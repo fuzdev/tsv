@@ -37,10 +37,10 @@ export interface Position {
 
 /**
  * Range with start/end positions: every object carrying numeric `start`/`end` gets one as
- * `loc` on the default wire — the line (1-based) and column (0-based, UTF-16 code units) of
- * those offsets, ECMAScript line terminators for a TypeScript document and LF alone for a
- * Svelte or CSS one. Optional, as in estree: the span-only wire (`locations: false`) omits
- * it. In the Svelte and CSS trees it is a superset of the canonical parsers' own wire, which
+ * `loc` when locations are requested (`{locations: true}`, `tsv parse --locations`) — the
+ * line (1-based) and column (0-based, UTF-16 code units) of those offsets, ECMAScript line
+ * terminators for a TypeScript document and LF alone for a Svelte or CSS one. Optional, as
+ * in estree: the default span-only wire omits it. In the Svelte and CSS trees it is a superset of the canonical parsers' own wire, which
  * carries `loc` on acorn-parsed nodes only.
  */
 export interface SourceLocation {

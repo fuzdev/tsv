@@ -134,6 +134,26 @@ for (const target of TARGETS) {
 				files: ['scripts/patch_npm_package.ts', 'scripts/npm_metadata.ts'],
 				rebuild
 			});
+			// The facade every entry imports is COPIED in, so its sources are the
+			// shared files — the half each variant ships.
+			freshness_checks.push({
+				label: `${variant}/npm facade`,
+				staged: repo_rel(`${wasm_bundle_dir(variant, 'npm')}/api.js`),
+				crates: [],
+				files: [
+					'crates/tsv_wasm/npm/api.js',
+					'crates/tsv_wasm/npm/api.d.ts',
+					...(variant === 'format'
+						? []
+						: [
+								'crates/tsv_wasm/npm/api_parse.js',
+								'crates/tsv_wasm/npm/api_parse.d.ts',
+								'crates/tsv_wasm/npm/locations.js',
+								'crates/tsv_wasm/npm/locations.d.ts'
+							])
+				],
+				rebuild
+			});
 		}
 	}
 }
@@ -159,10 +179,9 @@ const BOUNDS = {
 // convert path); `all − parse` is what the format feature adds (printers + doc
 // builder, dropped from the parse-only build at link time) — the gate-health
 // signal. A delta near zero means a feature gate broke. Read a delta as the
-// feature's weight MINUS whatever both variants share: `js-sys` is linked by both
-// (the format exports take an options bag), so `all − format` is the parse
-// feature net of that shared weight, not a clean readout of the parse feature
-// alone. A change that lands in code both variants link (a parser cut) moves the
+// feature's weight MINUS whatever both variants share (`js-sys` is linked by the
+// parse feature alone — the format exports read no options bag — so it counts in
+// `all − format`). A change that lands in code both variants link (a parser cut) moves the
 // bundles and leaves the deltas where they were; a delta that moves with the
 // bundles means a feature boundary shifted, not that code got smaller.
 //
@@ -239,8 +258,8 @@ interface SmokeTarget {
 	has_format: boolean;
 	has_parse: boolean;
 	/** The published npm package (patched by `patch_npm_package.ts`) vs the raw
-	 * wasm-pack deno bundle. The pure-JS `locations.js` helper is patched into the
-	 * npm packages only, so it's checked on npm entries alone. */
+	 * wasm-pack deno bundle. The facade and the pure-JS `locations.js` helper are
+	 * patched into the npm packages only, so they're checked on npm entries alone. */
 	is_npm: boolean;
 }
 
@@ -364,13 +383,14 @@ for (const { label, entry, has_format, has_parse, is_npm } of smoke_targets) {
 			() => (mod.parse_css('a { color: red }') as { type: string }).type === 'StyleSheetFile'
 		);
 	}
-	// The pure-JS `no-locations` reconstruction helper is patched into the npm
-	// packages only (the raw wasm-pack deno bundle doesn't carry it), so scope this
-	// to npm entries. Parse-side analog of IgnoreStack — Deno-runtime smoke that
-	// test_npm.ts (Node) can't give: reconstruct must mutate in place and add loc.
+	// The facade and the pure-JS reconstruction helper are patched into the npm
+	// packages only (the raw wasm-pack deno bundle carries neither), so scope this to
+	// npm entries. Parse-side analog of IgnoreStack — Deno-runtime smoke that
+	// test_npm.ts (Node) can't give: the default parse carries no `loc`, reconstruct
+	// mutates in place and adds one, and `{locations: true}` is that reconstruction.
 	if (is_npm) {
 		if (has_parse) {
-			check(label, 'reconstruct_locations', () => {
+			check(label, 'reconstruct_locations + {locations: true}', () => {
 				const reconstruct = (mod as Record<string, unknown>).reconstruct_locations as
 					((ast: unknown, source: string) => { loc?: unknown }) | undefined;
 				if (typeof reconstruct !== 'function') return false;
@@ -378,10 +398,13 @@ for (const { label, entry, has_format, has_parse, is_npm } of smoke_targets) {
 					source: string,
 					options?: { locations?: boolean }
 				) => { loc?: unknown };
-				const ast = parse('const x = 1;', { locations: false });
-				if (ast.loc) return false; // span-only wire must carry no loc
+				const ast = parse('const x = 1;');
+				if (ast.loc) return false; // the default wire is span-only
 				const out = reconstruct(ast, 'const x = 1;');
-				return out === ast && !!out.loc; // same reference (in-place) + loc added
+				if (out !== ast || !out.loc) return false; // same reference (in-place) + loc added
+				return (
+					JSON.stringify(parse('const x = 1;', { locations: true }).loc) === JSON.stringify(out.loc)
+				);
 			});
 		} else {
 			check(

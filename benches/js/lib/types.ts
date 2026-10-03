@@ -67,7 +67,7 @@ export type ParseGoal = 'script' | 'module';
  *
  * The goal is TypeScript's alone: all three tsv bindings REJECT a set goal on a
  * language that has none (`tsv_ffi`'s `ffi_source_type`, `tsv_napi`'s `napi_source_type`,
- * `tsv_wasm`'s `read_options`), rather than ignoring it — a caller must not be
+ * `tsv_wasm`'s `wasm_source_type`), rather than ignoring it — a caller must not be
  * able to believe it selected a goal that was silently dropped. So each wrapper
  * withholds it for svelte/css.
  *
@@ -178,14 +178,6 @@ export interface TsvImplementation {
 	 * `RESET_GROWTH_BYTES`).
 	 */
 	reset_heap?(): void;
-
-	/**
-	 * Parse source dropping per-node `loc` (the span-only `no-locations` wire) —
-	 * the closest-payload comparison against oxc-parser's span-only default AST,
-	 * which still runs larger (it writes out default-valued fields this omits).
-	 * Native/wasm only. The bench registers no CSS row for it (`implementations.ts`).
-	 */
-	parse_no_locations?(source: string, language: Language, goal?: ParseGoal): unknown;
 
 	/** Format source synchronously (native, wasm) */
 	format?(source: string, language: Language): string;

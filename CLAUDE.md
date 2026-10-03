@@ -126,7 +126,7 @@ Parser auto-detected from extension (the JS/TS family → TypeScript, `.svelte`,
 ```bash
 cargo run -p tsv_cli parse file.ts                                       # compact JSON
 cargo run -p tsv_cli parse file.ts --pretty                              # formatted JSON
-cargo run -p tsv_cli parse file.ts --no-locations                        # span-only wire (no per-node loc; ~46% smaller)
+cargo run -p tsv_cli parse file.ts --locations                           # add per-node loc (the Rust emitter; the default wire is span-only)
 cargo run -p tsv_cli parse --content '<div>x</div>' --parser svelte      # parse string (preferred for agents)
 cargo run -p tsv_cli parse --stdin --parser svelte                       # parse stdin (not preferred for agents)
 cargo run -p tsv_cli format file.svelte src/lib                          # format files/dirs in place
@@ -156,7 +156,7 @@ deno task typecheck:bench-core # the bench modules that are DELIBERATELY node-mo
 #                          transitive imports) or `test:deno`. NOT the maximal checkable set: the impl
 #                          wrappers qualify only because their npm imports are dynamic. See deno.json's `//` note
 deno task test           # cargo test
-deno task test:deno      # deno test over the node-modules-free deno tests: the bench harness's core (divergence detectors, format-config probe, the no-locations probe, gate_counts, the perf-omit summary, the Prettier-suite filter) + scripts/'s (`changelog_test.ts`, the changelog grammar publish.ts writes and release_notes.ts reads); gates in `check`
+deno task test:deno      # deno test over the node-modules-free deno tests: the bench harness's core (divergence detectors, format-config probe, the span-only wire probe, gate_counts, the perf-omit summary, the Prettier-suite filter, the loc tolerance rows, the NDJSON line reader) + scripts/'s (`changelog_test.ts`, the changelog grammar publish.ts writes and release_notes.ts reads; `npm_api_test.ts`, the npm packages' options facade over a fake engine); gates in `check`
 deno task test:audits    # cargo test -p tsv_lang --features audits — the `swallow_check` + `comment_check` seams' own tests (compiled out by default); gates in `check`
 deno task lint           # cargo clippy
 cargo fmt                # format Rust code
@@ -293,7 +293,7 @@ wasm-pack build crates/tsv_wasm --target deno --release --out-dir pkg/parse/deno
 npm is the package surface (the GitHub Release per tag carries only notes + the native CLI binaries npm already ships — see the N-API paragraph below). Three packages from the WASM crate, plus the N-API set below:
 
 - `@fuzdev/tsv-format-wasm` — format only (`--no-default-features --features format`)
-- `@fuzdev/tsv-parse-wasm` — parse only; bundles hand-maintained `tsv_ast.d.ts` (`crates/tsv_wasm/types/`) + the pure-JS `no-locations` line/column reconstruction helper (`crates/tsv_wasm/npm/locations.js` + `.d.ts`)
+- `@fuzdev/tsv-parse-wasm` — parse only; bundles hand-maintained `tsv_ast.d.ts` (`crates/tsv_wasm/types/`) + the pure-JS line/column reconstruction helper its `{locations: true}` runs (`crates/tsv_wasm/npm/locations.js` + `.d.ts`)
 - `@fuzdev/tsv-wasm` — full tool (both features); bundles the above and ships the `tsv` bin (`crates/tsv_wasm/npm/cli.js` — `format` + `parse` mirroring `tsv_cli`'s flags/exit codes; argv parsed by a transcription of argh's grammar, zero deps; path mode fans onto `node:worker_threads`, spawning itself as the worker and handing WASM workers the main thread's compiled module through the package's `./worker` entry — an explicit `--jobs N` is held to the native CLI's `4 × logical` ceiling (`clamp_worker_count`, restated by hand in `cli.js`), while both *defaults* are sized **per engine** and are smaller than the native CLI's: a JS pool's startup makes it worth waiting for a file-count threshold, and V8's own wasm tier-up has already claimed cores the pool would want, so the WASM copy peaks at half the physical cores where the N-API one peaks at the full count. Measured; see ./docs/cli.md §Binary Structure)
 
 **Naming.** Every npm name tsv publishes is kebab-case — `@fuzdev/tsv`, `@fuzdev/tsv-wasm`, `@fuzdev/tsv-format-wasm`, `@fuzdev/tsv-parse-wasm`, the `@fuzdev/tsv-<triple>` platform packages — one spelling with the `tsv-<triple>` release assets and the `fuzdev.tsv-format` VS Code extension (vsce forbids `_`). The Rust crates stay snake_case (`tsv_wasm`, `tsv_napi`), as does the rest of the `@fuzdev` npm scope's libraries; tsv ships beside Rust-tooling peers whose WASM editions all spell `-wasm`, so its shipped names follow that convention — the rule every `@fuzdev` WASM or native-delivery package follows (`@fuzdev/blake3-wasm` too). The crate-derived file names inside a package (`tsv_wasm.js`, `tsv_wasm_bg.wasm`, `tsv_napi.node`) are internal and follow the crate.
@@ -306,7 +306,7 @@ A types-only `@fuzdev/tsv-ast` package is deferred — `import type` from `@fuzd
 
 Version source of truth: `Cargo.toml` `[workspace.package] version` (read directly by `wasm-pack`). No root package.json, no changesets; all published packages move together.
 
-Package shape: wasm-pack `web` target, then `scripts/patch_npm_package.ts` adds a Node/Bun entry (sync auto-init), a browser entry (guarded `await init()`), `index.d.ts`, conditional `exports`, npm metadata, and the variant README. The export list is extracted from the generated JS, so new `lang_bindings!` languages flow through automatically.
+Package shape: wasm-pack `web` target, then `scripts/patch_npm_package.ts` adds a Node/Bun entry (sync auto-init), a browser entry (guarded `await init()`), `index.d.ts`, conditional `exports`, npm metadata, and the variant README. Every entry publishes through one hand-written facade shared with the native `@fuzdev/tsv` (`crates/tsv_wasm/npm/api.js` + `api_parse.js`: the `(source, options?)` bags, their errors, and `{locations: true}` over the span-only wire — ./crates/tsv_wasm/CLAUDE.md §The npm Facade). The export list is extracted from the generated JS, so new `lang_bindings!` languages flow through automatically.
 
 `scripts/publish.ts` orchestrates the release end to end (preflight → bump → check → conformance:all → audit:corpus (Step 3c) → build npm packages + deno bundles → verify → artifact validation: size bounds + Deno smoke + Node tests → idempotent npm publish → git commit + tag + push), printing a wasm size summary. It stamps CHANGELOG.md's `## Unreleased` section into the released version (the section the tag's GitHub Release then reads back as its body) — that section must be non-empty and carry a `<!-- bump: <level> -->` marker matching `--bump` (required in both places; a fresh empty `## Unreleased` is seeded on stamp; the grammar both sides share is `scripts/changelog.ts`). Agents don't touch `CHANGELOG.md` (see [Releases](#releases)). A failed wetrun is resumable at **every** step, the git finalize included — the retry sentinel is removed only once the push lands, so a rejected push (or a failed commit/tag) re-runs with `--wetrun` and no `--bump`, publishes nothing twice, and finishes the tag.
 
@@ -430,7 +430,7 @@ BENCH_FILTER=zzz BENCH_LIMIT=10 deno task bench:deno:run
 
 **Prerequisites**: `cargo install wasm-pack` + `deno task bench:install` once (the install needs npm/Node). Beyond that **Deno is the only hard dependency**; Node ≥ 22.18 (native TS type-stripping) for `bench:node`, Bun for `bench:bun` — the aggregate `bench` needs both and fails fast if either is missing (`bench:runtimes` preflights `bench:perf`; without it the miss surfaces ~8 minutes in, after two of the three siblings are regenerated and `bench:compose` is skipped). Its node arm probes `globalThis.Deno` rather than resolving the name — `deno task` puts a `node`→deno compat shim on PATH, which would otherwise pass the check and then run the harness AS Deno.
 
-Compares: canonical (prettier + svelte/compiler), native (FFI under Deno / N-API under Node+Bun), WASM, and alternatives (oxc-parser — an N-API row plus a separate wasm32-wasi row — oxfmt, biome-wasm, dprint-wasm — the engine `deno fmt` runs, TS/JS only — malva-wasm, dprint's CSS plugin over the same formatter host (CSS only, enforced by the plugin), `tsc` itself, parse-only and conformance-surface-only (the language's definition, not a peer: its parser is error-recovering, so an accept there means zero `parseDiagnostics`), yuku-parser, a Zig TS/JS parser shipped as both an N-API and a WASM binding, parse-only and payload-matched to oxc; its lazy `parse()` and error-tolerant parser are corrected for in `benches/js/lib/yuku.ts`, swc, parse-only over TS/JS on both surfaces (its own AST dialect, so oxc-class payload disclosure; `decorators` must be enabled explicitly and its goal axis is `isModule`), postcss, parse-only over CSS — the parser behind prettier's CSS printer, and the only kind available there since no Rust CSS parser exposes an AST to JS — and rsvelte's Svelte **parser** via its N-API addon, two rows on `parse/svelte` (plain, mechanism- *and* payload-matched to `tsv-json`, plus a `skipExpressionLoc` variant named for its option because that reduction is not tsv's), the first third-party engine on a surface that otherwise holds only the oracle and tsv itself). `rsvelte-fmt` (Svelte only) is a **coverage-only** row — an accept rate with no timing, since it ships no in-process API and a per-file subprocess row would rank process spawn rather than format work; its end-to-end CLI numbers live in the separate hyperfine comparison published on tsv.fuz.dev. See ./docs/benchmarks.md §Coverage-only rows. Results: `benches/js/results/report.<runtime>.{json,md}` (committed; every row carries a `runtime` field) + the combined `report.{json,md}`. To publish to tsv.fuz.dev: `npm run update-benchmarks` in ../tsv.fuz.dev. See ./benches/js/CLAUDE.md.
+Compares: canonical (prettier + svelte/compiler), native (FFI under Deno / N-API under Node+Bun), WASM, and alternatives (oxc-parser — an N-API row plus a separate wasm32-wasi row — oxfmt, biome-wasm, dprint-wasm — the engine `deno fmt` runs, TS/JS only — malva-wasm, dprint's CSS plugin over the same formatter host (CSS only, enforced by the plugin), `tsc` itself, parse-only and conformance-surface-only (the language's definition, not a peer: its parser is error-recovering, so an accept there means zero `parseDiagnostics`), yuku-parser, a Zig TS/JS parser shipped as both an N-API and a WASM binding, parse-only and payload-matched to oxc; its lazy `parse()` and error-tolerant parser are corrected for in `benches/js/lib/yuku.ts`, swc, parse-only over TS/JS on both surfaces (its own AST dialect, so oxc-class payload disclosure; `decorators` must be enabled explicitly and its goal axis is `isModule`), postcss, parse-only over CSS — the parser behind prettier's CSS printer, and the only kind available there since no Rust CSS parser exposes an AST to JS — and rsvelte's Svelte **parser** via its N-API addon, two rows on `parse/svelte` (plain — mechanism-matched to tsv's span row, its payload Svelte's own sparse-`loc` wire — plus a `skipExpressionLoc` variant named for its option because that reduction is not tsv's), the first third-party engine on a surface that otherwise holds only the oracle and tsv itself). `rsvelte-fmt` (Svelte only) is a **coverage-only** row — an accept rate with no timing, since it ships no in-process API and a per-file subprocess row would rank process spawn rather than format work; its end-to-end CLI numbers live in the separate hyperfine comparison published on tsv.fuz.dev. See ./docs/benchmarks.md §Coverage-only rows. Results: `benches/js/results/report.<runtime>.{json,md}` (committed; every row carries a `runtime` field) + the combined `report.{json,md}`. To publish to tsv.fuz.dev: `npm run update-benchmarks` in ../tsv.fuz.dev. See ./benches/js/CLAUDE.md.
 
 ### Performance Profiling
 
@@ -439,7 +439,7 @@ cargo run --release -p tsv_debug -- profile ../corpora/collections/zzz/src/lib  
 cargo run --release -p tsv_debug -- profile file.ts --iterations 20  # more iterations
 # Also: --json (machine-readable)
 
-cargo run --release -p tsv_debug -- json_profile ../corpora/collections/zzz/src/lib   # parse vs wire-JSON write timing
+cargo run --release -p tsv_debug -- json_profile ../corpora/collections/zzz/src/lib   # parse vs wire-JSON write timing (--locations: the loc emitter)
 
 cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile  # Svelte compile vs the format wall
 ```
@@ -765,6 +765,9 @@ cargo run -p tsv_debug conformance_audit
 # loc_wires - both parse wires (loc + span-only) of every fixture input (at its `goal`) and every
 # `expected_<stem>.json` variant, streamed as NDJSON `{path, language, source, loc, span}` — the
 # Rust half of `deno task check:loc` (scripts/check_loc.ts reconstructs and compares). Pure Rust.
+# --stdin answers NDJSON requests `{language, goal?, source}` with the loc wire (or a parse error,
+# or a caught panic) — how `corpus:compare:parse`'s loc arm reaches the loc-bearing wire, which no
+# binding ships (benches/js/lib/loc_wire_client.ts)
 cargo run -p tsv_debug loc_wires [root]
 
 # compile_conformance_audit - the compiler analog, deliberately minimal: _compiled_divergence
@@ -824,7 +827,7 @@ deno task conformance:tsc-check:update  # re-pin the run's snapshot counts after
 ```bash
 cargo run -p tsv_debug profile ../corpora/collections/zzz/src/lib                    # parse vs format phase timing (--iterations, --json, --flow-stats)
 cargo run -p tsv_debug profile --bind ../corpora/collections/zzz/src                 # parse vs lower+bind timing (TS-only) + peak RSS (§1)
-cargo run --release -p tsv_debug -- json_profile ../corpora/collections/zzz/src/lib  # FFI parse path: parse vs the wire-JSON write (§2)
+cargo run --release -p tsv_debug -- json_profile ../corpora/collections/zzz/src/lib  # the bindings' parse path: parse vs the span-only wire write (§2)
 cargo run -p tsv_debug buffer_sizes ../corpora/collections/zzz/src ../corpora/collections/gro/src     # printer SmallVec sizing histograms (§8)
 cargo run -p tsv_debug arena_stats ../corpora/collections/zzz/src/lib                # DocArena node-population + memory audit (§7; --reuse, --list-errors)
 cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile  # Svelte compile against the format wall (§9)
@@ -896,7 +899,7 @@ strip the BOM before parsing (`remove_bom`), so the Svelte and CSS writers build
 `Elided` and every offset indexes the BOM-less string (one UTF-16 unit below the file's, a
 line-1 column one lower, the acorn islands included — Svelte hands acorn the stripped
 string); acorn counts it as whitespace, so the TypeScript writer builds `Counted` and keeps
-file coordinates. The `no-locations` JS helper makes the same split. Pinned by the three
+file coordinates. The JS reconstruction helper (`locations.js`) makes the same split. Pinned by the three
 `bom_prettier_divergence` fixtures' `expected_prettier_variant_bom.json`, the variant pin
 (no `input.*` can carry a BOM with nothing load-bearing behind it: the format side strips
 it, so it is never its own fixed point; a BOM ahead of a content U+FEFF is written back, so

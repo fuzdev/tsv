@@ -670,7 +670,7 @@ const SURFACE_DISCLOSURES: ReadonlyArray<SurfaceDisclosure> = [
 			'corpus.\n'
 	},
 	// The two `+reconstruct` rows, one entry each because the claim is checked per row:
-	// consumer-cost rows whose parse IS the no-locations row's, so on a coverage surface
+	// consumer-cost rows whose parse IS the span-only row's, so on a coverage surface
 	// they would add nothing but a duplicate of that row's coverage.
 	{
 		row: 'tsv-json-no-locations+reconstruct',
@@ -831,7 +831,12 @@ if (uncompared_rows.length > 0) {
 // only as "unknown" — and an `Nx` it renders from that row then carries no word on
 // whether the two products match.
 const untiered_rows = rows_missing_from_payload_tiers(
-	get_defined_rows(impls, ['parse'], TASK_OPTIONS).map((r) => r.name)
+	LANGUAGES.flatMap((language) =>
+		get_benchmark_tasks(impls.complete, 'parse', language, TASK_OPTIONS).map((task) => ({
+			name: task.name,
+			language
+		}))
+	)
 );
 if (untiered_rows.length > 0) {
 	log(
@@ -846,7 +851,7 @@ if (untiered_rows.length > 0) {
 //
 
 //
-// Per-impl tracking maps (keyed by tracking_key, e.g. `parse/svelte/native`).
+// Per-impl tracking maps (keyed by tracking_key, e.g. `parse/svelte/native-no-locations`).
 //
 // Populated by the **untimed pre-flight pass** before each group's timed
 // bench run. The pre-flight records each impl's success/skip set; the timed
@@ -1175,7 +1180,7 @@ async function enforce_css_reject_pin(full_corpus: boolean): Promise<void> {
  * A NATIVE tsv row — `tsv` and its `tsv-<variant>` rows — as opposed to the
  * `tsv-wasm` family, which shares the `tsv-` prefix since the WASM package took its
  * kebab-case name. The wasm rows are the SIBLINGS these predicates derive, never a
- * base: the prefix test alone would pair `tsv-wasm-json` with a `tsv-wasm-wasm-json`
+ * base: the prefix test alone would pair `tsv-wasm-internal` with a `tsv-wasm-wasm-internal`
  * that no row defines.
  */
 const is_native_tsv_row = (name: string): boolean =>
@@ -2376,12 +2381,13 @@ interface BaselineEntry {
 	 */
 	files_iterated: number | null;
 	/**
-	 * What a PARSE row hands JS (`report.ts` `PayloadTier`) — a ratio between two
-	 * parse rows is payload-matched iff these are equal and not `own_shape`. `null`
-	 * on every format row (the product is a string either way) and on a parse row
-	 * the tier table does not list, which the run warns about at init.
+	 * What a PARSE row hands JS in its group's language (`report.ts` `PayloadTier`) —
+	 * a ratio between two rows of one parse group is payload-matched iff these are equal
+	 * and not `own_shape`. `null` on every format row (the product is a string either
+	 * way) and on a parse row the tier table does not list in that language, which the
+	 * run warns about at init.
 	 *
-	 * Since `version` 16.
+	 * Since `version` 16; per language, with `drop_in_superset`, since 20.
 	 */
 	payload: PayloadTier | null;
 	/**
@@ -2464,8 +2470,14 @@ interface BaselineVersions extends ReportVersions {
  * conformance surface only, absent when the retry added none), and conformance
  * reports gain `exclusion_caches` — each exclusion cache the view applied, by label,
  * its size or `null` when absent.
+ *
+ * 20: `payload` is keyed on the row IN ITS GROUP'S LANGUAGE and gains
+ * `drop_in_superset`: the CSS oracle row reads `span_only` (`parseCss` emits no `loc`),
+ * and the `+reconstruct` rows read `drop_in_superset` on Svelte and CSS, where their
+ * `loc` on every positioned object is a superset of the oracle's. A consumer that
+ * matched 19's tiers by row name alone called both pairs matched.
  */
-const REPORT_SCHEMA_VERSION = 19;
+const REPORT_SCHEMA_VERSION = 20;
 
 interface Baseline {
 	/** See `REPORT_SCHEMA_VERSION`. */
@@ -2680,9 +2692,13 @@ const NULL_STATS = {
 	settled_heap_bytes: null
 } as const;
 
-/** `BaselineEntry.payload` for a row: parse groups only — see the field. */
+/**
+ * `BaselineEntry.payload` for a row: parse groups only — see the field. The group
+ * names the language, which the tier is keyed on as much as the row (`PayloadTier`).
+ */
 function row_payload(group_name: string, row_name: string): PayloadTier | null {
-	return group_name.startsWith('parse/') ? parse_payload_tier(row_name) : null;
+	const [operation, language] = group_name.split('/') as [string, Language];
+	return operation === 'parse' ? parse_payload_tier(row_name, language) : null;
 }
 
 /**
@@ -3051,8 +3067,8 @@ function generate_markdown_report(data: Baseline, groups: GroupResults[]): strin
 			lines.push(comparison_markdown);
 			lines.push('');
 		}
-		// Consumer-side span-only + reconstruct note, computed from this run's rows and
-		// sitting with the parse comparison since it's about the `no-locations` wire.
+		// Consumer-side `{locations: true}` cost note, computed from this run's rows and
+		// sitting with the parse comparison since it's about the span-only wire.
 		const reconstruct_note = generate_reconstruct_note(groups);
 		if (reconstruct_note) lines.push(reconstruct_note, '');
 	}

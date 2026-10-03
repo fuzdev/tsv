@@ -488,7 +488,7 @@ pub fn convert_ast_json_bytes(program: &Program<'_>, source: &str) -> Vec<u8> {
 /// has the source loses nothing — line/column is derived lazily. Dropping it
 /// removes ~46% of the wire and ~61% of the downstream `JSON.parse` cost (three
 /// nested objects per node), and lets emission skip the line table entirely —
-/// mirroring acorn's own `locations: false`.
+/// mirroring acorn's own `locations: false`. The wire every binding emits.
 #[cfg(feature = "convert")]
 pub fn convert_ast_json_bytes_no_locations(program: &Program<'_>, source: &str) -> Vec<u8> {
     convert_ast_json_bytes_variant(program, source, false)

@@ -2,7 +2,8 @@
  * Stage the publishable N-API npm packages into `crates/tsv_napi/pkg/`:
  *
  * - `pkg/napi/` — the `@fuzdev/tsv` loader, ESM like the wasm packages (index.js + index.d.ts +
- *   platform.js (triple detection) + tsv_ast.d.ts + the shared `locations.js`/`.d.ts` helper + the shared
+ *   platform.js (triple detection) + tsv_ast.d.ts + the shared facade (`api.js` / `api_parse.js`
+ *   + their `.d.ts`) + the shared `locations.js`/`.d.ts` helper + the shared
  *   `cli.js` + the `bin.js` dispatcher wired as the `tsv` bin + README +
  *   LICENSE + generated package.json with the exact-pinned platform
  *   `optionalDependencies`).
@@ -109,6 +110,12 @@ for (const [from, to] of [
 	['crates/tsv_napi/npm/bin.js', 'bin.js'],
 	['crates/tsv_napi/npm/README.md', 'README.md'],
 	['crates/tsv_wasm/types/tsv_ast.d.ts', 'tsv_ast.d.ts'],
+	// the shared facade every tsv package exports through — one options reader and
+	// one set of error texts with the wasm packages; `index.js` imports both halves
+	['crates/tsv_wasm/npm/api.js', 'api.js'],
+	['crates/tsv_wasm/npm/api.d.ts', 'api.d.ts'],
+	['crates/tsv_wasm/npm/api_parse.js', 'api_parse.js'],
+	['crates/tsv_wasm/npm/api_parse.d.ts', 'api_parse.d.ts'],
 	['crates/tsv_wasm/npm/locations.js', 'locations.js'],
 	['crates/tsv_wasm/npm/locations.d.ts', 'locations.d.ts'],
 	// the JS CLI — imports its engine from `./index.js`, so the same source
@@ -120,8 +127,8 @@ for (const [from, to] of [
 	Deno.copyFileSync(from, `${loader_dir}/${to}`);
 }
 
-// The `no-locations` reconstruction helpers are pure JS over the span-only
-// wire — no wasm, no addon — so the wasm packages' copy ships here verbatim,
+// The reconstruction helpers are pure JS over the span-only wire — no wasm, no
+// addon — so the wasm packages' copy ships here verbatim,
 // which is what the ESM loader bought. The re-export is APPENDED to the staged
 // entry rather than written into `npm/index.js`: the source tree has no
 // sibling `locations.js`, and an import that resolves only after staging is a
@@ -172,6 +179,10 @@ write_pkg(loader_dir, {
 		'index.d.ts',
 		'platform.js',
 		'bin.js',
+		'api.js',
+		'api.d.ts',
+		'api_parse.js',
+		'api_parse.d.ts',
 		'locations.js',
 		'locations.d.ts',
 		'tsv_ast.d.ts',

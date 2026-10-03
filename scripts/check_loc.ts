@@ -32,6 +32,7 @@
  */
 
 import { type LocLanguage, loc_definition_violation } from '../benches/js/lib/loc_cross_grade.ts';
+import { lines_of } from '../benches/js/lib/text_lines.ts';
 
 const TSV_DEBUG = 'target/corpus/tsv_debug';
 const DEFAULT_ROOT = 'tests/fixtures';
@@ -71,21 +72,6 @@ function fixture_relative(path: string): string {
 	const marker = `${DEFAULT_ROOT}/`;
 	const at = path.lastIndexOf(marker);
 	return at === -1 ? path.replace(/^\.\//, '') : path.slice(at + marker.length);
-}
-
-/** Yield each line of a byte stream, decoded. */
-async function* lines_of(stream: ReadableStream<Uint8Array>): AsyncGenerator<string> {
-	let pending = '';
-	for await (const chunk of stream.pipeThrough(new TextDecoderStream())) {
-		pending += chunk;
-		let newline = pending.indexOf('\n');
-		while (newline !== -1) {
-			yield pending.slice(0, newline);
-			pending = pending.slice(newline + 1);
-			newline = pending.indexOf('\n');
-		}
-	}
-	if (pending !== '') yield pending;
 }
 
 /**

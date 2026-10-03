@@ -58,8 +58,11 @@ function create_bar(value: number, max: number, width = 40): string {
  * partner lookup was the fragile one — it chose the json row by testing the
  * internal row's NAME for `wasm`, so the correctness of every rendered overhead
  * ratio rested on no other internal row ever containing that substring. A third
- * tier would have paired silently to `tsv-json` and rendered a wrong number, with
- * nothing in the output looking off.
+ * tier would have paired silently to the native row and rendered a wrong number,
+ * with nothing in the output looking off.
+ *
+ * The materializing half is each binding's span-only row — the one parse wire the
+ * bindings ship — so the ratio is what turning the parse into JS objects costs.
  *
  * tsv-only by ARGUMENT, not for lack of looking: no alternative parser has a
  * comparably cheap parse-only mode — oxc's JS API always serializes to cross into
@@ -68,8 +71,8 @@ function create_bar(value: number, max: number, width = 40): string {
  * returns (see `yuku.ts`) — so neither yields a pair that belongs here.
  */
 const INTERNAL_PARSE_PAIRS: ReadonlyArray<readonly [internal: string, json: string]> = [
-	['tsv-internal', 'tsv-json'],
-	['tsv-wasm-internal', 'tsv-wasm-json']
+	['tsv-internal', 'tsv-json-no-locations'],
+	['tsv-wasm-internal', 'tsv-wasm-json-no-locations']
 ];
 
 /** The `-internal` half of `INTERNAL_PARSE_PAIRS` — the rows a group table shows separately. */
@@ -99,10 +102,8 @@ const DISPLAY_ORDER = [
 	...new Set(Object.values(CANONICAL_PARSER_ROWS)),
 	CANONICAL_FORMATTER_ROW,
 	// tsv variants
-	'tsv-json',
 	'tsv-json-no-locations',
 	'tsv-json-no-locations+reconstruct',
-	'tsv-wasm-json',
 	'tsv-wasm-json-no-locations',
 	'tsv-wasm-json-no-locations+reconstruct',
 	'tsv',
@@ -163,40 +164,66 @@ export function rows_missing_from_display_order(names: Iterable<string>): string
 /**
  * What a PARSE row hands JS — the axis a throughput ratio between two parse rows
  * silently integrates, since most of a `-json` row's time is materializing the
- * product (benches/js/CLAUDE.md §Known Issues).
+ * product (benches/js/CLAUDE.md §Known Issues). A tier belongs to a row IN A LANGUAGE:
+ * one row name can carry different products in different groups (`svelte/compiler` is
+ * both Svelte's oracle, which emits `loc`, and CSS's, whose `parseCss` emits none).
  *
- * - `drop_in` — the canonical parser's own AST shape (loc-bearing for TS and Svelte;
- *   `parseCss` emits no `loc`). The oracle rows, tsv's `-json` wires, and
- *   `rsvelte-parse`, measured within ~1.5% of tsv's bytes. The `+reconstruct` rows too:
- *   the span-only wire with `loc` rebuilt in JS, which is the tree tsv's own loc-bearing
- *   wire carries — one `loc` definition, implemented by the Rust writer and by
- *   `crates/tsv_wasm/npm/locations.js` — so acorn-exact on TypeScript, and on Svelte the
- *   same superset of Svelte's own `loc` that `tsv-json` is (every positioned object gains
- *   one, where Svelte gives one only to acorn-parsed nodes).
- * - `span_only` — `start`/`end` and no per-node `loc`: tsv's `no-locations` wires,
- *   and oxc's and yuku's default ASTs.
+ * - `drop_in` — the canonical parser's own AST shape with its own `loc`: the TypeScript
+ *   and Svelte oracle rows, `rsvelte-parse` (Svelte's own wire), and on TypeScript the
+ *   `+reconstruct` rows — tsv's span-only wire with `loc` rebuilt in JS, what
+ *   `{locations: true}` returns and the tree `tsv parse --locations` writes (one `loc`
+ *   definition, implemented by the Rust writer and by
+ *   `crates/tsv_wasm/npm/locations.js`), acorn-exact there.
+ * - `drop_in_superset` — the canonical shape with a `loc` on EVERY positioned object,
+ *   a superset of the oracle's: the `+reconstruct` rows on Svelte (where Svelte gives
+ *   a `loc` only to acorn-parsed nodes, plus `name_loc`) and on CSS (where `parseCss`
+ *   gives none). Matched to no oracle row — the extra `loc` sits on tsv's side.
+ * - `span_only` — `start`/`end` and no per-node `loc`: tsv's wire, the one every binding
+ *   ships, oxc's and yuku's default ASTs, and the CSS oracle (`parseCss` emits no `loc`,
+ *   so on CSS the span row and the oracle carry the same kind of tree).
  * - `own_shape` — a product that is neither: its own AST dialect (swc, postcss,
  *   tsc's `SourceFile`) or its own reduction (rsvelte's `skipExpressionLoc`).
  * - `none` — parse-only, nothing materialized in JS (`tsv-internal`).
  *
- * A ratio between two rows is PAYLOAD-MATCHED iff their tiers are equal and not
- * `own_shape`. The report's prose already argues each pairing; this is that
+ * A ratio between two rows of one group is PAYLOAD-MATCHED iff their tiers are equal
+ * and not `own_shape`. The report's prose already argues each pairing; this is that
  * argument as data, so a consumer rendering an `Nx` from `report.json` can say when
  * the two products differ instead of needing the docs to.
  */
-export type PayloadTier = 'drop_in' | 'span_only' | 'own_shape' | 'none';
+export type PayloadTier = 'drop_in' | 'drop_in_superset' | 'span_only' | 'own_shape' | 'none';
 
-const PARSE_PAYLOAD_TIERS: Readonly<Record<string, PayloadTier>> = {
-	...Object.fromEntries(Object.values(CANONICAL_PARSER_ROWS).map((row) => [row, 'drop_in'])),
-	'tsv-json': 'drop_in',
-	'tsv-wasm-json': 'drop_in',
+/**
+ * A row's tier: one `PayloadTier` for a row whose product does not depend on the
+ * language, or one per language it carries a different product in — a language such a
+ * map leaves out is an untiered (row, language) pair.
+ */
+type RowPayloadTier = PayloadTier | Readonly<Partial<Record<Language, PayloadTier>>>;
+
+/** The oracle rows' tiers, per language: `parseCss` emits no `loc`, the other two do. */
+function canonical_parse_tiers(): Record<string, Partial<Record<Language, PayloadTier>>> {
+	const tiers: Record<string, Partial<Record<Language, PayloadTier>>> = {};
+	for (const [language, row] of Object.entries(CANONICAL_PARSER_ROWS) as Array<
+		[Language, string]
+	>) {
+		(tiers[row] ??= {})[language] = language === 'css' ? 'span_only' : 'drop_in';
+	}
+	return tiers;
+}
+
+/** `loc` rebuilt in JS on every node — what `{locations: true}` returns. */
+const RECONSTRUCT_TIERS: RowPayloadTier = {
+	typescript: 'drop_in',
+	svelte: 'drop_in_superset',
+	css: 'drop_in_superset'
+};
+
+const PARSE_PAYLOAD_TIERS: Readonly<Record<string, RowPayloadTier>> = {
+	...canonical_parse_tiers(),
 	'rsvelte-parse': 'drop_in',
 	'tsv-json-no-locations': 'span_only',
 	'tsv-wasm-json-no-locations': 'span_only',
-	// `loc` rebuilt in JS on every node — the tree `tsv-json` itself carries (one `loc`
-	// definition, two implementations), so the drop-in tier wherever `tsv-json` is
-	'tsv-json-no-locations+reconstruct': 'drop_in',
-	'tsv-wasm-json-no-locations+reconstruct': 'drop_in',
+	'tsv-json-no-locations+reconstruct': RECONSTRUCT_TIERS,
+	'tsv-wasm-json-no-locations+reconstruct': RECONSTRUCT_TIERS,
 	'oxc-parser': 'span_only',
 	'oxc-parser-wasm': 'span_only',
 	'yuku-parser': 'span_only',
@@ -209,20 +236,34 @@ const PARSE_PAYLOAD_TIERS: Readonly<Record<string, PayloadTier>> = {
 	'tsv-wasm-internal': 'none'
 };
 
-/** A parse row's `PayloadTier`, or `null` for a row the table does not list. */
-export function parse_payload_tier(name: string): PayloadTier | null {
-	return PARSE_PAYLOAD_TIERS[name] ?? null;
+/**
+ * A parse row's `PayloadTier` in `language`, or `null` for a (row, language) pair the
+ * table does not list.
+ */
+export function parse_payload_tier(name: string, language: Language): PayloadTier | null {
+	const tier = PARSE_PAYLOAD_TIERS[name];
+	if (tier === undefined) return null;
+	return typeof tier === 'string' ? tier : (tier[language] ?? null);
+}
+
+/** One parse row in one language's group — the unit a payload tier is keyed on. */
+export interface ParseRowInLanguage {
+	name: string;
+	language: Language;
 }
 
 /**
- * The PARSE rows in `names` with no `PARSE_PAYLOAD_TIERS` entry — each would
- * publish `payload: null`, which a consumer can only read as "unknown".
+ * The parse rows in `rows` with no `PARSE_PAYLOAD_TIERS` tier in their language, as
+ * `name (language)` — each would publish `payload: null`, which a consumer can only
+ * read as "unknown".
  *
  * The third registry-checked list in this module, on `DISPLAY_ORDER`'s terms: asked
  * of the rows a surface DEFINES, one direction only, and a warning at the call site.
  */
-export function rows_missing_from_payload_tiers(parse_names: Iterable<string>): string[] {
-	return [...parse_names].filter((name) => !(name in PARSE_PAYLOAD_TIERS));
+export function rows_missing_from_payload_tiers(rows: Iterable<ParseRowInLanguage>): string[] {
+	return [...rows]
+		.filter(({ name, language }) => parse_payload_tier(name, language) === null)
+		.map(({ name, language }) => `${name} (${language})`);
 }
 
 /** Sort results by stable display order */
@@ -274,11 +315,11 @@ export function generate_summary_report(
 		return `(${ratio.toFixed(2)}x)`;
 	}
 
-	// Parse performance comparison. The `*-json-no-locations` rows render as
-	// ordinary bars; a curated "no-locations vs oxc" line is appended per language
-	// (see below) — that's the closest-payload comparison (same span-only shape,
-	// though oxc and yuku write out default-valued fields tsv omits, ~1.3x the bytes),
-	// where plain `tsv-json` carries the richer loc-bearing drop-in AST.
+	// Parse performance comparison. Every row renders as an ordinary bar against the
+	// canonical baseline; curated payload-matched lines are appended per language (see
+	// below) — tsv's span-only wire against oxc and yuku (the same span-only shape,
+	// though theirs write out default-valued fields tsv omits, ~1.3x the bytes), and
+	// its `+reconstruct` rows against the canonical parser, whose AST carries `loc`.
 	lines.push('');
 	lines.push('Parse Performance:');
 	for (const lang of languages) {
@@ -343,31 +384,40 @@ export function generate_summary_report(
 		// `swc` and `postcss` were, and are absent on purpose (docs/benchmarks.md
 		// §Fairness caveats states why for each).
 		//
-		// - The span-only pairs: tsv's `no-locations` wire against the span-only
-		//   default ASTs oxc and yuku emit (plain `tsv-json` carries the richer
-		//   loc-bearing drop-in AST both omit; yuku pads
-		//   `decorators`/`typeAnnotation`/`optional` exactly as oxc does, so the two
-		//   opponents are payload-matched to each other too). TS/JS only — neither
-		//   parses svelte or css.
-		// - The Svelte pair: rsvelte's parser is the only third-party engine there,
-		//   and it matches `tsv-json` on BOTH axes — mechanism (each returns a compact
-		//   JSON string the caller parses, so both pay the identical serialize +
-		//   boundary + JSON.parse cost) and payload (-0.13% of tsv's bytes ACROSS THE
-		//   CORPUS — the axis a throughput ratio integrates over; per component p50
-		//   1.000, p90 1.000, worst 7% under and 0.7% over, so the aggregate is the
-		//   claim. Measured over the 951-file Svelte perf corpus at
-		//   @rsvelte/vite-plugin-svelte-native 0.3.14 with `modern: true`; re-measure
-		//   on an rsvelte pin bump).
-		//   Deliberately NOT paired with the no-locations rows:
-		//   `skipExpressionLoc` is a different reduction from tsv's span-only wire
-		//   (see lib/rsvelte_parse.ts), which is also why that row is named for its
-		//   option rather than for tsv's.
+		// - The span-only pairs: tsv's span-only wire against the span-only default
+		//   ASTs oxc and yuku emit (yuku pads `decorators`/`typeAnnotation`/`optional`
+		//   exactly as oxc does, so the two opponents are payload-matched to each other
+		//   too). TS/JS only — neither parses svelte or css.
+		// - The canonical pairs: the `+reconstruct` rows — the span-only wire plus `loc`
+		//   rebuilt in JS, what `{locations: true}` returns — against the canonical
+		//   parser, whose AST carries `loc` (acorn under Svelte's `locations: true`
+		//   configuration). Exact on TypeScript; on Svelte the reconstruct is a superset
+		//   (a `loc` on every positioned object, where Svelte gives one only to
+		//   acorn-parsed nodes), as its note says. No CSS line: `parseCss` emits no `loc`,
+		//   so on CSS the payload-matched canonical read is the span row's own bar.
+		// - No Svelte third-party pair: rsvelte's parser emits Svelte's own wire (`loc`
+		//   on acorn-parsed nodes plus `name_loc`), which matches neither the span row
+		//   (no `loc` at all) nor the `+reconstruct` row (`loc` on every node). Its
+		//   `skipExpressionLoc` variant is a different reduction from tsv's span-only
+		//   wire too (see lib/rsvelte_parse.ts), which is also why that row is named
+		//   for its option rather than for tsv's.
+		const canonical_note =
+			lang === 'typescript'
+				? '`loc` on every node both sides, acorn-exact'
+				: "`loc` on every positioned object, a superset of Svelte's";
+		const canonical_pairs =
+			lang === 'css'
+				? []
+				: ([
+						['tsv-json-no-locations+reconstruct', canonical_name, canonical_note],
+						['tsv-wasm-json-no-locations+reconstruct', canonical_name, canonical_note]
+					] as const);
 		for (const [ours, opponent, note] of [
 			['tsv-json-no-locations', 'oxc-parser', 'span-only, theirs larger'],
 			['tsv-json-no-locations', 'yuku-parser', 'span-only, theirs larger'],
 			['tsv-wasm-json-no-locations', 'oxc-parser-wasm', 'span-only, theirs larger'],
 			['tsv-wasm-json-no-locations', 'yuku-parser-wasm', 'span-only, theirs larger'],
-			['tsv-json', 'rsvelte-parse', 'mechanism- and payload-matched, full AST']
+			...canonical_pairs
 		] as const) {
 			const ours_result = results.find((r) => r.name === ours);
 			const opponent_result = results.find((r) => r.name === opponent);
@@ -748,11 +798,11 @@ const OXFMT_NOTE: FairnessNote = {
 const OXC_NOTE: FairnessNote = {
 	terminal: [
 		'  (oxc-parser — native and wasm — serializes the AST to JSON in Rust and deserializes',
-		'   in JS, the same eager materialization as tsv-json — mechanism-matched; its payload is',
-		'   span-only, so the payload-matched read is the no-locations line, not this cell)'
+		'   in JS, the same eager materialization as tsv’s span rows; both ASTs are span-only,',
+		'   though oxc’s writes out default-valued fields tsv omits, so its tree is the larger)'
 	],
 	markdown:
-		'oxc-parser (native and wasm) serializes the AST to JSON in Rust and deserializes it in JS — the same eager materialization as tsv-json/tsv-wasm-json, so these parse rows are mechanism-matched; the payload is not: oxc’s default AST is span-only (`start`/`end`, no per-node `loc`, and no option to add one) where `tsv-json` carries the loc-bearing drop-in AST, so the payload-matched read is the `no-locations` line under each parse group'
+		'oxc-parser (native and wasm) serializes the AST to JSON in Rust and deserializes it in JS — the same eager materialization as tsv-json-no-locations/tsv-wasm-json-no-locations, so these parse rows are mechanism-matched, and both ASTs are span-only (`start`/`end`, no per-node `loc`); oxc’s writes out default-valued fields tsv omits, so its tree is the larger of the two'
 };
 
 const YUKU_NOTE: FairnessNote = {
@@ -760,28 +810,44 @@ const YUKU_NOTE: FairnessNote = {
 		'  (yuku-parser — native and wasm — decodes a binary AST buffer into JS objects,',
 		'   also full eager materialization; its parse() is lazy, so the bench forces it —',
 		'   verified: no lazy accessors survive, and its tree serializes to oxc-parser’s size,',
-		'   so it is span-only too and the no-locations line is its payload-matched read)'
+		'   so it is span-only like oxc and like tsv’s own rows)'
 	],
 	markdown:
-		'yuku-parser (native and wasm) decodes a binary AST buffer into JS objects — also full eager materialization (verified: no lazy accessors survive, and the tree serializes to within 3 bytes of oxc-parser, so it is span-only like oxc and its payload-matched read is the same `no-locations` line), but its `parse()` is lazy, so the bench reads `.program` to force it — an unforced row would report a throughput for a tree nobody built'
+		'yuku-parser (native and wasm) decodes a binary AST buffer into JS objects — also full eager materialization (verified: no lazy accessors survive, and the tree serializes to within 3 bytes of oxc-parser, so it is span-only like oxc and like tsv’s own rows), but its `parse()` is lazy, so the bench reads `.program` to force it — an unforced row would report a throughput for a tree nobody built'
 };
 
 const SWC_NOTE: FairnessNote = {
 	terminal: [
 		'  (swc parses to its own AST dialect — root `Module`, `span` rather than `loc` —',
-		'   so like oxc it emits neither tsv’s loc-bearing drop-in shape nor its span-only wire)'
+		'   so it emits neither tsv’s span-only wire nor the acorn shape `{locations: true}` returns)'
 	],
 	markdown:
-		'swc parses to its own AST dialect (root `Module`, `span` rather than `loc`, `Ts`-prefixed kinds), so it carries the same payload disclosure oxc-parser does — the mechanism matches `tsv-json` (serialize, cross, materialize) while the tree it produces is neither tsv’s loc-bearing drop-in shape nor its span-only wire; measured on the perf corpus its JSON is 0.64× `tsv-json`’s bytes'
+		'swc parses to its own AST dialect (root `Module`, `span` rather than `loc`, `Ts`-prefixed kinds) — the mechanism matches tsv’s span rows (serialize, cross, materialize) while the tree it produces is neither tsv’s span-only wire nor the acorn shape `{locations: true}` returns, so the cell is mechanism-matched only'
 };
 
 const RSVELTE_PARSE_NOTE: FairnessNote = {
 	terminal: [
-		'  (rsvelte-parse returns a JSON string the caller parses — the identical mechanism',
-		'   tsv-json measures, and within ~1.5% of its payload corpus-wide, so this pair matches on both axes)'
+		'  (rsvelte-parse returns a JSON string the caller parses — the mechanism tsv’s span',
+		'   rows measure — but carries Svelte’s own wire, `loc` on the acorn-parsed nodes plus',
+		'   `name_loc`, where tsv’s span row carries no `loc`: mechanism-matched, not payload-matched)'
 	],
 	markdown:
-		'rsvelte-parse returns a compact JSON string the caller parses — the identical mechanism `tsv-json` measures (same serialize + boundary + `JSON.parse` cost) and within ~1.5% of its payload measured across the corpus (0.13% smaller in aggregate at the current pin, per-component median exactly 1.00 — the axis a throughput ratio integrates), so it is the one third-party parse row matched to tsv on BOTH axes. Its `skipExpressionLoc` variant is deliberately not compared: that reduction is not tsv’s span-only wire'
+		'rsvelte-parse returns a compact JSON string the caller parses — the same serialize + boundary + `JSON.parse` mechanism tsv’s span rows measure — but not the same payload: it carries Svelte’s own wire, `loc` on the acorn-parsed nodes plus `name_loc`, where `tsv-json-no-locations` carries no `loc` at all and its `+reconstruct` sibling a `loc` on every node, so neither tsv row is payload-matched to it and this cell carries the `loc` on rsvelte’s side. Its `skipExpressionLoc` variant is deliberately not compared: that reduction is not tsv’s span-only wire either'
+};
+
+/**
+ * The canonical parse baselines' payload, which the tsv self rows do not match: the
+ * oracle ASTs carry `loc` and tsv's wire does not.
+ */
+const CANONICAL_PARSE_NOTE: FairnessNote = {
+	terminal: [
+		'  (the canonical parse baselines carry `loc` — acorn-typescript with `locations: true`,',
+		'   svelte/compiler its own sparse `loc` — where tsv’s span rows carry none; the',
+		'   `+reconstruct vs` lines under the typescript and svelte parse groups are the read',
+		'   with `loc` on both sides)'
+	],
+	markdown:
+		'The canonical parse baselines carry `loc` where tsv’s span rows carry none: acorn-typescript runs with `locations: true` (Svelte’s configuration of acorn), so every node has one; svelte/compiler emits Svelte’s own sparse `loc` (acorn-parsed nodes plus `name_loc`); `parseCss` emits none. So on typescript and svelte the parse cells compare a span-only tree against a loc-bearing one. The read with `loc` on both sides is the `+reconstruct` rows’ cells against the canonical baseline in those two groups’ tables — the span-only parse plus `{locations: true}`’s cost, acorn-exact on typescript, and on svelte a superset of Svelte’s `loc` (every positioned object)'
 };
 
 const POSTCSS_NOTE: FairnessNote = {
@@ -791,7 +857,7 @@ const POSTCSS_NOTE: FairnessNote = {
 		'   to JS, so it is the only peer)'
 	],
 	markdown:
-		'postcss is the JS parser behind prettier’s CSS printer, i.e. behind the `format/css` baseline — a JS-vs-native read like prettier’s own, not a same-tier one; it is the only third-party engine available on `parse/css`, since none of the Rust CSS tools considered exposes a parse call to JS (Lightning CSS hands a tree to a visitor only mid-transform, Biome surfaces no parser, malva is a formatter). Not payload-matched either: it keeps selectors as strings where `parseCss` (and so tsv) parses them into selector nodes — 0.38× tsv’s node count and at most 0.56× its JSON bytes on the perf corpus, though the `source` positions and `raws` on every node leave it about as many JS objects as `parseCss` builds'
+		'postcss is the JS parser behind prettier’s CSS printer, i.e. behind the `format/css` baseline — a JS-vs-native read like prettier’s own, not a same-tier one; it is the only third-party engine available on `parse/css`, since none of the Rust CSS tools considered exposes a parse call to JS (Lightning CSS hands a tree to a visitor only mid-transform, Biome surfaces no parser, malva is a formatter). Not payload-matched either: it keeps selectors as strings where `parseCss` (and so tsv) parses them into selector nodes — 0.38× tsv’s node count and at most 0.56× tsv’s span-only JSON bytes on the perf corpus, though the `source` positions and `raws` on every node leave it about as many JS objects as `parseCss` builds'
 };
 
 const MALVA_NOTE: FairnessNote = {
@@ -851,11 +917,11 @@ interface ComparisonSectionSpec {
 const COMPARISON_SECTIONS: readonly ComparisonSectionSpec[] = [
 	{
 		label: 'tsv',
-		self: { format: 'tsv', parse: 'tsv-json' },
+		self: { format: 'tsv', parse: 'tsv-json-no-locations' },
 		opponents: {
 			format: [{ row: CANONICAL_FORMATTER_ROW }, { row: 'oxfmt', note: OXFMT_NOTE }],
 			parse: [
-				{ row: CANONICAL_PARSER_ROWS },
+				{ row: CANONICAL_PARSER_ROWS, note: CANONICAL_PARSE_NOTE },
 				{ row: 'oxc-parser', note: OXC_NOTE },
 				{ row: 'yuku-parser', note: YUKU_NOTE },
 				{ row: 'swc', note: SWC_NOTE },
@@ -866,7 +932,7 @@ const COMPARISON_SECTIONS: readonly ComparisonSectionSpec[] = [
 	},
 	{
 		label: 'tsv-wasm',
-		self: { format: 'tsv-wasm', parse: 'tsv-wasm-json' },
+		self: { format: 'tsv-wasm', parse: 'tsv-wasm-json-no-locations' },
 		opponents: {
 			format: [
 				{ row: CANONICAL_FORMATTER_ROW },
@@ -877,7 +943,7 @@ const COMPARISON_SECTIONS: readonly ComparisonSectionSpec[] = [
 				{ row: 'malva-wasm', note: MALVA_NOTE }
 			],
 			parse: [
-				{ row: CANONICAL_PARSER_ROWS },
+				{ row: CANONICAL_PARSER_ROWS, note: CANONICAL_PARSE_NOTE },
 				{ row: 'oxc-parser-wasm', note: OXC_NOTE },
 				{ row: 'yuku-parser-wasm', note: YUKU_NOTE },
 				{ row: 'postcss', note: POSTCSS_NOTE }
@@ -911,13 +977,10 @@ const COMPARISON_SECTIONS: readonly ComparisonSectionSpec[] = [
  * has no such per-run signal here — the two surfaces never share a process.
  */
 const COMPARISON_EXCLUSIONS: Readonly<Record<string, string>> = {
-	'tsv-json-no-locations': "tsv's own wire variant — a row of the group table, not an opponent",
-	'tsv-wasm-json-no-locations':
-		"tsv's own wire variant — a row of the group table, not an opponent",
 	'tsv-json-no-locations+reconstruct':
-		"tsv's own consumer-cost row — read against tsv-json in the span-only + reconstruct note, not an opponent",
+		"tsv's own consumer-cost row — read against tsv-json-no-locations in the `{locations: true}` cost note, not an opponent",
 	'tsv-wasm-json-no-locations+reconstruct':
-		"tsv's own consumer-cost row — read against tsv-wasm-json in the span-only + reconstruct note, not an opponent",
+		"tsv's own consumer-cost row — read against tsv-wasm-json-no-locations in the `{locations: true}` cost note, not an opponent",
 	'tsv-internal': "tsv's own parse-only variant; no third-party row is the same tier",
 	'tsv-wasm-internal': "tsv's own parse-only variant; no third-party row is the same tier",
 	'tsv-forced-async': 'opt-in async-tax control (`BENCH_FORCED_ASYNC=1`), deliberately unpublished',
@@ -1548,7 +1611,7 @@ export type CoverageBySource = Map<string, Map<string, Map<string, SourceCoverag
  * support), and a whole source is omitted when no impl has data. Rows are the
  * sources in corpus order; columns are the impls in display order.
  *
- * The same-engine variant columns (`tsv-json` / `tsv-internal` /
+ * The same-engine variant columns (`tsv-json-no-locations` / `tsv-internal` /
  * `tsv-wasm-*`, `oxc-parser` / `oxc-parser-wasm`) look redundant and are
  * deliberately kept: they read identically only while the *bindings and payloads*
  * agree, which is a claim, not a given — a wire-writer failure would show as
@@ -1618,37 +1681,28 @@ export function generate_json_overhead_note(results: BenchmarkResult[]): string 
 }
 
 /**
- * tsv's three parse wires per binding, as `[binding, loc_bearing, span_only,
- * reconstruct]`: the loc-bearing drop-in wire, the span-only `no-locations` wire, and
- * that span-only wire plus `loc` reconstructed over the whole tree in JS. The two
- * ratios `generate_reconstruct_note` renders are both against `loc_bearing`, the
- * product a `{locations: true}` consumer gets today.
+ * tsv's two parse rows per binding, as `[binding, span_only, reconstruct]`: the
+ * span-only wire every binding ships, and that wire plus `loc` reconstructed over the
+ * whole tree in JS — what the packages' `{locations: true}` runs.
  */
 const RECONSTRUCT_ROWS: ReadonlyArray<
-	readonly [binding: string, loc_bearing: string, span_only: string, reconstruct: string]
+	readonly [binding: string, span_only: string, reconstruct: string]
 > = [
-	['native', 'tsv-json', 'tsv-json-no-locations', 'tsv-json-no-locations+reconstruct'],
-	['wasm', 'tsv-wasm-json', 'tsv-wasm-json-no-locations', 'tsv-wasm-json-no-locations+reconstruct']
+	['native', 'tsv-json-no-locations', 'tsv-json-no-locations+reconstruct'],
+	['wasm', 'tsv-wasm-json-no-locations', 'tsv-wasm-json-no-locations+reconstruct']
 ];
 
 /**
  * Consumer-side note, COMPUTED from this run's parse rows: per language and binding,
- * the loc-bearing wire against the span-only wire, and against the span-only wire
- * plus `loc` reconstructed in JS over every node (the `+reconstruct` rows — the
- * shipped `reconstruct_locations`, line-table build included). Speedup form like
- * every other `Nx` in the report: >1 means that path is faster than fetching the
- * loc-bearing wire, so the `+reconstruct` figure is what a consumer who wants every
- * node's `loc` saves (or pays) by fetching spans and reconstructing.
+ * what `{locations: true}` costs over the default — the `+reconstruct` row (the shipped
+ * `reconstruct_locations`, line-table build included, over the span-only parse) against
+ * the span-only row. Cost form like the JSON-overhead note (`reconstruct_ns /
+ * span_ns`, higher = more cost), since both rows are tsv's own and the question is what
+ * the option adds.
  *
- * A cell needs all of its rows in the same group; a language or binding missing
- * any is left out, and the note is omitted when nothing is left — a filtered or
- * coverage-only run carries no stale claim.
- *
- * The `+reconstruct` row builds exactly the tree its loc-bearing row materializes: the
- * Rust writer and `crates/tsv_wasm/npm/locations.js` implement one `loc` definition, and
- * `deno task check:loc` holds them equal over the fixture tree. So the ratio is
- * payload-matched in every language — on Svelte both products are the same superset of
- * Svelte's own `loc` (every positioned object carries one).
+ * A cell needs both rows in the same group; a language or binding missing either is
+ * left out, and the note is omitted when nothing is left — a filtered or coverage-only
+ * run carries no stale claim.
  */
 export function generate_reconstruct_note(all_group_results: GroupResults[]): string | null {
 	const parts: string[] = [];
@@ -1658,19 +1712,16 @@ export function generate_reconstruct_note(all_group_results: GroupResults[]): st
 		const mean = (name: string): number | undefined =>
 			group.results.find((r) => r.name === name)?.stats.mean_ns;
 		const cells: string[] = [];
-		for (const [binding, loc_bearing, span_only, reconstruct] of RECONSTRUCT_ROWS) {
-			const base = mean(loc_bearing);
+		for (const [binding, span_only, reconstruct] of RECONSTRUCT_ROWS) {
 			const span = mean(span_only);
 			const recon = mean(reconstruct);
-			if (base === undefined || span === undefined || recon === undefined) continue;
-			cells.push(
-				`${binding} span-only ${(base / span).toFixed(2)}x, +reconstruct ${(base / recon).toFixed(2)}x`
-			);
+			if (span === undefined || recon === undefined) continue;
+			cells.push(`${binding} ${(recon / span).toFixed(2)}x`);
 		}
-		if (cells.length > 0) parts.push(`${language}: ${cells.join('; ')}`);
+		if (cells.length > 0) parts.push(`${language}: ${cells.join(', ')}`);
 	}
 	if (parts.length === 0) return null;
-	return `**Span-only + reconstruct vs the loc-bearing wire** (the binding's loc-bearing row — \`tsv-json\` / \`tsv-wasm-json\` — mean / row mean, speedup form; \`+reconstruct\` = the span-only wire plus \`loc\` on every node rebuilt in JS by the shipped \`reconstruct_locations\`, line table included — the same tree the loc-bearing row carries, so the two are payload-matched): ${parts.join(' | ')}`;
+	return `**What \`{locations: true}\` costs over the default** (each binding's \`+reconstruct\` mean / its span-only row's mean, higher = more cost; \`+reconstruct\` = the span-only parse plus \`loc\` on every node rebuilt in JS by the shipped \`reconstruct_locations\`, line table included — exactly what the packages' \`{locations: true}\` runs): ${parts.join(' | ')}`;
 }
 
 /**
@@ -1701,8 +1752,8 @@ function classify_lang(path: string): SkipLang {
  * might be an impl-specific bug worth chasing.
  *
  * DERIVED from the run's task tracking rather than spelled as tracking keys: which tsv
- * rows a group carries varies by language (CSS has no `no-locations` rows) and by
- * surface (the `+reconstruct` rows are perf-only), so a hand-kept list cannot track it —
+ * rows a group carries varies by surface (the `+reconstruct` rows are perf-only) and
+ * has varied by language, so a hand-kept list cannot track it —
  * the set is read from the rows this run actually registered. `null` (never collapse)
  * without the tracking map.
  */
@@ -1733,8 +1784,8 @@ function is_universal_tsv_failure(
 }
 
 /**
- * Resolve a tracking_key (`parse/svelte/native`) to a display label
- * (`parse/svelte: tsv-json`). Falls back to the raw tracking_key when the
+ * Resolve a tracking_key (`parse/svelte/native-no-locations`) to a display label
+ * (`parse/svelte: tsv-json-no-locations`). Falls back to the raw tracking_key when the
  * mapping isn't available — readers still see something useful.
  */
 function tracking_key_display(

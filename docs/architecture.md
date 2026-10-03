@@ -177,12 +177,13 @@ the default of 128 levels refused ~60 nested arrays or ~40 nested objects the
 writer emits without trouble. Each of the two has a `_no_locations` sibling
 (`convert_ast_json_bytes_no_locations` / `_string_no_locations`) emitting the
 same wire minus every line/column object — the per-node `loc`, plus Svelte's
-`name_loc` — so only `start`/`end` offsets remain. Line/column is a pure function
-of an offset plus source, so the variant derives it lazily consumer-side rather
-than emitting it (every package that parses ships that derivation as a pure-JS
-`reconstruct_locations` helper); it's an opt-in span-only product mirroring
-acorn's `locations: false`, not a second encoding of the drop-in wire, which
-stays byte-identical. Each writer is a faithful emission of the acorn /
+`name_loc` — so only `start`/`end` offsets remain. That span-only wire is the one every
+binding ships (`tsv_ffi`, `tsv_napi`, `tsv_wasm`) and `tsv parse`'s default; the
+`loc`-bearing form ships through no binding — it is `tsv parse --locations`'s,
+`tsv_debug`'s, and the oracle comparison's. Line/column is a pure function of an offset
+plus source, so the packages derive it consumer-side rather than shipping it: every
+package that parses carries the derivation as a pure-JS `reconstruct_locations` helper,
+which its `parse_*(source, {locations: true})` runs. Each writer is a faithful emission of the acorn /
 `parseCss` quirk catalog; the fixture suite gates its output against the
 canonical parser's `expected.json` on every fixture (including the multibyte
 and template-comment ones that exercise the fused offset translation and
@@ -627,7 +628,7 @@ offsets index the BOM-less string — the Svelte and CSS writers build their `By
 lower (a line-1 column one lower too; the acorn islands follow, since Svelte hands acorn the
 stripped string). acorn treats the BOM as whitespace, so the TypeScript writer builds
 `Counted`: `Program.start` stays 0 and the first token sits at offset 1, column 1. The
-`no-locations` reconstruction helper (`crates/tsv_wasm/npm/locations.js`) strips the BOM
+JS reconstruction helper (`crates/tsv_wasm/npm/locations.js`) strips the BOM
 ahead of its Svelte and CSS line tables for the same reason, and keeps it for TypeScript.
 
 ### `loc` lines: one rule per document

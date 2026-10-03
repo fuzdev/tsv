@@ -32,12 +32,11 @@ pub struct ParseCommand {
     #[argh(option)]
     source_type: Option<String>,
 
-    /// omit per-node `loc` (line/column). Emits `start`/`end` offsets only — the
-    /// opt-in span-only wire (mirrors acorn's `locations: false`). `loc` is
-    /// derivable from the offsets plus source, so nothing is lost for a consumer
-    /// that has the source.
+    /// emit per-node `loc` (line/column) beside the `start`/`end` offsets
+    /// (Svelte also `name_loc`). The default wire is span-only, as on every
+    /// binding; `loc` is derivable from the offsets plus source.
     #[argh(switch)]
-    no_locations: bool,
+    locations: bool,
 
     /// file path (parser auto-detected from extension)
     #[argh(positional)]
@@ -69,7 +68,7 @@ impl ParseCommand {
             self.pretty,
             parser_type,
             goal,
-            !self.no_locations,
+            self.locations,
         )
         .unwrap_or_else(|e| exit_with_error(1, format_args!("Parse error: {e}")));
         // The wire bytes are UTF-8 by construction; writing them directly skips the
@@ -95,13 +94,15 @@ fn parse_to_json(
     goal: tsv_ts::Goal,
     locations: bool,
 ) -> Result<Vec<u8>, String> {
-    // Both outputs ride the convert_ast_json_bytes hot path (no intermediate
-    // tree, and no output UTF-8 validation a String would require): compact
-    // returns the bytes verbatim, and `--pretty` re-indents them in one linear
-    // pass (`indent_json_with_tabs`) rather than reading them back into a
-    // `serde_json::Value` — a read that recursed per JSON level and, at
-    // serde_json's default recursion limit, refused past ~60 nested arrays
-    // what the compact form of the same input emitted fine. So the pretty
+    // Every output rides a byte writer — `convert_ast_json_bytes_no_locations`
+    // (the span-only wire, the default) or `convert_ast_json_bytes` (the `loc`
+    // wire, `--locations`) — with no intermediate tree, and no output UTF-8
+    // validation a String would require: compact returns the bytes verbatim, and
+    // `--pretty` re-indents them in one linear pass (`indent_json_with_tabs`)
+    // rather than reading them back into a `serde_json::Value` — a read that
+    // recursed per JSON level and, at serde_json's default recursion limit,
+    // refused past ~60 nested arrays what the compact form of the same input
+    // emitted fine. So the pretty
     // route has no depth ceiling of its own; it stops where the parser stops.
     // The arena owns the internal AST; convert produces owned JSON, so nothing
     // borrowed escapes this function. Pre-sized to the source to avoid the
@@ -136,7 +137,7 @@ fn parse_to_json(
             }
         }
     };
-    // A no-locations pretty print rides the same bytes.
+    // Either wire's pretty print rides the same bytes.
     Ok(if pretty {
         indent_json_with_tabs(&bytes)
     } else {

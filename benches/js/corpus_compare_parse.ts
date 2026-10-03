@@ -15,12 +15,14 @@
  * own divergence reasoning surfaces as an undocumented group instead of being
  * silently absorbed. The canonical AST is serialized exactly like the fixture
  * sidecar serializes it (JSON round-trip with BigInt → string), so fixture and
- * corpus semantics match; the tsv side is the shipped FFI wire
- * (`convert_ast_json_string`), which the WASM artifact shares post-Win-1.
- * The span-only arm diffs the FFI `no-locations` wire against that same oracle
- * output with every `loc` / `name_loc` removed — the wire's own contract (it
- * omits exactly those keys), not a tolerance; everything else is raw-diffed as
- * above.
+ * corpus semantics match. tsv has two wires and each arm grades one. The span-only
+ * arm diffs the shipped wire — the FFI's, which every binding shares (each language
+ * crate's `convert_ast_json_*_no_locations`) — against that same oracle output with
+ * every `loc` / `name_loc` removed: the wire's own contract (it omits exactly those
+ * keys), not a tolerance; everything else is raw-diffed as above. The loc arm diffs
+ * the Rust `loc` emitter's wire (`convert_ast_json_*`), which no binding ships — the
+ * one `tsv parse --locations` writes — asked of one `tsv_debug loc_wires --stdin`
+ * process (`lib/loc_wire_client.ts`).
  *
  * `loc` is graded by its own rules on the loc arm (see `diff_asts`): tsv's `loc` must
  * first be the definition — the shipped `locations.js` reconstruction of its own
@@ -66,6 +68,7 @@ import {
 import { is_native_panic_error } from './lib/divergence/panic_errors.ts';
 import { CORPUS_PARSE_COMPARED_PIN, CORPUS_PARSE_TSV_ERRORS_PIN } from './lib/gate_counts.ts';
 import { first_difference, loc_definition_violation } from './lib/loc_cross_grade.ts';
+import { LocWireClient } from './lib/loc_wire_client.ts';
 import {
 	classify_loc_difference,
 	get_at_path,
@@ -77,6 +80,7 @@ import {
 	type SupersetAnchor,
 	wire_text
 } from './lib/loc_tolerance.ts';
+import { bigint_replacer, span_only_replacer } from './lib/span_only.ts';
 import { type Language, LANGUAGES, type ParseGoal } from './lib/types.ts';
 import {
 	type InjectKind,
@@ -172,46 +176,21 @@ function has_non_ascii(s: string): boolean {
 	return false;
 }
 
-// The BigInt half of the fixture sidecar's jsonReplacer
-// (crates/tsv_debug/src/deno/sidecar.ts), so corpus comparison and expected.json
-// generation agree on the values neither can serialize natively. Exported so
-// diagnostics/svelte_fixtures_compare.ts serializes its canonical AST the same way.
-//
-// ⚠️ Deliberately NOT the sidecar's whole replacer: the sidecar also substitutes
-// U+FFFD for lone surrogates, because its response crosses a Rust boundary where
-// serde_json rejects the document outright. Nothing crosses a boundary here, so the
-// canonical AST keeps acorn's TRUE lone-surrogate value — which is the only reason
-// the `lone_surrogate_value` divergence detector below can still fire. Substituting
-// here would make the canonical side agree with ours by construction and silently
-// retire that detector.
-export function bigint_replacer(_key: string, value: unknown): unknown {
-	return typeof value === 'bigint' ? value.toString() : value;
-}
-
 // --- The span-only arm -----------------------------------------------------------
 //
-// tsv's `no-locations` wire is graded against the SAME oracle output with its line/column
-// objects removed — the definition `tests/no_locations.rs` (`strip_locations`) encodes:
-// every `loc` key and every Svelte `name_loc` key, anywhere in the tree (the `character`
-// field Svelte puts on a name-shaped or in-tag-comment position lives inside one of those,
-// so it goes too). Nothing else differs between the two wires, so the arm reuses the diff
-// engine and the documented matchers unchanged: a span difference the loc arm excuses is
-// excused identically here, and the `loc` rules have no `loc` to grade. Every language has
-// the arm, CSS included — `parseCss` emits no `loc`, so for CSS the stripped oracle is the
+// tsv's span-only wire — the one every binding emits, here the FFI's — is graded against
+// the SAME oracle output with its line/column objects removed (`lib/span_only.ts`'s
+// `span_only_replacer`): every `loc` key and every Svelte `name_loc` key, anywhere in the
+// tree. Nothing else differs between the two tsv wires, so the arm reuses the diff engine
+// and the documented matchers unchanged: a span difference the loc arm excuses is excused
+// identically here, and the `loc` rules have no `loc` to grade. Every language has the
+// arm, CSS included — `parseCss` emits no `loc`, so for CSS the stripped oracle is the
 // oracle itself.
 //
 // The same span-only wire is what the loc arm's definition check reconstructs from: before
 // tsv's loc wire is graded against the oracle, `loc_definition_violation` requires it to
 // equal the shipped reconstruction of this wire, so a tolerance row can only excuse the
 // oracle's departure from the definition, never tsv's.
-
-/** The keys the span-only wire drops — see the section comment above. */
-const LOCATION_KEYS: ReadonlySet<string> = new Set(['loc', 'name_loc']);
-
-/** `bigint_replacer` that also drops the span-only wire's dropped keys. */
-function span_only_replacer(key: string, value: unknown): unknown {
-	return LOCATION_KEYS.has(key) ? undefined : bigint_replacer(key, value);
-}
 
 /** Per-language counts for the span-only arm. */
 interface SpanStats {
@@ -1271,8 +1250,9 @@ function print_usage(): void {
 Usage: deno task corpus:compare:parse <path> [options]
        deno task corpus:compare:parse --all [options]
 
-Deep-diffs tsv's shipped parse output (FFI wire) against the canonical parsers
-(acorn-typescript / svelte / parseCss). Raw diff first, documented-divergence
+Deep-diffs tsv's parse output against the canonical parsers (acorn-typescript /
+svelte / parseCss) on two arms: the shipped span-only wire (FFI) and the Rust \`loc\`
+emitter's wire (\`tsv_debug loc_wires --stdin\`). Raw diff first, documented-divergence
 classification at the reporting layer only.
 
 Arguments:
@@ -1514,6 +1494,9 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	const loader = create_compare_loader(use_all_repos, base_path);
 	const impls = await init_compare_implementations();
 	const { canonical, native } = impls;
+	// The loc wire ships through no binding, so the loc arm asks `tsv_debug` for it
+	// (`lib/loc_wire_client.ts`); the span-only wire is the FFI's.
+	const loc_wires = await LocWireClient.start();
 
 	const results: Map<Language, FileResult[]> = new Map();
 	const stats: Map<Language, LanguageStats> = new Map();
@@ -1580,7 +1563,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		let ours: unknown;
 		let tsv_error: string | null = null;
 		try {
-			ours = native.parse(file.content, lang, goal);
+			ours = await loc_wires.parse(file.content, lang, goal);
 		} catch (e) {
 			tsv_error = String(e instanceof Error ? e.message : e).split('\n')[0];
 		}
@@ -1596,14 +1579,14 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 			canonical_error = String(e instanceof Error ? e.message : e).split('\n')[0];
 		}
 
-		// The span-only arm (see `LOCATION_KEYS`). Its controls are recorded but not counted,
+		// The span-only arm (see `lib/span_only.ts`). Its controls are recorded but not counted,
 		// like the loc arm's, so `subtract_baseline_diffs` can grade a variant against them.
 		const span_stats = span_stats_by_lang.get(lang)!;
 		let declared_divergence = false;
 		let ours_span: unknown;
 		let span_error: string | null = null;
 		try {
-			ours_span = native.parse_no_locations(file.content, lang, goal);
+			ours_span = native.parse(file.content, lang, goal);
 		} catch (e) {
 			span_error = String(e instanceof Error ? e.message : e).split('\n')[0];
 			if (is_native_panic_error(span_error)) {
@@ -1732,6 +1715,8 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		}
 	}
 
+	await loc_wires.close();
+
 	if (injecting) {
 		// Re-grade every manufactured input against its own base: a divergence — or a parse
 		// failure — the base file already had is not the injection's doing. See
@@ -1858,8 +1843,8 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		}
 	}
 
-	// The span-only arm's table: the same deep diff over the `no-locations` wire, against
-	// the oracle with its line/column objects stripped (see `LOCATION_KEYS`).
+	// The span-only arm's table: the same deep diff over the span-only wire, against
+	// the oracle with its line/column objects stripped (see `lib/span_only.ts`).
 	const span_totals = empty_span_stats();
 	for (const s of span_stats_by_lang.values()) {
 		span_totals.compared += s.compared;
@@ -1869,7 +1854,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		span_totals.verdict_mismatch += s.verdict_mismatch;
 	}
 	if (span_totals.compared + span_totals.verdict_mismatch > 0) {
-		console.log('\nSpan-only arm (no-locations wire vs canonical with `loc`/`name_loc` stripped):');
+		console.log('\nSpan-only arm (span-only wire vs canonical with `loc`/`name_loc` stripped):');
 		const rows: [string, SpanStats][] = [
 			...[...span_stats_by_lang].filter(([, s]) => s.compared + s.verdict_mismatch > 0),
 			['total', span_totals]

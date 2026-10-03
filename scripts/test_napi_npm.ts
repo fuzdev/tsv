@@ -134,6 +134,10 @@ await assert_staged_fresh([
 			'crates/tsv_napi/npm/index.d.ts',
 			'crates/tsv_napi/npm/platform.js',
 			'crates/tsv_napi/npm/bin.js',
+			'crates/tsv_wasm/npm/api.js',
+			'crates/tsv_wasm/npm/api.d.ts',
+			'crates/tsv_wasm/npm/api_parse.js',
+			'crates/tsv_wasm/npm/api_parse.d.ts',
 			'crates/tsv_wasm/npm/locations.js',
 			'crates/tsv_wasm/npm/locations.d.ts',
 			'crates/tsv_wasm/types/tsv_ast.d.ts',
@@ -372,10 +376,11 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		}
 	);
 
-	it('parses to objects with loc, and _json siblings return the string', () => {
+	it('parses to span-only objects, and _json siblings return the string', () => {
 		const ast = api.parse_typescript('const x = 1;');
 		assert.equal(ast.type, 'Program');
-		assert.ok(ast.body[0].loc, 'default wire carries loc');
+		assert.equal(ast.body[0].loc, undefined, 'the default wire is span-only');
+		assert.equal(typeof ast.body[0].start, 'number');
 		assert.equal(api.parse_svelte('<div>x</div>').type, 'Root');
 		assert.equal(api.parse_css('a { color: red }').type, 'StyleSheetFile');
 		const json = api.parse_typescript_json('const x = 1;');
@@ -383,55 +388,52 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		assert.deepEqual(JSON.parse(json), ast);
 	});
 
-	it('locations: false selects the span-only wire', () => {
-		const ast = api.parse_typescript('const x = 1;', { locations: false });
-		assert.equal(ast.type, 'Program');
-		assert.equal(ast.body[0].loc, undefined, 'span-only wire omits loc');
-		assert.equal(
-			api.parse_svelte('<div>x</div>', { locations: false }).fragment.nodes[0].loc,
-			undefined
-		);
-		assert.ok(api.parse_css('a { color: red }').children[0].loc, 'CSS default wire carries loc');
-		assert.equal(
-			api.parse_css('a { color: red }', { locations: false }).children[0].loc,
-			undefined,
-			'CSS span-only wire omits loc'
-		);
+	it('locations: true adds loc in every language', () => {
+		assert.ok(api.parse_typescript('const x = 1;', { locations: true }).body[0].loc);
+		const sv = api.parse_svelte('<div>x</div>', { locations: true });
+		assert.ok(sv.fragment.nodes[0].loc);
+		assert.ok(sv.fragment.nodes[0].name_loc);
+		assert.ok(api.parse_css('a { color: red }', { locations: true }).children[0].loc);
+		assert.equal(api.parse_svelte('<div>x</div>').fragment.nodes[0].loc, undefined);
+		assert.equal(api.parse_css('a { color: red }').children[0].loc, undefined);
 	});
 
-	// The span-only wire and the helper that makes it usable ship together —
-	// the pure-JS `locations.js` is copied in from the wasm packages, so this
-	// asserts the copy landed AND that its output EQUALS the loc-bearing wire this
-	// same package emits by default, in all three languages: the native writer and
-	// the helper implement one `loc` definition.
-	it('the locations helpers ship alongside the span-only wire', () => {
+	// The facade and the helper that `{locations: true}` runs ship together — the
+	// pure-JS `api_parse.js` and `locations.js` are copied in from the wasm packages, so
+	// this asserts the copies landed and are WIRED: `{locations: true}` is exactly the
+	// helper's reconstruction of the default parse, in all three languages. Whether that
+	// reconstruction equals the native `loc` emitter is `deno task check:loc`'s, over
+	// every fixture document; the CLI section below compares it with the native binary's
+	// `parse --locations` directly.
+	it('the locations helpers ship, and {locations: true} runs them', () => {
 		const source = 'const x = 1;\nconst y = 2;\n';
-		const spans = api.parse_typescript(source, { locations: false });
-		assert.equal(spans.body[1].loc, undefined, 'span-only wire starts without loc');
+		const spans = api.parse_typescript(source);
+		assert.equal(spans.body[1].loc, undefined, 'the default wire starts without loc');
 		assert.equal(api.reconstruct_locations(spans, source), spans, 'mutates and returns the ast');
-		assert.deepEqual(spans, api.parse_typescript(source));
-		// The amortized entry point over the same source.
-		const locator = api.create_locator(source);
+		assert.deepEqual(spans, api.parse_typescript(source, { locations: true }));
+		// The amortized entry point over the same source, the language named.
+		const locator = api.create_locator(source, { language: 'typescript' });
 		assert.deepEqual(locator.loc_of(spans.body[1]), spans.body[1].loc);
-		assert.deepEqual(api.loc_of(spans.body[1], source), spans.body[1].loc);
+		assert.deepEqual(
+			api.loc_of(spans.body[1], source, { language: 'typescript' }),
+			spans.body[1].loc
+		);
+		assert.throws(() => api.create_locator(source), /`language` must be/);
 		// Svelte (LF-only for the whole document, `name_loc` and `character` restored) and
-		// CSS reconstruct exactly too.
+		// CSS through the facade.
 		const sv =
 			'<script>\nlet a = 1;\u2028let b = 2;\n</script>\n<div /* c */ {x}>\n{#each xs as { a }}{a}{/each}\n</div>\n<style>\np { }\n</style>\n';
 		assert.deepEqual(
-			api.reconstruct_locations(api.parse_svelte(sv, { locations: false }), sv),
-			api.parse_svelte(sv)
+			api.reconstruct_locations(api.parse_svelte(sv), sv),
+			api.parse_svelte(sv, { locations: true })
 		);
 		const css = '/* c */\na {\n\tcolor: red;\n}\r\nb { }';
 		assert.deepEqual(
-			api.reconstruct_locations(api.parse_css(css, { locations: false }), css),
-			api.parse_css(css)
+			api.reconstruct_locations(api.parse_css(css), css),
+			api.parse_css(css, { locations: true })
 		);
-		// The `_json` siblings route the bag the same way.
-		assert.equal(
-			api.parse_css_json(css, { locations: false }),
-			JSON.stringify(api.parse_css(css, { locations: false }))
-		);
+		// The `_json` siblings return the span-only wire the object parse reads.
+		assert.equal(api.parse_css_json(css), JSON.stringify(api.parse_css(css)));
 	});
 
 	it('the TypeScript sourceType axis reaches parse AND format', () => {
@@ -500,6 +502,16 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		throws_with(
 			() => api.parse_typescript('const x = 1;', { locations: 'no' }),
 			"parse option 'locations' must be a boolean"
+		);
+		// The `_json` siblings return the wire string itself, so they take no `locations`
+		// — `loc` is a view over objects.
+		throws_with(
+			() => api.parse_typescript_json('const x = 1;', { locations: false }),
+			"unknown parse option 'locations' (expected 'sourceType')"
+		);
+		throws_with(
+			() => api.parse_css_json('a{}', { locations: false }),
+			"unknown parse option 'locations' (this export takes no options)"
 		);
 	});
 
@@ -886,21 +898,21 @@ describe('cli (bin.js): the tsv bin dispatching to the native CLI binary', () =>
 		}
 	});
 
-	it('parse --content emits the wire; --no-locations omits loc', () => {
-		const full = run_cli(['parse', '--content', 'const x = 1;', '--parser', 'ts']);
-		assert.equal(full.status, 0, full.stderr);
-		assert.match(full.stdout, /"loc"/);
-		assert.equal(JSON.parse(full.stdout).type, 'Program');
-		const bare = run_cli([
+	it('parse --content emits the span-only wire; --locations adds loc', () => {
+		const bare = run_cli(['parse', '--content', 'const x = 1;', '--parser', 'ts']);
+		assert.equal(bare.status, 0, bare.stderr);
+		assert.doesNotMatch(bare.stdout, /"loc"/);
+		assert.equal(JSON.parse(bare.stdout).type, 'Program');
+		const located = run_cli([
 			'parse',
-			'--no-locations',
+			'--locations',
 			'--content',
 			'const x = 1;',
 			'--parser',
 			'ts'
 		]);
-		assert.equal(bare.status, 0, bare.stderr);
-		assert.doesNotMatch(bare.stdout, /"loc"/);
+		assert.equal(located.status, 0, located.stderr);
+		assert.match(located.stdout, /"loc"/);
 	});
 
 	it('path mode formats in place, --jobs forwarded (real parallelism here)', () => {
@@ -1349,6 +1361,42 @@ describe('message parity: the native CLI and cli.js refuse in the same order', (
 		assert.equal(mirror.status, 0, mirror.stderr);
 		assert.ok(native.stdout.includes('\t"type": "Program"'), 'the pretty form is tab-indented');
 		assert.equal(mirror.stdout, native.stdout);
+	});
+
+	// `parse --locations`: the native bin writes `loc` with its Rust emitter, the mirror
+	// through the facade's `{locations: true}` — the JS reconstruction over the span-only
+	// wire. One definition, two implementations, so the trees must be deep-equal; the
+	// bytes are not, since the Rust writer puts `loc` after `end` and the reconstruction
+	// appends it last. The sources reach `name_loc`, the `character` positions, a lone
+	// CR / U+2028 (each document's own line rule), and a leading BOM. The default wire
+	// stays byte-identical on both bins.
+	it('parse --locations is deep-equal on both bins, the default wire byte-identical', () => {
+		const cases: Array<[string, string]> = [
+			['typescript', 'let a = 1;\rlet b = { c: [2, "\u2028"] };\r\nfunction f(x) { return x; }\n'],
+			[
+				'svelte',
+				'\ufeff<script lang="ts">\nlet x: number = 1;\u2028let y = 2;\n</script>\n<div /* c */ class="a" {x} on:click|once={f}>\n\t{#each xs as { a }, i (a)}{a}{/each}\n\t{@const k = x}\n</div>\n{#snippet s(p)}{p}{/snippet}\n<style>\np { color: red; }\n</style>\n'
+			],
+			['css', '/* c */\na {\r\n\tcolor: red;\r}\n@media (x) { p::after { content: "😀"; } }\n']
+		];
+		for (const [parser, source] of cases) {
+			const extras = parser === 'typescript' ? [[], ['--source-type', 'script']] : [[]];
+			for (const extra of extras) {
+				const located = ['parse', '--locations', ...extra, '--content', source, '--parser', parser];
+				const native = run_native(located);
+				const mirror = run_mirror(located);
+				assert.equal(native.status, 0, native.stderr);
+				assert.equal(mirror.status, 0, mirror.stderr);
+				assert.match(native.stdout, /"loc"/);
+				assert.deepEqual(
+					JSON.parse(mirror.stdout),
+					JSON.parse(native.stdout),
+					`${parser} ${extra}`
+				);
+				const span = ['parse', ...extra, '--content', source, '--parser', parser];
+				assert.equal(run_mirror(span).stdout, run_native(span).stdout, `${parser} default wire`);
+			}
+		}
 	});
 
 	// The mirror's `format` help hand-restates the extension list (its help text is a

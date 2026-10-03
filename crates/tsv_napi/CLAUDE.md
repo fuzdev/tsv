@@ -28,10 +28,9 @@ Unlike `tsv_ffi`'s and `tsv_wasm`'s, **no build task produces a single-feature `
 
 ## Public API
 
-The `lang_bindings!` macro generates four `#[napi]` functions per language (svelte, typescript, css); the `format`/`parse` features gate which are emitted:
+The `lang_bindings!` macro generates three `#[napi]` functions per language (svelte, typescript, css); the `format`/`parse` features gate which are emitted:
 
-- `parse_<lang>(source, sourceType?) -> string` — JSON AST string (host `JSON.parse`s it — parity with FFI/WASM)
-- `parse_<lang>_no_locations(source, sourceType?) -> string` — the span-only variant (drops per-node `loc`; Svelte also `name_loc`). See [../tsv_ts/CLAUDE.md](../tsv_ts/CLAUDE.md) §Public API.
+- `parse_<lang>(source, sourceType?) -> string` — the span-only JSON AST string (`start`/`end` offsets, no per-node `loc`; Svelte also no `name_loc`) — the one parse wire every binding emits; the host `JSON.parse`s it. See [../tsv_ts/CLAUDE.md](../tsv_ts/CLAUDE.md) §Public API.
 - `parse_internal_<lang>(source, sourceType?) -> void` — parses without converting (benchmark-only; `black_box` prevents elision)
 - `format_<lang>(source, sourceType?) -> string` — formatted source
 
@@ -47,11 +46,11 @@ grammar accepts is never reinterpreted. A set value is exact on both. See
 [../../docs/cli.md §Multi-File Formatting](../../docs/cli.md#multi-file-formatting). **Svelte and CSS
 REJECT a set source type** rather than ignoring it: Svelte hard-wires `Module`
 and CSS has no goal axis, so a caller passing one asked for something that cannot
-be honored and is told — the same stance `tsv_wasm`'s `read_options` takes when it
-rejects the `sourceType` key outright. The source type shapes only the parse the
+be honored and is told — the same stance `tsv_wasm`'s flat exports and the npm facade's
+options reader take. The source type shapes only the parse the
 formatter runs; formatting itself is non-configurable.
 
-JS export names are kept **snake_case** via `#[napi(js_name = "…")]` (napi-rs would otherwise camelCase them) so the addon's names match `tsv_wasm`'s. The per-call SHAPE is where the raw addon diverges from `tsv_wasm`: here the two axes are a flat export (`parse_<lang>_no_locations`) and a positional argument (the source type), matching `tsv_ffi`'s C-style surface, where `tsv_wasm` takes an acorn-style `{locations?, sourceType?}` options object (see [../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Parse Options & Typed Returns). Coverage matches — each binding has its own `lang_bindings!`, but all three read the **same** `parse_ast!` / `goal_allowed!` pair out of [`tsv_arena`](../tsv_arena/), so which languages have a goal axis is one fact in one place. The published `@fuzdev/tsv` loader erases the shape difference too — see §The npm packages.
+JS export names are kept **snake_case** via `#[napi(js_name = "…")]` (napi-rs would otherwise camelCase them) so the addon's names match `tsv_wasm`'s. The per-call shape matches too: `tsv_wasm`'s raw exports take the same trailing optional source type, and `tsv_ffi` spells it as a `u32` code. Coverage matches — each binding has its own `lang_bindings!`, but all three read the **same** `parse_ast!` / `goal_allowed!` pair out of [`tsv_arena`](../tsv_arena/), so which languages have a goal axis is one fact in one place. The published `@fuzdev/tsv` loader wraps the addon in the same `(source, options?)` facade the wasm packages publish — see §The npm packages.
 
 Outside the macro, the `format` feature also exports **`IgnoreStack`** — a `#[napi]` class over `tsv_ignore::IgnoreStack` plus the `tsv_discover` verdicts, method for method with `tsv_wasm`'s `#[wasm_bindgen]` twin (see [../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Discovery Matcher + Policy). ⚠️ Its three maybe-a-warning methods return **`Either<String, Undefined>`, not `Option<String>`**: napi-rs maps `None` to JS `null` where wasm-bindgen maps it to `undefined`, and a package that exists to be swapped for the other must not change which one a caller sees. `Undefined` is napi-rs's `()`, so the none arm allocates nothing. Two tests pin it — the in-crate one on the `Either::B` variant, `scripts/test_napi_npm.ts` on the JS value, since only the latter can observe it.
 
@@ -63,8 +62,9 @@ into `crates/tsv_napi/pkg/` (gitignored):
 - **`pkg/napi/` — `@fuzdev/tsv`**, the loader: `npm/index.js` +
   `npm/index.d.ts` + `npm/platform.js` (triple detection, shared by the next
   two) + `npm/bin.js` (the `tsv` bin — a dispatcher, see below) +
-  `npm/README.md` + a copy of `tsv_wasm`'s `tsv_ast.d.ts`,
-  `locations.js`/`.d.ts`, and `cli.js` (the JS CLI mirror, `bin.js`'s
+  `npm/README.md` + a copy of `tsv_wasm`'s `tsv_ast.d.ts`, the facade
+  (`api.js` / `api_parse.js` + their `.d.ts`), `locations.js`/`.d.ts`, and
+  `cli.js` (the JS CLI mirror, `bin.js`'s
   fallback) + a generated package.json pinning the platform packages as
   **exact-version `optionalDependencies`**. The staging directory is named
   for the binding (`napi`), not for the package — the published name is the
@@ -107,10 +107,13 @@ fallback.
 
 **`@fuzdev/tsv` is the full native distribution; `@fuzdev/tsv-wasm` is the
 fallback** — so parity runs the whole way, not just the engine calls. Same
-export names, same `(source, options?)` bags, same error strings: the loader's
-`read_options` mirrors the wasm crate's key for key, and
+export names, same `(source, options?)` bags, same error strings: the loader
+publishes through the wasm packages' own facade (`api.js` / `api_parse.js`, staged
+in from `crates/tsv_wasm/npm/`), so there is one options reader for both, and
 `scripts/test_napi_npm.ts` asserts the strings. `parse_<lang>` returns the
-JSON-parsed object, `parse_<lang>_json` the wire string. The deliberately
+JSON-parsed span-only object (`{locations: true}` adds `loc`, reconstructed in JS),
+`parse_<lang>_json` the wire string. The loader's `index.js` imports the two facade
+files, which sit beside it only once staged. The deliberately
 absent exports are the four WASM lifecycle ones — `init()`/`init_sync()`
 (nothing to initialize), `wasm_module` (no compiled module), and
 `reinstantiate()` (no instance to poison; a native overflow is a process-fatal
@@ -127,10 +130,10 @@ exports the bench-only `parse_internal_*` family
 (`scripts/patch_npm_package.ts` filters it out of the wasm wrappers too).
 
 The locations helpers (`reconstruct_locations` / `create_locator` / `loc_of`)
-ship here too: `tsv_wasm/npm/locations.js` is pure JS over the span-only wire,
-so the staging script copies that same file in and appends the re-export to the
-staged entry — the export names are extracted from the helper, never listed a
-second time. The `IgnoreStack` discovery class ships too — a `#[napi]` twin of
+ship here too: `tsv_wasm/npm/locations.js` is pure JS over the span-only wire —
+the facade's `{locations: true}` runs it — so the staging script copies that same
+file in and appends the re-export to the staged entry — the export names are
+extracted from the helper, never listed a second time. The `IgnoreStack` discovery class ships too — a `#[napi]` twin of
 `tsv_wasm`'s wrapper over the same `tsv_ignore` / `tsv_discover` pair, re-exported
 straight off the addon since it takes no options bag.
 
@@ -290,7 +293,7 @@ Three properties a Node/Bun host inherits from this crate, none of them visible 
 ## Files
 
 - `src/lib.rs` — All bindings: the `lang_bindings!` macro (over the shared `parse_ast!` / `goal_allowed!` goal axis, with `napi_source_type` decoding the optional `sourceType` string, and `parse_ast_for_format!` carrying the format path's unset one), the three `lang_bindings!` invocations, the `format`-gated `IgnoreStack` class, the `panic_probe` export, and a `#[cfg(test)]` module. The reusable arenas and the goal macros are imported from `tsv_arena` (`with_ast_arena`, plus `with_doc_arena` under the `format` feature)
-- `npm/` — the `@fuzdev/tsv` loader package source (`index.js` + `index.d.ts` — hand-written, mirroring the wasm packages' surface minus the WASM lifecycle (§The npm packages states the exact delta, and the suite diffs it as a set), and bound by the same `.js`-extension rule on relative specifiers ([../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §The Span-Only Wire), asserted by `scripts/test_napi_npm.ts` — + `platform.js` (triple detection) + `bin.js` (the `tsv` bin dispatcher) + `README.md`); staged with generated package.jsons by `scripts/build_napi_packages.ts`, which also copies in the shared `locations.js` helper and `cli.js` fallback (see §The npm packages)
+- `npm/` — the `@fuzdev/tsv` loader package source (`index.js` + `index.d.ts` — hand-written: the loader plus the wasm packages' own facade over the addon, so the surface is theirs minus the WASM lifecycle (§The npm packages states the exact delta, and the suite diffs it as a set), and bound by the same `.js`-extension rule on relative specifiers ([../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Line/Column Reconstruction Helper), asserted by `scripts/test_napi_npm.ts` — + `platform.js` (triple detection) + `bin.js` (the `tsv` bin dispatcher) + `README.md`); staged with generated package.jsons by `scripts/build_napi_packages.ts`, which also copies in the shared facade (`api.js` / `api_parse.js`), the `locations.js` helper and the `cli.js` fallback (see §The npm packages)
 - `build.rs` — `napi_build::setup()` (linker config for the addon)
 - `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "deny"`, not `allow` — `#[napi]`'s generated items carry their own `#[allow(unsafe_code)]` (an inner `allow` overrides `deny`), so the macro output compiles while any hand-written `unsafe` stays a compile error; deps `napi` + `napi-derive` (3.x) + `tsv_arena`, plus the `format`-optional `tsv_ignore` + `tsv_discover` + `tsv_lang` (`normalize_carriage_returns`) behind `IgnoreStack`, build-dep `napi-build` (2.x). `format` → `tsv_arena/format` + those two
 

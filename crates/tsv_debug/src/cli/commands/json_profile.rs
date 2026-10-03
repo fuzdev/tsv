@@ -1,10 +1,12 @@
-//! Profile the parse→JSON emission path (the FFI parse path).
+//! Profile the parse→JSON emission path (the bindings' parse path).
 //!
-//! `tsv_ffi`'s `tsv_parse_<lang>` runs `parse` + `convert_ast_json_bytes`.
-//! This command times those two phases per file across a corpus. The writer
-//! (`convert_ast_json_bytes`) is the sole emission path — it walks the internal
-//! AST once and emits the final char-space wire JSON directly, so there are no
-//! sub-steps to decompose: just `parse` and `write`.
+//! Every binding's `parse_<lang>` (`tsv_ffi`'s `tsv_parse_<lang>` among them) runs
+//! `parse` + `convert_ast_json_bytes_no_locations` — the span-only wire. This command
+//! times those two phases per file across a corpus; `--locations` times the Rust `loc`
+//! emitter instead (`convert_ast_json_bytes`, what `tsv parse --locations` writes). Either
+//! writer walks the internal AST once and emits the final char-space wire JSON directly,
+//! so there are no sub-steps to decompose: just `parse` and `write`. `--json` names the
+//! writer it timed in its `wire` field (`span` / `loc`).
 //!
 //! Run with `--release`; debug-build numbers aren't meaningful.
 
@@ -26,7 +28,7 @@ fn is_bench_corpus_excluded(path: &Path) -> bool {
     s.ends_with(".d.ts") || s.contains("/build/") || s.contains("/dist/")
 }
 
-/// Profile the parse→JSON emission path (`parse` + `convert_ast_json_bytes`).
+/// Profile the parse→JSON emission path (`parse` + the span-only wire writer).
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "json_profile")]
 pub struct JsonProfileCommand {
@@ -37,6 +39,11 @@ pub struct JsonProfileCommand {
     /// emit JSON
     #[argh(switch)]
     json: bool,
+
+    /// time the `loc` emitter (`convert_ast_json_bytes`, what `tsv parse --locations`
+    /// writes) instead of the bindings' span-only wire
+    #[argh(switch)]
+    locations: bool,
 
     /// file paths, directories, or glob patterns
     #[argh(positional)]
@@ -52,7 +59,7 @@ impl JsonProfileCommand {
         let mut parse_errors = 0usize;
 
         for path in &files {
-            match profile_file(path, self.iterations) {
+            match profile_file(path, self.iterations, self.locations) {
                 Ok(result) => results.push(result),
                 Err(_) => parse_errors += 1,
             }
@@ -72,9 +79,16 @@ impl JsonProfileCommand {
                 self.iterations,
                 parse_errors,
                 skipped,
+                self.locations,
             );
         } else {
-            print_report(&aggregates, self.iterations, parse_errors, skipped);
+            print_report(
+                &aggregates,
+                self.iterations,
+                parse_errors,
+                skipped,
+                self.locations,
+            );
         }
 
         // Session perf counters, when built with `--features census` (no-op otherwise).
@@ -108,7 +122,7 @@ struct IterMeta {
     wire_bytes: usize,
 }
 
-fn profile_file(path: &Path, iterations: usize) -> Result<FileResult, String> {
+fn profile_file(path: &Path, iterations: usize, locations: bool) -> Result<FileResult, String> {
     let source = std::fs::read_to_string(path).map_err(|e| format!("read error: {e}"))?;
     let parser_type = ParserType::from_extension(&path.to_string_lossy());
 
@@ -116,7 +130,7 @@ fn profile_file(path: &Path, iterations: usize) -> Result<FileResult, String> {
     let mut meta: Option<IterMeta> = None;
 
     for _ in 0..iterations {
-        profile_once(&source, parser_type, &mut steps, &mut meta)?;
+        profile_once(&source, parser_type, locations, &mut steps, &mut meta)?;
     }
 
     let meta = meta.ok_or("no iterations ran")?;
@@ -135,10 +149,13 @@ fn profile_file(path: &Path, iterations: usize) -> Result<FileResult, String> {
     })
 }
 
-/// One iteration of the FFI parse path: `parse` then `convert_ast_json_bytes`.
+/// One iteration of the parse path: `parse`, then the span-only writer
+/// (`convert_ast_json_bytes_no_locations`) — or the `loc` emitter (`convert_ast_json_bytes`)
+/// under `locations`.
 fn profile_once(
     source: &str,
     parser_type: ParserType,
+    locations: bool,
     steps: &mut StepDurations,
     meta: &mut Option<IterMeta>,
 ) -> Result<(), String> {
@@ -151,7 +168,11 @@ fn profile_once(
             let ast = tsv_ts::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
             steps.parse.push(t.elapsed());
             let t = Instant::now();
-            let wire = tsv_ts::convert_ast_json_bytes(&ast, source);
+            let wire = if locations {
+                tsv_ts::convert_ast_json_bytes(&ast, source)
+            } else {
+                tsv_ts::convert_ast_json_bytes_no_locations(&ast, source)
+            };
             steps.write.push(t.elapsed());
             wire
         }
@@ -160,7 +181,11 @@ fn profile_once(
             let ast = tsv_svelte::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
             steps.parse.push(t.elapsed());
             let t = Instant::now();
-            let wire = tsv_svelte::convert_ast_json_bytes(&ast, source);
+            let wire = if locations {
+                tsv_svelte::convert_ast_json_bytes(&ast, source)
+            } else {
+                tsv_svelte::convert_ast_json_bytes_no_locations(&ast, source)
+            };
             steps.write.push(t.elapsed());
             wire
         }
@@ -169,7 +194,11 @@ fn profile_once(
             let ast = tsv_css::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
             steps.parse.push(t.elapsed());
             let t = Instant::now();
-            let wire = tsv_css::convert_ast_json_bytes(&ast, source);
+            let wire = if locations {
+                tsv_css::convert_ast_json_bytes(&ast, source)
+            } else {
+                tsv_css::convert_ast_json_bytes_no_locations(&ast, source)
+            };
             steps.write.push(t.elapsed());
             wire
         }
@@ -225,7 +254,13 @@ fn print_report(
     iterations: usize,
     parse_errors: usize,
     skipped: usize,
+    locations: bool,
 ) {
+    let writer = if locations {
+        "convert_ast_json_bytes, the loc writer"
+    } else {
+        "convert_ast_json_bytes_no_locations, the span-only writer"
+    };
     for (parser_type, a) in aggregates {
         eprintln!(
             "{} — {} files, {} source, {} wire JSON, {} multibyte",
@@ -237,7 +272,7 @@ fn print_report(
         );
         eprintln!("  parse  {:>10}", format_duration(a.parse_us));
         eprintln!(
-            "  write  {:>10}  (convert_ast_json_bytes — the sole emission path)",
+            "  write  {:>10}  ({writer} — one pass over the internal AST)",
             format_duration(a.write_us)
         );
         eprintln!();
@@ -261,6 +296,7 @@ fn print_json(
     iterations: usize,
     parse_errors: usize,
     skipped: usize,
+    locations: bool,
 ) {
     let languages: serde_json::Map<String, serde_json::Value> = aggregates
         .iter()
@@ -293,6 +329,8 @@ fn print_json(
         .collect();
 
     let output = serde_json::json!({
+        // the writer timed: the span-only wire every binding ships, or the `loc` one
+        "wire": if locations { "loc" } else { "span" },
         "iterations": iterations,
         "parse_errors": parse_errors,
         "skipped": skipped,

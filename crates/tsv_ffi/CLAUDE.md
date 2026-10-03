@@ -15,16 +15,15 @@ Build/usage commands live in [../../CLAUDE.md §JS Bindings](../../CLAUDE.md#js-
 Mirrors `tsv_wasm`'s split so the bench can size scope-matched native artifacts:
 
 - `format` (default) — `tsv_format_<lang>` exports
-- `parse` (default) — `tsv_parse_<lang>` + `tsv_parse_<lang>_no_locations` + `tsv_parse_internal_<lang>` exports, and the `convert` layer on each language crate
+- `parse` (default) — `tsv_parse_<lang>` + `tsv_parse_internal_<lang>` exports, and the `convert` layer on each language crate
 
 The default both-features build is the full `libtsv_ffi` the bench perf rows load and any FFI host links. The size table also reports two subset builds, each into its own target dir so they don't clobber the full lib: `--no-default-features --features format` (the native mirror of `@fuzdev/tsv-format-wasm`, no convert layer, scope-matched to oxfmt) and `--no-default-features --features parse` (the mirror of `@fuzdev/tsv-parse-wasm`, printers dropped, scope-matched to oxc-parser). See `deno task build:ffi:format` / `build:ffi:parse` — built only by `build:bench`, which the gate never runs, so `deno task typecheck:features` (in `check`) `cargo check`s each half on its own.
 
 ## Public API
 
-The `lang_bindings!` macro generates four `extern "C"` functions per language (svelte, typescript, css) — the full default build; the `format`/`parse` features gate which are emitted (see [Features](#features) above):
+The `lang_bindings!` macro generates three `extern "C"` functions per language (svelte, typescript, css) — the full default build; the `format`/`parse` features gate which are emitted (see [Features](#features) above):
 
-- `tsv_parse_<lang>` — JSON AST (public, converted)
-- `tsv_parse_<lang>_no_locations` — the span-only variant (drops per-node `loc`; Svelte also drops `name_loc`). See [../tsv_ts/CLAUDE.md](../tsv_ts/CLAUDE.md) §Public API.
+- `tsv_parse_<lang>` — the span-only JSON AST (`start`/`end` offsets, no per-node `loc`; Svelte also no `name_loc`) — the one parse wire every binding emits. See [../tsv_ts/CLAUDE.md](../tsv_ts/CLAUDE.md) §Public API. The `loc`-bearing wire has no C-ABI export; the corpus tools ask `tsv_debug loc_wires --stdin` for it.
 - `tsv_parse_internal_<lang>` — Empty payload (`*out_len == 0` with `TSV_STATUS_OK`; benchmark-only; AST is built but not converted/serialized — `std::hint::black_box` prevents elision)
 - `tsv_format_<lang>` — Formatted source
 
@@ -55,12 +54,12 @@ and a goalless one has nothing to answer at all, while a parse export's wire car
 a `Program.sourceType` that one settled grammar has to produce. **Svelte and CSS
 REJECT code `1`** rather than ignoring it: Svelte hard-wires `Module` and CSS has
 no goal axis, so a caller passing `1` there asked for something that cannot be
-honored and is told — the same stance `tsv_wasm`'s `read_options` takes when it
-rejects the `sourceType` key outright (see [../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md)
-§Format Options). `tsv_napi` spells the axis as a trailing optional `sourceType`
-string; each binding has its own `lang_bindings!`, but all three read the **same**
-`parse_ast!` / `goal_allowed!` pair out of [`tsv_arena`](../tsv_arena/), so which
-languages have a goal axis is one fact in one place and coverage is identical by
+honored and is told — the same stance `tsv_wasm`'s flat exports and the npm facade's
+options reader take (see [../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Format
+Options). `tsv_napi` and `tsv_wasm` spell the axis as a trailing optional
+`sourceType` string; each binding has its own `lang_bindings!`, but all three read the
+**same** `parse_ast!` / `goal_allowed!` pair out of [`tsv_arena`](../tsv_arena/), so
+which languages have a goal axis is one fact in one place and coverage is identical by
 construction.
 
 ## Memory & Safety Contract

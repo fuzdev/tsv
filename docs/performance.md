@@ -166,11 +166,12 @@ the `--json` output as `*_us_per_kb` / `*_us_per_file` fields.
 
 ### 2. `tsv_debug json_profile` — parse→JSON emission timing
 
-Times the two phases of the FFI parse path (`parse` +
-`convert_ast_json_bytes`) per file across a corpus. The writer
-(`convert_ast_json_bytes`) is the sole emission path — it walks the internal
-AST once and emits the final char-space wire JSON directly, so there are no
-sub-steps to decompose (per-language pipeline shapes:
+Times the two phases of the bindings' parse path (`parse` +
+`convert_ast_json_bytes_no_locations`, the span-only wire every binding ships) per file
+across a corpus; `--locations` times the Rust `loc` emitter (`convert_ast_json_bytes`,
+what `tsv parse --locations` writes) instead. Either writer walks the internal AST once
+and emits the final char-space wire JSON directly, so there are no sub-steps to decompose
+(per-language pipeline shapes:
 [architecture.md §Closed Scope, Open Convention](./architecture.md#closed-scope-open-convention)).
 Pure Rust, no external dependencies.
 
@@ -180,11 +181,13 @@ cargo run --release -p tsv_debug -- json_profile ../corpora/collections/zzz/src/
 
 # JSON output with per-file data (e.g. to split costs by multibyte flag)
 cargo run --release -p tsv_debug -- json_profile ../corpora/collections/zzz/src/lib --json
-# Also: --iterations <n> (default: 5)
+# Also: --iterations <n> (default: 5), --locations (the loc emitter)
 ```
 
 Output shows, per language: file/byte/wire-byte/multibyte counts and the
-`parse` and `write` medians (sums of per-file medians).
+`parse` and `write` medians (sums of per-file medians). `--json` also names the writer
+it timed, `"wire": "span"` or `"loc"`, so two saved runs can't be diffed across writers
+by accident.
 
 **When A/B-ing a write-path change, read `write` from here and `parse` from
 `profile` (§1) — not from this command.** Both phases run in one process against

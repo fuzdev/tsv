@@ -106,6 +106,13 @@ await assert_staged_fresh([
 		files: ['scripts/patch_npm_package.ts', 'scripts/npm_metadata.ts'],
 		rebuild: `deno task build:npm:${variant}`
 	},
+	{
+		label: `staged facade (${variant})`,
+		staged: `${pkg_dir}/api.js`,
+		crates: [],
+		files: ['crates/tsv_wasm/npm/api.js', 'crates/tsv_wasm/npm/api.d.ts'],
+		rebuild: `deno task build:npm:${variant}`
+	},
 	...(variant === 'all'
 		? [
 				{
@@ -119,6 +126,13 @@ await assert_staged_fresh([
 		: []),
 	...(variant !== 'format'
 		? [
+				{
+					label: `staged parse facade (${variant})`,
+					staged: `${pkg_dir}/api_parse.js`,
+					crates: [],
+					files: ['crates/tsv_wasm/npm/api_parse.js', 'crates/tsv_wasm/npm/api_parse.d.ts'],
+					rebuild: `deno task build:npm:${variant}`
+				},
 				{
 					label: `staged locations helper (${variant})`,
 					staged: `${pkg_dir}/locations.js`,
@@ -235,6 +249,35 @@ describe(`package metadata: ${pkg_dir}`, () => {
 		assert.ok(pkg.files.includes('locations.d.ts'));
 	});
 
+	// The facade's two halves: the shared one (the options reader + the format family)
+	// in every variant, the parse one only where parsing ships — so the format-only
+	// package carries neither `api_parse.js` nor the `locations.js` it imports.
+	it('every variant ships the shared facade, verbatim', () => {
+		for (const file of ['api.js', 'api.d.ts']) {
+			assert.ok(pkg.files.includes(file), file);
+			assert.equal(
+				readFileSync(new URL(`../${pkg_dir}/${file}`, import.meta.url), 'utf8'),
+				readFileSync(new URL(`../crates/tsv_wasm/npm/${file}`, import.meta.url), 'utf8'),
+				`${file} is the shared source`
+			);
+		}
+	});
+
+	it('only parse-capable variants ship the parse facade', () => {
+		for (const file of ['api_parse.js', 'api_parse.d.ts']) {
+			assert.equal(pkg.files.includes(file), has_parse, file);
+		}
+		if (!has_parse) {
+			assert.equal(pkg.files.includes('locations.js'), false);
+			const entries = ['index.js', 'browser.js'].map((f) =>
+				readFileSync(new URL(`../${pkg_dir}/${f}`, import.meta.url), 'utf8')
+			);
+			for (const text of entries) {
+				assert.doesNotMatch(text, /api_parse|locations/, 'the format-only entries load neither');
+			}
+		}
+	});
+
 	it('all variant ships the tsv bin', { skip: variant !== 'all' }, () => {
 		assert.deepEqual(pkg.bin, { tsv: 'cli.js' });
 		assert.ok(pkg.files.includes('cli.js'));
@@ -289,6 +332,40 @@ describe(`package metadata: ${pkg_dir}`, () => {
 });
 
 describe(`node entry (index.js): ${pkg_dir}`, () => {
+	// Past the facade, a caller holds the wasm-bindgen module itself (initialized by
+	// `index.js`'s import above — one module instance per URL). Its `source_type` is
+	// read off a `JsValue`, so a value that is not a string is refused by its kind,
+	// never coerced to `''` (`invalid sourceType ''`) or thrown from inside the glue.
+	it('raw module: a wrong-typed source_type is named, never coerced', async () => {
+		const raw = await import(`../${pkg_dir}/tsv_wasm.js`);
+		const raw_typescript: (source: string, source_type?: unknown) => unknown = has_format
+			? raw.format_typescript
+			: raw.parse_typescript_json;
+		for (const [value, kind] of [
+			[1, 'a number'],
+			[true, 'a boolean'],
+			[{}, 'an object'],
+			[['script'], 'an array']
+		] as const) {
+			assert.throws(
+				() => raw_typescript('x;', value),
+				(e: unknown) =>
+					e instanceof Error &&
+					e.message === `invalid sourceType: expected a string ('script' or 'module'), got ${kind}`,
+				String(value)
+			);
+		}
+		// unset stays unset, and a string still decodes by value
+		raw_typescript('x;');
+		raw_typescript('x;', null);
+		raw_typescript('x;', 'script');
+		assert.throws(
+			() => raw_typescript('x;', ''),
+			(e: unknown) =>
+				e instanceof Error && e.message === "invalid sourceType '' (expected 'script' or 'module')"
+		);
+	});
+
 	it('format_typescript formats', { skip: !has_format }, () => {
 		assert.equal(node_entry.format_typescript('const   x=1'), 'const x = 1;\n');
 	});
@@ -513,23 +590,21 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		);
 	});
 
-	it('parse options: {locations: false} emits the span-only wire', { skip: !has_parse }, () => {
-		const full = node_entry.parse_typescript('const x = 1;');
-		const span_only = node_entry.parse_typescript('const x = 1;', { locations: false });
-		assert.ok(full.loc);
+	it('parse: the span-only wire by default, `loc` on request', { skip: !has_parse }, () => {
+		const span_only = node_entry.parse_typescript('const x = 1;');
+		const located = node_entry.parse_typescript('const x = 1;', { locations: true });
 		assert.equal('loc' in span_only, false);
-		assert.equal(span_only.type, 'Program');
-		// svelte also drops name_loc
+		assert.equal(typeof span_only.start, 'number');
+		assert.deepEqual(located.loc, { start: { line: 1, column: 0 }, end: { line: 1, column: 12 } });
+		// `{locations: false}` is the default spelled out
+		assert.deepEqual(node_entry.parse_typescript('const x = 1;', { locations: false }), span_only);
+		// svelte's name_loc is a location field too
 		const sv = '<div class="a">x</div>';
-		assert.match(JSON.stringify(node_entry.parse_svelte(sv)), /"name_loc"/);
-		const sv_span_only = JSON.stringify(node_entry.parse_svelte(sv, { locations: false }));
-		assert.doesNotMatch(sv_span_only, /"name_loc"|"loc"/);
-		// css carries loc on the default wire like the other two, and drops it span-only
-		assert.ok(node_entry.parse_css('a { color: red }').children[0].loc);
-		assert.doesNotMatch(
-			JSON.stringify(node_entry.parse_css('a { color: red }', { locations: false })),
-			/"loc"/
-		);
+		assert.doesNotMatch(JSON.stringify(node_entry.parse_svelte(sv)), /"name_loc"|"loc"/);
+		assert.match(JSON.stringify(node_entry.parse_svelte(sv, { locations: true })), /"name_loc"/);
+		// css carries none by default, and `loc` on every node on request
+		assert.doesNotMatch(JSON.stringify(node_entry.parse_css('a { color: red }')), /"loc"/);
+		assert.ok(node_entry.parse_css('a { color: red }', { locations: true }).children[0].loc);
 	});
 
 	it('parse options: sourceType switches the TypeScript parse goal', { skip: !has_parse }, () => {
@@ -542,24 +617,33 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 			() => node_entry.parse_typescript('x;', { sourceType: 'bogus' }),
 			/invalid sourceType/
 		);
-		// sourceType composes with locations (it drives the parser, locations the
-		// writer)
+		// sourceType composes with locations (it drives the parser, locations the view)
 		const composed = node_entry.parse_typescript('var await = 1;', {
 			sourceType: 'script',
-			locations: false
+			locations: true
 		});
 		assert.equal(composed.sourceType, 'script');
-		assert.equal('loc' in composed, false);
+		assert.ok(composed.loc);
+		// the `_json` export takes the source type too
+		assert.equal(
+			JSON.parse(node_entry.parse_typescript_json('var await = 1;', { sourceType: 'script' }))
+				.sourceType,
+			'script'
+		);
 	});
 
 	it('parse options: unknown keys and a misapplied sourceType error', { skip: !has_parse }, () => {
-		assert.throws(
-			() => node_entry.parse_typescript('x;', { locatons: false }),
-			/unknown parse option 'locatons'/
-		);
+		assert.throws(() => node_entry.parse_typescript('x;', { locatons: true }), {
+			message: "unknown parse option 'locatons' (expected 'locations' or 'sourceType')"
+		});
+		assert.throws(() => node_entry.parse_svelte('x', { x: 1 }), {
+			message: "unknown parse option 'x' (expected 'locations')"
+		});
 		for (const [parse, source] of [
 			[node_entry.parse_svelte, '<div>x</div>'],
-			[node_entry.parse_css, 'a { color: red }']
+			[node_entry.parse_css, 'a { color: red }'],
+			[node_entry.parse_svelte_json, '<div>x</div>'],
+			[node_entry.parse_css_json, 'a { color: red }']
 		] as const) {
 			for (const sourceType of ['script', 'module']) {
 				assert.throws(() => parse(source, { sourceType }), {
@@ -567,24 +651,32 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 				});
 			}
 		}
-		assert.throws(
-			() => node_entry.parse_typescript('x;', { locations: 'yes' }),
-			/'locations' must be a boolean/
-		);
+		assert.throws(() => node_entry.parse_typescript('x;', { locations: 'yes' }), {
+			message: "parse option 'locations' must be a boolean"
+		});
+		// the `_json` exports return the wire string itself, so they take no
+		// `locations` — `loc` is a view over objects
+		assert.throws(() => node_entry.parse_typescript_json('x;', { locations: false }), {
+			message: "unknown parse option 'locations' (expected 'sourceType')"
+		});
+		assert.throws(() => node_entry.parse_css_json('a{}', { locations: false }), {
+			message: "unknown parse option 'locations' (this export takes no options)"
+		});
 		// a supported key explicitly set to undefined means that key's default
 		// (omitted-key convention)
-		assert.ok(
-			node_entry.parse_typescript('x;', { locations: undefined, sourceType: undefined }).loc
+		assert.equal(
+			'loc' in node_entry.parse_typescript('x;', { locations: undefined, sourceType: undefined }),
+			false
 		);
 		// ...including the TS-only key on a language that REJECTS it. Load-bearing:
 		// `npm/cli.js` forwards one options bag to whichever parser and spells the
 		// inapplicable source type as `undefined` rather than branching the call. The
 		// `sourceType` arm must read `undefined` before its language rejection, or
 		// this breaks with `check` still green. `ParseOptions` declares
-		// `sourceType?: undefined` so
-		// the same bag type-checks; see ../crates/tsv_wasm/CLAUDE.md.
+		// `sourceType?: undefined` so the same bag type-checks; see `api_parse.d.ts`.
 		assert.ok(node_entry.parse_svelte('<div>x</div>', { sourceType: undefined }));
 		assert.ok(node_entry.parse_css('a { color: red }', { sourceType: undefined }));
+		assert.ok(node_entry.parse_css_json('a { color: red }', { sourceType: undefined }));
 		// an UNKNOWN key throws even at `undefined` — the typo guard has no
 		// undefined-valued hole; only supported keys read `undefined` as absent
 		assert.throws(
@@ -592,156 +684,177 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 			/unknown parse option 'locatons'/
 		);
 		// a non-object options argument is an error, arrays included
-		assert.throws(() => node_entry.parse_typescript('x;', 'locations'), /must be an object/);
+		assert.throws(() => node_entry.parse_typescript('x;', 'locations'), {
+			message: 'parse options must be an object'
+		});
 		assert.throws(() => node_entry.parse_typescript('x;', []), /must be an object/);
 		// `null` and `undefined` both mean all-defaults — `null` is the arm that
 		// would otherwise fall through to the non-object error, since it is
 		// `typeof 'object'` — and so does `{}`, the zero-key object path
-		assert.ok(node_entry.parse_typescript('x;', null).loc);
-		assert.ok(node_entry.parse_typescript('x;', undefined).loc);
-		assert.ok(node_entry.parse_typescript('x;', {}).loc);
+		for (const options of [null, undefined, {}]) {
+			assert.equal(node_entry.parse_typescript('x;', options).type, 'Program');
+		}
 	});
 });
 
-// Locations helper (locations.js, re-exported from index.js) — reconstruct the
-// per-node `loc` a `no-locations` wire drops, from `start`/`end` + source. These
-// assert the shipped package export end-to-end; at corpus scale the bench's
-// `+reconstruct` rows run it too.
+// Locations helper (locations.js, re-exported from index.js) and the `{locations: true}`
+// sugar that runs it — `loc` reconstructed from `start`/`end` + source over the span-only
+// tree every parse returns. These assert the shipped package's wiring end to end; whether
+// the reconstruction equals the Rust `loc` emitter is `deno task check:loc`'s (every
+// fixture document) and `tests/loc_definition.rs`'s, which grade the engine itself, and
+// at corpus scale the bench's `+reconstruct` rows run it too.
 describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => {
-	it('reconstruct_locations is EXACT for TypeScript (equals the full wire)', () => {
+	it('`{locations: true}` is the reconstruction of the default parse', () => {
 		const ts = 'const x = 1;\nconst y = 2;\n';
-		const full = node_entry.parse_typescript(ts);
-		const recon = node_entry.reconstruct_locations(
-			node_entry.parse_typescript(ts, { locations: false }),
-			ts
+		const located = node_entry.parse_typescript(ts, { locations: true });
+		assert.deepEqual(
+			located,
+			node_entry.reconstruct_locations(node_entry.parse_typescript(ts), ts)
 		);
-		// The span-only wire is the full wire minus `loc`; adding it back must
-		// reproduce acorn's `loc` byte-for-byte on every node.
-		assert.deepEqual(recon, full);
+		// acorn's `loc`: 1-based line, 0-based UTF-16 column, on every node
+		assert.deepEqual(located.body[1].loc, {
+			start: { line: 2, column: 0 },
+			end: { line: 2, column: 12 }
+		});
+		assert.deepEqual(located.body[1].declarations[0].id.loc, {
+			start: { line: 2, column: 6 },
+			end: { line: 2, column: 7 }
+		});
 	});
 
 	it('reconstruct_locations mutates in place and returns the same object', () => {
-		const ast = node_entry.parse_typescript('const x = 1;', { locations: false });
+		const ast = node_entry.parse_typescript('const x = 1;');
 		const returned = node_entry.reconstruct_locations(ast, 'const x = 1;');
 		assert.equal(returned, ast); // same reference
 		assert.ok(ast.loc); // mutated in place
 	});
 
+	it('reconstruct_locations refuses to guess the language of a subtree', () => {
+		const sv = '<p>x</p>';
+		assert.throws(
+			() => node_entry.reconstruct_locations(node_entry.parse_svelte(sv).fragment, sv),
+			/cannot infer the document's language from a 'Fragment' root/
+		);
+		// named, the subtree reconstructs under Svelte's rule, `name_loc` included
+		const fragment = node_entry.reconstruct_locations(node_entry.parse_svelte(sv).fragment, sv, {
+			language: 'svelte'
+		});
+		assert.deepEqual(
+			fragment.nodes[0].name_loc,
+			node_entry.parse_svelte(sv, { locations: true }).fragment.nodes[0].name_loc
+		);
+	});
+
 	it('loc_of derives a single node line/column', () => {
 		const ts = 'const x = 1;\nconst y = 2;\n';
-		const full = node_entry.parse_typescript(ts);
-		const noloc = node_entry.parse_typescript(ts, { locations: false });
+		const located = node_entry.parse_typescript(ts, { locations: true });
+		const spans = node_entry.parse_typescript(ts);
 		// second statement starts on line 2, column 0
-		assert.deepEqual(node_entry.loc_of(noloc.body[1], ts), full.body[1].loc);
-		assert.equal(node_entry.loc_of({ type: 'X' }, ts), null); // no start/end → null
+		assert.deepEqual(
+			node_entry.loc_of(spans.body[1], ts, { language: 'typescript' }),
+			located.body[1].loc
+		);
+		assert.equal(node_entry.loc_of({ type: 'X' }, ts, { language: 'typescript' }), null); // no start/end → null
 	});
 
 	it('create_locator reuses one line table for many lookups', () => {
 		const ts = 'const x = 1;\nconst y = 2;\n';
-		const full = node_entry.parse_typescript(ts);
-		const noloc = node_entry.parse_typescript(ts, { locations: false });
-		const locator = node_entry.create_locator(ts);
-		assert.deepEqual(locator.loc_of(noloc.body[0]), full.body[0].loc);
-		assert.deepEqual(locator.loc_of(noloc.body[1]), full.body[1].loc);
+		const located = node_entry.parse_typescript(ts, { locations: true });
+		const spans = node_entry.parse_typescript(ts);
+		const locator = node_entry.create_locator(ts, { language: 'typescript' });
+		assert.deepEqual(locator.loc_of(spans.body[0]), located.body[0].loc);
+		assert.deepEqual(locator.loc_of(spans.body[1]), located.body[1].loc);
 	});
 
-	it('reconstruct_locations is EXACT for CSS (equals the full wire)', () => {
-		// CSS follows the same definition as the other two: LF-only lines, a leading BOM
-		// elided as `parseCss` strips it. Language inferred from the `StyleSheetFile` root.
-		for (const css of [
-			'a {\n\tcolor: red;\n}\n',
-			'/* c */\n@media (x) {\n\tp::after { content: "😀"; }\n}\r\nb { }',
-			'\ufeffa {\u2028color: red; }\n'
-		]) {
-			const out = node_entry.reconstruct_locations(
-				node_entry.parse_css(css, { locations: false }),
-				css
-			);
-			assert.deepEqual(out, node_entry.parse_css(css), JSON.stringify(css));
-		}
+	// A bare source or a lone node names no document, and the language decides the line
+	// rule, the BOM and the Svelte stamping — so the two entry points that take one refuse
+	// to guess, where `reconstruct_locations` reads it off the tree's root.
+	it('create_locator and loc_of require the language', () => {
+		const message = /`language` must be 'typescript', 'svelte' or 'css'/;
+		assert.throws(() => node_entry.create_locator('x'), message);
+		assert.throws(() => node_entry.create_locator('x', {}), message);
+		assert.throws(() => node_entry.create_locator('x', { language: 'js' }), /got 'js'/);
+		assert.throws(() => node_entry.loc_of({ start: 0, end: 1 }, 'x'), message);
+		assert.ok(
+			node_entry.reconstruct_locations(node_entry.parse_svelte('<p>x</p>'), '<p>x</p>').loc
+		);
 	});
 
-	// Svelte reconstructs EXACTLY too: the wire and the helper implement one definition —
-	// each object's own `start`/`end`, LF-only for the whole document — and neither models a
-	// quirk of Svelte's own `loc`. The sources cover every `name_loc` shape (tag name,
-	// attribute, shorthand padded and not, a directive head with modifiers), each position
-	// Svelte gives `character` (shorthand expansion, snippet name, simple block patterns, an
-	// in-tag comment, the `<svelte:options>` head), the objects with no `type` (`options`,
-	// `StyleSheet.content`, comments), destructured and typed block bindings off line 1, a
-	// newline before a binding's `:`, and a `<script>` program whose content starts mid-line.
-	it('reconstruct_locations is EXACT for Svelte (equals the full wire)', () => {
+	it('CSS: `loc` on every node on request, LF-only', () => {
+		const css = 'a {\r\n\tcolor: red;\r}\n';
+		const located = node_entry.parse_css(css, { locations: true });
+		assert.deepEqual(located, node_entry.reconstruct_locations(node_entry.parse_css(css), css));
+		// a lone CR opens no line in a CSS document (it is a column), and the CRLF's LF ends
+		// line 1: the rule closes on line 2 after `\tcolor: red;\r}`
+		assert.deepEqual(located.children[0].loc, {
+			start: { line: 1, column: 0 },
+			end: { line: 2, column: 14 }
+		});
+	});
+
+	// Svelte's reconstruction restores the Svelte-only fields too — `name_loc` on elements,
+	// attributes and directives, and `character` on the positions Svelte's own template
+	// reader creates — so `{locations: true}` must hand the facade's language through.
+	it('Svelte: `{locations: true}` restores name_loc and character', () => {
 		const sources = [
-			'<script>\nconst x = 1;\n</script>\n\n<div class="a" on:click|preventDefault={x} {x} { x }>\n\t{@const y = x}\n\t{#each [x] as item}{item}{/each}\n\t{#await x}p{:then value}{value}{:catch err}{err}{/await}\n</div>\n<svelte:head><title>t</title></svelte:head>\n{#snippet row(a)}{a}{/snippet}',
-			'<svelte:options /* o */ runes />\n<div /* c */ class="a" {@attach /* d */ x}>\n\t{#each xs as { a, b: [c] }, i (a)}{a}{/each}\n\t{#await p then [v, /* e */ w]}{v}{:catch { message }}{message}{/await}\n\t{@const { k } = o}\n</div>\n<style>\n/* s */\np { color: red; }\n</style>\n',
-			'<script lang="ts">let xs: any;</script>\n{#each xs as\ne: T}{e}{/each}\n{#each xs as { a }\n  : { x: A; /* t */ }}{a}{/each}\n{#each xs as [\na\n]: T}{a}{/each}\n',
-			'<div></div>\t<script>\n  let a = 1;\n</script>\n<script module>export const m = 1;</script>'
+			'<script>\nconst x = 1;\n</script>\n\n<div class="a" on:click|preventDefault={x} {x} { x }>\n\t{@const y = x}\n\t{#each [x] as item}{item}{/each}\n</div>\n{#snippet row(a)}{a}{/snippet}',
+			'<svelte:options /* o */ runes />\n<div /* c */ class="a">\n\t{#each xs as { a, b: [c] }, i (a)}{a}{/each}\n</div>\n<style>\n/* s */\np { color: red; }\n</style>\n'
 		];
 		for (const sv of sources) {
-			const recon = node_entry.reconstruct_locations(
-				node_entry.parse_svelte(sv, { locations: false }),
-				sv
+			const located = node_entry.parse_svelte(sv, { locations: true });
+			assert.deepEqual(
+				located,
+				node_entry.reconstruct_locations(node_entry.parse_svelte(sv), sv, { language: 'svelte' }),
+				JSON.stringify(sv.slice(0, 60))
 			);
-			assert.deepEqual(recon, node_entry.parse_svelte(sv), JSON.stringify(sv.slice(0, 60)));
 		}
+		const located = node_entry.parse_svelte(sources[0], { locations: true });
+		const div = located.fragment.nodes.find((n: any) => n.type === 'RegularElement');
+		const name_at = sources[0].indexOf('<div') + 1;
+		assert.deepEqual(div.name_loc, {
+			start: { line: 5, column: 1, character: name_at },
+			end: { line: 5, column: 4, character: name_at + 3 }
+		});
+		assert.match(JSON.stringify(located), /"character":/);
 	});
 
-	it('a leading BOM is elided for Svelte and CSS (as their wires are) and counted for TypeScript', () => {
+	it('a leading BOM is elided for Svelte (as its wire is) and counted for TypeScript', () => {
 		// Svelte's `parse` strips the BOM before parsing, so the wire's first element
-		// starts at 0 and its `name_loc` is column 1; the helper must index the same
-		// BOM-less string, or every line-1 column and name span reads one off.
+		// starts at 0 and its `name_loc` is column 1; the helper indexes the same
+		// BOM-less string, or every line-1 column and name span would read one off.
 		const sv = '\ufeff<div class="a">x</div>\n<span>y</span>';
-		const full = node_entry.parse_svelte(sv);
-		assert.equal(full.fragment.nodes[0].start, 0);
-		assert.equal(full.fragment.nodes[0].name_loc.start.column, 1);
-		assert.deepEqual(
-			node_entry.reconstruct_locations(node_entry.parse_svelte(sv, { locations: false }), sv),
-			full
-		);
-		// acorn counts the BOM as whitespace: the first statement sits at offset 1, column 1,
-		// and the reconstruction over the caller's string reproduces that exactly.
-		const ts = '\ufeffconst x = 1;';
-		const ts_full = node_entry.parse_typescript(ts);
-		assert.equal(ts_full.body[0].start, 1);
-		assert.deepEqual(
-			node_entry.reconstruct_locations(node_entry.parse_typescript(ts, { locations: false }), ts),
-			ts_full
-		);
+		const sv_located = node_entry.parse_svelte(sv, { locations: true });
+		assert.equal(sv_located.fragment.nodes[0].start, 0);
+		assert.equal(sv_located.fragment.nodes[0].name_loc.start.column, 1);
+		assert.equal(sv_located.fragment.nodes[0].loc.start.column, 0);
+		// acorn counts the BOM as whitespace: the first statement sits at offset 1, column 1
+		const ts_located = node_entry.parse_typescript('\ufeffconst x = 1;', { locations: true });
+		assert.equal(ts_located.body[0].start, 1);
+		assert.equal(ts_located.body[0].loc.start.column, 1);
 	});
 
 	// One line rule per DOCUMENT: a TypeScript document counts ECMAScript's terminators, a
-	// Svelte document `\n` alone — in its `<script>`, template expressions and `<style>` too —
-	// so a lone CR / U+2028 / U+2029 reconstructs like any other source, in both languages.
+	// Svelte document `\n` alone — in its `<script>`, template expressions and `<style>` too.
 	it('a lone CR / U+2028 / U+2029 follows its document rule in both languages', () => {
 		const script = 'let a = 1;\rlet b = 2;\u2028let c = 3;\u2029let d = 4;\r\nlet e = 5;';
-		const ts_full = node_entry.parse_typescript(script);
-		assert.equal(ts_full.body[4].loc.start.line, 5, 'TypeScript counts every terminator');
-		assert.deepEqual(
-			node_entry.reconstruct_locations(
-				node_entry.parse_typescript(script, { locations: false }),
-				script
-			),
-			ts_full
-		);
-		const sv = `<script>\n${script}\n</script>\n<p>{x\r+\u2028y}</p>\n<style>\np { }\r/* \u2029 */ a { }\n</style>\n`;
-		const sv_full = node_entry.parse_svelte(sv);
+		const ts_located = node_entry.parse_typescript(script, { locations: true });
+		assert.equal(ts_located.body[4].loc.start.line, 5, 'TypeScript counts every terminator');
+		const sv = `<script>\n${script}\n</script>\n<p>{x\r+\u2028y}</p>\n`;
+		const sv_located = node_entry.parse_svelte(sv, { locations: true });
 		// the script's lone CR / LS / PS open no line; its CRLF is one LF
-		assert.equal(sv_full.instance.content.body[3].loc.start.line, 2, 'Svelte counts LF alone');
-		assert.equal(sv_full.instance.content.body[4].loc.start.line, 3);
-		assert.deepEqual(
-			node_entry.reconstruct_locations(node_entry.parse_svelte(sv, { locations: false }), sv),
-			sv_full
-		);
+		assert.equal(sv_located.instance.content.body[3].loc.start.line, 2, 'Svelte counts LF alone');
+		assert.equal(sv_located.instance.content.body[4].loc.start.line, 3);
 	});
 
 	// The hand-written cases above pin the shapes a reader can follow; this one drives the
-	// SAME helper over every fixture source in the repo — `.svelte`, `.ts` and `.css`, inputs
-	// and variants alike — so the tables it carries (`NAME_LOC_KINDS`, the `character`-bearing
-	// shapes) are graded against what the writer actually emits rather than against a
-	// remembered list. The reconstruction must deep-equal the full wire of the same parse,
-	// and `create_locator(...).loc_of` must agree with it node for node, so the two entry
-	// points cannot drift apart. `deno task check:loc` grades the same equality over the
-	// native writer; this grades it through the shipped package.
-	it('reconstructs every fixture source exactly', () => {
+	// facade over every fixture source in the repo — `.svelte`, `.ts` and `.css`, inputs and
+	// variants alike — at the wiring level: `{locations: true}` must be exactly the shipped
+	// reconstruction of the default parse in the document's language, the default parse must
+	// be that tree minus `loc` / `name_loc`, and `create_locator(...).loc_of` must agree with
+	// the reconstruction node for node, so the two entry points cannot drift apart. Whether
+	// the reconstruction equals the Rust `loc` emitter is `deno task check:loc`'s, over the
+	// same tree, against the native writer.
+	it('wires `{locations: true}` exactly, over every fixture source', () => {
 		const roots = [join(repo_root, 'tests/fixtures'), join(repo_root, 'tests/fixtures_compile')];
 		const files: Array<[string, 'svelte' | 'typescript' | 'css']> = [];
 		const collect = (dir: string): void => {
@@ -774,6 +887,8 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 			}
 			return out;
 		};
+		const without_locations = (key: string, value: unknown): unknown =>
+			key === 'loc' || key === 'name_loc' ? undefined : value;
 
 		const findings: Array<string> = [];
 		const graded = { svelte: 0, typescript: 0, css: 0 };
@@ -788,23 +903,26 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 				readFileSync(goal_marker, 'utf8').trim() === 'script'
 					? { sourceType: 'script' }
 					: {};
-			let full;
+			let located;
 			let span_only;
 			try {
-				full = parse(language, source, options);
-				span_only = parse(language, source, { ...options, locations: false });
+				located = parse(language, source, { ...options, locations: true });
+				span_only = parse(language, source, options);
 			} catch {
 				continue; // a source tsv rejects (input_invalid_*, tsv_rejects, a non-module `.ts`)
 			}
 			graded[language]++;
 			const rel = file.slice(repo_root.length + 1);
+			if (JSON.stringify(located, without_locations) !== JSON.stringify(span_only)) {
+				findings.push(`${rel}: the default parse is not the located one minus loc/name_loc`);
+			}
 			// the per-node entry point, asked before `reconstruct` mutates the same tree
 			const locator = node_entry.create_locator(source, { language });
 			const nodes = spanned(span_only);
 			const answers = nodes.map((n) => locator.loc_of(n));
 			const recon = node_entry.reconstruct_locations(span_only, source, { language });
-			if (!isDeepStrictEqual(recon, full)) {
-				findings.push(`${rel}: reconstruct differs from the full wire`);
+			if (!isDeepStrictEqual(recon, located)) {
+				findings.push(`${rel}: {locations: true} differs from reconstruct_locations`);
 			}
 			nodes.forEach((n, i) => {
 				loc_of_checked++;
@@ -843,6 +961,13 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 	it('exports throw before init', () => {
 		const guarded = has_format ? 'format_typescript' : 'parse_typescript';
 		assert.throws(() => browser[guarded]('const x = 1'), /WASM not initialized/);
+	});
+
+	// The facade reads the options bag before it calls into the engine, so a bad bag
+	// reports itself even before init — the guard is for a well-formed call.
+	it('a bad options bag is reported as itself before init', () => {
+		const guarded = has_format ? 'format_typescript' : 'parse_typescript';
+		assert.throws(() => browser[guarded]('x', { sourceTpye: 'script' }), /unknown \w+ option/);
 	});
 
 	// The class exports are the one family that cannot take a per-call guard, so
@@ -890,10 +1015,10 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 	it('the init guard forwards extra args (parse options)', { skip: !has_parse }, () => {
 		const program = browser.parse_typescript('var await = 1;', {
 			sourceType: 'script',
-			locations: false
+			locations: true
 		});
 		assert.equal(program.sourceType, 'script');
-		assert.equal('loc' in program, false);
+		assert.ok(program.loc);
 	});
 
 	it('the init guard forwards extra args (format options)', { skip: !has_format }, () => {
@@ -1620,20 +1745,16 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		assert.equal(dflt.status, 1);
 	});
 
-	it('parse --no-locations omits per-node loc and composes with --source-type', () => {
-		const bare = run_cli([
-			'parse',
-			'--no-locations',
-			'--content',
-			'const x = 1;',
-			'--parser',
-			'ts'
-		]);
+	it('parse emits the span-only wire; --locations adds loc and composes with --source-type', () => {
+		const bare = run_cli(['parse', '--content', 'const x = 1;', '--parser', 'ts']);
 		assert.equal(bare.status, 0, bare.stderr);
 		assert.doesNotMatch(bare.stdout, /"loc"/);
+		// the default output is the engine's wire string, verbatim
+		assert.equal(bare.stdout, `${node_entry.parse_typescript_json('const x = 1;')}\n`);
+		// --locations is the facade's `{locations: true}`, stringified
 		const composed = run_cli([
 			'parse',
-			'--no-locations',
+			'--locations',
 			'--source-type',
 			'script',
 			'--content',
@@ -1642,29 +1763,39 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			'ts'
 		]);
 		assert.equal(composed.status, 0, composed.stderr);
+		assert.deepEqual(
+			JSON.parse(composed.stdout),
+			node_entry.parse_typescript('var await = 1;', { sourceType: 'script', locations: true })
+		);
 		assert.match(composed.stdout, /"sourceType":"script"/);
-		assert.doesNotMatch(composed.stdout, /"loc"/);
-		// svelte drops name_loc too; css drops its loc
-		const sv = run_cli([
+		// svelte carries name_loc on request; css loc
+		for (const [parser, source, parse] of [
+			['svelte', '<div class="a">x</div>', node_entry.parse_svelte],
+			['css', 'a{color:red}', node_entry.parse_css]
+		] as const) {
+			const span = run_cli(['parse', '--content', source, '--parser', parser]);
+			assert.equal(span.status, 0, span.stderr);
+			assert.doesNotMatch(span.stdout, /"name_loc"|"loc"/);
+			const located = run_cli(['parse', '--locations', '--content', source, '--parser', parser]);
+			assert.equal(located.status, 0, located.stderr);
+			assert.deepEqual(JSON.parse(located.stdout), parse(source, { locations: true }));
+		}
+		// --pretty --locations: the same tree, tab-indented
+		const pretty = run_cli([
 			'parse',
-			'--no-locations',
+			'--pretty',
+			'--locations',
 			'--content',
-			'<div>x</div>',
+			'const x = 1;',
 			'--parser',
-			'svelte'
+			'ts'
 		]);
-		assert.equal(sv.status, 0, sv.stderr);
-		assert.doesNotMatch(sv.stdout, /"name_loc"|"loc"/);
-		const css = run_cli([
-			'parse',
-			'--no-locations',
-			'--content',
-			'a{color:red}',
-			'--parser',
-			'css'
-		]);
-		assert.equal(css.status, 0, css.stderr);
-		assert.doesNotMatch(css.stdout, /"loc"/);
+		assert.equal(pretty.status, 0, pretty.stderr);
+		assert.match(pretty.stdout, /\n\t"type": "Program"/);
+		assert.deepEqual(
+			JSON.parse(pretty.stdout),
+			node_entry.parse_typescript('const x = 1;', { locations: true })
+		);
 	});
 
 	it('format --source-type script formats an `await` arrow param', () => {

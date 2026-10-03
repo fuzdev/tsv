@@ -139,15 +139,16 @@ pub fn convert_ast_json_bytes(root: &Root<'_>, source: &str) -> Vec<u8> {
 
 /// Convert internal AST to compact JSON wire bytes **without** line/column data.
 ///
-/// The opt-in `no-locations` variant of `convert_ast_json_bytes`: drops every
+/// The span-only variant of `convert_ast_json_bytes` — the wire every binding emits:
+/// drops every
 /// line/column object from the Svelte wire — the acorn `loc` on
 /// `<script>`/`{expr}` nodes, the `name_loc` on elements/attributes/directives,
 /// and the root-comment `loc` — keeping only `start`/`end` offsets. All are
 /// derivable from those offsets plus source, so a consumer that has the source
 /// loses nothing; a name's exact span reconstructs as `node.start + a fixed
 /// per-node-type prefix`. Because this removes *all* line/column emission,
-/// nothing queries the line table. Mirrors acorn's `locations: false`; a
-/// distinct, narrower product from the default drop-in wire.
+/// nothing queries the line table. Mirrors acorn's `locations: false`; the
+/// loc-bearing `convert_ast_json_bytes` is what `tsv parse --locations` writes.
 #[cfg(feature = "convert")]
 pub fn convert_ast_json_bytes_no_locations(root: &Root<'_>, source: &str) -> Vec<u8> {
     ast::convert::write_root_bytes_no_locations(root, source)

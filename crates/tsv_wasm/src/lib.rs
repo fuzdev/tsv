@@ -8,11 +8,16 @@
 //!   `parse_*`, `parse_*_json`, and `parse_internal_*` plus the convert layer
 //!   that serializes ASTs to JS; the printers drop out at link time.
 //!
-//! The AST crosses the JS boundary as a single JSON string: `parse_*` calls
-//! the engine's native `JSON.parse` on it (via `js_sys`) and returns the
-//! typed object; `parse_*_json` returns the string itself for consumers that
-//! forward the wire format without materializing. Building the JS object
-//! graph node-by-node with `serde_wasm_bindgen` is measurably slower.
+//! The AST crosses the JS boundary as a single JSON string — the span-only wire,
+//! the one every binding emits: `parse_*` calls the engine's native `JSON.parse` on
+//! it (via `js_sys`) and returns the object; `parse_*_json` returns the string
+//! itself for consumers that forward the wire format without materializing.
+//! Building the JS object graph node-by-node with `serde_wasm_bindgen` is
+//! measurably slower.
+//!
+//! Every export is flat, `(source, source_type?)`. The published packages wrap them
+//! in a hand-written JS facade (`npm/api.js`, shared with the native `@fuzdev/tsv`)
+//! that owns the options bag, its errors, and the `{locations: true}` sugar.
 
 use wasm_bindgen::prelude::*;
 
@@ -63,8 +68,8 @@ static ALLOCATOR: talc::cell::TalcSyncCell<talc::wasm::WasmGrowAndExtend, talc::
 //
 // `console.error` is declared directly rather than pulled from `web_sys` /
 // `console_error_panic_hook`: the binding is three lines, and `console` lives in
-// `web_sys` (not the `js-sys` the options readers already use), so either would
-// be a new dependency on every package for those three lines.
+// `web_sys` (not the `js-sys` the parse exports use), so either would be a new
+// dependency on every package for those three lines.
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 extern "C" {
@@ -318,409 +323,96 @@ impl IgnoreStack {
     }
 }
 
-/// Re-export every type from the bundled `./tsv_ast` declaration file
-/// so consumers of `@fuzdev/tsv-parse-wasm` can `import type { Program } from
-/// '@fuzdev/tsv-parse-wasm'` without reaching into the bundled `.d.ts`.
+/// What a flat export's `source_type` argument held, read off the raw `JsValue`.
 ///
-/// Spelled `./tsv_ast.js`, here and in every `import(...)` below: under
-/// `moduleResolution: node16`/`nodenext` a relative specifier inside a
-/// declaration file must carry the runtime extension or the consumer gets
-/// TS2834, and TypeScript resolves `./tsv_ast.js` to `./tsv_ast.d.ts`. The
-/// extensionless form only survives `skipLibCheck` or the legacy resolver.
-#[cfg(feature = "parse")]
-#[wasm_bindgen(typescript_custom_section)]
-const TS_AST_REEXPORT: &'static str = r#"
-export type * from "./tsv_ast.js";
-"#;
-
-// TODO: `tsv_ast.d.ts` declares `loc` optional, so the typed overload names the
-// span-only shape too — drop the `any` overload with the one-wire JS surface.
-/// Hand-written declarations for the parse exports, which are all
-/// `#[wasm_bindgen(skip_typescript)]`: wasm-bindgen can't express an
-/// options-dependent return type, so the `{locations: false}` overload
-/// returns `any` and must come first (the more specific signature). A signature
-/// change in `lang_bindings!` must update this block too; `ParseOptions` /
-/// `TypeScriptParseOptions` are re-exported through the npm facade
-/// (`scripts/patch_npm_package.ts`).
-///
-/// Every option key spells `| undefined` on top of `?`, here and in
-/// `TS_FORMAT_DECLS`. That is not redundant: under a consumer's
-/// `exactOptionalPropertyTypes`, a bare `?` accepts an ABSENT key but rejects
-/// one explicitly set to `undefined` — and setting it to `undefined` is the
-/// documented forwarding idiom (`npm/cli.js` builds `{sourceType: <maybe undefined>}`
-/// and hands it to whichever export). Dropping the `| undefined` would leave
-/// the types contradicting the runtime for exactly the caller the option's
-/// leniency exists to serve.
-#[cfg(feature = "parse")]
-#[wasm_bindgen(typescript_custom_section)]
-const TS_PARSE_DECLS: &'static str = r#"
-/**
- * Options accepted by `parse_svelte` / `parse_css` (and their `_json` /
- * `_internal` siblings). The parse goal is TypeScript's alone, so it is
- * declared here as `undefined`-only rather than omitted: a set `sourceType` throws,
- * but spelling the inapplicable source type `undefined` forwards one bag to whichever
- * parser, exactly as the runtime does.
- */
-export interface ParseOptions {
-	/**
-	 * Emit per-node `loc` (line/column) — the drop-in acorn/svelte wire.
-	 * `false` emits the span-only wire (much smaller; Svelte also omits
-	 * `name_loc`): `loc` stays derivable from `start`/`end` plus the source,
-	 * via this package's own `reconstruct_locations` / `create_locator` /
-	 * `loc_of`, whose result equals the loc-bearing wire (see `locations.d.ts`).
-	 * @default true
-	 */
-	locations?: boolean | undefined;
-	/**
-	 * Not accepted here — Svelte's `<script>` is always a module and CSS has no
-	 * goal, so a set `sourceType` throws. See `TypeScriptParseOptions`.
-	 */
-	sourceType?: undefined;
-}
-
-/** The TypeScript parsers' bag: the same keys, with `sourceType` settable. */
-export interface TypeScriptParseOptions {
-	/** As `ParseOptions.locations`. @default true */
-	locations?: boolean | undefined;
-	/**
-	 * Parse goal: at `'script'`, `await` is an ordinary identifier and
-	 * `import`/`export`/`import.meta` are syntax errors. A script is also
-	 * **sloppy** unless its own `"use strict"` directive prologue makes it
-	 * strict, so `with` and the legacy octal literals/escapes parse there; a
-	 * module is always strict.
-	 * @default 'module'
-	 */
-	sourceType?: 'script' | 'module' | undefined;
-}
-
-export function parse_svelte(source: string, options: ParseOptions & { locations: false }): any;
-export function parse_svelte(source: string, options?: ParseOptions): import('./tsv_ast.js').Root;
-export function parse_svelte_json(source: string, options?: ParseOptions): string;
-export function parse_internal_svelte(source: string, options?: ParseOptions): void;
-
-export function parse_typescript(
-	source: string,
-	options: TypeScriptParseOptions & { locations: false }
-): any;
-export function parse_typescript(
-	source: string,
-	options?: TypeScriptParseOptions
-): import('./tsv_ast.js').Program;
-export function parse_typescript_json(source: string, options?: TypeScriptParseOptions): string;
-export function parse_internal_typescript(
-	source: string,
-	options?: TypeScriptParseOptions
-): void;
-
-export function parse_css(source: string, options?: ParseOptions): import('./tsv_ast.js').StyleSheetFile;
-export function parse_css_json(source: string, options?: ParseOptions): string;
-export function parse_internal_css(source: string, options?: ParseOptions): void;
-"#;
-
-/// Hand-written declarations for the format exports, which are all
-/// `#[wasm_bindgen(skip_typescript)]`: a `JsValue` parameter generates as a
-/// **required** `options: any`, which would both untype the bag and break every
-/// existing arity-1 `format_<lang>(source)` call at compile time. A signature
-/// change in `lang_bindings!` must update this block too; `FormatOptions` /
-/// `TypeScriptFormatOptions` are re-exported through the npm facade
-/// (`scripts/patch_npm_package.ts`).
-///
-/// `FormatOptions` declares `sourceType?: undefined` rather than being `{}`, and
-/// `ParseOptions` declares it rather than omitting it. Two reasons — the first
-/// bites `FormatOptions` alone, the second both:
-///
-/// 1. An EMPTY interface opts out of both excess-property checking and
-///    weak-type detection, so `{}` accepts every non-nullish value —
-///    `{locatons: false}`, `'script'`, `42` — leaving `format_svelte` /
-///    `format_css` with no compile-time guard at all while the runtime rejects
-///    each. (`ParseOptions` was never empty; it has `locations`.)
-/// 2. A declared `sourceType?: undefined` is what makes the FORWARDING idiom
-///    type-check: `npm/cli.js` builds `{sourceType: <maybe undefined>}` and hands it
-///    to whichever export, so a bag with a `sourceType` key set to `undefined` must
-///    be legal on the languages that reject a *set* `sourceType`. Omitting the key
-///    rejects that bag (excess property), `never` rejects it under
-///    `exactOptionalPropertyTypes`; `undefined` is the spelling that works.
-///
-/// The TypeScript interfaces therefore do NOT `extends` their base — a settable
-/// `sourceType` is incompatible with the undefined-only one — at the cost of one
-/// duplicated `locations` line. The assignability `extends` would buy is
-/// unsound anyway (`format_svelte(src, {sourceType: 'script'})` throws).
-#[cfg(feature = "format")]
-#[wasm_bindgen(typescript_custom_section)]
-const TS_FORMAT_DECLS: &'static str = r#"
-/**
- * Options accepted by `format_svelte` / `format_css`. Formatting itself is
- * non-configurable and the parse goal is TypeScript's alone, so these carry no
- * settable key. Every unknown key throws, `locations` included: that option
- * shapes the parse wire, and format emits no wire.
- */
-export interface FormatOptions {
-	/**
-	 * Not accepted here — Svelte's `<script>` is always a module and CSS has no
-	 * goal, so a set `sourceType` throws. Declared (as `undefined`) rather than
-	 * omitted so one bag still forwards to whichever formatter: spell the
-	 * inapplicable source type `undefined` and this type accepts it, exactly as the
-	 * runtime does.
-	 */
-	sourceType?: undefined;
-}
-
-/** The TypeScript formatter's bag: the same key, settable. */
-export interface TypeScriptFormatOptions {
-	/**
-	 * Parse goal: at `'script'`, `await` is an ordinary identifier and
-	 * `import`/`export`/`import.meta` are syntax errors. A script is also
-	 * **sloppy** unless its own `"use strict"` directive prologue makes it
-	 * strict, so `with` and the legacy octal literals/escapes parse there; a
-	 * module is always strict.
-	 *
-	 * Omitted, the source is formatted as a **module, retried as a script** if
-	 * that parse fails — so a legacy sloppy script formats without naming a
-	 * grammar, while anything the module grammar accepts is never reinterpreted
-	 * (the printer does not read the goal, so no output changes). A set value is
-	 * exact: `'module'` refuses a script-only source rather than retrying.
-	 * `parse_typescript` has no such fallback — its wire's `Program.sourceType`
-	 * is a claim, and omitting the key there means `'module'`.
-	 */
-	sourceType?: 'script' | 'module' | undefined;
-}
-
-export function format_svelte(source: string, options?: FormatOptions): string;
-export function format_typescript(source: string, options?: TypeScriptFormatOptions): string;
-export function format_css(source: string, options?: FormatOptions): string;
-"#;
-
-/// Which options bag one export accepts — the noun that names it in every
-/// error, plus the supported key set. Both families read `{sourceType?}`; only parse
-/// reads `{locations?}`, because that option selects a **wire** and format
-/// emits none. So `locations` is not accepted-and-ignored on a format export,
-/// it is an unknown key: an inert-but-accepted spelling would let a caller
-/// believe they had asked a formatter for a narrower product. Nothing forwards
-/// a parse bag into a format call (`npm/cli.js` builds each at its own call
-/// site), so the "one bag, whichever function" property the `sourceType` arm exists
-/// for is untouched by rejecting it.
+/// The argument is a `JsValue` rather than an `Option<String>` because wasm-bindgen's
+/// release glue does not refuse a wrong-typed one: it coerces a number, a boolean or an
+/// object to `""`, which then reads as `invalid sourceType ''` (and an array throws from
+/// inside the glue, `arg.charCodeAt is not a function`). Read here, the type is named.
 #[cfg(any(feature = "parse", feature = "format"))]
-struct OptionsSpec {
-    noun: &'static str,
-    locations: bool,
-    source_type: bool,
+#[derive(Debug, PartialEq, Eq)]
+enum SourceTypeArg {
+    /// Omitted, `undefined` or `null`.
+    Unset,
+    /// A string, not yet checked against the two goals.
+    Text(String),
+    /// Any other value, by its kind (`typeof`, or `array`).
+    Other(String),
 }
 
 #[cfg(any(feature = "parse", feature = "format"))]
-impl OptionsSpec {
-    /// The parse family's bag: `{locations?, sourceType?}`.
-    #[cfg(feature = "parse")]
-    const fn parse(source_type: bool) -> Self {
-        Self {
-            noun: "parse",
-            locations: true,
-            source_type,
+impl SourceTypeArg {
+    fn read(value: &JsValue) -> Self {
+        if value.is_null_or_undefined() {
+            return Self::Unset;
         }
-    }
-
-    /// The format family's bag: `{sourceType?}` — no wire, so no `locations`.
-    #[cfg(feature = "format")]
-    const fn format(source_type: bool) -> Self {
-        Self {
-            noun: "format",
-            locations: false,
-            source_type,
+        if let Some(text) = value.as_string() {
+            return Self::Text(text);
         }
-    }
-}
-
-/// The parsed options bag: `{locations?, sourceType?}` for the parse exports,
-/// `{sourceType?}` for the format exports.
-///
-/// `locations` (default `true`) selects the wire: the loc-bearing drop-in
-/// contract, or the span-only variant (the language crates'
-/// `convert_ast_json_string_no_locations`). It is accepted by every parse
-/// export and inert where nothing reads it (`parse_internal_*` emits no
-/// wire), and rides the `parse` feature — the
-/// format-only build has no wire for it to shape. `sourceType` is
-/// TypeScript-only — Svelte hard-wires `Module` and CSS has no goal — so the
-/// other languages reject the key rather than silently ignoring a semantic
-/// axis. Unknown keys are an error: a typo like `{locatons: false}` silently
-/// succeeding would hand back the full wire while the caller believes they
-/// opted out.
-///
-/// An **unset** `sourceType` is `None` rather than `Module`, because the two
-/// families answer it differently: a parse reads it as `module` (its wire's
-/// `Program.sourceType` is a claim one settled grammar has to produce), while a
-/// format reads it as "no source type named" and parses at `Module` with a `Script`
-/// retry — which is what lets an editor's bare `format_typescript(source)` format a
-/// legacy sloppy script. A SET value is exact on both.
-#[cfg(any(feature = "parse", feature = "format"))]
-#[cfg_attr(test, derive(Debug))]
-struct Options {
-    #[cfg(feature = "parse")]
-    locations: bool,
-    source_type: Option<tsv_ts::Goal>,
-}
-
-/// One option's value as the JS side handed it over, classified to the three shapes
-/// the reader distinguishes. The `JsValue` stops here: [`resolve_options`] below
-/// decides over this enum alone, which is what lets `cargo test` grade the decision
-/// natively (a `JsValue` cannot be built off the wasm target).
-#[cfg(any(feature = "parse", feature = "format"))]
-#[cfg_attr(test, derive(Clone))]
-enum OptionValue {
-    Undefined,
-    /// The only key that accepts one is `locations`, which is parse-only — so a
-    /// format-only build classifies a boolean and then never reads the payload.
-    /// Kept rather than cfg'd away: [`OptionValue::classify`] is the one place the
-    /// three shapes are named, and a variant that appears under one feature would
-    /// make the `Str(_) | Other` refusal arms read differently per build.
-    #[cfg_attr(
-        not(feature = "parse"),
-        expect(
-            dead_code,
-            reason = "the payload is read only by the parse-only `locations` arm"
-        )
-    )]
-    Bool(bool),
-    Str(String),
-    /// Anything else — a number, an object, `null` — which no key accepts.
-    Other,
-}
-
-#[cfg(any(feature = "parse", feature = "format"))]
-impl OptionValue {
-    fn classify(value: &JsValue) -> Self {
-        if value.is_undefined() {
-            Self::Undefined
-        } else if let Some(b) = value.as_bool() {
-            Self::Bool(b)
-        } else if let Some(s) = value.as_string() {
-            Self::Str(s)
+        let kind = if value.is_array() {
+            "array".to_owned()
         } else {
-            Self::Other
-        }
-    }
-}
-
-/// Read an `Options` off the raw `options` argument against `spec`
-/// (`undefined`/`null` mean all-defaults; a supported key explicitly set to
-/// `undefined` means that key's default, matching the omitted-key JS
-/// convention — unknown keys error whatever their value).
-///
-/// One reader serves both export families so the two can't drift: the parse
-/// exports' documented semantics are the format exports' semantics, key for key.
-/// This half only reaches into the JS object — the shape test and the key/value
-/// walk; every decision about a key is [`resolve_options`]'s.
-#[cfg(any(feature = "parse", feature = "format"))]
-fn read_options(options: &JsValue, spec: OptionsSpec) -> Result<Options, JsError> {
-    if options.is_undefined() || options.is_null() {
-        return resolve_options(std::iter::empty(), spec).map_err(err);
-    }
-    // An array is `typeof 'object'` and yields no keys, so without the second
-    // test a positional-style `parse_typescript(src, ['script'])` would read as
-    // all-defaults — the same silent-opt-out the unknown-key error exists to
-    // prevent. (A keyless non-plain object, e.g. `new Date()`, still defaults;
-    // ruling that out needs a prototype test this doesn't earn.)
-    if !options.is_object() || js_sys::Array::is_array(options) {
-        return Err(err(format!("{} options must be an object", spec.noun)));
-    }
-    let object: &js_sys::Object = options.unchecked_ref();
-    let mut entries = Vec::new();
-    for key in js_sys::Object::keys(object).iter() {
-        // `Object.keys` yields only string keys.
-        let Some(name) = key.as_string() else {
-            return Err(err(format!("{} option keys must be strings", spec.noun)));
+            value.js_typeof().as_string().unwrap_or_default()
         };
-        let value = js_sys::Reflect::get(options, &key)
-            .map_err(|_| err(format!("failed to read {} option '{name}'", spec.noun)))?;
-        entries.push((name, OptionValue::classify(&value)));
+        Self::Other(kind)
     }
-    resolve_options(entries, spec).map_err(err)
 }
 
-/// The decision behind [`read_options`], over the bag's entries in key order: which
-/// keys `spec` admits, what each accepts, and how each refusal is worded. Pure, so
-/// the unit tests below grade it on the native target — the only Rust-side gate on
-/// a reader the loader `crates/tsv_napi/npm/index.js` restates by hand.
+/// Decode the flat exports' optional `source_type` argument (`"script"` /
+/// `"module"`); omitted, `undefined` or `null` stays **unset**.
+///
+/// The npm packages' facade (`npm/api.js`) validates its options bag before it calls
+/// here, so this is the decoder a caller importing the raw wasm-bindgen module past
+/// the facade meets — and it still refuses rather than defaulting: a value that is not
+/// a string, by its kind (where N-API refuses at its own conversion); then, in the
+/// facade's own words (`tsv_arena`'s two message functions, shared with `tsv_napi`'s
+/// `napi_source_type`), a source type on a language with no goal axis (Svelte
+/// hard-wires `Module`, CSS has none), and a value naming neither goal.
+///
+/// What an unset one means is the caller's: a parse reads it as `Module` (its wire's
+/// `Program.sourceType` is a claim one settled grammar has to produce), a format as
+/// "none named" — the module grammar retried as a script
+/// (`tsv_ts::parse_with_goal_or_fallback`).
 #[cfg(any(feature = "parse", feature = "format"))]
-fn resolve_options(
-    entries: impl IntoIterator<Item = (String, OptionValue)>,
-    spec: OptionsSpec,
-) -> Result<Options, String> {
-    let mut parsed = Options {
-        #[cfg(feature = "parse")]
-        locations: true,
-        source_type: None,
-    };
-    for (name, value) in entries {
-        // A supported key explicitly set to `undefined` means that key's default
-        // (the omitted-key JS convention) — decided per arm, AFTER the key match,
-        // so an unknown key errors whatever its value (`{locatons: undefined}` is
-        // the same typo as `{locatons: false}`). `sourceType`'s check runs before
-        // its language rejection: that's what lets one bag serve whichever parser —
-        // or whichever formatter — with the inapplicable source type spelled `undefined`
-        // (`npm/cli.js` does both).
-        match name.as_str() {
-            // A key the spec doesn't carry falls to the unknown arm, which is
-            // how `locations` reads on a format export.
-            #[cfg(feature = "parse")]
-            "locations" if spec.locations => {
-                parsed.locations = match value {
-                    OptionValue::Undefined => continue,
-                    OptionValue::Bool(b) => b,
-                    OptionValue::Str(_) | OptionValue::Other => {
-                        return Err(format!(
-                            "{} option 'locations' must be a boolean",
-                            spec.noun
-                        ));
-                    }
-                };
-            }
-            "sourceType" => {
-                if matches!(value, OptionValue::Undefined) {
-                    continue;
-                }
-                if !spec.source_type {
-                    return Err(tsv_arena::source_type_unsupported_message(spec.noun));
-                }
-                let OptionValue::Str(source_type) = value else {
-                    return Err(format!(
-                        "{} option 'sourceType' must be 'script' or 'module'",
-                        spec.noun
-                    ));
-                };
-                parsed.source_type = Some(
-                    tsv_ts::Goal::from_source_type(&source_type)
-                        .ok_or_else(|| tsv_arena::invalid_source_type_message(&source_type))?,
-                );
-            }
-            other => {
-                let noun = spec.noun;
-                let detail = match (spec.locations, spec.source_type) {
-                    (true, true) => "expected 'locations' or 'sourceType'",
-                    (true, false) => "expected 'locations'",
-                    (false, true) => "expected 'sourceType'",
-                    // The non-TypeScript formatters: formatting is
-                    // non-configurable and the source type is TypeScript's alone.
-                    (false, false) => "this export takes no options",
-                };
-                return Err(format!("unknown {noun} option '{other}' ({detail})"));
-            }
+fn wasm_source_type(
+    source_type: SourceTypeArg,
+    allowed: bool,
+    noun: &str,
+) -> Result<Option<tsv_ts::Goal>, String> {
+    let source_type = match source_type {
+        SourceTypeArg::Unset => return Ok(None),
+        SourceTypeArg::Text(text) => text,
+        SourceTypeArg::Other(kind) => {
+            let article = if kind.starts_with(['a', 'e', 'i', 'o', 'u']) {
+                "an"
+            } else {
+                "a"
+            };
+            return Err(format!(
+                "invalid sourceType: expected a string ('script' or 'module'), \
+                 got {article} {kind}"
+            ));
         }
+    };
+    if !allowed {
+        return Err(tsv_arena::source_type_unsupported_message(noun));
     }
-    Ok(parsed)
+    tsv_ts::Goal::from_source_type(&source_type)
+        .map(Some)
+        .ok_or_else(|| tsv_arena::invalid_source_type_message(&source_type))
 }
 
 /// Generate `parse_<lang>` / `parse_<lang>_json` / `parse_internal_<lang>` /
 /// `format_<lang>` WASM functions for one language module. The parse exports
 /// are gated on `parse` (so the format-only build excludes the convert layer)
 /// and `format_*` on `format` (so the parse-only build drops the printers at
-/// link time). Every export — parse and format alike — shares one uniform
-/// signature, `(source, options?)`: the bag read by `read_options`
-/// (`{locations?, sourceType?}` for parse, `{sourceType?}` for format), with `$goalness`
-/// (`goal` / `nogoal`) selecting whether the TypeScript-only `sourceType` key is
-/// accepted and threaded. One package must not teach two calling conventions,
-/// so a caller holding a `{sourceType}` bag hands it to either family. Their `.d.ts`
-/// is the hand-written `TS_PARSE_DECLS` / `TS_FORMAT_DECLS` block above (each
-/// export is `skip_typescript`), so a signature change here must update those
-/// blocks too.
+/// link time). Every export shares one flat signature, `(source, source_type?)` —
+/// the same one `tsv_napi`'s addon takes — with `$goalness` (`goal` / `nogoal`)
+/// selecting whether a source type is accepted. The options bag, the
+/// `{locations: true}` sugar and the published declarations are the npm
+/// packages' hand-written facade (`npm/api.js` + `api.d.ts`), shared with the
+/// native `@fuzdev/tsv`; the declarations wasm-bindgen generates here type only the
+/// raw module.
 // The bodies parse the source into a per-thread AST arena and run the
 // conversion/format/no-op over it. Every language crate is interner-free
 // (identifier and element/attribute names are span-identity), so these are
@@ -735,65 +427,64 @@ macro_rules! lang_bindings {
         $format_fn:ident,
         $lang:ident $(,)?
     ) => {
-        /// Parse source into the typed JSON AST (`options`: `{locations?, sourceType?}`,
-        /// see `TS_PARSE_DECLS` / `read_options`).
+        /// Parse source into the span-only AST object — `JSON.parse` of
+        /// `parse_<lang>_json`'s wire, run engine-side from Rust.
         #[cfg(feature = "parse")]
-        #[wasm_bindgen(skip_typescript)]
-        pub fn $parse_fn(source: &str, options: JsValue) -> Result<JsValue, JsError> {
-            let json = $parse_json_fn(source, options)?;
+        #[wasm_bindgen]
+        pub fn $parse_fn(source: &str, source_type: JsValue) -> Result<JsValue, JsError> {
+            let json = $parse_json_fn(source, source_type)?;
             js_sys::JSON::parse(&json)
                 .map_err(|_| err("internal error: AST serialized to invalid JSON"))
         }
 
-        /// Parse source into the JSON AST as a compact JSON string, skipping
-        /// JS object materialization (for consumers forwarding the wire format).
+        /// Parse source into the span-only JSON wire as a compact string —
+        /// `start`/`end` offsets, no per-node `loc` (Svelte also no `name_loc`) —
+        /// skipping JS object materialization (for consumers forwarding the wire).
         #[cfg(feature = "parse")]
-        #[wasm_bindgen(skip_typescript)]
-        pub fn $parse_json_fn(source: &str, options: JsValue) -> Result<String, JsError> {
-            let opts = read_options(&options, OptionsSpec::parse(goal_allowed!($goalness)))?;
+        #[wasm_bindgen]
+        pub fn $parse_json_fn(source: &str, source_type: JsValue) -> Result<String, JsError> {
+            let goal = wasm_source_type(
+                SourceTypeArg::read(&source_type),
+                goal_allowed!($goalness),
+                "parse",
+            )
+            .map_err(err)?
+            .unwrap_or(tsv_ts::Goal::Module);
             with_ast_arena(|arena| {
-                let ast = parse_ast!(
-                    $goalness,
-                    $lang,
-                    source,
-                    opts.source_type.unwrap_or(tsv_ts::Goal::Module),
-                    arena
-                )
-                .map_err(err)?;
-                Ok(if opts.locations {
-                    $lang::convert_ast_json_string(&ast, source)
-                } else {
-                    $lang::convert_ast_json_string_no_locations(&ast, source)
-                })
+                let ast = parse_ast!($goalness, $lang, source, goal, arena).map_err(err)?;
+                Ok($lang::convert_ast_json_string_no_locations(&ast, source))
             })
         }
 
-        /// Parse only, no serialization — the benchmark coverage/throughput
-        /// probe. `options.locations` is inert (no wire is emitted).
+        /// Parse only, no serialization — the benchmark coverage/throughput probe.
         #[cfg(feature = "parse")]
-        #[wasm_bindgen(skip_typescript)]
-        pub fn $parse_internal_fn(source: &str, options: JsValue) -> Result<(), JsError> {
-            let opts = read_options(&options, OptionsSpec::parse(goal_allowed!($goalness)))?;
+        #[wasm_bindgen]
+        pub fn $parse_internal_fn(source: &str, source_type: JsValue) -> Result<(), JsError> {
+            let goal = wasm_source_type(
+                SourceTypeArg::read(&source_type),
+                goal_allowed!($goalness),
+                "parse",
+            )
+            .map_err(err)?
+            .unwrap_or(tsv_ts::Goal::Module);
             with_ast_arena(|arena| {
-                let ast = parse_ast!(
-                    $goalness,
-                    $lang,
-                    source,
-                    opts.source_type.unwrap_or(tsv_ts::Goal::Module),
-                    arena
-                )
-                .map_err(err)?;
+                let ast = parse_ast!($goalness, $lang, source, goal, arena).map_err(err)?;
                 std::hint::black_box(&ast);
                 Ok(())
             })
         }
 
-        /// Format source (`options`: `{sourceType?}`, see `TS_FORMAT_DECLS` /
-        /// `read_options`).
+        /// Format source. The source type shapes only the parse the formatter runs;
+        /// omitted, it means none was named — the module grammar, retried as a script.
         #[cfg(feature = "format")]
-        #[wasm_bindgen(skip_typescript)]
-        pub fn $format_fn(source: &str, options: JsValue) -> Result<String, JsError> {
-            let opts = read_options(&options, OptionsSpec::format(goal_allowed!($goalness)))?;
+        #[wasm_bindgen]
+        pub fn $format_fn(source: &str, source_type: JsValue) -> Result<String, JsError> {
+            let goal = wasm_source_type(
+                SourceTypeArg::read(&source_type),
+                goal_allowed!($goalness),
+                "format",
+            )
+            .map_err(err)?;
             // The format path's line-terminator fold, ahead of the parse — see
             // `tsv_lang::printing::normalize_carriage_returns`. The parse exports
             // deliberately skip it: the wire's offsets are a drop-in contract over the
@@ -801,8 +492,8 @@ macro_rules! lang_bindings {
             let folded = tsv_lang::printing::normalize_carriage_returns(source);
             let source = folded.text();
             with_ast_arena(|arena| {
-                let ast = parse_ast_for_format!($goalness, $lang, source, opts.source_type, arena)
-                    .map_err(err)?;
+                let ast =
+                    parse_ast_for_format!($goalness, $lang, source, goal, arena).map_err(err)?;
                 Ok(with_doc_arena(|doc_arena| {
                     $lang::format_folded_in(&ast, &folded, doc_arena)
                 }))
@@ -838,117 +529,78 @@ lang_bindings!(
 
 #[cfg(all(test, any(feature = "parse", feature = "format")))]
 mod tests {
-    use super::{OptionValue, OptionsSpec, resolve_options};
+    use super::{SourceTypeArg, wasm_source_type};
 
-    fn entries(pairs: &[(&str, OptionValue)]) -> Vec<(String, OptionValue)> {
-        pairs
-            .iter()
-            .map(|(k, v)| ((*k).to_owned(), v.clone()))
-            .collect()
+    fn text(value: &str) -> SourceTypeArg {
+        SourceTypeArg::Text(value.to_owned())
     }
 
-    /// The reader the loader (`npm/index.js`) restates by hand: every refusal's
-    /// wording, and the two `undefined` conventions (an omitted or `undefined`
-    /// supported key is its default; an unknown key errors whatever its value).
+    /// The raw module's decoder: an unset source type stays unset (each family reads
+    /// it its own way), a set one decodes exactly, and both refusals are worded as the
+    /// facade and `tsv_napi` word them.
     #[test]
-    fn resolve_options_words_every_refusal_and_reads_undefined_as_default() {
-        #[cfg(feature = "parse")]
-        {
-            let spec = OptionsSpec::parse(true);
-            let parsed = resolve_options(std::iter::empty(), spec).unwrap();
-            assert!(parsed.locations);
-            assert!(parsed.source_type.is_none());
-
-            let parsed = resolve_options(
-                entries(&[
-                    ("locations", OptionValue::Bool(false)),
-                    ("sourceType", OptionValue::Str("script".to_owned())),
-                ]),
-                OptionsSpec::parse(true),
-            )
-            .unwrap();
-            assert!(!parsed.locations);
-            assert_eq!(parsed.source_type, Some(tsv_ts::Goal::Script));
-
-            // an explicit `undefined` is the omitted key
-            let parsed = resolve_options(
-                entries(&[
-                    ("locations", OptionValue::Undefined),
-                    ("sourceType", OptionValue::Undefined),
-                ]),
-                OptionsSpec::parse(false),
-            )
-            .unwrap();
-            assert!(parsed.locations);
-            assert!(parsed.source_type.is_none());
-
-            let refused = |pairs: &[(&str, OptionValue)], source_type: bool| {
-                resolve_options(entries(pairs), OptionsSpec::parse(source_type)).unwrap_err()
-            };
-            assert_eq!(
-                refused(&[("locations", OptionValue::Str("no".to_owned()))], true),
-                "parse option 'locations' must be a boolean"
-            );
-            assert_eq!(
-                refused(
-                    &[("sourceType", OptionValue::Str("module".to_owned()))],
-                    false
-                ),
-                "parse option 'sourceType' is only supported for TypeScript"
-            );
-            assert_eq!(
-                refused(&[("sourceType", OptionValue::Bool(true))], true),
-                "parse option 'sourceType' must be 'script' or 'module'"
-            );
-            assert_eq!(
-                refused(
-                    &[("sourceType", OptionValue::Str("sloppy".to_owned()))],
-                    true
-                ),
-                "invalid sourceType 'sloppy' (expected 'script' or 'module')"
-            );
-            assert_eq!(
-                refused(&[("locatons", OptionValue::Undefined)], true),
-                "unknown parse option 'locatons' (expected 'locations' or 'sourceType')"
-            );
-            assert_eq!(
-                refused(
-                    &[
-                        ("sourceType", OptionValue::Undefined),
-                        ("x", OptionValue::Other)
-                    ],
-                    false
-                ),
-                "unknown parse option 'x' (expected 'locations')"
-            );
+    fn wasm_source_type_decodes_and_words_every_refusal() {
+        assert_eq!(
+            wasm_source_type(SourceTypeArg::Unset, true, "parse"),
+            Ok(None)
+        );
+        assert_eq!(
+            wasm_source_type(SourceTypeArg::Unset, false, "format"),
+            Ok(None)
+        );
+        assert_eq!(
+            wasm_source_type(text("script"), true, "parse"),
+            Ok(Some(tsv_ts::Goal::Script))
+        );
+        assert_eq!(
+            wasm_source_type(text("module"), true, "format"),
+            Ok(Some(tsv_ts::Goal::Module))
+        );
+        // a goalless language refuses the axis, `"module"` included
+        for noun in ["parse", "format"] {
+            for value in ["script", "module"] {
+                assert_eq!(
+                    wasm_source_type(text(value), false, noun),
+                    Err(format!(
+                        "{noun} option 'sourceType' is only supported for TypeScript"
+                    ))
+                );
+            }
         }
-        #[cfg(feature = "format")]
-        {
-            let refused = |pairs: &[(&str, OptionValue)], source_type: bool| {
-                resolve_options(entries(pairs), OptionsSpec::format(source_type)).unwrap_err()
-            };
-            // `locations` selects a wire, and a format emits none: unknown, not inert
-            assert_eq!(
-                refused(&[("locations", OptionValue::Bool(false))], true),
-                "unknown format option 'locations' (expected 'sourceType')"
-            );
-            assert_eq!(
-                refused(&[("anything", OptionValue::Bool(true))], false),
-                "unknown format option 'anything' (this export takes no options)"
-            );
-            assert_eq!(
-                refused(
-                    &[("sourceType", OptionValue::Str("script".to_owned()))],
-                    false
-                ),
-                "format option 'sourceType' is only supported for TypeScript"
-            );
-            let parsed = resolve_options(
-                entries(&[("sourceType", OptionValue::Str("module".to_owned()))]),
-                OptionsSpec::format(true),
-            )
-            .unwrap();
-            assert_eq!(parsed.source_type, Some(tsv_ts::Goal::Module));
+        assert_eq!(
+            wasm_source_type(text("sloppy"), true, "parse"),
+            Err("invalid sourceType 'sloppy' (expected 'script' or 'module')".to_owned())
+        );
+        // the empty string is a string — refused by value, as the facade refuses it
+        assert_eq!(
+            wasm_source_type(text(""), true, "parse"),
+            Err("invalid sourceType '' (expected 'script' or 'module')".to_owned())
+        );
+    }
+
+    /// A value that is not a string is refused by its kind — never coerced to `""` and
+    /// read as `invalid sourceType ''`, which is what the glue's `Option<String>` did —
+    /// and ahead of the goal-axis refusal, as N-API's conversion refuses it first.
+    #[test]
+    fn wasm_source_type_names_a_wrong_typed_value() {
+        for (kind, article) in [
+            ("number", "a"),
+            ("boolean", "a"),
+            ("object", "an"),
+            ("array", "an"),
+            ("bigint", "a"),
+            ("symbol", "a"),
+            ("function", "a"),
+        ] {
+            for allowed in [true, false] {
+                assert_eq!(
+                    wasm_source_type(SourceTypeArg::Other(kind.to_owned()), allowed, "parse"),
+                    Err(format!(
+                        "invalid sourceType: expected a string ('script' or 'module'), \
+                         got {article} {kind}"
+                    ))
+                );
+            }
         }
     }
 }

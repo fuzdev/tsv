@@ -1,10 +1,11 @@
 /**
  * Diagnostic: attribute the WASM-vs-native JSON parse penalty.
  *
- * Native JSON path:  parse -> convert_ast_json_string -> FFI copy -> JSON.parse (JS)
- *                    (the wire-JSON writer emits directly from the internal AST)
- * WASM JSON path:    parse -> convert_ast_json_string -> boundary string decode
- *                    -> engine JSON.parse (called from Rust via js_sys)
+ * Native JSON path:  parse -> convert_ast_json_bytes_no_locations -> FFI copy
+ *                    -> JSON.parse (JS) (the span-only wire every binding ships; the
+ *                    wire-JSON writer emits directly from the internal AST)
+ * WASM JSON path:    parse -> convert_ast_json_string_no_locations -> boundary string
+ *                    decode -> engine JSON.parse (called from Rust via js_sys)
  *
  * Both share the parse; they differ in materialization. This splits total
  * into parse vs materialization for each, and isolates the JS-side

@@ -225,7 +225,7 @@ pub const SOURCE_TYPE_UNSPECIFIED: u32 = 2;
 /// language that has none is an **error**, not a silent Module: Svelte
 /// hard-wires `Module` and CSS has no goal, so a caller passing `1` there asked
 /// for something that cannot be honored and must be told — the same stance
-/// `tsv_wasm`'s `read_options` takes when it rejects the `sourceType` key outright.
+/// `tsv_wasm`'s `wasm_source_type` and `tsv_napi`'s `napi_source_type` take.
 /// Code `0` (module) is accepted on every language, the goalless ones included —
 /// the one place this binding parts from its two siblings, which refuse even
 /// `'module'` there. It is forced by the shape: a `u32` is a required argument, so a
@@ -321,9 +321,8 @@ macro_rules! parse_format {
     }};
 }
 
-/// Generate `tsv_parse_<lang>` / `tsv_parse_<lang>_no_locations` /
-/// `tsv_parse_internal_<lang>` / `tsv_format_<lang>` C FFI functions for one
-/// language module.
+/// Generate `tsv_parse_<lang>` / `tsv_parse_internal_<lang>` / `tsv_format_<lang>`
+/// C FFI functions for one language module.
 ///
 /// # Safety (applies to every generated function)
 /// - `source_ptr` must point to valid UTF-8 data of `source_len` bytes
@@ -339,9 +338,9 @@ macro_rules! parse_format {
 // `import.meta` are syntax errors. See `tsv parse --source-type` /
 // `tsv format --source-type` and `tsv_ts::parse_with_goal`.
 //
-// `tsv_wasm` spells the same axis as one key of a per-call options bag
-// (`format_typescript(src, {sourceType})`) and `tsv_napi` as a trailing optional
-// string; each binding's own `lang_bindings!` reads the SAME `parse_ast!` /
+// `tsv_wasm` and `tsv_napi` spell the same axis as a trailing optional string (the
+// npm facade over both turns it into a `{sourceType}` bag); each binding's own
+// `lang_bindings!` reads the SAME `parse_ast!` /
 // `goal_allowed!` pair out of `tsv_arena`, so which languages have a goal axis
 // is one fact in one place rather than three that agree today. See
 // `crates/tsv_wasm/CLAUDE.md` §Format Options.
@@ -349,12 +348,13 @@ macro_rules! lang_bindings {
     (
         $goalness:ident,
         $parse_fn:ident,
-        $parse_no_loc_fn:ident,
         $parse_internal_fn:ident,
         $format_fn:ident,
         $lang:ident $(,)?
     ) => {
-        /// Parse source code and return JSON AST.
+        /// Parse source code and return the span-only JSON AST — `start`/`end` offsets,
+        /// no per-node `loc` (Svelte also no `name_loc`): the language crate's
+        /// `convert_ast_json_bytes_no_locations`, the one wire every binding emits.
         ///
         /// # Safety
         /// See the module-level safety contract.
@@ -373,31 +373,6 @@ macro_rules! lang_bindings {
                     // `Program.sourceType` is a claim one settled grammar must produce —
                     // so the `Option` is always `Some` here and the `unwrap_or` only
                     // names the default the decoder already applied.
-                    let goal = ffi_source_type(source_type, goal_allowed!($goalness), false)?
-                        .unwrap_or(tsv_ts::Goal::Module);
-                    parse_convert!($goalness, $lang, convert_ast_json_bytes, source, goal)
-                })
-            }
-        }
-
-        /// Parse source and return JSON AST **without** per-node `loc` (the
-        /// span-only `no-locations` wire — see the language crate's
-        /// `convert_ast_json_bytes_no_locations`).
-        ///
-        /// # Safety
-        /// See the module-level safety contract.
-        #[cfg(feature = "parse")]
-        #[unsafe(no_mangle)]
-        pub unsafe extern "C" fn $parse_no_loc_fn(
-            source_ptr: *const u8,
-            source_len: usize,
-            source_type: u32,
-            out_len: *mut usize,
-            out_status: *mut u32,
-        ) -> *mut u8 {
-            unsafe {
-                with_source_string(source_ptr, source_len, out_len, out_status, |source| {
-                    // parse export: the unspecified code is refused (see the first arm)
                     let goal = ffi_source_type(source_type, goal_allowed!($goalness), false)?
                         .unwrap_or(tsv_ts::Goal::Module);
                     parse_convert!(
@@ -464,7 +439,6 @@ macro_rules! lang_bindings {
 lang_bindings!(
     nogoal,
     tsv_parse_svelte,
-    tsv_parse_svelte_no_locations,
     tsv_parse_internal_svelte,
     tsv_format_svelte,
     tsv_svelte,
@@ -472,7 +446,6 @@ lang_bindings!(
 lang_bindings!(
     goal,
     tsv_parse_typescript,
-    tsv_parse_typescript_no_locations,
     tsv_parse_internal_typescript,
     tsv_format_typescript,
     tsv_ts,
@@ -480,7 +453,6 @@ lang_bindings!(
 lang_bindings!(
     nogoal,
     tsv_parse_css,
-    tsv_parse_css_no_locations,
     tsv_parse_internal_css,
     tsv_format_css,
     tsv_css,
@@ -649,6 +621,11 @@ mod tests {
                     .is_some(),
                 "{label}: AST root missing a string `type` field: {out}"
             );
+            // the span-only wire: offsets, never a line/column object
+            assert!(
+                !out.contains(r#""loc""#) && !out.contains(r#""name_loc""#),
+                "{label}: the parse export emits the span-only wire: {out}"
+            );
         }
     }
 
@@ -731,10 +708,8 @@ mod tests {
     fn typescript_goal_switches_await() {
         // `await` is an ordinary identifier at Script goal, reserved at Module goal.
         let src = "var await = 1;\n";
-        for f in [tsv_parse_typescript, tsv_parse_typescript_no_locations] {
-            call_goal(f, src, SCRIPT);
-            call_err_goal(f, src, MODULE);
-        }
+        call_goal(tsv_parse_typescript, src, SCRIPT);
+        call_err_goal(tsv_parse_typescript, src, MODULE);
         // parse_internal's payload is empty either way — only the status differs.
         assert_eq!(call_goal(tsv_parse_internal_typescript, src, SCRIPT), "");
         call_err_goal(tsv_parse_internal_typescript, src, MODULE);
@@ -747,25 +722,21 @@ mod tests {
     }
 
     /// Every export of one goalless language, so a refusal lost on a single
-    /// generated entry point can't hide behind its siblings. CSS has no
-    /// `no_locations` binding in the bench harness, but the export exists and
-    /// owes the same refusal, so it is driven here.
+    /// generated entry point can't hide behind its siblings.
     ///
     /// Returned as a fresh array per language rather than one flat table because
     /// each export takes its own source.
-    fn goalless_exports(language: &str) -> [(&'static str, FfiFn); 4] {
+    fn goalless_exports(language: &str) -> [(&'static str, FfiFn); 3] {
         assert!(language == "svelte" || language == "css", "{language}");
         if language == "svelte" {
             [
                 ("parse", tsv_parse_svelte),
-                ("parse_no_locations", tsv_parse_svelte_no_locations),
                 ("parse_internal", tsv_parse_internal_svelte),
                 ("format", tsv_format_svelte),
             ]
         } else {
             [
                 ("parse", tsv_parse_css),
-                ("parse_no_locations", tsv_parse_css_no_locations),
                 ("parse_internal", tsv_parse_internal_css),
                 ("format", tsv_format_css),
             ]
@@ -783,9 +754,8 @@ mod tests {
         // told `1 = script` would have worked, and a parse export must not be told
         // `2 = unspecified` would have — each is exactly the code its own arm above
         // refuses.
-        let ts: [(&str, FfiFn); 3] = [
+        let ts: [(&str, FfiFn); 2] = [
             ("parse", tsv_parse_typescript),
-            ("parse_no_locations", tsv_parse_typescript_no_locations),
             ("parse_internal", tsv_parse_internal_typescript),
         ];
         for (op, f) in ts {
@@ -829,9 +799,8 @@ mod tests {
         // Code 2 says the caller named no source type. Only a formatter has an
         // answer for that — the module grammar, retried as a script — so the parse
         // exports refuse it while every format export takes it, goal axis or not.
-        let parse_exports: [(&str, FfiFn); 3] = [
+        let parse_exports: [(&str, FfiFn); 2] = [
             ("parse", tsv_parse_typescript),
-            ("parse_no_locations", tsv_parse_typescript_no_locations),
             ("parse_internal", tsv_parse_internal_typescript),
         ];
         for (op, f) in parse_exports {
@@ -860,7 +829,7 @@ mod tests {
             ("svelte", "<div>x</div>\n"),
             ("css", "a {\n\tcolor: red;\n}\n"),
         ] {
-            let (_, f) = goalless_exports(language)[3];
+            let (_, f) = goalless_exports(language)[2];
             assert_eq!(
                 call_goal(f, src, UNSPECIFIED),
                 call_goal(f, src, MODULE),
@@ -873,7 +842,7 @@ mod tests {
     fn goalless_languages_reject_a_script_goal() {
         // Svelte hard-wires Module and CSS has no goal, so `1` asks for something
         // that cannot be honored — the caller is told rather than silently served
-        // a Module parse. The same stance `tsv_wasm`'s `read_options` takes.
+        // a Module parse. The same stance `tsv_wasm`'s `wasm_source_type` takes.
         //
         // Every export, not one per language: each is a separately generated
         // entry point that calls `ffi_source_type` on its own line, so a refusal can be

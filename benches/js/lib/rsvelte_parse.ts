@@ -21,9 +21,12 @@
  * coverage-only *formatter* row — already cites this same package, for the
  * opposite reason: it has no format export.)
  *
- * **Mechanism-matched to `tsv-json`.** `parse()` returns the AST as a JSON string
- * that the caller `JSON.parse`s — exactly what tsv's FFI/WASM parse rows do — so
- * this is an apples-to-apples comparison rather than a disclosed approximation.
+ * **Mechanism-matched to tsv's span rows, not payload-matched.** `parse()` returns
+ * the AST as a JSON string that the caller `JSON.parse`s — exactly what tsv's FFI/WASM
+ * parse rows do. The payload differs: this is Svelte's own wire, `loc` on the
+ * acorn-parsed nodes plus `name_loc`, where tsv's span row carries no `loc` and its
+ * `+reconstruct` row a `loc` on every node — so the report discloses the pairing
+ * rather than claiming it (`report.ts`'s `RSVELTE_PARSE_NOTE`).
  * With `modern: true` its root keys are identical to `svelte/compiler`'s modern
  * `Root` (`comments, css, end, fragment, instance, js, options, start, type`) and
  * its `VERSION` reports the upstream Svelte it targets — which need not be the
@@ -42,7 +45,7 @@
  * which cost that engine its row on this surface. Re-check on an rsvelte bump: a
  * native addon that aborts mid-preflight kills every run, for every tool.
  *
- * ⚠ **The reduced row is NOT payload-matched to tsv's `no-locations` wire**, which
+ * ⚠ **The reduced row is NOT payload-matched to tsv's span-only wire**, which
  * is why it is named for the option it passes rather than for tsv's. tsv drops
  * per-node `loc` throughout; `skipExpressionLoc` drops `loc` from every JS node —
  * the `<script>` Program and its statements included, not only template
@@ -173,16 +176,15 @@ export class RsvelteParseImplementation extends BaseImplementation {
 		}
 		// `parse()` hands back JSON; the `JSON.parse` is the caller's cost in the
 		// real consumer too, and including it is what makes this mechanism-matched
-		// to `tsv-json` (which pays the identical boundary + parse cost).
+		// to tsv's span rows (which pay the identical boundary + parse cost).
 		return JSON.parse(this._native.parse(source, PARSE_OPTIONS));
 	}
 
 	/**
 	 * The `skipExpressionLoc` wire — rsvelte's own lighter payload. Deliberately
-	 * NOT named `parse_no_locations`: that interface hook means tsv's span-only
-	 * wire, and this is a different reduction (see the module doc), so it stays a
-	 * method of its own rather than borrowing a name that would assert a payload
-	 * match the bytes don't support.
+	 * NOT named for tsv's span-only wire: this is a different reduction (see the
+	 * module doc), so it stays a method of its own rather than borrowing a name that
+	 * would assert a payload match the bytes don't support.
 	 */
 	parse_skip_expression_loc(source: string, language: Language): unknown {
 		if (!this._native) throw new Error('rsvelte parse not initialized');

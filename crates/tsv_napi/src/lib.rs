@@ -5,12 +5,14 @@
 //! JS string into a Rust `String` and the returned `String` back out, so there
 //! are no raw pointers and no manual free — the cleanest of the three bindings.
 //!
-//! Transport mirrors `tsv_wasm`'s deliberate choice: `parse_<lang>` returns a
-//! JSON **string** for the host to `JSON.parse`, rather than building the object
-//! graph node-by-node across the boundary (measurably slower). `format_<lang>`
-//! returns the formatted source directly. Engine errors surface as thrown JS
-//! errors (`napi::Error`); `parse_internal_<lang>` parses without converting
-//! (benchmark-only, AST kept live via `black_box`).
+//! Transport mirrors `tsv_wasm`'s deliberate choice: `parse_<lang>` returns the
+//! span-only wire as a JSON **string** for the host to `JSON.parse`, rather than
+//! building the object graph node-by-node across the boundary (measurably slower).
+//! It is the one wire every binding emits — `start`/`end` offsets, no per-node
+//! `loc`; the `@fuzdev/tsv` loader's `{locations: true}` reconstructs `loc` in JS.
+//! `format_<lang>` returns the formatted source directly. Engine errors surface as
+//! thrown JS errors (`napi::Error`); `parse_internal_<lang>` parses without
+//! converting (benchmark-only, AST kept live via `black_box`).
 //!
 //! **Panic contract**: every export carries `#[napi(catch_unwind)]`, and the
 //! addon builds with the workspace `napi` profile (`release` + `panic =
@@ -50,7 +52,7 @@ use tsv_arena::with_doc_arena;
 /// against a language that has none is an **error**, not a silent Module: Svelte
 /// hard-wires `Module` and CSS has no goal, so a caller passing one asked for
 /// something that cannot be honored and must be told — the same stance
-/// `tsv_wasm`'s `read_options` takes when it rejects the `sourceType` key outright.
+/// `tsv_wasm`'s flat exports and the npm facade's options reader take.
 ///
 /// What an unset one means is the caller's: the parse exports read it as `Module`
 /// (their wire's `Program.sourceType` is a claim one settled grammar has to
@@ -67,8 +69,8 @@ fn napi_source_type(
         return Ok(None);
     };
     if !allowed {
-        // `noun` names the export family (`parse` / `format`), as the loader's own
-        // `read_options` and `tsv_wasm` spell it — this addon is published on its own
+        // `noun` names the export family (`parse` / `format`), as the npm facade's
+        // options reader and `tsv_wasm` spell it — this addon is published on its own
         // (`@fuzdev/tsv-<triple>`), so it says the whole sentence itself
         return Err(napi::Error::from_reason(
             tsv_arena::source_type_unsupported_message(noun),
@@ -126,10 +128,10 @@ macro_rules! parse_format {
     }};
 }
 
-/// Generate `parse_<lang>` / `parse_<lang>_no_locations` /
-/// `parse_internal_<lang>` / `format_<lang>` N-API functions for one language
-/// module. The `js_name` literals keep the JS export names snake_case for parity
-/// with `tsv_wasm` (napi-rs would otherwise camelCase them).
+/// Generate `parse_<lang>` / `parse_internal_<lang>` / `format_<lang>` N-API
+/// functions for one language module. The `js_name` literals keep the JS export
+/// names snake_case for parity with `tsv_wasm` (napi-rs would otherwise camelCase
+/// them).
 // One export per (language, operation), each taking the same
 // `(source, sourceType?)` arguments. The `$goalness` axis decides only whether a
 // `sourceType` ARGUMENT is accepted, never the arity: there is no goalless twin
@@ -140,8 +142,8 @@ macro_rules! parse_format {
 // `import.meta` are syntax errors. See `tsv parse --source-type` and
 // `tsv_ts::parse_with_goal`.
 //
-// `tsv_ffi` spells the same axis as a `u32` source-type code and `tsv_wasm` as
-// one key of a per-call options bag (`format_typescript(src, {sourceType})`); each binding's
+// `tsv_ffi` spells the same axis as a `u32` source-type code and `tsv_wasm` as the
+// same trailing optional string this addon takes; each binding's
 // own `lang_bindings!` reads the SAME `parse_ast!` / `goal_allowed!` pair out of
 // `tsv_arena`, so which languages have a goal axis is one fact in one place
 // rather than three that agree today.
@@ -150,27 +152,14 @@ macro_rules! lang_bindings {
         $goalness:ident,
         $lang:ident,
         $parse_fn:ident, $parse_js:literal,
-        $parse_no_loc_fn:ident, $parse_no_loc_js:literal,
         $parse_internal_fn:ident, $parse_internal_js:literal,
         $format_fn:ident, $format_js:literal
     ) => {
-        /// Parse source code and return its public JSON AST as a string.
+        /// Parse source code and return its span-only JSON AST as a string —
+        /// `start`/`end` offsets, no per-node `loc` (Svelte also no `name_loc`).
         #[cfg(feature = "parse")]
         #[napi(js_name = $parse_js, catch_unwind)]
         pub fn $parse_fn(source: String, source_type: Option<String>) -> napi::Result<String> {
-            let goal = napi_source_type(source_type, goal_allowed!($goalness), "parse")?
-                .unwrap_or(tsv_ts::Goal::Module);
-            parse_convert!($goalness, $lang, convert_ast_json_string, &source, goal)
-        }
-
-        /// Parse source and return its JSON AST string **without** per-node `loc`
-        /// (the span-only `no-locations` wire).
-        #[cfg(feature = "parse")]
-        #[napi(js_name = $parse_no_loc_js, catch_unwind)]
-        pub fn $parse_no_loc_fn(
-            source: String,
-            source_type: Option<String>,
-        ) -> napi::Result<String> {
             let goal = napi_source_type(source_type, goal_allowed!($goalness), "parse")?
                 .unwrap_or(tsv_ts::Goal::Module);
             parse_convert!(
@@ -210,8 +199,6 @@ lang_bindings!(
     tsv_svelte,
     parse_svelte,
     "parse_svelte",
-    parse_svelte_no_locations,
-    "parse_svelte_no_locations",
     parse_internal_svelte,
     "parse_internal_svelte",
     format_svelte,
@@ -222,8 +209,6 @@ lang_bindings!(
     tsv_ts,
     parse_typescript,
     "parse_typescript",
-    parse_typescript_no_locations,
-    "parse_typescript_no_locations",
     parse_internal_typescript,
     "parse_internal_typescript",
     format_typescript,
@@ -234,8 +219,6 @@ lang_bindings!(
     tsv_css,
     parse_css,
     "parse_css",
-    parse_css_no_locations,
-    "parse_css_no_locations",
     parse_internal_css,
     "parse_internal_css",
     format_css,
@@ -601,6 +584,11 @@ mod tests {
                 Some(root_type),
                 "{label}: unexpected root type in {json}"
             );
+            // the span-only wire: offsets, never a line/column object
+            assert!(
+                !json.contains(r#""loc""#) && !json.contains(r#""name_loc""#),
+                "{label}: the parse export emits the span-only wire: {json}"
+            );
         }
     }
 
@@ -611,13 +599,10 @@ mod tests {
         // `await` is an ordinary identifier at Script goal, reserved at Module goal.
         let src = "var await = 1;\n";
         // Annotate the array type so the fn items coerce to `StringFn` (no casts).
-        let parsers: [StringFn; 2] = [parse_typescript, parse_typescript_no_locations];
-        for f in parsers {
-            assert!(at_goal(f, src, "script").is_ok());
-            assert!(at_goal(f, src, "module").is_err());
-            // An omitted goal is the Module default, not a third behavior.
-            assert!(at_default(f, src).is_err());
-        }
+        assert!(at_goal(parse_typescript, src, "script").is_ok());
+        assert!(at_goal(parse_typescript, src, "module").is_err());
+        // An omitted goal is the Module default, not a third behavior.
+        assert!(at_default(parse_typescript, src).is_err());
         assert!(parse_internal_typescript(src.to_owned(), Some("script".to_owned())).is_ok());
         assert!(parse_internal_typescript(src.to_owned(), Some("module".to_owned())).is_err());
         assert!(parse_internal_typescript(src.to_owned(), None).is_err());
@@ -637,27 +622,17 @@ mod tests {
     fn goalless_languages_reject_a_goal_argument() {
         // Svelte hard-wires Module and CSS has no goal, so a `sourceType` argument asks
         // for something that cannot be honored — the caller is told rather than
-        // silently served a Module parse. The same stance `tsv_wasm`'s
-        // `read_options` takes when it rejects the key outright.
+        // silently served a Module parse. The same stance `tsv_wasm`'s flat
+        // exports and the npm facade's options reader take.
         //
         // Every string-returning export, not one per language: each is a
         // separately generated entry point that calls `napi_source_type` on its own
         // line, so a refusal can be lost on exactly one of them.
         // `parse_internal_*` returns `()` and is driven separately below.
-        let cases: [(&str, StringFn, &str); 6] = [
+        let cases: [(&str, StringFn, &str); 4] = [
             ("svelte parse", parse_svelte, "<div>x</div>"),
-            (
-                "svelte parse_no_locations",
-                parse_svelte_no_locations,
-                "<div>x</div>",
-            ),
             ("svelte format", format_svelte, "<div>x</div>"),
             ("css parse", parse_css, "a { color: red }"),
-            (
-                "css parse_no_locations",
-                parse_css_no_locations,
-                "a { color: red }",
-            ),
             ("css format", format_css, "a { color: red }"),
         ];
         for (label, f, src) in cases {

@@ -19,7 +19,7 @@
  * `await`), which puts its setup in `init()` where every other impl's setup lives.
  * Its parse path encodes the source into linear memory, calls in, then copies the
  * result buffer back out — a boundary tax of the same shape `tsv-wasm` pays, and
- * the reason that row belongs beside `tsv-wasm-json` and `oxc-parser-wasm` rather
+ * the reason that row belongs beside `tsv-wasm-json-no-locations` and `oxc-parser-wasm` rather
  * than beside the native ones.
  *
  * ⚠ **The native binding is not memory-safe on adversarial input, so the N-API row
@@ -131,7 +131,7 @@ const PARSE_OPTIONS: YukuParseOptions = {
  * §Fairness caveats) — so a row that called `parse()` and discarded the result would report
  * a throughput for a tree nobody built, and would not be measuring the same
  * deliverable as `oxc-parser` (whose `.program` getter `JSON.parse`s) or
- * `tsv-json`. **Returning `result.program` is what forces the decode: never
+ * `tsv-json-no-locations`. **Returning `result.program` is what forces the decode: never
  * "simplify" it to `return result`.**
  *
  * ⚠ **The parser is ERROR-TOLERANT — it never throws.** An invalid file yields an
@@ -165,7 +165,7 @@ function parse_yuku(
 	}
 
 	// Forces the lazy decode — the full JS AST, matching `oxc-parser` and
-	// `tsv-json`. See the laziness warning above before touching this line.
+	// `tsv-json-no-locations`. See the laziness warning above before touching this line.
 	return result.program;
 }
 

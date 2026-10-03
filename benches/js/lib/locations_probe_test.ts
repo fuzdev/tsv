@@ -1,14 +1,14 @@
 /**
- * Tests for the no-locations grader (`assert_locations_dropped`) and the walk that
- * drives it (`assert_binding_drops_locations`).
+ * Tests for the span-only grader (`assert_span_only`) and the walk that drives it
+ * (`assert_binding_emits_span_only`).
  *
  * Pins the directions that matter, since a wrong verdict either publishes a
- * loc-bearing parse under the no-locations label or stops a healthy run:
- *  - a span-only AST beside a loc-bearing sibling PASSES,
- *  - a no-locations AST that still carries `loc` FAILS, naming the artifact and its
- *    rebuild — the check's whole purpose, and
- *  - a loc-bearing sibling with no `loc` FAILS — the vacuity arm, the shape no live
- *    run can show you.
+ * loc-bearing parse under a span label or stops a healthy run:
+ *  - a span-only AST with numeric root offsets PASSES,
+ *  - an AST that still carries `loc` (or Svelte's `name_loc`) FAILS, naming the artifact
+ *    and its rebuild — the check's whole purpose, and
+ *  - an AST whose root has no numeric `start`/`end` FAILS — the vacuity arm, the shape
+ *    no live run can show you.
  *
  * Hand-written ASTs rather than a real binding on purpose: the grader's job is to
  * read a wire's shape, and a test that parsed through an artifact would need one
@@ -18,8 +18,8 @@
 
 import { doesNotThrow, strictEqual, throws } from 'node:assert';
 import {
-	assert_binding_drops_locations,
-	assert_locations_dropped,
+	assert_binding_emits_span_only,
+	assert_span_only,
 	count_loc_keys,
 	type LocationsProbeTarget
 } from './locations_probe.ts';
@@ -44,86 +44,80 @@ const with_loc = {
 };
 
 /** Its span-only twin — an identifier NAMED `loc` is a value, not a key. */
-const without_loc = {
+const span_only = {
 	type: 'Program',
 	start: 0,
 	end: 12,
 	body: [{ type: 'Identifier', name: 'loc', start: 6, end: 7 }]
 };
 
-/** The failure a reader acts on: how many `loc`, which artifact, how to rebuild it. */
-const names_artifact = (e: Error): boolean =>
-	e.message.includes('carrying 2 `loc` keys') &&
-	e.message.includes(`${artifact.path} still emits \`loc\` on its no-locations parse`) &&
-	e.message.includes(artifact.rebuild);
+/** A Svelte span wire that kept one `name_loc` and nothing else. */
+const with_name_loc = {
+	type: 'Root',
+	start: 0,
+	end: 5,
+	fragment: {
+		nodes: [{ type: 'RegularElement', start: 0, end: 5, name_loc: { start: {}, end: {} } }]
+	}
+};
 
-Deno.test('count_loc_keys: counts keys at every depth, never values', () => {
+/** The failure a reader acts on: how many keys, which artifact, how to rebuild it. */
+const names_artifact =
+	(count: string) =>
+	(e: Error): boolean =>
+		e.message.includes(`carrying ${count}`) &&
+		e.message.includes(`${artifact.path} still emits the loc-bearing wire`) &&
+		e.message.includes(artifact.rebuild);
+
+Deno.test('count_loc_keys: counts loc and name_loc keys at every depth, never values', () => {
 	strictEqual(count_loc_keys(with_loc), 2);
-	strictEqual(count_loc_keys(without_loc), 0);
+	strictEqual(count_loc_keys(span_only), 0);
+	strictEqual(count_loc_keys(with_name_loc), 1);
 	strictEqual(count_loc_keys(null), 0);
 	strictEqual(count_loc_keys('loc'), 0);
 });
 
-Deno.test('locations dropped: span-only beside a loc-bearing sibling passes', () => {
-	doesNotThrow(() =>
-		assert_locations_dropped('probe', 'parse_no_locations[x]', artifact, with_loc, without_loc)
-	);
+Deno.test('span only: offsets without loc pass', () => {
+	doesNotThrow(() => assert_span_only('probe', 'parse[x]', artifact, span_only));
 });
 
-Deno.test('locations dropped: a no-locations AST carrying `loc` fails, naming the artifact', () => {
+Deno.test('span only: an AST carrying `loc` fails, naming the artifact', () => {
 	throws(
-		() => assert_locations_dropped('probe', 'parse_no_locations[x]', artifact, with_loc, with_loc),
-		names_artifact
+		() => assert_span_only('probe', 'parse[x]', artifact, with_loc),
+		names_artifact('2 `loc` / `name_loc` keys')
 	);
-});
-
-Deno.test('locations dropped: a sibling with no `loc` fails as vacuous', () => {
 	throws(
-		() =>
-			assert_locations_dropped(
-				'probe',
-				'parse_no_locations[x]',
-				artifact,
-				without_loc,
-				without_loc
-			),
-		/no longer discriminates/
+		() => assert_span_only('probe', 'parse[x]', artifact, with_name_loc),
+		names_artifact('1 `loc` / `name_loc` key ')
 	);
 });
 
-/** A binding whose no-locations call does (or does not) drop `loc`, recording its calls. */
-const binding = (drops: boolean, calls: Array<string>): LocationsProbeTarget => ({
-	parse: (_source, language, goal) => {
-		calls.push(`parse:${language}:${goal ?? 'unset'}`);
-		return with_loc;
-	},
-	parse_no_locations: (_source, language, goal) => {
-		calls.push(`parse_no_locations:${language}:${goal ?? 'unset'}`);
-		return drops ? without_loc : with_loc;
+Deno.test('span only: a root with no numeric offsets fails as vacuous', () => {
+	for (const ast of [{ error: 'x' }, null, { type: 'Program', start: '0', end: 1 }]) {
+		throws(() => assert_span_only('probe', 'parse[x]', artifact, ast), /no longer discriminates/);
 	}
 });
 
-Deno.test('binding drops locations: probes svelte and every typescript goal, never css', () => {
+/** A binding whose parse does (or does not) emit the span wire, recording its calls. */
+const binding = (span: boolean, calls: Array<string>): LocationsProbeTarget => ({
+	parse: (_source, language, goal) => {
+		calls.push(`${language}:${goal ?? 'unset'}`);
+		return span ? span_only : with_loc;
+	}
+});
+
+Deno.test('binding emits span only: probes every language, and every typescript goal', () => {
 	const calls: Array<string> = [];
-	doesNotThrow(() => assert_binding_drops_locations('probe', artifact, binding(true, calls)));
+	doesNotThrow(() => assert_binding_emits_span_only('probe', artifact, binding(true, calls)));
 	strictEqual(
-		calls.filter((c) => c.startsWith('parse_no_locations:')).join(' '),
-		'parse_no_locations:svelte:unset parse_no_locations:typescript:unset ' +
-			'parse_no_locations:typescript:module parse_no_locations:typescript:script'
-	);
-	strictEqual(
-		calls.filter((c) => c.startsWith('parse:')).join(' '),
-		'parse:svelte:unset parse:typescript:unset parse:typescript:module parse:typescript:script'
-	);
-	strictEqual(
-		calls.some((c) => c.includes(':css:')),
-		false
+		calls.join(' '),
+		'svelte:unset typescript:unset typescript:module typescript:script css:unset'
 	);
 });
 
-Deno.test('binding drops locations: a binding that ignores the request fails', () => {
+Deno.test('binding emits span only: a binding still emitting loc fails', () => {
 	throws(
-		() => assert_binding_drops_locations('probe', artifact, binding(false, [])),
-		/probe: parse_no_locations\[svelte\]\(\) returned an AST carrying 2 `loc` keys/
+		() => assert_binding_emits_span_only('probe', artifact, binding(false, [])),
+		/probe: parse\[svelte\]\(\) returned an AST carrying 2 `loc` \/ `name_loc` keys/
 	);
 });

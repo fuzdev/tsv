@@ -267,7 +267,7 @@ pub fn parse_source_type_arg(source_type: Option<&str>) -> Result<Option<tsv_ts:
 /// Refuse a `--source-type` on a language that has no goal axis. Svelte hard-wires
 /// `Module` and CSS has no goal, so a caller naming one there asked for something
 /// that cannot be honored and must be told — the stance every binding takes
-/// (`tsv_wasm`'s `read_options`, `tsv_ffi`'s `ffi_source_type`, `tsv_napi`), so the
+/// (`tsv_wasm`'s `wasm_source_type`, `tsv_ffi`'s `ffi_source_type`, `tsv_napi`), so the
 /// CLI is not the one surface where the flag is silently dropped — the JS mirror
 /// (`crates/tsv_wasm/npm/cli.js`, the bin of both npm CLIs) carries the same
 /// refusal word for word, so the two shipped `tsv` bins cannot drift. Shared by

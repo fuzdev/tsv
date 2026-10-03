@@ -316,11 +316,17 @@ deno task corpus:compare:format:run --all --json 2>/dev/null > report.json
 
 ## Parse Comparison
 
-Deep-diff tsv's shipped parse output against the canonical parsers
+Deep-diff tsv's parse output against the canonical parsers
 (acorn-typescript / `svelte.parse` / `parseCss`) — the parser-side sibling of the
-formatting comparison. Native-FFI-only by design: the WASM artifact rides the same
-Rust wire (`convert_ast_json_string`), differing only at the boundary, and is
-already exercised per-file by the bench preflight and `deno task smoke`. This is the
+formatting comparison. The shipped span-only wire comes from the native FFI by design:
+the WASM artifact rides the same Rust wire (`convert_ast_json_string_no_locations`),
+differing only at the boundary, and is already exercised per-file by the bench
+preflight and `deno task smoke`. The `loc`-bearing wire ships through no binding, so
+the loc arm asks one `target/corpus/tsv_debug loc_wires --stdin` process for it
+(`lib/loc_wire_client.ts`: one NDJSON request per document, a parse error or a caught
+panic answered as such, so a panic still reaches the panic gate as a panic) — which is
+why `corpus:compare:parse` and `conformance` build `build:check`'s world beside the
+corpus FFI. This is the
 external oracle the internal identity gates can't provide: fixtures cover curated
 cases and the wire-JSON writer is the sole emission path, so a writer bug (e.g. an
 untranslated position field) on an uncurated shape is invisible without a
@@ -367,7 +373,7 @@ dedicated tool for those.
 **Two arms, one run.** Every file is graded twice, and the two arms never blend their
 tables.
 
-- **The loc arm** grades tsv's loc-bearing wire. First the **definition check**: tsv's
+- **The loc arm** grades tsv's loc-bearing wire (the Rust emitter, via `tsv_debug`). First the **definition check**: tsv's
   `loc` must deep-equal the shipped `crates/tsv_wasm/npm/locations.js` reconstruction of
   its own span-only wire (`lib/loc_cross_grade.ts`, the same check `deno task check:loc`
   runs over the fixture tree) — a violation is a tsv bug and fails every run, controls
@@ -404,7 +410,7 @@ tables.
   declared — equivalent to excluding those fixtures from span grading while still grading
   their `loc`. A divergence baked into `expected_ours.json` therefore stays invisible here,
   as it does to `fixtures:validate`, which compares tsv against that same pin.
-- **The span-only arm** grades tsv's `no-locations` wire (the FFI's span-only export) in
+- **The span-only arm** grades tsv's shipped span-only wire (the FFI's parse export) in
   every language: per file, it is deep-diffed against the oracle's output with every `loc`
   and `name_loc` key removed — the definition `tests/no_locations.rs` encodes, and the whole
   of what that wire drops (the `character` field Svelte writes lives inside one of those).
@@ -445,7 +451,10 @@ new group is intentional, add a matcher AND catalog it in
 Three gates run tsv's parsers against an upstream suite. All three share one shape —
 **verdict parity** (enforced) plus **AST-shape** deep-diff (report-only, via the
 SHARED `corpus_compare_parse.ts` engine: `diff_asts` + `DOCUMENTED_MATCHERS`, which
-is `import.meta.main`-guarded so importing it doesn't run the CLI). All accept `-v`,
+is `import.meta.main`-guarded so importing it doesn't run the CLI). The shape half grades
+tsv's shipped span-only wire against the oracle with its `loc` / `name_loc` stripped
+(`lib/span_only.ts`), as `corpus:compare:parse`'s span-only arm does; `loc` is that
+tool's loc arm's to grade. All accept `-v`,
 `--json`, and a subtree path; each has a `:run` variant that skips the FFI rebuild
 (freshness-guarded).
 
@@ -562,7 +571,8 @@ The three gates above plus `corpus:compare:parse --all` and `corpus:compare:form
 are deliberately NOT legs — `tsv_check` is experimental and may never ship, so its
 gates stay on-demand (../../docs/typechecker.md).
 
-`deno task conformance` builds the corpus FFI once and runs every leg in **ONE
+`deno task conformance` builds the corpus FFI (and `build:check`'s `tsv_debug`, the loc arm's
+loc-wire server) once and runs every leg in **ONE
 process** (`conformance.ts`): the canonical oracle modules (prettier, the svelte
 plugin, svelte/compiler, acorn, acorn-ts) load once via the module cache instead of
 once per leg (`render:audit`, the lone non-JS leg, is a `cargo` subprocess — which
@@ -918,7 +928,7 @@ below, field for field and version note for version note, so a new top-level fie
 here is a change there too — it declares them optional and degrades on an older
 report, which is what makes the drift silent rather than loud.
 
-The report JSON (per-runtime schema `version: 19`, `bench.ts` `REPORT_SCHEMA_VERSION` —
+The report JSON (per-runtime schema `version: 20`, `bench.ts` `REPORT_SCHEMA_VERSION` —
 a committed report says which version wrote it, and lags the schema until the next
 refresh; the combined compose report carries its own version; coverage-only runs add
 `coverage_by_source`) carries, beyond
@@ -1008,9 +1018,13 @@ leaves EVERY row's timed set, and a file count understates it (a harvested
 per-collection stylesheet is ONE file); a group nothing failed is
 listed with zeroes, and the `.md` prints the same fact as an **Omitted from every
 row's timed set** line under the group. Each parse `entries[]` row also carries a
-`payload` tier (`report.ts` `PayloadTier`, a registry-checked table like
-`DISPLAY_ORDER`: an unlisted parse row warns at init and publishes `null`), so a
-consumer building an `Nx` from two rows can say whether their products match;
+`payload` tier (`report.ts` `PayloadTier`: `drop_in`, `drop_in_superset` — the
+`+reconstruct` rows on Svelte and CSS, a `loc` on every positioned object where the
+oracle's is sparser — `span_only`, `own_shape`, `none`; keyed on the row IN ITS GROUP'S
+LANGUAGE, since `svelte/compiler` is a `loc`-bearing oracle on Svelte and a `loc`-free
+one on CSS; a registry-checked table like `DISPLAY_ORDER`: a parse row untiered in a
+language it is registered in warns at init and publishes `null`), so a consumer
+building an `Nx` from two rows of a group can say whether their products match;
 top-level `output_digest_ungraded` records files a byte-graded row
 ACCEPTED whose output the byte-parity check could not digest, as `{"<group>/<row>":
 count}` — the one known cause is a pathologically deep AST overflowing V8's
@@ -1095,7 +1109,7 @@ table (`rows_missing_from_display_order`); `COMPARISON_SECTIONS` — the
 Comparisons tables' per-tier opponent lists — where an unlisted row gets no
 comparison cell at all (`rows_missing_from_comparisons`, cleared by an entry in
 `COMPARISON_EXCLUSIONS` for a row that belongs in none); and `PARSE_PAYLOAD_TIERS`,
-where an unlisted PARSE row publishes `payload: null`
+where a PARSE row untiered in one of its languages publishes `payload: null` there
 (`rows_missing_from_payload_tiers`). All three WARN rather than
 throw: an absent row understates a table, where a stale `SURFACE_DISCLOSURES`
 sentence asserts something false. The comparison guard exists because its drift is
@@ -1132,16 +1146,16 @@ stale or missing. The build-first tasks rebuild first, so they pass for free.
 `BENCH_STALE_OK=1` downgrades a _stale_ artifact to a `⚠` warning (a _missing_ one
 stays fatal); see the module doc for why stale is a hard error by default.
 
-**Behind the override: the no-locations wire is probed at init.** An mtime can only
-say an artifact is old, not what it does, and a WASM bundle whose parse exports
-predate the options bag drops `{locations: false}` without a throw — under
-`BENCH_STALE_OK=1` the `tsv-wasm-json-no-locations` row would time the loc-bearing
-wire and publish it under the span-only label. So each tsv binding's `init()` parses
-a fixed source both ways through the row's own calls and requires the no-locations
-AST to carry no `loc` while its sibling carries some (`lib/locations_probe.ts`
-`assert_binding_drops_locations`; the native bindings select the wire by a separate
-export and are probed alike). A failure names the artifact and its rebuild task and,
-tsv's bindings being REQUIRED (§Report files), stops the run before any row is timed.
+**Behind the override: the span-only wire is probed at init.** An mtime can only
+say an artifact is old, not what it does, and a binding built before the bindings went
+span-only still returns the loc-bearing wire from `parse_<lang>` — under
+`BENCH_STALE_OK=1` the span rows would time it under the span-only label, and the
+`+reconstruct` rows would rebuild `loc` over a tree that already had it. So each tsv
+binding's `init()` parses a fixed source per language through the row's own call and
+requires the AST to carry no `loc` / `name_loc` and numeric root offsets
+(`lib/locations_probe.ts` `assert_binding_emits_span_only`). A failure names the
+artifact and its rebuild task and, tsv's bindings being REQUIRED (§Report files), stops
+the run before any row is timed.
 
 **The size-only artifacts are graded too, as a warning.** The bench's size table
 reports every tsv build from every runtime (the other binding, the subset bundles,
@@ -1509,10 +1523,13 @@ benches/js/
     ├── loc_tolerance.ts   # The loc arm's six tolerance rows — Svelte's own `loc` departures from
     │                      # the definition, recognized by structure (a seventh fails the run) —
     │                      # and its pinned superset kinds; mutation-tested by loc_tolerance_test.ts
-    ├── locations_probe.ts # Behavioral "did `locations: false` TAKE" check, asked at each tsv
-    │                      # binding's init: the no-locations parse must carry no `loc` and its
-    │                      # sibling some, so a bundle that ignores the option can't be timed under
-    │                      # the span-only label; unit-tested by locations_probe_test.ts
+    ├── loc_wire_client.ts # The loc arm's loc-bearing wire, asked of one `tsv_debug loc_wires
+    │                      # --stdin` process (NDJSON, per-request panic catching) — the wire no
+    │                      # binding ships
+    ├── locations_probe.ts # Behavioral "is the parse wire still SPAN-ONLY" check, asked at each
+    │                      # tsv binding's init: no `loc` / `name_loc`, numeric root offsets, so
+    │                      # a binding still emitting `loc` can't be timed under the span rows'
+    │                      # label; unit-tested by locations_probe_test.ts
     ├── malva.ts           # malva WASM wrapper (CSS only; dprint's CSS plugin, shared formatter host)
     ├── napi.ts            # process.dlopen bindings (NapiImplementation — Node/Bun native)
     ├── oxc.ts             # OXC native wrappers (oxc-parser + oxfmt)
@@ -1528,6 +1545,9 @@ benches/js/
     │                      # and each directory's `format.test.js` verdicts, the conformance view's
     │                      # filter over the Prettier suites (unit-tested by prettier_fixtures_test.ts)
     ├── prettier_cache.ts  # Content-addressed prettier-output cache for the format comparison
+    ├── span_only.ts       # How the parse comparisons serialize a canonical AST: the BigInt
+    │                      # replacer, and the span-only one that strips `loc` / `name_loc`
+    │                      # (shared by corpus_compare_parse and fixtures_gate)
     ├── reject_probe.ts    # Behavioral "is a rejection still REPORTED" check, asked at every
     │                      # wrapper's init: tsv's three front-ends (FFI decides by the `out_status`
     │                      # word, so a misread status would fabricate 100% coverage; an
@@ -1543,6 +1563,8 @@ benches/js/
     │                      # artifact-naming pair every loader AND guard shares — native_library_filename
     │                      # and wasm_target (the pkg/<variant>/<target>/ segment)
     ├── swc.ts             # swc wrapper (parse-only, TS/JS; both surfaces — goal axis is `isModule`)
+    ├── text_lines.ts      # `lines_of`: a byte stream's lines, linear in its length — the NDJSON
+    │                      # reader `loc_wire_client.ts` and `scripts/check_loc.ts` share
     ├── ts_repo.ts         # Shared `../typescript`-corpus vocabulary: discovery, the `@filename`
     │                      # unit split (tsc's own harness rule), and the baseline key/grammar-code
     │                      # rules (the ts-repo GATE and the harvest both read it, so they can't
@@ -1595,7 +1617,7 @@ most universal-tsv failures are unsupported-syntax fixtures (SCSS in `.css`, JSX
 size so rare / impl-specific failures land at the top, and the `Failed in:` line
 collapses to `all tsv variants` when the failure set is exactly the tsv rows the run
 registered in that language's groups (derived from the task tracking — which rows exist
-varies by language and surface). All labels use display names (`tsv-json`, `acorn-typescript`) rather than
+varies by surface). All labels use display names (`tsv-json-no-locations`, `acorn-typescript`) rather than
 internal trackingKeys. If an impl fails on many files (e.g. WASM panics corrupting
 internal state), the coverage report and skip counts make it visible without
 `--verbose`.
@@ -1639,7 +1661,7 @@ internal state), the coverage report and skip counts make it visible without
 - **Parse benchmark overhead**: JSON materialization, not parsing, dominates the
   `-json` rows (see `results/report.<runtime>.md` for current ratios). Use
   `tsv-internal` for raw parse speed. Both the native and WASM rows go through
-  `convert_ast_json_string` — the wire-JSON writer emitting directly from the
+  `convert_ast_json_string_no_locations` — the span-only wire-JSON writer emitting directly from the
   internal AST in one walk, no intermediate `serde_json::Value` or typed public tree
   ([../../docs/architecture.md §Closed Scope, Open
   Convention](../../docs/architecture.md#closed-scope-open-convention)). They differ

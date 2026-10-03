@@ -29,22 +29,22 @@ const program: Program = parse_typescript('const x: number = 1;');
 const stylesheet: StyleSheetFile = parse_css('a { color: red }');
 ```
 
-Three parsers: `parse_svelte` (matches Svelte's modern parser), `parse_typescript` (matches acorn + acorn-typescript), `parse_css` (matches Svelte's `parseCss`). Each takes a source `string` plus an optional options object and returns a Svelte-compatible JSON AST, throwing on a parse error.
+Three parsers: `parse_svelte` (matches Svelte's modern parser), `parse_typescript` (matches acorn + acorn-typescript), `parse_css` (matches Svelte's `parseCss`). Each takes a source `string` plus an optional options object and returns a Svelte-compatible JSON AST, throwing on a parse error. The AST is **span-only** by default: every node carries its `start`/`end` offsets but no per-node `loc` (line/column) object, and Svelte nodes no `name_loc` — pass `{locations: true}` for those (below).
 
 AST types are bundled in `tsv_ast.d.ts` and re-exported from the package — `import type` any node directly.
 
 To parse across threads, compile once and share: the main entry exports `wasm_module`, the compiled `WebAssembly.Module` behind its exports, and the `@fuzdev/tsv-parse-wasm/worker` subpath is the same API without the import-time initialization — so a worker calls `init_sync({module: wasm_module})` on the module handed to it (`workerData` or `postMessage`) instead of reading and compiling the WASM again. Compiled code is shared across isolates, so no worker pays for a second compile. `wasm_module` is the Node/Bun entry's alone — that entry is the one that compiles at import — so in a browser Worker call `await init()` instead, or `postMessage` a `WebAssembly.Module` you compiled yourself.
 
-Each parser also has a `parse_*_json` variant (`parse_svelte_json`, `parse_typescript_json`, `parse_css_json`) taking the same arguments but returning the AST as a compact JSON string — faster when you're writing it to disk or sending it over the wire, since it skips materializing the JS object tree.
+Each parser also has a `parse_*_json` variant (`parse_svelte_json`, `parse_typescript_json`, `parse_css_json`) returning the span-only AST as a compact JSON string — faster when you're writing it to disk or sending it over the wire, since it skips materializing the JS object tree. It takes `{sourceType}` alone: `loc` is computed over objects, so `locations` is not a `_json` option.
 
 ### Options
 
 Every parser accepts an optional second argument, like acorn:
 
-- `locations` (default `true`) — emit per-node `loc` (line/column), the drop-in acorn/svelte wire. Pass `false` for the **span-only** wire: `start`/`end` offsets only (Svelte also drops `name_loc`), much smaller and faster to materialize, mirroring acorn's `locations: false`. Line/column stays derivable from the offsets plus your source, so nothing is lost if you have the source.
+- `locations` (default `false`) — add per-node `loc` (line/column), as acorn's `locations: true` does, and Svelte's `name_loc`. The parser emits the offsets; the line/column objects are computed from them and your source in JS (see below), so the default is the smaller, faster-to-materialize tree and nothing is lost if you have the source.
 - `sourceType` (TypeScript only, default `'module'` — the parsers have no source-type fallback, since the wire's `Program.sourceType` is a claim one settled grammar has to produce) — the parse goal: at `'script'`, `await` is an ordinary identifier, `import`/`export`/`import.meta` and a top-level `for await` are syntax errors, and the code is sloppy unless its own `"use strict"` prologue makes it strict (so `with` and legacy octal literals/escapes parse; a module is always strict). `parse_svelte` and `parse_css` **throw** on the key rather than ignoring it (Svelte's `<script>` is always a module, CSS has no goal), so code forwarding one options bag to whichever parser should spell the inapplicable source type as `undefined` — every supported key reads `undefined` as its default.
 
-Unknown option keys throw, whatever their value — a typo like `{locatons: false}` (or `{locatons: undefined}`) fails loudly instead of silently handing back the full wire.
+Unknown option keys throw, whatever their value — a typo like `{locatons: true}` (or `{locatons: undefined}`) fails loudly instead of silently handing back the tree without `loc`.
 
 A second argument that isn't an object throws too, arrays included. That makes `sources.map(parse_typescript)` an error, since `map` passes the index as the second argument — write `sources.map((s) => parse_typescript(s))`.
 
@@ -54,19 +54,21 @@ Deeply nested input has a ceiling: the WASM stack is 1 MiB, and the deepest shap
 
 ### Reconstructing line/column
 
-Need `loc` back? The package ships a pure-JS helper that derives it from the span-only wire + your source — no re-parse:
+`{locations: true}` derives `loc` from the offsets plus your source — no re-parse — with a pure-JS helper the package also exports, for a tree you already hold:
 
 ```typescript
 import {parse_typescript, reconstruct_locations} from '@fuzdev/tsv-parse-wasm';
 
 const src = 'const x = 1;\n';
-const ast = reconstruct_locations(parse_typescript(src, {locations: false}), src);
-// every node now carries loc: {start: {line, column}, end: {line, column}}
+const ast = parse_typescript(src, {locations: true});
+// every node carries loc: {start: {line, column}, end: {line, column}}
+// the same, in two steps:
+const same = reconstruct_locations(parse_typescript(src), src);
 ```
 
-`reconstruct_locations(ast, source)` walks the tree and adds `loc` to every object carrying `start`/`end`, **mutating in place** and returning it (`structuredClone(ast)` first if you need the input untouched). Its result equals the loc-bearing wire of the same parse, in every language: each `loc` is the line and column of the object's own `start`/`end` — ECMAScript's line terminators for TypeScript (acorn's count exactly), `\n` alone for a whole Svelte document and for CSS — together with the `name_loc` on Svelte elements, attributes, and directives, and the `character` field Svelte reports on a shorthand attribute's identifier, a snippet name, a simple-identifier block pattern, and an in-tag comment (`<div /* c */ class="x">`, including inside `<svelte:options>`). The key is appended last, so an object consumer matches but a re-serialized tree won't byte-match the wire's key order.
+`reconstruct_locations(ast, source)` walks the tree and adds `loc` to every object carrying `start`/`end`, **mutating in place** and returning it (`structuredClone(ast)` first if you need the input untouched). Each `loc` is the line and column of the object's own `start`/`end` — ECMAScript's line terminators for TypeScript (acorn's `locations: true` exactly), `\n` alone for a whole Svelte document and for CSS — together with the `name_loc` on Svelte elements, attributes, and directives, and the `character` field Svelte reports on a shorthand attribute's identifier, a snippet name, a simple-identifier block pattern, and an in-tag comment (`<div /* c */ class="x">`, including inside `<svelte:options>`). The key is appended last on each object. Without a `language` it is read off the root (`Root`, `Program`, `StyleSheetFile`), so for a subtree — a Svelte `Fragment`, a single statement — pass `{language}`; it throws rather than guess.
 
-For sparse or repeated lookups, `create_locator(source, opts?)` holds the prebuilt line-start table and exposes `loc_of(node)` and `reconstruct(ast)`; pass `{language: 'svelte'}` or `{language: 'css'}` for those documents (the default is `typescript`). A one-shot `loc_of(node, source, opts?)` is also exported for the occasional single lookup (it rebuilds the table each call).
+For sparse or repeated lookups, `create_locator(source, {language})` holds the prebuilt line-start table and exposes `loc_of(node)` and `reconstruct(ast)`; the `language` (`'typescript'`, `'svelte'`, or `'css'`) is required, since it picks the document's line rule. A one-shot `loc_of(node, source, {language})` is also exported for the occasional single lookup (it rebuilds the table each call).
 
 ## Status
 

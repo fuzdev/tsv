@@ -1,9 +1,10 @@
 /**
- * Hand-written types for `@fuzdev/tsv` — mirrors `@fuzdev/tsv-wasm`'s
- * surface (same option interfaces, same overloads, same `tsv_ast` re-export),
- * so the two packages type-check interchangeably except for what a WASM engine
- * needs and this one doesn't: `init()` and `init_sync()` (nothing here needs
- * initializing), `wasm_module` (no compiled module to hand a worker),
+ * Hand-written types for `@fuzdev/tsv` — `@fuzdev/tsv-wasm`'s surface (the same
+ * facade declarations, re-exported from the staged `api.d.ts` / `api_parse.d.ts`, and
+ * the same `tsv_ast` re-export), so the two packages type-check interchangeably
+ * except for what a WASM engine needs and this one doesn't: `init()` and
+ * `init_sync()` (nothing here needs initializing), `wasm_module` (no compiled module
+ * to hand a worker),
  * `reinstantiate()` (no instance to poison), and `IgnoreStack`'s `free()` /
  * `[Symbol.dispose]` (a GC-managed native object has no handle to release).
  * That list is the whole delta — `scripts/test_napi_npm.ts` diffs the two
@@ -19,105 +20,25 @@
  */
 export type * from './tsv_ast.js';
 
-/**
- * Options accepted by `parse_svelte` / `parse_css` (and their `_json`
- * siblings). The parse goal is TypeScript's alone, so it is declared here as
- * `undefined`-only rather than omitted: a set `sourceType` throws, but spelling
- * the inapplicable source type `undefined` forwards one bag to whichever parser,
- * exactly as the runtime does.
- */
-export interface ParseOptions {
-	/**
-	 * Emit per-node `loc` (line/column) — the drop-in acorn/svelte wire.
-	 * `false` emits the span-only wire (much smaller; Svelte also omits
-	 * `name_loc`): `loc` stays derivable from `start`/`end` plus the source,
-	 * via this package's own `reconstruct_locations` / `create_locator` /
-	 * `loc_of`, whose result equals the loc-bearing wire (see `locations.d.ts`).
-	 * @default true
-	 */
-	locations?: boolean | undefined;
-	/**
-	 * Not accepted here — Svelte's `<script>` is always a module and CSS has no
-	 * goal, so a set `sourceType` throws. See `TypeScriptParseOptions`.
-	 */
-	sourceType?: undefined;
-}
-
-/** The TypeScript parsers' bag: the same keys, with `sourceType` settable. */
-export interface TypeScriptParseOptions {
-	/** As `ParseOptions.locations`. @default true */
-	locations?: boolean | undefined;
-	/**
-	 * Parse goal: at `'script'`, `await` is an ordinary identifier and
-	 * `import`/`export`/`import.meta` are syntax errors. A script is also
-	 * **sloppy** unless its own `"use strict"` directive prologue makes it
-	 * strict, so `with` and the legacy octal literals/escapes parse there; a
-	 * module is always strict.
-	 * @default 'module'
-	 */
-	sourceType?: 'script' | 'module' | undefined;
-}
-
-/**
- * Options accepted by `format_svelte` / `format_css`. Formatting itself is
- * non-configurable and the parse goal is TypeScript's alone, so these carry no
- * settable key. Every unknown key throws, `locations` included: that option
- * shapes the parse wire, and format emits no wire.
- */
-export interface FormatOptions {
-	/**
-	 * Not accepted here — Svelte's `<script>` is always a module and CSS has no
-	 * goal, so a set `sourceType` throws. Declared (as `undefined`) rather than
-	 * omitted so one bag still forwards to whichever formatter: spell the
-	 * inapplicable source type `undefined` and this type accepts it, exactly as
-	 * the runtime does.
-	 */
-	sourceType?: undefined;
-}
-
-/** The TypeScript formatter's bag: the same key, settable. */
-export interface TypeScriptFormatOptions {
-	/**
-	 * Parse goal: at `'script'`, `await` is an ordinary identifier and
-	 * `import`/`export`/`import.meta` are syntax errors. A script is also
-	 * **sloppy** unless its own `"use strict"` directive prologue makes it
-	 * strict, so `with` and the legacy octal literals/escapes parse there; a
-	 * module is always strict.
-	 *
-	 * Omitted, the source is formatted as a **module, retried as a script** if
-	 * that parse fails — so a legacy sloppy script formats without naming a
-	 * grammar, while anything the module grammar accepts is never reinterpreted
-	 * (the printer does not read the goal, so no output changes). A set value is
-	 * exact: `'module'` refuses a script-only source rather than retrying.
-	 * `parse_typescript` has no such fallback — its wire's `Program.sourceType`
-	 * is a claim, and omitting the key there means `'module'`.
-	 */
-	sourceType?: 'script' | 'module' | undefined;
-}
-
-export function parse_svelte(source: string, options: ParseOptions & { locations: false }): any;
-export function parse_svelte(source: string, options?: ParseOptions): import('./tsv_ast.js').Root;
-export function parse_svelte_json(source: string, options?: ParseOptions): string;
-
-export function parse_typescript(
-	source: string,
-	options: TypeScriptParseOptions & { locations: false }
-): any;
-export function parse_typescript(
-	source: string,
-	options?: TypeScriptParseOptions
-): import('./tsv_ast.js').Program;
-export function parse_typescript_json(source: string, options?: TypeScriptParseOptions): string;
-
-export function parse_css(
-	source: string,
-	options?: ParseOptions
-): import('./tsv_ast.js').StyleSheetFile;
-export function parse_css_json(source: string, options?: ParseOptions): string;
-
-export function format_svelte(source: string, options?: FormatOptions): string;
-export function format_typescript(source: string, options?: TypeScriptFormatOptions): string;
-export function format_css(source: string, options?: FormatOptions): string;
+// The parse/format surface is the shared facade's, declared once beside it
+// (`api.d.ts` / `api_parse.d.ts`, staged in from `crates/tsv_wasm/npm/`). Re-exported by
+// NAME, so the `tsv_ast` star export above can never ambiguate one away (TS2308).
+export type {
+	ParseOptions,
+	TypeScriptParseOptions,
+	ParseJsonOptions,
+	TypeScriptParseJsonOptions
+} from './api_parse.js';
+export type { FormatOptions, TypeScriptFormatOptions } from './api.js';
+export {
+	parse_svelte,
+	parse_svelte_json,
+	parse_typescript,
+	parse_typescript_json,
+	parse_css,
+	parse_css_json
+} from './api_parse.js';
+export { format_svelte, format_typescript, format_css } from './api.js';
 
 /**
  * The gitignore-aware matcher stack — the same layering and prune decisions

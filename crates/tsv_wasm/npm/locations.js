@@ -1,22 +1,28 @@
 /**
- * Line/column reconstruction for tsv's `no-locations` parse wire.
+ * Line/column reconstruction for tsv's span-only parse wire.
  *
- * A `parse_*` call with `{locations: false}` emits a span-only AST: every node keeps its
- * `start`/`end` (UTF-16 code-unit offsets) but drops the per-node `loc`
- * (line/column) object (Svelte also drops the element/attribute/directive
- * `name_loc`). Line/column is a pure function of an offset plus the source, so a
- * consumer holding only the span-only wire recovers both on demand — no re-parse.
- * This module is that reconstruction, shipped so callers don't reimplement the
- * line rules.
+ * Every tsv parse emits a span-only AST: every node carries its `start`/`end` (UTF-16
+ * code-unit offsets) and no per-node `loc` (line/column) object (Svelte also no
+ * element/attribute/directive `name_loc`). Line/column is a pure function of an offset
+ * plus the source, so a consumer recovers both on demand — no re-parse. This module is
+ * that reconstruction, shipped so callers don't reimplement the line rules; a package's
+ * `parse_*(source, {locations: true})` runs it for them.
  *
- * Two entry points:
- * - `reconstruct_locations(ast, source)` — one-shot: build the line table once,
- *   walk the tree, add `loc` to every node (and `name_loc` back to the Svelte
- *   nodes that carry one), return the (mutated) ast.
- * - `create_locator(source)` — amortized: hold the prebuilt line table and expose
- *   `loc_of(node)` (single node) and `reconstruct(ast)` (whole tree). Prefer this
- *   for heavy sparse use; the bare `loc_of(node, source)` convenience rebuilds the
- *   O(source) table per call.
+ * Three entry points:
+ * - `reconstruct_locations(ast, source, opts?)` — one-shot: build the line table once,
+ *   walk the tree, add `loc` to every node (and `name_loc` back to the Svelte nodes that
+ *   carry one), return the (mutated) ast. The language is inferred from the root when
+ *   `opts.language` is omitted — a whole parse's root (`Root`, `Program`,
+ *   `StyleSheetFile`); any other node names no document, so it throws rather than guess.
+ * - `create_locator(source, {language})` — amortized: hold the prebuilt line table and
+ *   expose `loc_of(node)` (single node) and `reconstruct(ast)` (whole tree). Prefer this
+ *   for heavy sparse use.
+ * - `loc_of(node, source, {language})` — a single node; rebuilds the O(source) table per
+ *   call.
+ *
+ * The last two take the language **required** — a lone node or a bare source names no
+ * document, and the language decides the line rule, the BOM, and the Svelte stamping, so
+ * a default would silently answer for the wrong document.
  *
  * **The definition.** Every object in the tree that carries numeric `start` and `end` —
  * in all three languages, objects without a `type` included (Svelte's `StyleSheet.content`
@@ -25,11 +31,11 @@
  * `end`. One line-terminator rule per **document**: ECMAScript's (LF, CR, CRLF as one,
  * U+2028, U+2029) for a TypeScript document, LF alone for a Svelte document — its
  * `<script>`s, template expressions and `<style>` included — and for a CSS document. That
- * is the same definition tsv's loc-bearing wire is written to, so the two agree on every
- * object: the reconstruction of the span-only wire deep-equals the loc wire of the same
- * parse. (Only key order differs — this module appends `loc` last on each object, where
- * the wire places it after `end` — so a deep-equal sees identical data, and a
- * re-serialized tree won't byte-match the wire.)
+ * is the same definition tsv's Rust `loc` emitter is written to (`tsv parse --locations`),
+ * so the two agree on every object: the reconstruction of the span-only wire deep-equals
+ * the loc wire of the same parse. (Only key order differs — this module appends `loc`
+ * last on each object, where the Rust wire places it after `end` — so a deep-equal sees
+ * identical data, and a re-serialized tree won't byte-match that wire.)
  *
  * The TypeScript count is acorn's. A Svelte document's is not Svelte's everywhere: Svelte's
  * own wire carries `loc` only on the nodes acorn parsed (this adds it to template, style and
@@ -146,11 +152,12 @@ function loc_at(offset, starts) {
 }
 
 /**
- * Guess the language from the AST root when `opts.language` is omitted:
- * `Root` → svelte, `Program` → typescript, `StyleSheetFile` → css. Defaults to
- * typescript for anything else.
+ * Read the language off the AST root when `opts.language` is omitted:
+ * `Root` → svelte, `Program` → typescript, `StyleSheetFile` → css. `undefined` for
+ * anything else — a subtree (a Svelte `Fragment`, a statement) names no document, and
+ * guessing would silently apply the wrong line rule and skip Svelte's `name_loc`.
  * @param {any} ast
- * @returns {'typescript' | 'svelte' | 'css'}
+ * @returns {'typescript' | 'svelte' | 'css' | undefined}
  */
 function infer_language(ast) {
 	if (ast && typeof ast === 'object') {
@@ -163,7 +170,7 @@ function infer_language(ast) {
 				return 'css';
 		}
 	}
-	return 'typescript';
+	return undefined;
 }
 
 /**
@@ -481,19 +488,29 @@ function reconstruct_in(ast, starts, source, is_svelte) {
 	return ast;
 }
 
+/** The languages a locator reads, each its own line rule. */
+const LANGUAGES = new Set(['typescript', 'svelte', 'css']);
+
 /**
  * Build a locator that holds the source's line-start table so repeated lookups
  * don't rebuild it. Prefer this over the bare `loc_of`/`reconstruct_locations`
  * helpers for heavy sparse use — those rebuild the O(source) table per call.
  *
  * @param {string} source - the exact source the span-only wire was parsed from.
- * @param {{language?: 'typescript' | 'svelte' | 'css'}} [opts] - `language` selects the
- *   document's line rule and coordinates: `typescript` (the default — ECMAScript line
+ * @param {{language: 'typescript' | 'svelte' | 'css'}} opts - `language` (required)
+ *   selects the document's line rule and coordinates: `typescript` (ECMAScript line
  *   terminators, a leading BOM counted), `svelte` or `css` (LF alone, a leading BOM elided).
  * @returns {{loc_of: (node: any) => ({start: {line: number, column: number}, end: {line: number, column: number}} | null), reconstruct: (ast: any) => any}}
+ * @throws {Error} when `opts.language` is missing or not one of the three
  */
 export function create_locator(source, opts) {
-	const language = opts?.language ?? 'typescript';
+	const language = opts?.language;
+	if (!LANGUAGES.has(language)) {
+		throw new Error(
+			`locations: \`language\` must be 'typescript', 'svelte' or 'css' — the document's ` +
+				`line rule depends on it (got ${language === undefined ? 'none' : `'${language}'`})`
+		);
+	}
 	// Everything below reads the string the wire's offsets index (see `indexed_text`),
 	// never the caller's `source` directly — a Svelte or CSS BOM is not in the wire's
 	// coordinates.
@@ -522,15 +539,26 @@ export function create_locator(source, opts) {
  *
  * The result deep-equals the loc-bearing wire of the same parse — see the module doc.
  *
- * @param {any} ast - the span-only AST from a `{locations: false}` parse.
+ * @param {any} ast - a span-only AST, as every tsv parse returns it by default.
  * @param {string} source - the exact source `ast` was parsed from.
  * @param {{language?: 'typescript' | 'svelte' | 'css'}} [opts] - the document's language;
  *   inferred from the root node (`Root`/`Program`/`StyleSheetFile`) when omitted.
  * @returns {any} the same `ast`, now with `loc` on every node (plus `name_loc` on
  *   the Svelte nodes that carry one).
+ * @throws {Error} when `opts.language` is omitted and `ast` is not one of those three
+ *   roots, or when it is set and not one of the three languages
  */
 export function reconstruct_locations(ast, source, opts) {
 	const language = opts?.language ?? infer_language(ast);
+	if (language === undefined) {
+		const type = ast && typeof ast === 'object' ? ast.type : undefined;
+		throw new Error(
+			`locations: cannot infer the document's language from ` +
+				`${typeof type === 'string' ? `a '${type}' root` : 'a root with no type'} — ` +
+				`pass {language: 'typescript' | 'svelte' | 'css'}, or the parse's own root ` +
+				`(Root, Program or StyleSheetFile)`
+		);
+	}
 	return create_locator(source, { language }).reconstruct(ast);
 }
 
@@ -545,8 +573,9 @@ export function reconstruct_locations(ast, source, opts) {
  *
  * @param {any} node - a node from a span-only wire (must carry numeric `start`/`end`).
  * @param {string} source - the exact source the node was parsed from.
- * @param {{language?: 'typescript' | 'svelte' | 'css'}} [opts] - as for `create_locator`.
+ * @param {{language: 'typescript' | 'svelte' | 'css'}} opts - as for `create_locator`.
  * @returns {{start: {line: number, column: number}, end: {line: number, column: number}} | null}
+ * @throws {Error} when `opts.language` is missing or not one of the three
  */
 export function loc_of(node, source, opts) {
 	return create_locator(source, opts).loc_of(node);

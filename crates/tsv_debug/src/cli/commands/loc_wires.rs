@@ -36,6 +36,26 @@
 //! Not graded at all, each by a declaration the fixture tree makes: an `input_invalid_*`
 //! file (it must fail both parsers) and the input of a `tsv_rejects.txt` fixture (tsv
 //! rejects it on purpose, and such a fixture holds no format variant).
+//!
+//! ## `--stdin`: the corpus tools' loc wire, on request
+//!
+//! The loc-bearing wire ships through no binding — every binding emits the span-only
+//! wire — so the corpus tools (`benches/js/corpus_compare_parse.ts`, through
+//! `benches/js/lib/loc_wire_client.ts`) ask this process for it instead: one NDJSON
+//! request per line on stdin, `{"language", "goal"?, "source"}` (`goal` is
+//! `"script"` / `"module"`, TypeScript only — it is refused on a language with no goal
+//! axis, as every binding refuses it), answered by exactly one line on stdout, flushed
+//! before the next request is read:
+//!
+//! - `{"loc": <wire>}` — the language crate's `convert_ast_json_bytes`, verbatim;
+//! - `{"error": "<message>"}` — tsv rejected the source, the parse error's message
+//!   exactly as `tsv_ffi` renders it;
+//! - `{"panic": "<payload>"}` — tsv panicked. Each request runs under `catch_unwind`
+//!   (the `corpus` profile unwinds), and a panic answers as a panic, never as a parse
+//!   error, so the caller's panic gate sees it as one.
+//!
+//! A malformed request is a harness bug, not a tsv verdict: it ends the process with an
+//! error rather than answering.
 
 use crate::cli::CliError;
 use crate::fixtures::validation::parsed_input::{ParsedInput, parse_input};
@@ -44,10 +64,15 @@ use argh::FromArgs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-/// Stream both parse wires of every fixture document as NDJSON (the `loc` cross-grade's input).
+/// Stream both parse wires of every fixture document as NDJSON (the `loc` cross-grade's
+/// input), or answer loc-wire requests over stdin (`--stdin`, the corpus tools' loc arm).
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "loc_wires")]
 pub struct LocWiresCommand {
+    /// answer NDJSON loc-wire requests read from stdin instead of walking a tree
+    #[argh(switch)]
+    pub stdin: bool,
+
     /// fixture tree to walk (default: tests/fixtures)
     #[argh(positional, default = "PathBuf::from(\"tests/fixtures\")")]
     pub root: PathBuf,
@@ -59,8 +84,11 @@ impl LocWiresCommand {
     /// # Errors
     ///
     /// Returns [`CliError::Failed`] when the tree can't be walked, a document can't be
-    /// read or parsed, or stdout can't be written.
+    /// read or parsed, a `--stdin` request is malformed, or stdin / stdout fails.
     pub fn run(self) -> Result<(), CliError> {
+        if self.stdin {
+            return serve_requests();
+        }
         let fixtures = fixtures::walk_fixtures(&self.root).map_err(|e| {
             eprintln!("Error: {e}");
             CliError::Failed
@@ -200,4 +228,121 @@ fn record(path: &Path, input_type: InputType, goal: tsv_ts::Goal) -> Result<Vec<
 fn json_string(s: &str) -> String {
     // serializing a `str` cannot fail
     serde_json::to_string(s).unwrap_or_default()
+}
+
+/// One `--stdin` request (module doc).
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WireRequest {
+    language: String,
+    #[serde(default)]
+    goal: Option<String>,
+    source: String,
+}
+
+/// Answer loc-wire requests until stdin closes (module doc §`--stdin`).
+fn serve_requests() -> Result<(), CliError> {
+    let stdin = std::io::stdin();
+    let mut input = stdin.lock();
+    let stdout = std::io::stdout();
+    let mut out = std::io::BufWriter::new(stdout.lock());
+    let mut line = String::new();
+    let mut arena = bumpalo::Bump::new();
+    loop {
+        line.clear();
+        let read = std::io::BufRead::read_line(&mut input, &mut line).map_err(|e| {
+            eprintln!("Error: reading stdin: {e}");
+            CliError::Failed
+        })?;
+        if read == 0 {
+            return Ok(());
+        }
+        if line.trim().is_empty() {
+            continue;
+        }
+        let request: WireRequest = serde_json::from_str(&line).map_err(|e| {
+            eprintln!("Error: malformed loc_wires request: {e}");
+            CliError::Failed
+        })?;
+        let reply = answer(&request, &mut arena).map_err(|e| {
+            eprintln!("Error: {e}");
+            CliError::Failed
+        })?;
+        let written = out
+            .write_all(&reply)
+            .and_then(|()| out.write_all(b"\n"))
+            .and_then(|()| out.flush());
+        if let Err(e) = written {
+            eprintln!("Error: writing stdout: {e}");
+            return Err(CliError::Failed);
+        }
+    }
+}
+
+/// The reply line for one request — `Err` only for a request no binding would accept
+/// (an unknown language or goal, a goal on a goalless language).
+fn answer(request: &WireRequest, arena: &mut bumpalo::Bump) -> Result<Vec<u8>, String> {
+    // the language first: a goal on an unknown one is a bad language, not a goalless one
+    if !matches!(request.language.as_str(), "svelte" | "typescript" | "css") {
+        return Err(format!(
+            "unknown language {:?} in a loc_wires request",
+            request.language
+        ));
+    }
+    let goal = match request.goal.as_deref() {
+        None => tsv_ts::Goal::Module,
+        Some(goal) if request.language == "typescript" => tsv_ts::Goal::from_source_type(goal)
+            .ok_or_else(|| format!("unknown goal {goal:?} in a loc_wires request"))?,
+        Some(goal) => {
+            return Err(format!(
+                "goal {goal:?} on {:?}, which has no goal axis",
+                request.language
+            ));
+        }
+    };
+    arena.reset();
+    let source = request.source.as_str();
+    let language = request.language.as_str();
+    let parsed = {
+        let arena: &bumpalo::Bump = arena;
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(
+            || -> Result<Vec<u8>, String> {
+                Ok(match language {
+                    "svelte" => {
+                        let ast = tsv_svelte::parse(source, arena).map_err(|e| e.to_string())?;
+                        tsv_svelte::convert_ast_json_bytes(&ast, source)
+                    }
+                    "typescript" => {
+                        let ast = tsv_ts::parse_with_goal(source, goal, arena)
+                            .map_err(|e| e.to_string())?;
+                        tsv_ts::convert_ast_json_bytes(&ast, source)
+                    }
+                    _ => {
+                        let ast = tsv_css::parse(source, arena).map_err(|e| e.to_string())?;
+                        tsv_css::convert_ast_json_bytes(&ast, source)
+                    }
+                })
+            },
+        ))
+    };
+    Ok(match parsed {
+        Ok(Ok(wire)) => {
+            let mut reply = Vec::with_capacity(wire.len() + 8);
+            reply.extend_from_slice(b"{\"loc\":");
+            reply.extend_from_slice(&wire);
+            reply.push(b'}');
+            reply
+        }
+        Ok(Err(message)) => format!("{{\"error\":{}}}", json_string(&message)).into_bytes(),
+        Err(payload) => {
+            // a panicked parse may leave the arena mid-allocation; start the next one fresh
+            *arena = bumpalo::Bump::new();
+            let message = payload
+                .downcast_ref::<&str>()
+                .map(|s| (*s).to_owned())
+                .or_else(|| payload.downcast_ref::<String>().cloned())
+                .unwrap_or_else(|| "<unknown>".to_owned());
+            format!("{{\"panic\":{}}}", json_string(&message)).into_bytes()
+        }
+    })
 }

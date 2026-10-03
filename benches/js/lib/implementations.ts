@@ -172,8 +172,8 @@ export interface InitializedImplementations extends ImplementationSet {
 	 *
 	 * Sound because the gates the registry evaluates are all construction-time
 	 * facts, never init state: `parse_languages`/`format_languages` are `readonly`
-	 * class fields (`BaseImplementation`), and `format`/`parse_internal`/
-	 * `parse_no_locations` are prototype methods. An uninitialized instance answers
+	 * class fields (`BaseImplementation`), and `format`/`parse_internal` are
+	 * prototype methods. An uninitialized instance answers
 	 * every one of them exactly as a loaded one would.
 	 *
 	 * ⚠ Read for SHAPE only. Never hand this to `get_benchmark_tasks` directly — a
@@ -471,7 +471,7 @@ export interface BenchmarkTask {
 	 * `oxc-parser` and `oxfmt`.
 	 */
 	impl: ImplKey;
-	/** Key for corpus size tracking (e.g., "parse/svelte/native") */
+	/** Key for corpus size tracking (e.g., "parse/svelte/native-no-locations") */
 	tracking_key: string;
 	/** Whether this benchmark runs async */
 	is_async: boolean;
@@ -597,60 +597,46 @@ export function get_benchmark_tasks(
 			(source, _language, goal) => impls.canonical.parse(source, language, goal)
 		);
 
-		// Native + WASM parsers (with JSON serialization)
-		add('native', true, 'tsv-json', 'native', (source, _language, goal) =>
+		// Native + WASM parsers: the span-only wire (`start`/`end` offsets, no per-node
+		// `loc`) — the one parse wire every tsv binding emits, `JSON.parse`d into objects.
+		// The payload-matched opponent to oxc-parser and yuku-parser, whose default ASTs
+		// are also span-only. Materialized in JS for the native binding and engine-side
+		// (via `js_sys`) for wasm, as each package's facade does. Rows are named by wire
+		// and never renamed, so the span rows keep their `-no-locations` names; no row
+		// times the loc-bearing wire, which no binding ships.
+		add('native', true, 'tsv-json-no-locations', 'native-no-locations', (source, _language, goal) =>
 			impls.native.parse(source, language, goal)
-		);
-		add('wasm', true, 'tsv-wasm-json', 'wasm', (source, _language, goal) =>
-			impls.wasm.parse(source, language, goal)
-		);
-
-		// The no-locations wire (span-only: no per-node `loc`) — the payload-matched
-		// opponent to oxc-parser and yuku-parser, whose default ASTs are also
-		// span-only. Materialized in Rust either side, so native and wasm stay
-		// mechanism-matched to their `-json` siblings. No CSS row is registered.
-		// TODO: a CSS row — the CSS wire carries `loc` now, so its span-only twin is a
-		// distinct product, as it is in the other two languages.
-		add(
-			'native',
-			language !== 'css',
-			'tsv-json-no-locations',
-			'native-no-locations',
-			(source, _language, goal) => impls.native.parse_no_locations(source, language, goal)
 		);
 		add(
 			'wasm',
-			language !== 'css',
+			true,
 			'tsv-wasm-json-no-locations',
 			'wasm-no-locations',
-			(source, _language, goal) => impls.wasm.parse_no_locations(source, language, goal)
+			(source, _language, goal) => impls.wasm.parse(source, language, goal)
 		);
 
-		// The no-locations wire PLUS `loc` reconstructed in JS over the whole tree — what
-		// a consumer who wants every node's line/column pays when only the span-only wire
-		// is fetched. Same call as the row above (`JSON.parse` included), then the SHIPPED
-		// helper (`crates/tsv_wasm/npm/locations.js`, the source every parse-capable
-		// package bundles) with its line-table build inside the timed region, so the row
-		// is directly comparable to the loc-bearing `tsv-json` / `tsv-wasm-json` beside it.
+		// The span-only wire PLUS `loc` reconstructed in JS over the whole tree — what
+		// `{locations: true}` costs over the default, since the packages' facade runs
+		// exactly this: the same parse (`JSON.parse` included), then the SHIPPED helper
+		// (`crates/tsv_wasm/npm/locations.js`, the source every parse-capable package
+		// bundles) with its line-table build inside the timed region.
 		//
-		// ⚠ The language is NAMED, never left to a default: a locator built without one
-		// reads every source as TypeScript — the ECMAScript line rule and none of the
-		// Svelte stamping (`name_loc`, the `character` field) — and would time a cheaper
-		// walk than a Svelte consumer runs. CSS has no row, as it has no no-locations row.
+		// ⚠ The language is NAMED, never left to a default: `create_locator` / `loc_of`
+		// refuse a missing one, and the line rule and the Svelte stamping (`name_loc`,
+		// the `character` field) both key on it, so a Svelte row timed under another
+		// language would time a different walk than a Svelte consumer runs.
 		//
-		// PERF-ONLY: a consumer-cost row, and the parse it runs is the no-locations row's,
-		// so on the coverage surface it would add nothing. Its absence there is disclosed
+		// PERF-ONLY: a consumer-cost row, and the parse it runs is the span row's, so on
+		// the coverage surface it would add nothing. Its absence there is disclosed
 		// (`SURFACE_DISCLOSURES` in bench.ts).
-		const reconstruct_enabled = language !== 'css' && options.corpus_kind !== 'conformance';
+		const reconstruct_enabled = options.corpus_kind !== 'conformance';
 		add(
 			'native',
 			reconstruct_enabled,
 			'tsv-json-no-locations+reconstruct',
 			'native-no-locations-reconstruct',
 			(source, _language, goal) =>
-				reconstruct_locations(impls.native.parse_no_locations(source, language, goal), source, {
-					language
-				})
+				reconstruct_locations(impls.native.parse(source, language, goal), source, { language })
 		);
 		add(
 			'wasm',
@@ -658,9 +644,7 @@ export function get_benchmark_tasks(
 			'tsv-wasm-json-no-locations+reconstruct',
 			'wasm-no-locations-reconstruct',
 			(source, _language, goal) =>
-				reconstruct_locations(impls.wasm.parse_no_locations(source, language, goal), source, {
-					language
-				})
+				reconstruct_locations(impls.wasm.parse(source, language, goal), source, { language })
 		);
 
 		// Internal parsing variants (no JSON serialization) - shows JSON overhead
@@ -673,9 +657,10 @@ export function get_benchmark_tasks(
 
 		// OXC parser (TypeScript/JS only) — default mode: serializes to JSON in Rust
 		// then JSON.parses in JS, eagerly materializing the full AST (the like-for-like
-		// opponent to tsv-json). There is intentionally no `oxc-parser-lazy` row: oxc's
-		// `experimentalLazy` raw transfer is setup-dominated in every runtime (measures
-		// buffer copy, not parse speed) — see `lib/oxc.ts` and docs/benchmarks.md §Fairness caveats.
+		// opponent to tsv-json-no-locations). There is intentionally no `oxc-parser-lazy`
+		// row: oxc's `experimentalLazy` raw transfer is setup-dominated in every runtime
+		// (measures buffer copy, not parse speed) — see `lib/oxc.ts` and
+		// docs/benchmarks.md §Fairness caveats.
 		add(
 			'oxc',
 			impls.oxc?.supports_parse_language(language),
@@ -715,8 +700,7 @@ export function get_benchmark_tasks(
 
 		// yuku-parser, N-API and WASM (TypeScript/JS only) — a Zig parser whose
 		// default AST is span-only and padded exactly like oxc's, so both rows are
-		// payload-matched to the oxc pair and to `tsv-json-no-locations` (plain
-		// `tsv-json` carries the loc-bearing drop-in AST neither emits). The wrapper
+		// payload-matched to the oxc pair and to `tsv-json-no-locations`. The wrapper
 		// forces yuku's LAZY materialization and reads its diagnostics — without
 		// either, the row would report an unearned throughput at a fabricated 100%
 		// coverage. See lib/yuku.ts + docs/benchmarks.md §Fairness caveats.
@@ -743,10 +727,13 @@ export function get_benchmark_tasks(
 
 		// rsvelte's parser (Svelte only) — the ONLY third-party engine on this surface;
 		// the rest of the group is `svelte/compiler` (the oracle) and tsv's own
-		// variants. `parse()` returns JSON the caller parses, exactly the
-		// mechanism `tsv-json` measures, so the two are apples-to-apples. It also
-		// claims tsv's own drop-in contract, which makes the row a conformance datum
-		// as much as a speed one. See lib/rsvelte_parse.ts.
+		// variants. `parse()` returns JSON the caller parses — the mechanism tsv's span
+		// rows measure — but not the same payload: rsvelte emits Svelte's own wire,
+		// `loc` on the acorn-parsed nodes plus `name_loc`, where `tsv-json-no-locations`
+		// carries no `loc` and its `+reconstruct` sibling a `loc` on every node, so
+		// neither tsv row is payload-matched to it (report.ts discloses each row's
+		// payload tier). It also claims tsv's own drop-in contract, which makes the row
+		// a conformance datum as much as a speed one. See lib/rsvelte_parse.ts.
 		add(
 			'rsvelte_parse',
 			impls.rsvelte_parse?.supports_parse_language(language),
@@ -754,8 +741,8 @@ export function get_benchmark_tasks(
 			'rsvelte-parse',
 			(source) => impls.rsvelte_parse!.parse(source, language)
 		);
-		// ⚠ Named for the OPTION it passes, not for tsv's `no-locations` wire: the two
-		// reductions differ (tsv drops per-node `loc` throughout, ~46%; rsvelte drops
+		// ⚠ Named for the OPTION it passes, not for tsv's span-only wire: the two
+		// reductions differ (tsv's wire carries no per-node `loc` at all; rsvelte drops
 		// `loc` from every JS node but keeps `name_loc` and the root comments' `loc`,
 		// -29% at 0.3.14 with `modern: true` — re-measure on a pin bump), so this
 		// row is NOT payload-matched to `tsv-json-no-locations` and is deliberately
@@ -887,7 +874,7 @@ export interface DefinedRow {
  *
  * Returns plain data, never tasks: a task built from `complete` closes over an
  * uninitialized impl, so the closures must not escape this function. Deduped by
- * name — a row spans several languages (`tsv-json` is in all three) and this
+ * name — a row spans several languages (`tsv-json-no-locations` is in all three) and this
  * answers about rows, not cells.
  */
 export function get_defined_rows(

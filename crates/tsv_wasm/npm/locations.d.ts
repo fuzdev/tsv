@@ -1,24 +1,34 @@
 /**
  * Types for the line/column reconstruction helper (`locations.js`).
  *
- * Hand-written: the span-only `no-locations` wire is untyped (`any`), and these
- * functions add `loc` to that same object graph. See `locations.js` for the
- * definition both the helper and the loc-bearing wire implement.
+ * Hand-written: these functions add `loc` to the span-only object graph every tsv parse
+ * returns. See `locations.js` for the definition both the helper and the Rust `loc`
+ * emitter (`tsv parse --locations`) implement.
  */
 
 /** The document's language, which selects its line-terminator rule. */
 export type LocationLanguage = 'typescript' | 'svelte' | 'css';
 
-/** Options shared by every entry point. */
+/** `reconstruct_locations`' options: the language, inferred from the AST root when omitted. */
 export interface LocationOptions {
 	/**
-	 * The document's language. `typescript` (the default for `create_locator` /
-	 * `loc_of`) counts ECMAScript LineTerminators and counts a leading BOM, as acorn
-	 * does; `svelte` and `css` count LF alone — a Svelte document's `<script>`s and
-	 * `<style>` included — and elide a leading BOM, as Svelte's `parse` and `parseCss`
-	 * do. `reconstruct_locations` infers it from the AST root when omitted.
+	 * The document's language. `typescript` counts ECMAScript LineTerminators and counts
+	 * a leading BOM, as acorn does; `svelte` and `css` count LF alone — a Svelte
+	 * document's `<script>`s and `<style>` included — and elide a leading BOM, as
+	 * Svelte's `parse` and `parseCss` do. Omitted, it is read off the root (`Root`,
+	 * `Program`, `StyleSheetFile`); any other node — a subtree such as a Svelte
+	 * `Fragment` names no document — throws, so name the language to reconstruct one.
 	 */
 	language?: LocationLanguage | undefined;
+}
+
+/**
+ * `create_locator` / `loc_of`'s options: the language is REQUIRED, since a bare source
+ * or a lone node names no document (a missing or unknown one throws).
+ */
+export interface LocatorOptions {
+	/** The document's language — see `LocationOptions.language`. */
+	language: LocationLanguage;
 }
 
 /**
@@ -49,13 +59,17 @@ export interface Locator {
  * Build a locator that holds the source's line-start table for repeated lookups.
  * Prefer this over the bare helpers for heavy sparse use.
  */
-export declare function create_locator(source: string, opts?: LocationOptions): Locator;
+export declare function create_locator(source: string, opts: LocatorOptions): Locator;
 
 /**
- * Add a `loc` line/column object to every object of a span-only wire that carries
+ * Add a `loc` line/column object to every object of a span-only tree that carries
  * numeric `start`/`end`, derived from those offsets + `source` — plus the Svelte
- * `name_loc`. Mutates `ast` in place and returns it. The result deep-equals the
- * loc-bearing wire of the same parse, in every language.
+ * `name_loc`. Mutates `ast` in place and returns it. The result deep-equals the Rust
+ * emitter's loc-bearing wire of the same parse (`tsv parse --locations`), in every
+ * language — and is what a parse with `{locations: true}` returns.
+ *
+ * @throws when `opts.language` is omitted and `ast` is not a parse's root (`Root`,
+ *   `Program`, `StyleSheetFile`), or names a language that is not one of the three.
  */
 export declare function reconstruct_locations(
 	ast: any,
@@ -67,4 +81,4 @@ export declare function reconstruct_locations(
  * Line/column for a single node. Rebuilds the line-start table per call — reuse a
  * `create_locator` for more than a couple of lookups against one source.
  */
-export declare function loc_of(node: any, source: string, opts?: LocationOptions): Loc | null;
+export declare function loc_of(node: any, source: string, opts: LocatorOptions): Loc | null;

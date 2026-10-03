@@ -7,7 +7,7 @@
 import { ffi_library_path } from './tsv_artifacts.ts';
 import { BaseImplementation, goal_for, type Language, LANGUAGES, type ParseGoal } from './types.ts';
 import { assert_binding_reports_rejection } from './reject_probe.ts';
-import { assert_binding_drops_locations } from './locations_probe.ts';
+import { assert_binding_emits_span_only } from './locations_probe.ts';
 
 // FFI symbol definitions.
 //
@@ -52,10 +52,6 @@ const symbols = {
 	tsv_parse_css: ENTRY_POINT,
 	tsv_parse_internal_css: ENTRY_POINT,
 	tsv_format_css: ENTRY_POINT,
-	// no-locations parse (the span-only wire)
-	tsv_parse_svelte_no_locations: ENTRY_POINT,
-	tsv_parse_typescript_no_locations: ENTRY_POINT,
-	tsv_parse_css_no_locations: ENTRY_POINT,
 	tsv_free: {
 		parameters: ['pointer', 'usize'],
 		result: 'void'
@@ -137,10 +133,9 @@ interface MarshalState {
  * plugins array out of the per-call path.
  */
 interface FfiTables {
+	/** The span-only wire — the one parse wire every tsv binding emits. */
 	parse: Record<Language, FfiFn>;
 	parse_internal: Record<Language, FfiFn>;
-	/** The span-only wire. */
-	parse_no_locations: Record<Language, FfiFn>;
 	format: Record<Language, FfiFn>;
 }
 
@@ -224,11 +219,6 @@ export class NativeImplementation extends BaseImplementation {
 				typescript: this.symbols.tsv_parse_internal_typescript as FfiFn,
 				css: this.symbols.tsv_parse_internal_css as FfiFn
 			},
-			parse_no_locations: {
-				svelte: this.symbols.tsv_parse_svelte_no_locations as FfiFn,
-				typescript: this.symbols.tsv_parse_typescript_no_locations as FfiFn,
-				css: this.symbols.tsv_parse_css_no_locations as FfiFn
-			},
 			format: {
 				svelte: this.symbols.tsv_format_svelte as FfiFn,
 				typescript: this.symbols.tsv_format_typescript as FfiFn,
@@ -241,10 +231,10 @@ export class NativeImplementation extends BaseImplementation {
 		// fires — see `lib/reject_probe.ts`.
 		assert_binding_reports_rejection('tsv (FFI)', this);
 
-		// The no-locations wire is its own symbol here, not an option, so it can't be
-		// silently dropped the way the WASM bag can; probed anyway so the three
-		// bindings answer one question — see `lib/locations_probe.ts`.
-		assert_binding_drops_locations('tsv (FFI)', { path: lib_path, rebuild }, this);
+		// The parse wire is span-only — prove this artifact emits it, so a library built
+		// before the bindings went span-only can't be timed under the span rows' label.
+		// See `lib/locations_probe.ts`.
+		assert_binding_emits_span_only('tsv (FFI)', { path: lib_path, rebuild }, this);
 	}
 
 	/**
@@ -347,11 +337,6 @@ export class NativeImplementation extends BaseImplementation {
 			source,
 			parse_source_type_code(goal_for(language, goal))
 		);
-	}
-
-	parse_no_locations(source: string, language: Language, goal?: ParseGoal): unknown {
-		const fn = this.tables.parse_no_locations[language];
-		return JSON.parse(this.call_ffi(fn, source, parse_source_type_code(goal_for(language, goal))));
 	}
 
 	// The format rows name NO source type — the shipped default on every surface

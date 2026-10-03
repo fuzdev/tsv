@@ -264,7 +264,10 @@ async function parse(sample: Sample): Promise<string> {
 			sample.source,
 			'--parser',
 			sample.parser,
-			...(sample.source_type ? ['--source-type', sample.source_type] : [])
+			...(sample.source_type ? ['--source-type', sample.source_type] : []),
+			// the loc-bearing wire, so the `loc` / `name_loc` shapes stay typed: the
+			// default wire is span-only, and arm C's fixtures pin it too
+			'--locations'
 		],
 		stdout: 'piped',
 		stderr: 'piped'

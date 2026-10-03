@@ -4,9 +4,9 @@
  * Creates:
  * - index.js — Node.js/Bun entry: auto-init via readFileSync + initSync (zero config)
  * - browser.js — Browser/default entry: async `init()` with not-initialized
- *   guards — a wrapper per function export, and a guarded SUBCLASS per class
- *   export, since a constructor cannot take a per-call guard and `new` before
- *   init would otherwise report the glue's opaque `TypeError`
+ *   guards — one around each engine function the facade calls, and a guarded
+ *   SUBCLASS per class export, since a constructor cannot take a per-call guard
+ *   and `new` before init would otherwise report the glue's opaque `TypeError`
  * - worker.js — the `./worker` subpath: browser.js under the name a worker
  *   consumer reaches for (the same module instance, so the same singleton)
  * - index.d.ts / browser.d.ts — type declarations, one per entry (the Node
@@ -26,24 +26,28 @@
  * `README_parse.md`, and `README_all.md` are the canonical sources and ship
  * as each package's `README.md`.
  *
- * The exported function list is extracted from the generated `tsv_wasm.js`
- * (every `export function format_*` / `parse_*`), so adding a language to
- * `lang_bindings!` flows through the JS wrappers with no changes here.
- * `parse_internal_*` exports are bench-only and excluded from the wrappers.
- * Its TYPES do not flow through — every parse/format export is
- * `skip_typescript`, so a new language also needs a declaration hand-added to
- * `TS_PARSE_DECLS` / `TS_FORMAT_DECLS`. This script fails the build when one is
- * missing (the declaration check alongside the export validations), because the
- * omission is otherwise silent all the way to a consumer.
+ * The raw exports are flat — `parse_<lang>(source, source_type?)`,
+ * `parse_<lang>_json(…)`, `format_<lang>(…)` — and every entry publishes them
+ * through the hand-written facade (`crates/tsv_wasm/npm/api.js` + `api_parse.js`,
+ * shared with the native `@fuzdev/tsv`), which owns the `(source, options?)` bag,
+ * its errors, and the `{locations: true}` sugar. The function list is extracted
+ * from the generated `tsv_wasm.js` (every `export function format_*` / `parse_*`),
+ * so adding a language to `lang_bindings!` flows through the entries with no
+ * changes here. `parse_internal_*` exports are bench-only and excluded. Its TYPES
+ * do not flow through — the published declarations are the facade's hand-written
+ * `api.d.ts` / `api_parse.d.ts`, so a new language also needs a declaration added
+ * there. This script fails the build when one is missing (the declaration check
+ * alongside the export validations), because the omission is otherwise silent all
+ * the way to a consumer.
  *
- * For the variants with parse exports (`parse`, `all`), also copies
- * `crates/tsv_wasm/types/tsv_ast.d.ts` into the package root alongside the
- * generated `tsv_wasm.d.ts`. The wasm-bindgen
- * `typescript_type = "import('./tsv_ast').*"` extern types resolve against
- * this bundled file at consumer compile time. It also copies the pure-JS
- * `no-locations` reconstruction helper (`npm/locations.js` + `locations.d.ts`)
- * and re-exports its functions from index.js/browser.js and both `.d.ts` — it works on
- * the span-only parse wire, so it ships only where parsing does (not format-only).
+ * Every variant gets the facade's shared half (`api.js` + `api.d.ts`: the options
+ * reader and the format family). For the variants with parse exports (`parse`,
+ * `all`), it also copies the parse half (`api_parse.js` + `api_parse.d.ts`),
+ * `crates/tsv_wasm/types/tsv_ast.d.ts` (the AST types `api_parse.d.ts` names), and
+ * the pure-JS reconstruction helper (`npm/locations.js` + `locations.d.ts`), whose
+ * functions it re-exports from index.js/browser.js and both `.d.ts` — the facade's
+ * `{locations: true}` runs it, and it ships only where parsing does (the format-only
+ * package loads neither it nor `api_parse.js`).
  *
  * The `all` variant additionally ships the CLI: `crates/tsv_wasm/npm/cli.js`
  * is copied into the package root and wired up as the `tsv` bin.
@@ -97,10 +101,19 @@ const worker_file = 'worker.js';
  * which re-exports it). Separate from `index.d.ts` only because the Node entry
  * has one extra export, `wasm_module`. */
 const browser_dts = 'browser.d.ts';
-// The pure-JS `no-locations` line/column reconstruction helper (`npm/locations.js`
-// + hand-written `locations.d.ts`). Rides the parse-capable packages only — it
-// operates on the span-only parse wire, so the format-only package has no use for
-// it. Needs no WASM init (pure computation over an already-parsed AST).
+// The hand-written facade every entry publishes through (`npm/api.js` +
+// `api_parse.js`, with their `.d.ts`), shared with the native `@fuzdev/tsv`. The
+// shared half (the options reader + the format family) rides every variant; the
+// parse half rides the parse-capable ones, beside the helper it imports.
+const api_file = 'api.js';
+const api_dts = 'api.d.ts';
+const api_parse_file = 'api_parse.js';
+const api_parse_dts = 'api_parse.d.ts';
+// The pure-JS line/column reconstruction helper (`npm/locations.js` + hand-written
+// `locations.d.ts`), which `api_parse.js` runs for `{locations: true}` and every
+// parse-capable entry also re-exports. Rides the parse-capable packages only — the
+// format-only package has no use for it. Needs no WASM init (pure computation over
+// an already-parsed AST).
 const locations_file = 'locations.js';
 const locations_dts = 'locations.d.ts';
 // Extracted from the helper, not listed here: `scripts/build_napi_packages.ts`
@@ -401,40 +414,87 @@ if (has_format_exports) {
 }
 console.log(`Exports: ${[...fns, ...classes].join(', ')}`);
 
-// Each family's hand-written option types (the `TS_PARSE_DECLS` /
-// `TS_FORMAT_DECLS` custom sections in crates/tsv_wasm/src/lib.rs). The `.d.ts`
-// re-exports them by NAME, so the tsv_ast/locations star exports can never
-// ambiguate them away (the TS2308 rule).
-const parse_option_types = has_parse_exports ? ['ParseOptions', 'TypeScriptParseOptions'] : [];
+// The facade's families, keyed by language — read off the raw export names, so a new
+// `lang_bindings!` language reaches the entries with no edit here.
+const languages_of = (pattern: RegExp): Array<string> =>
+	fns.map((name) => pattern.exec(name)?.[1]).filter((l): l is string => l !== undefined);
+const format_languages = languages_of(/^format_(\w+)$/);
+const parse_languages = languages_of(/^parse_(\w+)_json$/);
+for (const language of parse_languages) {
+	if (!fns.includes(`parse_${language}`)) {
+		console.error(
+			`FAIL: generated ${main_js} has \`parse_${language}_json\` but no \`parse_${language}\``
+		);
+		Deno.exit(1);
+	}
+}
+/** The names the facade publishes per family — the raw names, which it keeps. */
+const format_fns = fns.filter((name) => name.startsWith('format_'));
+const parse_fns = fns.filter((name) => name.startsWith('parse_'));
+
+// Each family's hand-written option types, declared beside the facade (`api.d.ts` /
+// `api_parse.d.ts`). The `.d.ts` re-exports them by NAME, so the tsv_ast/locations
+// star exports can never ambiguate them away (the TS2308 rule).
+const parse_option_types = has_parse_exports
+	? ['ParseOptions', 'TypeScriptParseOptions', 'ParseJsonOptions', 'TypeScriptParseJsonOptions']
+	: [];
 const format_option_types = has_format_exports ? ['FormatOptions', 'TypeScriptFormatOptions'] : [];
 
-// Every name the generated `.d.ts` will re-export must actually be DECLARED in the
-// generated `tsv_wasm.d.ts`. Not a formality: every parse/format export is
-// `#[wasm_bindgen(skip_typescript)]`, so its declaration comes from a
-// hand-written `typescript_custom_section` rather than from wasm-bindgen, and
-// the only thing holding the two in sync is a "must update this block too"
-// comment. A name that drifts out does NOT fail loudly downstream — without
-// `skipLibCheck` it is a TS2614 *inside the shipped package*, and WITH it (the
-// common consumer config) the export silently degrades to `any`, so the package
-// keeps type-checking while checking nothing. Nothing in-repo type-checks the
-// merged `.d.ts` (`check:ast-types` covers `tsv_ast.d.ts` alone), so this is the
-// only place the drift can still fail a build. Checked here, with the other
-// export validations, so a failure leaves no half-patched package behind.
+// Every name the entries' `.d.ts` will re-export must actually be DECLARED where it
+// is re-exported from: the facade's functions and option types in its hand-written
+// `api.d.ts` / `api_parse.d.ts`, the classes in the generated `tsv_wasm.d.ts`. Not a
+// formality: nothing ties a hand-written declaration to the export it types, and a
+// name that drifts out does NOT fail loudly downstream — without `skipLibCheck` it is
+// a TS2614 *inside the shipped package*, and WITH it (the common consumer config)
+// the export silently degrades to `any`, so the package keeps type-checking while
+// checking nothing. Nothing in-repo type-checks the merged `.d.ts`
+// (`check:ast-types` covers `tsv_ast.d.ts` alone), so this is the only place the
+// drift can still fail a build. Checked here, with the other export validations,
+// so a failure leaves no half-patched package behind.
 const generated_dts = Deno.readTextFileSync(`${pkg_root}/${dts_file}`);
+const api_dts_source = Deno.readTextFileSync(`crates/tsv_wasm/npm/${api_dts}`);
+const api_parse_dts_source = Deno.readTextFileSync(`crates/tsv_wasm/npm/${api_parse_dts}`);
 const undeclared = [
-	...fns.map((name) => ['function', name] as const),
-	...classes.map((name) => ['class', name] as const),
-	...[...parse_option_types, ...format_option_types].map((name) => ['interface', name] as const)
-].filter(([kind, name]) => !new RegExp(`^export ${kind} ${name}\\b`, 'm').test(generated_dts));
+	...format_fns.map((name) => [api_dts, api_dts_source, 'declare function', name] as const),
+	...parse_fns.map(
+		(name) => [api_parse_dts, api_parse_dts_source, 'declare function', name] as const
+	),
+	...format_option_types.map((name) => [api_dts, api_dts_source, 'interface', name] as const),
+	...parse_option_types.map(
+		(name) => [api_parse_dts, api_parse_dts_source, 'interface', name] as const
+	),
+	...classes.map((name) => [dts_file, generated_dts, 'class', name] as const)
+].filter(([, source, kind, name]) => !new RegExp(`^export ${kind} ${name}\\b`, 'm').test(source));
 if (undeclared.length) {
 	console.error(
-		`FAIL: ${dts_file} is missing ${undeclared.map(([kind, name]) => `${kind} \`${name}\``).join(', ')} — ` +
+		`FAIL: missing declarations — ${undeclared.map(([file, , kind, name]) => `${kind} \`${name}\` in ${file}`).join(', ')}. ` +
 			`index.d.ts re-exports the name${undeclared.length === 1 ? '' : 's'} anyway, which ships ` +
-			`untyped under a consumer's skipLibCheck. Add the declaration to TS_PARSE_DECLS / ` +
-			`TS_FORMAT_DECLS in crates/tsv_wasm/src/lib.rs.`
+			`untyped under a consumer's skipLibCheck. Declare facade functions and option types in ` +
+			`crates/tsv_wasm/npm/${api_dts} / ${api_parse_dts}; a class comes from the generated ${dts_file}.`
 	);
 	Deno.exit(1);
 }
+
+// The facade wiring both entries share: the engine families handed to `create_*_api`
+// (each raw export under its alias `_<name>`, optionally wrapped), then the published
+// names destructured out of the result.
+const engine_table = (languages: Array<string>, raw: (language: string) => string): string =>
+	`{ ${languages.map((language) => `${language}: ${raw(language)}`).join(', ')} }`;
+// each factory is imported only where an export uses it — a parse-only entry has no
+// format functions, though its `api_parse.js` still imports `api.js`'s shared helpers
+const facade_imports =
+	(format_fns.length ? `import { create_format_api } from './${api_file}';\n` : '') +
+	(has_parse_exports ? `import { create_parse_api } from './${api_parse_file}';\n` : '');
+const facade_exports = (wrap: (raw: string) => string): string =>
+	(format_fns.length
+		? `export const { ${format_fns.join(', ')} } = create_format_api(\n` +
+			`\t${engine_table(format_languages, (l) => wrap(`_format_${l}`))}\n);\n`
+		: '') +
+	(parse_fns.length
+		? `export const { ${parse_fns.join(', ')} } = create_parse_api({\n` +
+			`\tparse: ${engine_table(parse_languages, (l) => wrap(`_parse_${l}`))},\n` +
+			`\tparse_json: ${engine_table(parse_languages, (l) => wrap(`_parse_${l}_json`))}\n});\n`
+		: '');
 
 // 2. Create index.js — Node.js/Bun entry: auto-init via readFileSync + initSync.
 // WASM is initialized synchronously at import time, so no init guard needed.
@@ -450,9 +510,10 @@ import {
 	default as init,
 	initSync,
 	reinstantiate,
-${[...fns, ...classes].map((f) => `\t${f},`).join('\n')}
+${fns.map((f) => `\t${f} as _${f},`).join('\n')}
+${classes.map((c) => `\t${c},`).join('\n')}
 } from './${main_js}';
-
+${facade_imports}
 /** The compiled WASM module backing this package's exports. Pass it to a worker
  * (\`workerData\`/\`postMessage\`) and initialize there via \`${pkg_name}/worker\`'s
  * \`init_sync({module})\` — no worker recompiles, and compiled code is shared. */
@@ -461,7 +522,9 @@ const wasm_module = new WebAssembly.Module(
 );
 initSync({ module: wasm_module });
 
-export { init, initSync as init_sync, reinstantiate, wasm_module, ${[...fns, ...classes].join(', ')} };
+// the published functions: the shared facade over the raw flat exports
+${facade_exports((raw) => raw)}
+export { init, initSync as init_sync, reinstantiate, wasm_module${classes.map((c) => `, ${c}`).join('')} };
 ${locations_reexport}`;
 
 Deno.writeTextFileSync(`${pkg_root}/index.js`, index_js);
@@ -476,7 +539,7 @@ const browser_js = `import {
 	initSync,
 ${[...fns, ...classes].map((f) => `\t${f} as _${f},`).join('\n')}
 } from './${main_js}';
-// the trap-recovery hook re-exports as-is — it guards itself (throws until initialized)
+${facade_imports}// the trap-recovery hook re-exports as-is — it guards itself (throws until initialized)
 export { reinstantiate } from './${main_js}';
 ${
 	// the reconstruction helper is pure JS — re-export directly, no init guard
@@ -487,6 +550,16 @@ let _ready = false;
 function _check() {
 	if (!_ready) throw new Error('${pkg_name}: WASM not initialized. Call \\\`await init()\\\` first.');
 }
+
+/** One engine function behind the not-initialized guard. The facade validates the
+ * options bag before it calls in here, so a bad bag reports itself even before
+ * \`init()\`; a well-formed call before it gets this guard's message. */
+const _guarded =
+	(f) =>
+	(...args) => {
+		_check();
+		return f(...args);
+	};
 
 /** Initialize the WASM module. Required in browsers before calling any other export. No-op if already initialized. */
 export async function init(...args) {
@@ -520,19 +593,10 @@ ${classes
 	}
 }`
 	)
-	.join('\n\n')}${classes.length ? '\n\n' : ''}${fns
-	.map(
-		// Arity-agnostic passthrough: every export takes an optional trailing
-		// options object, so the guard must forward every argument, not a fixed
-		// parameter list.
-		(f) =>
-			`export function ${f}(...args) {
-	_check();
-	return _${f}(...args);
-}`
-	)
-	.join('\n\n')}
-`;
+	.join(
+		'\n\n'
+	)}${classes.length ? '\n\n' : ''}// the published functions: the shared facade over the guarded raw exports
+${facade_exports((raw) => `_guarded(${raw})`)}`;
 
 Deno.writeTextFileSync(`${pkg_root}/browser.js`, browser_js);
 console.log(`Created ${pkg_root}/browser.js`);
@@ -553,28 +617,29 @@ Deno.writeTextFileSync(`${pkg_root}/${worker_file}`, worker_js);
 console.log(`Created ${pkg_root}/${worker_file}`);
 
 // 4. Create the type declarations — one file per entry.
-// Re-exports the generated function types, but declares init/init_sync with clean
-// signatures to avoid leaking wasm-bindgen internals (InitOutput with raw pointers).
+// The facade's functions and option types re-export by name from its hand-written
+// declarations, the classes from the generated ones; init/init_sync are declared with
+// clean signatures to avoid leaking wasm-bindgen internals (InitOutput with raw
+// pointers).
 
 const ast_reexport = has_parse_exports ? `export type * from './tsv_ast.js';\n` : '';
 // `export *` (not `export type *`) so the helper's functions AND its types flow through.
 const locations_reexport_dts = has_parse_exports
 	? `export * from './${locations_dts.replace(/\.d\.ts$/, '.js')}';\n`
 	: '';
-const options_reexport = (names: Array<string>) =>
-	names.length ? `export type { ${names.join(', ')} } from '${dts_module}';\n` : '';
-const parse_options_reexport = options_reexport(parse_option_types);
-const format_options_reexport = options_reexport(format_option_types);
+const named_reexport = (names: Array<string>, from: string, type_only: boolean): string =>
+	names.length
+		? `export ${type_only ? 'type ' : ''}{ ${names.join(', ')} } from './${from}';\n`
+		: '';
 // Everything all three entries share. `wasm_module` is deliberately NOT here:
 // only `index.js` compiles at import and exports it, so declaring it for the
 // browser and `./worker` entries would name an export that does not exist —
 // under a bundler that is a build error TypeScript said was fine, which is a
 // worse failure than a nullable type. Hence one `.d.ts` per entry, and the
 // per-condition `types` in `exports` that lets each be reached.
-const shared_dts = `${ast_reexport}${locations_reexport_dts}${parse_options_reexport}${format_options_reexport}export {
-${[...fns, ...classes].map((f) => `\t${f},`).join('\n')}
-} from '${dts_module}';
-/** Initialize the WASM module. Required in browsers before calling any other export. No-op if already initialized. */
+const shared_dts = `${ast_reexport}${locations_reexport_dts}${named_reexport(parse_option_types, api_parse_file, true)}${named_reexport(format_option_types, api_file, true)}${named_reexport(parse_fns, api_parse_file, false)}${named_reexport(format_fns, api_file, false)}${
+	classes.length ? `export { ${classes.join(', ')} } from '${dts_module}';\n` : ''
+}/** Initialize the WASM module. Required in browsers before calling any other export. No-op if already initialized. */
 export declare function init(module_or_path?: {
 	module_or_path: RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 }): Promise<void>;
@@ -628,12 +693,23 @@ console.log(`Copied ${readme_src} → ${pkg_root}/README.md`);
 Deno.copyFileSync('LICENSE', `${pkg_root}/LICENSE`);
 console.log(`Copied LICENSE → ${pkg_root}/LICENSE`);
 
+// The facade's shared half, in every variant (the entries import it).
+for (const file of [api_file, api_dts]) {
+	Deno.copyFileSync(`crates/tsv_wasm/npm/${file}`, `${pkg_root}/${file}`);
+	console.log(`Copied crates/tsv_wasm/npm/${file} → ${pkg_root}/${file}`);
+}
+
 if (has_parse_exports) {
+	// The facade's parse half, which imports the reconstruction helper below.
+	for (const file of [api_parse_file, api_parse_dts]) {
+		Deno.copyFileSync(`crates/tsv_wasm/npm/${file}`, `${pkg_root}/${file}`);
+		console.log(`Copied crates/tsv_wasm/npm/${file} → ${pkg_root}/${file}`);
+	}
 	// Bundle the hand-maintained AST types alongside the generated `tsv_wasm.d.ts`.
 	Deno.copyFileSync('crates/tsv_wasm/types/tsv_ast.d.ts', `${pkg_root}/tsv_ast.d.ts`);
 	console.log(`Copied crates/tsv_wasm/types/tsv_ast.d.ts → ${pkg_root}/tsv_ast.d.ts`);
-	// Bundle the pure-JS `no-locations` line/column reconstruction helper + its
-	// hand-written types (re-exported from index.js/browser.js/index.d.ts above).
+	// Bundle the pure-JS line/column reconstruction helper + its hand-written types
+	// (re-exported from index.js/browser.js/index.d.ts above, and run by the facade).
 	Deno.copyFileSync(`crates/tsv_wasm/npm/${locations_file}`, `${pkg_root}/${locations_file}`);
 	console.log(`Copied crates/tsv_wasm/npm/${locations_file} → ${pkg_root}/${locations_file}`);
 	Deno.copyFileSync(`crates/tsv_wasm/npm/${locations_dts}`, `${pkg_root}/${locations_dts}`);
@@ -697,7 +773,11 @@ pkg.files = [
 	main_js,
 	dts_file,
 	wasm_file,
-	...(has_parse_exports ? ['tsv_ast.d.ts', locations_file, locations_dts] : []),
+	api_file,
+	api_dts,
+	...(has_parse_exports
+		? [api_parse_file, api_parse_dts, 'tsv_ast.d.ts', locations_file, locations_dts]
+		: []),
 	...(variant === 'all' ? [cli_file] : []),
 	'README.md',
 	'LICENSE'

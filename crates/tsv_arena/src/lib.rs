@@ -137,20 +137,21 @@ pub fn with_doc_arena<R>(f: impl FnOnce(&tsv_lang::doc::arena::DocArena) -> R) -
 //
 // The second thing all three bindings would otherwise hand-sync. Each one
 // spells the parse goal in its host's idiom — `tsv_ffi` a `u32` code, `tsv_napi`
-// a trailing optional string, `tsv_wasm` one key of an options bag — but the
-// axis underneath is one question asked three times, so it is answered once
-// here. The macros carry no arena; they live beside the helpers because this
-// crate is where the bindings' shared substrate goes rather than in any one of
-// them (see the crate's CLAUDE.md §Why this crate exists).
+// and `tsv_wasm` a trailing optional string — but the axis underneath is one
+// question asked three times, so it is answered once here. The macros carry no
+// arena; they live beside the helpers because this crate is where the bindings'
+// shared substrate goes rather than in any one of them (see the crate's
+// CLAUDE.md §Why this crate exists).
 
 /// The refusal for a `sourceType` named on a language that has no goal axis
 /// (Svelte hard-wires `Module`; CSS has no goal), `noun` naming the export family
 /// (`parse` / `format`) the way the binding's other option errors do.
 ///
-/// One spelling for `tsv_wasm` and `tsv_napi` — the loader `crates/tsv_napi/npm/index.js`
-/// restates it by hand in JS, the one copy this crate cannot reach — so a consumer
-/// swapping `@fuzdev/tsv-wasm` for `@fuzdev/tsv` reads the same text. The C FFI has no
-/// noun (a code, not a bag) and spells its own.
+/// One spelling for `tsv_wasm` and `tsv_napi`'s raw decoders — the npm facade both
+/// package sets publish through (`crates/tsv_wasm/npm/api.js`) restates it by hand in
+/// JS, the one copy this crate cannot reach — so a caller reads the same text past the
+/// facade or through it, and swapping `@fuzdev/tsv-wasm` for `@fuzdev/tsv` changes
+/// nothing. The C FFI has no noun (a code, not a bag) and spells its own.
 #[must_use]
 pub fn source_type_unsupported_message(noun: &str) -> String {
     format!("{noun} option 'sourceType' is only supported for TypeScript")

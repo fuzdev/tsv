@@ -213,7 +213,6 @@ export async function assert_tool_rejects_invalid_async(
 export interface RejectProbeTarget {
 	parse(source: string, language: Language, goal?: ParseGoal): unknown;
 	parse_internal(source: string, language: Language, goal?: ParseGoal): void;
-	parse_no_locations(source: string, language: Language, goal?: ParseGoal): unknown;
 	format(source: string, language: Language): string;
 }
 
@@ -234,7 +233,6 @@ export interface RejectProbeTarget {
  * and goal for the same reason one level down: each `<operation>_<language>` is its own
  * generated export, and the goal selects the source-type code the call hands it — the
  * unset one being `format`'s module-then-script fallback, which no other code reaches.
- * `parse_no_locations` skips CSS, where the bench registers no such row (`implementations.ts`).
  *
  * @param binding - the row-facing name, so the throw names which one failed
  * @param impl - the binding, called through its own methods so each keeps its receiver
@@ -249,12 +247,6 @@ export function assert_binding_reports_rejection(binding: string, impl: RejectPr
 				[`parse[${at}]`, () => impl.parse(source, language, goal)],
 				[`parse_internal[${at}]`, () => impl.parse_internal(source, language, goal)]
 			);
-			if (language !== 'css') {
-				operations.push([
-					`parse_no_locations[${at}]`,
-					() => impl.parse_no_locations(source, language, goal)
-				]);
-			}
 		}
 		operations.push([`format[${language}]`, () => impl.format(source, language)]);
 	}

@@ -17,7 +17,10 @@
  * The AST-shape half reuses the SHARED `corpus_compare_parse.ts` diff engine
  * (`diff_asts` + `DOCUMENTED_MATCHERS`, `import.meta.main`-guarded so importing it
  * is side-effect-free), so a divergence cataloged there also shrinks the
- * `corpus:compare:parse` count. Verdict parity GATES; AST-shape is report-only.
+ * `corpus:compare:parse` count. It grades tsv's shipped wire — span-only, the one
+ * every binding emits — against the oracle with its `loc` / `name_loc` stripped
+ * (`lib/span_only.ts`), as `corpus:compare:parse`'s span-only arm does; `loc` itself is
+ * that tool's loc arm's to grade. Verdict parity GATES; AST-shape is report-only.
  */
 
 import { readdir, readFile } from 'node:fs/promises';
@@ -26,14 +29,10 @@ import { join } from 'node:path';
 import { init_compare_implementations } from './compare_cli.ts';
 import type { GatePins } from './gate_counts.ts';
 import type { KnownGap, Sanction } from './parse_sanctions.ts';
+import { span_only_replacer } from './span_only.ts';
 import type { Language } from './types.ts';
 import { type CanonicalVersions, load_all_versions } from './versions.ts';
-import {
-	bigint_replacer,
-	type DiffEntry,
-	diff_asts,
-	type MatchContext
-} from '../corpus_compare_parse.ts';
+import { type DiffEntry, diff_asts, type MatchContext } from '../corpus_compare_parse.ts';
 
 export interface FixturesGateConfig {
 	/** Display title, e.g. `TypeScript-fixtures`. */
@@ -204,9 +203,10 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 		} else if (!tsv_err && canon_err) {
 			buckets.over_acceptance.push({ path: file.path, error: canon_err });
 		} else {
-			// Both accept — deep-diff the ASTs (canonical serialized like the sidecar).
+			// Both accept — deep-diff the span-only ASTs (canonical serialized like the
+			// sidecar, its `loc` / `name_loc` stripped).
 			buckets.both_accept++;
-			const canonical_root = JSON.parse(JSON.stringify(canon_ast, bigint_replacer));
+			const canonical_root = JSON.parse(JSON.stringify(canon_ast, span_only_replacer));
 			const ctx: MatchContext = {
 				source: file.content,
 				canonical_root,

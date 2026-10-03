@@ -10,9 +10,9 @@
  * **Not payload-matched — its AST is its own dialect.** Root is `Module` (not
  * `Program`), positions ride a `span` rather than `loc`/`range`, and node kinds are
  * `Ts`-prefixed (`TsTypeAliasDeclaration`, `TsFunctionType`). So it belongs with
- * the oxc-class disclosure: a ratio against `tsv-json` compares two different
- * products, not two spellings of one. Unlike oxc/yuku it is NOT span-only-padded
- * either, so it is not an opponent for the `no-locations` curated lines.
+ * the oxc-class disclosure: a ratio against `tsv-json-no-locations` compares two
+ * different products, not two spellings of one. Unlike oxc/yuku it is NOT
+ * span-only-padded either, so it is not an opponent for the span-only curated lines.
  *
  * Two properties decide how it must be driven:
  *

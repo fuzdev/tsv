@@ -10,8 +10,8 @@
  * measures the shipped panic contract).
  *
  * Unlike FFI there are no raw pointers and no manual free: napi-rs marshals the
- * JS string in and the returned `String` out. `parse_<lang>` returns a JSON
- * string (parity with FFI/WASM — the host `JSON.parse`s it), and engine errors
+ * JS string in and the returned `String` out. `parse_<lang>` returns the span-only
+ * wire as a JSON string (parity with FFI/WASM — the host `JSON.parse`s it), and engine errors
  * surface as thrown JS errors (napi-rs converts the `napi::Error`), so there is
  * no status out-param to read (the FFI shape) — a throw just propagates. A Rust PANIC
  * surfaces the same way: every export carries `catch_unwind` and the `napi`
@@ -27,7 +27,7 @@ import { stat } from 'node:fs/promises';
 import { napi_library_path } from './tsv_artifacts.ts';
 import { BaseImplementation, goal_for, type Language, LANGUAGES, type ParseGoal } from './types.ts';
 import { assert_binding_reports_rejection } from './reject_probe.ts';
-import { assert_binding_drops_locations } from './locations_probe.ts';
+import { assert_binding_emits_span_only } from './locations_probe.ts';
 
 /**
  * The N-API addon's exported functions (snake_case `js_name`s, matching WASM/FFI).
@@ -47,10 +47,6 @@ export interface NapiAddon {
 	parse_css: (source: string, goal?: string) => string;
 	parse_internal_css: (source: string, goal?: string) => void;
 	format_css: (source: string, goal?: string) => string;
-	// the span-only wire
-	parse_svelte_no_locations: (source: string, goal?: string) => string;
-	parse_typescript_no_locations: (source: string, goal?: string) => string;
-	parse_css_no_locations: (source: string, goal?: string) => string;
 	// test-only panic-contract probe — present only when built with the
 	// `panic_probe` cargo feature (`deno task test:napi`); absent in published
 	// builds, so `test_napi.ts` skips its contract test when undefined
@@ -72,10 +68,9 @@ export function get_napi_library_path(): string {
  * charged to whichever row it sat under, which belongs to no impl.
  */
 interface NapiTables {
+	/** The span-only wire — the one parse wire every tsv binding emits. */
 	parse: Record<Language, (source: string, goal?: string) => string>;
 	parse_internal: Record<Language, (source: string, goal?: string) => void>;
-	/** The span-only wire. */
-	parse_no_locations: Record<Language, (source: string, goal?: string) => string>;
 	format: Record<Language, (source: string, goal?: string) => string>;
 }
 
@@ -124,11 +119,6 @@ export class NapiImplementation extends BaseImplementation {
 				typescript: addon.parse_internal_typescript,
 				css: addon.parse_internal_css
 			},
-			parse_no_locations: {
-				svelte: addon.parse_svelte_no_locations,
-				typescript: addon.parse_typescript_no_locations,
-				css: addon.parse_css_no_locations
-			},
 			format: {
 				svelte: addon.format_svelte,
 				typescript: addon.format_typescript,
@@ -140,19 +130,19 @@ export class NapiImplementation extends BaseImplementation {
 		// come to disagree about what surfacing a refusal MEANS — see `lib/reject_probe.ts`.
 		assert_binding_reports_rejection('tsv (N-API)', this);
 
-		// The no-locations wire is its own export here, not an option, so it can't be
-		// silently dropped the way the WASM bag can; probed anyway so the three
-		// bindings answer one question — see `lib/locations_probe.ts`.
-		assert_binding_drops_locations('tsv (N-API)', { path, rebuild: 'deno task build:napi' }, this);
+		// The parse wire is span-only — prove this artifact emits it, so an addon built
+		// before the bindings went span-only can't be timed under the span rows' label.
+		// See `lib/locations_probe.ts`.
+		assert_binding_emits_span_only('tsv (N-API)', { path, rebuild: 'deno task build:napi' }, this);
 	}
 
 	// `goal_for` withholds the goal for svelte/css, which REJECT a set goal rather
 	// than ignoring it (`tsv_napi`'s `napi_source_type`). One shared helper for all three
 	// wrappers — see its doc in `lib/types.ts`.
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {
-		// `parse_<lang>` returns a JSON string (the engine throws on parse error);
-		// materialize it the same way ffi.ts / wasm.ts do for an apples-to-apples
-		// `tsv-json`-style row.
+		// `parse_<lang>` returns the span-only wire as a JSON string (the engine throws on
+		// parse error); materialize it the same way ffi.ts / wasm.ts do, for an
+		// apples-to-apples row.
 		return JSON.parse(this.tables.parse[language](source, goal_for(language, goal)));
 	}
 
@@ -160,13 +150,8 @@ export class NapiImplementation extends BaseImplementation {
 		this.tables.parse_internal[language](source, goal_for(language, goal));
 	}
 
-	parse_no_locations(source: string, language: Language, goal?: ParseGoal): unknown {
-		const fn = this.tables.parse_no_locations[language];
-		return JSON.parse(fn(source, goal_for(language, goal)));
-	}
-
-	// No `sourceType` key: the shipped default on every surface, and the one that
-	// reaches the module-then-script fallback (`tsv_ts::parse_with_goal_or_fallback`).
+	// No source type: the shipped default on every surface, and the one that reaches
+	// the module-then-script fallback (`tsv_ts::parse_with_goal_or_fallback`).
 	format(source: string, language: Language): string {
 		return this.tables.format[language](source);
 	}

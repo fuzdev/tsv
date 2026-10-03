@@ -130,6 +130,14 @@ const PARSERS = {
 	css: engine.parse_css_json
 };
 
+/** The object parsers, for `parse --locations`: `{locations: true}` reconstructs `loc`
+ * over the span-only tree (the facade's sugar), which is then stringified. */
+const OBJECT_PARSERS = {
+	svelte: engine.parse_svelte,
+	typescript: engine.parse_typescript,
+	css: engine.parse_css
+};
+
 /**
  * How many in-scope files it takes before worker threads are worth their
  * startup. Below this the run stays on the main thread: bringing a pool up
@@ -283,7 +291,7 @@ Options:
 Exit codes: 0 clean, 1 would change (--check), 2 errors.
 `;
 
-const PARSE_HELP = `Usage: tsv parse [<file>] [--pretty] [--content <s> | --stdin] [--parser <p>] [--source-type <t>] [--no-locations]
+const PARSE_HELP = `Usage: tsv parse [<file>] [--pretty] [--content <s> | --stdin] [--parser <p>] [--source-type <t>] [--locations]
 
 Parse source code into AST JSON.
 
@@ -293,7 +301,7 @@ Options:
   --stdin           read from stdin (requires --parser)
   --parser <p>      parser type: svelte | typescript | css
   --source-type <t> TypeScript parse goal: script | module (default: module; an error with svelte/css)
-  --no-locations    omit per-node loc (span-only wire; svelte also omits name_loc)
+  --locations       emit per-node loc (line/column) beside the start/end offsets (svelte also name_loc); the default wire is span-only
 `;
 
 /**
@@ -324,7 +332,7 @@ const PARSE_ARGS = {
 		'--stdin': { switch: true },
 		'--parser': { parse: parser_type_from_str },
 		'--source-type': {},
-		'--no-locations': { switch: true }
+		'--locations': { switch: true }
 	},
 	positionals: 1,
 	help: PARSE_HELP
@@ -535,7 +543,7 @@ function resolve_source_type(source_type, code) {
  * the native CLI's `check_source_type_language`, word for word. Svelte hard-wires
  * `Module` and css has no goal, so a caller naming one there asked for something
  * that cannot be honored and must be told; every binding takes that stance
- * (`tsv_wasm`'s `read_options` throws on a set key), so this bin is not the one
+ * (the npm facade's options reader throws on a set key), so this bin is not the one
  * surface that drops the flag silently. Called once the parser is resolved and
  * before the parse/format call, so `source_type` is thereafter `undefined` on
  * every goalless language and one options bag still serves whichever engine. */
@@ -1458,21 +1466,26 @@ function run_parse({ values, positionals }) {
 		}
 	}
 
-	// --no-locations drops per-node `loc` (span-only wire; svelte also `name_loc`)
-	// in every language; orthogonal to --source-type (the source type drives the TS
-	// parser, no-locations the writer), so they compose. `locations` is a parse-only
-	// option — format emits no wire and rejects the key.
-	const no_locations = values.no_locations === true;
+	// The default output is the span-only wire, verbatim from the engine. --locations
+	// adds per-node `loc` (svelte also `name_loc`) through the facade's
+	// `{locations: true}` — the JS reconstruction over the span tree — and stringifies
+	// the result; orthogonal to --source-type (the source type drives the TS parser),
+	// so they compose. The native CLI writes `loc` with its Rust emitter instead: the
+	// two trees are deep-equal, but its `loc` sits after `end` where the
+	// reconstruction appends it last, so the bytes differ by key order.
 	let json;
 	try {
-		json = PARSERS[parser](input, {
-			locations: !no_locations,
-			sourceType: source_type
-		});
+		json = values.locations
+			? JSON.stringify(
+					OBJECT_PARSERS[parser](input, { locations: true, sourceType: source_type }),
+					null,
+					values.pretty ? '\t' : undefined
+				)
+			: PARSERS[parser](input, { sourceType: source_type });
 	} catch (error) {
 		exit_with_error(1, single_input_failure(error));
 	}
-	if (values.pretty) {
+	if (values.pretty && !values.locations) {
 		// A re-serialization, where the native CLI re-indents the compact bytes
 		// without ever reading them back — and byte-identical to it all the same: the
 		// wire writer spells every number in ECMAScript's own `Number::toString` form

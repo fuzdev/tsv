@@ -8,7 +8,7 @@ The bindings (`tsv_ffi`, `tsv_napi`, `tsv_wasm`) are invoked once per file in ti
 
 It's a crate, not duplicated inline, because the bindings would otherwise hand-sync it. The helpers are tiny but encode a subtle soundness contract (nothing borrowed may outlive the next call's `reset()`); a single home keeps that contract from drifting.
 
-**The same argument, a second time, is why the goal macros are here too.** Each binding spells the parse goal in its host's idiom — a `u32` code, a trailing optional string, one key of an options bag — but *which languages have a goal axis at all* is one fact, and three copies of it agree only until one is edited. So the crate's scope is the bindings' shared substrate, not arenas specifically; the name is older than the second half.
+**The same argument, a second time, is why the goal macros are here too.** Each binding spells the parse goal in its host's idiom — a `u32` code, a trailing optional string — but *which languages have a goal axis at all* is one fact, and three copies of it agree only until one is edited. So the crate's scope is the bindings' shared substrate, not arenas specifically; the name is older than the second half.
 
 **Not in `tsv_lang`:** the foundation crate deliberately doesn't depend on `bumpalo` (the AST `Bump` is passed *into* the language crates), and a thread-local hot-loop reuse policy is a binding concern, not a language primitive — putting it there would invert the layering.
 
@@ -23,7 +23,7 @@ Plus the goal-axis pair, `#[macro_export]`ed and feature-independent (they gener
 
 - `parse_ast!($goalness, $lang, $source, $goal, $arena)` — the per-language parse call. `goal` (TypeScript) threads the decoded goal into `$lang::parse_with_goal`; `nogoal` (Svelte, CSS) drops it and calls `$lang::parse`. `$lang` resolves in the *caller's* scope, so this crate depends on no language crate.
 - `parse_ast_for_format!($goalness, $lang, $source, $goal, $arena)` — the format path's twin, whose `$goal` is an `Option`: `goal` calls `$lang::parse_with_goal_or_fallback`, so a named source type is exact and an unnamed one takes the module-then-script fallback (see [../../docs/cli.md §Multi-File Formatting](../../docs/cli.md#multi-file-formatting)); `nogoal` drops it as above. The parse exports keep `parse_ast!`, whose goal is settled: their product is a wire carrying `Program.sourceType`, a claim no retry may make depend on the input.
-- `goal_allowed!($goalness)` — `true` / `false`, read by each binding's own goal decoder (`ffi_source_type`, `napi_source_type`, `read_options`).
+- `goal_allowed!($goalness)` — `true` / `false`, read by each binding's own goal decoder (`ffi_source_type`, `napi_source_type`, `wasm_source_type`).
 
 The load-bearing property is that **one `$goalness` tag drives both**: a language with no axis *rejects* a set goal rather than ignoring it, and the macro that picks the parse call and the macro that licenses the refusal can't come to disagree about which languages those are. Each binding still owns its own `lang_bindings!` (three different export signatures) and its own refusal wording.
 

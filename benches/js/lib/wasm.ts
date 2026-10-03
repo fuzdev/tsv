@@ -17,32 +17,25 @@ import { wasm_target } from './runtime.ts';
 import { wasm_bundle_dir } from './tsv_artifacts.ts';
 import { BaseImplementation, goal_for, type Language, LANGUAGES, type ParseGoal } from './types.ts';
 import { assert_binding_reports_rejection } from './reject_probe.ts';
-import { assert_binding_drops_locations } from './locations_probe.ts';
+import { assert_binding_emits_span_only } from './locations_probe.ts';
 
-/** The `{locations?, sourceType?}` options bag the parse exports take
- * (`sourceType` is TypeScript-only — the other languages reject the key). */
-interface WasmParseOptions {
-	locations?: boolean;
-	sourceType?: ParseGoal;
-}
-
-/** The `{sourceType?}` bag the format exports take — format emits no wire, so
- * `locations` is an unknown key there, and `sourceType` stays TypeScript-only. */
-interface WasmFormatOptions {
-	sourceType?: ParseGoal;
-}
-
-/** WASM module function signatures */
+/**
+ * WASM module function signatures — the raw wasm-bindgen exports, flat like the two
+ * native bindings': each takes the source type as a trailing OPTIONAL string
+ * (`'script'` / `'module'`; omitted = none named). Svelte and CSS REJECT a set one
+ * rather than ignoring it, so the wrappers below withhold it for them. `parse_<lang>`
+ * returns the span-only wire as an object, `JSON.parse`d engine-side via `js_sys`.
+ */
 interface WasmModule {
-	parse_svelte: (source: string, options?: WasmParseOptions) => unknown;
-	parse_internal_svelte: (source: string, options?: WasmParseOptions) => void;
-	format_svelte: (source: string, options?: WasmFormatOptions) => string;
-	parse_typescript: (source: string, options?: WasmParseOptions) => unknown;
-	parse_internal_typescript: (source: string, options?: WasmParseOptions) => void;
-	format_typescript: (source: string, options?: WasmFormatOptions) => string;
-	parse_css: (source: string, options?: WasmParseOptions) => unknown;
-	parse_internal_css: (source: string, options?: WasmParseOptions) => void;
-	format_css: (source: string, options?: WasmFormatOptions) => string;
+	parse_svelte: (source: string, source_type?: string) => unknown;
+	parse_internal_svelte: (source: string, source_type?: string) => void;
+	format_svelte: (source: string, source_type?: string) => string;
+	parse_typescript: (source: string, source_type?: string) => unknown;
+	parse_internal_typescript: (source: string, source_type?: string) => void;
+	format_typescript: (source: string, source_type?: string) => string;
+	parse_css: (source: string, source_type?: string) => unknown;
+	parse_internal_css: (source: string, source_type?: string) => void;
+	format_css: (source: string, source_type?: string) => string;
 }
 
 /**
@@ -54,9 +47,10 @@ interface WasmModule {
  * no impl.
  */
 interface WasmTables {
-	parse: Record<Language, (source: string, options?: WasmParseOptions) => unknown>;
-	parse_internal: Record<Language, (source: string, options?: WasmParseOptions) => void>;
-	format: Record<Language, (source: string, options?: WasmFormatOptions) => string>;
+	/** The span-only wire — the one parse wire every tsv binding emits. */
+	parse: Record<Language, (source: string, source_type?: string) => unknown>;
+	parse_internal: Record<Language, (source: string, source_type?: string) => void>;
+	format: Record<Language, (source: string, source_type?: string) => string>;
 }
 
 export class WasmImplementation extends BaseImplementation {
@@ -146,9 +140,9 @@ export class WasmImplementation extends BaseImplementation {
 		// Fairness guard for the parse rows: the wasm parse fns must return a
 		// js_sys-materialized OBJECT (the engine runs the host's JSON.parse from
 		// Rust). If a glue/build regression ever handed back the raw JSON string
-		// instead, the timed `tsv-wasm-json` rows would silently skip
-		// materialization and read artificially fast vs `tsv-json`. Probe once
-		// here, outside any timed loop.
+		// instead, the timed `tsv-wasm-json-no-locations` rows would silently skip
+		// materialization and read artificially fast vs their native sibling. Probe
+		// once here, outside any timed loop.
 		const probe = this._module.parse_typescript('const x = 1;');
 		if (typeof probe !== 'object' || probe === null) {
 			throw new Error(
@@ -161,49 +155,31 @@ export class WasmImplementation extends BaseImplementation {
 		// The guard above asks what a SUCCESS returns; this asks what a REFUSAL does.
 		assert_binding_reports_rejection('tsv (WASM)', this);
 
-		// `parse_no_locations` rides an OPTION here, and a bundle whose exports predate
-		// the options bag drops it without a throw — the no-locations row would then
-		// time the loc-bearing wire. The freshness guard refuses such a bundle unless
-		// `BENCH_STALE_OK=1`; this is what still stands then — see `lib/locations_probe.ts`.
-		assert_binding_drops_locations(
+		// The parse wire is span-only — prove this bundle emits it, so one built before
+		// the bindings went span-only (whose `parse_<lang>` took an options bag and
+		// returned the loc-bearing wire) can't be timed under the span rows' label. The
+		// freshness guard refuses such a bundle unless `BENCH_STALE_OK=1`; this is what
+		// still stands then — see `lib/locations_probe.ts`.
+		assert_binding_emits_span_only(
 			'tsv (WASM)',
 			{ path: wasm_path, rebuild: `deno task build:wasm:all:${target}` },
 			this
 		);
 	}
 
-	// `goal_for` withholds the goal for svelte/css, which reject a SET value — not
-	// the key itself: `crates/tsv_wasm/src/lib.rs` declares `sourceType?: undefined` on
-	// `ParseOptions` precisely so one options bag can be forwarded to whichever
-	// export (the documented forwarding idiom `npm/cli.js` uses). So spelling the
-	// key `undefined` is legal here, and `parse_no_locations` — which builds a bag
-	// regardless — does exactly that. The same helper the two native wrappers use;
-	// see its doc in `lib/types.ts`.
-	//
-	// ⚠️ All three are TIMED rows, and an unconditional object literal allocates on
-	// every call — harness-side allocation charged to whichever row it sat under
-	// (`WasmTables`). `parse_no_locations` pays it because it MUST carry
-	// `locations: false` and so has no bag-free path; `parse` and `parse_internal`
-	// have one and take it whenever `goal_for` withholds the goal.
+	// `goal_for` withholds the goal for svelte/css, which REJECT a set one rather than
+	// ignoring it (`crates/tsv_wasm/src/lib.rs`'s `wasm_source_type`). The same helper
+	// the two native wrappers use; see its doc in `lib/types.ts`.
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {
-		const resolved = goal_for(language, goal);
-		return this.tables.parse[language](source, resolved ? { sourceType: resolved } : undefined);
+		return this.tables.parse[language](source, goal_for(language, goal));
 	}
 
 	parse_internal(source: string, language: Language, goal?: ParseGoal): void {
-		const resolved = goal_for(language, goal);
-		this.tables.parse_internal[language](source, resolved ? { sourceType: resolved } : undefined);
+		this.tables.parse_internal[language](source, goal_for(language, goal));
 	}
 
-	parse_no_locations(source: string, language: Language, goal?: ParseGoal): unknown {
-		return this.tables.parse[language](source, {
-			locations: false,
-			sourceType: goal_for(language, goal)
-		});
-	}
-
-	// No `sourceType` key: the shipped default on every surface, and the one that
-	// reaches the module-then-script fallback (`tsv_ts::parse_with_goal_or_fallback`).
+	// No source type: the shipped default on every surface, and the one that reaches
+	// the module-then-script fallback (`tsv_ts::parse_with_goal_or_fallback`).
 	format(source: string, language: Language): string {
 		return this.tables.format[language](source);
 	}

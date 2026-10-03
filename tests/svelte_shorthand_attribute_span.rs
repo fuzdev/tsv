@@ -12,7 +12,7 @@
 //!
 //! Taking the whole braces interior for all three puts the padding inside every span
 //! (`name_loc` 6..9 instead of 7..8 on `<div { x }>`), which makes the **span-only**
-//! `--no-locations` wire wrong too, not just `loc`.
+//! wire wrong too, not just `loc`.
 //!
 //! Not fixturable: `format` normalizes `{ x }` → `{x}`, so no format-stable `input.svelte`
 //! can hold the trigger (the same reason the `:nth-*()` span trims live in

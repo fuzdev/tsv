@@ -1,4 +1,4 @@
-//! `tsv parse`: the content, stdin and file input arms, `--pretty`, `--no-locations`,
+//! `tsv parse`: the content, stdin and file input arms, `--pretty`, `--locations`,
 //! the `--source-type` goal axis, parser selection and the argument refusals.
 
 use std::fs;
@@ -58,39 +58,38 @@ fn test_parse_command_with_pretty() {
 }
 
 #[test]
-fn test_parse_no_locations_omits_loc() {
-    // `--no-locations` emits the span-only wire: `start`/`end` offsets, no `loc`.
-    let full = tsv(&[
+fn test_parse_default_is_span_only_and_locations_adds_loc() {
+    // The default wire is span-only: `start`/`end` offsets, no `loc`. `--locations`
+    // adds the per-node `loc` object (the Rust emitter) and keeps the offsets.
+    let span = tsv(&[
         "parse",
         "--content",
         "const x = 42;",
         "--parser",
         "typescript",
     ]);
-    let no_loc = tsv(&[
+    let located = tsv(&[
         "parse",
         "--content",
         "const x = 42;",
         "--parser",
         "typescript",
-        "--no-locations",
+        "--locations",
     ]);
-    assert!(full.status.success() && no_loc.status.success());
-    let full_out = String::from_utf8_lossy(&full.stdout);
-    let no_loc_out = String::from_utf8_lossy(&no_loc.stdout);
-    // The default wire carries the `loc` object; the span-only wire drops it but
-    // keeps offsets and the rest of the payload.
+    assert!(span.status.success() && located.status.success());
+    let span_out = String::from_utf8_lossy(&span.stdout);
+    let located_out = String::from_utf8_lossy(&located.stdout);
     assert!(
-        full_out.contains(r#""loc":{"#),
-        "default wire should carry loc"
+        !span_out.contains(r#""loc""#),
+        "the default wire must not carry a loc key: {span_out}"
     );
     assert!(
-        !no_loc_out.contains(r#""loc":{"#),
-        "no-locations wire must not carry a loc object: {no_loc_out}"
+        span_out.contains(r#""start":0"#) && span_out.contains(r#""type":"Program"#),
+        "the default wire keeps offsets + payload: {span_out}"
     );
     assert!(
-        no_loc_out.contains(r#""start":0"#) && no_loc_out.contains(r#""type":"Program"#),
-        "no-locations wire keeps offsets + payload: {no_loc_out}"
+        located_out.contains(r#""loc":{"#) && located_out.contains(r#""start":0"#),
+        "--locations carries loc beside the offsets: {located_out}"
     );
 }
 
@@ -125,9 +124,9 @@ fn test_parse_pretty_has_no_depth_ceiling_of_its_own() {
 }
 
 #[test]
-fn test_parse_no_locations_pretty_reparses() {
-    // `--pretty --no-locations` rides the reparse-the-bytes pretty path — assert
-    // it's tab-indented AND loc-free (the only place the two branches combine).
+fn test_parse_pretty_locations_reindents_the_loc_wire() {
+    // `--pretty --locations` rides the re-indent-the-bytes pretty path over the loc
+    // wire — assert it's tab-indented AND loc-bearing (the only place the two combine).
     let output = tsv(&[
         "parse",
         "--content",
@@ -135,76 +134,74 @@ fn test_parse_no_locations_pretty_reparses() {
         "--parser",
         "typescript",
         "--pretty",
-        "--no-locations",
+        "--locations",
     ]);
-    assert!(
-        output.status.success(),
-        "pretty no-locations should succeed"
-    );
+    assert!(output.status.success(), "pretty --locations should succeed");
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
         stdout.contains("\n\t"),
         "pretty output is tab-indented: {stdout}"
     );
     assert!(
-        !stdout.contains(r#""loc""#),
-        "no loc key in pretty output: {stdout}"
+        stdout.contains(r#""loc": {"#),
+        "loc key in pretty output: {stdout}"
     );
 }
 
 #[test]
-fn test_parse_no_locations_svelte_omits_name_loc() {
-    // Svelte also drops the element/attribute/directive `name_loc`.
-    let full = tsv(&["parse", "--content", "<div>x</div>", "--parser", "svelte"]);
-    let no_loc = tsv(&[
+fn test_parse_svelte_name_loc_rides_locations() {
+    // Svelte's element/attribute/directive `name_loc` is a location field too: absent
+    // from the default wire, present under `--locations`.
+    let span = tsv(&["parse", "--content", "<div>x</div>", "--parser", "svelte"]);
+    let located = tsv(&[
         "parse",
         "--content",
         "<div>x</div>",
         "--parser",
         "svelte",
-        "--no-locations",
+        "--locations",
     ]);
-    let full_out = String::from_utf8_lossy(&full.stdout);
-    let no_loc_out = String::from_utf8_lossy(&no_loc.stdout);
+    let span_out = String::from_utf8_lossy(&span.stdout);
+    let located_out = String::from_utf8_lossy(&located.stdout);
     assert!(
-        full_out.contains(r#""name_loc""#),
-        "default Svelte wire carries name_loc"
+        !span_out.contains(r#""name_loc""#) && !span_out.contains(r#""loc""#),
+        "the default Svelte wire carries neither name_loc nor loc: {span_out}"
     );
     assert!(
-        !no_loc_out.contains(r#""name_loc""#) && !no_loc_out.contains(r#""loc":{"#),
-        "no-locations Svelte wire drops name_loc and loc: {no_loc_out}"
+        located_out.contains(r#""name_loc""#) && located_out.contains(r#""loc":{"#),
+        "--locations Svelte wire carries name_loc and loc: {located_out}"
     );
 }
 
 #[test]
-fn test_parse_no_locations_drops_css_loc() {
-    // `parseCss` emits no `loc`, but tsv's CSS wire carries one on every node like
-    // the other two languages, and `--no-locations` drops it: the span-only wire.
-    let full = tsv(&["parse", "--content", "a { color: red }", "--parser", "css"]);
-    let no_loc = tsv(&[
+fn test_parse_css_loc_rides_locations() {
+    // `parseCss` emits no `loc`, but tsv's CSS `--locations` wire carries one on every
+    // node like the other two languages; the default wire carries none.
+    let span = tsv(&["parse", "--content", "a { color: red }", "--parser", "css"]);
+    let located = tsv(&[
         "parse",
         "--content",
         "a { color: red }",
         "--parser",
         "css",
-        "--no-locations",
+        "--locations",
     ]);
-    let full_out = String::from_utf8_lossy(&full.stdout);
-    let no_loc_out = String::from_utf8_lossy(&no_loc.stdout);
+    let span_out = String::from_utf8_lossy(&span.stdout);
+    let located_out = String::from_utf8_lossy(&located.stdout);
     assert!(
-        full_out.contains(r#""loc":{"#),
-        "default CSS wire carries loc: {full_out}"
+        !span_out.contains(r#""loc""#),
+        "the default CSS wire carries no loc: {span_out}"
     );
     assert!(
-        !no_loc_out.contains(r#""loc""#),
-        "no-locations CSS wire drops loc: {no_loc_out}"
+        located_out.contains(r#""loc":{"#),
+        "--locations CSS wire carries loc: {located_out}"
     );
 }
 
 #[test]
-fn test_parse_no_locations_composes_with_source_type_script() {
-    // `--source-type` drives the parser, `--no-locations` the writer — orthogonal, so the
-    // two combine (the `sourceType` still follows the goal; no loc is emitted).
+fn test_parse_locations_composes_with_source_type_script() {
+    // `--source-type` drives the parser, `--locations` the writer — orthogonal, so the
+    // two combine (the `sourceType` still follows the goal; `loc` is emitted).
     let output = tsv(&[
         "parse",
         "--content",
@@ -213,11 +210,11 @@ fn test_parse_no_locations_composes_with_source_type_script() {
         "typescript",
         "--source-type",
         "script",
-        "--no-locations",
+        "--locations",
     ]);
     assert!(
         output.status.success(),
-        "source type + no-locations should succeed"
+        "source type + --locations should succeed"
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
@@ -225,8 +222,8 @@ fn test_parse_no_locations_composes_with_source_type_script() {
         "sourceType follows the goal: {stdout}"
     );
     assert!(
-        !stdout.contains(r#""loc":{"#),
-        "no-locations still drops loc: {stdout}"
+        stdout.contains(r#""loc":{"#),
+        "--locations still emits loc: {stdout}"
     );
 }
 
