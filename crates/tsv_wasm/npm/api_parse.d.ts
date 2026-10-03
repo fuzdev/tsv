@@ -50,8 +50,9 @@ export interface TypeScriptParseOptions {
 
 /**
  * Options accepted by `parse_svelte_json` / `parse_css_json`: none settable. The JSON
- * string is the wire itself, so there is no `locations` (`loc` is a view over objects);
- * `sourceType` is declared `undefined` so a forwarded bag still type-checks.
+ * string is the wire itself, so there is no `locations` (`loc` is a view over objects —
+ * the key throws a `TypeError` pointing at the object parser); `sourceType` is declared
+ * `undefined` so a forwarded bag still type-checks.
  */
 export interface ParseJsonOptions {
 	/** Not accepted here — see `ParseOptions.sourceType`. */

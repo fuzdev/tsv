@@ -21,7 +21,10 @@
  * including `sourceType` on a language that refuses a set one — which is what lets one
  * bag forward to whichever export (`npm/cli.js` does). `parse_*_json` and `format_*`
  * take no `locations`: the JSON string is the wire, and `loc` is a view over objects; a
- * format emits no wire at all.
+ * format emits no wire at all. A `_json` export refuses the key with that explanation, a
+ * format export as an unknown key.
+ *
+ * Every argument refusal — the bag's and the source's — is a `TypeError`.
  *
  * A `source` that is not a string is refused before the engine sees it
  * (`read_source`), since the engines would each answer it differently.
@@ -52,39 +55,51 @@
  * all defaults. A key's getter runs once, and one that throws surfaces as
  * `failed to read <noun> option '<name>'` with the getter's error as its `cause`.
  *
+ * Every refusal is a `TypeError` — each is a caller passing an argument of the wrong
+ * shape, the class `read_source`'s refusal and the engines' own conversions throw.
+ *
  * @param {unknown} options - the caller's bag
  * @param {'parse' | 'format'} noun - the export family, as every error names it
  * @param {boolean} takes_locations - whether this export takes `locations`
  * @param {boolean} takes_source_type - whether this export's language has a parse goal
+ * @param {string} [json_language] - set for a `parse_<lang>_json` export, to its language:
+ *   a `locations` key there (whatever its value) is refused with its own explanation —
+ *   the export returns the wire, which `loc` is not part of — rather than as unknown
  * @returns {{locations: boolean, source_type: 'script' | 'module' | undefined}}
+ * @throws {TypeError} on any refusal
  */
-export function read_options(options, noun, takes_locations, takes_source_type) {
+export function read_options(options, noun, takes_locations, takes_source_type, json_language) {
 	const parsed = { locations: false, source_type: undefined };
 	if (options === undefined || options === null) return parsed;
 	if (typeof options !== 'object' || Array.isArray(options)) {
-		throw new Error(`${noun} options must be an object`);
+		throw new TypeError(`${noun} options must be an object`);
 	}
 	for (const name of Object.keys(options)) {
 		if (name === 'locations' && takes_locations) {
 			const value = read_option(options, name, noun);
 			if (value === undefined) continue;
 			if (typeof value !== 'boolean') {
-				throw new Error(`${noun} option 'locations' must be a boolean`);
+				throw new TypeError(`${noun} option 'locations' must be a boolean`);
 			}
 			parsed.locations = value;
+		} else if (name === 'locations' && json_language !== undefined) {
+			throw new TypeError(
+				`${noun} option 'locations' is not supported by parse_${json_language}_json — the ` +
+					`JSON string is the span-only wire; use parse_${json_language}(source, {locations: true})`
+			);
 		} else if (name === 'sourceType') {
 			const value = read_option(options, name, noun);
 			// checked before the language's refusal: a forwarded bag spells the
 			// inapplicable source type `undefined`, and that must pass everywhere
 			if (value === undefined) continue;
 			if (!takes_source_type) {
-				throw new Error(`${noun} option 'sourceType' is only supported for TypeScript`);
+				throw new TypeError(`${noun} option 'sourceType' is only supported for TypeScript`);
 			}
 			if (typeof value !== 'string') {
-				throw new Error(`${noun} option 'sourceType' must be 'script' or 'module'`);
+				throw new TypeError(`${noun} option 'sourceType' must be 'script' or 'module'`);
 			}
 			if (value !== 'script' && value !== 'module') {
-				throw new Error(`invalid sourceType '${value}' (expected 'script' or 'module')`);
+				throw new TypeError(`invalid sourceType '${value}' (expected 'script' or 'module')`);
 			}
 			parsed.source_type = value;
 		} else {
@@ -96,7 +111,7 @@ export function read_options(options, noun, takes_locations, takes_source_type) 
 						: takes_source_type
 							? "expected 'sourceType'"
 							: 'this export takes no options';
-			throw new Error(`unknown ${noun} option '${name}' (${detail})`);
+			throw new TypeError(`unknown ${noun} option '${name}' (${detail})`);
 		}
 	}
 	return parsed;
@@ -111,12 +126,13 @@ export function read_options(options, noun, takes_locations, takes_source_type) 
  * @param {string} name - a key this export takes
  * @param {'parse' | 'format'} noun - the export family, as every error names it
  * @returns {unknown}
+ * @throws {TypeError} when the key's getter throws
  */
 function read_option(options, name, noun) {
 	try {
 		return /** @type {Record<string, unknown>} */ (options)[name];
 	} catch (cause) {
-		throw new Error(`failed to read ${noun} option '${name}'`, { cause });
+		throw new TypeError(`failed to read ${noun} option '${name}'`, { cause });
 	}
 }
 

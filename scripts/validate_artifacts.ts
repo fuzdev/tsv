@@ -307,7 +307,11 @@ for (const { label, entry, has_format, has_parse, is_npm } of smoke_targets) {
 						push_gitignore(anchor: string, content: string): void;
 						push_formatignore(anchor: string, content: string): void;
 						is_ignored(path: string, is_dir: boolean): boolean;
-						classify_dir(name: string, child_rel: string, heuristic_active: boolean): string;
+						classify_dir(
+							name: string,
+							child_rel: string,
+							heuristic_active: boolean
+						): 'descend' | 'prune' | 'prune_warn';
 						should_format_file(name: string, child_rel: string): boolean;
 						shadow_warning(dir: string, loose_root: string | undefined): string | undefined;
 				  })

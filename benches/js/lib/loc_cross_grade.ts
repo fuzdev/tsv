@@ -16,7 +16,8 @@
  * @module
  */
 
-// @ts-types="../../../crates/tsv_wasm/npm/locations.d.ts"
+// typed by the module's own JSDoc, not its `.d.ts`: that file imports `./tsv_ast.js`, which
+// resolves only where a package stages the two side by side
 import { reconstruct_locations } from '../../../crates/tsv_wasm/npm/locations.js';
 import type { Language } from './types.ts';
 

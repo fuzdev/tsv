@@ -7,8 +7,8 @@
  * `{locations: true}` runs `locations.js`'s `reconstruct_locations` over the parsed
  * object — the same definition the Rust `loc` emitter (`tsv parse --locations`)
  * implements, acorn-exact for TypeScript — so `loc` is a view, computed in JS where a
- * caller asks for it. `parse_<lang>_json` returns the wire string untouched: it takes no
- * `locations`, since `loc` is a view over objects.
+ * caller asks for it. `parse_<lang>_json` returns the wire string untouched: it refuses
+ * `locations` (pointing at `parse_<lang>`), since `loc` is a view over objects.
  *
  * A separate module from `api.js` so the format-only package, which ships no
  * `locations.js`, never loads one.
@@ -43,14 +43,14 @@ export function create_parse_api(engine) {
 			((source, source_type) => JSON.parse(parse_json(source, source_type)));
 		api[`parse_${language}`] = (source, options) => {
 			const text = read_source(source, 'parse');
-			const opts = read_options(options, 'parse', true, goal);
-			const ast = parse(text, opts.source_type);
-			return opts.locations ? reconstruct_locations(ast, text, { language }) : ast;
+			const parsed = read_options(options, 'parse', true, goal);
+			const ast = parse(text, parsed.source_type);
+			return parsed.locations ? reconstruct_locations(ast, text, { language }) : ast;
 		};
 		api[`parse_${language}_json`] = (source, options) =>
 			parse_json(
 				read_source(source, 'parse'),
-				read_options(options, 'parse', false, goal).source_type
+				read_options(options, 'parse', false, goal, language).source_type
 			);
 	}
 	return api;

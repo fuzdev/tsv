@@ -168,7 +168,10 @@ impl IgnoreStack {
     ///
     /// A string tag (rather than a wasm-bindgen enum or a returned struct) keeps
     /// the package facade / `patch_npm_package.ts` unchanged and allocates no JS
-    /// object on the common descend path.
+    /// object on the common descend path. The generated declaration names the three
+    /// tags (`unchecked_return_type`), as the N-API twin's hand-written one does, so
+    /// the two packages type-check interchangeably.
+    #[wasm_bindgen(unchecked_return_type = "'descend' | 'prune' | 'prune_warn'")]
     pub fn classify_dir(&self, name: &str, child_rel: &str, heuristic_active: bool) -> String {
         match tsv_discover::classify_dir(name, child_rel, heuristic_active, &self.inner) {
             tsv_discover::DirVerdict::Descend => "descend".to_string(),

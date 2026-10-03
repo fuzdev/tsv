@@ -375,6 +375,23 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 				[],
 				'the native IgnoreStack has a method the wasm one is missing'
 			);
+			// And the subpaths: the wasm package's `./worker` is its WASM lifecycle too (the
+			// lazy entry a worker initializes from a handed module); every other subpath —
+			// `./locations` included — both packages export.
+			const subpaths = (dir: string): Array<string> =>
+				Object.keys(JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).exports);
+			const wasm_subpaths = subpaths(dirname(wasm_package_index));
+			const native_subpaths = subpaths(join(staged, 'node_modules', '@fuzdev', 'tsv'));
+			assert.deepEqual(
+				wasm_subpaths.filter((name) => !native_subpaths.includes(name)).sort(),
+				['./worker'],
+				'the wasm package exports a subpath this loader is missing'
+			);
+			assert.deepEqual(
+				native_subpaths.filter((name) => !wasm_subpaths.includes(name)).sort(),
+				[],
+				'this loader exports a subpath the wasm package is missing'
+			);
 		}
 	);
 
@@ -416,6 +433,7 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		// The amortized entry point over the same source, the language named.
 		const locator = api.create_locator(source, { language: 'typescript' });
 		assert.deepEqual(locator.loc_of(spans.body[1]), spans.body[1].loc);
+		assert.deepEqual(locator.position_at(spans.body[1].start), spans.body[1].loc.start);
 		assert.deepEqual(
 			api.loc_of(spans.body[1], source, { language: 'typescript' }),
 			spans.body[1].loc
@@ -477,8 +495,11 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		);
 		throws_with(
 			() => api.parse_css_json('a{}', { locations: false }),
-			"unknown parse option 'locations' (this export takes no options)"
+			"parse option 'locations' is not supported by parse_css_json — the JSON string is " +
+				'the span-only wire; use parse_css(source, {locations: true})'
 		);
+		// every argument refusal is a TypeError, the class `read_source` throws too
+		assert.throws(() => api.format_typescript('x', { sourceType: 'sloppy' }), TypeError);
 		throws_with(
 			() => api.format_css('a{}', { sourceType: 'script' }),
 			"format option 'sourceType' is only supported for TypeScript"
@@ -573,14 +594,43 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 				'--eval',
 				`const tsv = await import('@fuzdev/tsv');
 const unexported = await import('@fuzdev/tsv/cli.js').then(() => 'resolved', (error) => error.code);
-process.stdout.write(JSON.stringify({out: tsv.format_typescript('const   x=1'), unexported}));`
+const locations = Object.keys(await import('@fuzdev/tsv/locations')).sort();
+process.stdout.write(JSON.stringify({out: tsv.format_typescript('const   x=1'), unexported, locations}));`
 			],
 			{ cwd: staged, encoding: 'utf-8' }
 		);
 		assert.equal(probe.status, 0, probe.stderr);
 		assert.deepEqual(JSON.parse(probe.stdout), {
 			out: 'const x = 1;\n',
-			unexported: 'ERR_PACKAGE_PATH_NOT_EXPORTED'
+			unexported: 'ERR_PACKAGE_PATH_NOT_EXPORTED',
+			locations: ['create_locator', 'loc_of', 'reconstruct_locations']
+		});
+	});
+
+	// The `./locations` subpath loads no addon: the bare staging has no platform package, so
+	// the loader itself throws there (next test) while the subpath works.
+	it('the ./locations subpath works with no platform package installed', () => {
+		const probe = spawnSync(
+			process.execPath,
+			[
+				'--input-type=module',
+				'--eval',
+				`const {create_locator, loc_of, reconstruct_locations} = await import('@fuzdev/tsv/locations');
+const src = 'a\\nbc';
+const tree = {type: 'Program', start: 0, end: src.length, body: [{type: 'X', start: 2, end: 4}]};
+process.stdout.write(JSON.stringify({
+	position: create_locator(src, {language: 'typescript'}).position_at(3),
+	node: loc_of(tree.body[0], src, {language: 'typescript'}),
+	root: reconstruct_locations(tree, src).loc
+}));`
+			],
+			{ cwd: staged_bare, encoding: 'utf-8' }
+		);
+		assert.equal(probe.status, 0, probe.stderr);
+		assert.deepEqual(JSON.parse(probe.stdout), {
+			position: { line: 2, column: 1 },
+			node: { start: { line: 2, column: 0 }, end: { line: 2, column: 2 } },
+			root: { start: { line: 1, column: 0 }, end: { line: 2, column: 2 } }
 		});
 	});
 

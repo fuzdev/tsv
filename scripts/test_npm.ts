@@ -296,6 +296,13 @@ describe(`package metadata: ${pkg_dir}`, () => {
 		assert.ok(pkg.files.includes('worker.js'));
 	});
 
+	it('exports the ./locations subpath where the helper ships', () => {
+		assert.deepEqual(
+			pkg.exports['./locations'],
+			has_parse ? { types: './locations.d.ts', default: './locations.js' } : undefined
+		);
+	});
+
 	// The two entries do NOT have the same exports — only the Node one compiles
 	// at import, so only it has `wasm_module` — so `types` nests inside each
 	// condition. A hoisted `types` would hand the browser build a declaration
@@ -463,9 +470,11 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 	// engine.
 	it('format options: the entries route through the shared facade', { skip: !has_format }, () => {
 		assert.throws(() => node_entry.format_typescript('x;', { sourceTpye: 'script' }), {
+			name: 'TypeError',
 			message: "unknown format option 'sourceTpye' (expected 'sourceType')"
 		});
 		assert.throws(() => node_entry.format_svelte('<div>x</div>', { sourceType: 'module' }), {
+			name: 'TypeError',
 			message: "format option 'sourceType' is only supported for TypeScript"
 		});
 		// a supported key at `undefined` is its default, on a language that refuses a set
@@ -563,13 +572,19 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 
 	it('parse options: the entries route through the shared facade', { skip: !has_parse }, () => {
 		assert.throws(() => node_entry.parse_typescript('x;', { locatons: true }), {
+			name: 'TypeError',
 			message: "unknown parse option 'locatons' (expected 'locations' or 'sourceType')"
 		});
-		// the `_json` exports return the wire string itself, so they take no `locations`
+		// the `_json` exports return the wire string itself, so they refuse `locations`,
+		// pointing at the object parser
 		assert.throws(() => node_entry.parse_css_json('a{}', { locations: false }), {
-			message: "unknown parse option 'locations' (this export takes no options)"
+			name: 'TypeError',
+			message:
+				"parse option 'locations' is not supported by parse_css_json — the JSON string is " +
+				'the span-only wire; use parse_css(source, {locations: true})'
 		});
 		assert.throws(() => node_entry.parse_svelte('<div>x</div>', { sourceType: 'module' }), {
+			name: 'TypeError',
 			message: "parse option 'sourceType' is only supported for TypeScript"
 		});
 		// the forwarding idiom over the real engine (`npm/cli.js` hands one bag to whichever
@@ -652,17 +667,28 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 		const locator = node_entry.create_locator(ts, { language: 'typescript' });
 		assert.deepEqual(locator.loc_of(spans.body[0]), located.body[0].loc);
 		assert.deepEqual(locator.loc_of(spans.body[1]), located.body[1].loc);
+		// one offset at a time, in the same coordinates
+		assert.deepEqual(locator.position_at(spans.body[1].start), located.body[1].loc.start);
+		assert.throws(() => locator.position_at(ts.length + 1), RangeError);
+		assert.throws(() => locator.loc_of({ start: 0, end: ts.length + 1 }), RangeError);
 	});
 
 	// A bare source or a lone node names no document, and the language decides the line
 	// rule, the BOM and the Svelte stamping — so the two entry points that take one refuse
 	// to guess, where `reconstruct_locations` reads it off the tree's root.
 	it('create_locator and loc_of require the language', () => {
-		const message = /`language` must be 'typescript', 'svelte' or 'css'/;
+		const message = {
+			name: 'TypeError',
+			message: /`language` must be 'typescript', 'svelte' or 'css'/
+		};
 		assert.throws(() => node_entry.create_locator('x'), message);
 		assert.throws(() => node_entry.create_locator('x', {}), message);
 		assert.throws(() => node_entry.create_locator('x', { language: 'js' }), /got 'js'/);
 		assert.throws(() => node_entry.loc_of({ start: 0, end: 1 }, 'x'), message);
+		assert.throws(() => node_entry.loc_of({ start: 0, end: 1 }, 42, { language: 'css' }), {
+			name: 'TypeError',
+			message: 'locations source must be a string (got number)'
+		});
 		assert.ok(
 			node_entry.reconstruct_locations(node_entry.parse_svelte('<p>x</p>'), '<p>x</p>').loc
 		);
@@ -1002,6 +1028,18 @@ mkdirSync(dirname(consumer_link), { recursive: true });
 // this works on Windows without the developer-mode symlink privilege; the
 // type argument is ignored on POSIX.
 symlinkSync(fileURLToPath(new URL(`../${pkg_dir}`, import.meta.url)), consumer_link, 'junction');
+// A second consumer whose copy of the package holds ONLY what the `./locations` subpath
+// claims to need — package.json and the helper, no engine at all. Importing the subpath
+// there and using it is the proof that it loads no engine: there is none to load. A copy,
+// not a link, since the point is what is absent.
+const locations_only_dir = mkdtempSync(join(tmpdir(), 'tsv-locations-only-'));
+if (has_parse) {
+	const pkg_copy = join(locations_only_dir, 'node_modules', pkg_name);
+	mkdirSync(pkg_copy, { recursive: true });
+	for (const file of ['package.json', 'locations.js', 'locations.d.ts', 'tsv_ast.d.ts']) {
+		cpSync(fileURLToPath(new URL(`../${pkg_dir}/${file}`, import.meta.url)), join(pkg_copy, file));
+	}
+}
 // Staged and torn down at FILE scope, not inside the suite: a hook registered
 // in a `describe` does not run when a `--test-name-pattern` filters that suite
 // out, while the body that made the directory runs regardless — so the natural
@@ -1016,10 +1054,12 @@ after(() => {
 	} catch {
 		// already gone — the rmSync below still clears the directory
 	}
-	try {
-		rmSync(consumer_dir, { recursive: true, force: true });
-	} catch {
-		// leaked into the OS temp dir, which is harmless
+	for (const dir of [consumer_dir, locations_only_dir]) {
+		try {
+			rmSync(dir, { recursive: true, force: true });
+		} catch {
+			// leaked into the OS temp dir, which is harmless
+		}
 	}
 });
 
@@ -1056,6 +1096,10 @@ report.package_json = (
 ).default.name;
 report.unexported = await import(${JSON.stringify(`${pkg_name}/browser.js`)}).then(
 	() => 'resolved',
+	(error) => error.code
+);
+report.locations = await import(${JSON.stringify(`${pkg_name}/locations`)}).then(
+	(mod) => Object.keys(mod).sort(),
 	(error) => error.code
 );
 report.worker = await new Promise((resolve, reject) => {
@@ -1105,6 +1149,38 @@ console.log(JSON.stringify(report));
 	// can bind the lazy entry by.
 	it('a file the exports map does not name is not importable', () => {
 		assert.equal(report?.unexported, 'ERR_PACKAGE_PATH_NOT_EXPORTED');
+	});
+
+	// The helper alone, by its subpath: exactly its three functions where it ships, and
+	// unreachable from the format-only package, which ships no helper.
+	it('the ./locations subpath exposes exactly the helper', () => {
+		assert.deepEqual(
+			report?.locations,
+			has_parse
+				? ['create_locator', 'loc_of', 'reconstruct_locations']
+				: 'ERR_PACKAGE_PATH_NOT_EXPORTED'
+		);
+	});
+
+	it('the ./locations subpath works with no engine installed', { skip: !has_parse }, () => {
+		const source = `const {create_locator, loc_of, reconstruct_locations} = await import(${JSON.stringify(`${pkg_name}/locations`)});
+const src = 'a\\nbc';
+const tree = {type: 'Program', start: 0, end: src.length, body: [{type: 'X', start: 2, end: 4}]};
+console.log(JSON.stringify({
+	position: create_locator(src, {language: 'typescript'}).position_at(3),
+	node: loc_of(tree.body[0], src, {language: 'typescript'}),
+	root: reconstruct_locations(tree, src).loc
+}));`;
+		const run = spawnSync(process.execPath, ['--input-type=module', '--eval', source], {
+			cwd: locations_only_dir,
+			encoding: 'utf-8'
+		});
+		assert.equal(run.status, 0, `probe failed:\n${run.stdout}\n${run.stderr}`);
+		assert.deepEqual(JSON.parse(run.stdout), {
+			position: { line: 2, column: 1 },
+			node: { start: { line: 2, column: 0 }, end: { line: 2, column: 2 } },
+			root: { start: { line: 1, column: 0 }, end: { line: 2, column: 2 } }
+		});
 	});
 });
 

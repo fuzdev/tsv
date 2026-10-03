@@ -733,7 +733,18 @@ pkg.exports = {
 	'./worker': {
 		types: `./${browser_dts}`,
 		default: `./${worker_file}`
-	}
+	},
+	// the reconstruction helper alone — pure JS that imports nothing, so a consumer
+	// holding a tree (from disk, another process, a `_json` export) reaches it without
+	// loading the engine; parse-capable variants only, like the helper itself
+	...(has_parse_exports
+		? {
+				'./locations': {
+					types: `./${locations_dts}`,
+					default: `./${locations_file}`
+				}
+			}
+		: {})
 };
 if (variant === 'all') {
 	// No `./` prefix: npm normalizes bin targets to bare relative paths at publish,

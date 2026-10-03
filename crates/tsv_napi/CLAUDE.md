@@ -121,7 +121,8 @@ SIGSEGV) — whose absence is itself the engine signal `cli.js` keys on, plus
 `IgnoreStack`'s `free()` and its `[Symbol.dispose]` alias, which a GC-managed
 native object has no handle to need. That is the whole delta, and it is checked
 as a SET rather than as prose: `scripts/test_napi_npm.ts` diffs the two
-packages' export names, and the class's keys via `Reflect.ownKeys` — a
+packages' export names, their `exports` subpaths (the wasm `./worker` is the lifecycle's
+too), and the class's keys via `Reflect.ownKeys` — a
 name-only walk would miss `[Symbol.dispose]`, which is half of what the
 sentence above claims. It runs whenever the wasm package is staged AND fresh,
 and SKIPS otherwise: `deno task test:napi:npm` does not build that package, and
@@ -132,8 +133,11 @@ exports the bench-only `parse_internal_*` family
 The locations helpers (`reconstruct_locations` / `create_locator` / `loc_of`)
 ship here too: `tsv_wasm/npm/locations.js` is pure JS over the span-only wire —
 the facade's `{locations: true}` runs it — so the staging script copies that same
-file in and appends the re-export to the staged entry — the export names are
-extracted from the helper, never listed a second time. The `IgnoreStack` discovery class ships too — a `#[napi]` twin of
+file in and the loader's `index.js` re-exports it whole (`export *`), so the names are
+never listed a second time. It is also the loader's `./locations` subpath, as in the wasm
+packages that parse: pure JS importing nothing, so it loads no addon —
+`scripts/test_napi_npm.ts` imports it from the staging that has no platform package, where
+the loader itself throws. The `IgnoreStack` discovery class ships too — a `#[napi]` twin of
 `tsv_wasm`'s wrapper over the same `tsv_ignore` / `tsv_discover` pair, re-exported
 straight off the addon since it takes no options bag.
 

@@ -44,7 +44,12 @@ that rejects it, which is what lets a caller forward one bag to whichever parser
 (`npm/cli.js` does). A non-object argument errors, arrays included. The error texts are
 `read_options`'s in `npm/api.js` — two of them are `tsv_arena`'s
 (`source_type_unsupported_message`, `invalid_source_type_message`), restated there by hand
-and shared with the raw decoders below.
+and shared with the raw decoders below. **Every argument refusal is a `TypeError`** — the
+bag's, `read_source`'s non-string source, and `locations.js`'s (a non-string source, a non-object bag or unknown key, a
+missing or unknown `language`, an uninferable root); a parse error stays the engine's plain
+`Error`, so a caller can tell "you called it wrong" from "the source doesn't parse" by
+class. `locations.js`'s single lookups add the one `RangeError` (an offset the text doesn't
+hold — [the helper](#linecolumn-reconstruction-helper-npmlocationsjs)).
 
 **Why the reader is JS.** Both package sets need it, and the native one has no WASM to
 host a Rust reader — so a reader in Rust would need a hand restatement in the napi loader
@@ -187,8 +192,13 @@ a formatter for something it does not produce. The forwarding argument that make
 `unknown format option 'locations' (this export takes no options)`. `sourceType` is the
 exception on those two: it matches its own arm first and reports `format option
 'sourceType' is only supported for TypeScript`, which is the more useful message and the
-reason the key stays leniently `undefined`-tolerant there. The `parse_*_json` exports take
-the same stance on `locations`, for the same reason: they return the wire itself.
+reason the key stays leniently `undefined`-tolerant there. The `parse_*_json` exports refuse
+`locations` too, for the same reason — they return the wire itself — but in their own words,
+whatever the value (`undefined` included): `parse option 'locations' is not supported by
+parse_<lang>_json — the JSON string is the span-only wire; use parse_<lang>(source,
+{locations: true})`. There the key is not a typo but a near miss with a one-line remedy, so
+the error names it (`read_options`' `json_language` argument); a format export has no
+such neighbour, so `locations` stays an unknown key there.
 
 ## The Option Interfaces
 
@@ -257,13 +267,28 @@ trees deep-equal the native CLI's while their key order differs (the Rust writer
 `npm/locations.js` (pure JS, zero deps, no WASM) is the reconstruction, shipped so callers
 don't reimplement the line rules — in every package that parses, native `@fuzdev/tsv`
 included, and run by the facade for `{locations: true}`: `reconstruct_locations(ast,
-source, opts?)` (one-shot, adds `loc` to every object carrying `start`/`end`, **mutates in
-place**; `opts.language` inferred from the root when omitted), `create_locator(source,
-{language})` (amortized — holds the prebuilt line table, exposes `loc_of(node)` /
-`reconstruct(ast)`), and a bare `loc_of(node, source, {language})` convenience. The last
-two take the language **required** (types and a runtime throw): a bare source or a lone
-node names no document, and the language decides the line rule, the BOM, and the Svelte
-stamping, so a default would silently answer for the wrong document.
+source, options?)` (one-shot, adds `loc` to every object carrying `start`/`end`, **mutates in
+place**; `options.language` inferred from the root when omitted), `create_locator(source,
+{language})` (amortized — holds the prebuilt line table, exposes `position_at(offset)` /
+`loc_of(node)` / `reconstruct(ast)`), and a bare `loc_of(node, source, {language})`
+convenience. The last two take the language **required** (types and a runtime throw): a
+bare source or a lone node names no document, and the language decides the line rule, the
+BOM, and the Svelte stamping, so a default would silently answer for the wrong document.
+
+**The single lookups check, the walk does not.** `position_at` and `loc_of` throw a
+`RangeError` for an offset outside the indexed text (an integer from 0 to its length — the
+BOM-elided text for Svelte and CSS) or a `start` after `end`; `loc_of` still answers `null`
+for a node with no numeric `start`/`end`. The whole-tree walk (`reconstruct`,
+`reconstruct_locations`) checks no node: it is the hot path `{locations: true}` runs, and it
+trusts its tree to be a parse of the source. Argument errors (a non-string source, a non-object bag or unknown key, the
+language) are `TypeError`s; the source check restates `api.js`'s `read_source` rather than
+importing it, since this module imports nothing.
+
+**It is also its own entry point**, the `./locations` subpath of every package that ships
+it (`types: './locations.d.ts'`): a consumer holding a tree — from disk, another process, a
+`_json` export — reaches line/column without loading the engine. Both package suites import
+it by bare specifier from a staging that holds no engine (the wasm suite from a copy holding
+only the helper, the napi suite from the staging without a platform package).
 
 **It implements the same definition the Rust writers do**, so its result deep-equals the
 Rust emitter's loc-bearing wire of the same parse in every language: every object with numeric
@@ -308,8 +333,12 @@ through its cataloged tolerance rows.
 (`export type *`) and `locations.d.ts` (`export *`), so a name exported by BOTH is
 ambiguated away (TS2308) — silently dropping that name from the package. `tsv_ast`
 owns `Position` / `SourceLocation` / `NameLocation` / `NamePosition` (+ every AST
-node type), so `locations.d.ts` must not export any of those — its `Loc` inlines
-the `{line, column}` point rather than naming a `Position`. Any future hand-written
+node type), so `locations.d.ts` must not export any of those — it **imports**
+`Position` / `SourceLocation` (`import type … from './tsv_ast.js'`) for its return
+types and re-exports neither. That import resolves only where the two files sit side by
+side, i.e. in a package; in the source tree they don't, so in-repo TypeScript importing
+`locations.js` takes its types from the module's JSDoc, not from this file
+(`benches/js/lib/loc_cross_grade.ts`). Any future hand-written
 `.d.ts` added to the parse packages faces the same rule; nothing in-repo type-checks
 the merged package `.d.ts` (`check:ast-types` covers `tsv_ast.d.ts` alone), so a
 collision only surfaces at a consumer's compile — check names against `tsv_ast`
@@ -388,7 +417,9 @@ the file a warning names), then queries:
 - `classify_dir(name, child_rel, heuristic_active) -> 'descend' | 'prune' |
   'prune_warn'` — the shared per-directory verdict (`tsv_discover::classify_dir`:
   safety nets, the build-output heuristic, the matcher). On `'prune_warn'` fetch
-  the message via `shadow_warning(dir, loose_root?)`.
+  the message via `shadow_warning(dir, loose_root?)`. Typed as that union in both
+  packages' declarations: here by `unchecked_return_type` on the `#[wasm_bindgen]`
+  method (the Rust return stays a `String`), in the napi `index.d.ts` by hand.
 - `should_format_file(name, child_rel) -> bool` — the per-file verdict (a
   formattable extension and not ignored).
 - `is_path_pruned(rel) -> bool` — the per-file form of the directory-prune verdict
@@ -545,7 +576,7 @@ require dual updates.
 - `types/tsv_ast.d.ts` — Hand-maintained TS types, bundled into the parse-capable packages
 - `npm/cli.js` — The `tsv` bin shipped in `@fuzdev/tsv-wasm` — mirrors `tsv_cli`'s contract (flags, exit codes, traversal); argv parsed by a transcription of argh's grammar, zero deps. Path mode fans onto `node:worker_threads` behind `--jobs`, spawning **itself** as the worker (`isMainThread` splits the two roles) and claiming work off one `Atomics` cursor. `WORKER_FILE_THRESHOLD` gates the **default** only — a JS pool costs tens of milliseconds to bring up against the native pool's ~50 µs thread spawn — and only on the WASM engine does a width of 1 stay on the main thread: over the N-API engine it is a pool of one worker (`resolve_route`), since a native stack overflow on the main thread is a `SIGSEGV` no catch survives and only a pool worker carries the reserved stack — while an explicit `--jobs N` bypasses the threshold at any file count and is held to the native CLI's `4 × logical` ceiling (`clamp_worker_count`, restated by hand, over the same logical count — the affinity mask capped by the cgroup CPU quota, which `cgroup_cpu_quota` transcribes from Rust std because Node's and Bun's `availableParallelism()` leave it out), giving the threshold something to be calibrated against. Both the threshold and `default_jobs` are **per engine**, keyed off the same `wasm_module` export that decides how a worker binds: the crossover and the knee are properties of the engine, not the driver (see [../../docs/cli.md](../../docs/cli.md) §Binary Structure). On WASM the pool peaks at *half* the physical cores because V8's wasm tier-up is itself multithreaded and has claimed the rest before the first worker exists; over the N-API addon there is no compiler thread to compete with and it peaks at the core count. A WASM trap is contained to its file on both roles: `format_one` calls `reinstantiate` on any `WebAssembly.RuntimeError`, and on the `RangeError` V8 raises when a deep call exhausts the engine's native stack before its shadow stack (feature-detected — the native engine exports no hook and its overflow is process-fatal), so a too-deep file costs one per-file error instead of poisoning the rest of the run (see [§Panic Reporting](#panic-reporting)). Every pool worker reserves the native CLI's `STACK_SIZE` (`WORKER_STACK_SIZE_MB`, gated against `cli/stack.rs` by `scripts/test_npm.ts`), and the sequential route re-runs a file whose main-thread format hit that `RangeError` in a one-worker pool (`retry_overflowed_files`), so a deep file's verdict no longer depends on which route the file count picked — on Node, whose workers honor the reservation (Bun and Deno ignore it; see [../../docs/cli.md §Recursion Depth](../../docs/cli.md#recursion-depth)). Which engine a worker binds is decided by whether the main thread's `./index.js` exported a `wasm_module`: here it did, so the worker takes it through the [`./worker` entry](#the-worker-entry) and recompiles nothing; in the native package it didn't, so the worker loads the addon. That is why the engine import is **dynamic** — a static one is hoisted above the branch, and the worker would have paid for `./index.js` before it could ask. Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — one source for both packages (it imports its engine from `./index.js`, so each copy binds to its own package's engine), which the ESM loader bought like `locations.js` below. In the native package it is the *fallback*: the bin there is a napi-only dispatcher (`tsv_napi/npm/bin.js`) that execs the platform package's real `tsv_cli` binary, deferring to cli.js only when no binary is reachable — the dispatcher deliberately does NOT live in this shared source, so the wasm copy stays byte-identical and can never resolve a sibling-installed native binary. Every path it names itself — the `--list` and changed-path lines, `error:` lines, its traversal and argument errors, `parse`'s read failure — goes through its hand restatement of `tsv_discover::quote_path` (a name holding a control character or a double quote is C-quoted as `git ls-files` prints it; the binding's warnings arrive quoted), pinned beside the native rule by `scripts/test_npm.ts` (see [../../docs/cli.md §Multi-File Formatting](../../docs/cli.md#multi-file-formatting))
 - `npm/api.js` + `npm/api.d.ts`, `npm/api_parse.js` + `npm/api_parse.d.ts` — The hand-written facade every package publishes through: the options reader + the format family, and the parse family with the `{locations: true}` sugar (see [The npm Facade](#the-npm-facade-options--typed-returns)). Staged verbatim by `patch_npm_package.ts` (`api_parse.*` into the parse-capable packages only) and by `scripts/build_napi_packages.ts` into the native `@fuzdev/tsv` — one source for both package sets
-- `npm/locations.js` + `npm/locations.d.ts` — Pure-JS line/column reconstruction for the span-only wire; ships in the parse-capable packages, run by `api_parse.js` for `{locations: true}` and re-exported from index.js/browser.js by `patch_npm_package.ts`. Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — this file is the single source for both, which is what the napi loader being ESM bought (see [Line/Column Reconstruction Helper](#linecolumn-reconstruction-helper-npmlocationsjs))
+- `npm/locations.js` + `npm/locations.d.ts` — Pure-JS line/column reconstruction for the span-only wire; ships in the parse-capable packages, run by `api_parse.js` for `{locations: true}`, re-exported from index.js/browser.js by `patch_npm_package.ts`, and exported alone as the `./locations` subpath. Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — this file is the single source for both, which is what the napi loader being ESM bought (see [Line/Column Reconstruction Helper](#linecolumn-reconstruction-helper-npmlocationsjs))
 - `README_format.md` — Shipped as `README.md` in `@fuzdev/tsv-format-wasm` (copied by `patch_npm_package.ts`)
 - `README_parse.md` — Shipped as `README.md` in `@fuzdev/tsv-parse-wasm` (copied by `patch_npm_package.ts`)
 - `README_all.md` — Shipped as `README.md` in `@fuzdev/tsv-wasm` (copied by `patch_npm_package.ts`)

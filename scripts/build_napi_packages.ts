@@ -138,6 +138,12 @@ write_pkg(loader_dir, {
 		'.': {
 			types: './index.d.ts',
 			default: './index.js'
+		},
+		// the reconstruction helper alone — pure JS that imports nothing, so it loads no
+		// addon (the wasm packages that parse export the same subpath)
+		'./locations': {
+			types: './locations.d.ts',
+			default: './locations.js'
 		}
 	},
 	// Bare relative path: npm normalizes `./bin.js` → `bin.js` at publish and words
