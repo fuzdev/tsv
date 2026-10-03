@@ -13,18 +13,18 @@ and a drop-in for [Svelte](https://svelte.dev/)'s parser +
 
 tsv aims to simplify its covered domains and stay lean, and so it makes opinionated choices.
 The formatter has a single non-configurable style, using Svelte's Prettier config.
-Among other benefits this means tsv doesn't depend on a JS runtime,
-which it would need to resolve configs like Prettier.
+Among other benefits, this means tsv doesn't depend on a JS runtime,
+which it would need in order to resolve configs the way Prettier does.
 
-Compared to Oxc, Biome, and SWC, tsv is a set of focused tools, not an extensible language platform,
-so it targets Web standards + TS + Svelte and there's no support for JSX/SCSS/etc.
+Compared to Oxc, Biome, and swc, tsv is a set of focused tools, not an extensible language
+platform, so it targets Web standards + TS + Svelte and there's no support for JSX/SCSS/etc.
 tsv's extensibility story is currently limited to using its Rust crates as libraries (or forking);
-bridging to JS or WASM plugins is an open question (leaning against).
+bridging to JS or wasm plugins is an open question (leaning against).
 
 Compared to [rsvelte](https://github.com/baseballyama/rsvelte),
-tsv has its own TS/JS/CSS parsers instead of using Oxc,
-and rsvelte additionally has a Svelte compiler and linter/typechecker integration
-(the full toolchain; tsv has some work in progress here, of unknown scope, that may never ship).
+tsv has its own TS/JS/CSS parsers instead of using Oxc.
+rsvelte also ships a Svelte compiler and linter/typechecker integration;
+tsv has experimental work in that direction that may never ship.
 
 tsv prioritizes, in order:
 
@@ -37,14 +37,13 @@ Staying simple is an overarching goal, and is sometimes at odds with flexibility
 Feedback is welcome to help navigate these tradeoffs.
 
 See the [benchmarks](https://tsv.fuz.dev/docs/benchmarks) for measurements.
-Compared to Oxc/oxfmt and Biome, tsv is smaller and faster
-at parsing and formatting its supported languages,
+Compared to Oxc/Oxfmt and Biome, tsv is generally faster and smaller,
 but lacks their features, extensibility, and broad language support.
-One reason for tsv to exist is to help find the performance
-left on the table in the Web's implementations.
+One reason for tsv to exist is to help find the performance left on the table
+in the Web's implementations.
 
 tsv is near production-ready, with a long tail of rare bugs.
-Reports and feedback are appreciated.
+Reports and opinions are appreciated.
 See the [issues](https://github.com/fuzdev/tsv/issues)
 and [discussions](https://github.com/fuzdev/tsv/discussions).
 
