@@ -25,36 +25,12 @@
 				"start": 29,
 				"end": 70,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 30
-					},
-					"end": {
-						"line": 2,
-						"column": 4,
-						"character": 33
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 34,
 						"end": 63,
 						"name": "onclick",
-						"name_loc": {
-							"start": {
-								"line": 2,
-								"column": 5,
-								"character": 34
-							},
-							"end": {
-								"line": 2,
-								"column": 12,
-								"character": 41
-							}
-						},
 						"value": {
 							"type": "ExpressionTag",
 							"start": 42,
@@ -63,16 +39,6 @@
 								"type": "ArrowFunctionExpression",
 								"start": 43,
 								"end": 62,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 14
-									},
-									"end": {
-										"line": 2,
-										"column": 33
-									}
-								},
 								"id": null,
 								"expression": true,
 								"generator": false,
@@ -82,44 +48,14 @@
 									"type": "CallExpression",
 									"start": 49,
 									"end": 62,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 20
-										},
-										"end": {
-											"line": 2,
-											"column": 33
-										}
-									},
 									"callee": {
 										"type": "MemberExpression",
 										"start": 49,
 										"end": 57,
-										"loc": {
-											"start": {
-												"line": 2,
-												"column": 20
-											},
-											"end": {
-												"line": 2,
-												"column": 28
-											}
-										},
 										"object": {
 											"type": "Literal",
 											"start": 49,
 											"end": 52,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 20
-												},
-												"end": {
-													"line": 2,
-													"column": 23
-												}
-											},
 											"value": {},
 											"raw": "/}/",
 											"regex": {
@@ -131,16 +67,6 @@
 											"type": "Identifier",
 											"start": 53,
 											"end": 57,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 24
-												},
-												"end": {
-													"line": 2,
-													"column": 28
-												}
-											},
 											"name": "test"
 										},
 										"computed": false,
@@ -151,16 +77,6 @@
 											"type": "Identifier",
 											"start": 58,
 											"end": 61,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 29
-												},
-												"end": {
-													"line": 2,
-													"column": 32
-												}
-											},
 											"name": "str"
 										}
 									],
@@ -200,36 +116,12 @@
 				"start": 101,
 				"end": 142,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 1,
-						"character": 102
-					},
-					"end": {
-						"line": 5,
-						"column": 4,
-						"character": 105
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 106,
 						"end": 135,
 						"name": "onclick",
-						"name_loc": {
-							"start": {
-								"line": 5,
-								"column": 5,
-								"character": 106
-							},
-							"end": {
-								"line": 5,
-								"column": 12,
-								"character": 113
-							}
-						},
 						"value": {
 							"type": "ExpressionTag",
 							"start": 114,
@@ -238,16 +130,6 @@
 								"type": "ArrowFunctionExpression",
 								"start": 115,
 								"end": 134,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 14
-									},
-									"end": {
-										"line": 5,
-										"column": 33
-									}
-								},
 								"id": null,
 								"expression": true,
 								"generator": false,
@@ -257,44 +139,14 @@
 									"type": "CallExpression",
 									"start": 121,
 									"end": 134,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 20
-										},
-										"end": {
-											"line": 5,
-											"column": 33
-										}
-									},
 									"callee": {
 										"type": "MemberExpression",
 										"start": 121,
 										"end": 129,
-										"loc": {
-											"start": {
-												"line": 5,
-												"column": 20
-											},
-											"end": {
-												"line": 5,
-												"column": 28
-											}
-										},
 										"object": {
 											"type": "Literal",
 											"start": 121,
 											"end": 124,
-											"loc": {
-												"start": {
-													"line": 5,
-													"column": 20
-												},
-												"end": {
-													"line": 5,
-													"column": 23
-												}
-											},
 											"value": {},
 											"raw": "/{/",
 											"regex": {
@@ -306,16 +158,6 @@
 											"type": "Identifier",
 											"start": 125,
 											"end": 129,
-											"loc": {
-												"start": {
-													"line": 5,
-													"column": 24
-												},
-												"end": {
-													"line": 5,
-													"column": 28
-												}
-											},
 											"name": "test"
 										},
 										"computed": false,
@@ -326,16 +168,6 @@
 											"type": "Identifier",
 											"start": 130,
 											"end": 133,
-											"loc": {
-												"start": {
-													"line": 5,
-													"column": 29
-												},
-												"end": {
-													"line": 5,
-													"column": 32
-												}
-											},
 											"name": "str"
 										}
 									],
@@ -375,36 +207,12 @@
 				"start": 171,
 				"end": 216,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 8,
-						"column": 1,
-						"character": 172
-					},
-					"end": {
-						"line": 8,
-						"column": 4,
-						"character": 175
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 176,
 						"end": 209,
 						"name": "data-x",
-						"name_loc": {
-							"start": {
-								"line": 8,
-								"column": 5,
-								"character": 176
-							},
-							"end": {
-								"line": 8,
-								"column": 11,
-								"character": 182
-							}
-						},
 						"value": {
 							"type": "ExpressionTag",
 							"start": 183,
@@ -413,60 +221,20 @@
 								"type": "CallExpression",
 								"start": 184,
 								"end": 208,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 13
-									},
-									"end": {
-										"line": 8,
-										"column": 37
-									}
-								},
 								"callee": {
 									"type": "MemberExpression",
 									"start": 184,
 									"end": 195,
-									"loc": {
-										"start": {
-											"line": 8,
-											"column": 13
-										},
-										"end": {
-											"line": 8,
-											"column": 24
-										}
-									},
 									"object": {
 										"type": "Identifier",
 										"start": 184,
 										"end": 187,
-										"loc": {
-											"start": {
-												"line": 8,
-												"column": 13
-											},
-											"end": {
-												"line": 8,
-												"column": 16
-											}
-										},
 										"name": "str"
 									},
 									"property": {
 										"type": "Identifier",
 										"start": 188,
 										"end": 195,
-										"loc": {
-											"start": {
-												"line": 8,
-												"column": 17
-											},
-											"end": {
-												"line": 8,
-												"column": 24
-											}
-										},
 										"name": "replace"
 									},
 									"computed": false,
@@ -477,16 +245,6 @@
 										"type": "Literal",
 										"start": 196,
 										"end": 203,
-										"loc": {
-											"start": {
-												"line": 8,
-												"column": 25
-											},
-											"end": {
-												"line": 8,
-												"column": 32
-											}
-										},
 										"value": {},
 										"raw": "/[{}]/g",
 										"regex": {
@@ -498,16 +256,6 @@
 										"type": "Literal",
 										"start": 205,
 										"end": 207,
-										"loc": {
-											"start": {
-												"line": 8,
-												"column": 34
-											},
-											"end": {
-												"line": 8,
-												"column": 36
-											}
-										},
 										"value": "",
 										"raw": "''"
 									}

@@ -382,8 +382,7 @@ macro_rules! lang_bindings {
 
         /// Parse source and return JSON AST **without** per-node `loc` (the
         /// span-only `no-locations` wire — see the language crate's
-        /// `convert_ast_json_bytes_no_locations`). CSS is identical to
-        /// `$parse_fn` (`parseCss` emits no `loc`).
+        /// `convert_ast_json_bytes_no_locations`).
         ///
         /// # Safety
         /// See the module-level safety contract.

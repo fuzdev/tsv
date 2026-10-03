@@ -630,113 +630,83 @@ stripped string). acorn treats the BOM as whitespace, so the TypeScript writer b
 `no-locations` reconstruction helper (`crates/tsv_wasm/npm/locations.js`) strips the BOM
 ahead of its Svelte and CSS line tables for the same reason, and keeps it for TypeScript.
 
-### `loc` lines: two classes, one per acorn parse
+### `loc` lines: one rule per document
 
-The fold above is about the bytes tsv *writes*. The counting question is separate, and the
-Svelte wire answers it two ways at once, because Svelte's parser does.
+The fold above is about the bytes tsv *writes*. The counting question is separate, and tsv
+answers it once, with one definition every writer implements: every JSON object on the
+`loc`-bearing wire that carries numeric `start` / `end` — in all three languages, objects
+without a `type` included (`StyleSheet.content`, `<svelte:options>`, attached and root
+comments) — gets `loc: {start: {line, column}, end: {line, column}}` immediately after
+`end` (acorn's key order): the line (1-based) and column (0-based, UTF-16 code units) of that
+object's own emitted `start` / `end`. A widened `end` (a typed block binding's, which Svelte
+patches to its annotation's) gives a widened `loc.end`.
 
-Svelte's own positions come from `locate-character`, which opens a line at `\n` and nothing
-else — the template spine, `name_loc`, the CSS `loc`, a `<script>`'s `Program` `loc` (which
-`read_script` re-stamps after the parse), and the identifiers `read_identifier` builds
-(recognizable in the wire by the `character` field beside `line`/`column`). Everything acorn
-parses carries acorn's `loc`, and acorn's is the ECMAScript class: `\n`, `\r`, `\r\n`, `<LS>`,
-`<PS>`. Since `format` folds `<CR>` and `<LS>`/`<PS>` are vanishingly rare in real code, the two
-agree on essentially every document — but where they disagree, a single table is a whole class
-of silently-off positions.
+The line rule is the **document's**:
 
-**It is not "route acorn's islands to an ECMAScript table" either.** acorn seeds its line
-counter *once per parse*, and Svelte hands it a differently prepared string at every island:
+| document | line terminators |
+| --- | --- |
+| TypeScript (`.ts`, `.svelte.ts`) | ECMAScript's — `\n`, `\r`, `\r\n` (one), `<LS>`, `<PS>` — acorn's rule |
+| Svelte, everything embedded in it included (`<script>`, template expressions, `<style>`) | `\n` alone — Svelte's `locate-character` |
+| CSS | `\n` alone (`parseCss` emits no `loc`; this is what a CSS consumer gets from Svelte's locator) |
 
-| island | source acorn receives | prefix counts as |
-| --- | --- | --- |
-| `<script>` (`read_script`) | prefix blanked with `replace(/[^\n]/g, ' ')` + content | LF only |
-| `{expr}` / attribute values (`read_expression`) | the raw template | ECMAScript |
-| `{const …}` / `{let …}` (`read_declaration` → `parse_statement_at`) | the raw template | ECMAScript |
-| `{#snippet}` parameters | prefix `replace(/\S/g, ' ')` — whitespace survives | ECMAScript |
-| a pattern binding — `{@const}`'s `id`, a destructured block binding (`read_pattern`) | blanked prefix + `(pattern = 1)` | LF only |
-| a binding's trailing `: T` (`read_type_annotation`) | blanked prefix + `_ as ` + raw rest | LF only |
+So the same script reports different lines as a `.ts` file and inside a `<script>` when it
+holds a lone `<CR>` / `<LS>` / `<PS>` — each document follows its host's rule — and agrees
+everywhere else, CRLF included (one ECMAScript break holding one LF). The BOM reading is
+`LeadingBom`'s, above, so a Svelte or CSS line-1 column sits one lower than a TypeScript one.
+`name_loc`, and the `character` field on the positions Svelte's own reader builds, are exact
+functions of the span on the same table.
 
-Note that `{@const}` is **one tag spanning both classes**: Svelte reads its `id` with
-`read_pattern` and its `init` with `read_expression`, so the two halves of a single declarator
-carry different prefix counts. (The unprefixed `{const …}` / `{let …}` tags are a different
-construct on a different reader — one `parse_statement_at` over the raw template.)
+That is a **superset** of Svelte's wire, which carries `loc` on acorn-parsed nodes only, and
+it reproduces none of Svelte's `loc` quirks: the one-column shift a destructured block
+binding takes off line 1 (`read_pattern`'s synthetic `(`), the newline its `_ as ` swallows
+before a binding's colon, acorn's ECMAScript count inside islands seeded per parse, the
+`<script>` `Program.loc` stamped at the tag, and the typed destructure's `loc.end` left at its
+bracket. Each is a cataloged difference from Svelte
+([conformance_svelte.md](./conformance_svelte.md)), graded at corpus scale as a named
+tolerance.
 
-And then, whatever the prefix, acorn *skips* `[lineStart, startPos)` outright — `lineStart` is
-found with `lastIndexOf("\n", startPos - 1)`, so a non-LF terminator between that LF and the
-island is counted by neither half.
+The writers take the line table as `Option<&LocationTracker>` inside
+`tsv_lang::WirePositions`, built at **write** time, once per document and only when `loc` is
+requested — the span-only wire builds the byte→UTF-16 map alone, and no parse path builds a
+line table at all. The fixtures pin the span-only wire; the definition itself is graded by
+`tests/loc_definition.rs`, an independent reference over every fixture input plus the
+terminator, BOM and astral inputs no fixture can hold. The shipped JS reconstruction
+(`crates/tsv_wasm/npm/locations.js`) implements the same definition over the span-only wire,
+and `deno task check:loc` holds the two equal over every fixture input.
 
-`tsv_ts::AcornSeed` carries that per-parse difference as two constants over the
-ECMAScript-rule tracker's answer (lines to subtract, columns to add on the region's first
-line), and `tsv_svelte`'s parser records the parse start of every island in
-`Root::acorn_regions` so the writer can rebuild the seed — including for the root `comments`
-array, which is emitted outside the tree walk that would otherwise carry it. The second
-tracker is built **only** when the two classes actually differ, which
-`LocationTracker::new_with_map` reports out of the scan it already runs.
+**The comment `value` is the one question acorn's prepared sources still answer.** acorn's
+`onComment` dedents a multi-line block comment by the `[ \t]` run opening the comment's line
+*in the string acorn was handed*, and Svelte hands it a differently prepared string at every
+island:
 
-⚠️ **The route answers two questions, and each has its own exact condition.** They look
-like one and are not:
+| island | source acorn receives |
+| --- | --- |
+| `<script>` (`read_script`) | prefix blanked with `replace(/[^\n]/g, ' ')` + content |
+| `{expr}` / attribute values (`read_expression`) | the raw template |
+| `{const …}` / `{let …}` (`read_declaration` → `parse_statement_at`) | the raw template |
+| `{#snippet}` parameters | prefix `replace(/\S/g, ' ')` — whitespace survives |
+| a pattern binding — `{@const}`'s `id`, a destructured block binding (`read_pattern`) | blanked prefix + `(pattern = 1)` |
+| a binding's trailing `: T` (`read_type_annotation`) | blanked prefix + `_ as ` + raw rest |
 
-1. **Which table** answers an acorn-owned position — acorn's ECMAScript one, or the Svelte
-   LF one. Exactly "the two classes differ": a terminator *inside* an island moves every
-   node after it whether or not any seed re-bases anything.
-2. **Whether a seed** re-bases that answer. Exactly "some seed is not the identity".
+`tsv_svelte`'s parser records the parse start of every island in `Root::acorn_regions`, and
+`tsv_lang::AcornPrefix` models the four manufactured rows (`Comment::wire_value`), resolved by
+"the last region starting at or before" a comment — per COMMENT rather than per island, since
+a block binding spans two of the rows (`AcornPrefixes::at`, which both the root `comments`
+array and the attached `leadingComments`/`trailingComments` copies read, so the two lists
+cannot disagree about one comment). Regions **can** nest (a block pattern's `: T` runs inside
+the pattern's own parse), where the later start is the inner parse and so the right answer.
 
-Neither stands in for the other. Five of the six rows above seed from the class difference
-alone, so a document without a lone `<CR>` / `<LS>` / `<PS>` leaves them inert — question 2
-is `false` while question 1 may still be `true`. And the **annotation** row goes the other
-way: the five code units ending at the colon are *overwritten* with an `_ as `, and acorn is
-entered at the first of them, so a plain `\n` in the four units before a block binding's `:`
-is erased before acorn ever sees it and the annotation's nodes sit that many lines higher (a
-newline further back survives the prefix blanking, which keeps every `\n`) — question 2 is
-`true` on a pure-LF source where question 1 is `false`.
-
-`tsv_svelte`'s writer therefore computes the seeds (one per region, once per document) and
-activates the route when the classes differ **or** some seed is non-identity. Computing them
-is itself gated by the cheap *necessary* condition — the classes differ, or some region has
-`origin != lex_start`, which is exactly the parses that begin behind where they lex — so a
-document with a glued `{#each xs as e: T}`, whose seed is the identity, pays a filter and
-nothing more. When only question 2 holds the route answers through the LF table, which the
-probe has certified is byte-identical to acorn's, so no second table is built. Pinned by
-`tests/acorn_loc_line_terminators.rs`.
-
-The region a position belongs to is the last one starting at or before it; regions **can**
-nest (a block pattern's `: T` runs inside the pattern's own parse), where the later start is
-the inner parse and so the right answer. Each region carries the extent of the slice its
-sub-parse was handed, and the lookup asserts the resolved parse contains the position — the
-one failure mode here is otherwise silent, since a position resolved to the previous parse
-still emits a well-formed wire with only its lines moved.
-
-**The same table answers a second question — the comment `value`.** acorn's `onComment`
-dedents a multi-line block comment by the `[ \t]` run opening the comment's line *in the
-string acorn was handed*, so the four manufactured rows above strip something the document
-does not contain. `tsv_lang::AcornPrefix` models them (`Comment::wire_value`), resolved from
-the same `Root::acorn_regions` by the same "last region starting at or before" rule — per
-COMMENT rather than per island, since a block binding spans two of the rows
-(`AcornPrefixes::at`, which both the root `comments` array and the attached
-`leadingComments`/`trailingComments` copies read, so the two lists cannot disagree about one
-comment).
-
-The two questions are answered off **one** field, `AcornRegion::prefix` (an
-`AcornPrefixText`), because they are one fact seen from two sides: a prefix blanked with
-`/[^\n]/g` both erases the non-`\n` terminators (the line class,
-`AcornPrefix::counts_ecmascript_lines` — what an `AcornSeed` is computed from) and turns the
-author's indentation into spaces (the dedent's run, `AcornPrefix::line_indentation`). The
-dedent's answer is the finer of the two — it alone tells `read_pattern` apart from its
-siblings, which deletes one blank from its prefix so its synthetic `(` does not shift the
-pattern's columns — so it is what the region stores and the line class is derived from it.
-Carrying both would let a record site pass a pair that disagrees, and nothing could catch
-that; the line class is also inert on a pure-LF document, so the disagreement would surface
-nowhere. The two synthetic tokens differ in kind, and the difference is load-bearing for the
-dedent alone: `read_pattern`'s `(` is **spliced** between prefix and region, where
-`read_type_annotation`'s `_ as ` **overwrites** the five UTF-16 code units it covers (the
-colon and the four before it; behind non-ASCII text that is more than five bytes, and it can
-open between a surrogate pair's halves) — it can swallow an author's `\n` (the line then
-opens further back than the document's does), and a line opening on the insert itself has no
-document indentation to read. The blanking is `String.replace`,
-which lays one space per UTF-16 code unit, so any non-ASCII ahead of the comment on its line
-makes a byte count too long. Pinned by `tests/comment_dedent_manufactured_source.rs` and the
-frozen fixture `tests/fixtures/svelte/syntax/comments/head_multiline_comment_dedent`; the
-line-terminator classes the dedent's two steps read are the sibling question, pinned by
+The two synthetic tokens differ in kind, and the difference is load-bearing for the dedent:
+`read_pattern`'s `(` is **spliced** between prefix and region, where `read_type_annotation`'s
+`_ as ` **overwrites** the five UTF-16 code units it covers (the colon and the four before
+it; behind non-ASCII text that is more than five bytes, and it can open between a surrogate
+pair's halves) — it can swallow an author's `\n` (the line then opens further back than the
+document's does), and a line opening on the insert itself has no document indentation to
+read. The blanking is `String.replace`, which lays one space per UTF-16 code unit, so any
+non-ASCII ahead of the comment on its line makes a byte count too long. Pinned by
+`tests/comment_dedent_manufactured_source.rs` and the frozen fixture
+`tests/fixtures/svelte/syntax/comments/head_multiline_comment_dedent`; the line-terminator
+classes the dedent's two steps read are the sibling question, pinned by
 `tests/comment_dedent_line_terminators.rs`.
 
 ### Source-Based Printing
@@ -808,7 +778,6 @@ pub struct Comment {
     pub multiline: bool,             // content contains '\n' (precomputed; block-only in practice)
     pub span: Span,                  // full comment span, delimiters included
     pub emit_character_field: bool,  // Serializer hint: include `character` in JSON loc
-    pub bump_pattern_columns: bool,  // Serializer hint: Svelte block-pattern column shift
     pub owned_by_node: bool,         // bound to the token after it; printed by that node,
                                      // not the enclosing gap (see docs/comments.md)
 }

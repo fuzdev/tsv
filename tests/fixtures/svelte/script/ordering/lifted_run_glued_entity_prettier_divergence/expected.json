@@ -107,18 +107,6 @@
 				"start": 113,
 				"end": 121,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 13,
-						"column": 1,
-						"character": 114
-					},
-					"end": {
-						"line": 13,
-						"column": 2,
-						"character": 115
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -145,18 +133,6 @@
 				"start": 135,
 				"end": 143,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 15,
-						"column": 1,
-						"character": 136
-					},
-					"end": {
-						"line": 15,
-						"column": 2,
-						"character": 137
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -183,18 +159,6 @@
 				"start": 157,
 				"end": 165,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 17,
-						"column": 1,
-						"character": 158
-					},
-					"end": {
-						"line": 17,
-						"column": 2,
-						"character": 159
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -221,18 +185,6 @@
 				"start": 181,
 				"end": 189,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 19,
-						"column": 1,
-						"character": 182
-					},
-					"end": {
-						"line": 19,
-						"column": 2,
-						"character": 183
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -259,18 +211,6 @@
 				"start": 203,
 				"end": 211,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 21,
-						"column": 1,
-						"character": 204
-					},
-					"end": {
-						"line": 21,
-						"column": 2,
-						"character": 205
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -297,18 +237,6 @@
 				"start": 226,
 				"end": 234,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 23,
-						"column": 1,
-						"character": 227
-					},
-					"end": {
-						"line": 23,
-						"column": 2,
-						"character": 228
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -335,18 +263,6 @@
 				"start": 244,
 				"end": 252,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 25,
-						"column": 1,
-						"character": 245
-					},
-					"end": {
-						"line": 25,
-						"column": 2,
-						"character": 246
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -386,18 +302,6 @@
 				"start": 288,
 				"end": 296,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 27,
-						"column": 1,
-						"character": 289
-					},
-					"end": {
-						"line": 27,
-						"column": 2,
-						"character": 290
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -450,18 +354,6 @@
 				"start": 364,
 				"end": 372,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 29,
-						"column": 1,
-						"character": 365
-					},
-					"end": {
-						"line": 29,
-						"column": 2,
-						"character": 366
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -514,18 +406,6 @@
 				"start": 440,
 				"end": 448,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 31,
-						"column": 1,
-						"character": 441
-					},
-					"end": {
-						"line": 31,
-						"column": 2,
-						"character": 442
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -558,18 +438,6 @@
 				"start": 16,
 				"end": 21,
 				"name": "runes",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 16,
-						"character": 16
-					},
-					"end": {
-						"line": 1,
-						"column": 21,
-						"character": 21
-					}
-				},
 				"value": true
 			}
 		],
@@ -585,60 +453,20 @@
 			"type": "Program",
 			"start": 41,
 			"end": 50,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 0
-				},
-				"end": {
-					"line": 5,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 43,
 					"end": 49,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 7
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 47,
 							"end": 48,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 5
-								},
-								"end": {
-									"line": 4,
-									"column": 6
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 47,
 								"end": 48,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 5
-									},
-									"end": {
-										"line": 4,
-										"column": 6
-									}
-								},
 								"name": "b"
 							},
 							"init": null
@@ -655,18 +483,6 @@
 				"start": 34,
 				"end": 40,
 				"name": "module",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 8,
-						"character": 34
-					},
-					"end": {
-						"line": 3,
-						"column": 14,
-						"character": 40
-					}
-				},
 				"value": true
 			}
 		]
@@ -680,60 +496,20 @@
 			"type": "Program",
 			"start": 80,
 			"end": 89,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 0
-				},
-				"end": {
-					"line": 10,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 82,
 					"end": 88,
-					"loc": {
-						"start": {
-							"line": 9,
-							"column": 1
-						},
-						"end": {
-							"line": 9,
-							"column": 7
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 86,
 							"end": 87,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 5
-								},
-								"end": {
-									"line": 9,
-									"column": 6
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 86,
 								"end": 87,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 5
-									},
-									"end": {
-										"line": 9,
-										"column": 6
-									}
-								},
 								"name": "a"
 							},
 							"init": null

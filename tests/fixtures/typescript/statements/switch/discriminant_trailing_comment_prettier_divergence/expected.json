@@ -14,49 +14,19 @@
 			"type": "Line",
 			"value": " trailing after discriminant",
 			"start": 25,
-			"end": 55,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 2
-				},
-				"end": {
-					"line": 4,
-					"column": 32
-				}
-			}
+			"end": 55
 		},
 		{
 			"type": "Line",
 			"value": " Block comment variant",
 			"start": 84,
-			"end": 108,
-			"loc": {
-				"start": {
-					"line": 10,
-					"column": 1
-				},
-				"end": {
-					"line": 10,
-					"column": 25
-				}
-			}
+			"end": 108
 		},
 		{
 			"type": "Block",
 			"value": " trailing ",
 			"start": 125,
-			"end": 139,
-			"loc": {
-				"start": {
-					"line": 13,
-					"column": 2
-				},
-				"end": {
-					"line": 13,
-					"column": 16
-				}
-			}
+			"end": 139
 		}
 	],
 	"instance": {
@@ -68,45 +38,15 @@
 			"type": "Program",
 			"start": 8,
 			"end": 166,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 18,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "SwitchStatement",
 					"start": 10,
 					"end": 81,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 2
-						}
-					},
 					"discriminant": {
 						"type": "Identifier",
 						"start": 21,
 						"end": 22,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 2
-							},
-							"end": {
-								"line": 3,
-								"column": 3
-							}
-						},
 						"name": "x"
 					},
 					"cases": [
@@ -114,59 +54,19 @@
 							"type": "SwitchCase",
 							"start": 63,
 							"end": 78,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 2
-								},
-								"end": {
-									"line": 7,
-									"column": 7
-								}
-							},
 							"consequent": [
 								{
 									"type": "ExpressionStatement",
 									"start": 74,
 									"end": 78,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 3
-										},
-										"end": {
-											"line": 7,
-											"column": 7
-										}
-									},
 									"expression": {
 										"type": "CallExpression",
 										"start": 74,
 										"end": 77,
-										"loc": {
-											"start": {
-												"line": 7,
-												"column": 3
-											},
-											"end": {
-												"line": 7,
-												"column": 6
-											}
-										},
 										"callee": {
 											"type": "Identifier",
 											"start": 74,
 											"end": 75,
-											"loc": {
-												"start": {
-													"line": 7,
-													"column": 3
-												},
-												"end": {
-													"line": 7,
-													"column": 4
-												}
-											},
 											"name": "a"
 										},
 										"arguments": [],
@@ -178,16 +78,6 @@
 								"type": "Literal",
 								"start": 68,
 								"end": 69,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 7
-									},
-									"end": {
-										"line": 6,
-										"column": 8
-									}
-								},
 								"value": 1,
 								"raw": "1"
 							},
@@ -206,30 +96,10 @@
 					"type": "SwitchStatement",
 					"start": 110,
 					"end": 165,
-					"loc": {
-						"start": {
-							"line": 11,
-							"column": 1
-						},
-						"end": {
-							"line": 17,
-							"column": 2
-						}
-					},
 					"discriminant": {
 						"type": "Identifier",
 						"start": 121,
 						"end": 122,
-						"loc": {
-							"start": {
-								"line": 12,
-								"column": 2
-							},
-							"end": {
-								"line": 12,
-								"column": 3
-							}
-						},
 						"name": "y"
 					},
 					"cases": [
@@ -237,59 +107,19 @@
 							"type": "SwitchCase",
 							"start": 147,
 							"end": 162,
-							"loc": {
-								"start": {
-									"line": 15,
-									"column": 2
-								},
-								"end": {
-									"line": 16,
-									"column": 7
-								}
-							},
 							"consequent": [
 								{
 									"type": "ExpressionStatement",
 									"start": 158,
 									"end": 162,
-									"loc": {
-										"start": {
-											"line": 16,
-											"column": 3
-										},
-										"end": {
-											"line": 16,
-											"column": 7
-										}
-									},
 									"expression": {
 										"type": "CallExpression",
 										"start": 158,
 										"end": 161,
-										"loc": {
-											"start": {
-												"line": 16,
-												"column": 3
-											},
-											"end": {
-												"line": 16,
-												"column": 6
-											}
-										},
 										"callee": {
 											"type": "Identifier",
 											"start": 158,
 											"end": 159,
-											"loc": {
-												"start": {
-													"line": 16,
-													"column": 3
-												},
-												"end": {
-													"line": 16,
-													"column": 4
-												}
-											},
 											"name": "a"
 										},
 										"arguments": [],
@@ -301,16 +131,6 @@
 								"type": "Literal",
 								"start": 152,
 								"end": 153,
-								"loc": {
-									"start": {
-										"line": 15,
-										"column": 7
-									},
-									"end": {
-										"line": 15,
-										"column": 8
-									}
-								},
 								"value": 1,
 								"raw": "1"
 							},

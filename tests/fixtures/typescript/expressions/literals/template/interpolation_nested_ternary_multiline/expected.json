@@ -19,90 +19,30 @@
 			"type": "Program",
 			"start": 18,
 			"end": 168,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 15,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 20,
 					"end": 167,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 14,
-							"column": 3
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 26,
 							"end": 166,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 7
-								},
-								"end": {
-									"line": 14,
-									"column": 2
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 26,
 								"end": 27,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 7
-									},
-									"end": {
-										"line": 2,
-										"column": 8
-									}
-								},
 								"name": "x"
 							},
 							"init": {
 								"type": "CallExpression",
 								"start": 30,
 								"end": 166,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 11
-									},
-									"end": {
-										"line": 14,
-										"column": 2
-									}
-								},
 								"callee": {
 									"type": "Identifier",
 									"start": 30,
 									"end": 38,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 11
-										},
-										"end": {
-											"line": 2,
-											"column": 19
-										}
-									},
 									"name": "$derived"
 								},
 								"arguments": [
@@ -110,44 +50,14 @@
 										"type": "ConditionalExpression",
 										"start": 42,
 										"end": 163,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 2
-											},
-											"end": {
-												"line": 13,
-												"column": 8
-											}
-										},
 										"test": {
 											"type": "LogicalExpression",
 											"start": 42,
 											"end": 55,
-											"loc": {
-												"start": {
-													"line": 3,
-													"column": 2
-												},
-												"end": {
-													"line": 3,
-													"column": 15
-												}
-											},
 											"left": {
 												"type": "Identifier",
 												"start": 42,
 												"end": 46,
-												"loc": {
-													"start": {
-														"line": 3,
-														"column": 2
-													},
-													"end": {
-														"line": 3,
-														"column": 6
-													}
-												},
 												"name": "cond"
 											},
 											"operator": "&&",
@@ -155,16 +65,6 @@
 												"type": "Identifier",
 												"start": 50,
 												"end": 55,
-												"loc": {
-													"start": {
-														"line": 3,
-														"column": 10
-													},
-													"end": {
-														"line": 3,
-														"column": 15
-													}
-												},
 												"name": "other"
 											}
 										},
@@ -172,61 +72,21 @@
 											"type": "TemplateLiteral",
 											"start": 61,
 											"end": 154,
-											"loc": {
-												"start": {
-													"line": 4,
-													"column": 5
-												},
-												"end": {
-													"line": 12,
-													"column": 8
-												}
-											},
 											"expressions": [
 												{
 													"type": "MemberExpression",
 													"start": 125,
 													"end": 136,
-													"loc": {
-														"start": {
-															"line": 10,
-															"column": 2
-														},
-														"end": {
-															"line": 10,
-															"column": 13
-														}
-													},
 													"object": {
 														"type": "Identifier",
 														"start": 125,
 														"end": 128,
-														"loc": {
-															"start": {
-																"line": 10,
-																"column": 2
-															},
-															"end": {
-																"line": 10,
-																"column": 5
-															}
-														},
 														"name": "obj"
 													},
 													"property": {
 														"type": "Identifier",
 														"start": 129,
 														"end": 136,
-														"loc": {
-															"start": {
-																"line": 10,
-																"column": 6
-															},
-															"end": {
-																"line": 10,
-																"column": 13
-															}
-														},
 														"name": "content"
 													},
 													"computed": false,
@@ -238,16 +98,6 @@
 													"type": "TemplateElement",
 													"start": 62,
 													"end": 123,
-													"loc": {
-														"start": {
-															"line": 4,
-															"column": 6
-														},
-														"end": {
-															"line": 10,
-															"column": 0
-														}
-													},
 													"value": {
 														"raw": "<!DOCTYPE html>\n<html>\n<head>\n<style></style>\n</head>\n<body>\n",
 														"cooked": "<!DOCTYPE html>\n<html>\n<head>\n<style></style>\n</head>\n<body>\n"
@@ -258,16 +108,6 @@
 													"type": "TemplateElement",
 													"start": 137,
 													"end": 153,
-													"loc": {
-														"start": {
-															"line": 10,
-															"column": 14
-														},
-														"end": {
-															"line": 12,
-															"column": 7
-														}
-													},
 													"value": {
 														"raw": "\n</body>\n</html>",
 														"cooked": "\n</body>\n</html>"
@@ -280,16 +120,6 @@
 											"type": "Identifier",
 											"start": 160,
 											"end": 163,
-											"loc": {
-												"start": {
-													"line": 13,
-													"column": 5
-												},
-												"end": {
-													"line": 13,
-													"column": 8
-												}
-											},
 											"name": "alt"
 										}
 									}
@@ -309,18 +139,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

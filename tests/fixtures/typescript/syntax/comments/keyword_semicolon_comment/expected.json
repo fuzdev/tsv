@@ -14,193 +14,73 @@
 			"type": "Line",
 			"value": " Return with comment before semicolon (no argument)",
 			"start": 10,
-			"end": 63,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 54
-				}
-			}
+			"end": 63
 		},
 		{
 			"type": "Block",
 			"value": " comment ",
 			"start": 90,
-			"end": 103,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 10
-				},
-				"end": {
-					"line": 4,
-					"column": 23
-				}
-			}
+			"end": 103
 		},
 		{
 			"type": "Line",
 			"value": " Break with block comment before semicolon",
 			"start": 109,
-			"end": 153,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 1
-				},
-				"end": {
-					"line": 7,
-					"column": 45
-				}
-			}
+			"end": 153
 		},
 		{
 			"type": "Block",
 			"value": " comment ",
 			"start": 175,
-			"end": 188,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 9
-				},
-				"end": {
-					"line": 9,
-					"column": 22
-				}
-			}
+			"end": 188
 		},
 		{
 			"type": "Line",
 			"value": " Continue with block comment before semicolon",
 			"start": 194,
-			"end": 241,
-			"loc": {
-				"start": {
-					"line": 12,
-					"column": 1
-				},
-				"end": {
-					"line": 12,
-					"column": 48
-				}
-			}
+			"end": 241
 		},
 		{
 			"type": "Block",
 			"value": " comment ",
 			"start": 266,
-			"end": 279,
-			"loc": {
-				"start": {
-					"line": 14,
-					"column": 12
-				},
-				"end": {
-					"line": 14,
-					"column": 25
-				}
-			}
+			"end": 279
 		},
 		{
 			"type": "Line",
 			"value": " Break with line comment before semicolon",
 			"start": 285,
-			"end": 328,
-			"loc": {
-				"start": {
-					"line": 17,
-					"column": 1
-				},
-				"end": {
-					"line": 17,
-					"column": 44
-				}
-			}
+			"end": 328
 		},
 		{
 			"type": "Line",
 			"value": " comment",
 			"start": 350,
-			"end": 360,
-			"loc": {
-				"start": {
-					"line": 19,
-					"column": 9
-				},
-				"end": {
-					"line": 19,
-					"column": 19
-				}
-			}
+			"end": 360
 		},
 		{
 			"type": "Line",
 			"value": " Continue with line comment before semicolon",
 			"start": 366,
-			"end": 412,
-			"loc": {
-				"start": {
-					"line": 22,
-					"column": 1
-				},
-				"end": {
-					"line": 22,
-					"column": 47
-				}
-			}
+			"end": 412
 		},
 		{
 			"type": "Line",
 			"value": " comment",
 			"start": 437,
-			"end": 447,
-			"loc": {
-				"start": {
-					"line": 24,
-					"column": 12
-				},
-				"end": {
-					"line": 24,
-					"column": 22
-				}
-			}
+			"end": 447
 		},
 		{
 			"type": "Line",
 			"value": " Return with line comment before semicolon (no argument)",
 			"start": 453,
-			"end": 511,
-			"loc": {
-				"start": {
-					"line": 27,
-					"column": 1
-				},
-				"end": {
-					"line": 27,
-					"column": 59
-				}
-			}
+			"end": 511
 		},
 		{
 			"type": "Line",
 			"value": " comment",
 			"start": 538,
-			"end": 548,
-			"loc": {
-				"start": {
-					"line": 29,
-					"column": 10
-				},
-				"end": {
-					"line": 29,
-					"column": 20
-				}
-			}
+			"end": 548
 		}
 	],
 	"instance": {
@@ -212,45 +92,15 @@
 			"type": "Program",
 			"start": 8,
 			"end": 552,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 31,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "FunctionDeclaration",
 					"start": 65,
 					"end": 106,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 74,
 						"end": 75,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 10
-							},
-							"end": {
-								"line": 3,
-								"column": 11
-							}
-						},
 						"name": "a"
 					},
 					"expression": false,
@@ -261,31 +111,11 @@
 						"type": "BlockStatement",
 						"start": 78,
 						"end": 106,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 14
-							},
-							"end": {
-								"line": 5,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "ReturnStatement",
 								"start": 82,
 								"end": 89,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 2
-									},
-									"end": {
-										"line": 4,
-										"column": 9
-									}
-								},
 								"argument": null,
 								"trailingComments": [
 									{
@@ -311,16 +141,6 @@
 					"type": "ForStatement",
 					"start": 155,
 					"end": 191,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 1
-						},
-						"end": {
-							"line": 10,
-							"column": 2
-						}
-					},
 					"init": null,
 					"test": null,
 					"update": null,
@@ -328,31 +148,11 @@
 						"type": "BlockStatement",
 						"start": 164,
 						"end": 191,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 10
-							},
-							"end": {
-								"line": 10,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "BreakStatement",
 								"start": 168,
 								"end": 174,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 2
-									},
-									"end": {
-										"line": 9,
-										"column": 8
-									}
-								},
 								"label": null,
 								"trailingComments": [
 									{
@@ -378,16 +178,6 @@
 					"type": "ForStatement",
 					"start": 243,
 					"end": 282,
-					"loc": {
-						"start": {
-							"line": 13,
-							"column": 1
-						},
-						"end": {
-							"line": 15,
-							"column": 2
-						}
-					},
 					"init": null,
 					"test": null,
 					"update": null,
@@ -395,31 +185,11 @@
 						"type": "BlockStatement",
 						"start": 252,
 						"end": 282,
-						"loc": {
-							"start": {
-								"line": 13,
-								"column": 10
-							},
-							"end": {
-								"line": 15,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "ContinueStatement",
 								"start": 256,
 								"end": 265,
-								"loc": {
-									"start": {
-										"line": 14,
-										"column": 2
-									},
-									"end": {
-										"line": 14,
-										"column": 11
-									}
-								},
 								"label": null,
 								"trailingComments": [
 									{
@@ -445,16 +215,6 @@
 					"type": "ForStatement",
 					"start": 330,
 					"end": 363,
-					"loc": {
-						"start": {
-							"line": 18,
-							"column": 1
-						},
-						"end": {
-							"line": 20,
-							"column": 2
-						}
-					},
 					"init": null,
 					"test": null,
 					"update": null,
@@ -462,31 +222,11 @@
 						"type": "BlockStatement",
 						"start": 339,
 						"end": 363,
-						"loc": {
-							"start": {
-								"line": 18,
-								"column": 10
-							},
-							"end": {
-								"line": 20,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "BreakStatement",
 								"start": 343,
 								"end": 349,
-								"loc": {
-									"start": {
-										"line": 19,
-										"column": 2
-									},
-									"end": {
-										"line": 19,
-										"column": 8
-									}
-								},
 								"label": null,
 								"trailingComments": [
 									{
@@ -512,16 +252,6 @@
 					"type": "ForStatement",
 					"start": 414,
 					"end": 450,
-					"loc": {
-						"start": {
-							"line": 23,
-							"column": 1
-						},
-						"end": {
-							"line": 25,
-							"column": 2
-						}
-					},
 					"init": null,
 					"test": null,
 					"update": null,
@@ -529,31 +259,11 @@
 						"type": "BlockStatement",
 						"start": 423,
 						"end": 450,
-						"loc": {
-							"start": {
-								"line": 23,
-								"column": 10
-							},
-							"end": {
-								"line": 25,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "ContinueStatement",
 								"start": 427,
 								"end": 436,
-								"loc": {
-									"start": {
-										"line": 24,
-										"column": 2
-									},
-									"end": {
-										"line": 24,
-										"column": 11
-									}
-								},
 								"label": null,
 								"trailingComments": [
 									{
@@ -579,30 +289,10 @@
 					"type": "FunctionDeclaration",
 					"start": 513,
 					"end": 551,
-					"loc": {
-						"start": {
-							"line": 28,
-							"column": 1
-						},
-						"end": {
-							"line": 30,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 522,
 						"end": 523,
-						"loc": {
-							"start": {
-								"line": 28,
-								"column": 10
-							},
-							"end": {
-								"line": 28,
-								"column": 11
-							}
-						},
 						"name": "b"
 					},
 					"expression": false,
@@ -613,31 +303,11 @@
 						"type": "BlockStatement",
 						"start": 526,
 						"end": 551,
-						"loc": {
-							"start": {
-								"line": 28,
-								"column": 14
-							},
-							"end": {
-								"line": 30,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "ReturnStatement",
 								"start": 530,
 								"end": 537,
-								"loc": {
-									"start": {
-										"line": 29,
-										"column": 2
-									},
-									"end": {
-										"line": 29,
-										"column": 9
-									}
-								},
 								"argument": null,
 								"trailingComments": [
 									{

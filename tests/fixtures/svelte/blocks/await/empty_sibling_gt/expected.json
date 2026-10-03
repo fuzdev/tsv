@@ -12,18 +12,6 @@
 				"start": 0,
 				"end": 59,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 4,
-						"character": 4
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -40,36 +28,12 @@
 							"start": 7,
 							"end": 28,
 							"name": "a",
-							"name_loc": {
-								"start": {
-									"line": 2,
-									"column": 2,
-									"character": 8
-								},
-								"end": {
-									"line": 2,
-									"column": 3,
-									"character": 9
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 10,
 									"end": 20,
 									"name": "href",
-									"name_loc": {
-										"start": {
-											"line": 2,
-											"column": 4,
-											"character": 10
-										},
-										"end": {
-											"line": 2,
-											"column": 8,
-											"character": 14
-										}
-									},
 									"value": [
 										{
 											"start": 16,
@@ -102,16 +66,6 @@
 								"type": "Identifier",
 								"start": 36,
 								"end": 43,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 30
-									},
-									"end": {
-										"line": 2,
-										"column": 37
-									}
-								},
 								"name": "promise"
 							},
 							"value": null,

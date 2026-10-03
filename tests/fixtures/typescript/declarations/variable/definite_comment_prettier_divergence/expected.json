@@ -14,33 +14,13 @@
 			"type": "Line",
 			"value": " Comment between name and ! - prettier relocates to after !",
 			"start": 20,
-			"end": 81,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 62
-				}
-			}
+			"end": 81
 		},
 		{
 			"type": "Block",
 			"value": " c1 ",
 			"start": 89,
-			"end": 97,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 7
-				},
-				"end": {
-					"line": 3,
-					"column": 15
-				}
-			}
+			"end": 97
 		}
 	],
 	"instance": {
@@ -52,89 +32,29 @@
 			"type": "Program",
 			"start": 18,
 			"end": 108,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 4,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 83,
 					"end": 107,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 25
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 87,
 							"end": 106,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 5
-								},
-								"end": {
-									"line": 3,
-									"column": 24
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 87,
 								"end": 106,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 5
-									},
-									"end": {
-										"line": 3,
-										"column": 24
-									}
-								},
 								"name": "a",
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
 									"start": 98,
 									"end": 106,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 16
-										},
-										"end": {
-											"line": 3,
-											"column": 24
-										}
-									},
 									"typeAnnotation": {
 										"type": "TSNumberKeyword",
 										"start": 100,
-										"end": 106,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 18
-											},
-											"end": {
-												"line": 3,
-												"column": 24
-											}
-										}
+										"end": 106
 									},
 									"leadingComments": [
 										{
@@ -169,18 +89,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

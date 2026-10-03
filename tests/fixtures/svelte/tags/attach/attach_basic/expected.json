@@ -12,18 +12,6 @@
 				"start": 0,
 				"end": 24,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 4,
-						"character": 4
-					}
-				},
 				"attributes": [
 					{
 						"type": "AttachTag",
@@ -33,16 +21,6 @@
 							"type": "Identifier",
 							"start": 14,
 							"end": 16,
-							"loc": {
-								"start": {
-									"line": 1,
-									"column": 14
-								},
-								"end": {
-									"line": 1,
-									"column": 16
-								}
-							},
 							"name": "fn"
 						}
 					}
@@ -64,18 +42,6 @@
 				"start": 26,
 				"end": 61,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 1,
-						"character": 27
-					},
-					"end": {
-						"line": 3,
-						"column": 4,
-						"character": 30
-					}
-				},
 				"attributes": [
 					{
 						"type": "AttachTag",
@@ -85,30 +51,10 @@
 							"type": "CallExpression",
 							"start": 40,
 							"end": 53,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 14
-								},
-								"end": {
-									"line": 3,
-									"column": 27
-								}
-							},
 							"callee": {
 								"type": "Identifier",
 								"start": 40,
 								"end": 47,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 14
-									},
-									"end": {
-										"line": 3,
-										"column": 21
-									}
-								},
 								"name": "tooltip"
 							},
 							"arguments": [
@@ -116,16 +62,6 @@
 									"type": "Literal",
 									"start": 48,
 									"end": 52,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 22
-										},
-										"end": {
-											"line": 3,
-											"column": 26
-										}
-									},
 									"value": "hi",
 									"raw": "'hi'"
 								}
@@ -151,18 +87,6 @@
 				"start": 63,
 				"end": 103,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 1,
-						"character": 64
-					},
-					"end": {
-						"line": 5,
-						"column": 4,
-						"character": 67
-					}
-				},
 				"attributes": [
 					{
 						"type": "AttachTag",
@@ -172,16 +96,6 @@
 							"type": "ArrowFunctionExpression",
 							"start": 77,
 							"end": 95,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 14
-								},
-								"end": {
-									"line": 5,
-									"column": 32
-								}
-							},
 							"id": null,
 							"expression": true,
 							"generator": false,
@@ -191,16 +105,6 @@
 									"type": "Identifier",
 									"start": 78,
 									"end": 80,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 15
-										},
-										"end": {
-											"line": 5,
-											"column": 17
-										}
-									},
 									"name": "el"
 								}
 							],
@@ -208,60 +112,20 @@
 								"type": "CallExpression",
 								"start": 85,
 								"end": 95,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 22
-									},
-									"end": {
-										"line": 5,
-										"column": 32
-									}
-								},
 								"callee": {
 									"type": "MemberExpression",
 									"start": 85,
 									"end": 93,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 22
-										},
-										"end": {
-											"line": 5,
-											"column": 30
-										}
-									},
 									"object": {
 										"type": "Identifier",
 										"start": 85,
 										"end": 87,
-										"loc": {
-											"start": {
-												"line": 5,
-												"column": 22
-											},
-											"end": {
-												"line": 5,
-												"column": 24
-											}
-										},
 										"name": "el"
 									},
 									"property": {
 										"type": "Identifier",
 										"start": 88,
 										"end": 93,
-										"loc": {
-											"start": {
-												"line": 5,
-												"column": 25
-											},
-											"end": {
-												"line": 5,
-												"column": 30
-											}
-										},
 										"name": "focus"
 									},
 									"computed": false,

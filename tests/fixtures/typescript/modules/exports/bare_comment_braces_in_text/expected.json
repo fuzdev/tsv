@@ -14,33 +14,13 @@
 			"type": "Line",
 			"value": " block comment with braces-like text",
 			"start": 10,
-			"end": 48,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 39
-				}
-			}
+			"end": 48
 		},
 		{
 			"type": "Block",
 			"value": " {} ",
 			"start": 57,
-			"end": 65,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 8
-				},
-				"end": {
-					"line": 3,
-					"column": 16
-				}
-			}
+			"end": 65
 		}
 	],
 	"instance": {
@@ -52,31 +32,11 @@
 			"type": "Program",
 			"start": 8,
 			"end": 70,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 4,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExportNamedDeclaration",
 					"start": 50,
 					"end": 69,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 20
-						}
-					},
 					"declaration": null,
 					"specifiers": [],
 					"source": null,

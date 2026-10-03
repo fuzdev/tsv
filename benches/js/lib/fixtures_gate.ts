@@ -207,7 +207,11 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 			// Both accept — deep-diff the ASTs (canonical serialized like the sidecar).
 			buckets.both_accept++;
 			const canonical_root = JSON.parse(JSON.stringify(canon_ast, bigint_replacer));
-			const ctx: MatchContext = { source: file.content, canonical_root };
+			const ctx: MatchContext = {
+				source: file.content,
+				canonical_root,
+				language: config.language
+			};
 			const { diffs } = diff_asts(tsv_ast, canonical_root, ctx);
 			record_ast(file.path, diffs);
 		}

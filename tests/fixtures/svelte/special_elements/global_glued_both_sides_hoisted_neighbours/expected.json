@@ -41,61 +41,21 @@
 					"type": "VariableDeclaration",
 					"start": 322,
 					"end": 333,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 6
-						},
-						"end": {
-							"line": 8,
-							"column": 17
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 328,
 							"end": 333,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 12
-								},
-								"end": {
-									"line": 8,
-									"column": 17
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 328,
 								"end": 329,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 12
-									},
-									"end": {
-										"line": 8,
-										"column": 13
-									}
-								},
 								"name": "a"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 332,
 								"end": 333,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 16
-									},
-									"end": {
-										"line": 8,
-										"column": 17
-									}
-								},
 								"value": 1,
 								"raw": "1"
 							}
@@ -109,50 +69,16 @@
 				"start": 334,
 				"end": 362,
 				"name": "svelte:window",
-				"name_loc": {
-					"start": {
-						"line": 8,
-						"column": 19,
-						"character": 335
-					},
-					"end": {
-						"line": 8,
-						"column": 32,
-						"character": 348
-					}
-				},
 				"attributes": [
 					{
 						"start": 349,
 						"end": 359,
 						"type": "OnDirective",
 						"name": "x",
-						"name_loc": {
-							"start": {
-								"line": 8,
-								"column": 33,
-								"character": 349
-							},
-							"end": {
-								"line": 8,
-								"column": 37,
-								"character": 353
-							}
-						},
 						"expression": {
 							"type": "Identifier",
 							"start": 355,
 							"end": 358,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 39
-								},
-								"end": {
-									"line": 8,
-									"column": 42
-								}
-							},
 							"name": "fn1"
 						},
 						"modifiers": []
@@ -188,50 +114,16 @@
 				"start": 407,
 				"end": 437,
 				"name": "svelte:document",
-				"name_loc": {
-					"start": {
-						"line": 11,
-						"column": 6,
-						"character": 408
-					},
-					"end": {
-						"line": 11,
-						"column": 21,
-						"character": 423
-					}
-				},
 				"attributes": [
 					{
 						"start": 424,
 						"end": 434,
 						"type": "OnDirective",
 						"name": "x",
-						"name_loc": {
-							"start": {
-								"line": 11,
-								"column": 22,
-								"character": 424
-							},
-							"end": {
-								"line": 11,
-								"column": 26,
-								"character": 428
-							}
-						},
 						"expression": {
 							"type": "Identifier",
 							"start": 430,
 							"end": 433,
-							"loc": {
-								"start": {
-									"line": 11,
-									"column": 28
-								},
-								"end": {
-									"line": 11,
-									"column": 31
-								}
-							},
 							"name": "fn2"
 						},
 						"modifiers": []
@@ -250,61 +142,21 @@
 					"type": "VariableDeclaration",
 					"start": 438,
 					"end": 447,
-					"loc": {
-						"start": {
-							"line": 11,
-							"column": 36
-						},
-						"end": {
-							"line": 11,
-							"column": 45
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 442,
 							"end": 447,
-							"loc": {
-								"start": {
-									"line": 11,
-									"column": 40
-								},
-								"end": {
-									"line": 11,
-									"column": 45
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 442,
 								"end": 443,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 40
-									},
-									"end": {
-										"line": 11,
-										"column": 41
-									}
-								},
 								"name": "b"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 446,
 								"end": 447,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 44
-									},
-									"end": {
-										"line": 11,
-										"column": 45
-									}
-								},
 								"value": 1,
 								"raw": "1"
 							}
@@ -342,16 +194,6 @@
 						"type": "Identifier",
 						"start": 496,
 						"end": 497,
-						"loc": {
-							"start": {
-								"line": 14,
-								"column": 13
-							},
-							"end": {
-								"line": 14,
-								"column": 14
-							}
-						},
 						"name": "a"
 					}
 				]
@@ -361,50 +203,16 @@
 				"start": 498,
 				"end": 524,
 				"name": "svelte:body",
-				"name_loc": {
-					"start": {
-						"line": 14,
-						"column": 16,
-						"character": 499
-					},
-					"end": {
-						"line": 14,
-						"column": 27,
-						"character": 510
-					}
-				},
 				"attributes": [
 					{
 						"start": 511,
 						"end": 521,
 						"type": "OnDirective",
 						"name": "x",
-						"name_loc": {
-							"start": {
-								"line": 14,
-								"column": 28,
-								"character": 511
-							},
-							"end": {
-								"line": 14,
-								"column": 32,
-								"character": 515
-							}
-						},
 						"expression": {
 							"type": "Identifier",
 							"start": 517,
 							"end": 520,
-							"loc": {
-								"start": {
-									"line": 14,
-									"column": 34
-								},
-								"end": {
-									"line": 14,
-									"column": 37
-								}
-							},
 							"name": "fn3"
 						},
 						"modifiers": []
@@ -443,19 +251,7 @@
 					"type": "Identifier",
 					"name": "fn4",
 					"start": 572,
-					"end": 575,
-					"loc": {
-						"start": {
-							"line": 17,
-							"column": 15,
-							"character": 572
-						},
-						"end": {
-							"line": 17,
-							"column": 18,
-							"character": 575
-						}
-					}
+					"end": 575
 				},
 				"parameters": [],
 				"body": {
@@ -476,18 +272,6 @@
 				"start": 593,
 				"end": 640,
 				"name": "svelte:head",
-				"name_loc": {
-					"start": {
-						"line": 17,
-						"column": 37,
-						"character": 594
-					},
-					"end": {
-						"line": 17,
-						"column": 48,
-						"character": 605
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -497,18 +281,6 @@
 							"start": 606,
 							"end": 626,
 							"name": "title",
-							"name_loc": {
-								"start": {
-									"line": 17,
-									"column": 50,
-									"character": 607
-								},
-								"end": {
-									"line": 17,
-									"column": 55,
-									"character": 612
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",

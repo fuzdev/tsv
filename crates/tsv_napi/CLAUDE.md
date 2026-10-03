@@ -31,7 +31,7 @@ Unlike `tsv_ffi`'s and `tsv_wasm`'s, **no build task produces a single-feature `
 The `lang_bindings!` macro generates four `#[napi]` functions per language (svelte, typescript, css); the `format`/`parse` features gate which are emitted:
 
 - `parse_<lang>(source, sourceType?) -> string` — JSON AST string (host `JSON.parse`s it — parity with FFI/WASM)
-- `parse_<lang>_no_locations(source, sourceType?) -> string` — the span-only variant (drops per-node `loc`; Svelte also `name_loc`; CSS identical to `parse_css`). See [../tsv_ts/CLAUDE.md](../tsv_ts/CLAUDE.md) §Public API.
+- `parse_<lang>_no_locations(source, sourceType?) -> string` — the span-only variant (drops per-node `loc`; Svelte also `name_loc`). See [../tsv_ts/CLAUDE.md](../tsv_ts/CLAUDE.md) §Public API.
 - `parse_internal_<lang>(source, sourceType?) -> void` — parses without converting (benchmark-only; `black_box` prevents elision)
 - `format_<lang>(source, sourceType?) -> string` — formatted source
 

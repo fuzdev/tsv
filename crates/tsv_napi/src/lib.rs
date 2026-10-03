@@ -164,7 +164,7 @@ macro_rules! lang_bindings {
         }
 
         /// Parse source and return its JSON AST string **without** per-node `loc`
-        /// (the span-only `no-locations` wire). CSS is identical to `$parse_fn`.
+        /// (the span-only `no-locations` wire).
         #[cfg(feature = "parse")]
         #[napi(js_name = $parse_no_loc_js, catch_unwind)]
         pub fn $parse_no_loc_fn(

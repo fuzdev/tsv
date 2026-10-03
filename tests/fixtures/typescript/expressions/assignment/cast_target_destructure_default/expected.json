@@ -14,33 +14,13 @@
 			"type": "Line",
 			"value": " A cast target with a default in a destructuring pattern KEEPS its assertion",
 			"start": 20,
-			"end": 98,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 79
-				}
-			}
+			"end": 98
 		},
 		{
 			"type": "Line",
 			"value": " wrapper (the parens are grouping and drop out), like acorn's toAssignable.",
 			"start": 100,
-			"end": 177,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 78
-				}
-			}
+			"end": 177
 		}
 	],
 	"instance": {
@@ -52,75 +32,25 @@
 			"type": "Program",
 			"start": 18,
 			"end": 320,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 9,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
 					"start": 179,
 					"end": 207,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 29
-						}
-					},
 					"expression": {
 						"type": "AssignmentExpression",
 						"start": 180,
 						"end": 205,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 2
-							},
-							"end": {
-								"line": 4,
-								"column": 27
-							}
-						},
 						"operator": "=",
 						"left": {
 							"type": "ObjectPattern",
 							"start": 180,
 							"end": 199,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 2
-								},
-								"end": {
-									"line": 4,
-									"column": 21
-								}
-							},
 							"properties": [
 								{
 									"type": "Property",
 									"start": 182,
 									"end": 197,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 4
-										},
-										"end": {
-											"line": 4,
-											"column": 19
-										}
-									},
 									"method": false,
 									"shorthand": false,
 									"computed": false,
@@ -128,90 +58,30 @@
 										"type": "Identifier",
 										"start": 182,
 										"end": 183,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 4
-											},
-											"end": {
-												"line": 4,
-												"column": 5
-											}
-										},
 										"name": "a"
 									},
 									"value": {
 										"type": "AssignmentPattern",
 										"start": 185,
 										"end": 197,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 7
-											},
-											"end": {
-												"line": 4,
-												"column": 19
-											}
-										},
 										"left": {
 											"type": "TSAsExpression",
 											"start": 186,
 											"end": 192,
-											"loc": {
-												"start": {
-													"line": 4,
-													"column": 8
-												},
-												"end": {
-													"line": 4,
-													"column": 14
-												}
-											},
 											"expression": {
 												"type": "Identifier",
 												"start": 186,
 												"end": 187,
-												"loc": {
-													"start": {
-														"line": 4,
-														"column": 8
-													},
-													"end": {
-														"line": 4,
-														"column": 9
-													}
-												},
 												"name": "b"
 											},
 											"typeAnnotation": {
 												"type": "TSTypeReference",
 												"start": 191,
 												"end": 192,
-												"loc": {
-													"start": {
-														"line": 4,
-														"column": 13
-													},
-													"end": {
-														"line": 4,
-														"column": 14
-													}
-												},
 												"typeName": {
 													"type": "Identifier",
 													"start": 191,
 													"end": 192,
-													"loc": {
-														"start": {
-															"line": 4,
-															"column": 13
-														},
-														"end": {
-															"line": 4,
-															"column": 14
-														}
-													},
 													"name": "T"
 												}
 											}
@@ -220,16 +90,6 @@
 											"type": "Literal",
 											"start": 196,
 											"end": 197,
-											"loc": {
-												"start": {
-													"line": 4,
-													"column": 18
-												},
-												"end": {
-													"line": 4,
-													"column": 19
-												}
-											},
 											"value": 1,
 											"raw": "1"
 										}
@@ -242,16 +102,6 @@
 							"type": "Identifier",
 							"start": 202,
 							"end": 205,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 24
-								},
-								"end": {
-									"line": 4,
-									"column": 27
-								}
-							},
 							"name": "obj"
 						}
 					},
@@ -274,60 +124,20 @@
 					"type": "ExpressionStatement",
 					"start": 209,
 					"end": 244,
-					"loc": {
-						"start": {
-							"line": 5,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 36
-						}
-					},
 					"expression": {
 						"type": "AssignmentExpression",
 						"start": 210,
 						"end": 242,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 2
-							},
-							"end": {
-								"line": 5,
-								"column": 34
-							}
-						},
 						"operator": "=",
 						"left": {
 							"type": "ObjectPattern",
 							"start": 210,
 							"end": 236,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 2
-								},
-								"end": {
-									"line": 5,
-									"column": 28
-								}
-							},
 							"properties": [
 								{
 									"type": "Property",
 									"start": 212,
 									"end": 234,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 4
-										},
-										"end": {
-											"line": 5,
-											"column": 26
-										}
-									},
 									"method": false,
 									"shorthand": false,
 									"computed": false,
@@ -335,90 +145,30 @@
 										"type": "Identifier",
 										"start": 212,
 										"end": 213,
-										"loc": {
-											"start": {
-												"line": 5,
-												"column": 4
-											},
-											"end": {
-												"line": 5,
-												"column": 5
-											}
-										},
 										"name": "a"
 									},
 									"value": {
 										"type": "AssignmentPattern",
 										"start": 215,
 										"end": 234,
-										"loc": {
-											"start": {
-												"line": 5,
-												"column": 7
-											},
-											"end": {
-												"line": 5,
-												"column": 26
-											}
-										},
 										"left": {
 											"type": "TSSatisfiesExpression",
 											"start": 216,
 											"end": 229,
-											"loc": {
-												"start": {
-													"line": 5,
-													"column": 8
-												},
-												"end": {
-													"line": 5,
-													"column": 21
-												}
-											},
 											"expression": {
 												"type": "Identifier",
 												"start": 216,
 												"end": 217,
-												"loc": {
-													"start": {
-														"line": 5,
-														"column": 8
-													},
-													"end": {
-														"line": 5,
-														"column": 9
-													}
-												},
 												"name": "b"
 											},
 											"typeAnnotation": {
 												"type": "TSTypeReference",
 												"start": 228,
 												"end": 229,
-												"loc": {
-													"start": {
-														"line": 5,
-														"column": 20
-													},
-													"end": {
-														"line": 5,
-														"column": 21
-													}
-												},
 												"typeName": {
 													"type": "Identifier",
 													"start": 228,
 													"end": 229,
-													"loc": {
-														"start": {
-															"line": 5,
-															"column": 20
-														},
-														"end": {
-															"line": 5,
-															"column": 21
-														}
-													},
 													"name": "T"
 												}
 											}
@@ -427,16 +177,6 @@
 											"type": "Literal",
 											"start": 233,
 											"end": 234,
-											"loc": {
-												"start": {
-													"line": 5,
-													"column": 25
-												},
-												"end": {
-													"line": 5,
-													"column": 26
-												}
-											},
 											"value": 2,
 											"raw": "2"
 										}
@@ -449,16 +189,6 @@
 							"type": "Identifier",
 							"start": 239,
 							"end": 242,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 31
-								},
-								"end": {
-									"line": 5,
-									"column": 34
-								}
-							},
 							"name": "obj"
 						}
 					}
@@ -467,60 +197,20 @@
 					"type": "ExpressionStatement",
 					"start": 246,
 					"end": 272,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 27
-						}
-					},
 					"expression": {
 						"type": "AssignmentExpression",
 						"start": 247,
 						"end": 270,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 2
-							},
-							"end": {
-								"line": 6,
-								"column": 25
-							}
-						},
 						"operator": "=",
 						"left": {
 							"type": "ObjectPattern",
 							"start": 247,
 							"end": 264,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 2
-								},
-								"end": {
-									"line": 6,
-									"column": 19
-								}
-							},
 							"properties": [
 								{
 									"type": "Property",
 									"start": 249,
 									"end": 262,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 4
-										},
-										"end": {
-											"line": 6,
-											"column": 17
-										}
-									},
 									"method": false,
 									"shorthand": false,
 									"computed": false,
@@ -528,74 +218,24 @@
 										"type": "Identifier",
 										"start": 249,
 										"end": 250,
-										"loc": {
-											"start": {
-												"line": 6,
-												"column": 4
-											},
-											"end": {
-												"line": 6,
-												"column": 5
-											}
-										},
 										"name": "a"
 									},
 									"value": {
 										"type": "AssignmentPattern",
 										"start": 252,
 										"end": 262,
-										"loc": {
-											"start": {
-												"line": 6,
-												"column": 7
-											},
-											"end": {
-												"line": 6,
-												"column": 17
-											}
-										},
 										"left": {
 											"type": "TSTypeAssertion",
 											"start": 253,
 											"end": 257,
-											"loc": {
-												"start": {
-													"line": 6,
-													"column": 8
-												},
-												"end": {
-													"line": 6,
-													"column": 12
-												}
-											},
 											"typeAnnotation": {
 												"type": "TSTypeReference",
 												"start": 254,
 												"end": 255,
-												"loc": {
-													"start": {
-														"line": 6,
-														"column": 9
-													},
-													"end": {
-														"line": 6,
-														"column": 10
-													}
-												},
 												"typeName": {
 													"type": "Identifier",
 													"start": 254,
 													"end": 255,
-													"loc": {
-														"start": {
-															"line": 6,
-															"column": 9
-														},
-														"end": {
-															"line": 6,
-															"column": 10
-														}
-													},
 													"name": "T"
 												}
 											},
@@ -603,16 +243,6 @@
 												"type": "Identifier",
 												"start": 256,
 												"end": 257,
-												"loc": {
-													"start": {
-														"line": 6,
-														"column": 11
-													},
-													"end": {
-														"line": 6,
-														"column": 12
-													}
-												},
 												"name": "b"
 											}
 										},
@@ -620,16 +250,6 @@
 											"type": "Literal",
 											"start": 261,
 											"end": 262,
-											"loc": {
-												"start": {
-													"line": 6,
-													"column": 16
-												},
-												"end": {
-													"line": 6,
-													"column": 17
-												}
-											},
 											"value": 3,
 											"raw": "3"
 										}
@@ -642,16 +262,6 @@
 							"type": "Identifier",
 							"start": 267,
 							"end": 270,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 22
-								},
-								"end": {
-									"line": 6,
-									"column": 25
-								}
-							},
 							"name": "obj"
 						}
 					}
@@ -660,60 +270,20 @@
 					"type": "ExpressionStatement",
 					"start": 274,
 					"end": 296,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 1
-						},
-						"end": {
-							"line": 7,
-							"column": 23
-						}
-					},
 					"expression": {
 						"type": "AssignmentExpression",
 						"start": 275,
 						"end": 294,
-						"loc": {
-							"start": {
-								"line": 7,
-								"column": 2
-							},
-							"end": {
-								"line": 7,
-								"column": 21
-							}
-						},
 						"operator": "=",
 						"left": {
 							"type": "ObjectPattern",
 							"start": 275,
 							"end": 288,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 2
-								},
-								"end": {
-									"line": 7,
-									"column": 15
-								}
-							},
 							"properties": [
 								{
 									"type": "Property",
 									"start": 277,
 									"end": 286,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 4
-										},
-										"end": {
-											"line": 7,
-											"column": 13
-										}
-									},
 									"method": false,
 									"shorthand": false,
 									"computed": false,
@@ -721,60 +291,20 @@
 										"type": "Identifier",
 										"start": 277,
 										"end": 278,
-										"loc": {
-											"start": {
-												"line": 7,
-												"column": 4
-											},
-											"end": {
-												"line": 7,
-												"column": 5
-											}
-										},
 										"name": "a"
 									},
 									"value": {
 										"type": "AssignmentPattern",
 										"start": 280,
 										"end": 286,
-										"loc": {
-											"start": {
-												"line": 7,
-												"column": 7
-											},
-											"end": {
-												"line": 7,
-												"column": 13
-											}
-										},
 										"left": {
 											"type": "TSNonNullExpression",
 											"start": 280,
 											"end": 282,
-											"loc": {
-												"start": {
-													"line": 7,
-													"column": 7
-												},
-												"end": {
-													"line": 7,
-													"column": 9
-												}
-											},
 											"expression": {
 												"type": "Identifier",
 												"start": 280,
 												"end": 281,
-												"loc": {
-													"start": {
-														"line": 7,
-														"column": 7
-													},
-													"end": {
-														"line": 7,
-														"column": 8
-													}
-												},
 												"name": "b"
 											}
 										},
@@ -782,16 +312,6 @@
 											"type": "Literal",
 											"start": 285,
 											"end": 286,
-											"loc": {
-												"start": {
-													"line": 7,
-													"column": 12
-												},
-												"end": {
-													"line": 7,
-													"column": 13
-												}
-											},
 											"value": 4,
 											"raw": "4"
 										}
@@ -804,16 +324,6 @@
 							"type": "Identifier",
 							"start": 291,
 							"end": 294,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 18
-								},
-								"end": {
-									"line": 7,
-									"column": 21
-								}
-							},
 							"name": "obj"
 						}
 					}
@@ -822,118 +332,38 @@
 					"type": "ExpressionStatement",
 					"start": 298,
 					"end": 319,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 22
-						}
-					},
 					"expression": {
 						"type": "AssignmentExpression",
 						"start": 298,
 						"end": 318,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 1
-							},
-							"end": {
-								"line": 8,
-								"column": 21
-							}
-						},
 						"operator": "=",
 						"left": {
 							"type": "ArrayPattern",
 							"start": 298,
 							"end": 312,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 1
-								},
-								"end": {
-									"line": 8,
-									"column": 15
-								}
-							},
 							"elements": [
 								{
 									"type": "AssignmentPattern",
 									"start": 299,
 									"end": 311,
-									"loc": {
-										"start": {
-											"line": 8,
-											"column": 2
-										},
-										"end": {
-											"line": 8,
-											"column": 14
-										}
-									},
 									"left": {
 										"type": "TSAsExpression",
 										"start": 300,
 										"end": 306,
-										"loc": {
-											"start": {
-												"line": 8,
-												"column": 3
-											},
-											"end": {
-												"line": 8,
-												"column": 9
-											}
-										},
 										"expression": {
 											"type": "Identifier",
 											"start": 300,
 											"end": 301,
-											"loc": {
-												"start": {
-													"line": 8,
-													"column": 3
-												},
-												"end": {
-													"line": 8,
-													"column": 4
-												}
-											},
 											"name": "c"
 										},
 										"typeAnnotation": {
 											"type": "TSTypeReference",
 											"start": 305,
 											"end": 306,
-											"loc": {
-												"start": {
-													"line": 8,
-													"column": 8
-												},
-												"end": {
-													"line": 8,
-													"column": 9
-												}
-											},
 											"typeName": {
 												"type": "Identifier",
 												"start": 305,
 												"end": 306,
-												"loc": {
-													"start": {
-														"line": 8,
-														"column": 8
-													},
-													"end": {
-														"line": 8,
-														"column": 9
-													}
-												},
 												"name": "T"
 											}
 										}
@@ -942,16 +372,6 @@
 										"type": "Literal",
 										"start": 310,
 										"end": 311,
-										"loc": {
-											"start": {
-												"line": 8,
-												"column": 13
-											},
-											"end": {
-												"line": 8,
-												"column": 14
-											}
-										},
 										"value": 5,
 										"raw": "5"
 									}
@@ -962,16 +382,6 @@
 							"type": "Identifier",
 							"start": 315,
 							"end": 318,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 18
-								},
-								"end": {
-									"line": 8,
-									"column": 21
-								}
-							},
 							"name": "arr"
 						}
 					}
@@ -985,18 +395,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

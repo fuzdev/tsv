@@ -12,18 +12,6 @@
 				"start": 0,
 				"end": 27,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 2,
-						"character": 2
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -50,18 +38,6 @@
 				"start": 28,
 				"end": 57,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 29
-					},
-					"end": {
-						"line": 2,
-						"column": 2,
-						"character": 30
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -88,18 +64,6 @@
 				"start": 58,
 				"end": 84,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 1,
-						"character": 59
-					},
-					"end": {
-						"line": 3,
-						"column": 2,
-						"character": 60
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -126,18 +90,6 @@
 				"start": 85,
 				"end": 100,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 4,
-						"column": 1,
-						"character": 86
-					},
-					"end": {
-						"line": 4,
-						"column": 2,
-						"character": 87
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -164,18 +116,6 @@
 				"start": 101,
 				"end": 133,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 1,
-						"character": 102
-					},
-					"end": {
-						"line": 5,
-						"column": 2,
-						"character": 103
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",

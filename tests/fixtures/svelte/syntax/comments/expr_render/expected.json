@@ -15,30 +15,10 @@
 					"type": "CallExpression",
 					"start": 9,
 					"end": 25,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 9
-						},
-						"end": {
-							"line": 1,
-							"column": 25
-						}
-					},
 					"callee": {
 						"type": "Identifier",
 						"start": 9,
 						"end": 11,
-						"loc": {
-							"start": {
-								"line": 1,
-								"column": 9
-							},
-							"end": {
-								"line": 1,
-								"column": 11
-							}
-						},
 						"name": "fn"
 					},
 					"arguments": [
@@ -46,16 +26,6 @@
 							"type": "Identifier",
 							"start": 20,
 							"end": 21,
-							"loc": {
-								"start": {
-									"line": 1,
-									"column": 20
-								},
-								"end": {
-									"line": 1,
-									"column": 21
-								}
-							},
 							"name": "a",
 							"leadingComments": [
 								{
@@ -70,16 +40,6 @@
 							"type": "Identifier",
 							"start": 23,
 							"end": 24,
-							"loc": {
-								"start": {
-									"line": 1,
-									"column": 23
-								},
-								"end": {
-									"line": 1,
-									"column": 24
-								}
-							},
 							"name": "b"
 						}
 					],
@@ -94,17 +54,7 @@
 			"type": "Block",
 			"value": " c ",
 			"start": 12,
-			"end": 19,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 12
-				},
-				"end": {
-					"line": 1,
-					"column": 19
-				}
-			}
+			"end": 19
 		}
 	]
 }

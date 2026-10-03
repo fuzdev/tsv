@@ -14,65 +14,25 @@
 			"type": "Block",
 			"value": " comment ",
 			"start": 13,
-			"end": 26,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 4
-				},
-				"end": {
-					"line": 2,
-					"column": 17
-				}
-			}
+			"end": 26
 		},
 		{
 			"type": "Block",
 			"value": " comment ",
 			"start": 43,
-			"end": 56,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 7
-				},
-				"end": {
-					"line": 4,
-					"column": 20
-				}
-			}
+			"end": 56
 		},
 		{
 			"type": "Block",
 			"value": " comment ",
 			"start": 69,
-			"end": 82,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 5
-				},
-				"end": {
-					"line": 5,
-					"column": 18
-				}
-			}
+			"end": 82
 		},
 		{
 			"type": "Block",
 			"value": " comment ",
 			"start": 99,
-			"end": 112,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 8
-				},
-				"end": {
-					"line": 6,
-					"column": 21
-				}
-			}
+			"end": 112
 		}
 	],
 	"instance": {
@@ -84,45 +44,15 @@
 			"type": "Program",
 			"start": 8,
 			"end": 122,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 8,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "IfStatement",
 					"start": 10,
 					"end": 35,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 2
-						}
-					},
 					"test": {
 						"type": "Identifier",
 						"start": 28,
 						"end": 29,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 19
-							},
-							"end": {
-								"line": 2,
-								"column": 20
-							}
-						},
 						"name": "a",
 						"leadingComments": [
 							{
@@ -137,16 +67,6 @@
 						"type": "BlockStatement",
 						"start": 31,
 						"end": 35,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 22
-							},
-							"end": {
-								"line": 3,
-								"column": 2
-							}
-						},
 						"body": []
 					},
 					"alternate": null
@@ -155,30 +75,10 @@
 					"type": "WhileStatement",
 					"start": 37,
 					"end": 63,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 27
-						}
-					},
 					"test": {
 						"type": "Identifier",
 						"start": 58,
 						"end": 59,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 22
-							},
-							"end": {
-								"line": 4,
-								"column": 23
-							}
-						},
 						"name": "a",
 						"leadingComments": [
 							{
@@ -193,16 +93,6 @@
 						"type": "BlockStatement",
 						"start": 61,
 						"end": 63,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 25
-							},
-							"end": {
-								"line": 4,
-								"column": 27
-							}
-						},
 						"body": []
 					}
 				},
@@ -210,16 +100,6 @@
 					"type": "ForStatement",
 					"start": 65,
 					"end": 90,
-					"loc": {
-						"start": {
-							"line": 5,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 26
-						}
-					},
 					"init": null,
 					"test": null,
 					"update": null,
@@ -227,16 +107,6 @@
 						"type": "BlockStatement",
 						"start": 88,
 						"end": 90,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 24
-							},
-							"end": {
-								"line": 5,
-								"column": 26
-							}
-						},
 						"body": [],
 						"leadingComments": [
 							{
@@ -252,30 +122,10 @@
 					"type": "SwitchStatement",
 					"start": 92,
 					"end": 121,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 7,
-							"column": 2
-						}
-					},
 					"discriminant": {
 						"type": "Identifier",
 						"start": 114,
 						"end": 115,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 23
-							},
-							"end": {
-								"line": 6,
-								"column": 24
-							}
-						},
 						"name": "a",
 						"leadingComments": [
 							{

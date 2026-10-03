@@ -12,50 +12,16 @@
 				"start": 0,
 				"end": 24,
 				"name": "input",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 6,
-						"character": 6
-					}
-				},
 				"attributes": [
 					{
 						"start": 7,
 						"end": 21,
 						"type": "BindDirective",
 						"name": "value",
-						"name_loc": {
-							"start": {
-								"line": 1,
-								"column": 7,
-								"character": 7
-							},
-							"end": {
-								"line": 1,
-								"column": 17,
-								"character": 17
-							}
-						},
 						"expression": {
 							"type": "Identifier",
 							"start": 19,
 							"end": 20,
-							"loc": {
-								"start": {
-									"line": 1,
-									"column": 19
-								},
-								"end": {
-									"line": 1,
-									"column": 20
-								}
-							},
 							"name": "a"
 						},
 						"modifiers": []
@@ -78,36 +44,12 @@
 				"start": 25,
 				"end": 45,
 				"name": "input",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 26
-					},
-					"end": {
-						"line": 2,
-						"column": 6,
-						"character": 31
-					}
-				},
 				"attributes": [
 					{
 						"start": 32,
 						"end": 42,
 						"type": "BindDirective",
 						"name": "value",
-						"name_loc": {
-							"start": {
-								"line": 2,
-								"column": 7,
-								"character": 32
-							},
-							"end": {
-								"line": 2,
-								"column": 17,
-								"character": 42
-							}
-						},
 						"expression": {
 							"start": 37,
 							"end": 42,

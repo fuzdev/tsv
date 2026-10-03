@@ -26,8 +26,7 @@
 
 use super::super::internal;
 use super::{Schema, bigint_to_decimal};
-use crate::acorn_loc::AcornSeed;
-use tsv_lang::{LocationMapper, Position, Span, StageRun};
+use tsv_lang::{Span, StageRun, WirePositions};
 // The JSON-scalar substrate is shared across the three language writers (so the
 // Svelte writer can compose embedded TS/CSS emission into one buffer). Only the
 // TS-specific node emitters (`node_header`, field helpers, `Ctx`) live here.
@@ -50,10 +49,10 @@ use types::{write_type_annotation, write_type_parameter_instantiation};
 
 /// Convert an internal `Program` straight to its compact wire-JSON bytes.
 ///
-/// One AST walk, no intermediate tree. The mapper decides the offset space:
-/// identity → byte space (`tsv_svelte`'s embedded islands, whose spans are already
-/// host-file byte offsets),
-/// real map → UTF-16 code units (the shipped char-space wire).
+/// One AST walk, no intermediate tree. `positions` decides the offset space and
+/// whether `loc` is written: its map translates byte offsets to UTF-16 code units
+/// (identity on ASCII), and its line table — the document's ECMAScript one — is
+/// present exactly when the wire carries `loc`.
 ///
 /// Returns `Vec<u8>` rather than `String`: every emitted byte comes from `&str`
 /// slices and ASCII fragments, so the output is valid UTF-8 by construction,
@@ -64,20 +63,10 @@ use types::{write_type_annotation, write_type_parameter_instantiation};
 pub fn write_program_json(
     program: &internal::Program<'_>,
     source: &str,
-    loc: LocationMapper<'_>,
+    positions: WirePositions<'_>,
     schema: Schema,
-    locations: bool,
 ) -> Vec<u8> {
-    let ctx = Ctx::new(
-        source,
-        loc,
-        schema,
-        CommentMode::Off,
-        locations,
-        // Standalone TypeScript: this parse IS acorn's, seeded at offset 0, so
-        // the tracker's answer is already the emitted one.
-        AcornSeed::NONE,
-    );
+    let ctx = Ctx::new(source, positions, schema, CommentMode::Off);
     let mut w = JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(source.len()));
     write_program(&mut w, program, &ctx);
     w.into_bytes()
@@ -86,8 +75,8 @@ pub fn write_program_json(
 /// Emit an embedded TS expression's wire JSON into a caller-owned writer, for
 /// `tsv_svelte` composing template `{expr}` / directive / block expression
 /// emission into its own buffer. Shares the host document's
-/// `LocationMapper` (spans are host-file coordinates); with a real map it emits
-/// final char-space positions directly.
+/// `WirePositions` (spans are host-file coordinates, and the line table is the
+/// host document's).
 ///
 /// `comments` is this emission's comment role: `Attach` for a comment-bearing
 /// template expression island, where acorn's leading/trailing attach runs
@@ -105,8 +94,8 @@ pub fn write_expression_embedded(
 
 /// Emit an embedded standalone `VariableDeclaration`'s wire JSON, for
 /// `tsv_svelte`'s `{const …}` / `{let …}` declaration tag. Shares the host
-/// document's `LocationMapper` (spans are host-file coordinates), emitting final char-space
-/// positions directly. `comments` as in `write_expression_embedded`.
+/// document's `WirePositions` (spans are host-file coordinates). `comments` as in
+/// `write_expression_embedded`.
 #[inline]
 pub fn write_variable_declaration_embedded(
     w: &mut JsonWriter,
@@ -121,8 +110,7 @@ pub fn write_variable_declaration_embedded(
 /// `character` in its `loc` (the fused `inject_loc_character`), for the Svelte
 /// shorthand attribute (`{name}`) and snippet name. The `character` is injected
 /// only on a top-level `Identifier`, so any other expression emits exactly as
-/// `write_expression_embedded` (character a no-op). No type-annotation-`loc`
-/// stripping (unlike a block pattern). `comments` is `Attach` for a
+/// `write_expression_embedded` (character a no-op). `comments` is `Attach` for a
 /// comment-bearing snippet name (`{#snippet /* c */ name(…)}`), where a
 /// leading comment attaches to the `Identifier`.
 #[inline]
@@ -160,24 +148,14 @@ fn write_identifier_expression_with_character_in(
 /// `{:then value}`/`{:catch error}`, `{@const id = …}`) into a caller-owned
 /// writer.
 ///
-/// Reproduces Svelte's three `read_pattern` quirks fused, in final char space:
+/// A **simple identifier** gets `character` in its `loc` (`inject_loc_character`)
+/// — Svelte reports it on the identifiers `read_identifier` creates directly.
 ///
-/// - **Destructure** (`ObjectPattern`/`ArrayPattern`): every node's `loc` column
-///   is bumped `+1` on the pattern's start line when that line `> 1`
-///   (`adjust_read_pattern_columns` — the synthetic `(`-wrapper acorn parses the
-///   pattern under shifts that one line by a byte).
-/// - **Simple identifier**: `character` is injected into the top-level
-///   `Identifier`'s `loc` (`inject_loc_character`) — Svelte reports it on the
-///   identifiers `read_identifier` creates directly.
-/// - **Both**: `loc` is omitted on the pattern's **top-level** `TSTypeAnnotation`
-///   only — the one Svelte's `read_context` synthesizes itself (no `loc`);
-///   annotations nested inside it come from the acorn parse and keep `loc`.
-///
+/// A trailing `: T` is Svelte's second parse, so it is a second comment island:
 /// `comments` is `Attach` for a comment-carrying destructure pattern
-/// (`{@const { b = /* c */ 1 } = expr}`): canonical parses it as a synthetic
+/// (`{@const { b = /* c */ 1 } = expr}`), whose canonical parse is a synthetic
 /// `(pattern = 1)` acorn expression whose comment attach covers the pattern
-/// subtree, and attached comments emit at each node's close. A trailing `: T` is
-/// Svelte's second parse and attaches under `annotation_comments` instead — see
+/// subtree, and the annotation attaches under `annotation_comments` instead — see
 /// `Ctx::annotation_comments`.
 #[inline]
 pub fn write_pattern_embedded(
@@ -190,24 +168,6 @@ pub fn write_pattern_embedded(
         ctx.pattern_ann_span = ann.span;
     }
     match &expr.kind {
-        internal::ExpressionKind::ObjectPattern(_) | internal::ExpressionKind::ArrayPattern(_) => {
-            // Destructure: `+1`-column adjustment on the start line (when `> 1`).
-            // Only affects column output, so skip the line lookup entirely on the
-            // no-locations path (where it would only hit the stub `[0]` table).
-            if env.emit_loc {
-                // The bump's line is the EMITTED one — `pattern_line` is compared
-                // against a re-seeded line in `emitted_position`.
-                let line = env
-                    .acorn
-                    .position(env.loc.pos_and_position(expr.span().start).1)
-                    .line;
-                if line > 1 {
-                    ctx.pattern_line = line;
-                    ctx.plain_positions = false;
-                }
-            }
-            expressions::write_expression(w, expr, &ctx);
-        }
         internal::ExpressionKind::Identifier(id) => {
             // Simple identifier: inject `character` on its own `loc`.
             write_identifier_parts_with_character(
@@ -220,10 +180,8 @@ pub fn write_pattern_embedded(
                 &ctx,
             );
         }
-        // Any other non-destructure pattern: `inject_loc_character` is a no-op
-        // (it only touches a top-level `Identifier`), and a block-pattern root
-        // is always an identifier or a destructure, so no top-level annotation
-        // can exist here.
+        // A destructure, or any other non-identifier pattern: `inject_loc_character`
+        // is a no-op (it only touches a top-level `Identifier`).
         _ => expressions::write_expression(w, expr, &ctx),
     }
 }
@@ -239,20 +197,11 @@ fn write_program(w: &mut JsonWriter, program: &internal::Program<'_>, ctx: &Ctx<
 }
 
 /// Emit an embedded `<script>` `Program`'s wire JSON into a caller-owned writer —
-/// for `tsv_svelte` composing a
-/// `<script>` block's `content` into its own buffer. Shares the host document's
-/// `LocationMapper` (spans are host-file coordinates), threads the
-/// `Schema`, and — unlike a standalone `Program` — emits the node's own `loc`
-/// from `program_loc` rather than deriving it from `program.span`.
-///
-/// Svelte reports the `Program` `loc` against the `<script>` **tag** (start line,
-/// column 0) and the tag's closing `</script>`, not the content span; the caller
-/// supplies those two final char-space `Position`s via `ProgramLoc::Emit` (the
-/// offset-translated form of Svelte's byte-space override), or `ProgramLoc::Omit`
-/// for the no-locations wire. `start`/`end` offsets still come from `program.span`
-/// via `loc.pos`, and the body/`sourceType` are emitted exactly as the standalone
-/// program writer does — so an eligible (comment-free, `lang="ts"`, no preceding
-/// HTML comment) script's `content` matches the standalone `Program` emission.
+/// for `tsv_svelte` composing a `<script>` block's `content` into its own buffer.
+/// Shares the host document's `WirePositions` (spans are host-file coordinates)
+/// and threads the `Schema`; the node is emitted exactly as a standalone
+/// `Program` is, its `loc` included (the content span's, under the host
+/// document's line table).
 pub fn write_program_embedded(
     w: &mut JsonWriter,
     program: &internal::Program<'_>,
@@ -260,31 +209,12 @@ pub fn write_program_embedded(
 ) {
     let ProgramWriter {
         source,
-        loc,
+        positions,
         schema,
-        program_loc,
         comments,
-        acorn,
     } = env;
-    let ctx = Ctx::new(
-        source,
-        loc,
-        schema,
-        comments,
-        matches!(program_loc, ProgramLoc::Emit(..)),
-        acorn,
-    );
-    attach_open("Program", program.span, &ctx);
-    w.raw("{\"type\":\"Program\",\"start\":");
-    w.start_end(loc.pos(program.span.start), loc.pos(program.span.end));
-    if let ProgramLoc::Emit(start_pos, end_pos) = program_loc {
-        write_loc_field(w, start_pos, end_pos);
-    }
-    w.raw(",\"body\":");
-    write_body_array(w, program.body, &ctx, |w, s| write_statement(w, s, &ctx));
-    w.raw(",\"sourceType\":");
-    w.token(program.goal.source_type());
-    close_node(w, "Program", program.span, &ctx);
+    let ctx = Ctx::new(source, positions, schema, comments);
+    write_program(w, program, &ctx);
 }
 
 /// The comment role of an emission (the Svelte comment-attach paths).
@@ -300,30 +230,13 @@ pub enum CommentMode<'a> {
     Attach(&'a CommentAttach<'a>),
 }
 
-/// The embedded `Program` node's `loc` source (see `write_program_embedded`).
-///
-/// Fuses the former `loc_override` + `emit_loc` parameters into one value so the
-/// "no `loc` but a meaningful override" state is unrepresentable — the caller no
-/// longer builds a dummy `Position` pair just to satisfy the signature. `Omit`
-/// is the no-locations wire, which drops `loc` from every node globally (it sets
-/// `Ctx::emit_loc`), this `Program` included.
-#[derive(Clone, Copy)]
-pub enum ProgramLoc {
-    /// No-locations wire: omit `loc` on the `Program` (and every node).
-    Omit,
-    /// Emit the `Program`'s `loc` from Svelte's tag-line `(start, end)` positions.
-    Emit(Position, Position),
-}
-
 /// The per-document inputs the four "plain" embedded writers share
 /// (`write_expression_embedded`, `write_pattern_embedded`,
 /// `write_variable_declaration_embedded`,
-/// `write_identifier_expression_with_character`) — the source text, offset
-/// mapper, comment role, `loc`-emission flag, and parser variant each one
-/// funnels into a `Ctx`.
+/// `write_identifier_expression_with_character`) — the source text, positions,
+/// comment role and parser variant each one funnels into a `Ctx`.
 ///
-/// Bundled into one `Copy` value (every field is `Copy` — two references, two
-/// enums, two bools, two seeds) so the call sites stop re-threading the same
+/// Bundled into one `Copy` value so the call sites stop re-threading the same
 /// arguments. It is an entry-boundary value: each writer destructures it into a
 /// stack `Ctx` (`Ctx::from_embed`) and the per-node walk threads `&Ctx`, so it
 /// is copied once per island rather than once per node. `ProgramWriter` is its
@@ -331,19 +244,12 @@ pub enum ProgramLoc {
 #[derive(Clone, Copy)]
 pub struct EmbedWriter<'a> {
     pub source: &'a str,
-    pub loc: LocationMapper<'a>,
+    pub positions: WirePositions<'a>,
     pub comments: CommentMode<'a>,
-    pub emit_loc: bool,
     /// The canonical parser for this document — see `Ctx::vanilla_acorn`. It is
     /// component-global, so an island carries the same variant as the
     /// component's `<script>` blocks.
     pub vanilla_acorn: bool,
-    /// The acorn parse this island's `loc` came from — see `Ctx::acorn`.
-    pub acorn: AcornSeed,
-    /// The block pattern's trailing `: T` — see `Ctx::acorn_annotation`. Only
-    /// `write_pattern_embedded` can reach it, so every other entry leaves it
-    /// `AcornSeed::NONE`.
-    pub acorn_annotation: AcornSeed,
     /// The block pattern's trailing `: T` — its comment role, see
     /// `Ctx::annotation_comments`. `Off` for every other entry.
     pub annotation_comments: CommentMode<'a>,
@@ -352,53 +258,33 @@ pub struct EmbedWriter<'a> {
 /// The per-document inputs `write_program_embedded` takes — `EmbedWriter`'s
 /// sibling for a `<script>`'s `Program`.
 ///
-/// It is a separate bundle rather than a seventh `EmbedWriter` field for two
-/// reasons the `Program` writer alone has: it carries the `Schema` (from which
-/// the parser variant is *derived*, not passed), and its `loc`-emission flag
-/// lives inside `ProgramLoc` rather than beside it, so the "no `loc` but a
-/// meaningful override" state stays unrepresentable. `acorn_annotation` has no
-/// meaning here either — only a block pattern can carry a second parse.
+/// A separate bundle rather than a sixth `EmbedWriter` field because it carries the
+/// `Schema`, from which the parser variant is *derived*, not passed, and an
+/// `annotation_comments` role has no meaning here — only a block pattern can carry a
+/// second parse.
 #[derive(Clone, Copy)]
 pub struct ProgramWriter<'a> {
     pub source: &'a str,
-    pub loc: LocationMapper<'a>,
+    pub positions: WirePositions<'a>,
     pub schema: Schema,
-    pub program_loc: ProgramLoc,
     pub comments: CommentMode<'a>,
-    /// The `<script>`'s own acorn parse — see `Ctx::acorn`. The `Program`'s own
-    /// `loc` is Svelte's (it arrives in `program_loc`); this seeds its **body**.
-    pub acorn: AcornSeed,
 }
 
 /// The per-document environment every writer function shares (`source` and the
-/// `LocationMapper`).
+/// `WirePositions`).
 ///
-/// `pattern_line` / `pattern_ann_span` are the two Svelte block-pattern quirks
-/// (`write_pattern_embedded`): they are inert (`0` / the empty span) for every
-/// ordinary emission, where `plain_positions` skips the position rewrite
-/// outright and the annotation test is one never-taken compare.
+/// `pattern_ann_span` is inert (the empty span) for every ordinary emission, where
+/// the annotation test is one never-taken compare.
 #[derive(Clone, Copy)]
 pub(super) struct Ctx<'a> {
     pub(super) source: &'a str,
-    pub(super) loc: LocationMapper<'a>,
-    /// Block-pattern `read_pattern` `+1`-column quirk: the (1-based) line on
-    /// which the pattern starts, or `0` when inactive. A node's `loc` column is
-    /// bumped `+1` on this line only, reproducing `adjust_read_pattern_columns`.
-    pub(super) pattern_line: usize,
-    /// Block-pattern quirk: the span of the pattern's **top-level**
-    /// `TSTypeAnnotation`. Two things key on it.
-    ///
-    /// Its own `loc` is omitted — Svelte's `read_context` synthesizes that node
-    /// itself, without `loc` (nested annotations keep theirs).
-    ///
-    /// And it **bounds the `+1` column bump**: Svelte reads the annotation with a
-    /// *second*, separately-padded acorn parse (`read_type_annotation`'s `_ as `
-    /// trick) that inserts no `(`, so the type nodes inside it are NOT shifted the
-    /// way the pattern's own nodes are. The bump therefore stops at this span's
-    /// start (inclusive — the pattern's own `loc.end` lands exactly there).
+    pub(super) positions: WirePositions<'a>,
+    /// The span of a Svelte block pattern's **top-level** `TSTypeAnnotation` — the
+    /// one Svelte reads with a *second* acorn parse (`read_type_annotation`'s `_ as `
+    /// trick), which therefore emits under `annotation_comments`.
     ///
     /// `Span::new(u32::MAX, u32::MAX)` when inactive: never equal to a real
-    /// annotation's span, and an unreachable upper bound, so both uses are inert.
+    /// annotation's span.
     pub(super) pattern_ann_span: Span,
     /// This pass's comment role (Svelte comment-attach paths). `Off` for every
     /// ordinary emission, so the hot path pays only a never-taken compare per
@@ -418,23 +304,6 @@ pub(super) struct Ctx<'a> {
     /// or directive value, `{@const}`, a `{#snippet}` body — carries the same
     /// variant, and reaches this field through `EmbedWriter`.
     pub(super) vanilla_acorn: bool,
-    /// The acorn parse whose line/column seed this island's `loc` is emitted
-    /// against ([`AcornSeed`]).
-    ///
-    /// The `loc` on an embedded node is acorn's, and acorn seeded its line
-    /// counter once at the start of the parse Svelte prepared for *this* island
-    /// — so the ECMAScript tracker's answer has to be re-based onto it. Inert
-    /// (`AcornSeed::NONE`) for standalone TypeScript, which IS that parse, and for
-    /// essentially every Svelte document — though not, as it reads, for exactly the
-    /// ones whose two line classes agree: see `tsv_svelte`'s `AcornLines` for the
-    /// annotation parse that needs a seed on a plain-LF source.
-    pub(super) acorn: AcornSeed,
-    /// The block pattern's trailing `: T`: Svelte reads it with a **second**
-    /// acorn parse (`read_type_annotation`'s `_ as ` trick), so it carries its
-    /// own seed, used at every offset past `pattern_ann_span.start` — the same
-    /// boundary that stops the `+1` column bump, and for the same reason.
-    /// Inert with the bump: `pattern_ann_span.start == u32::MAX`.
-    pub(super) acorn_annotation: AcornSeed,
     /// The block pattern's trailing `: T` is a second acorn parse, so it is a second
     /// comment island too: the top-level annotation (`pattern_ann_span`) is emitted under
     /// this mode instead of `comments`. Svelte's `add_comments` runs once per parse over
@@ -443,31 +312,11 @@ pub(super) struct Ctx<'a> {
     /// which one attach over both let happen wherever a walk left a comment unclaimed.
     /// `Off` for every ordinary emission.
     pub(super) annotation_comments: CommentMode<'a>,
-    /// Whether to emit the per-node `loc` object (line/column). `true` for the
-    /// default acorn/svelte drop-in wire; `false` for the opt-in `no-locations`
-    /// variant (`start`/`end` offsets only — `loc` is derivable from them plus
-    /// source, so nothing is lost). Constant for a whole document, so the
-    /// per-node branch in `position_fields` predicts perfectly on the default
-    /// path.
-    pub(super) emit_loc: bool,
-    /// Whether [`emitted_position`] is the identity for every position this
-    /// context emits, so `position_fields` skips it: both seeds are the identity
-    /// and no `pattern_line` is set. That is every standalone TypeScript emission
-    /// and nearly every Svelte island, where the per-endpoint re-seed and bump
-    /// test would compute the tracker's answer back.
-    ///
-    /// Derived, not independent: the constructors set it from the two seeds, and
-    /// `write_pattern_embedded` clears it where it sets `pattern_line`. The other
-    /// field that function writes, `pattern_ann_span`, only chooses between the
-    /// two seeds, so it cannot move a position while both are the identity.
-    /// `Ctx::positions_are_plain` is the definition, and debug builds hold the
-    /// flag to it at every `loc`-emitting `position_fields` call.
-    pub(super) plain_positions: bool,
 }
 
 impl<'a> Ctx<'a> {
-    /// The per-document context for a whole-`Program` writer (no pattern quirks
-    /// active), and the one place `Schema` becomes the `vanilla_acorn` fact.
+    /// The per-document context for a whole-`Program` writer, and the one place
+    /// `Schema` becomes the `vanilla_acorn` fact.
     ///
     /// Every per-document field is set in the initializer, like `from_embed`:
     /// a field that a caller must remember to overwrite afterwards is a default
@@ -476,30 +325,22 @@ impl<'a> Ctx<'a> {
     #[inline]
     fn new(
         source: &'a str,
-        loc: LocationMapper<'a>,
+        positions: WirePositions<'a>,
         schema: Schema,
         comments: CommentMode<'a>,
-        emit_loc: bool,
-        acorn: AcornSeed,
     ) -> Self {
         Ctx {
             source,
-            loc,
-            pattern_line: 0,
+            positions,
             pattern_ann_span: Span::new(u32::MAX, u32::MAX),
             comments,
             vanilla_acorn: schema.is_svelte_script(),
-            acorn,
-            acorn_annotation: AcornSeed::NONE,
             annotation_comments: CommentMode::Off,
-            emit_loc,
-            // `acorn_annotation` is `NONE` and `pattern_line` is `0` here.
-            plain_positions: acorn.is_identity(),
         }
     }
 
     /// The per-document context for an embedded writer: the shared `EmbedWriter`
-    /// inputs plus the inert pattern-quirk defaults. Sets every per-document
+    /// inputs plus the inert pattern-annotation default. Sets every per-document
     /// field in the initializer (no post-construction re-assignment), so with
     /// the entry writers inlined the `EmbedWriter` aggregate scalar-replaces
     /// away.
@@ -507,26 +348,18 @@ impl<'a> Ctx<'a> {
     fn from_embed(env: EmbedWriter<'a>) -> Self {
         Ctx {
             source: env.source,
-            loc: env.loc,
-            pattern_line: 0,
+            positions: env.positions,
             pattern_ann_span: Span::new(u32::MAX, u32::MAX),
             comments: env.comments,
             vanilla_acorn: env.vanilla_acorn,
-            acorn: env.acorn,
-            acorn_annotation: env.acorn_annotation,
             annotation_comments: env.annotation_comments,
-            emit_loc: env.emit_loc,
-            plain_positions: env.acorn.is_identity() && env.acorn_annotation.is_identity(),
         }
     }
 
-    /// What `plain_positions` caches: nothing [`emitted_position`] reads can move
-    /// a position. An identity seed leaves the line and the column alone whichever
-    /// side of `pattern_ann_span.start` the offset falls, and a `pattern_line` of
-    /// `0` equals no 1-based line.
-    #[cfg(debug_assertions)]
-    fn positions_are_plain(&self) -> bool {
-        self.acorn.is_identity() && self.acorn_annotation.is_identity() && self.pattern_line == 0
+    /// Byte offset → emitted (UTF-16 code unit) offset; identity on ASCII.
+    #[inline]
+    pub(super) fn pos(&self, byte: u32) -> u32 {
+        self.positions.pos(byte)
     }
 }
 
@@ -538,35 +371,9 @@ impl<'a> Ctx<'a> {
 #[inline]
 pub(super) fn close_node(w: &mut JsonWriter, node_type: &'static str, span: Span, ctx: &Ctx<'_>) {
     if let CommentMode::Attach(attach) = ctx.comments {
-        attach.close_and_emit(w, node_type, span, ctx.loc);
+        attach.close_and_emit(w, node_type, span, ctx.positions);
     }
     w.raw("}");
-}
-
-/// The emitted position for one endpoint: the tracker's answer re-seeded onto
-/// the acorn parse that produced this node, then the block-pattern `+1`-column
-/// bump.
-///
-/// **One boundary answers both questions.** A block pattern's trailing `: T` is a
-/// *second* acorn parse (`read_type_annotation`'s `_ as ` trick), so it carries
-/// its own line seed — and, inserting no `(`, none of the pattern's column shift.
-/// The bound is inclusive on the pattern's side: its own `loc.end` sits exactly on
-/// the annotation's start. Both halves are inert without one
-/// (`pattern_ann_span.start == u32::MAX`, `pattern_line == 0` — which never equals
-/// a real 1-based line — and `AcornSeed::NONE` is the identity).
-#[inline]
-pub(super) fn emitted_position(ctx: &Ctx<'_>, offset: u32, pos: Position) -> Position {
-    let in_pattern = offset <= ctx.pattern_ann_span.start;
-    let seed = if in_pattern {
-        ctx.acorn
-    } else {
-        ctx.acorn_annotation
-    };
-    let mut pos = seed.position(pos);
-    if in_pattern && pos.line == ctx.pattern_line {
-        pos.column += 1;
-    }
-    pos
 }
 
 /// Emit a node with no fields beyond the universal prefix (`ThisExpression`,
@@ -585,16 +392,14 @@ pub(super) fn write_bare_node(
 /// Report a node open to the online comment attach (`CommentMode::Attach` only
 /// — one never-taken compare for every ordinary emission), which shifts this
 /// node's leading comments off the queue. `node_header` calls this; the
-/// hand-written header sites (the embedded `Program`, the name-first
-/// `Identifier`, the `loc`-less block-pattern `TSTypeAnnotation`) call it
-/// directly so every wire node reaches the attach.
+/// hand-written header sites (the name-first `Identifier`, the widened-`end`
+/// pattern header) call it directly so every wire node reaches the attach.
 ///
-/// ⚠️ **Never gate this on `ctx.emit_loc`.** The attach is driven by node opens
-/// and knows nothing about line/column, so a node skipped here in the
-/// `no-locations` variant re-binds its comments to whatever opens next — in that
-/// variant only, which every `loc`-emitting gate is blind to. Pinned by
-/// `tests/no_locations.rs`'s comment-attach cases (mutation-tested: without them
-/// the whole workspace suite passes with the gate added).
+/// ⚠️ **Never gate this on whether the wire carries `loc`.** The attach is driven by node
+/// opens and knows nothing about line/column, so a node skipped here on one wire re-binds
+/// its comments to whatever opens next on that wire alone, and the two wires then attach
+/// comments differently. The fixture gate pins the span-only wire's attachment, `check:loc`
+/// holds the loc wire's to it, and `tests/no_locations.rs`'s comment-attach cases pin both.
 #[inline]
 pub(super) fn attach_open(node_type: &'static str, span: Span, ctx: &Ctx<'_>) {
     if let CommentMode::Attach(attach) = ctx.comments {
@@ -681,25 +486,24 @@ pub(super) fn write_body_array_holes<'a, T: 'a>(
 /// Leaves the object open — the caller appends its remaining fields and the
 /// closing `}`. `span` is the span every one of `start`/`end`/`loc` derives
 /// from (start/end are the fused char-space positions, `loc` their
-/// line/column form); TS emits no `Position.character`, so it is always
-/// omitted. Static fragments are pre-fused into the fewest buffer writes —
-/// this runs once per node.
+/// line/column form, absent on the span-only wire); TS emits no
+/// `Position.character`, so it is always omitted. Static fragments are
+/// pre-fused into the fewest buffer writes — this runs once per node.
 #[inline]
 pub(super) fn node_header(w: &mut JsonWriter, node_type: &'static str, span: Span, ctx: &Ctx<'_>) {
     node_header_impl::<false>(w, node_type, span, ctx);
 }
 
-/// A header whose wire **`end` offset is widened past its `loc`** — the one node
-/// class where a node's byte range and its line/column range genuinely disagree.
+/// A header whose wire **`end` is widened past the node's own span** — a Svelte
+/// **block** binding pattern (`{#each xs as { a }: T}`, `{:then { a }: T}`).
 ///
-/// A Svelte **block** binding pattern (`{#each xs as { a }: T}`, `{:then { a }: T}`)
-/// is parsed bare by acorn, after which Svelte's `read_pattern`
-/// (`1-parse/read/context.js`) patches `expression.end = typeAnnotation.end` and
-/// never touches `expression.loc`. acorn parsing the same pattern as a real
-/// *signature parameter* extends both — and there the internal span already covers
-/// the annotation, so the `max` below is a no-op. The internal span therefore
-/// records the **bare** pattern (which `loc` derives from) and the widened `end` is
-/// recovered here from the annotation.
+/// acorn parses such a pattern bare, after which Svelte's `read_pattern`
+/// (`1-parse/read/context.js`) patches `expression.end = typeAnnotation.end`. acorn
+/// parsing the same pattern as a real *signature parameter* extends the span itself —
+/// and there the internal span already covers the annotation, so the `max` below is a
+/// no-op. The internal span therefore records the **bare** pattern (which the comment
+/// attach keys on) and the widened `end` is recovered here from the annotation; `loc`
+/// follows the wire `start`/`end`, as on every node.
 ///
 /// Cold by construction: only reached by a destructuring pattern that actually
 /// carries an annotation, so the hot per-node path keeps its branch-free
@@ -715,34 +519,7 @@ pub(super) fn node_header_wide_end(
     #[cfg(debug_assertions)]
     debug_assert_overhanging_node_is_island_root(node_type, span, wire_end, ctx);
     attach_open(node_type, span, ctx);
-    w.raw("{\"type\":\"");
-    w.raw(node_type);
-    w.raw("\"");
-    if !ctx.emit_loc {
-        w.start_end_field(ctx.loc.pos(span.start), ctx.loc.pos(wire_end));
-        return;
-    }
-    let ((start_pos, start), (_, end)) = ctx.loc.span_positions(span.start, span.end);
-    let start = emitted_position(ctx, span.start, start);
-    let end = emitted_position(ctx, span.end, end);
-    w.start_end_field(start_pos, ctx.loc.pos(wire_end));
-    write_loc_field(w, start, end);
-}
-
-/// A node's `,"loc":{"start":{"line","column"},"end":{…}}` field — the acorn `loc` shape
-/// every node header and the `Program` share.
-#[expect(clippy::inline_always)]
-#[inline(always)]
-fn write_loc_field(w: &mut JsonWriter, start: Position, end: Position) {
-    w.raw(",\"loc\":{\"start\":{\"line\":");
-    w.usize(start.line);
-    w.raw(",\"column\":");
-    w.usize(start.column);
-    w.raw("},\"end\":{\"line\":");
-    w.usize(end.line);
-    w.raw(",\"column\":");
-    w.usize(end.column);
-    w.raw("}}");
+    header_run::<false>(w, node_type, Span::new(span.start, wire_end), ctx);
 }
 
 /// Debug-only, ahead of a node's open: a node whose subtree ends at `subtree_end`, past
@@ -770,10 +547,22 @@ fn debug_assert_overhanging_node_is_island_root(
 /// `loc.start`/`loc.end` for the top-level `Identifier` of a simple block
 /// pattern / shorthand) is a compile-time constant, so each wrapper
 /// monomorphizes to its own straight-line emission (no runtime branch on the
-/// per-node hot path). The pattern `+1`-column adjustment applies in both
-/// (it never actually co-occurs with character injection — destructure has
-/// no character).
+/// per-node hot path).
 fn node_header_impl<const CHARACTER: bool>(
+    w: &mut JsonWriter,
+    node_type: &'static str,
+    span: Span,
+    ctx: &Ctx<'_>,
+) {
+    attach_open(node_type, span, ctx);
+    header_run::<CHARACTER>(w, node_type, span, ctx);
+}
+
+/// The header's bytes — `{"type":"X"` and the position fields of `span` — as one
+/// staged run: the part of a header that does not report to the comment attach.
+#[expect(clippy::inline_always)]
+#[inline(always)]
+fn header_run<const CHARACTER: bool>(
     w: &mut JsonWriter,
     node_type: &'static str,
     span: Span,
@@ -785,7 +574,6 @@ fn node_header_impl<const CHARACTER: bool>(
             .all(|b| b != b'"' && b != b'\\' && b >= 0x20),
         "node type must be escape-free: {node_type:?}"
     );
-    attach_open(node_type, span, ctx);
     let mut run = w.stage_run();
     run.raw("{\"type\":\"");
     run.short(node_type);
@@ -795,8 +583,8 @@ fn node_header_impl<const CHARACTER: bool>(
 }
 
 /// The `,"start":…,"end":…,"loc":{…}` position fields (final char space) —
-/// the tail of `node_header_impl`, also emitted after a leading `name` for
-/// the Svelte-constructed identifiers whose fields precede the positions.
+/// the tail of `header_run`, also emitted after a leading `name` for the
+/// Svelte-constructed identifiers whose fields precede the positions.
 ///
 /// Emits into the caller's **staged run**, which the caller opens and flushes
 /// around it — the whole header reaches the output buffer as one append (see
@@ -808,26 +596,17 @@ fn node_header_impl<const CHARACTER: bool>(
 #[expect(clippy::inline_always)]
 #[inline(always)]
 fn position_fields<const CHARACTER: bool>(run: &mut StageRun<'_>, span: Span, ctx: &Ctx<'_>) {
-    if !ctx.emit_loc {
-        // `no-locations` variant: offsets only, no `loc` (and no `character`,
-        // which lives inside `loc`). Only the byte→char `pos` is needed, so the
+    let Some(lines) = ctx.positions.lines() else {
+        // The span-only wire: offsets only, no `loc` (and no `character`, which
+        // lives inside `loc`). Only the byte→char `pos` is needed, so the
         // per-node line/column lookup is skipped entirely.
         run.raw(",\"start\":");
-        run.u32(ctx.loc.pos(span.start));
+        run.u32(ctx.pos(span.start));
         run.raw(",\"end\":");
-        run.u32(ctx.loc.pos(span.end));
+        run.u32(ctx.pos(span.end));
         return;
-    }
-    let ((start_pos, mut start), (end_pos, mut end)) = ctx.loc.span_positions(span.start, span.end);
-    #[cfg(debug_assertions)]
-    debug_assert_eq!(ctx.plain_positions, ctx.positions_are_plain());
-    if ctx.plain_positions {
-        debug_assert_eq!(emitted_position(ctx, span.start, start), start);
-        debug_assert_eq!(emitted_position(ctx, span.end, end), end);
-    } else {
-        start = emitted_position(ctx, span.start, start);
-        end = emitted_position(ctx, span.end, end);
-    }
+    };
+    let ((start_pos, start), (end_pos, end)) = lines.span_positions(span.start, span.end);
     run.raw(",\"start\":");
     run.u32(start_pos);
     run.raw(",\"end\":");
@@ -1345,18 +1124,8 @@ mod tests {
         emit: impl FnOnce(&mut JsonWriter, &Ctx<'_>),
     ) -> String {
         let (tracker, map) = LocationTracker::new_ecmascript_with_map(source, LeadingBom::Counted);
-        let loc = LocationMapper {
-            tracker: &tracker,
-            map: &map,
-        };
-        let ctx = Ctx::new(
-            source,
-            loc,
-            Schema::Acorn,
-            comments,
-            emit_loc,
-            AcornSeed::NONE,
-        );
+        let positions = WirePositions::new(&map, emit_loc.then_some(&tracker));
+        let ctx = Ctx::new(source, positions, Schema::Acorn, comments);
         let mut w = JsonWriter::with_capacity(0);
         emit(&mut w, &ctx);
         String::from_utf8(w.into_bytes()).expect("the wire is UTF-8")

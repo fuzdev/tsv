@@ -25,18 +25,6 @@
 				"start": 60,
 				"end": 105,
 				"name": "table",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 61
-					},
-					"end": {
-						"line": 2,
-						"column": 6,
-						"character": 66
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -53,18 +41,6 @@
 							"start": 69,
 							"end": 96,
 							"name": "tr",
-							"name_loc": {
-								"start": {
-									"line": 3,
-									"column": 2,
-									"character": 70
-								},
-								"end": {
-									"line": 3,
-									"column": 4,
-									"character": 72
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -81,18 +57,6 @@
 										"start": 76,
 										"end": 89,
 										"name": "td",
-										"name_loc": {
-											"start": {
-												"line": 4,
-												"column": 3,
-												"character": 77
-											},
-											"end": {
-												"line": 4,
-												"column": 5,
-												"character": 79
-											}
-										},
 										"attributes": [],
 										"fragment": {
 											"type": "Fragment",
@@ -152,18 +116,6 @@
 				"start": 163,
 				"end": 204,
 				"name": "select",
-				"name_loc": {
-					"start": {
-						"line": 9,
-						"column": 1,
-						"character": 164
-					},
-					"end": {
-						"line": 9,
-						"column": 7,
-						"character": 170
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -180,18 +132,6 @@
 							"start": 173,
 							"end": 194,
 							"name": "option",
-							"name_loc": {
-								"start": {
-									"line": 10,
-									"column": 2,
-									"character": 174
-								},
-								"end": {
-									"line": 10,
-									"column": 8,
-									"character": 180
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -241,18 +181,6 @@
 				"start": 257,
 				"end": 285,
 				"name": "svg",
-				"name_loc": {
-					"start": {
-						"line": 14,
-						"column": 1,
-						"character": 258
-					},
-					"end": {
-						"line": 14,
-						"column": 4,
-						"character": 261
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -262,18 +190,6 @@
 							"start": 262,
 							"end": 279,
 							"name": "text",
-							"name_loc": {
-								"start": {
-									"line": 14,
-									"column": 6,
-									"character": 263
-								},
-								"end": {
-									"line": 14,
-									"column": 10,
-									"character": 267
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",

@@ -12,36 +12,12 @@
 				"start": 0,
 				"end": 116,
 				"name": "Comp",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 5,
-						"character": 5
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 7,
 						"end": 12,
 						"name": "a",
-						"name_loc": {
-							"start": {
-								"line": 2,
-								"column": 1,
-								"character": 7
-							},
-							"end": {
-								"line": 2,
-								"column": 2,
-								"character": 8
-							}
-						},
 						"value": [
 							{
 								"start": 10,
@@ -57,18 +33,6 @@
 						"start": 14,
 						"end": 19,
 						"name": "b",
-						"name_loc": {
-							"start": {
-								"line": 3,
-								"column": 1,
-								"character": 14
-							},
-							"end": {
-								"line": 3,
-								"column": 2,
-								"character": 15
-							}
-						},
 						"value": [
 							{
 								"start": 17,
@@ -84,18 +48,6 @@
 						"start": 21,
 						"end": 26,
 						"name": "c",
-						"name_loc": {
-							"start": {
-								"line": 4,
-								"column": 1,
-								"character": 21
-							},
-							"end": {
-								"line": 4,
-								"column": 2,
-								"character": 22
-							}
-						},
 						"value": [
 							{
 								"start": 24,
@@ -111,18 +63,6 @@
 						"start": 28,
 						"end": 33,
 						"name": "d",
-						"name_loc": {
-							"start": {
-								"line": 5,
-								"column": 1,
-								"character": 28
-							},
-							"end": {
-								"line": 5,
-								"column": 2,
-								"character": 29
-							}
-						},
 						"value": [
 							{
 								"start": 31,
@@ -138,18 +78,6 @@
 						"start": 35,
 						"end": 40,
 						"name": "e",
-						"name_loc": {
-							"start": {
-								"line": 6,
-								"column": 1,
-								"character": 35
-							},
-							"end": {
-								"line": 6,
-								"column": 2,
-								"character": 36
-							}
-						},
 						"value": [
 							{
 								"start": 38,
@@ -165,18 +93,6 @@
 						"start": 42,
 						"end": 47,
 						"name": "f",
-						"name_loc": {
-							"start": {
-								"line": 7,
-								"column": 1,
-								"character": 42
-							},
-							"end": {
-								"line": 7,
-								"column": 2,
-								"character": 43
-							}
-						},
 						"value": [
 							{
 								"start": 45,
@@ -192,18 +108,6 @@
 						"start": 49,
 						"end": 54,
 						"name": "g",
-						"name_loc": {
-							"start": {
-								"line": 8,
-								"column": 1,
-								"character": 49
-							},
-							"end": {
-								"line": 8,
-								"column": 2,
-								"character": 50
-							}
-						},
 						"value": [
 							{
 								"start": 52,
@@ -219,18 +123,6 @@
 						"start": 56,
 						"end": 61,
 						"name": "h",
-						"name_loc": {
-							"start": {
-								"line": 9,
-								"column": 1,
-								"character": 56
-							},
-							"end": {
-								"line": 9,
-								"column": 2,
-								"character": 57
-							}
-						},
 						"value": [
 							{
 								"start": 59,
@@ -246,18 +138,6 @@
 						"start": 63,
 						"end": 68,
 						"name": "i",
-						"name_loc": {
-							"start": {
-								"line": 10,
-								"column": 1,
-								"character": 63
-							},
-							"end": {
-								"line": 10,
-								"column": 2,
-								"character": 64
-							}
-						},
 						"value": [
 							{
 								"start": 66,
@@ -273,18 +153,6 @@
 						"start": 70,
 						"end": 75,
 						"name": "j",
-						"name_loc": {
-							"start": {
-								"line": 11,
-								"column": 1,
-								"character": 70
-							},
-							"end": {
-								"line": 11,
-								"column": 2,
-								"character": 71
-							}
-						},
 						"value": [
 							{
 								"start": 73,
@@ -300,18 +168,6 @@
 						"start": 77,
 						"end": 82,
 						"name": "k",
-						"name_loc": {
-							"start": {
-								"line": 12,
-								"column": 1,
-								"character": 77
-							},
-							"end": {
-								"line": 12,
-								"column": 2,
-								"character": 78
-							}
-						},
 						"value": [
 							{
 								"start": 80,
@@ -327,18 +183,6 @@
 						"start": 84,
 						"end": 89,
 						"name": "l",
-						"name_loc": {
-							"start": {
-								"line": 13,
-								"column": 1,
-								"character": 84
-							},
-							"end": {
-								"line": 13,
-								"column": 2,
-								"character": 85
-							}
-						},
 						"value": [
 							{
 								"start": 87,
@@ -354,18 +198,6 @@
 						"start": 91,
 						"end": 96,
 						"name": "m",
-						"name_loc": {
-							"start": {
-								"line": 14,
-								"column": 1,
-								"character": 91
-							},
-							"end": {
-								"line": 14,
-								"column": 2,
-								"character": 92
-							}
-						},
 						"value": [
 							{
 								"start": 94,
@@ -381,18 +213,6 @@
 						"start": 98,
 						"end": 103,
 						"name": "n",
-						"name_loc": {
-							"start": {
-								"line": 15,
-								"column": 1,
-								"character": 98
-							},
-							"end": {
-								"line": 15,
-								"column": 2,
-								"character": 99
-							}
-						},
 						"value": [
 							{
 								"start": 101,
@@ -408,18 +228,6 @@
 						"start": 105,
 						"end": 113,
 						"name": "o",
-						"name_loc": {
-							"start": {
-								"line": 16,
-								"column": 1,
-								"character": 105
-							},
-							"end": {
-								"line": 16,
-								"column": 2,
-								"character": 106
-							}
-						},
 						"value": [
 							{
 								"start": 108,

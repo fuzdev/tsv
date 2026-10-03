@@ -25,18 +25,6 @@
 				"start": 85,
 				"end": 106,
 				"name": "textarea",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 86
-					},
-					"end": {
-						"line": 2,
-						"column": 9,
-						"character": 94
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -68,18 +56,6 @@
 				"start": 151,
 				"end": 177,
 				"name": "textarea",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 1,
-						"character": 152
-					},
-					"end": {
-						"line": 5,
-						"column": 9,
-						"character": 160
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -119,18 +95,6 @@
 				"start": 217,
 				"end": 238,
 				"name": "textarea",
-				"name_loc": {
-					"start": {
-						"line": 8,
-						"column": 1,
-						"character": 218
-					},
-					"end": {
-						"line": 8,
-						"column": 9,
-						"character": 226
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",

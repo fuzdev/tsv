@@ -14,529 +14,199 @@
 			"type": "Line",
 			"value": " A comment in an IIFE callee's required parens stays inside them and takes the",
 			"start": 20,
-			"end": 100,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 81
-				}
-			}
+			"end": 100
 		},
 		{
 			"type": "Line",
 			"value": " expanded shell — the `//` on the `(` line, the function one indent in, the `)`",
 			"start": 102,
-			"end": 183,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 82
-				}
-			}
+			"end": 183
 		},
 		{
 			"type": "Line",
 			"value": " back out. The tagged-template tag position answers the same gap.",
 			"start": 185,
-			"end": 252,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 1
-				},
-				"end": {
-					"line": 4,
-					"column": 68
-				}
-			}
+			"end": 252
 		},
 		{
 			"type": "Line",
 			"value": " c1",
 			"start": 256,
-			"end": 261,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 3
-				},
-				"end": {
-					"line": 5,
-					"column": 8
-				}
-			}
+			"end": 261
 		},
 		{
 			"type": "Line",
 			"value": " c2",
 			"start": 292,
-			"end": 297,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 13
-				},
-				"end": {
-					"line": 8,
-					"column": 18
-				}
-			}
+			"end": 297
 		},
 		{
 			"type": "Line",
 			"value": " c3",
 			"start": 324,
-			"end": 329,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 3
-				},
-				"end": {
-					"line": 11,
-					"column": 8
-				}
-			}
+			"end": 329
 		},
 		{
 			"type": "Line",
 			"value": " An own-line comment keeps its own line inside the shell; an optional call is",
 			"start": 352,
-			"end": 431,
-			"loc": {
-				"start": {
-					"line": 15,
-					"column": 1
-				},
-				"end": {
-					"line": 15,
-					"column": 80
-				}
-			}
+			"end": 431
 		},
 		{
 			"type": "Line",
 			"value": " the same position.",
 			"start": 433,
-			"end": 454,
-			"loc": {
-				"start": {
-					"line": 16,
-					"column": 1
-				},
-				"end": {
-					"line": 16,
-					"column": 22
-				}
-			}
+			"end": 454
 		},
 		{
 			"type": "Line",
 			"value": " c4",
 			"start": 460,
-			"end": 465,
-			"loc": {
-				"start": {
-					"line": 18,
-					"column": 2
-				},
-				"end": {
-					"line": 18,
-					"column": 7
-				}
-			}
+			"end": 465
 		},
 		{
 			"type": "Line",
 			"value": " An inline block run leads the function flat inside the pair.",
 			"start": 493,
-			"end": 556,
-			"loc": {
-				"start": {
-					"line": 22,
-					"column": 1
-				},
-				"end": {
-					"line": 22,
-					"column": 64
-				}
-			}
+			"end": 556
 		},
 		{
 			"type": "Block",
 			"value": " c5 ",
 			"start": 559,
-			"end": 567,
-			"loc": {
-				"start": {
-					"line": 23,
-					"column": 2
-				},
-				"end": {
-					"line": 23,
-					"column": 10
-				}
-			}
+			"end": 567
 		},
 		{
 			"type": "Line",
 			"value": " A callee whose required pair is not a function keeps the hoist — the run leads",
 			"start": 583,
-			"end": 664,
-			"loc": {
-				"start": {
-					"line": 25,
-					"column": 1
-				},
-				"end": {
-					"line": 25,
-					"column": 82
-				}
-			}
+			"end": 664
 		},
 		{
 			"type": "Line",
 			"value": " the enclosing position, matching prettier.",
 			"start": 666,
-			"end": 711,
-			"loc": {
-				"start": {
-					"line": 26,
-					"column": 1
-				},
-				"end": {
-					"line": 26,
-					"column": 46
-				}
-			}
+			"end": 711
 		},
 		{
 			"type": "Line",
 			"value": " c6",
 			"start": 717,
-			"end": 722,
-			"loc": {
-				"start": {
-					"line": 27,
-					"column": 5
-				},
-				"end": {
-					"line": 27,
-					"column": 10
-				}
-			}
+			"end": 722
 		},
 		{
 			"type": "Line",
 			"value": " c7",
 			"start": 746,
-			"end": 751,
-			"loc": {
-				"start": {
-					"line": 29,
-					"column": 1
-				},
-				"end": {
-					"line": 29,
-					"column": 6
-				}
-			}
+			"end": 751
 		},
 		{
 			"type": "Line",
 			"value": " The pair owns its TRAILING gap too — a comment between the function and the `)`",
 			"start": 771,
-			"end": 853,
-			"loc": {
-				"start": {
-					"line": 32,
-					"column": 1
-				},
-				"end": {
-					"line": 32,
-					"column": 83
-				}
-			}
+			"end": 853
 		},
 		{
 			"type": "Line",
 			"value": " stays inside the parens, where the author wrote it. A block run keeps the pair",
 			"start": 855,
-			"end": 936,
-			"loc": {
-				"start": {
-					"line": 33,
-					"column": 1
-				},
-				"end": {
-					"line": 33,
-					"column": 82
-				}
-			}
+			"end": 936
 		},
 		{
 			"type": "Line",
 			"value": " flat; a `//` expands it, the closer dropping below the run.",
 			"start": 938,
-			"end": 1000,
-			"loc": {
-				"start": {
-					"line": 34,
-					"column": 1
-				},
-				"end": {
-					"line": 34,
-					"column": 63
-				}
-			}
+			"end": 1000
 		},
 		{
 			"type": "Block",
 			"value": " c8 ",
 			"start": 1012,
-			"end": 1020,
-			"loc": {
-				"start": {
-					"line": 35,
-					"column": 11
-				},
-				"end": {
-					"line": 35,
-					"column": 19
-				}
-			}
+			"end": 1020
 		},
 		{
 			"type": "Line",
 			"value": " c9",
 			"start": 1045,
-			"end": 1050,
-			"loc": {
-				"start": {
-					"line": 37,
-					"column": 17
-				},
-				"end": {
-					"line": 37,
-					"column": 22
-				}
-			}
+			"end": 1050
 		},
 		{
 			"type": "Block",
 			"value": " c10 ",
 			"start": 1068,
-			"end": 1077,
-			"loc": {
-				"start": {
-					"line": 39,
-					"column": 11
-				},
-				"end": {
-					"line": 39,
-					"column": 20
-				}
-			}
+			"end": 1077
 		},
 		{
 			"type": "Block",
 			"value": " c11 ",
 			"start": 1095,
-			"end": 1104,
-			"loc": {
-				"start": {
-					"line": 40,
-					"column": 11
-				},
-				"end": {
-					"line": 40,
-					"column": 20
-				}
-			}
+			"end": 1104
 		},
 		{
 			"type": "Line",
 			"value": " With BOTH gaps commented the pair still takes ONE expanded shell — the leading run",
 			"start": 1114,
-			"end": 1199,
-			"loc": {
-				"start": {
-					"line": 42,
-					"column": 1
-				},
-				"end": {
-					"line": 42,
-					"column": 86
-				}
-			}
+			"end": 1199
 		},
 		{
 			"type": "Line",
 			"value": " above the function, the trailing run beside it, the `)` back out — which is",
 			"start": 1201,
-			"end": 1279,
-			"loc": {
-				"start": {
-					"line": 43,
-					"column": 1
-				},
-				"end": {
-					"line": 43,
-					"column": 79
-				}
-			}
+			"end": 1279
 		},
 		{
 			"type": "Line",
 			"value": " prettier's own shape here.",
 			"start": 1281,
-			"end": 1310,
-			"loc": {
-				"start": {
-					"line": 44,
-					"column": 1
-				},
-				"end": {
-					"line": 44,
-					"column": 30
-				}
-			}
+			"end": 1310
 		},
 		{
 			"type": "Line",
 			"value": " c14",
 			"start": 1316,
-			"end": 1322,
-			"loc": {
-				"start": {
-					"line": 46,
-					"column": 2
-				},
-				"end": {
-					"line": 46,
-					"column": 8
-				}
-			}
+			"end": 1322
 		},
 		{
 			"type": "Block",
 			"value": " c15 ",
 			"start": 1334,
-			"end": 1343,
-			"loc": {
-				"start": {
-					"line": 47,
-					"column": 11
-				},
-				"end": {
-					"line": 47,
-					"column": 20
-				}
-			}
+			"end": 1343
 		},
 		{
 			"type": "Line",
 			"value": " c16",
 			"start": 1355,
-			"end": 1361,
-			"loc": {
-				"start": {
-					"line": 50,
-					"column": 2
-				},
-				"end": {
-					"line": 50,
-					"column": 8
-				}
-			}
+			"end": 1361
 		},
 		{
 			"type": "Line",
 			"value": " c17",
 			"start": 1379,
-			"end": 1385,
-			"loc": {
-				"start": {
-					"line": 51,
-					"column": 17
-				},
-				"end": {
-					"line": 51,
-					"column": 23
-				}
-			}
+			"end": 1385
 		},
 		{
 			"type": "Line",
 			"value": " A comment written OUTSIDE the pair stays outside it, on the callee→`(` gap, and",
 			"start": 1394,
-			"end": 1476,
-			"loc": {
-				"start": {
-					"line": 54,
-					"column": 1
-				},
-				"end": {
-					"line": 54,
-					"column": 83
-				}
-			}
+			"end": 1476
 		},
 		{
 			"type": "Line",
 			"value": " so does one in a required pair that is not a function's.",
 			"start": 1478,
-			"end": 1537,
-			"loc": {
-				"start": {
-					"line": 55,
-					"column": 1
-				},
-				"end": {
-					"line": 55,
-					"column": 60
-				}
-			}
+			"end": 1537
 		},
 		{
 			"type": "Block",
 			"value": " c12 ",
 			"start": 1550,
-			"end": 1559,
-			"loc": {
-				"start": {
-					"line": 56,
-					"column": 12
-				},
-				"end": {
-					"line": 56,
-					"column": 21
-				}
-			}
+			"end": 1559
 		},
 		{
 			"type": "Block",
 			"value": " c13 ",
 			"start": 1576,
-			"end": 1585,
-			"loc": {
-				"start": {
-					"line": 57,
-					"column": 13
-				},
-				"end": {
-					"line": 57,
-					"column": 22
-				}
-			}
+			"end": 1585
 		}
 	],
 	"instance": {
@@ -548,59 +218,19 @@
 			"type": "Program",
 			"start": 18,
 			"end": 1589,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 58,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
 					"start": 254,
 					"end": 278,
-					"loc": {
-						"start": {
-							"line": 5,
-							"column": 1
-						},
-						"end": {
-							"line": 7,
-							"column": 5
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 254,
 						"end": 277,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 1
-							},
-							"end": {
-								"line": 7,
-								"column": 4
-							}
-						},
 						"callee": {
 							"type": "ArrowFunctionExpression",
 							"start": 264,
 							"end": 272,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 2
-								},
-								"end": {
-									"line": 6,
-									"column": 10
-								}
-							},
 							"id": null,
 							"expression": false,
 							"generator": false,
@@ -610,16 +240,6 @@
 								"type": "BlockStatement",
 								"start": 270,
 								"end": 272,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 8
-									},
-									"end": {
-										"line": 6,
-										"column": 10
-									}
-								},
 								"body": []
 							},
 							"leadingComments": [
@@ -659,75 +279,25 @@
 					"type": "VariableDeclaration",
 					"start": 280,
 					"end": 320,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 1
-						},
-						"end": {
-							"line": 10,
-							"column": 5
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 286,
 							"end": 319,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 7
-								},
-								"end": {
-									"line": 10,
-									"column": 4
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 286,
 								"end": 287,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 7
-									},
-									"end": {
-										"line": 8,
-										"column": 8
-									}
-								},
 								"name": "a"
 							},
 							"init": {
 								"type": "CallExpression",
 								"start": 290,
 								"end": 319,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 11
-									},
-									"end": {
-										"line": 10,
-										"column": 4
-									}
-								},
 								"callee": {
 									"type": "FunctionExpression",
 									"start": 300,
 									"end": 314,
-									"loc": {
-										"start": {
-											"line": 9,
-											"column": 2
-										},
-										"end": {
-											"line": 9,
-											"column": 16
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -737,16 +307,6 @@
 										"type": "BlockStatement",
 										"start": 312,
 										"end": 314,
-										"loc": {
-											"start": {
-												"line": 9,
-												"column": 14
-											},
-											"end": {
-												"line": 9,
-												"column": 16
-											}
-										},
 										"body": []
 									},
 									"leadingComments": [
@@ -769,44 +329,14 @@
 					"type": "ExpressionStatement",
 					"start": 322,
 					"end": 349,
-					"loc": {
-						"start": {
-							"line": 11,
-							"column": 1
-						},
-						"end": {
-							"line": 13,
-							"column": 8
-						}
-					},
 					"expression": {
 						"type": "TaggedTemplateExpression",
 						"start": 322,
 						"end": 348,
-						"loc": {
-							"start": {
-								"line": 11,
-								"column": 1
-							},
-							"end": {
-								"line": 13,
-								"column": 7
-							}
-						},
 						"tag": {
 							"type": "ArrowFunctionExpression",
 							"start": 332,
 							"end": 340,
-							"loc": {
-								"start": {
-									"line": 12,
-									"column": 2
-								},
-								"end": {
-									"line": 12,
-									"column": 10
-								}
-							},
 							"id": null,
 							"expression": false,
 							"generator": false,
@@ -816,16 +346,6 @@
 								"type": "BlockStatement",
 								"start": 338,
 								"end": 340,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 8
-									},
-									"end": {
-										"line": 12,
-										"column": 10
-									}
-								},
 								"body": []
 							},
 							"leadingComments": [
@@ -841,32 +361,12 @@
 							"type": "TemplateLiteral",
 							"start": 343,
 							"end": 348,
-							"loc": {
-								"start": {
-									"line": 13,
-									"column": 2
-								},
-								"end": {
-									"line": 13,
-									"column": 7
-								}
-							},
 							"expressions": [],
 							"quasis": [
 								{
 									"type": "TemplateElement",
 									"start": 344,
 									"end": 347,
-									"loc": {
-										"start": {
-											"line": 13,
-											"column": 3
-										},
-										"end": {
-											"line": 13,
-											"column": 6
-										}
-									},
 									"value": {
 										"raw": "tpl",
 										"cooked": "tpl"
@@ -881,58 +381,18 @@
 					"type": "ExpressionStatement",
 					"start": 456,
 					"end": 490,
-					"loc": {
-						"start": {
-							"line": 17,
-							"column": 1
-						},
-						"end": {
-							"line": 20,
-							"column": 7
-						}
-					},
 					"expression": {
 						"type": "ChainExpression",
 						"start": 456,
 						"end": 489,
-						"loc": {
-							"start": {
-								"line": 17,
-								"column": 1
-							},
-							"end": {
-								"line": 20,
-								"column": 6
-							}
-						},
 						"expression": {
 							"type": "CallExpression",
 							"start": 456,
 							"end": 489,
-							"loc": {
-								"start": {
-									"line": 17,
-									"column": 1
-								},
-								"end": {
-									"line": 20,
-									"column": 6
-								}
-							},
 							"callee": {
 								"type": "ArrowFunctionExpression",
 								"start": 468,
 								"end": 482,
-								"loc": {
-									"start": {
-										"line": 19,
-										"column": 2
-									},
-									"end": {
-										"line": 19,
-										"column": 16
-									}
-								},
 								"id": null,
 								"expression": false,
 								"generator": false,
@@ -942,16 +402,6 @@
 									"type": "BlockStatement",
 									"start": 480,
 									"end": 482,
-									"loc": {
-										"start": {
-											"line": 19,
-											"column": 14
-										},
-										"end": {
-											"line": 19,
-											"column": 16
-										}
-									},
 									"body": []
 								},
 								"leadingComments": [
@@ -986,44 +436,14 @@
 					"type": "ExpressionStatement",
 					"start": 558,
 					"end": 580,
-					"loc": {
-						"start": {
-							"line": 23,
-							"column": 1
-						},
-						"end": {
-							"line": 23,
-							"column": 23
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 558,
 						"end": 579,
-						"loc": {
-							"start": {
-								"line": 23,
-								"column": 1
-							},
-							"end": {
-								"line": 23,
-								"column": 22
-							}
-						},
 						"callee": {
 							"type": "ArrowFunctionExpression",
 							"start": 568,
 							"end": 576,
-							"loc": {
-								"start": {
-									"line": 23,
-									"column": 11
-								},
-								"end": {
-									"line": 23,
-									"column": 19
-								}
-							},
 							"id": null,
 							"expression": false,
 							"generator": false,
@@ -1033,16 +453,6 @@
 								"type": "BlockStatement",
 								"start": 574,
 								"end": 576,
-								"loc": {
-									"start": {
-										"line": 23,
-										"column": 17
-									},
-									"end": {
-										"line": 23,
-										"column": 19
-									}
-								},
 								"body": []
 							},
 							"leadingComments": [
@@ -1070,44 +480,14 @@
 					"type": "ExpressionStatement",
 					"start": 713,
 					"end": 744,
-					"loc": {
-						"start": {
-							"line": 27,
-							"column": 1
-						},
-						"end": {
-							"line": 28,
-							"column": 21
-						}
-					},
 					"expression": {
 						"type": "NewExpression",
 						"start": 713,
 						"end": 743,
-						"loc": {
-							"start": {
-								"line": 27,
-								"column": 1
-							},
-							"end": {
-								"line": 28,
-								"column": 20
-							}
-						},
 						"callee": {
 							"type": "FunctionExpression",
 							"start": 726,
 							"end": 740,
-							"loc": {
-								"start": {
-									"line": 28,
-									"column": 3
-								},
-								"end": {
-									"line": 28,
-									"column": 17
-								}
-							},
 							"id": null,
 							"expression": false,
 							"generator": false,
@@ -1117,16 +497,6 @@
 								"type": "BlockStatement",
 								"start": 738,
 								"end": 740,
-								"loc": {
-									"start": {
-										"line": 28,
-										"column": 15
-									},
-									"end": {
-										"line": 28,
-										"column": 17
-									}
-								},
 								"body": []
 							},
 							"leadingComments": [
@@ -1159,58 +529,18 @@
 					"type": "ExpressionStatement",
 					"start": 753,
 					"end": 768,
-					"loc": {
-						"start": {
-							"line": 30,
-							"column": 1
-						},
-						"end": {
-							"line": 30,
-							"column": 16
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 753,
 						"end": 767,
-						"loc": {
-							"start": {
-								"line": 30,
-								"column": 1
-							},
-							"end": {
-								"line": 30,
-								"column": 15
-							}
-						},
 						"callee": {
 							"type": "ClassExpression",
 							"start": 754,
 							"end": 764,
-							"loc": {
-								"start": {
-									"line": 30,
-									"column": 2
-								},
-								"end": {
-									"line": 30,
-									"column": 12
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 760,
 								"end": 761,
-								"loc": {
-									"start": {
-										"line": 30,
-										"column": 8
-									},
-									"end": {
-										"line": 30,
-										"column": 9
-									}
-								},
 								"name": "A"
 							},
 							"superClass": null,
@@ -1218,16 +548,6 @@
 								"type": "ClassBody",
 								"start": 762,
 								"end": 764,
-								"loc": {
-									"start": {
-										"line": 30,
-										"column": 10
-									},
-									"end": {
-										"line": 30,
-										"column": 12
-									}
-								},
 								"body": []
 							}
 						},
@@ -1247,44 +567,14 @@
 					"type": "ExpressionStatement",
 					"start": 1002,
 					"end": 1024,
-					"loc": {
-						"start": {
-							"line": 35,
-							"column": 1
-						},
-						"end": {
-							"line": 35,
-							"column": 23
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 1002,
 						"end": 1023,
-						"loc": {
-							"start": {
-								"line": 35,
-								"column": 1
-							},
-							"end": {
-								"line": 35,
-								"column": 22
-							}
-						},
 						"callee": {
 							"type": "ArrowFunctionExpression",
 							"start": 1003,
 							"end": 1011,
-							"loc": {
-								"start": {
-									"line": 35,
-									"column": 2
-								},
-								"end": {
-									"line": 35,
-									"column": 10
-								}
-							},
 							"id": null,
 							"expression": false,
 							"generator": false,
@@ -1294,16 +584,6 @@
 								"type": "BlockStatement",
 								"start": 1009,
 								"end": 1011,
-								"loc": {
-									"start": {
-										"line": 35,
-										"column": 8
-									},
-									"end": {
-										"line": 35,
-										"column": 10
-									}
-								},
 								"body": []
 							},
 							"trailingComments": [
@@ -1343,44 +623,14 @@
 					"type": "ExpressionStatement",
 					"start": 1026,
 					"end": 1056,
-					"loc": {
-						"start": {
-							"line": 36,
-							"column": 1
-						},
-						"end": {
-							"line": 38,
-							"column": 5
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 1026,
 						"end": 1055,
-						"loc": {
-							"start": {
-								"line": 36,
-								"column": 1
-							},
-							"end": {
-								"line": 38,
-								"column": 4
-							}
-						},
 						"callee": {
 							"type": "FunctionExpression",
 							"start": 1030,
 							"end": 1044,
-							"loc": {
-								"start": {
-									"line": 37,
-									"column": 2
-								},
-								"end": {
-									"line": 37,
-									"column": 16
-								}
-							},
 							"id": null,
 							"expression": false,
 							"generator": false,
@@ -1390,16 +640,6 @@
 								"type": "BlockStatement",
 								"start": 1042,
 								"end": 1044,
-								"loc": {
-									"start": {
-										"line": 37,
-										"column": 14
-									},
-									"end": {
-										"line": 37,
-										"column": 16
-									}
-								},
 								"body": []
 							},
 							"trailingComments": [
@@ -1419,58 +659,18 @@
 					"type": "ExpressionStatement",
 					"start": 1058,
 					"end": 1083,
-					"loc": {
-						"start": {
-							"line": 39,
-							"column": 1
-						},
-						"end": {
-							"line": 39,
-							"column": 26
-						}
-					},
 					"expression": {
 						"type": "MemberExpression",
 						"start": 1058,
 						"end": 1082,
-						"loc": {
-							"start": {
-								"line": 39,
-								"column": 1
-							},
-							"end": {
-								"line": 39,
-								"column": 25
-							}
-						},
 						"object": {
 							"type": "CallExpression",
 							"start": 1058,
 							"end": 1080,
-							"loc": {
-								"start": {
-									"line": 39,
-									"column": 1
-								},
-								"end": {
-									"line": 39,
-									"column": 23
-								}
-							},
 							"callee": {
 								"type": "ArrowFunctionExpression",
 								"start": 1059,
 								"end": 1067,
-								"loc": {
-									"start": {
-										"line": 39,
-										"column": 2
-									},
-									"end": {
-										"line": 39,
-										"column": 10
-									}
-								},
 								"id": null,
 								"expression": false,
 								"generator": false,
@@ -1480,16 +680,6 @@
 									"type": "BlockStatement",
 									"start": 1065,
 									"end": 1067,
-									"loc": {
-										"start": {
-											"line": 39,
-											"column": 8
-										},
-										"end": {
-											"line": 39,
-											"column": 10
-										}
-									},
 									"body": []
 								},
 								"trailingComments": [
@@ -1508,16 +698,6 @@
 							"type": "Identifier",
 							"start": 1081,
 							"end": 1082,
-							"loc": {
-								"start": {
-									"line": 39,
-									"column": 24
-								},
-								"end": {
-									"line": 39,
-									"column": 25
-								}
-							},
 							"name": "p"
 						},
 						"computed": false,
@@ -1528,44 +708,14 @@
 					"type": "ExpressionStatement",
 					"start": 1085,
 					"end": 1111,
-					"loc": {
-						"start": {
-							"line": 40,
-							"column": 1
-						},
-						"end": {
-							"line": 40,
-							"column": 27
-						}
-					},
 					"expression": {
 						"type": "TaggedTemplateExpression",
 						"start": 1085,
 						"end": 1110,
-						"loc": {
-							"start": {
-								"line": 40,
-								"column": 1
-							},
-							"end": {
-								"line": 40,
-								"column": 26
-							}
-						},
 						"tag": {
 							"type": "ArrowFunctionExpression",
 							"start": 1086,
 							"end": 1094,
-							"loc": {
-								"start": {
-									"line": 40,
-									"column": 2
-								},
-								"end": {
-									"line": 40,
-									"column": 10
-								}
-							},
 							"id": null,
 							"expression": false,
 							"generator": false,
@@ -1575,16 +725,6 @@
 								"type": "BlockStatement",
 								"start": 1092,
 								"end": 1094,
-								"loc": {
-									"start": {
-										"line": 40,
-										"column": 8
-									},
-									"end": {
-										"line": 40,
-										"column": 10
-									}
-								},
 								"body": []
 							},
 							"trailingComments": [
@@ -1600,32 +740,12 @@
 							"type": "TemplateLiteral",
 							"start": 1105,
 							"end": 1110,
-							"loc": {
-								"start": {
-									"line": 40,
-									"column": 21
-								},
-								"end": {
-									"line": 40,
-									"column": 26
-								}
-							},
 							"expressions": [],
 							"quasis": [
 								{
 									"type": "TemplateElement",
 									"start": 1106,
 									"end": 1109,
-									"loc": {
-										"start": {
-											"line": 40,
-											"column": 22
-										},
-										"end": {
-											"line": 40,
-											"column": 25
-										}
-									},
 									"value": {
 										"raw": "tpl",
 										"cooked": "tpl"
@@ -1640,44 +760,14 @@
 					"type": "ExpressionStatement",
 					"start": 1312,
 					"end": 1349,
-					"loc": {
-						"start": {
-							"line": 45,
-							"column": 1
-						},
-						"end": {
-							"line": 48,
-							"column": 5
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 1312,
 						"end": 1348,
-						"loc": {
-							"start": {
-								"line": 45,
-								"column": 1
-							},
-							"end": {
-								"line": 48,
-								"column": 4
-							}
-						},
 						"callee": {
 							"type": "ArrowFunctionExpression",
 							"start": 1325,
 							"end": 1333,
-							"loc": {
-								"start": {
-									"line": 47,
-									"column": 2
-								},
-								"end": {
-									"line": 47,
-									"column": 10
-								}
-							},
 							"id": null,
 							"expression": false,
 							"generator": false,
@@ -1687,16 +777,6 @@
 								"type": "BlockStatement",
 								"start": 1331,
 								"end": 1333,
-								"loc": {
-									"start": {
-										"line": 47,
-										"column": 8
-									},
-									"end": {
-										"line": 47,
-										"column": 10
-									}
-								},
 								"body": []
 							},
 							"leadingComments": [
@@ -1744,44 +824,14 @@
 					"type": "ExpressionStatement",
 					"start": 1351,
 					"end": 1391,
-					"loc": {
-						"start": {
-							"line": 49,
-							"column": 1
-						},
-						"end": {
-							"line": 52,
-							"column": 5
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 1351,
 						"end": 1390,
-						"loc": {
-							"start": {
-								"line": 49,
-								"column": 1
-							},
-							"end": {
-								"line": 52,
-								"column": 4
-							}
-						},
 						"callee": {
 							"type": "ArrowFunctionExpression",
 							"start": 1364,
 							"end": 1378,
-							"loc": {
-								"start": {
-									"line": 51,
-									"column": 2
-								},
-								"end": {
-									"line": 51,
-									"column": 16
-								}
-							},
 							"id": null,
 							"expression": false,
 							"generator": false,
@@ -1791,16 +841,6 @@
 								"type": "BlockStatement",
 								"start": 1376,
 								"end": 1378,
-								"loc": {
-									"start": {
-										"line": 51,
-										"column": 14
-									},
-									"end": {
-										"line": 51,
-										"column": 16
-									}
-								},
 								"body": []
 							},
 							"leadingComments": [
@@ -1828,44 +868,14 @@
 					"type": "ExpressionStatement",
 					"start": 1539,
 					"end": 1562,
-					"loc": {
-						"start": {
-							"line": 56,
-							"column": 1
-						},
-						"end": {
-							"line": 56,
-							"column": 24
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 1539,
 						"end": 1561,
-						"loc": {
-							"start": {
-								"line": 56,
-								"column": 1
-							},
-							"end": {
-								"line": 56,
-								"column": 23
-							}
-						},
 						"callee": {
 							"type": "ArrowFunctionExpression",
 							"start": 1540,
 							"end": 1548,
-							"loc": {
-								"start": {
-									"line": 56,
-									"column": 2
-								},
-								"end": {
-									"line": 56,
-									"column": 10
-								}
-							},
 							"id": null,
 							"expression": false,
 							"generator": false,
@@ -1875,16 +885,6 @@
 								"type": "BlockStatement",
 								"start": 1546,
 								"end": 1548,
-								"loc": {
-									"start": {
-										"line": 56,
-										"column": 8
-									},
-									"end": {
-										"line": 56,
-										"column": 10
-									}
-								},
 								"body": []
 							},
 							"trailingComments": [
@@ -1918,90 +918,30 @@
 					"type": "ExpressionStatement",
 					"start": 1564,
 					"end": 1588,
-					"loc": {
-						"start": {
-							"line": 57,
-							"column": 1
-						},
-						"end": {
-							"line": 57,
-							"column": 25
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 1564,
 						"end": 1587,
-						"loc": {
-							"start": {
-								"line": 57,
-								"column": 1
-							},
-							"end": {
-								"line": 57,
-								"column": 24
-							}
-						},
 						"callee": {
 							"type": "ConditionalExpression",
 							"start": 1565,
 							"end": 1574,
-							"loc": {
-								"start": {
-									"line": 57,
-									"column": 2
-								},
-								"end": {
-									"line": 57,
-									"column": 11
-								}
-							},
 							"test": {
 								"type": "Identifier",
 								"start": 1565,
 								"end": 1566,
-								"loc": {
-									"start": {
-										"line": 57,
-										"column": 2
-									},
-									"end": {
-										"line": 57,
-										"column": 3
-									}
-								},
 								"name": "a"
 							},
 							"consequent": {
 								"type": "Identifier",
 								"start": 1569,
 								"end": 1570,
-								"loc": {
-									"start": {
-										"line": 57,
-										"column": 6
-									},
-									"end": {
-										"line": 57,
-										"column": 7
-									}
-								},
 								"name": "b"
 							},
 							"alternate": {
 								"type": "Identifier",
 								"start": 1573,
 								"end": 1574,
-								"loc": {
-									"start": {
-										"line": 57,
-										"column": 10
-									},
-									"end": {
-										"line": 57,
-										"column": 11
-									}
-								},
 								"name": "c"
 							},
 							"trailingComments": [
@@ -2026,18 +966,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

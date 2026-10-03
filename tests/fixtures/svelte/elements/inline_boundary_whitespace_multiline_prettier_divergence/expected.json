@@ -25,18 +25,6 @@
 				"start": 85,
 				"end": 123,
 				"name": "span",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 86
-					},
-					"end": {
-						"line": 2,
-						"column": 5,
-						"character": 90
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -53,18 +41,6 @@
 							"start": 99,
 							"end": 115,
 							"name": "div",
-							"name_loc": {
-								"start": {
-									"line": 4,
-									"column": 2,
-									"character": 100
-								},
-								"end": {
-									"line": 4,
-									"column": 5,
-									"character": 103
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -114,18 +90,6 @@
 				"start": 170,
 				"end": 210,
 				"name": "span",
-				"name_loc": {
-					"start": {
-						"line": 8,
-						"column": 1,
-						"character": 171
-					},
-					"end": {
-						"line": 8,
-						"column": 5,
-						"character": 175
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -146,16 +110,6 @@
 								"type": "Identifier",
 								"start": 187,
 								"end": 191,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 10
-									},
-									"end": {
-										"line": 9,
-										"column": 14
-									}
-								},
 								"name": "cond"
 							},
 							"consequent": {
@@ -207,18 +161,6 @@
 				"start": 282,
 				"end": 328,
 				"name": "span",
-				"name_loc": {
-					"start": {
-						"line": 13,
-						"column": 1,
-						"character": 283
-					},
-					"end": {
-						"line": 13,
-						"column": 5,
-						"character": 287
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -235,18 +177,6 @@
 							"start": 297,
 							"end": 313,
 							"name": "div",
-							"name_loc": {
-								"start": {
-									"line": 15,
-									"column": 2,
-									"character": 298
-								},
-								"end": {
-									"line": 15,
-									"column": 5,
-									"character": 301
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",

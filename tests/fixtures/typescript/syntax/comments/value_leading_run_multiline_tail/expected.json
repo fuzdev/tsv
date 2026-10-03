@@ -14,1105 +14,415 @@
 			"type": "Line",
 			"value": " variable initializer: a multi-line comment glued to the value prints outside the",
 			"start": 20,
-			"end": 103,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 84
-				}
-			}
+			"end": 103
 		},
 		{
 			"type": "Line",
 			"value": " value's own group, so the value keeps its own layout",
 			"start": 105,
-			"end": 160,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 56
-				}
-			}
+			"end": 160
 		},
 		{
 			"type": "Block",
 			"value": " x ",
 			"start": 175,
-			"end": 182,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 2
-				},
-				"end": {
-					"line": 5,
-					"column": 9
-				}
-			}
+			"end": 182
 		},
 		{
 			"type": "Block",
 			"value": " y\n ",
 			"start": 185,
-			"end": 195,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 2
-				},
-				"end": {
-					"line": 7,
-					"column": 5
-				}
-			}
+			"end": 195
 		},
 		{
 			"type": "Line",
 			"value": " a preserved multi-line comment: same rule",
 			"start": 215,
-			"end": 259,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 1
-				},
-				"end": {
-					"line": 9,
-					"column": 45
-				}
-			}
+			"end": 259
 		},
 		{
 			"type": "Block",
 			"value": " x ",
 			"start": 274,
-			"end": 281,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 2
-				},
-				"end": {
-					"line": 11,
-					"column": 9
-				}
-			}
+			"end": 281
 		},
 		{
 			"type": "Block",
 			"value": " y\nz ",
 			"start": 284,
-			"end": 293,
-			"loc": {
-				"start": {
-					"line": 12,
-					"column": 2
-				},
-				"end": {
-					"line": 13,
-					"column": 4
-				}
-			}
+			"end": 293
 		},
 		{
 			"type": "Line",
 			"value": " the break between the comments carries an author blank",
 			"start": 313,
-			"end": 370,
-			"loc": {
-				"start": {
-					"line": 15,
-					"column": 1
-				},
-				"end": {
-					"line": 15,
-					"column": 58
-				}
-			}
+			"end": 370
 		},
 		{
 			"type": "Block",
 			"value": " x ",
 			"start": 385,
-			"end": 392,
-			"loc": {
-				"start": {
-					"line": 17,
-					"column": 2
-				},
-				"end": {
-					"line": 17,
-					"column": 9
-				}
-			}
+			"end": 392
 		},
 		{
 			"type": "Block",
 			"value": " y\n ",
 			"start": 396,
-			"end": 406,
-			"loc": {
-				"start": {
-					"line": 19,
-					"column": 2
-				},
-				"end": {
-					"line": 20,
-					"column": 5
-				}
-			}
+			"end": 406
 		},
 		{
 			"type": "Line",
 			"value": " a value that breaks on its own",
 			"start": 426,
-			"end": 459,
-			"loc": {
-				"start": {
-					"line": 22,
-					"column": 1
-				},
-				"end": {
-					"line": 22,
-					"column": 34
-				}
-			}
+			"end": 459
 		},
 		{
 			"type": "Block",
 			"value": " x ",
 			"start": 474,
-			"end": 481,
-			"loc": {
-				"start": {
-					"line": 24,
-					"column": 2
-				},
-				"end": {
-					"line": 24,
-					"column": 9
-				}
-			}
+			"end": 481
 		},
 		{
 			"type": "Block",
 			"value": " y\n ",
 			"start": 484,
-			"end": 494,
-			"loc": {
-				"start": {
-					"line": 25,
-					"column": 2
-				},
-				"end": {
-					"line": 26,
-					"column": 5
-				}
-			}
+			"end": 494
 		},
 		{
 			"type": "Line",
 			"value": " expression-statement assignment: same rule",
 			"start": 514,
-			"end": 559,
-			"loc": {
-				"start": {
-					"line": 30,
-					"column": 1
-				},
-				"end": {
-					"line": 30,
-					"column": 46
-				}
-			}
+			"end": 559
 		},
 		{
 			"type": "Block",
 			"value": " x ",
 			"start": 577,
-			"end": 584,
-			"loc": {
-				"start": {
-					"line": 33,
-					"column": 2
-				},
-				"end": {
-					"line": 33,
-					"column": 9
-				}
-			}
+			"end": 584
 		},
 		{
 			"type": "Block",
 			"value": " y\n ",
 			"start": 587,
-			"end": 597,
-			"loc": {
-				"start": {
-					"line": 34,
-					"column": 2
-				},
-				"end": {
-					"line": 35,
-					"column": 5
-				}
-			}
+			"end": 597
 		},
 		{
 			"type": "Line",
 			"value": " a line comment on the operator's line: the value still keeps its own layout",
 			"start": 617,
-			"end": 695,
-			"loc": {
-				"start": {
-					"line": 37,
-					"column": 1
-				},
-				"end": {
-					"line": 37,
-					"column": 79
-				}
-			}
+			"end": 695
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 709,
-			"end": 713,
-			"loc": {
-				"start": {
-					"line": 38,
-					"column": 13
-				},
-				"end": {
-					"line": 38,
-					"column": 17
-				}
-			}
+			"end": 713
 		},
 		{
 			"type": "Block",
 			"value": " y\n ",
 			"start": 716,
-			"end": 726,
-			"loc": {
-				"start": {
-					"line": 39,
-					"column": 2
-				},
-				"end": {
-					"line": 40,
-					"column": 5
-				}
-			}
+			"end": 726
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 761,
-			"end": 765,
-			"loc": {
-				"start": {
-					"line": 42,
-					"column": 7
-				},
-				"end": {
-					"line": 42,
-					"column": 11
-				}
-			}
+			"end": 765
 		},
 		{
 			"type": "Block",
 			"value": " y\n ",
 			"start": 768,
-			"end": 778,
-			"loc": {
-				"start": {
-					"line": 43,
-					"column": 2
-				},
-				"end": {
-					"line": 44,
-					"column": 5
-				}
-			}
+			"end": 778
 		},
 		{
 			"type": "Line",
 			"value": " arrow body: same rule",
 			"start": 798,
-			"end": 822,
-			"loc": {
-				"start": {
-					"line": 46,
-					"column": 1
-				},
-				"end": {
-					"line": 46,
-					"column": 25
-				}
-			}
+			"end": 822
 		},
 		{
 			"type": "Block",
 			"value": " x ",
 			"start": 843,
-			"end": 850,
-			"loc": {
-				"start": {
-					"line": 48,
-					"column": 2
-				},
-				"end": {
-					"line": 48,
-					"column": 9
-				}
-			}
+			"end": 850
 		},
 		{
 			"type": "Block",
 			"value": " y\n ",
 			"start": 853,
-			"end": 863,
-			"loc": {
-				"start": {
-					"line": 49,
-					"column": 2
-				},
-				"end": {
-					"line": 50,
-					"column": 5
-				}
-			}
+			"end": 863
 		},
 		{
 			"type": "Line",
 			"value": " arrow body with an author blank between the comments",
 			"start": 883,
-			"end": 938,
-			"loc": {
-				"start": {
-					"line": 52,
-					"column": 1
-				},
-				"end": {
-					"line": 52,
-					"column": 56
-				}
-			}
+			"end": 938
 		},
 		{
 			"type": "Block",
 			"value": " x ",
 			"start": 959,
-			"end": 966,
-			"loc": {
-				"start": {
-					"line": 54,
-					"column": 2
-				},
-				"end": {
-					"line": 54,
-					"column": 9
-				}
-			}
+			"end": 966
 		},
 		{
 			"type": "Block",
 			"value": " y\n ",
 			"start": 970,
-			"end": 980,
-			"loc": {
-				"start": {
-					"line": 56,
-					"column": 2
-				},
-				"end": {
-					"line": 57,
-					"column": 5
-				}
-			}
+			"end": 980
 		},
 		{
 			"type": "Line",
 			"value": " an arrow body that is not a ternary: same rule",
 			"start": 1000,
-			"end": 1049,
-			"loc": {
-				"start": {
-					"line": 59,
-					"column": 1
-				},
-				"end": {
-					"line": 59,
-					"column": 50
-				}
-			}
+			"end": 1049
 		},
 		{
 			"type": "Block",
 			"value": " x ",
 			"start": 1071,
-			"end": 1078,
-			"loc": {
-				"start": {
-					"line": 61,
-					"column": 2
-				},
-				"end": {
-					"line": 61,
-					"column": 9
-				}
-			}
+			"end": 1078
 		},
 		{
 			"type": "Block",
 			"value": " y\n ",
 			"start": 1081,
-			"end": 1091,
-			"loc": {
-				"start": {
-					"line": 62,
-					"column": 2
-				},
-				"end": {
-					"line": 63,
-					"column": 5
-				}
-			}
+			"end": 1091
 		},
 		{
 			"type": "Line",
 			"value": " the same arrow as a call argument",
 			"start": 1105,
-			"end": 1141,
-			"loc": {
-				"start": {
-					"line": 65,
-					"column": 1
-				},
-				"end": {
-					"line": 65,
-					"column": 37
-				}
-			}
+			"end": 1141
 		},
 		{
 			"type": "Block",
 			"value": " x ",
 			"start": 1155,
-			"end": 1162,
-			"loc": {
-				"start": {
-					"line": 67,
-					"column": 2
-				},
-				"end": {
-					"line": 67,
-					"column": 9
-				}
-			}
+			"end": 1162
 		},
 		{
 			"type": "Block",
 			"value": " y\n ",
 			"start": 1165,
-			"end": 1175,
-			"loc": {
-				"start": {
-					"line": 68,
-					"column": 2
-				},
-				"end": {
-					"line": 69,
-					"column": 5
-				}
-			}
+			"end": 1175
 		},
 		{
 			"type": "Line",
 			"value": " the same arrow as a `new` argument",
 			"start": 1198,
-			"end": 1235,
-			"loc": {
-				"start": {
-					"line": 72,
-					"column": 1
-				},
-				"end": {
-					"line": 72,
-					"column": 38
-				}
-			}
+			"end": 1235
 		},
 		{
 			"type": "Block",
 			"value": " x ",
 			"start": 1253,
-			"end": 1260,
-			"loc": {
-				"start": {
-					"line": 74,
-					"column": 2
-				},
-				"end": {
-					"line": 74,
-					"column": 9
-				}
-			}
+			"end": 1260
 		},
 		{
 			"type": "Block",
 			"value": " y\n ",
 			"start": 1263,
-			"end": 1273,
-			"loc": {
-				"start": {
-					"line": 75,
-					"column": 2
-				},
-				"end": {
-					"line": 76,
-					"column": 5
-				}
-			}
+			"end": 1273
 		},
 		{
 			"type": "Line",
 			"value": " the same arrow as a member-chain argument",
 			"start": 1296,
-			"end": 1340,
-			"loc": {
-				"start": {
-					"line": 79,
-					"column": 1
-				},
-				"end": {
-					"line": 79,
-					"column": 45
-				}
-			}
+			"end": 1340
 		},
 		{
 			"type": "Block",
 			"value": " x ",
 			"start": 1358,
-			"end": 1365,
-			"loc": {
-				"start": {
-					"line": 81,
-					"column": 2
-				},
-				"end": {
-					"line": 81,
-					"column": 9
-				}
-			}
+			"end": 1365
 		},
 		{
 			"type": "Block",
 			"value": " y\n ",
 			"start": 1368,
-			"end": 1378,
-			"loc": {
-				"start": {
-					"line": 82,
-					"column": 2
-				},
-				"end": {
-					"line": 83,
-					"column": 5
-				}
-			}
+			"end": 1378
 		},
 		{
 			"type": "Line",
 			"value": " the same arrow as the last of several arguments",
 			"start": 1401,
-			"end": 1451,
-			"loc": {
-				"start": {
-					"line": 86,
-					"column": 1
-				},
-				"end": {
-					"line": 86,
-					"column": 51
-				}
-			}
+			"end": 1451
 		},
 		{
 			"type": "Block",
 			"value": " x ",
 			"start": 1468,
-			"end": 1475,
-			"loc": {
-				"start": {
-					"line": 88,
-					"column": 2
-				},
-				"end": {
-					"line": 88,
-					"column": 9
-				}
-			}
+			"end": 1475
 		},
 		{
 			"type": "Block",
 			"value": " y\n ",
 			"start": 1478,
-			"end": 1488,
-			"loc": {
-				"start": {
-					"line": 89,
-					"column": 2
-				},
-				"end": {
-					"line": 90,
-					"column": 5
-				}
-			}
+			"end": 1488
 		},
 		{
 			"type": "Block",
 			"value": " x ",
 			"start": 1529,
-			"end": 1536,
-			"loc": {
-				"start": {
-					"line": 93,
-					"column": 2
-				},
-				"end": {
-					"line": 93,
-					"column": 9
-				}
-			}
+			"end": 1536
 		},
 		{
 			"type": "Block",
 			"value": " y\n ",
 			"start": 1539,
-			"end": 1549,
-			"loc": {
-				"start": {
-					"line": 94,
-					"column": 2
-				},
-				"end": {
-					"line": 95,
-					"column": 5
-				}
-			}
+			"end": 1549
 		},
 		{
 			"type": "Block",
 			"value": " x ",
 			"start": 1590,
-			"end": 1597,
-			"loc": {
-				"start": {
-					"line": 98,
-					"column": 2
-				},
-				"end": {
-					"line": 98,
-					"column": 9
-				}
-			}
+			"end": 1597
 		},
 		{
 			"type": "Block",
 			"value": " y\n ",
 			"start": 1600,
-			"end": 1610,
-			"loc": {
-				"start": {
-					"line": 99,
-					"column": 2
-				},
-				"end": {
-					"line": 100,
-					"column": 5
-				}
-			}
+			"end": 1610
 		},
 		{
 			"type": "Line",
 			"value": " spread argument: the first comment keeps the dots' line",
 			"start": 1633,
-			"end": 1691,
-			"loc": {
-				"start": {
-					"line": 103,
-					"column": 1
-				},
-				"end": {
-					"line": 103,
-					"column": 59
-				}
-			}
+			"end": 1691
 		},
 		{
 			"type": "Block",
 			"value": " x ",
 			"start": 1711,
-			"end": 1718,
-			"loc": {
-				"start": {
-					"line": 105,
-					"column": 5
-				},
-				"end": {
-					"line": 105,
-					"column": 12
-				}
-			}
+			"end": 1718
 		},
 		{
 			"type": "Block",
 			"value": " y\n ",
 			"start": 1721,
-			"end": 1731,
-			"loc": {
-				"start": {
-					"line": 106,
-					"column": 2
-				},
-				"end": {
-					"line": 107,
-					"column": 5
-				}
-			}
+			"end": 1731
 		},
 		{
 			"type": "Line",
 			"value": " object property value",
 			"start": 1751,
-			"end": 1775,
-			"loc": {
-				"start": {
-					"line": 110,
-					"column": 1
-				},
-				"end": {
-					"line": 110,
-					"column": 25
-				}
-			}
+			"end": 1775
 		},
 		{
 			"type": "Block",
 			"value": " x ",
 			"start": 1798,
-			"end": 1805,
-			"loc": {
-				"start": {
-					"line": 113,
-					"column": 3
-				},
-				"end": {
-					"line": 113,
-					"column": 10
-				}
-			}
+			"end": 1805
 		},
 		{
 			"type": "Block",
 			"value": " y\n ",
 			"start": 1809,
-			"end": 1820,
-			"loc": {
-				"start": {
-					"line": 114,
-					"column": 3
-				},
-				"end": {
-					"line": 115,
-					"column": 6
-				}
-			}
+			"end": 1820
 		},
 		{
 			"type": "Line",
 			"value": " class property",
 			"start": 1843,
-			"end": 1860,
-			"loc": {
-				"start": {
-					"line": 118,
-					"column": 1
-				},
-				"end": {
-					"line": 118,
-					"column": 18
-				}
-			}
+			"end": 1860
 		},
 		{
 			"type": "Block",
 			"value": " x ",
 			"start": 1881,
-			"end": 1888,
-			"loc": {
-				"start": {
-					"line": 121,
-					"column": 3
-				},
-				"end": {
-					"line": 121,
-					"column": 10
-				}
-			}
+			"end": 1888
 		},
 		{
 			"type": "Block",
 			"value": " y\n ",
 			"start": 1892,
-			"end": 1903,
-			"loc": {
-				"start": {
-					"line": 122,
-					"column": 3
-				},
-				"end": {
-					"line": 123,
-					"column": 6
-				}
-			}
+			"end": 1903
 		},
 		{
 			"type": "Line",
 			"value": " class property with a line comment on the operator's line, and on a line of its own",
 			"start": 1926,
-			"end": 2012,
-			"loc": {
-				"start": {
-					"line": 126,
-					"column": 1
-				},
-				"end": {
-					"line": 126,
-					"column": 87
-				}
-			}
+			"end": 2012
 		},
 		{
 			"type": "Line",
 			"value": " x",
 			"start": 2031,
-			"end": 2035,
-			"loc": {
-				"start": {
-					"line": 128,
-					"column": 7
-				},
-				"end": {
-					"line": 128,
-					"column": 11
-				}
-			}
+			"end": 2035
 		},
 		{
 			"type": "Block",
 			"value": " y\n ",
 			"start": 2039,
-			"end": 2050,
-			"loc": {
-				"start": {
-					"line": 129,
-					"column": 3
-				},
-				"end": {
-					"line": 130,
-					"column": 6
-				}
-			}
+			"end": 2050
 		},
 		{
 			"type": "Line",
 			"value": " x",
 			"start": 2078,
-			"end": 2082,
-			"loc": {
-				"start": {
-					"line": 132,
-					"column": 3
-				},
-				"end": {
-					"line": 132,
-					"column": 7
-				}
-			}
+			"end": 2082
 		},
 		{
 			"type": "Block",
 			"value": " y\n ",
 			"start": 2086,
-			"end": 2097,
-			"loc": {
-				"start": {
-					"line": 133,
-					"column": 3
-				},
-				"end": {
-					"line": 134,
-					"column": 6
-				}
-			}
+			"end": 2097
 		},
 		{
 			"type": "Line",
 			"value": " variable type annotation: the first comment keeps the head line",
 			"start": 2120,
-			"end": 2186,
-			"loc": {
-				"start": {
-					"line": 137,
-					"column": 1
-				},
-				"end": {
-					"line": 137,
-					"column": 67
-				}
-			}
+			"end": 2186
 		},
 		{
 			"type": "Block",
 			"value": " x ",
 			"start": 2197,
-			"end": 2204,
-			"loc": {
-				"start": {
-					"line": 138,
-					"column": 10
-				},
-				"end": {
-					"line": 138,
-					"column": 17
-				}
-			}
+			"end": 2204
 		},
 		{
 			"type": "Block",
 			"value": " y\n ",
 			"start": 2206,
-			"end": 2215,
-			"loc": {
-				"start": {
-					"line": 139,
-					"column": 1
-				},
-				"end": {
-					"line": 140,
-					"column": 4
-				}
-			}
+			"end": 2215
 		},
 		{
 			"type": "Line",
 			"value": " function return type: same as the annotation",
 			"start": 2221,
-			"end": 2268,
-			"loc": {
-				"start": {
-					"line": 142,
-					"column": 1
-				},
-				"end": {
-					"line": 142,
-					"column": 48
-				}
-			}
+			"end": 2268
 		},
 		{
 			"type": "Block",
 			"value": " x ",
 			"start": 2285,
-			"end": 2292,
-			"loc": {
-				"start": {
-					"line": 143,
-					"column": 16
-				},
-				"end": {
-					"line": 143,
-					"column": 23
-				}
-			}
+			"end": 2292
 		},
 		{
 			"type": "Block",
 			"value": " y\n ",
 			"start": 2294,
-			"end": 2303,
-			"loc": {
-				"start": {
-					"line": 144,
-					"column": 1
-				},
-				"end": {
-					"line": 145,
-					"column": 4
-				}
-			}
+			"end": 2303
 		},
 		{
 			"type": "Line",
 			"value": " type alias: the break between the comments carries an author blank",
 			"start": 2311,
-			"end": 2380,
-			"loc": {
-				"start": {
-					"line": 147,
-					"column": 1
-				},
-				"end": {
-					"line": 147,
-					"column": 70
-				}
-			}
+			"end": 2380
 		},
 		{
 			"type": "Block",
 			"value": " x ",
 			"start": 2394,
-			"end": 2401,
-			"loc": {
-				"start": {
-					"line": 149,
-					"column": 2
-				},
-				"end": {
-					"line": 149,
-					"column": 9
-				}
-			}
+			"end": 2401
 		},
 		{
 			"type": "Block",
 			"value": " y\n ",
 			"start": 2405,
-			"end": 2415,
-			"loc": {
-				"start": {
-					"line": 151,
-					"column": 2
-				},
-				"end": {
-					"line": 152,
-					"column": 5
-				}
-			}
+			"end": 2415
 		}
 	],
 	"instance": {
@@ -1124,122 +434,42 @@
 			"type": "Program",
 			"start": 18,
 			"end": 2419,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 153,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 162,
 					"end": 212,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 7,
-							"column": 22
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 168,
 							"end": 211,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 7
-								},
-								"end": {
-									"line": 7,
-									"column": 21
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 168,
 								"end": 170,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 7
-									},
-									"end": {
-										"line": 4,
-										"column": 9
-									}
-								},
 								"name": "a1"
 							},
 							"init": {
 								"type": "ConditionalExpression",
 								"start": 196,
 								"end": 211,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 6
-									},
-									"end": {
-										"line": 7,
-										"column": 21
-									}
-								},
 								"test": {
 									"type": "Identifier",
 									"start": 196,
 									"end": 199,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 6
-										},
-										"end": {
-											"line": 7,
-											"column": 9
-										}
-									},
 									"name": "aaa"
 								},
 								"consequent": {
 									"type": "Identifier",
 									"start": 202,
 									"end": 205,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 12
-										},
-										"end": {
-											"line": 7,
-											"column": 15
-										}
-									},
 									"name": "bbb"
 								},
 								"alternate": {
 									"type": "Identifier",
 									"start": 208,
 									"end": 211,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 18
-										},
-										"end": {
-											"line": 7,
-											"column": 21
-										}
-									},
 									"name": "ccc"
 								},
 								"leadingComments": [
@@ -1279,107 +509,37 @@
 					"type": "VariableDeclaration",
 					"start": 261,
 					"end": 310,
-					"loc": {
-						"start": {
-							"line": 10,
-							"column": 1
-						},
-						"end": {
-							"line": 13,
-							"column": 21
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 267,
 							"end": 309,
-							"loc": {
-								"start": {
-									"line": 10,
-									"column": 7
-								},
-								"end": {
-									"line": 13,
-									"column": 20
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 267,
 								"end": 269,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 7
-									},
-									"end": {
-										"line": 10,
-										"column": 9
-									}
-								},
 								"name": "a2"
 							},
 							"init": {
 								"type": "ConditionalExpression",
 								"start": 294,
 								"end": 309,
-								"loc": {
-									"start": {
-										"line": 13,
-										"column": 5
-									},
-									"end": {
-										"line": 13,
-										"column": 20
-									}
-								},
 								"test": {
 									"type": "Identifier",
 									"start": 294,
 									"end": 297,
-									"loc": {
-										"start": {
-											"line": 13,
-											"column": 5
-										},
-										"end": {
-											"line": 13,
-											"column": 8
-										}
-									},
 									"name": "aaa"
 								},
 								"consequent": {
 									"type": "Identifier",
 									"start": 300,
 									"end": 303,
-									"loc": {
-										"start": {
-											"line": 13,
-											"column": 11
-										},
-										"end": {
-											"line": 13,
-											"column": 14
-										}
-									},
 									"name": "bbb"
 								},
 								"alternate": {
 									"type": "Identifier",
 									"start": 306,
 									"end": 309,
-									"loc": {
-										"start": {
-											"line": 13,
-											"column": 17
-										},
-										"end": {
-											"line": 13,
-											"column": 20
-										}
-									},
 									"name": "ccc"
 								},
 								"leadingComments": [
@@ -1413,107 +573,37 @@
 					"type": "VariableDeclaration",
 					"start": 372,
 					"end": 423,
-					"loc": {
-						"start": {
-							"line": 16,
-							"column": 1
-						},
-						"end": {
-							"line": 20,
-							"column": 22
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 378,
 							"end": 422,
-							"loc": {
-								"start": {
-									"line": 16,
-									"column": 7
-								},
-								"end": {
-									"line": 20,
-									"column": 21
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 378,
 								"end": 380,
-								"loc": {
-									"start": {
-										"line": 16,
-										"column": 7
-									},
-									"end": {
-										"line": 16,
-										"column": 9
-									}
-								},
 								"name": "a3"
 							},
 							"init": {
 								"type": "ConditionalExpression",
 								"start": 407,
 								"end": 422,
-								"loc": {
-									"start": {
-										"line": 20,
-										"column": 6
-									},
-									"end": {
-										"line": 20,
-										"column": 21
-									}
-								},
 								"test": {
 									"type": "Identifier",
 									"start": 407,
 									"end": 410,
-									"loc": {
-										"start": {
-											"line": 20,
-											"column": 6
-										},
-										"end": {
-											"line": 20,
-											"column": 9
-										}
-									},
 									"name": "aaa"
 								},
 								"consequent": {
 									"type": "Identifier",
 									"start": 413,
 									"end": 416,
-									"loc": {
-										"start": {
-											"line": 20,
-											"column": 12
-										},
-										"end": {
-											"line": 20,
-											"column": 15
-										}
-									},
 									"name": "bbb"
 								},
 								"alternate": {
 									"type": "Identifier",
 									"start": 419,
 									"end": 422,
-									"loc": {
-										"start": {
-											"line": 20,
-											"column": 18
-										},
-										"end": {
-											"line": 20,
-											"column": 21
-										}
-									},
 									"name": "ccc"
 								},
 								"leadingComments": [
@@ -1547,76 +637,26 @@
 					"type": "VariableDeclaration",
 					"start": 461,
 					"end": 511,
-					"loc": {
-						"start": {
-							"line": 23,
-							"column": 1
-						},
-						"end": {
-							"line": 28,
-							"column": 4
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 467,
 							"end": 510,
-							"loc": {
-								"start": {
-									"line": 23,
-									"column": 7
-								},
-								"end": {
-									"line": 28,
-									"column": 3
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 467,
 								"end": 469,
-								"loc": {
-									"start": {
-										"line": 23,
-										"column": 7
-									},
-									"end": {
-										"line": 23,
-										"column": 9
-									}
-								},
 								"name": "a4"
 							},
 							"init": {
 								"type": "ObjectExpression",
 								"start": 495,
 								"end": 510,
-								"loc": {
-									"start": {
-										"line": 26,
-										"column": 6
-									},
-									"end": {
-										"line": 28,
-										"column": 3
-									}
-								},
 								"properties": [
 									{
 										"type": "Property",
 										"start": 500,
 										"end": 506,
-										"loc": {
-											"start": {
-												"line": 27,
-												"column": 3
-											},
-											"end": {
-												"line": 27,
-												"column": 9
-											}
-										},
 										"method": false,
 										"shorthand": false,
 										"computed": false,
@@ -1624,32 +664,12 @@
 											"type": "Identifier",
 											"start": 500,
 											"end": 503,
-											"loc": {
-												"start": {
-													"line": 27,
-													"column": 3
-												},
-												"end": {
-													"line": 27,
-													"column": 6
-												}
-											},
 											"name": "aaa"
 										},
 										"value": {
 											"type": "Literal",
 											"start": 505,
 											"end": 506,
-											"loc": {
-												"start": {
-													"line": 27,
-													"column": 8
-												},
-												"end": {
-													"line": 27,
-													"column": 9
-												}
-											},
 											"value": 1,
 											"raw": "1"
 										},
@@ -1687,45 +707,15 @@
 					"type": "VariableDeclaration",
 					"start": 561,
 					"end": 568,
-					"loc": {
-						"start": {
-							"line": 31,
-							"column": 1
-						},
-						"end": {
-							"line": 31,
-							"column": 8
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 565,
 							"end": 567,
-							"loc": {
-								"start": {
-									"line": 31,
-									"column": 5
-								},
-								"end": {
-									"line": 31,
-									"column": 7
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 565,
 								"end": 567,
-								"loc": {
-									"start": {
-										"line": 31,
-										"column": 5
-									},
-									"end": {
-										"line": 31,
-										"column": 7
-									}
-								},
 								"name": "a5"
 							},
 							"init": null
@@ -1745,107 +735,37 @@
 					"type": "ExpressionStatement",
 					"start": 570,
 					"end": 614,
-					"loc": {
-						"start": {
-							"line": 32,
-							"column": 1
-						},
-						"end": {
-							"line": 35,
-							"column": 22
-						}
-					},
 					"expression": {
 						"type": "AssignmentExpression",
 						"start": 570,
 						"end": 613,
-						"loc": {
-							"start": {
-								"line": 32,
-								"column": 1
-							},
-							"end": {
-								"line": 35,
-								"column": 21
-							}
-						},
 						"operator": "=",
 						"left": {
 							"type": "Identifier",
 							"start": 570,
 							"end": 572,
-							"loc": {
-								"start": {
-									"line": 32,
-									"column": 1
-								},
-								"end": {
-									"line": 32,
-									"column": 3
-								}
-							},
 							"name": "a5"
 						},
 						"right": {
 							"type": "ConditionalExpression",
 							"start": 598,
 							"end": 613,
-							"loc": {
-								"start": {
-									"line": 35,
-									"column": 6
-								},
-								"end": {
-									"line": 35,
-									"column": 21
-								}
-							},
 							"test": {
 								"type": "Identifier",
 								"start": 598,
 								"end": 601,
-								"loc": {
-									"start": {
-										"line": 35,
-										"column": 6
-									},
-									"end": {
-										"line": 35,
-										"column": 9
-									}
-								},
 								"name": "aaa"
 							},
 							"consequent": {
 								"type": "Identifier",
 								"start": 604,
 								"end": 607,
-								"loc": {
-									"start": {
-										"line": 35,
-										"column": 12
-									},
-									"end": {
-										"line": 35,
-										"column": 15
-									}
-								},
 								"name": "bbb"
 							},
 							"alternate": {
 								"type": "Identifier",
 								"start": 610,
 								"end": 613,
-								"loc": {
-									"start": {
-										"line": 35,
-										"column": 18
-									},
-									"end": {
-										"line": 35,
-										"column": 21
-									}
-								},
 								"name": "ccc"
 							},
 							"leadingComments": [
@@ -1869,107 +789,37 @@
 					"type": "VariableDeclaration",
 					"start": 697,
 					"end": 743,
-					"loc": {
-						"start": {
-							"line": 38,
-							"column": 1
-						},
-						"end": {
-							"line": 40,
-							"column": 22
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 703,
 							"end": 742,
-							"loc": {
-								"start": {
-									"line": 38,
-									"column": 7
-								},
-								"end": {
-									"line": 40,
-									"column": 21
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 703,
 								"end": 706,
-								"loc": {
-									"start": {
-										"line": 38,
-										"column": 7
-									},
-									"end": {
-										"line": 38,
-										"column": 10
-									}
-								},
 								"name": "a11"
 							},
 							"init": {
 								"type": "ConditionalExpression",
 								"start": 727,
 								"end": 742,
-								"loc": {
-									"start": {
-										"line": 40,
-										"column": 6
-									},
-									"end": {
-										"line": 40,
-										"column": 21
-									}
-								},
 								"test": {
 									"type": "Identifier",
 									"start": 727,
 									"end": 730,
-									"loc": {
-										"start": {
-											"line": 40,
-											"column": 6
-										},
-										"end": {
-											"line": 40,
-											"column": 9
-										}
-									},
 									"name": "aaa"
 								},
 								"consequent": {
 									"type": "Identifier",
 									"start": 733,
 									"end": 736,
-									"loc": {
-										"start": {
-											"line": 40,
-											"column": 12
-										},
-										"end": {
-											"line": 40,
-											"column": 15
-										}
-									},
 									"name": "bbb"
 								},
 								"alternate": {
 									"type": "Identifier",
 									"start": 739,
 									"end": 742,
-									"loc": {
-										"start": {
-											"line": 40,
-											"column": 18
-										},
-										"end": {
-											"line": 40,
-											"column": 21
-										}
-									},
 									"name": "ccc"
 								},
 								"leadingComments": [
@@ -2003,45 +853,15 @@
 					"type": "VariableDeclaration",
 					"start": 745,
 					"end": 753,
-					"loc": {
-						"start": {
-							"line": 41,
-							"column": 1
-						},
-						"end": {
-							"line": 41,
-							"column": 9
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 749,
 							"end": 752,
-							"loc": {
-								"start": {
-									"line": 41,
-									"column": 5
-								},
-								"end": {
-									"line": 41,
-									"column": 8
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 749,
 								"end": 752,
-								"loc": {
-									"start": {
-										"line": 41,
-										"column": 5
-									},
-									"end": {
-										"line": 41,
-										"column": 8
-									}
-								},
 								"name": "a12"
 							},
 							"init": null
@@ -2053,107 +873,37 @@
 					"type": "ExpressionStatement",
 					"start": 755,
 					"end": 795,
-					"loc": {
-						"start": {
-							"line": 42,
-							"column": 1
-						},
-						"end": {
-							"line": 44,
-							"column": 22
-						}
-					},
 					"expression": {
 						"type": "AssignmentExpression",
 						"start": 755,
 						"end": 794,
-						"loc": {
-							"start": {
-								"line": 42,
-								"column": 1
-							},
-							"end": {
-								"line": 44,
-								"column": 21
-							}
-						},
 						"operator": "=",
 						"left": {
 							"type": "Identifier",
 							"start": 755,
 							"end": 758,
-							"loc": {
-								"start": {
-									"line": 42,
-									"column": 1
-								},
-								"end": {
-									"line": 42,
-									"column": 4
-								}
-							},
 							"name": "a12"
 						},
 						"right": {
 							"type": "ConditionalExpression",
 							"start": 779,
 							"end": 794,
-							"loc": {
-								"start": {
-									"line": 44,
-									"column": 6
-								},
-								"end": {
-									"line": 44,
-									"column": 21
-								}
-							},
 							"test": {
 								"type": "Identifier",
 								"start": 779,
 								"end": 782,
-								"loc": {
-									"start": {
-										"line": 44,
-										"column": 6
-									},
-									"end": {
-										"line": 44,
-										"column": 9
-									}
-								},
 								"name": "aaa"
 							},
 							"consequent": {
 								"type": "Identifier",
 								"start": 785,
 								"end": 788,
-								"loc": {
-									"start": {
-										"line": 44,
-										"column": 12
-									},
-									"end": {
-										"line": 44,
-										"column": 15
-									}
-								},
 								"name": "bbb"
 							},
 							"alternate": {
 								"type": "Identifier",
 								"start": 791,
 								"end": 794,
-								"loc": {
-									"start": {
-										"line": 44,
-										"column": 18
-									},
-									"end": {
-										"line": 44,
-										"column": 21
-									}
-								},
 								"name": "ccc"
 							},
 							"leadingComments": [
@@ -2177,61 +927,21 @@
 					"type": "VariableDeclaration",
 					"start": 824,
 					"end": 880,
-					"loc": {
-						"start": {
-							"line": 47,
-							"column": 1
-						},
-						"end": {
-							"line": 50,
-							"column": 22
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 830,
 							"end": 879,
-							"loc": {
-								"start": {
-									"line": 47,
-									"column": 7
-								},
-								"end": {
-									"line": 50,
-									"column": 21
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 830,
 								"end": 832,
-								"loc": {
-									"start": {
-										"line": 47,
-										"column": 7
-									},
-									"end": {
-										"line": 47,
-										"column": 9
-									}
-								},
 								"name": "a6"
 							},
 							"init": {
 								"type": "ArrowFunctionExpression",
 								"start": 835,
 								"end": 879,
-								"loc": {
-									"start": {
-										"line": 47,
-										"column": 12
-									},
-									"end": {
-										"line": 50,
-										"column": 21
-									}
-								},
 								"id": null,
 								"expression": true,
 								"generator": false,
@@ -2241,62 +951,22 @@
 									"type": "ConditionalExpression",
 									"start": 864,
 									"end": 879,
-									"loc": {
-										"start": {
-											"line": 50,
-											"column": 6
-										},
-										"end": {
-											"line": 50,
-											"column": 21
-										}
-									},
 									"test": {
 										"type": "Identifier",
 										"start": 864,
 										"end": 867,
-										"loc": {
-											"start": {
-												"line": 50,
-												"column": 6
-											},
-											"end": {
-												"line": 50,
-												"column": 9
-											}
-										},
 										"name": "aaa"
 									},
 									"consequent": {
 										"type": "Identifier",
 										"start": 870,
 										"end": 873,
-										"loc": {
-											"start": {
-												"line": 50,
-												"column": 12
-											},
-											"end": {
-												"line": 50,
-												"column": 15
-											}
-										},
 										"name": "bbb"
 									},
 									"alternate": {
 										"type": "Identifier",
 										"start": 876,
 										"end": 879,
-										"loc": {
-											"start": {
-												"line": 50,
-												"column": 18
-											},
-											"end": {
-												"line": 50,
-												"column": 21
-											}
-										},
 										"name": "ccc"
 									},
 									"leadingComments": [
@@ -2331,61 +1001,21 @@
 					"type": "VariableDeclaration",
 					"start": 940,
 					"end": 997,
-					"loc": {
-						"start": {
-							"line": 53,
-							"column": 1
-						},
-						"end": {
-							"line": 57,
-							"column": 22
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 946,
 							"end": 996,
-							"loc": {
-								"start": {
-									"line": 53,
-									"column": 7
-								},
-								"end": {
-									"line": 57,
-									"column": 21
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 946,
 								"end": 948,
-								"loc": {
-									"start": {
-										"line": 53,
-										"column": 7
-									},
-									"end": {
-										"line": 53,
-										"column": 9
-									}
-								},
 								"name": "a7"
 							},
 							"init": {
 								"type": "ArrowFunctionExpression",
 								"start": 951,
 								"end": 996,
-								"loc": {
-									"start": {
-										"line": 53,
-										"column": 12
-									},
-									"end": {
-										"line": 57,
-										"column": 21
-									}
-								},
 								"id": null,
 								"expression": true,
 								"generator": false,
@@ -2395,62 +1025,22 @@
 									"type": "ConditionalExpression",
 									"start": 981,
 									"end": 996,
-									"loc": {
-										"start": {
-											"line": 57,
-											"column": 6
-										},
-										"end": {
-											"line": 57,
-											"column": 21
-										}
-									},
 									"test": {
 										"type": "Identifier",
 										"start": 981,
 										"end": 984,
-										"loc": {
-											"start": {
-												"line": 57,
-												"column": 6
-											},
-											"end": {
-												"line": 57,
-												"column": 9
-											}
-										},
 										"name": "aaa"
 									},
 									"consequent": {
 										"type": "Identifier",
 										"start": 987,
 										"end": 990,
-										"loc": {
-											"start": {
-												"line": 57,
-												"column": 12
-											},
-											"end": {
-												"line": 57,
-												"column": 15
-											}
-										},
 										"name": "bbb"
 									},
 									"alternate": {
 										"type": "Identifier",
 										"start": 993,
 										"end": 996,
-										"loc": {
-											"start": {
-												"line": 57,
-												"column": 18
-											},
-											"end": {
-												"line": 57,
-												"column": 21
-											}
-										},
 										"name": "ccc"
 									},
 									"leadingComments": [
@@ -2485,61 +1075,21 @@
 					"type": "VariableDeclaration",
 					"start": 1051,
 					"end": 1102,
-					"loc": {
-						"start": {
-							"line": 60,
-							"column": 1
-						},
-						"end": {
-							"line": 63,
-							"column": 16
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 1057,
 							"end": 1101,
-							"loc": {
-								"start": {
-									"line": 60,
-									"column": 7
-								},
-								"end": {
-									"line": 63,
-									"column": 15
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 1057,
 								"end": 1060,
-								"loc": {
-									"start": {
-										"line": 60,
-										"column": 7
-									},
-									"end": {
-										"line": 60,
-										"column": 10
-									}
-								},
 								"name": "a13"
 							},
 							"init": {
 								"type": "ArrowFunctionExpression",
 								"start": 1063,
 								"end": 1101,
-								"loc": {
-									"start": {
-										"line": 60,
-										"column": 13
-									},
-									"end": {
-										"line": 63,
-										"column": 15
-									}
-								},
 								"id": null,
 								"expression": true,
 								"generator": false,
@@ -2549,30 +1099,10 @@
 									"type": "BinaryExpression",
 									"start": 1092,
 									"end": 1101,
-									"loc": {
-										"start": {
-											"line": 63,
-											"column": 6
-										},
-										"end": {
-											"line": 63,
-											"column": 15
-										}
-									},
 									"left": {
 										"type": "Identifier",
 										"start": 1092,
 										"end": 1095,
-										"loc": {
-											"start": {
-												"line": 63,
-												"column": 6
-											},
-											"end": {
-												"line": 63,
-												"column": 9
-											}
-										},
 										"name": "aaa"
 									},
 									"operator": "+",
@@ -2580,16 +1110,6 @@
 										"type": "Identifier",
 										"start": 1098,
 										"end": 1101,
-										"loc": {
-											"start": {
-												"line": 63,
-												"column": 12
-											},
-											"end": {
-												"line": 63,
-												"column": 15
-											}
-										},
 										"name": "bbb"
 									},
 									"leadingComments": [
@@ -2624,44 +1144,14 @@
 					"type": "ExpressionStatement",
 					"start": 1143,
 					"end": 1195,
-					"loc": {
-						"start": {
-							"line": 66,
-							"column": 1
-						},
-						"end": {
-							"line": 70,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 1143,
 						"end": 1194,
-						"loc": {
-							"start": {
-								"line": 66,
-								"column": 1
-							},
-							"end": {
-								"line": 70,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 1143,
 							"end": 1145,
-							"loc": {
-								"start": {
-									"line": 66,
-									"column": 1
-								},
-								"end": {
-									"line": 66,
-									"column": 3
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -2669,16 +1159,6 @@
 								"type": "ArrowFunctionExpression",
 								"start": 1146,
 								"end": 1191,
-								"loc": {
-									"start": {
-										"line": 66,
-										"column": 4
-									},
-									"end": {
-										"line": 69,
-										"column": 21
-									}
-								},
 								"id": null,
 								"expression": true,
 								"generator": false,
@@ -2688,16 +1168,6 @@
 										"type": "Identifier",
 										"start": 1147,
 										"end": 1148,
-										"loc": {
-											"start": {
-												"line": 66,
-												"column": 5
-											},
-											"end": {
-												"line": 66,
-												"column": 6
-											}
-										},
 										"name": "x"
 									}
 								],
@@ -2705,62 +1175,22 @@
 									"type": "ConditionalExpression",
 									"start": 1176,
 									"end": 1191,
-									"loc": {
-										"start": {
-											"line": 69,
-											"column": 6
-										},
-										"end": {
-											"line": 69,
-											"column": 21
-										}
-									},
 									"test": {
 										"type": "Identifier",
 										"start": 1176,
 										"end": 1179,
-										"loc": {
-											"start": {
-												"line": 69,
-												"column": 6
-											},
-											"end": {
-												"line": 69,
-												"column": 9
-											}
-										},
 										"name": "aaa"
 									},
 									"consequent": {
 										"type": "Identifier",
 										"start": 1182,
 										"end": 1185,
-										"loc": {
-											"start": {
-												"line": 69,
-												"column": 12
-											},
-											"end": {
-												"line": 69,
-												"column": 15
-											}
-										},
 										"name": "bbb"
 									},
 									"alternate": {
 										"type": "Identifier",
 										"start": 1188,
 										"end": 1191,
-										"loc": {
-											"start": {
-												"line": 69,
-												"column": 18
-											},
-											"end": {
-												"line": 69,
-												"column": 21
-											}
-										},
 										"name": "ccc"
 									},
 									"leadingComments": [
@@ -2795,44 +1225,14 @@
 					"type": "ExpressionStatement",
 					"start": 1237,
 					"end": 1293,
-					"loc": {
-						"start": {
-							"line": 73,
-							"column": 1
-						},
-						"end": {
-							"line": 77,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "NewExpression",
 						"start": 1237,
 						"end": 1292,
-						"loc": {
-							"start": {
-								"line": 73,
-								"column": 1
-							},
-							"end": {
-								"line": 77,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 1241,
 							"end": 1243,
-							"loc": {
-								"start": {
-									"line": 73,
-									"column": 5
-								},
-								"end": {
-									"line": 73,
-									"column": 7
-								}
-							},
 							"name": "C1"
 						},
 						"arguments": [
@@ -2840,16 +1240,6 @@
 								"type": "ArrowFunctionExpression",
 								"start": 1244,
 								"end": 1289,
-								"loc": {
-									"start": {
-										"line": 73,
-										"column": 8
-									},
-									"end": {
-										"line": 76,
-										"column": 21
-									}
-								},
 								"id": null,
 								"expression": true,
 								"generator": false,
@@ -2859,16 +1249,6 @@
 										"type": "Identifier",
 										"start": 1245,
 										"end": 1246,
-										"loc": {
-											"start": {
-												"line": 73,
-												"column": 9
-											},
-											"end": {
-												"line": 73,
-												"column": 10
-											}
-										},
 										"name": "x"
 									}
 								],
@@ -2876,62 +1256,22 @@
 									"type": "ConditionalExpression",
 									"start": 1274,
 									"end": 1289,
-									"loc": {
-										"start": {
-											"line": 76,
-											"column": 6
-										},
-										"end": {
-											"line": 76,
-											"column": 21
-										}
-									},
 									"test": {
 										"type": "Identifier",
 										"start": 1274,
 										"end": 1277,
-										"loc": {
-											"start": {
-												"line": 76,
-												"column": 6
-											},
-											"end": {
-												"line": 76,
-												"column": 9
-											}
-										},
 										"name": "aaa"
 									},
 									"consequent": {
 										"type": "Identifier",
 										"start": 1280,
 										"end": 1283,
-										"loc": {
-											"start": {
-												"line": 76,
-												"column": 12
-											},
-											"end": {
-												"line": 76,
-												"column": 15
-											}
-										},
 										"name": "bbb"
 									},
 									"alternate": {
 										"type": "Identifier",
 										"start": 1286,
 										"end": 1289,
-										"loc": {
-											"start": {
-												"line": 76,
-												"column": 18
-											},
-											"end": {
-												"line": 76,
-												"column": 21
-											}
-										},
 										"name": "ccc"
 									},
 									"leadingComments": [
@@ -2965,88 +1305,28 @@
 					"type": "ExpressionStatement",
 					"start": 1342,
 					"end": 1398,
-					"loc": {
-						"start": {
-							"line": 80,
-							"column": 1
-						},
-						"end": {
-							"line": 84,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 1342,
 						"end": 1397,
-						"loc": {
-							"start": {
-								"line": 80,
-								"column": 1
-							},
-							"end": {
-								"line": 84,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "MemberExpression",
 							"start": 1342,
 							"end": 1348,
-							"loc": {
-								"start": {
-									"line": 80,
-									"column": 1
-								},
-								"end": {
-									"line": 80,
-									"column": 7
-								}
-							},
 							"object": {
 								"type": "MemberExpression",
 								"start": 1342,
 								"end": 1345,
-								"loc": {
-									"start": {
-										"line": 80,
-										"column": 1
-									},
-									"end": {
-										"line": 80,
-										"column": 4
-									}
-								},
 								"object": {
 									"type": "Identifier",
 									"start": 1342,
 									"end": 1343,
-									"loc": {
-										"start": {
-											"line": 80,
-											"column": 1
-										},
-										"end": {
-											"line": 80,
-											"column": 2
-										}
-									},
 									"name": "a"
 								},
 								"property": {
 									"type": "Identifier",
 									"start": 1344,
 									"end": 1345,
-									"loc": {
-										"start": {
-											"line": 80,
-											"column": 3
-										},
-										"end": {
-											"line": 80,
-											"column": 4
-										}
-									},
 									"name": "b"
 								},
 								"computed": false,
@@ -3056,16 +1336,6 @@
 								"type": "Identifier",
 								"start": 1346,
 								"end": 1348,
-								"loc": {
-									"start": {
-										"line": 80,
-										"column": 5
-									},
-									"end": {
-										"line": 80,
-										"column": 7
-									}
-								},
 								"name": "m1"
 							},
 							"computed": false,
@@ -3076,16 +1346,6 @@
 								"type": "ArrowFunctionExpression",
 								"start": 1349,
 								"end": 1394,
-								"loc": {
-									"start": {
-										"line": 80,
-										"column": 8
-									},
-									"end": {
-										"line": 83,
-										"column": 21
-									}
-								},
 								"id": null,
 								"expression": true,
 								"generator": false,
@@ -3095,16 +1355,6 @@
 										"type": "Identifier",
 										"start": 1350,
 										"end": 1351,
-										"loc": {
-											"start": {
-												"line": 80,
-												"column": 9
-											},
-											"end": {
-												"line": 80,
-												"column": 10
-											}
-										},
 										"name": "x"
 									}
 								],
@@ -3112,62 +1362,22 @@
 									"type": "ConditionalExpression",
 									"start": 1379,
 									"end": 1394,
-									"loc": {
-										"start": {
-											"line": 83,
-											"column": 6
-										},
-										"end": {
-											"line": 83,
-											"column": 21
-										}
-									},
 									"test": {
 										"type": "Identifier",
 										"start": 1379,
 										"end": 1382,
-										"loc": {
-											"start": {
-												"line": 83,
-												"column": 6
-											},
-											"end": {
-												"line": 83,
-												"column": 9
-											}
-										},
 										"name": "aaa"
 									},
 									"consequent": {
 										"type": "Identifier",
 										"start": 1385,
 										"end": 1388,
-										"loc": {
-											"start": {
-												"line": 83,
-												"column": 12
-											},
-											"end": {
-												"line": 83,
-												"column": 15
-											}
-										},
 										"name": "bbb"
 									},
 									"alternate": {
 										"type": "Identifier",
 										"start": 1391,
 										"end": 1394,
-										"loc": {
-											"start": {
-												"line": 83,
-												"column": 18
-											},
-											"end": {
-												"line": 83,
-												"column": 21
-											}
-										},
 										"name": "ccc"
 									},
 									"leadingComments": [
@@ -3202,44 +1412,14 @@
 					"type": "ExpressionStatement",
 					"start": 1453,
 					"end": 1508,
-					"loc": {
-						"start": {
-							"line": 87,
-							"column": 1
-						},
-						"end": {
-							"line": 91,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 1453,
 						"end": 1507,
-						"loc": {
-							"start": {
-								"line": 87,
-								"column": 1
-							},
-							"end": {
-								"line": 91,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 1453,
 							"end": 1455,
-							"loc": {
-								"start": {
-									"line": 87,
-									"column": 1
-								},
-								"end": {
-									"line": 87,
-									"column": 3
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -3247,32 +1427,12 @@
 								"type": "Identifier",
 								"start": 1456,
 								"end": 1457,
-								"loc": {
-									"start": {
-										"line": 87,
-										"column": 4
-									},
-									"end": {
-										"line": 87,
-										"column": 5
-									}
-								},
 								"name": "a"
 							},
 							{
 								"type": "ArrowFunctionExpression",
 								"start": 1459,
 								"end": 1504,
-								"loc": {
-									"start": {
-										"line": 87,
-										"column": 7
-									},
-									"end": {
-										"line": 90,
-										"column": 21
-									}
-								},
 								"id": null,
 								"expression": true,
 								"generator": false,
@@ -3282,16 +1442,6 @@
 										"type": "Identifier",
 										"start": 1460,
 										"end": 1461,
-										"loc": {
-											"start": {
-												"line": 87,
-												"column": 8
-											},
-											"end": {
-												"line": 87,
-												"column": 9
-											}
-										},
 										"name": "x"
 									}
 								],
@@ -3299,62 +1449,22 @@
 									"type": "ConditionalExpression",
 									"start": 1489,
 									"end": 1504,
-									"loc": {
-										"start": {
-											"line": 90,
-											"column": 6
-										},
-										"end": {
-											"line": 90,
-											"column": 21
-										}
-									},
 									"test": {
 										"type": "Identifier",
 										"start": 1489,
 										"end": 1492,
-										"loc": {
-											"start": {
-												"line": 90,
-												"column": 6
-											},
-											"end": {
-												"line": 90,
-												"column": 9
-											}
-										},
 										"name": "aaa"
 									},
 									"consequent": {
 										"type": "Identifier",
 										"start": 1495,
 										"end": 1498,
-										"loc": {
-											"start": {
-												"line": 90,
-												"column": 12
-											},
-											"end": {
-												"line": 90,
-												"column": 15
-											}
-										},
 										"name": "bbb"
 									},
 									"alternate": {
 										"type": "Identifier",
 										"start": 1501,
 										"end": 1504,
-										"loc": {
-											"start": {
-												"line": 90,
-												"column": 18
-											},
-											"end": {
-												"line": 90,
-												"column": 21
-											}
-										},
 										"name": "ccc"
 									},
 									"leadingComments": [
@@ -3389,44 +1499,14 @@
 					"type": "ExpressionStatement",
 					"start": 1510,
 					"end": 1569,
-					"loc": {
-						"start": {
-							"line": 92,
-							"column": 1
-						},
-						"end": {
-							"line": 96,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "NewExpression",
 						"start": 1510,
 						"end": 1568,
-						"loc": {
-							"start": {
-								"line": 92,
-								"column": 1
-							},
-							"end": {
-								"line": 96,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 1514,
 							"end": 1516,
-							"loc": {
-								"start": {
-									"line": 92,
-									"column": 5
-								},
-								"end": {
-									"line": 92,
-									"column": 7
-								}
-							},
 							"name": "C2"
 						},
 						"arguments": [
@@ -3434,32 +1514,12 @@
 								"type": "Identifier",
 								"start": 1517,
 								"end": 1518,
-								"loc": {
-									"start": {
-										"line": 92,
-										"column": 8
-									},
-									"end": {
-										"line": 92,
-										"column": 9
-									}
-								},
 								"name": "a"
 							},
 							{
 								"type": "ArrowFunctionExpression",
 								"start": 1520,
 								"end": 1565,
-								"loc": {
-									"start": {
-										"line": 92,
-										"column": 11
-									},
-									"end": {
-										"line": 95,
-										"column": 21
-									}
-								},
 								"id": null,
 								"expression": true,
 								"generator": false,
@@ -3469,16 +1529,6 @@
 										"type": "Identifier",
 										"start": 1521,
 										"end": 1522,
-										"loc": {
-											"start": {
-												"line": 92,
-												"column": 12
-											},
-											"end": {
-												"line": 92,
-												"column": 13
-											}
-										},
 										"name": "x"
 									}
 								],
@@ -3486,62 +1536,22 @@
 									"type": "ConditionalExpression",
 									"start": 1550,
 									"end": 1565,
-									"loc": {
-										"start": {
-											"line": 95,
-											"column": 6
-										},
-										"end": {
-											"line": 95,
-											"column": 21
-										}
-									},
 									"test": {
 										"type": "Identifier",
 										"start": 1550,
 										"end": 1553,
-										"loc": {
-											"start": {
-												"line": 95,
-												"column": 6
-											},
-											"end": {
-												"line": 95,
-												"column": 9
-											}
-										},
 										"name": "aaa"
 									},
 									"consequent": {
 										"type": "Identifier",
 										"start": 1556,
 										"end": 1559,
-										"loc": {
-											"start": {
-												"line": 95,
-												"column": 12
-											},
-											"end": {
-												"line": 95,
-												"column": 15
-											}
-										},
 										"name": "bbb"
 									},
 									"alternate": {
 										"type": "Identifier",
 										"start": 1562,
 										"end": 1565,
-										"loc": {
-											"start": {
-												"line": 95,
-												"column": 18
-											},
-											"end": {
-												"line": 95,
-												"column": 21
-											}
-										},
 										"name": "ccc"
 									},
 									"leadingComments": [
@@ -3567,88 +1577,28 @@
 					"type": "ExpressionStatement",
 					"start": 1571,
 					"end": 1630,
-					"loc": {
-						"start": {
-							"line": 97,
-							"column": 1
-						},
-						"end": {
-							"line": 101,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 1571,
 						"end": 1629,
-						"loc": {
-							"start": {
-								"line": 97,
-								"column": 1
-							},
-							"end": {
-								"line": 101,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "MemberExpression",
 							"start": 1571,
 							"end": 1577,
-							"loc": {
-								"start": {
-									"line": 97,
-									"column": 1
-								},
-								"end": {
-									"line": 97,
-									"column": 7
-								}
-							},
 							"object": {
 								"type": "MemberExpression",
 								"start": 1571,
 								"end": 1574,
-								"loc": {
-									"start": {
-										"line": 97,
-										"column": 1
-									},
-									"end": {
-										"line": 97,
-										"column": 4
-									}
-								},
 								"object": {
 									"type": "Identifier",
 									"start": 1571,
 									"end": 1572,
-									"loc": {
-										"start": {
-											"line": 97,
-											"column": 1
-										},
-										"end": {
-											"line": 97,
-											"column": 2
-										}
-									},
 									"name": "a"
 								},
 								"property": {
 									"type": "Identifier",
 									"start": 1573,
 									"end": 1574,
-									"loc": {
-										"start": {
-											"line": 97,
-											"column": 3
-										},
-										"end": {
-											"line": 97,
-											"column": 4
-										}
-									},
 									"name": "b"
 								},
 								"computed": false,
@@ -3658,16 +1608,6 @@
 								"type": "Identifier",
 								"start": 1575,
 								"end": 1577,
-								"loc": {
-									"start": {
-										"line": 97,
-										"column": 5
-									},
-									"end": {
-										"line": 97,
-										"column": 7
-									}
-								},
 								"name": "m2"
 							},
 							"computed": false,
@@ -3678,32 +1618,12 @@
 								"type": "Identifier",
 								"start": 1578,
 								"end": 1579,
-								"loc": {
-									"start": {
-										"line": 97,
-										"column": 8
-									},
-									"end": {
-										"line": 97,
-										"column": 9
-									}
-								},
 								"name": "a"
 							},
 							{
 								"type": "ArrowFunctionExpression",
 								"start": 1581,
 								"end": 1626,
-								"loc": {
-									"start": {
-										"line": 97,
-										"column": 11
-									},
-									"end": {
-										"line": 100,
-										"column": 21
-									}
-								},
 								"id": null,
 								"expression": true,
 								"generator": false,
@@ -3713,16 +1633,6 @@
 										"type": "Identifier",
 										"start": 1582,
 										"end": 1583,
-										"loc": {
-											"start": {
-												"line": 97,
-												"column": 12
-											},
-											"end": {
-												"line": 97,
-												"column": 13
-											}
-										},
 										"name": "x"
 									}
 								],
@@ -3730,62 +1640,22 @@
 									"type": "ConditionalExpression",
 									"start": 1611,
 									"end": 1626,
-									"loc": {
-										"start": {
-											"line": 100,
-											"column": 6
-										},
-										"end": {
-											"line": 100,
-											"column": 21
-										}
-									},
 									"test": {
 										"type": "Identifier",
 										"start": 1611,
 										"end": 1614,
-										"loc": {
-											"start": {
-												"line": 100,
-												"column": 6
-											},
-											"end": {
-												"line": 100,
-												"column": 9
-											}
-										},
 										"name": "aaa"
 									},
 									"consequent": {
 										"type": "Identifier",
 										"start": 1617,
 										"end": 1620,
-										"loc": {
-											"start": {
-												"line": 100,
-												"column": 12
-											},
-											"end": {
-												"line": 100,
-												"column": 15
-											}
-										},
 										"name": "bbb"
 									},
 									"alternate": {
 										"type": "Identifier",
 										"start": 1623,
 										"end": 1626,
-										"loc": {
-											"start": {
-												"line": 100,
-												"column": 18
-											},
-											"end": {
-												"line": 100,
-												"column": 21
-											}
-										},
 										"name": "ccc"
 									},
 									"leadingComments": [
@@ -3812,104 +1682,34 @@
 					"type": "VariableDeclaration",
 					"start": 1693,
 					"end": 1748,
-					"loc": {
-						"start": {
-							"line": 104,
-							"column": 1
-						},
-						"end": {
-							"line": 108,
-							"column": 3
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 1699,
 							"end": 1747,
-							"loc": {
-								"start": {
-									"line": 104,
-									"column": 7
-								},
-								"end": {
-									"line": 108,
-									"column": 2
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 1699,
 								"end": 1701,
-								"loc": {
-									"start": {
-										"line": 104,
-										"column": 7
-									},
-									"end": {
-										"line": 104,
-										"column": 9
-									}
-								},
 								"name": "a8"
 							},
 							"init": {
 								"type": "ArrayExpression",
 								"start": 1704,
 								"end": 1747,
-								"loc": {
-									"start": {
-										"line": 104,
-										"column": 12
-									},
-									"end": {
-										"line": 108,
-										"column": 2
-									}
-								},
 								"elements": [
 									{
 										"type": "SpreadElement",
 										"start": 1708,
 										"end": 1744,
-										"loc": {
-											"start": {
-												"line": 105,
-												"column": 2
-											},
-											"end": {
-												"line": 107,
-												"column": 18
-											}
-										},
 										"argument": {
 											"type": "CallExpression",
 											"start": 1732,
 											"end": 1744,
-											"loc": {
-												"start": {
-													"line": 107,
-													"column": 6
-												},
-												"end": {
-													"line": 107,
-													"column": 18
-												}
-											},
 											"callee": {
 												"type": "Identifier",
 												"start": 1732,
 												"end": 1734,
-												"loc": {
-													"start": {
-														"line": 107,
-														"column": 6
-													},
-													"end": {
-														"line": 107,
-														"column": 8
-													}
-												},
 												"name": "fn"
 											},
 											"arguments": [
@@ -3917,32 +1717,12 @@
 													"type": "Identifier",
 													"start": 1735,
 													"end": 1738,
-													"loc": {
-														"start": {
-															"line": 107,
-															"column": 9
-														},
-														"end": {
-															"line": 107,
-															"column": 12
-														}
-													},
 													"name": "aaa"
 												},
 												{
 													"type": "Identifier",
 													"start": 1740,
 													"end": 1743,
-													"loc": {
-														"start": {
-															"line": 107,
-															"column": 14
-														},
-														"end": {
-															"line": 107,
-															"column": 17
-														}
-													},
 													"name": "bbb"
 												}
 											],
@@ -3981,76 +1761,26 @@
 					"type": "VariableDeclaration",
 					"start": 1777,
 					"end": 1840,
-					"loc": {
-						"start": {
-							"line": 111,
-							"column": 1
-						},
-						"end": {
-							"line": 116,
-							"column": 3
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 1783,
 							"end": 1839,
-							"loc": {
-								"start": {
-									"line": 111,
-									"column": 7
-								},
-								"end": {
-									"line": 116,
-									"column": 2
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 1783,
 								"end": 1785,
-								"loc": {
-									"start": {
-										"line": 111,
-										"column": 7
-									},
-									"end": {
-										"line": 111,
-										"column": 9
-									}
-								},
 								"name": "a9"
 							},
 							"init": {
 								"type": "ObjectExpression",
 								"start": 1788,
 								"end": 1839,
-								"loc": {
-									"start": {
-										"line": 111,
-										"column": 12
-									},
-									"end": {
-										"line": 116,
-										"column": 2
-									}
-								},
 								"properties": [
 									{
 										"type": "Property",
 										"start": 1792,
 										"end": 1836,
-										"loc": {
-											"start": {
-												"line": 112,
-												"column": 2
-											},
-											"end": {
-												"line": 115,
-												"column": 22
-											}
-										},
 										"method": false,
 										"shorthand": false,
 										"computed": false,
@@ -4058,78 +1788,28 @@
 											"type": "Identifier",
 											"start": 1792,
 											"end": 1793,
-											"loc": {
-												"start": {
-													"line": 112,
-													"column": 2
-												},
-												"end": {
-													"line": 112,
-													"column": 3
-												}
-											},
 											"name": "k"
 										},
 										"value": {
 											"type": "ConditionalExpression",
 											"start": 1821,
 											"end": 1836,
-											"loc": {
-												"start": {
-													"line": 115,
-													"column": 7
-												},
-												"end": {
-													"line": 115,
-													"column": 22
-												}
-											},
 											"test": {
 												"type": "Identifier",
 												"start": 1821,
 												"end": 1824,
-												"loc": {
-													"start": {
-														"line": 115,
-														"column": 7
-													},
-													"end": {
-														"line": 115,
-														"column": 10
-													}
-												},
 												"name": "aaa"
 											},
 											"consequent": {
 												"type": "Identifier",
 												"start": 1827,
 												"end": 1830,
-												"loc": {
-													"start": {
-														"line": 115,
-														"column": 13
-													},
-													"end": {
-														"line": 115,
-														"column": 16
-													}
-												},
 												"name": "bbb"
 											},
 											"alternate": {
 												"type": "Identifier",
 												"start": 1833,
 												"end": 1836,
-												"loc": {
-													"start": {
-														"line": 115,
-														"column": 19
-													},
-													"end": {
-														"line": 115,
-														"column": 22
-													}
-												},
 												"name": "ccc"
 											},
 											"leadingComments": [
@@ -4167,30 +1847,10 @@
 					"type": "ClassDeclaration",
 					"start": 1862,
 					"end": 1923,
-					"loc": {
-						"start": {
-							"line": 119,
-							"column": 1
-						},
-						"end": {
-							"line": 124,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 1868,
 						"end": 1869,
-						"loc": {
-							"start": {
-								"line": 119,
-								"column": 7
-							},
-							"end": {
-								"line": 119,
-								"column": 8
-							}
-						},
 						"name": "A"
 					},
 					"superClass": null,
@@ -4198,109 +1858,39 @@
 						"type": "ClassBody",
 						"start": 1870,
 						"end": 1923,
-						"loc": {
-							"start": {
-								"line": 119,
-								"column": 9
-							},
-							"end": {
-								"line": 124,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "PropertyDefinition",
 								"start": 1874,
 								"end": 1920,
-								"loc": {
-									"start": {
-										"line": 120,
-										"column": 2
-									},
-									"end": {
-										"line": 123,
-										"column": 23
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
 									"start": 1874,
 									"end": 1875,
-									"loc": {
-										"start": {
-											"line": 120,
-											"column": 2
-										},
-										"end": {
-											"line": 120,
-											"column": 3
-										}
-									},
 									"name": "b"
 								},
 								"value": {
 									"type": "ConditionalExpression",
 									"start": 1904,
 									"end": 1919,
-									"loc": {
-										"start": {
-											"line": 123,
-											"column": 7
-										},
-										"end": {
-											"line": 123,
-											"column": 22
-										}
-									},
 									"test": {
 										"type": "Identifier",
 										"start": 1904,
 										"end": 1907,
-										"loc": {
-											"start": {
-												"line": 123,
-												"column": 7
-											},
-											"end": {
-												"line": 123,
-												"column": 10
-											}
-										},
 										"name": "aaa"
 									},
 									"consequent": {
 										"type": "Identifier",
 										"start": 1910,
 										"end": 1913,
-										"loc": {
-											"start": {
-												"line": 123,
-												"column": 13
-											},
-											"end": {
-												"line": 123,
-												"column": 16
-											}
-										},
 										"name": "bbb"
 									},
 									"alternate": {
 										"type": "Identifier",
 										"start": 1916,
 										"end": 1919,
-										"loc": {
-											"start": {
-												"line": 123,
-												"column": 19
-											},
-											"end": {
-												"line": 123,
-												"column": 22
-											}
-										},
 										"name": "ccc"
 									},
 									"leadingComments": [
@@ -4334,30 +1924,10 @@
 					"type": "ClassDeclaration",
 					"start": 2014,
 					"end": 2117,
-					"loc": {
-						"start": {
-							"line": 127,
-							"column": 1
-						},
-						"end": {
-							"line": 135,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 2020,
 						"end": 2021,
-						"loc": {
-							"start": {
-								"line": 127,
-								"column": 7
-							},
-							"end": {
-								"line": 127,
-								"column": 8
-							}
-						},
 						"name": "B"
 					},
 					"superClass": null,
@@ -4365,109 +1935,39 @@
 						"type": "ClassBody",
 						"start": 2022,
 						"end": 2117,
-						"loc": {
-							"start": {
-								"line": 127,
-								"column": 9
-							},
-							"end": {
-								"line": 135,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "PropertyDefinition",
 								"start": 2026,
 								"end": 2067,
-								"loc": {
-									"start": {
-										"line": 128,
-										"column": 2
-									},
-									"end": {
-										"line": 130,
-										"column": 23
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
 									"start": 2026,
 									"end": 2028,
-									"loc": {
-										"start": {
-											"line": 128,
-											"column": 2
-										},
-										"end": {
-											"line": 128,
-											"column": 4
-										}
-									},
 									"name": "c1"
 								},
 								"value": {
 									"type": "ConditionalExpression",
 									"start": 2051,
 									"end": 2066,
-									"loc": {
-										"start": {
-											"line": 130,
-											"column": 7
-										},
-										"end": {
-											"line": 130,
-											"column": 22
-										}
-									},
 									"test": {
 										"type": "Identifier",
 										"start": 2051,
 										"end": 2054,
-										"loc": {
-											"start": {
-												"line": 130,
-												"column": 7
-											},
-											"end": {
-												"line": 130,
-												"column": 10
-											}
-										},
 										"name": "aaa"
 									},
 									"consequent": {
 										"type": "Identifier",
 										"start": 2057,
 										"end": 2060,
-										"loc": {
-											"start": {
-												"line": 130,
-												"column": 13
-											},
-											"end": {
-												"line": 130,
-												"column": 16
-											}
-										},
 										"name": "bbb"
 									},
 									"alternate": {
 										"type": "Identifier",
 										"start": 2063,
 										"end": 2066,
-										"loc": {
-											"start": {
-												"line": 130,
-												"column": 19
-											},
-											"end": {
-												"line": 130,
-												"column": 22
-											}
-										},
 										"name": "ccc"
 									},
 									"leadingComments": [
@@ -4490,94 +1990,34 @@
 								"type": "PropertyDefinition",
 								"start": 2070,
 								"end": 2114,
-								"loc": {
-									"start": {
-										"line": 131,
-										"column": 2
-									},
-									"end": {
-										"line": 134,
-										"column": 23
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
 									"start": 2070,
 									"end": 2072,
-									"loc": {
-										"start": {
-											"line": 131,
-											"column": 2
-										},
-										"end": {
-											"line": 131,
-											"column": 4
-										}
-									},
 									"name": "c2"
 								},
 								"value": {
 									"type": "ConditionalExpression",
 									"start": 2098,
 									"end": 2113,
-									"loc": {
-										"start": {
-											"line": 134,
-											"column": 7
-										},
-										"end": {
-											"line": 134,
-											"column": 22
-										}
-									},
 									"test": {
 										"type": "Identifier",
 										"start": 2098,
 										"end": 2101,
-										"loc": {
-											"start": {
-												"line": 134,
-												"column": 7
-											},
-											"end": {
-												"line": 134,
-												"column": 10
-											}
-										},
 										"name": "aaa"
 									},
 									"consequent": {
 										"type": "Identifier",
 										"start": 2104,
 										"end": 2107,
-										"loc": {
-											"start": {
-												"line": 134,
-												"column": 13
-											},
-											"end": {
-												"line": 134,
-												"column": 16
-											}
-										},
 										"name": "bbb"
 									},
 									"alternate": {
 										"type": "Identifier",
 										"start": 2110,
 										"end": 2113,
-										"loc": {
-											"start": {
-												"line": 134,
-												"column": 19
-											},
-											"end": {
-												"line": 134,
-												"column": 22
-											}
-										},
 										"name": "ccc"
 									},
 									"leadingComments": [
@@ -4611,88 +2051,28 @@
 					"type": "VariableDeclaration",
 					"start": 2188,
 					"end": 2218,
-					"loc": {
-						"start": {
-							"line": 138,
-							"column": 1
-						},
-						"end": {
-							"line": 140,
-							"column": 7
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 2192,
 							"end": 2217,
-							"loc": {
-								"start": {
-									"line": 138,
-									"column": 5
-								},
-								"end": {
-									"line": 140,
-									"column": 6
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 2192,
 								"end": 2217,
-								"loc": {
-									"start": {
-										"line": 138,
-										"column": 5
-									},
-									"end": {
-										"line": 140,
-										"column": 6
-									}
-								},
 								"name": "a10",
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
 									"start": 2195,
 									"end": 2217,
-									"loc": {
-										"start": {
-											"line": 138,
-											"column": 8
-										},
-										"end": {
-											"line": 140,
-											"column": 6
-										}
-									},
 									"typeAnnotation": {
 										"type": "TSTypeReference",
 										"start": 2216,
 										"end": 2217,
-										"loc": {
-											"start": {
-												"line": 140,
-												"column": 5
-											},
-											"end": {
-												"line": 140,
-												"column": 6
-											}
-										},
 										"typeName": {
 											"type": "Identifier",
 											"start": 2216,
 											"end": 2217,
-											"loc": {
-												"start": {
-													"line": 140,
-													"column": 5
-												},
-												"end": {
-													"line": 140,
-													"column": 6
-												}
-											},
 											"name": "B"
 										},
 										"leadingComments": [
@@ -4729,30 +2109,10 @@
 					"type": "FunctionDeclaration",
 					"start": 2270,
 					"end": 2308,
-					"loc": {
-						"start": {
-							"line": 143,
-							"column": 1
-						},
-						"end": {
-							"line": 145,
-							"column": 9
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 2279,
 						"end": 2281,
-						"loc": {
-							"start": {
-								"line": 143,
-								"column": 10
-							},
-							"end": {
-								"line": 143,
-								"column": 12
-							}
-						},
 						"name": "f2"
 					},
 					"expression": false,
@@ -4763,44 +2123,14 @@
 						"type": "TSTypeAnnotation",
 						"start": 2283,
 						"end": 2305,
-						"loc": {
-							"start": {
-								"line": 143,
-								"column": 14
-							},
-							"end": {
-								"line": 145,
-								"column": 6
-							}
-						},
 						"typeAnnotation": {
 							"type": "TSTypeReference",
 							"start": 2304,
 							"end": 2305,
-							"loc": {
-								"start": {
-									"line": 145,
-									"column": 5
-								},
-								"end": {
-									"line": 145,
-									"column": 6
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 2304,
 								"end": 2305,
-								"loc": {
-									"start": {
-										"line": 145,
-										"column": 5
-									},
-									"end": {
-										"line": 145,
-										"column": 6
-									}
-								},
 								"name": "B"
 							},
 							"leadingComments": [
@@ -4823,16 +2153,6 @@
 						"type": "BlockStatement",
 						"start": 2306,
 						"end": 2308,
-						"loc": {
-							"start": {
-								"line": 145,
-								"column": 7
-							},
-							"end": {
-								"line": 145,
-								"column": 9
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -4848,60 +2168,20 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 2382,
 					"end": 2418,
-					"loc": {
-						"start": {
-							"line": 148,
-							"column": 1
-						},
-						"end": {
-							"line": 152,
-							"column": 8
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 2387,
 						"end": 2389,
-						"loc": {
-							"start": {
-								"line": 148,
-								"column": 6
-							},
-							"end": {
-								"line": 148,
-								"column": 8
-							}
-						},
 						"name": "A1"
 					},
 					"typeAnnotation": {
 						"type": "TSTypeReference",
 						"start": 2416,
 						"end": 2417,
-						"loc": {
-							"start": {
-								"line": 152,
-								"column": 6
-							},
-							"end": {
-								"line": 152,
-								"column": 7
-							}
-						},
 						"typeName": {
 							"type": "Identifier",
 							"start": 2416,
 							"end": 2417,
-							"loc": {
-								"start": {
-									"line": 152,
-									"column": 6
-								},
-								"end": {
-									"line": 152,
-									"column": 7
-								}
-							},
 							"name": "B"
 						},
 						"leadingComments": [
@@ -4937,18 +2217,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

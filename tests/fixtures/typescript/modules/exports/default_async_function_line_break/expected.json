@@ -14,17 +14,7 @@
 			"type": "Line",
 			"value": " export default async function — `async function` on the same line (valid)",
 			"start": 20,
-			"end": 96,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 77
-				}
-			}
+			"end": 96
 		}
 	],
 	"instance": {
@@ -36,60 +26,20 @@
 			"type": "Program",
 			"start": 18,
 			"end": 137,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 4,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExportDefaultDeclaration",
 					"start": 98,
 					"end": 136,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 39
-						}
-					},
 					"exportKind": "value",
 					"declaration": {
 						"type": "FunctionDeclaration",
 						"start": 113,
 						"end": 136,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 16
-							},
-							"end": {
-								"line": 3,
-								"column": 39
-							}
-						},
 						"id": {
 							"type": "Identifier",
 							"start": 128,
 							"end": 131,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 31
-								},
-								"end": {
-									"line": 3,
-									"column": 34
-								}
-							},
 							"name": "foo"
 						},
 						"expression": false,
@@ -100,16 +50,6 @@
 							"type": "BlockStatement",
 							"start": 134,
 							"end": 136,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 37
-								},
-								"end": {
-									"line": 3,
-									"column": 39
-								}
-							},
 							"body": []
 						}
 					},
@@ -131,18 +71,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

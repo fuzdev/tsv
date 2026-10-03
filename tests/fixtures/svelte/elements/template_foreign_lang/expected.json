@@ -25,36 +25,12 @@
 				"start": 60,
 				"end": 132,
 				"name": "template",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 61
-					},
-					"end": {
-						"line": 2,
-						"column": 9,
-						"character": 69
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 70,
 						"end": 80,
 						"name": "lang",
-						"name_loc": {
-							"start": {
-								"line": 2,
-								"column": 10,
-								"character": 70
-							},
-							"end": {
-								"line": 2,
-								"column": 14,
-								"character": 74
-							}
-						},
 						"value": [
 							{
 								"start": 76,

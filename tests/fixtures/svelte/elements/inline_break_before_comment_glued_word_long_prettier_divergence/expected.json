@@ -25,18 +25,6 @@
 				"start": 590,
 				"end": 698,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 10,
-						"column": 1,
-						"character": 591
-					},
-					"end": {
-						"line": 10,
-						"column": 2,
-						"character": 592
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -59,36 +47,12 @@
 							"start": 666,
 							"end": 692,
 							"name": "a",
-							"name_loc": {
-								"start": {
-									"line": 11,
-									"column": 73,
-									"character": 667
-								},
-								"end": {
-									"line": 11,
-									"column": 74,
-									"character": 668
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 669,
 									"end": 680,
 									"name": "href",
-									"name_loc": {
-										"start": {
-											"line": 11,
-											"column": 75,
-											"character": 669
-										},
-										"end": {
-											"line": 11,
-											"column": 79,
-											"character": 673
-										}
-									},
 									"value": [
 										{
 											"start": 675,
@@ -135,18 +99,6 @@
 				"start": 699,
 				"end": 809,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 13,
-						"column": 1,
-						"character": 700
-					},
-					"end": {
-						"line": 13,
-						"column": 2,
-						"character": 701
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -169,36 +121,12 @@
 							"start": 777,
 							"end": 803,
 							"name": "a",
-							"name_loc": {
-								"start": {
-									"line": 15,
-									"column": 15,
-									"character": 778
-								},
-								"end": {
-									"line": 15,
-									"column": 16,
-									"character": 779
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 780,
 									"end": 791,
 									"name": "href",
-									"name_loc": {
-										"start": {
-											"line": 15,
-											"column": 17,
-											"character": 780
-										},
-										"end": {
-											"line": 15,
-											"column": 21,
-											"character": 784
-										}
-									},
 									"value": [
 										{
 											"start": 786,

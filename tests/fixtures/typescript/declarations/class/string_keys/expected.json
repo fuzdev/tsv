@@ -19,45 +19,15 @@
 			"type": "Program",
 			"start": 18,
 			"end": 138,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 11,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ClassDeclaration",
 					"start": 20,
 					"end": 137,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 10,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 26,
 						"end": 27,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 7
-							},
-							"end": {
-								"line": 2,
-								"column": 8
-							}
-						},
 						"name": "A"
 					},
 					"superClass": null,
@@ -65,47 +35,17 @@
 						"type": "ClassBody",
 						"start": 28,
 						"end": 137,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 9
-							},
-							"end": {
-								"line": 10,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "MethodDefinition",
 								"start": 32,
 								"end": 42,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 2
-									},
-									"end": {
-										"line": 3,
-										"column": 12
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Literal",
 									"start": 32,
 									"end": 37,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 2
-										},
-										"end": {
-											"line": 3,
-											"column": 7
-										}
-									},
 									"value": "a-b",
 									"raw": "'a-b'"
 								},
@@ -114,16 +54,6 @@
 									"type": "FunctionExpression",
 									"start": 37,
 									"end": 42,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 7
-										},
-										"end": {
-											"line": 3,
-											"column": 12
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -133,16 +63,6 @@
 										"type": "BlockStatement",
 										"start": 40,
 										"end": 42,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 10
-											},
-											"end": {
-												"line": 3,
-												"column": 12
-											}
-										},
 										"body": []
 									}
 								}
@@ -151,32 +71,12 @@
 								"type": "PropertyDefinition",
 								"start": 45,
 								"end": 55,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 2
-									},
-									"end": {
-										"line": 4,
-										"column": 12
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Literal",
 									"start": 45,
 									"end": 50,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 2
-										},
-										"end": {
-											"line": 4,
-											"column": 7
-										}
-									},
 									"value": "c-d",
 									"raw": "'c-d'"
 								},
@@ -184,16 +84,6 @@
 									"type": "Literal",
 									"start": 53,
 									"end": 54,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 10
-										},
-										"end": {
-											"line": 4,
-											"column": 11
-										}
-									},
 									"value": 1,
 									"raw": "1"
 								}
@@ -202,32 +92,12 @@
 								"type": "MethodDefinition",
 								"start": 58,
 								"end": 88,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 2
-									},
-									"end": {
-										"line": 7,
-										"column": 3
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Literal",
 									"start": 62,
 									"end": 67,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 6
-										},
-										"end": {
-											"line": 5,
-											"column": 11
-										}
-									},
 									"value": "e-f",
 									"raw": "'e-f'"
 								},
@@ -236,16 +106,6 @@
 									"type": "FunctionExpression",
 									"start": 67,
 									"end": 88,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 11
-										},
-										"end": {
-											"line": 7,
-											"column": 3
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -255,45 +115,15 @@
 										"type": "BlockStatement",
 										"start": 70,
 										"end": 88,
-										"loc": {
-											"start": {
-												"line": 5,
-												"column": 14
-											},
-											"end": {
-												"line": 7,
-												"column": 3
-											}
-										},
 										"body": [
 											{
 												"type": "ReturnStatement",
 												"start": 75,
 												"end": 84,
-												"loc": {
-													"start": {
-														"line": 6,
-														"column": 3
-													},
-													"end": {
-														"line": 6,
-														"column": 12
-													}
-												},
 												"argument": {
 													"type": "Literal",
 													"start": 82,
 													"end": 83,
-													"loc": {
-														"start": {
-															"line": 6,
-															"column": 10
-														},
-														"end": {
-															"line": 6,
-															"column": 11
-														}
-													},
 													"value": 1,
 													"raw": "1"
 												}
@@ -306,32 +136,12 @@
 								"type": "MethodDefinition",
 								"start": 91,
 								"end": 114,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 2
-									},
-									"end": {
-										"line": 8,
-										"column": 25
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Literal",
 									"start": 95,
 									"end": 100,
-									"loc": {
-										"start": {
-											"line": 8,
-											"column": 6
-										},
-										"end": {
-											"line": 8,
-											"column": 11
-										}
-									},
 									"value": "g-h",
 									"raw": "'g-h'"
 								},
@@ -340,16 +150,6 @@
 									"type": "FunctionExpression",
 									"start": 100,
 									"end": 114,
-									"loc": {
-										"start": {
-											"line": 8,
-											"column": 11
-										},
-										"end": {
-											"line": 8,
-											"column": 25
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -359,45 +159,15 @@
 											"type": "Identifier",
 											"start": 101,
 											"end": 110,
-											"loc": {
-												"start": {
-													"line": 8,
-													"column": 12
-												},
-												"end": {
-													"line": 8,
-													"column": 21
-												}
-											},
 											"name": "x",
 											"typeAnnotation": {
 												"type": "TSTypeAnnotation",
 												"start": 102,
 												"end": 110,
-												"loc": {
-													"start": {
-														"line": 8,
-														"column": 13
-													},
-													"end": {
-														"line": 8,
-														"column": 21
-													}
-												},
 												"typeAnnotation": {
 													"type": "TSNumberKeyword",
 													"start": 104,
-													"end": 110,
-													"loc": {
-														"start": {
-															"line": 8,
-															"column": 15
-														},
-														"end": {
-															"line": 8,
-															"column": 21
-														}
-													}
+													"end": 110
 												}
 											}
 										}
@@ -406,16 +176,6 @@
 										"type": "BlockStatement",
 										"start": 112,
 										"end": 114,
-										"loc": {
-											"start": {
-												"line": 8,
-												"column": 23
-											},
-											"end": {
-												"line": 8,
-												"column": 25
-											}
-										},
 										"body": []
 									}
 								}
@@ -424,32 +184,12 @@
 								"type": "MethodDefinition",
 								"start": 117,
 								"end": 134,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 2
-									},
-									"end": {
-										"line": 9,
-										"column": 19
-									}
-								},
 								"static": true,
 								"computed": false,
 								"key": {
 									"type": "Literal",
 									"start": 124,
 									"end": 129,
-									"loc": {
-										"start": {
-											"line": 9,
-											"column": 9
-										},
-										"end": {
-											"line": 9,
-											"column": 14
-										}
-									},
 									"value": "i-j",
 									"raw": "'i-j'"
 								},
@@ -458,16 +198,6 @@
 									"type": "FunctionExpression",
 									"start": 129,
 									"end": 134,
-									"loc": {
-										"start": {
-											"line": 9,
-											"column": 14
-										},
-										"end": {
-											"line": 9,
-											"column": 19
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -477,16 +207,6 @@
 										"type": "BlockStatement",
 										"start": 132,
 										"end": 134,
-										"loc": {
-											"start": {
-												"line": 9,
-												"column": 17
-											},
-											"end": {
-												"line": 9,
-												"column": 19
-											}
-										},
 										"body": []
 									}
 								}
@@ -503,18 +223,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

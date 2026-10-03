@@ -14,49 +14,19 @@
 			"type": "Line",
 			"value": " Comments between tuple label and ?/: are preserved",
 			"start": 20,
-			"end": 73,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 54
-				}
-			}
+			"end": 73
 		},
 		{
 			"type": "Block",
 			"value": " c1 ",
 			"start": 87,
-			"end": 95,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 13
-				},
-				"end": {
-					"line": 3,
-					"column": 21
-				}
-			}
+			"end": 95
 		},
 		{
 			"type": "Block",
 			"value": " c2 ",
 			"start": 120,
-			"end": 128,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 13
-				},
-				"end": {
-					"line": 4,
-					"column": 21
-				}
-			}
+			"end": 128
 		}
 	],
 	"instance": {
@@ -68,90 +38,30 @@
 			"type": "Program",
 			"start": 18,
 			"end": 139,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 5,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 75,
 					"end": 106,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 32
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 80,
 						"end": 81,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 6
-							},
-							"end": {
-								"line": 3,
-								"column": 7
-							}
-						},
 						"name": "T"
 					},
 					"typeAnnotation": {
 						"type": "TSTupleType",
 						"start": 84,
 						"end": 105,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 10
-							},
-							"end": {
-								"line": 3,
-								"column": 31
-							}
-						},
 						"elementTypes": [
 							{
 								"type": "TSNamedTupleMember",
 								"start": 85,
 								"end": 104,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 11
-									},
-									"end": {
-										"line": 3,
-										"column": 30
-									}
-								},
 								"label": {
 									"type": "Identifier",
 									"start": 85,
 									"end": 86,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 11
-										},
-										"end": {
-											"line": 3,
-											"column": 12
-										}
-									},
 									"name": "a",
 									"trailingComments": [
 										{
@@ -166,17 +76,7 @@
 								"elementType": {
 									"type": "TSStringKeyword",
 									"start": 98,
-									"end": 104,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 24
-										},
-										"end": {
-											"line": 3,
-											"column": 30
-										}
-									}
+									"end": 104
 								}
 							}
 						]
@@ -194,75 +94,25 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 108,
 					"end": 138,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 31
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 113,
 						"end": 114,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 6
-							},
-							"end": {
-								"line": 4,
-								"column": 7
-							}
-						},
 						"name": "U"
 					},
 					"typeAnnotation": {
 						"type": "TSTupleType",
 						"start": 117,
 						"end": 137,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 10
-							},
-							"end": {
-								"line": 4,
-								"column": 30
-							}
-						},
 						"elementTypes": [
 							{
 								"type": "TSNamedTupleMember",
 								"start": 118,
 								"end": 136,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 11
-									},
-									"end": {
-										"line": 4,
-										"column": 29
-									}
-								},
 								"label": {
 									"type": "Identifier",
 									"start": 118,
 									"end": 119,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 11
-										},
-										"end": {
-											"line": 4,
-											"column": 12
-										}
-									},
 									"name": "b",
 									"trailingComments": [
 										{
@@ -277,17 +127,7 @@
 								"elementType": {
 									"type": "TSStringKeyword",
 									"start": 130,
-									"end": 136,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 23
-										},
-										"end": {
-											"line": 4,
-											"column": 29
-										}
-									}
+									"end": 136
 								}
 							}
 						]
@@ -302,18 +142,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

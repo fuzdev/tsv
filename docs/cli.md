@@ -168,8 +168,11 @@ changes how anything is printed. The same axis appears on the bindings as the
 `parse` also takes `--no-locations`: it emits the span-only wire — `start`/`end`
 offsets but no per-node `loc` (line/column) object, and for Svelte no `name_loc`
 either. `loc` is derivable from the offsets plus source, so nothing is lost for a
-consumer that has the source; it mirrors acorn's `locations: false`. No-op for CSS
-(`parseCss` emits no `loc`). Orthogonal to `--source-type` (the source type drives the
+consumer that has the source; it mirrors acorn's `locations: false`. The default wire's
+`loc` is the line (1-based) and column (0-based, UTF-16 code units) of each object's own
+`start`/`end`, on every object that carries them — CSS's included, which `parseCss` itself
+leaves bare — under the document's line rule (ECMAScript's terminators for TypeScript, LF
+alone for Svelte and everything in it, and for CSS). Orthogonal to `--source-type` (the source type drives the
 parser, `--no-locations` the writer), so the two compose.
 
 Implemented in `tsv_cli/src/cli/input.rs`

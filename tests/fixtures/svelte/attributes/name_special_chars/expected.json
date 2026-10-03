@@ -12,36 +12,12 @@
 				"start": 0,
 				"end": 20,
 				"name": "Comp",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 5,
-						"character": 5
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 6,
 						"end": 13,
 						"name": "a%b",
-						"name_loc": {
-							"start": {
-								"line": 1,
-								"column": 6,
-								"character": 6
-							},
-							"end": {
-								"line": 1,
-								"column": 9,
-								"character": 9
-							}
-						},
 						"value": {
 							"type": "ExpressionTag",
 							"start": 10,
@@ -50,16 +26,6 @@
 								"type": "Literal",
 								"start": 11,
 								"end": 12,
-								"loc": {
-									"start": {
-										"line": 1,
-										"column": 11
-									},
-									"end": {
-										"line": 1,
-										"column": 12
-									}
-								},
 								"value": 1,
 								"raw": "1"
 							}
@@ -70,18 +36,6 @@
 						"start": 14,
 						"end": 17,
 						"name": "c&d",
-						"name_loc": {
-							"start": {
-								"line": 1,
-								"column": 14,
-								"character": 14
-							},
-							"end": {
-								"line": 1,
-								"column": 17,
-								"character": 17
-							}
-						},
 						"value": true
 					}
 				],
@@ -102,36 +56,12 @@
 				"start": 21,
 				"end": 53,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 22
-					},
-					"end": {
-						"line": 2,
-						"column": 4,
-						"character": 25
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 26,
 						"end": 42,
 						"name": "data-a%b",
-						"name_loc": {
-							"start": {
-								"line": 2,
-								"column": 5,
-								"character": 26
-							},
-							"end": {
-								"line": 2,
-								"column": 13,
-								"character": 34
-							}
-						},
 						"value": [
 							{
 								"start": 36,
@@ -147,18 +77,6 @@
 						"start": 43,
 						"end": 46,
 						"name": "e?f",
-						"name_loc": {
-							"start": {
-								"line": 2,
-								"column": 22,
-								"character": 43
-							},
-							"end": {
-								"line": 2,
-								"column": 25,
-								"character": 46
-							}
-						},
 						"value": true
 					}
 				],

@@ -38,18 +38,6 @@
 				"start": 358,
 				"end": 414,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 6,
-						"column": 1,
-						"character": 359
-					},
-					"end": {
-						"line": 6,
-						"column": 4,
-						"character": 362
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -63,46 +51,16 @@
 								"type": "BinaryExpression",
 								"start": 368,
 								"end": 401,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 10
-									},
-									"end": {
-										"line": 7,
-										"column": 19
-									}
-								},
 								"left": {
 									"type": "UnaryExpression",
 									"start": 368,
 									"end": 388,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 10
-										},
-										"end": {
-											"line": 7,
-											"column": 6
-										}
-									},
 									"operator": "typeof",
 									"prefix": true,
 									"argument": {
 										"type": "Identifier",
 										"start": 384,
 										"end": 387,
-										"loc": {
-											"start": {
-												"line": 7,
-												"column": 2
-											},
-											"end": {
-												"line": 7,
-												"column": 5
-											}
-										},
 										"name": "ast",
 										"leadingComments": [
 											{
@@ -119,16 +77,6 @@
 									"type": "Literal",
 									"start": 393,
 									"end": 401,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 11
-										},
-										"end": {
-											"line": 7,
-											"column": 19
-										}
-									},
 									"value": "object",
 									"raw": "'object'"
 								}
@@ -162,18 +110,6 @@
 				"start": 416,
 				"end": 471,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 9,
-						"column": 1,
-						"character": 417
-					},
-					"end": {
-						"line": 9,
-						"column": 4,
-						"character": 420
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -186,32 +122,12 @@
 								"type": "UnaryExpression",
 								"start": 428,
 								"end": 443,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 12
-									},
-									"end": {
-										"line": 10,
-										"column": 7
-									}
-								},
 								"operator": "!",
 								"prefix": true,
 								"argument": {
 									"type": "Identifier",
 									"start": 438,
 									"end": 442,
-									"loc": {
-										"start": {
-											"line": 10,
-											"column": 2
-										},
-										"end": {
-											"line": 10,
-											"column": 6
-										}
-									},
 									"name": "cond",
 									"leadingComments": [
 										{
@@ -234,16 +150,6 @@
 											"type": "Identifier",
 											"start": 453,
 											"end": 457,
-											"loc": {
-												"start": {
-													"line": 10,
-													"column": 17
-												},
-												"end": {
-													"line": 10,
-													"column": 21
-												}
-											},
 											"name": "item"
 										}
 									}
@@ -253,19 +159,7 @@
 								"type": "Identifier",
 								"name": "item",
 								"start": 447,
-								"end": 451,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 11,
-										"character": 447
-									},
-									"end": {
-										"line": 10,
-										"column": 15,
-										"character": 451
-									}
-								}
+								"end": 451
 							}
 						}
 					]
@@ -296,18 +190,6 @@
 				"start": 552,
 				"end": 615,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 13,
-						"column": 1,
-						"character": 553
-					},
-					"end": {
-						"line": 13,
-						"column": 4,
-						"character": 556
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -320,16 +202,6 @@
 								"type": "Identifier",
 								"start": 564,
 								"end": 569,
-								"loc": {
-									"start": {
-										"line": 13,
-										"column": 12
-									},
-									"end": {
-										"line": 13,
-										"column": 17
-									}
-								},
 								"name": "items"
 							},
 							"body": {
@@ -343,16 +215,6 @@
 											"type": "Identifier",
 											"start": 597,
 											"end": 601,
-											"loc": {
-												"start": {
-													"line": 14,
-													"column": 10
-												},
-												"end": {
-													"line": 14,
-													"column": 14
-												}
-											},
 											"name": "item"
 										}
 									}
@@ -362,50 +224,18 @@
 								"type": "Identifier",
 								"name": "item",
 								"start": 573,
-								"end": 577,
-								"loc": {
-									"start": {
-										"line": 13,
-										"column": 21,
-										"character": 573
-									},
-									"end": {
-										"line": 13,
-										"column": 25,
-										"character": 577
-									}
-								}
+								"end": 577
 							},
 							"key": {
 								"type": "UnaryExpression",
 								"start": 579,
 								"end": 594,
-								"loc": {
-									"start": {
-										"line": 13,
-										"column": 27
-									},
-									"end": {
-										"line": 14,
-										"column": 7
-									}
-								},
 								"operator": "!",
 								"prefix": true,
 								"argument": {
 									"type": "Identifier",
 									"start": 589,
 									"end": 593,
-									"loc": {
-										"start": {
-											"line": 14,
-											"column": 2
-										},
-										"end": {
-											"line": 14,
-											"column": 6
-										}
-									},
 									"name": "cond",
 									"leadingComments": [
 										{
@@ -446,18 +276,6 @@
 				"start": 698,
 				"end": 737,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 17,
-						"column": 1,
-						"character": 699
-					},
-					"end": {
-						"line": 17,
-						"column": 4,
-						"character": 702
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -471,46 +289,16 @@
 								"type": "MemberExpression",
 								"start": 708,
 								"end": 724,
-								"loc": {
-									"start": {
-										"line": 17,
-										"column": 10
-									},
-									"end": {
-										"line": 18,
-										"column": 6
-									}
-								},
 								"object": {
 									"type": "Identifier",
 									"start": 708,
 									"end": 711,
-									"loc": {
-										"start": {
-											"line": 17,
-											"column": 10
-										},
-										"end": {
-											"line": 17,
-											"column": 13
-										}
-									},
 									"name": "obj"
 								},
 								"property": {
 									"type": "Identifier",
 									"start": 720,
 									"end": 723,
-									"loc": {
-										"start": {
-											"line": 18,
-											"column": 2
-										},
-										"end": {
-											"line": 18,
-											"column": 5
-										}
-									},
 									"name": "key",
 									"leadingComments": [
 										{
@@ -553,18 +341,6 @@
 				"start": 739,
 				"end": 795,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 20,
-						"column": 1,
-						"character": 740
-					},
-					"end": {
-						"line": 20,
-						"column": 4,
-						"character": 743
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -577,46 +353,16 @@
 								"type": "MemberExpression",
 								"start": 751,
 								"end": 767,
-								"loc": {
-									"start": {
-										"line": 20,
-										"column": 12
-									},
-									"end": {
-										"line": 21,
-										"column": 6
-									}
-								},
 								"object": {
 									"type": "Identifier",
 									"start": 751,
 									"end": 754,
-									"loc": {
-										"start": {
-											"line": 20,
-											"column": 12
-										},
-										"end": {
-											"line": 20,
-											"column": 15
-										}
-									},
 									"name": "obj"
 								},
 								"property": {
 									"type": "Identifier",
 									"start": 763,
 									"end": 766,
-									"loc": {
-										"start": {
-											"line": 21,
-											"column": 2
-										},
-										"end": {
-											"line": 21,
-											"column": 5
-										}
-									},
 									"name": "key",
 									"leadingComments": [
 										{
@@ -641,16 +387,6 @@
 											"type": "Identifier",
 											"start": 777,
 											"end": 781,
-											"loc": {
-												"start": {
-													"line": 21,
-													"column": 16
-												},
-												"end": {
-													"line": 21,
-													"column": 20
-												}
-											},
 											"name": "item"
 										}
 									}
@@ -660,19 +396,7 @@
 								"type": "Identifier",
 								"name": "item",
 								"start": 771,
-								"end": 775,
-								"loc": {
-									"start": {
-										"line": 21,
-										"column": 10,
-										"character": 771
-									},
-									"end": {
-										"line": 21,
-										"column": 14,
-										"character": 775
-									}
-								}
+								"end": 775
 							}
 						}
 					]
@@ -703,18 +427,6 @@
 				"start": 867,
 				"end": 905,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 24,
-						"column": 1,
-						"character": 868
-					},
-					"end": {
-						"line": 24,
-						"column": 4,
-						"character": 871
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -728,31 +440,11 @@
 								"type": "TemplateLiteral",
 								"start": 877,
 								"end": 892,
-								"loc": {
-									"start": {
-										"line": 24,
-										"column": 10
-									},
-									"end": {
-										"line": 25,
-										"column": 4
-									}
-								},
 								"expressions": [
 									{
 										"type": "Identifier",
 										"start": 881,
 										"end": 882,
-										"loc": {
-											"start": {
-												"line": 24,
-												"column": 14
-											},
-											"end": {
-												"line": 24,
-												"column": 15
-											}
-										},
 										"name": "a",
 										"trailingComments": [
 											{
@@ -769,16 +461,6 @@
 										"type": "TemplateElement",
 										"start": 878,
 										"end": 879,
-										"loc": {
-											"start": {
-												"line": 24,
-												"column": 11
-											},
-											"end": {
-												"line": 24,
-												"column": 12
-											}
-										},
 										"value": {
 											"raw": "x",
 											"cooked": "x"
@@ -789,16 +471,6 @@
 										"type": "TemplateElement",
 										"start": 890,
 										"end": 891,
-										"loc": {
-											"start": {
-												"line": 25,
-												"column": 2
-											},
-											"end": {
-												"line": 25,
-												"column": 3
-											}
-										},
 										"value": {
 											"raw": "y",
 											"cooked": "y"
@@ -849,18 +521,6 @@
 				"start": 1167,
 				"end": 1225,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 30,
-						"column": 1,
-						"character": 1168
-					},
-					"end": {
-						"line": 30,
-						"column": 4,
-						"character": 1171
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -874,46 +534,16 @@
 								"type": "BinaryExpression",
 								"start": 1177,
 								"end": 1212,
-								"loc": {
-									"start": {
-										"line": 30,
-										"column": 10
-									},
-									"end": {
-										"line": 32,
-										"column": 19
-									}
-								},
 								"left": {
 									"type": "UnaryExpression",
 									"start": 1177,
 									"end": 1199,
-									"loc": {
-										"start": {
-											"line": 30,
-											"column": 10
-										},
-										"end": {
-											"line": 32,
-											"column": 6
-										}
-									},
 									"operator": "typeof",
 									"prefix": true,
 									"argument": {
 										"type": "Identifier",
 										"start": 1195,
 										"end": 1198,
-										"loc": {
-											"start": {
-												"line": 32,
-												"column": 2
-											},
-											"end": {
-												"line": 32,
-												"column": 5
-											}
-										},
 										"name": "ast",
 										"leadingComments": [
 											{
@@ -930,16 +560,6 @@
 									"type": "Literal",
 									"start": 1204,
 									"end": 1212,
-									"loc": {
-										"start": {
-											"line": 32,
-											"column": 11
-										},
-										"end": {
-											"line": 32,
-											"column": 19
-										}
-									},
 									"value": "object",
 									"raw": "'object'"
 								}
@@ -973,18 +593,6 @@
 				"start": 1227,
 				"end": 1268,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 34,
-						"column": 1,
-						"character": 1228
-					},
-					"end": {
-						"line": 34,
-						"column": 4,
-						"character": 1231
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -998,46 +606,16 @@
 								"type": "MemberExpression",
 								"start": 1237,
 								"end": 1255,
-								"loc": {
-									"start": {
-										"line": 34,
-										"column": 10
-									},
-									"end": {
-										"line": 36,
-										"column": 6
-									}
-								},
 								"object": {
 									"type": "Identifier",
 									"start": 1237,
 									"end": 1240,
-									"loc": {
-										"start": {
-											"line": 34,
-											"column": 10
-										},
-										"end": {
-											"line": 34,
-											"column": 13
-										}
-									},
 									"name": "obj"
 								},
 								"property": {
 									"type": "Identifier",
 									"start": 1251,
 									"end": 1254,
-									"loc": {
-										"start": {
-											"line": 36,
-											"column": 2
-										},
-										"end": {
-											"line": 36,
-											"column": 5
-										}
-									},
 									"name": "key",
 									"leadingComments": [
 										{
@@ -1093,18 +671,6 @@
 				"start": 1388,
 				"end": 1463,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 40,
-						"column": 1,
-						"character": 1389
-					},
-					"end": {
-						"line": 40,
-						"column": 4,
-						"character": 1392
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -1117,30 +683,10 @@
 								"type": "CallExpression",
 								"start": 1401,
 								"end": 1421,
-								"loc": {
-									"start": {
-										"line": 40,
-										"column": 13
-									},
-									"end": {
-										"line": 42,
-										"column": 2
-									}
-								},
 								"callee": {
 									"type": "Identifier",
 									"start": 1401,
 									"end": 1402,
-									"loc": {
-										"start": {
-											"line": 40,
-											"column": 13
-										},
-										"end": {
-											"line": 40,
-											"column": 14
-										}
-									},
 									"name": "f"
 								},
 								"arguments": [
@@ -1148,16 +694,6 @@
 										"type": "Identifier",
 										"start": 1411,
 										"end": 1418,
-										"loc": {
-											"start": {
-												"line": 41,
-												"column": 2
-											},
-											"end": {
-												"line": 41,
-												"column": 9
-											}
-										},
 										"name": "promise",
 										"leadingComments": [
 											{
@@ -1175,19 +711,7 @@
 								"type": "Identifier",
 								"name": "value",
 								"start": 1436,
-								"end": 1441,
-								"loc": {
-									"start": {
-										"line": 42,
-										"column": 17,
-										"character": 1436
-									},
-									"end": {
-										"line": 42,
-										"column": 22,
-										"character": 1441
-									}
-								}
+								"end": 1441
 							},
 							"error": null,
 							"pending": {
@@ -1213,16 +737,6 @@
 											"type": "Identifier",
 											"start": 1443,
 											"end": 1448,
-											"loc": {
-												"start": {
-													"line": 42,
-													"column": 24
-												},
-												"end": {
-													"line": 42,
-													"column": 29
-												}
-											},
 											"name": "value"
 										}
 									}
@@ -1245,18 +759,6 @@
 				"start": 1465,
 				"end": 1508,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 44,
-						"column": 1,
-						"character": 1466
-					},
-					"end": {
-						"line": 44,
-						"column": 4,
-						"character": 1469
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -1269,30 +771,10 @@
 								"type": "CallExpression",
 								"start": 1476,
 								"end": 1491,
-								"loc": {
-									"start": {
-										"line": 44,
-										"column": 11
-									},
-									"end": {
-										"line": 46,
-										"column": 2
-									}
-								},
 								"callee": {
 									"type": "Identifier",
 									"start": 1476,
 									"end": 1477,
-									"loc": {
-										"start": {
-											"line": 44,
-											"column": 11
-										},
-										"end": {
-											"line": 44,
-											"column": 12
-										}
-									},
 									"name": "f"
 								},
 								"arguments": [
@@ -1300,16 +782,6 @@
 										"type": "Identifier",
 										"start": 1486,
 										"end": 1488,
-										"loc": {
-											"start": {
-												"line": 45,
-												"column": 2
-											},
-											"end": {
-												"line": 45,
-												"column": 4
-											}
-										},
 										"name": "id",
 										"leadingComments": [
 											{
@@ -1347,161 +819,61 @@
 			"type": "Line",
 			"value": " c",
 			"start": 377,
-			"end": 381,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 19
-				},
-				"end": {
-					"line": 6,
-					"column": 23
-				}
-			}
+			"end": 381
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 431,
-			"end": 435,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 15
-				},
-				"end": {
-					"line": 9,
-					"column": 19
-				}
-			}
+			"end": 435
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 582,
-			"end": 586,
-			"loc": {
-				"start": {
-					"line": 13,
-					"column": 30
-				},
-				"end": {
-					"line": 13,
-					"column": 34
-				}
-			}
+			"end": 586
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 713,
-			"end": 717,
-			"loc": {
-				"start": {
-					"line": 17,
-					"column": 15
-				},
-				"end": {
-					"line": 17,
-					"column": 19
-				}
-			}
+			"end": 717
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 756,
-			"end": 760,
-			"loc": {
-				"start": {
-					"line": 20,
-					"column": 17
-				},
-				"end": {
-					"line": 20,
-					"column": 21
-				}
-			}
+			"end": 760
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 883,
-			"end": 887,
-			"loc": {
-				"start": {
-					"line": 24,
-					"column": 16
-				},
-				"end": {
-					"line": 24,
-					"column": 20
-				}
-			}
+			"end": 887
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 1188,
-			"end": 1192,
-			"loc": {
-				"start": {
-					"line": 31,
-					"column": 2
-				},
-				"end": {
-					"line": 31,
-					"column": 6
-				}
-			}
+			"end": 1192
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 1244,
-			"end": 1248,
-			"loc": {
-				"start": {
-					"line": 35,
-					"column": 2
-				},
-				"end": {
-					"line": 35,
-					"column": 6
-				}
-			}
+			"end": 1248
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 1404,
-			"end": 1408,
-			"loc": {
-				"start": {
-					"line": 40,
-					"column": 16
-				},
-				"end": {
-					"line": 40,
-					"column": 20
-				}
-			}
+			"end": 1408
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 1479,
-			"end": 1483,
-			"loc": {
-				"start": {
-					"line": 44,
-					"column": 14
-				},
-				"end": {
-					"line": 44,
-					"column": 18
-				}
-			}
+			"end": 1483
 		}
 	]
 }

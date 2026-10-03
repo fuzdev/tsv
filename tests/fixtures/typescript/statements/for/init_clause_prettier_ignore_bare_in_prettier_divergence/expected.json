@@ -14,689 +14,259 @@
 			"type": "Line",
 			"value": " A frozen `for` init clause prints verbatim, so the ambient `[~In]` pair cannot be",
 			"start": 20,
-			"end": 104,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 85
-				}
-			}
+			"end": 104
 		},
 		{
 			"type": "Line",
 			"value": " placed at the `in`'s own position the way the unfrozen clause places it — the one",
 			"start": 106,
-			"end": 190,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 85
-				}
-			}
+			"end": 190
 		},
 		{
 			"type": "Line",
 			"value": " pair goes around the whole slice. The question is therefore the SLICE's: the clause",
 			"start": 192,
-			"end": 278,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 1
-				},
-				"end": {
-					"line": 4,
-					"column": 87
-				}
-			}
+			"end": 278
 		},
 		{
 			"type": "Line",
 			"value": " root need not be the `in` binary, only reach one through a position the grammar",
 			"start": 280,
-			"end": 362,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 1
-				},
-				"end": {
-					"line": 5,
-					"column": 83
-				}
-			}
+			"end": 362
 		},
 		{
 			"type": "Line",
 			"value": " threads `[~In]` into.",
 			"start": 364,
-			"end": 388,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 1
-				},
-				"end": {
-					"line": 6,
-					"column": 25
-				}
-			}
+			"end": 388
 		},
 		{
 			"type": "Line",
 			"value": " a sequence operand",
 			"start": 391,
-			"end": 412,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 1
-				},
-				"end": {
-					"line": 8,
-					"column": 22
-				}
-			}
+			"end": 412
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 422,
-			"end": 440,
-			"loc": {
-				"start": {
-					"line": 10,
-					"column": 2
-				},
-				"end": {
-					"line": 10,
-					"column": 20
-				}
-			}
+			"end": 440
 		},
 		{
 			"type": "Line",
 			"value": " an assignment value",
 			"start": 479,
-			"end": 501,
-			"loc": {
-				"start": {
-					"line": 15,
-					"column": 1
-				},
-				"end": {
-					"line": 15,
-					"column": 23
-				}
-			}
+			"end": 501
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 511,
-			"end": 529,
-			"loc": {
-				"start": {
-					"line": 17,
-					"column": 2
-				},
-				"end": {
-					"line": 17,
-					"column": 20
-				}
-			}
+			"end": 529
 		},
 		{
 			"type": "Line",
 			"value": " a compound assignment's value",
 			"start": 568,
-			"end": 600,
-			"loc": {
-				"start": {
-					"line": 22,
-					"column": 1
-				},
-				"end": {
-					"line": 22,
-					"column": 33
-				}
-			}
+			"end": 600
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 610,
-			"end": 628,
-			"loc": {
-				"start": {
-					"line": 24,
-					"column": 2
-				},
-				"end": {
-					"line": 24,
-					"column": 20
-				}
-			}
+			"end": 628
 		},
 		{
 			"type": "Line",
 			"value": " a conditional's alternate",
 			"start": 668,
-			"end": 696,
-			"loc": {
-				"start": {
-					"line": 29,
-					"column": 1
-				},
-				"end": {
-					"line": 29,
-					"column": 29
-				}
-			}
+			"end": 696
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 706,
-			"end": 724,
-			"loc": {
-				"start": {
-					"line": 31,
-					"column": 2
-				},
-				"end": {
-					"line": 31,
-					"column": 20
-				}
-			}
+			"end": 724
 		},
 		{
 			"type": "Line",
 			"value": " a conditional's test",
 			"start": 769,
-			"end": 792,
-			"loc": {
-				"start": {
-					"line": 36,
-					"column": 1
-				},
-				"end": {
-					"line": 36,
-					"column": 24
-				}
-			}
+			"end": 792
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 802,
-			"end": 820,
-			"loc": {
-				"start": {
-					"line": 38,
-					"column": 2
-				},
-				"end": {
-					"line": 38,
-					"column": 20
-				}
-			}
+			"end": 820
 		},
 		{
 			"type": "Line",
 			"value": " a logical operand",
 			"start": 865,
-			"end": 885,
-			"loc": {
-				"start": {
-					"line": 43,
-					"column": 1
-				},
-				"end": {
-					"line": 43,
-					"column": 21
-				}
-			}
+			"end": 885
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 895,
-			"end": 913,
-			"loc": {
-				"start": {
-					"line": 45,
-					"column": 2
-				},
-				"end": {
-					"line": 45,
-					"column": 20
-				}
-			}
+			"end": 913
 		},
 		{
 			"type": "Line",
 			"value": " an arrow's concise body",
 			"start": 953,
-			"end": 979,
-			"loc": {
-				"start": {
-					"line": 50,
-					"column": 1
-				},
-				"end": {
-					"line": 50,
-					"column": 27
-				}
-			}
+			"end": 979
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 989,
-			"end": 1007,
-			"loc": {
-				"start": {
-					"line": 52,
-					"column": 2
-				},
-				"end": {
-					"line": 52,
-					"column": 20
-				}
-			}
+			"end": 1007
 		},
 		{
 			"type": "Line",
 			"value": " An arrow's concise body is `[?In]` too, and the freeze there is the arrow's own",
 			"start": 1046,
-			"end": 1128,
-			"loc": {
-				"start": {
-					"line": 57,
-					"column": 1
-				},
-				"end": {
-					"line": 57,
-					"column": 83
-				}
-			}
+			"end": 1128
 		},
 		{
 			"type": "Line",
 			"value": " `=>`→body head rather than the clause's. The root case takes the pair from the",
 			"start": 1130,
-			"end": 1211,
-			"loc": {
-				"start": {
-					"line": 58,
-					"column": 1
-				},
-				"end": {
-					"line": 58,
-					"column": 82
-				}
-			}
+			"end": 1211
 		},
 		{
 			"type": "Line",
 			"value": " ARROW-BODY position; a descended one takes it from the slice.",
 			"start": 1213,
-			"end": 1277,
-			"loc": {
-				"start": {
-					"line": 59,
-					"column": 1
-				},
-				"end": {
-					"line": 59,
-					"column": 65
-				}
-			}
+			"end": 1277
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 1302,
-			"end": 1320,
-			"loc": {
-				"start": {
-					"line": 62,
-					"column": 3
-				},
-				"end": {
-					"line": 62,
-					"column": 21
-				}
-			}
+			"end": 1320
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 1377,
-			"end": 1395,
-			"loc": {
-				"start": {
-					"line": 69,
-					"column": 3
-				},
-				"end": {
-					"line": 69,
-					"column": 21
-				}
-			}
+			"end": 1395
 		},
 		{
 			"type": "Line",
 			"value": " The same pair of cases at a host that is `[+In]` in its own right — a call argument, an",
 			"start": 1436,
-			"end": 1526,
-			"loc": {
-				"start": {
-					"line": 74,
-					"column": 1
-				},
-				"end": {
-					"line": 74,
-					"column": 91
-				}
-			}
+			"end": 1526
 		},
 		{
 			"type": "Line",
 			"value": " object value and a template substitution. The ROOT case takes its pair from the",
 			"start": 1528,
-			"end": 1610,
-			"loc": {
-				"start": {
-					"line": 75,
-					"column": 1
-				},
-				"end": {
-					"line": 75,
-					"column": 83
-				}
-			}
+			"end": 1610
 		},
 		{
 			"type": "Line",
 			"value": " arrow-body position at all three, prettier included; only the DESCENDED one, which",
 			"start": 1612,
-			"end": 1697,
-			"loc": {
-				"start": {
-					"line": 76,
-					"column": 1
-				},
-				"end": {
-					"line": 76,
-					"column": 86
-				}
-			}
+			"end": 1697
 		},
 		{
 			"type": "Line",
 			"value": " takes it from the slice, parts — and there prettier's bare form parses, the host",
 			"start": 1699,
-			"end": 1782,
-			"loc": {
-				"start": {
-					"line": 77,
-					"column": 1
-				},
-				"end": {
-					"line": 77,
-					"column": 84
-				}
-			}
+			"end": 1782
 		},
 		{
 			"type": "Line",
 			"value": " needing no pair.",
 			"start": 1784,
-			"end": 1803,
-			"loc": {
-				"start": {
-					"line": 78,
-					"column": 1
-				},
-				"end": {
-					"line": 78,
-					"column": 20
-				}
-			}
+			"end": 1803
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 1830,
-			"end": 1848,
-			"loc": {
-				"start": {
-					"line": 82,
-					"column": 4
-				},
-				"end": {
-					"line": 82,
-					"column": 22
-				}
-			}
+			"end": 1848
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 1928,
-			"end": 1946,
-			"loc": {
-				"start": {
-					"line": 91,
-					"column": 4
-				},
-				"end": {
-					"line": 91,
-					"column": 22
-				}
-			}
+			"end": 1946
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 2012,
-			"end": 2030,
-			"loc": {
-				"start": {
-					"line": 99,
-					"column": 3
-				},
-				"end": {
-					"line": 99,
-					"column": 21
-				}
-			}
+			"end": 2030
 		},
 		{
 			"type": "Line",
 			"value": " an `as` / `satisfies` operand — the cast is over the binary, so the `in` is not the root",
 			"start": 2073,
-			"end": 2164,
-			"loc": {
-				"start": {
-					"line": 104,
-					"column": 1
-				},
-				"end": {
-					"line": 104,
-					"column": 92
-				}
-			}
+			"end": 2164
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 2174,
-			"end": 2192,
-			"loc": {
-				"start": {
-					"line": 106,
-					"column": 2
-				},
-				"end": {
-					"line": 106,
-					"column": 20
-				}
-			}
+			"end": 2192
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 2240,
-			"end": 2258,
-			"loc": {
-				"start": {
-					"line": 112,
-					"column": 2
-				},
-				"end": {
-					"line": 112,
-					"column": 20
-				}
-			}
+			"end": 2258
 		},
 		{
 			"type": "Line",
 			"value": " a `yield` / `yield*` argument",
 			"start": 2305,
-			"end": 2337,
-			"loc": {
-				"start": {
-					"line": 117,
-					"column": 1
-				},
-				"end": {
-					"line": 117,
-					"column": 33
-				}
-			}
+			"end": 2337
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 2368,
-			"end": 2386,
-			"loc": {
-				"start": {
-					"line": 120,
-					"column": 3
-				},
-				"end": {
-					"line": 120,
-					"column": 21
-				}
-			}
+			"end": 2386
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 2438,
-			"end": 2456,
-			"loc": {
-				"start": {
-					"line": 126,
-					"column": 3
-				},
-				"end": {
-					"line": 126,
-					"column": 21
-				}
-			}
+			"end": 2456
 		},
 		{
 			"type": "Line",
 			"value": " Controls. An `in` the author already parenthesized rides inside the slice with its",
 			"start": 2502,
-			"end": 2587,
-			"loc": {
-				"start": {
-					"line": 132,
-					"column": 1
-				},
-				"end": {
-					"line": 132,
-					"column": 86
-				}
-			}
+			"end": 2587
 		},
 		{
 			"type": "Line",
 			"value": " own pair, and a conditional's CONSEQUENT is `[+In]` whatever the conditional is, so",
 			"start": 2589,
-			"end": 2675,
-			"loc": {
-				"start": {
-					"line": 133,
-					"column": 1
-				},
-				"end": {
-					"line": 133,
-					"column": 87
-				}
-			}
+			"end": 2675
 		},
 		{
 			"type": "Line",
 			"value": " neither needs one.",
 			"start": 2677,
-			"end": 2698,
-			"loc": {
-				"start": {
-					"line": 134,
-					"column": 1
-				},
-				"end": {
-					"line": 134,
-					"column": 22
-				}
-			}
+			"end": 2698
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 2708,
-			"end": 2726,
-			"loc": {
-				"start": {
-					"line": 136,
-					"column": 2
-				},
-				"end": {
-					"line": 136,
-					"column": 20
-				}
-			}
+			"end": 2726
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 2773,
-			"end": 2791,
-			"loc": {
-				"start": {
-					"line": 142,
-					"column": 2
-				},
-				"end": {
-					"line": 142,
-					"column": 20
-				}
-			}
+			"end": 2791
 		}
 	],
 	"instance": {
@@ -708,90 +278,30 @@
 			"type": "Program",
 			"start": 18,
 			"end": 2832,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 146,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ForStatement",
 					"start": 414,
 					"end": 476,
-					"loc": {
-						"start": {
-							"line": 9,
-							"column": 1
-						},
-						"end": {
-							"line": 13,
-							"column": 5
-						}
-					},
 					"init": {
 						"type": "SequenceExpression",
 						"start": 444,
 						"end": 464,
-						"loc": {
-							"start": {
-								"line": 11,
-								"column": 3
-							},
-							"end": {
-								"line": 11,
-								"column": 23
-							}
-						},
 						"expressions": [
 							{
 								"type": "Identifier",
 								"start": 444,
 								"end": 448,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 3
-									},
-									"end": {
-										"line": 11,
-										"column": 7
-									}
-								},
 								"name": "aaa1"
 							},
 							{
 								"type": "BinaryExpression",
 								"start": 450,
 								"end": 464,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 9
-									},
-									"end": {
-										"line": 11,
-										"column": 23
-									}
-								},
 								"left": {
 									"type": "Literal",
 									"start": 450,
 									"end": 455,
-									"loc": {
-										"start": {
-											"line": 11,
-											"column": 9
-										},
-										"end": {
-											"line": 11,
-											"column": 14
-										}
-									},
 									"value": "aaa",
 									"raw": "'aaa'"
 								},
@@ -800,16 +310,6 @@
 									"type": "Identifier",
 									"start": 461,
 									"end": 464,
-									"loc": {
-										"start": {
-											"line": 11,
-											"column": 20
-										},
-										"end": {
-											"line": 11,
-											"column": 23
-										}
-									},
 									"name": "bbb"
 								}
 							}
@@ -829,16 +329,6 @@
 						"type": "BlockStatement",
 						"start": 474,
 						"end": 476,
-						"loc": {
-							"start": {
-								"line": 13,
-								"column": 3
-							},
-							"end": {
-								"line": 13,
-								"column": 5
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -884,75 +374,25 @@
 					"type": "ForStatement",
 					"start": 503,
 					"end": 565,
-					"loc": {
-						"start": {
-							"line": 16,
-							"column": 1
-						},
-						"end": {
-							"line": 20,
-							"column": 5
-						}
-					},
 					"init": {
 						"type": "AssignmentExpression",
 						"start": 533,
 						"end": 553,
-						"loc": {
-							"start": {
-								"line": 18,
-								"column": 3
-							},
-							"end": {
-								"line": 18,
-								"column": 23
-							}
-						},
 						"operator": "=",
 						"left": {
 							"type": "Identifier",
 							"start": 533,
 							"end": 536,
-							"loc": {
-								"start": {
-									"line": 18,
-									"column": 3
-								},
-								"end": {
-									"line": 18,
-									"column": 6
-								}
-							},
 							"name": "ccc"
 						},
 						"right": {
 							"type": "BinaryExpression",
 							"start": 539,
 							"end": 553,
-							"loc": {
-								"start": {
-									"line": 18,
-									"column": 9
-								},
-								"end": {
-									"line": 18,
-									"column": 23
-								}
-							},
 							"left": {
 								"type": "Literal",
 								"start": 539,
 								"end": 544,
-								"loc": {
-									"start": {
-										"line": 18,
-										"column": 9
-									},
-									"end": {
-										"line": 18,
-										"column": 14
-									}
-								},
 								"value": "aaa",
 								"raw": "'aaa'"
 							},
@@ -961,16 +401,6 @@
 								"type": "Identifier",
 								"start": 550,
 								"end": 553,
-								"loc": {
-									"start": {
-										"line": 18,
-										"column": 20
-									},
-									"end": {
-										"line": 18,
-										"column": 23
-									}
-								},
 								"name": "bbb"
 							}
 						},
@@ -989,16 +419,6 @@
 						"type": "BlockStatement",
 						"start": 563,
 						"end": 565,
-						"loc": {
-							"start": {
-								"line": 20,
-								"column": 3
-							},
-							"end": {
-								"line": 20,
-								"column": 5
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -1014,75 +434,25 @@
 					"type": "ForStatement",
 					"start": 602,
 					"end": 665,
-					"loc": {
-						"start": {
-							"line": 23,
-							"column": 1
-						},
-						"end": {
-							"line": 27,
-							"column": 5
-						}
-					},
 					"init": {
 						"type": "AssignmentExpression",
 						"start": 632,
 						"end": 653,
-						"loc": {
-							"start": {
-								"line": 25,
-								"column": 3
-							},
-							"end": {
-								"line": 25,
-								"column": 24
-							}
-						},
 						"operator": "+=",
 						"left": {
 							"type": "Identifier",
 							"start": 632,
 							"end": 635,
-							"loc": {
-								"start": {
-									"line": 25,
-									"column": 3
-								},
-								"end": {
-									"line": 25,
-									"column": 6
-								}
-							},
 							"name": "ccc"
 						},
 						"right": {
 							"type": "BinaryExpression",
 							"start": 639,
 							"end": 653,
-							"loc": {
-								"start": {
-									"line": 25,
-									"column": 10
-								},
-								"end": {
-									"line": 25,
-									"column": 24
-								}
-							},
 							"left": {
 								"type": "Literal",
 								"start": 639,
 								"end": 644,
-								"loc": {
-									"start": {
-										"line": 25,
-										"column": 10
-									},
-									"end": {
-										"line": 25,
-										"column": 15
-									}
-								},
 								"value": "aaa",
 								"raw": "'aaa'"
 							},
@@ -1091,16 +461,6 @@
 								"type": "Identifier",
 								"start": 650,
 								"end": 653,
-								"loc": {
-									"start": {
-										"line": 25,
-										"column": 21
-									},
-									"end": {
-										"line": 25,
-										"column": 24
-									}
-								},
 								"name": "bbb"
 							}
 						},
@@ -1119,16 +479,6 @@
 						"type": "BlockStatement",
 						"start": 663,
 						"end": 665,
-						"loc": {
-							"start": {
-								"line": 27,
-								"column": 3
-							},
-							"end": {
-								"line": 27,
-								"column": 5
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -1144,90 +494,30 @@
 					"type": "ForStatement",
 					"start": 698,
 					"end": 766,
-					"loc": {
-						"start": {
-							"line": 30,
-							"column": 1
-						},
-						"end": {
-							"line": 34,
-							"column": 5
-						}
-					},
 					"init": {
 						"type": "ConditionalExpression",
 						"start": 728,
 						"end": 754,
-						"loc": {
-							"start": {
-								"line": 32,
-								"column": 3
-							},
-							"end": {
-								"line": 32,
-								"column": 29
-							}
-						},
 						"test": {
 							"type": "Identifier",
 							"start": 728,
 							"end": 731,
-							"loc": {
-								"start": {
-									"line": 32,
-									"column": 3
-								},
-								"end": {
-									"line": 32,
-									"column": 6
-								}
-							},
 							"name": "ooo"
 						},
 						"consequent": {
 							"type": "Identifier",
 							"start": 734,
 							"end": 737,
-							"loc": {
-								"start": {
-									"line": 32,
-									"column": 9
-								},
-								"end": {
-									"line": 32,
-									"column": 12
-								}
-							},
 							"name": "ppp"
 						},
 						"alternate": {
 							"type": "BinaryExpression",
 							"start": 740,
 							"end": 754,
-							"loc": {
-								"start": {
-									"line": 32,
-									"column": 15
-								},
-								"end": {
-									"line": 32,
-									"column": 29
-								}
-							},
 							"left": {
 								"type": "Literal",
 								"start": 740,
 								"end": 745,
-								"loc": {
-									"start": {
-										"line": 32,
-										"column": 15
-									},
-									"end": {
-										"line": 32,
-										"column": 20
-									}
-								},
 								"value": "aaa",
 								"raw": "'aaa'"
 							},
@@ -1236,16 +526,6 @@
 								"type": "Identifier",
 								"start": 751,
 								"end": 754,
-								"loc": {
-									"start": {
-										"line": 32,
-										"column": 26
-									},
-									"end": {
-										"line": 32,
-										"column": 29
-									}
-								},
 								"name": "bbb"
 							}
 						},
@@ -1264,16 +544,6 @@
 						"type": "BlockStatement",
 						"start": 764,
 						"end": 766,
-						"loc": {
-							"start": {
-								"line": 34,
-								"column": 3
-							},
-							"end": {
-								"line": 34,
-								"column": 5
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -1289,58 +559,18 @@
 					"type": "ForStatement",
 					"start": 794,
 					"end": 862,
-					"loc": {
-						"start": {
-							"line": 37,
-							"column": 1
-						},
-						"end": {
-							"line": 41,
-							"column": 5
-						}
-					},
 					"init": {
 						"type": "ConditionalExpression",
 						"start": 824,
 						"end": 850,
-						"loc": {
-							"start": {
-								"line": 39,
-								"column": 3
-							},
-							"end": {
-								"line": 39,
-								"column": 29
-							}
-						},
 						"test": {
 							"type": "BinaryExpression",
 							"start": 824,
 							"end": 838,
-							"loc": {
-								"start": {
-									"line": 39,
-									"column": 3
-								},
-								"end": {
-									"line": 39,
-									"column": 17
-								}
-							},
 							"left": {
 								"type": "Literal",
 								"start": 824,
 								"end": 829,
-								"loc": {
-									"start": {
-										"line": 39,
-										"column": 3
-									},
-									"end": {
-										"line": 39,
-										"column": 8
-									}
-								},
 								"value": "aaa",
 								"raw": "'aaa'"
 							},
@@ -1349,16 +579,6 @@
 								"type": "Identifier",
 								"start": 835,
 								"end": 838,
-								"loc": {
-									"start": {
-										"line": 39,
-										"column": 14
-									},
-									"end": {
-										"line": 39,
-										"column": 17
-									}
-								},
 								"name": "bbb"
 							}
 						},
@@ -1366,32 +586,12 @@
 							"type": "Identifier",
 							"start": 841,
 							"end": 844,
-							"loc": {
-								"start": {
-									"line": 39,
-									"column": 20
-								},
-								"end": {
-									"line": 39,
-									"column": 23
-								}
-							},
 							"name": "ppp"
 						},
 						"alternate": {
 							"type": "Identifier",
 							"start": 847,
 							"end": 850,
-							"loc": {
-								"start": {
-									"line": 39,
-									"column": 26
-								},
-								"end": {
-									"line": 39,
-									"column": 29
-								}
-							},
 							"name": "qqq"
 						},
 						"leadingComments": [
@@ -1409,16 +609,6 @@
 						"type": "BlockStatement",
 						"start": 860,
 						"end": 862,
-						"loc": {
-							"start": {
-								"line": 41,
-								"column": 3
-							},
-							"end": {
-								"line": 41,
-								"column": 5
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -1434,44 +624,14 @@
 					"type": "ForStatement",
 					"start": 887,
 					"end": 950,
-					"loc": {
-						"start": {
-							"line": 44,
-							"column": 1
-						},
-						"end": {
-							"line": 48,
-							"column": 5
-						}
-					},
 					"init": {
 						"type": "LogicalExpression",
 						"start": 917,
 						"end": 938,
-						"loc": {
-							"start": {
-								"line": 46,
-								"column": 3
-							},
-							"end": {
-								"line": 46,
-								"column": 24
-							}
-						},
 						"left": {
 							"type": "Identifier",
 							"start": 917,
 							"end": 920,
-							"loc": {
-								"start": {
-									"line": 46,
-									"column": 3
-								},
-								"end": {
-									"line": 46,
-									"column": 6
-								}
-							},
 							"name": "qqq"
 						},
 						"operator": "&&",
@@ -1479,30 +639,10 @@
 							"type": "BinaryExpression",
 							"start": 924,
 							"end": 938,
-							"loc": {
-								"start": {
-									"line": 46,
-									"column": 10
-								},
-								"end": {
-									"line": 46,
-									"column": 24
-								}
-							},
 							"left": {
 								"type": "Literal",
 								"start": 924,
 								"end": 929,
-								"loc": {
-									"start": {
-										"line": 46,
-										"column": 10
-									},
-									"end": {
-										"line": 46,
-										"column": 15
-									}
-								},
 								"value": "aaa",
 								"raw": "'aaa'"
 							},
@@ -1511,16 +651,6 @@
 								"type": "Identifier",
 								"start": 935,
 								"end": 938,
-								"loc": {
-									"start": {
-										"line": 46,
-										"column": 21
-									},
-									"end": {
-										"line": 46,
-										"column": 24
-									}
-								},
 								"name": "bbb"
 							}
 						},
@@ -1539,16 +669,6 @@
 						"type": "BlockStatement",
 						"start": 948,
 						"end": 950,
-						"loc": {
-							"start": {
-								"line": 48,
-								"column": 3
-							},
-							"end": {
-								"line": 48,
-								"column": 5
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -1564,30 +684,10 @@
 					"type": "ForStatement",
 					"start": 981,
 					"end": 1043,
-					"loc": {
-						"start": {
-							"line": 51,
-							"column": 1
-						},
-						"end": {
-							"line": 55,
-							"column": 5
-						}
-					},
 					"init": {
 						"type": "ArrowFunctionExpression",
 						"start": 1011,
 						"end": 1031,
-						"loc": {
-							"start": {
-								"line": 53,
-								"column": 3
-							},
-							"end": {
-								"line": 53,
-								"column": 23
-							}
-						},
 						"id": null,
 						"expression": true,
 						"generator": false,
@@ -1597,30 +697,10 @@
 							"type": "BinaryExpression",
 							"start": 1017,
 							"end": 1031,
-							"loc": {
-								"start": {
-									"line": 53,
-									"column": 9
-								},
-								"end": {
-									"line": 53,
-									"column": 23
-								}
-							},
 							"left": {
 								"type": "Literal",
 								"start": 1017,
 								"end": 1022,
-								"loc": {
-									"start": {
-										"line": 53,
-										"column": 9
-									},
-									"end": {
-										"line": 53,
-										"column": 14
-									}
-								},
 								"value": "aaa",
 								"raw": "'aaa'"
 							},
@@ -1629,16 +709,6 @@
 								"type": "Identifier",
 								"start": 1028,
 								"end": 1031,
-								"loc": {
-									"start": {
-										"line": 53,
-										"column": 20
-									},
-									"end": {
-										"line": 53,
-										"column": 23
-									}
-								},
 								"name": "bbb"
 							}
 						},
@@ -1657,16 +727,6 @@
 						"type": "BlockStatement",
 						"start": 1041,
 						"end": 1043,
-						"loc": {
-							"start": {
-								"line": 55,
-								"column": 3
-							},
-							"end": {
-								"line": 55,
-								"column": 5
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -1682,61 +742,21 @@
 					"type": "ForStatement",
 					"start": 1279,
 					"end": 1351,
-					"loc": {
-						"start": {
-							"line": 60,
-							"column": 1
-						},
-						"end": {
-							"line": 65,
-							"column": 5
-						}
-					},
 					"init": {
 						"type": "AssignmentExpression",
 						"start": 1287,
 						"end": 1340,
-						"loc": {
-							"start": {
-								"line": 61,
-								"column": 2
-							},
-							"end": {
-								"line": 63,
-								"column": 19
-							}
-						},
 						"operator": "=",
 						"left": {
 							"type": "Identifier",
 							"start": 1287,
 							"end": 1290,
-							"loc": {
-								"start": {
-									"line": 61,
-									"column": 2
-								},
-								"end": {
-									"line": 61,
-									"column": 5
-								}
-							},
 							"name": "xxx"
 						},
 						"right": {
 							"type": "ArrowFunctionExpression",
 							"start": 1293,
 							"end": 1340,
-							"loc": {
-								"start": {
-									"line": 61,
-									"column": 8
-								},
-								"end": {
-									"line": 63,
-									"column": 19
-								}
-							},
 							"id": null,
 							"expression": true,
 							"generator": false,
@@ -1746,30 +766,10 @@
 								"type": "BinaryExpression",
 								"start": 1325,
 								"end": 1339,
-								"loc": {
-									"start": {
-										"line": 63,
-										"column": 4
-									},
-									"end": {
-										"line": 63,
-										"column": 18
-									}
-								},
 								"left": {
 									"type": "Literal",
 									"start": 1325,
 									"end": 1330,
-									"loc": {
-										"start": {
-											"line": 63,
-											"column": 4
-										},
-										"end": {
-											"line": 63,
-											"column": 9
-										}
-									},
 									"value": "aaa",
 									"raw": "'aaa'"
 								},
@@ -1778,16 +778,6 @@
 									"type": "Identifier",
 									"start": 1336,
 									"end": 1339,
-									"loc": {
-										"start": {
-											"line": 63,
-											"column": 15
-										},
-										"end": {
-											"line": 63,
-											"column": 18
-										}
-									},
 									"name": "bbb"
 								},
 								"leadingComments": [
@@ -1807,16 +797,6 @@
 						"type": "BlockStatement",
 						"start": 1349,
 						"end": 1351,
-						"loc": {
-							"start": {
-								"line": 65,
-								"column": 3
-							},
-							"end": {
-								"line": 65,
-								"column": 5
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -1844,61 +824,21 @@
 					"type": "ForStatement",
 					"start": 1354,
 					"end": 1433,
-					"loc": {
-						"start": {
-							"line": 67,
-							"column": 1
-						},
-						"end": {
-							"line": 72,
-							"column": 5
-						}
-					},
 					"init": {
 						"type": "AssignmentExpression",
 						"start": 1362,
 						"end": 1422,
-						"loc": {
-							"start": {
-								"line": 68,
-								"column": 2
-							},
-							"end": {
-								"line": 70,
-								"column": 26
-							}
-						},
 						"operator": "=",
 						"left": {
 							"type": "Identifier",
 							"start": 1362,
 							"end": 1365,
-							"loc": {
-								"start": {
-									"line": 68,
-									"column": 2
-								},
-								"end": {
-									"line": 68,
-									"column": 5
-								}
-							},
 							"name": "xxx"
 						},
 						"right": {
 							"type": "ArrowFunctionExpression",
 							"start": 1368,
 							"end": 1422,
-							"loc": {
-								"start": {
-									"line": 68,
-									"column": 8
-								},
-								"end": {
-									"line": 70,
-									"column": 26
-								}
-							},
 							"id": null,
 							"expression": true,
 							"generator": false,
@@ -1908,30 +848,10 @@
 								"type": "LogicalExpression",
 								"start": 1400,
 								"end": 1421,
-								"loc": {
-									"start": {
-										"line": 70,
-										"column": 4
-									},
-									"end": {
-										"line": 70,
-										"column": 25
-									}
-								},
 								"left": {
 									"type": "Identifier",
 									"start": 1400,
 									"end": 1403,
-									"loc": {
-										"start": {
-											"line": 70,
-											"column": 4
-										},
-										"end": {
-											"line": 70,
-											"column": 7
-										}
-									},
 									"name": "ccc"
 								},
 								"operator": "||",
@@ -1939,30 +859,10 @@
 									"type": "BinaryExpression",
 									"start": 1407,
 									"end": 1421,
-									"loc": {
-										"start": {
-											"line": 70,
-											"column": 11
-										},
-										"end": {
-											"line": 70,
-											"column": 25
-										}
-									},
 									"left": {
 										"type": "Literal",
 										"start": 1407,
 										"end": 1412,
-										"loc": {
-											"start": {
-												"line": 70,
-												"column": 11
-											},
-											"end": {
-												"line": 70,
-												"column": 16
-											}
-										},
 										"value": "aaa",
 										"raw": "'aaa'"
 									},
@@ -1971,16 +871,6 @@
 										"type": "Identifier",
 										"start": 1418,
 										"end": 1421,
-										"loc": {
-											"start": {
-												"line": 70,
-												"column": 22
-											},
-											"end": {
-												"line": 70,
-												"column": 25
-											}
-										},
 										"name": "bbb"
 									}
 								},
@@ -2001,16 +891,6 @@
 						"type": "BlockStatement",
 						"start": 1431,
 						"end": 1433,
-						"loc": {
-							"start": {
-								"line": 72,
-								"column": 3
-							},
-							"end": {
-								"line": 72,
-								"column": 5
-							}
-						},
 						"body": []
 					}
 				},
@@ -2018,44 +898,14 @@
 					"type": "ForStatement",
 					"start": 1805,
 					"end": 1891,
-					"loc": {
-						"start": {
-							"line": 79,
-							"column": 1
-						},
-						"end": {
-							"line": 86,
-							"column": 5
-						}
-					},
 					"init": {
 						"type": "CallExpression",
 						"start": 1813,
 						"end": 1880,
-						"loc": {
-							"start": {
-								"line": 80,
-								"column": 2
-							},
-							"end": {
-								"line": 84,
-								"column": 3
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 1813,
 							"end": 1815,
-							"loc": {
-								"start": {
-									"line": 80,
-									"column": 2
-								},
-								"end": {
-									"line": 80,
-									"column": 4
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -2063,16 +913,6 @@
 								"type": "ArrowFunctionExpression",
 								"start": 1820,
 								"end": 1876,
-								"loc": {
-									"start": {
-										"line": 81,
-										"column": 3
-									},
-									"end": {
-										"line": 83,
-										"column": 27
-									}
-								},
 								"id": null,
 								"expression": true,
 								"generator": false,
@@ -2082,30 +922,10 @@
 									"type": "LogicalExpression",
 									"start": 1854,
 									"end": 1875,
-									"loc": {
-										"start": {
-											"line": 83,
-											"column": 5
-										},
-										"end": {
-											"line": 83,
-											"column": 26
-										}
-									},
 									"left": {
 										"type": "Identifier",
 										"start": 1854,
 										"end": 1857,
-										"loc": {
-											"start": {
-												"line": 83,
-												"column": 5
-											},
-											"end": {
-												"line": 83,
-												"column": 8
-											}
-										},
 										"name": "ccc"
 									},
 									"operator": "||",
@@ -2113,30 +933,10 @@
 										"type": "BinaryExpression",
 										"start": 1861,
 										"end": 1875,
-										"loc": {
-											"start": {
-												"line": 83,
-												"column": 12
-											},
-											"end": {
-												"line": 83,
-												"column": 26
-											}
-										},
 										"left": {
 											"type": "Literal",
 											"start": 1861,
 											"end": 1866,
-											"loc": {
-												"start": {
-													"line": 83,
-													"column": 12
-												},
-												"end": {
-													"line": 83,
-													"column": 17
-												}
-											},
 											"value": "aaa",
 											"raw": "'aaa'"
 										},
@@ -2145,16 +945,6 @@
 											"type": "Identifier",
 											"start": 1872,
 											"end": 1875,
-											"loc": {
-												"start": {
-													"line": 83,
-													"column": 23
-												},
-												"end": {
-													"line": 83,
-													"column": 26
-												}
-											},
 											"name": "bbb"
 										}
 									},
@@ -2177,16 +967,6 @@
 						"type": "BlockStatement",
 						"start": 1889,
 						"end": 1891,
-						"loc": {
-							"start": {
-								"line": 86,
-								"column": 3
-							},
-							"end": {
-								"line": 86,
-								"column": 5
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -2226,76 +1006,26 @@
 					"type": "ForStatement",
 					"start": 1894,
 					"end": 1989,
-					"loc": {
-						"start": {
-							"line": 88,
-							"column": 1
-						},
-						"end": {
-							"line": 95,
-							"column": 5
-						}
-					},
 					"init": {
 						"type": "AssignmentExpression",
 						"start": 1902,
 						"end": 1978,
-						"loc": {
-							"start": {
-								"line": 89,
-								"column": 2
-							},
-							"end": {
-								"line": 93,
-								"column": 3
-							}
-						},
 						"operator": "=",
 						"left": {
 							"type": "Identifier",
 							"start": 1902,
 							"end": 1905,
-							"loc": {
-								"start": {
-									"line": 89,
-									"column": 2
-								},
-								"end": {
-									"line": 89,
-									"column": 5
-								}
-							},
 							"name": "yyy"
 						},
 						"right": {
 							"type": "ObjectExpression",
 							"start": 1908,
 							"end": 1978,
-							"loc": {
-								"start": {
-									"line": 89,
-									"column": 8
-								},
-								"end": {
-									"line": 93,
-									"column": 3
-								}
-							},
 							"properties": [
 								{
 									"type": "Property",
 									"start": 1913,
 									"end": 1974,
-									"loc": {
-										"start": {
-											"line": 90,
-											"column": 3
-										},
-										"end": {
-											"line": 92,
-											"column": 27
-										}
-									},
 									"method": false,
 									"shorthand": false,
 									"computed": false,
@@ -2303,32 +1033,12 @@
 										"type": "Identifier",
 										"start": 1913,
 										"end": 1916,
-										"loc": {
-											"start": {
-												"line": 90,
-												"column": 3
-											},
-											"end": {
-												"line": 90,
-												"column": 6
-											}
-										},
 										"name": "zzz"
 									},
 									"value": {
 										"type": "ArrowFunctionExpression",
 										"start": 1918,
 										"end": 1974,
-										"loc": {
-											"start": {
-												"line": 90,
-												"column": 8
-											},
-											"end": {
-												"line": 92,
-												"column": 27
-											}
-										},
 										"id": null,
 										"expression": true,
 										"generator": false,
@@ -2338,30 +1048,10 @@
 											"type": "LogicalExpression",
 											"start": 1952,
 											"end": 1973,
-											"loc": {
-												"start": {
-													"line": 92,
-													"column": 5
-												},
-												"end": {
-													"line": 92,
-													"column": 26
-												}
-											},
 											"left": {
 												"type": "Identifier",
 												"start": 1952,
 												"end": 1955,
-												"loc": {
-													"start": {
-														"line": 92,
-														"column": 5
-													},
-													"end": {
-														"line": 92,
-														"column": 8
-													}
-												},
 												"name": "ccc"
 											},
 											"operator": "||",
@@ -2369,30 +1059,10 @@
 												"type": "BinaryExpression",
 												"start": 1959,
 												"end": 1973,
-												"loc": {
-													"start": {
-														"line": 92,
-														"column": 12
-													},
-													"end": {
-														"line": 92,
-														"column": 26
-													}
-												},
 												"left": {
 													"type": "Literal",
 													"start": 1959,
 													"end": 1964,
-													"loc": {
-														"start": {
-															"line": 92,
-															"column": 12
-														},
-														"end": {
-															"line": 92,
-															"column": 17
-														}
-													},
 													"value": "aaa",
 													"raw": "'aaa'"
 												},
@@ -2401,16 +1071,6 @@
 													"type": "Identifier",
 													"start": 1970,
 													"end": 1973,
-													"loc": {
-														"start": {
-															"line": 92,
-															"column": 23
-														},
-														"end": {
-															"line": 92,
-															"column": 26
-														}
-													},
 													"name": "bbb"
 												}
 											},
@@ -2435,16 +1095,6 @@
 						"type": "BlockStatement",
 						"start": 1987,
 						"end": 1989,
-						"loc": {
-							"start": {
-								"line": 95,
-								"column": 3
-							},
-							"end": {
-								"line": 95,
-								"column": 5
-							}
-						},
 						"body": []
 					}
 				},
@@ -2452,45 +1102,15 @@
 					"type": "ForStatement",
 					"start": 1992,
 					"end": 2070,
-					"loc": {
-						"start": {
-							"line": 97,
-							"column": 1
-						},
-						"end": {
-							"line": 102,
-							"column": 5
-						}
-					},
 					"init": {
 						"type": "TemplateLiteral",
 						"start": 2000,
 						"end": 2059,
-						"loc": {
-							"start": {
-								"line": 98,
-								"column": 2
-							},
-							"end": {
-								"line": 100,
-								"column": 28
-							}
-						},
 						"expressions": [
 							{
 								"type": "ArrowFunctionExpression",
 								"start": 2003,
 								"end": 2057,
-								"loc": {
-									"start": {
-										"line": 98,
-										"column": 5
-									},
-									"end": {
-										"line": 100,
-										"column": 26
-									}
-								},
 								"id": null,
 								"expression": true,
 								"generator": false,
@@ -2500,30 +1120,10 @@
 									"type": "LogicalExpression",
 									"start": 2035,
 									"end": 2056,
-									"loc": {
-										"start": {
-											"line": 100,
-											"column": 4
-										},
-										"end": {
-											"line": 100,
-											"column": 25
-										}
-									},
 									"left": {
 										"type": "Identifier",
 										"start": 2035,
 										"end": 2038,
-										"loc": {
-											"start": {
-												"line": 100,
-												"column": 4
-											},
-											"end": {
-												"line": 100,
-												"column": 7
-											}
-										},
 										"name": "ccc"
 									},
 									"operator": "||",
@@ -2531,30 +1131,10 @@
 										"type": "BinaryExpression",
 										"start": 2042,
 										"end": 2056,
-										"loc": {
-											"start": {
-												"line": 100,
-												"column": 11
-											},
-											"end": {
-												"line": 100,
-												"column": 25
-											}
-										},
 										"left": {
 											"type": "Literal",
 											"start": 2042,
 											"end": 2047,
-											"loc": {
-												"start": {
-													"line": 100,
-													"column": 11
-												},
-												"end": {
-													"line": 100,
-													"column": 16
-												}
-											},
 											"value": "aaa",
 											"raw": "'aaa'"
 										},
@@ -2563,16 +1143,6 @@
 											"type": "Identifier",
 											"start": 2053,
 											"end": 2056,
-											"loc": {
-												"start": {
-													"line": 100,
-													"column": 22
-												},
-												"end": {
-													"line": 100,
-													"column": 25
-												}
-											},
 											"name": "bbb"
 										}
 									},
@@ -2592,16 +1162,6 @@
 								"type": "TemplateElement",
 								"start": 2001,
 								"end": 2001,
-								"loc": {
-									"start": {
-										"line": 98,
-										"column": 3
-									},
-									"end": {
-										"line": 98,
-										"column": 3
-									}
-								},
 								"value": {
 									"raw": "",
 									"cooked": ""
@@ -2612,16 +1172,6 @@
 								"type": "TemplateElement",
 								"start": 2058,
 								"end": 2058,
-								"loc": {
-									"start": {
-										"line": 100,
-										"column": 27
-									},
-									"end": {
-										"line": 100,
-										"column": 27
-									}
-								},
 								"value": {
 									"raw": "",
 									"cooked": ""
@@ -2636,16 +1186,6 @@
 						"type": "BlockStatement",
 						"start": 2068,
 						"end": 2070,
-						"loc": {
-							"start": {
-								"line": 102,
-								"column": 3
-							},
-							"end": {
-								"line": 102,
-								"column": 5
-							}
-						},
 						"body": []
 					}
 				},
@@ -2653,58 +1193,18 @@
 					"type": "ForStatement",
 					"start": 2166,
 					"end": 2229,
-					"loc": {
-						"start": {
-							"line": 105,
-							"column": 1
-						},
-						"end": {
-							"line": 109,
-							"column": 5
-						}
-					},
 					"init": {
 						"type": "TSAsExpression",
 						"start": 2196,
 						"end": 2217,
-						"loc": {
-							"start": {
-								"line": 107,
-								"column": 3
-							},
-							"end": {
-								"line": 107,
-								"column": 24
-							}
-						},
 						"expression": {
 							"type": "BinaryExpression",
 							"start": 2196,
 							"end": 2210,
-							"loc": {
-								"start": {
-									"line": 107,
-									"column": 3
-								},
-								"end": {
-									"line": 107,
-									"column": 17
-								}
-							},
 							"left": {
 								"type": "Literal",
 								"start": 2196,
 								"end": 2201,
-								"loc": {
-									"start": {
-										"line": 107,
-										"column": 3
-									},
-									"end": {
-										"line": 107,
-										"column": 8
-									}
-								},
 								"value": "aaa",
 								"raw": "'aaa'"
 							},
@@ -2713,33 +1213,13 @@
 								"type": "Identifier",
 								"start": 2207,
 								"end": 2210,
-								"loc": {
-									"start": {
-										"line": 107,
-										"column": 14
-									},
-									"end": {
-										"line": 107,
-										"column": 17
-									}
-								},
 								"name": "bbb"
 							}
 						},
 						"typeAnnotation": {
 							"type": "TSAnyKeyword",
 							"start": 2214,
-							"end": 2217,
-							"loc": {
-								"start": {
-									"line": 107,
-									"column": 21
-								},
-								"end": {
-									"line": 107,
-									"column": 24
-								}
-							}
+							"end": 2217
 						},
 						"leadingComments": [
 							{
@@ -2756,16 +1236,6 @@
 						"type": "BlockStatement",
 						"start": 2227,
 						"end": 2229,
-						"loc": {
-							"start": {
-								"line": 109,
-								"column": 3
-							},
-							"end": {
-								"line": 109,
-								"column": 5
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -2781,58 +1251,18 @@
 					"type": "ForStatement",
 					"start": 2232,
 					"end": 2302,
-					"loc": {
-						"start": {
-							"line": 111,
-							"column": 1
-						},
-						"end": {
-							"line": 115,
-							"column": 5
-						}
-					},
 					"init": {
 						"type": "TSSatisfiesExpression",
 						"start": 2262,
 						"end": 2290,
-						"loc": {
-							"start": {
-								"line": 113,
-								"column": 3
-							},
-							"end": {
-								"line": 113,
-								"column": 31
-							}
-						},
 						"expression": {
 							"type": "BinaryExpression",
 							"start": 2262,
 							"end": 2276,
-							"loc": {
-								"start": {
-									"line": 113,
-									"column": 3
-								},
-								"end": {
-									"line": 113,
-									"column": 17
-								}
-							},
 							"left": {
 								"type": "Literal",
 								"start": 2262,
 								"end": 2267,
-								"loc": {
-									"start": {
-										"line": 113,
-										"column": 3
-									},
-									"end": {
-										"line": 113,
-										"column": 8
-									}
-								},
 								"value": "aaa",
 								"raw": "'aaa'"
 							},
@@ -2841,33 +1271,13 @@
 								"type": "Identifier",
 								"start": 2273,
 								"end": 2276,
-								"loc": {
-									"start": {
-										"line": 113,
-										"column": 14
-									},
-									"end": {
-										"line": 113,
-										"column": 17
-									}
-								},
 								"name": "bbb"
 							}
 						},
 						"typeAnnotation": {
 							"type": "TSAnyKeyword",
 							"start": 2287,
-							"end": 2290,
-							"loc": {
-								"start": {
-									"line": 113,
-									"column": 28
-								},
-								"end": {
-									"line": 113,
-									"column": 31
-								}
-							}
+							"end": 2290
 						},
 						"leadingComments": [
 							{
@@ -2884,16 +1294,6 @@
 						"type": "BlockStatement",
 						"start": 2300,
 						"end": 2302,
-						"loc": {
-							"start": {
-								"line": 115,
-								"column": 3
-							},
-							"end": {
-								"line": 115,
-								"column": 5
-							}
-						},
 						"body": []
 					}
 				},
@@ -2901,30 +1301,10 @@
 					"type": "FunctionDeclaration",
 					"start": 2339,
 					"end": 2499,
-					"loc": {
-						"start": {
-							"line": 118,
-							"column": 1
-						},
-						"end": {
-							"line": 130,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 2349,
 						"end": 2352,
-						"loc": {
-							"start": {
-								"line": 118,
-								"column": 11
-							},
-							"end": {
-								"line": 118,
-								"column": 14
-							}
-						},
 						"name": "gen"
 					},
 					"expression": false,
@@ -2935,74 +1315,24 @@
 						"type": "BlockStatement",
 						"start": 2355,
 						"end": 2499,
-						"loc": {
-							"start": {
-								"line": 118,
-								"column": 17
-							},
-							"end": {
-								"line": 130,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "ForStatement",
 								"start": 2359,
 								"end": 2425,
-								"loc": {
-									"start": {
-										"line": 119,
-										"column": 2
-									},
-									"end": {
-										"line": 123,
-										"column": 6
-									}
-								},
 								"init": {
 									"type": "YieldExpression",
 									"start": 2391,
 									"end": 2411,
-									"loc": {
-										"start": {
-											"line": 121,
-											"column": 4
-										},
-										"end": {
-											"line": 121,
-											"column": 24
-										}
-									},
 									"delegate": false,
 									"argument": {
 										"type": "BinaryExpression",
 										"start": 2397,
 										"end": 2411,
-										"loc": {
-											"start": {
-												"line": 121,
-												"column": 10
-											},
-											"end": {
-												"line": 121,
-												"column": 24
-											}
-										},
 										"left": {
 											"type": "Literal",
 											"start": 2397,
 											"end": 2402,
-											"loc": {
-												"start": {
-													"line": 121,
-													"column": 10
-												},
-												"end": {
-													"line": 121,
-													"column": 15
-												}
-											},
 											"value": "aaa",
 											"raw": "'aaa'"
 										},
@@ -3011,16 +1341,6 @@
 											"type": "Identifier",
 											"start": 2408,
 											"end": 2411,
-											"loc": {
-												"start": {
-													"line": 121,
-													"column": 21
-												},
-												"end": {
-													"line": 121,
-													"column": 24
-												}
-											},
 											"name": "bbb"
 										}
 									},
@@ -3039,16 +1359,6 @@
 									"type": "BlockStatement",
 									"start": 2423,
 									"end": 2425,
-									"loc": {
-										"start": {
-											"line": 123,
-											"column": 4
-										},
-										"end": {
-											"line": 123,
-											"column": 6
-										}
-									},
 									"body": []
 								}
 							},
@@ -3056,59 +1366,19 @@
 								"type": "ForStatement",
 								"start": 2429,
 								"end": 2496,
-								"loc": {
-									"start": {
-										"line": 125,
-										"column": 2
-									},
-									"end": {
-										"line": 129,
-										"column": 6
-									}
-								},
 								"init": {
 									"type": "YieldExpression",
 									"start": 2461,
 									"end": 2482,
-									"loc": {
-										"start": {
-											"line": 127,
-											"column": 4
-										},
-										"end": {
-											"line": 127,
-											"column": 25
-										}
-									},
 									"delegate": true,
 									"argument": {
 										"type": "BinaryExpression",
 										"start": 2468,
 										"end": 2482,
-										"loc": {
-											"start": {
-												"line": 127,
-												"column": 11
-											},
-											"end": {
-												"line": 127,
-												"column": 25
-											}
-										},
 										"left": {
 											"type": "Literal",
 											"start": 2468,
 											"end": 2473,
-											"loc": {
-												"start": {
-													"line": 127,
-													"column": 11
-												},
-												"end": {
-													"line": 127,
-													"column": 16
-												}
-											},
 											"value": "aaa",
 											"raw": "'aaa'"
 										},
@@ -3117,16 +1387,6 @@
 											"type": "Identifier",
 											"start": 2479,
 											"end": 2482,
-											"loc": {
-												"start": {
-													"line": 127,
-													"column": 22
-												},
-												"end": {
-													"line": 127,
-													"column": 25
-												}
-											},
 											"name": "bbb"
 										}
 									},
@@ -3145,16 +1405,6 @@
 									"type": "BlockStatement",
 									"start": 2494,
 									"end": 2496,
-									"loc": {
-										"start": {
-											"line": 129,
-											"column": 4
-										},
-										"end": {
-											"line": 129,
-											"column": 6
-										}
-									},
 									"body": []
 								}
 							}
@@ -3173,75 +1423,25 @@
 					"type": "ForStatement",
 					"start": 2700,
 					"end": 2762,
-					"loc": {
-						"start": {
-							"line": 135,
-							"column": 1
-						},
-						"end": {
-							"line": 139,
-							"column": 5
-						}
-					},
 					"init": {
 						"type": "SequenceExpression",
 						"start": 2729,
 						"end": 2751,
-						"loc": {
-							"start": {
-								"line": 137,
-								"column": 2
-							},
-							"end": {
-								"line": 137,
-								"column": 24
-							}
-						},
 						"expressions": [
 							{
 								"type": "Identifier",
 								"start": 2729,
 								"end": 2733,
-								"loc": {
-									"start": {
-										"line": 137,
-										"column": 2
-									},
-									"end": {
-										"line": 137,
-										"column": 6
-									}
-								},
 								"name": "aaa1"
 							},
 							{
 								"type": "BinaryExpression",
 								"start": 2736,
 								"end": 2750,
-								"loc": {
-									"start": {
-										"line": 137,
-										"column": 9
-									},
-									"end": {
-										"line": 137,
-										"column": 23
-									}
-								},
 								"left": {
 									"type": "Literal",
 									"start": 2736,
 									"end": 2741,
-									"loc": {
-										"start": {
-											"line": 137,
-											"column": 9
-										},
-										"end": {
-											"line": 137,
-											"column": 14
-										}
-									},
 									"value": "aaa",
 									"raw": "'aaa'"
 								},
@@ -3250,16 +1450,6 @@
 									"type": "Identifier",
 									"start": 2747,
 									"end": 2750,
-									"loc": {
-										"start": {
-											"line": 137,
-											"column": 20
-										},
-										"end": {
-											"line": 137,
-											"column": 23
-										}
-									},
 									"name": "bbb"
 								}
 							}
@@ -3279,16 +1469,6 @@
 						"type": "BlockStatement",
 						"start": 2760,
 						"end": 2762,
-						"loc": {
-							"start": {
-								"line": 139,
-								"column": 3
-							},
-							"end": {
-								"line": 139,
-								"column": 5
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -3316,74 +1496,24 @@
 					"type": "ForStatement",
 					"start": 2765,
 					"end": 2831,
-					"loc": {
-						"start": {
-							"line": 141,
-							"column": 1
-						},
-						"end": {
-							"line": 145,
-							"column": 5
-						}
-					},
 					"init": {
 						"type": "ConditionalExpression",
 						"start": 2794,
 						"end": 2820,
-						"loc": {
-							"start": {
-								"line": 143,
-								"column": 2
-							},
-							"end": {
-								"line": 143,
-								"column": 28
-							}
-						},
 						"test": {
 							"type": "Identifier",
 							"start": 2794,
 							"end": 2797,
-							"loc": {
-								"start": {
-									"line": 143,
-									"column": 2
-								},
-								"end": {
-									"line": 143,
-									"column": 5
-								}
-							},
 							"name": "ooo"
 						},
 						"consequent": {
 							"type": "BinaryExpression",
 							"start": 2800,
 							"end": 2814,
-							"loc": {
-								"start": {
-									"line": 143,
-									"column": 8
-								},
-								"end": {
-									"line": 143,
-									"column": 22
-								}
-							},
 							"left": {
 								"type": "Literal",
 								"start": 2800,
 								"end": 2805,
-								"loc": {
-									"start": {
-										"line": 143,
-										"column": 8
-									},
-									"end": {
-										"line": 143,
-										"column": 13
-									}
-								},
 								"value": "aaa",
 								"raw": "'aaa'"
 							},
@@ -3392,16 +1522,6 @@
 								"type": "Identifier",
 								"start": 2811,
 								"end": 2814,
-								"loc": {
-									"start": {
-										"line": 143,
-										"column": 19
-									},
-									"end": {
-										"line": 143,
-										"column": 22
-									}
-								},
 								"name": "bbb"
 							}
 						},
@@ -3409,16 +1529,6 @@
 							"type": "Identifier",
 							"start": 2817,
 							"end": 2820,
-							"loc": {
-								"start": {
-									"line": 143,
-									"column": 25
-								},
-								"end": {
-									"line": 143,
-									"column": 28
-								}
-							},
 							"name": "qqq"
 						},
 						"leadingComments": [
@@ -3436,16 +1546,6 @@
 						"type": "BlockStatement",
 						"start": 2829,
 						"end": 2831,
-						"loc": {
-							"start": {
-								"line": 145,
-								"column": 3
-							},
-							"end": {
-								"line": 145,
-								"column": 5
-							}
-						},
 						"body": []
 					}
 				}
@@ -3458,18 +1558,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

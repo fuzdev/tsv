@@ -25,18 +25,6 @@
 				"start": 462,
 				"end": 581,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 9,
-						"column": 1,
-						"character": 463
-					},
-					"end": {
-						"line": 9,
-						"column": 2,
-						"character": 464
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -53,36 +41,12 @@
 							"start": 543,
 							"end": 575,
 							"name": "Comp",
-							"name_loc": {
-								"start": {
-									"line": 11,
-									"column": 2,
-									"character": 544
-								},
-								"end": {
-									"line": 11,
-									"column": 6,
-									"character": 548
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 549,
 									"end": 560,
 									"name": "href",
-									"name_loc": {
-										"start": {
-											"line": 11,
-											"column": 7,
-											"character": 549
-										},
-										"end": {
-											"line": 11,
-											"column": 11,
-											"character": 553
-										}
-									},
 									"value": [
 										{
 											"start": 555,
@@ -129,18 +93,6 @@
 				"start": 582,
 				"end": 787,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 13,
-						"column": 1,
-						"character": 583
-					},
-					"end": {
-						"line": 13,
-						"column": 2,
-						"character": 584
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -157,36 +109,12 @@
 							"start": 663,
 							"end": 781,
 							"name": "Comp",
-							"name_loc": {
-								"start": {
-									"line": 15,
-									"column": 2,
-									"character": 664
-								},
-								"end": {
-									"line": 15,
-									"column": 6,
-									"character": 668
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 669,
 									"end": 678,
 									"name": "href",
-									"name_loc": {
-										"start": {
-											"line": 15,
-											"column": 7,
-											"character": 669
-										},
-										"end": {
-											"line": 15,
-											"column": 11,
-											"character": 673
-										}
-									},
 									"value": [
 										{
 											"start": 675,

@@ -14,49 +14,19 @@
 			"type": "Line",
 			"value": " MemberExpression extends with long type params - extends inline after >",
 			"start": 20,
-			"end": 94,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 75
-				}
-			}
+			"end": 94
 		},
 		{
 			"type": "Line",
 			"value": " MemberExpression extends with long type params and implements - all break",
 			"start": 254,
-			"end": 330,
-			"loc": {
-				"start": {
-					"line": 10,
-					"column": 1
-				},
-				"end": {
-					"line": 10,
-					"column": 77
-				}
-			}
+			"end": 330
 		},
 		{
 			"type": "Line",
 			"value": " Short - MemberExpression extends on one line (contrast case)",
 			"start": 518,
-			"end": 581,
-			"loc": {
-				"start": {
-					"line": 22,
-					"column": 1
-				},
-				"end": {
-					"line": 22,
-					"column": 64
-				}
-			}
+			"end": 581
 		}
 	],
 	"instance": {
@@ -68,120 +38,40 @@
 			"type": "Program",
 			"start": 18,
 			"end": 616,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 24,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ClassDeclaration",
 					"start": 96,
 					"end": 251,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 102,
 						"end": 115,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 7
-							},
-							"end": {
-								"line": 3,
-								"column": 20
-							}
-						},
 						"name": "InlineExtends"
 					},
 					"typeParameters": {
 						"type": "TSTypeParameterDeclaration",
 						"start": 115,
 						"end": 219,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 20
-							},
-							"end": {
-								"line": 6,
-								"column": 2
-							}
-						},
 						"params": [
 							{
 								"type": "TSTypeParameter",
 								"start": 119,
 								"end": 167,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 2
-									},
-									"end": {
-										"line": 4,
-										"column": 50
-									}
-								},
 								"name": "T",
 								"constraint": {
 									"type": "TSUnionType",
 									"start": 129,
 									"end": 167,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 12
-										},
-										"end": {
-											"line": 4,
-											"column": 50
-										}
-									},
 									"types": [
 										{
 											"type": "TSTypeReference",
 											"start": 129,
 											"end": 145,
-											"loc": {
-												"start": {
-													"line": 4,
-													"column": 12
-												},
-												"end": {
-													"line": 4,
-													"column": 28
-												}
-											},
 											"typeName": {
 												"type": "Identifier",
 												"start": 129,
 												"end": 145,
-												"loc": {
-													"start": {
-														"line": 4,
-														"column": 12
-													},
-													"end": {
-														"line": 4,
-														"column": 28
-													}
-												},
 												"name": "VeryLongTypeName"
 											}
 										},
@@ -189,30 +79,10 @@
 											"type": "TSTypeReference",
 											"start": 148,
 											"end": 167,
-											"loc": {
-												"start": {
-													"line": 4,
-													"column": 31
-												},
-												"end": {
-													"line": 4,
-													"column": 50
-												}
-											},
 											"typeName": {
 												"type": "Identifier",
 												"start": 148,
 												"end": 167,
-												"loc": {
-													"start": {
-														"line": 4,
-														"column": 31
-													},
-													"end": {
-														"line": 4,
-														"column": 50
-													}
-												},
 												"name": "AnotherLongTypeName"
 											}
 										}
@@ -223,60 +93,20 @@
 								"type": "TSTypeParameter",
 								"start": 171,
 								"end": 216,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 2
-									},
-									"end": {
-										"line": 5,
-										"column": 47
-									}
-								},
 								"name": "U",
 								"constraint": {
 									"type": "TSUnionType",
 									"start": 181,
 									"end": 216,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 12
-										},
-										"end": {
-											"line": 5,
-											"column": 47
-										}
-									},
 									"types": [
 										{
 											"type": "TSTypeReference",
 											"start": 181,
 											"end": 204,
-											"loc": {
-												"start": {
-													"line": 5,
-													"column": 12
-												},
-												"end": {
-													"line": 5,
-													"column": 35
-												}
-											},
 											"typeName": {
 												"type": "Identifier",
 												"start": 181,
 												"end": 204,
-												"loc": {
-													"start": {
-														"line": 5,
-														"column": 12
-													},
-													"end": {
-														"line": 5,
-														"column": 35
-													}
-												},
 												"name": "ExtraLongConstraintType"
 											}
 										},
@@ -284,30 +114,10 @@
 											"type": "TSTypeReference",
 											"start": 207,
 											"end": 216,
-											"loc": {
-												"start": {
-													"line": 5,
-													"column": 38
-												},
-												"end": {
-													"line": 5,
-													"column": 47
-												}
-											},
 											"typeName": {
 												"type": "Identifier",
 												"start": 207,
 												"end": 216,
-												"loc": {
-													"start": {
-														"line": 5,
-														"column": 38
-													},
-													"end": {
-														"line": 5,
-														"column": 47
-													}
-												},
 												"name": "MoreTypes"
 											}
 										}
@@ -320,46 +130,16 @@
 						"type": "MemberExpression",
 						"start": 228,
 						"end": 231,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 11
-							},
-							"end": {
-								"line": 6,
-								"column": 14
-							}
-						},
 						"object": {
 							"type": "Identifier",
 							"start": 228,
 							"end": 229,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 11
-								},
-								"end": {
-									"line": 6,
-									"column": 12
-								}
-							},
 							"name": "A"
 						},
 						"property": {
 							"type": "Identifier",
 							"start": 230,
 							"end": 231,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 13
-								},
-								"end": {
-									"line": 6,
-									"column": 14
-								}
-							},
 							"name": "B"
 						},
 						"computed": false,
@@ -369,45 +149,15 @@
 						"type": "TSTypeParameterInstantiation",
 						"start": 231,
 						"end": 234,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 14
-							},
-							"end": {
-								"line": 6,
-								"column": 17
-							}
-						},
 						"params": [
 							{
 								"type": "TSTypeReference",
 								"start": 232,
 								"end": 233,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 15
-									},
-									"end": {
-										"line": 6,
-										"column": 16
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 232,
 									"end": 233,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 15
-										},
-										"end": {
-											"line": 6,
-											"column": 16
-										}
-									},
 									"name": "T"
 								}
 							}
@@ -417,91 +167,31 @@
 						"type": "ClassBody",
 						"start": 235,
 						"end": 251,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 18
-							},
-							"end": {
-								"line": 8,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "PropertyDefinition",
 								"start": 239,
 								"end": 248,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 2
-									},
-									"end": {
-										"line": 7,
-										"column": 11
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
 									"start": 239,
 									"end": 244,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 2
-										},
-										"end": {
-											"line": 7,
-											"column": 7
-										}
-									},
 									"name": "value"
 								},
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
 									"start": 244,
 									"end": 247,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 7
-										},
-										"end": {
-											"line": 7,
-											"column": 10
-										}
-									},
 									"typeAnnotation": {
 										"type": "TSTypeReference",
 										"start": 246,
 										"end": 247,
-										"loc": {
-											"start": {
-												"line": 7,
-												"column": 9
-											},
-											"end": {
-												"line": 7,
-												"column": 10
-											}
-										},
 										"typeName": {
 											"type": "Identifier",
 											"start": 246,
 											"end": 247,
-											"loc": {
-												"start": {
-													"line": 7,
-													"column": 9
-												},
-												"end": {
-													"line": 7,
-													"column": 10
-												}
-											},
 											"name": "T"
 										}
 									}
@@ -523,105 +213,35 @@
 					"type": "ClassDeclaration",
 					"start": 332,
 					"end": 515,
-					"loc": {
-						"start": {
-							"line": 11,
-							"column": 1
-						},
-						"end": {
-							"line": 20,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 338,
 						"end": 347,
-						"loc": {
-							"start": {
-								"line": 11,
-								"column": 7
-							},
-							"end": {
-								"line": 11,
-								"column": 16
-							}
-						},
 						"name": "BothBreak"
 					},
 					"typeParameters": {
 						"type": "TSTypeParameterDeclaration",
 						"start": 347,
 						"end": 451,
-						"loc": {
-							"start": {
-								"line": 11,
-								"column": 16
-							},
-							"end": {
-								"line": 14,
-								"column": 2
-							}
-						},
 						"params": [
 							{
 								"type": "TSTypeParameter",
 								"start": 351,
 								"end": 399,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 2
-									},
-									"end": {
-										"line": 12,
-										"column": 50
-									}
-								},
 								"name": "T",
 								"constraint": {
 									"type": "TSUnionType",
 									"start": 361,
 									"end": 399,
-									"loc": {
-										"start": {
-											"line": 12,
-											"column": 12
-										},
-										"end": {
-											"line": 12,
-											"column": 50
-										}
-									},
 									"types": [
 										{
 											"type": "TSTypeReference",
 											"start": 361,
 											"end": 377,
-											"loc": {
-												"start": {
-													"line": 12,
-													"column": 12
-												},
-												"end": {
-													"line": 12,
-													"column": 28
-												}
-											},
 											"typeName": {
 												"type": "Identifier",
 												"start": 361,
 												"end": 377,
-												"loc": {
-													"start": {
-														"line": 12,
-														"column": 12
-													},
-													"end": {
-														"line": 12,
-														"column": 28
-													}
-												},
 												"name": "VeryLongTypeName"
 											}
 										},
@@ -629,30 +249,10 @@
 											"type": "TSTypeReference",
 											"start": 380,
 											"end": 399,
-											"loc": {
-												"start": {
-													"line": 12,
-													"column": 31
-												},
-												"end": {
-													"line": 12,
-													"column": 50
-												}
-											},
 											"typeName": {
 												"type": "Identifier",
 												"start": 380,
 												"end": 399,
-												"loc": {
-													"start": {
-														"line": 12,
-														"column": 31
-													},
-													"end": {
-														"line": 12,
-														"column": 50
-													}
-												},
 												"name": "AnotherLongTypeName"
 											}
 										}
@@ -663,60 +263,20 @@
 								"type": "TSTypeParameter",
 								"start": 403,
 								"end": 448,
-								"loc": {
-									"start": {
-										"line": 13,
-										"column": 2
-									},
-									"end": {
-										"line": 13,
-										"column": 47
-									}
-								},
 								"name": "U",
 								"constraint": {
 									"type": "TSUnionType",
 									"start": 413,
 									"end": 448,
-									"loc": {
-										"start": {
-											"line": 13,
-											"column": 12
-										},
-										"end": {
-											"line": 13,
-											"column": 47
-										}
-									},
 									"types": [
 										{
 											"type": "TSTypeReference",
 											"start": 413,
 											"end": 436,
-											"loc": {
-												"start": {
-													"line": 13,
-													"column": 12
-												},
-												"end": {
-													"line": 13,
-													"column": 35
-												}
-											},
 											"typeName": {
 												"type": "Identifier",
 												"start": 413,
 												"end": 436,
-												"loc": {
-													"start": {
-														"line": 13,
-														"column": 12
-													},
-													"end": {
-														"line": 13,
-														"column": 35
-													}
-												},
 												"name": "ExtraLongConstraintType"
 											}
 										},
@@ -724,30 +284,10 @@
 											"type": "TSTypeReference",
 											"start": 439,
 											"end": 448,
-											"loc": {
-												"start": {
-													"line": 13,
-													"column": 38
-												},
-												"end": {
-													"line": 13,
-													"column": 47
-												}
-											},
 											"typeName": {
 												"type": "Identifier",
 												"start": 439,
 												"end": 448,
-												"loc": {
-													"start": {
-														"line": 13,
-														"column": 38
-													},
-													"end": {
-														"line": 13,
-														"column": 47
-													}
-												},
 												"name": "MoreTypes"
 											}
 										}
@@ -760,60 +300,20 @@
 						"type": "TSInstantiationExpression",
 						"start": 462,
 						"end": 468,
-						"loc": {
-							"start": {
-								"line": 15,
-								"column": 10
-							},
-							"end": {
-								"line": 15,
-								"column": 16
-							}
-						},
 						"expression": {
 							"type": "MemberExpression",
 							"start": 462,
 							"end": 465,
-							"loc": {
-								"start": {
-									"line": 15,
-									"column": 10
-								},
-								"end": {
-									"line": 15,
-									"column": 13
-								}
-							},
 							"object": {
 								"type": "Identifier",
 								"start": 462,
 								"end": 463,
-								"loc": {
-									"start": {
-										"line": 15,
-										"column": 10
-									},
-									"end": {
-										"line": 15,
-										"column": 11
-									}
-								},
 								"name": "A"
 							},
 							"property": {
 								"type": "Identifier",
 								"start": 464,
 								"end": 465,
-								"loc": {
-									"start": {
-										"line": 15,
-										"column": 12
-									},
-									"end": {
-										"line": 15,
-										"column": 13
-									}
-								},
 								"name": "B"
 							},
 							"computed": false,
@@ -823,45 +323,15 @@
 							"type": "TSTypeParameterInstantiation",
 							"start": 465,
 							"end": 468,
-							"loc": {
-								"start": {
-									"line": 15,
-									"column": 13
-								},
-								"end": {
-									"line": 15,
-									"column": 16
-								}
-							},
 							"params": [
 								{
 									"type": "TSTypeReference",
 									"start": 466,
 									"end": 467,
-									"loc": {
-										"start": {
-											"line": 15,
-											"column": 14
-										},
-										"end": {
-											"line": 15,
-											"column": 15
-										}
-									},
 									"typeName": {
 										"type": "Identifier",
 										"start": 466,
 										"end": 467,
-										"loc": {
-											"start": {
-												"line": 15,
-												"column": 14
-											},
-											"end": {
-												"line": 15,
-												"column": 15
-											}
-										},
 										"name": "T"
 									}
 								}
@@ -873,75 +343,25 @@
 							"type": "TSExpressionWithTypeArguments",
 							"start": 482,
 							"end": 493,
-							"loc": {
-								"start": {
-									"line": 16,
-									"column": 13
-								},
-								"end": {
-									"line": 16,
-									"column": 24
-								}
-							},
 							"expression": {
 								"type": "Identifier",
 								"start": 482,
 								"end": 490,
-								"loc": {
-									"start": {
-										"line": 16,
-										"column": 13
-									},
-									"end": {
-										"line": 16,
-										"column": 21
-									}
-								},
 								"name": "Contract"
 							},
 							"typeParameters": {
 								"type": "TSTypeParameterInstantiation",
 								"start": 490,
 								"end": 493,
-								"loc": {
-									"start": {
-										"line": 16,
-										"column": 21
-									},
-									"end": {
-										"line": 16,
-										"column": 24
-									}
-								},
 								"params": [
 									{
 										"type": "TSTypeReference",
 										"start": 491,
 										"end": 492,
-										"loc": {
-											"start": {
-												"line": 16,
-												"column": 22
-											},
-											"end": {
-												"line": 16,
-												"column": 23
-											}
-										},
 										"typeName": {
 											"type": "Identifier",
 											"start": 491,
 											"end": 492,
-											"loc": {
-												"start": {
-													"line": 16,
-													"column": 22
-												},
-												"end": {
-													"line": 16,
-													"column": 23
-												}
-											},
 											"name": "U"
 										}
 									}
@@ -953,91 +373,31 @@
 						"type": "ClassBody",
 						"start": 495,
 						"end": 515,
-						"loc": {
-							"start": {
-								"line": 17,
-								"column": 1
-							},
-							"end": {
-								"line": 20,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "PropertyDefinition",
 								"start": 499,
 								"end": 504,
-								"loc": {
-									"start": {
-										"line": 18,
-										"column": 2
-									},
-									"end": {
-										"line": 18,
-										"column": 7
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
 									"start": 499,
 									"end": 500,
-									"loc": {
-										"start": {
-											"line": 18,
-											"column": 2
-										},
-										"end": {
-											"line": 18,
-											"column": 3
-										}
-									},
 									"name": "a"
 								},
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
 									"start": 500,
 									"end": 503,
-									"loc": {
-										"start": {
-											"line": 18,
-											"column": 3
-										},
-										"end": {
-											"line": 18,
-											"column": 6
-										}
-									},
 									"typeAnnotation": {
 										"type": "TSTypeReference",
 										"start": 502,
 										"end": 503,
-										"loc": {
-											"start": {
-												"line": 18,
-												"column": 5
-											},
-											"end": {
-												"line": 18,
-												"column": 6
-											}
-										},
 										"typeName": {
 											"type": "Identifier",
 											"start": 502,
 											"end": 503,
-											"loc": {
-												"start": {
-													"line": 18,
-													"column": 5
-												},
-												"end": {
-													"line": 18,
-													"column": 6
-												}
-											},
 											"name": "T"
 										}
 									}
@@ -1048,76 +408,26 @@
 								"type": "PropertyDefinition",
 								"start": 507,
 								"end": 512,
-								"loc": {
-									"start": {
-										"line": 19,
-										"column": 2
-									},
-									"end": {
-										"line": 19,
-										"column": 7
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
 									"start": 507,
 									"end": 508,
-									"loc": {
-										"start": {
-											"line": 19,
-											"column": 2
-										},
-										"end": {
-											"line": 19,
-											"column": 3
-										}
-									},
 									"name": "b"
 								},
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
 									"start": 508,
 									"end": 511,
-									"loc": {
-										"start": {
-											"line": 19,
-											"column": 3
-										},
-										"end": {
-											"line": 19,
-											"column": 6
-										}
-									},
 									"typeAnnotation": {
 										"type": "TSTypeReference",
 										"start": 510,
 										"end": 511,
-										"loc": {
-											"start": {
-												"line": 19,
-												"column": 5
-											},
-											"end": {
-												"line": 19,
-												"column": 6
-											}
-										},
 										"typeName": {
 											"type": "Identifier",
 											"start": 510,
 											"end": 511,
-											"loc": {
-												"start": {
-													"line": 19,
-													"column": 5
-												},
-												"end": {
-													"line": 19,
-													"column": 6
-												}
-											},
 											"name": "U"
 										}
 									}
@@ -1139,61 +449,21 @@
 					"type": "ClassDeclaration",
 					"start": 583,
 					"end": 615,
-					"loc": {
-						"start": {
-							"line": 23,
-							"column": 1
-						},
-						"end": {
-							"line": 23,
-							"column": 33
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 589,
 						"end": 594,
-						"loc": {
-							"start": {
-								"line": 23,
-								"column": 7
-							},
-							"end": {
-								"line": 23,
-								"column": 12
-							}
-						},
 						"name": "Short"
 					},
 					"typeParameters": {
 						"type": "TSTypeParameterDeclaration",
 						"start": 594,
 						"end": 597,
-						"loc": {
-							"start": {
-								"line": 23,
-								"column": 12
-							},
-							"end": {
-								"line": 23,
-								"column": 15
-							}
-						},
 						"params": [
 							{
 								"type": "TSTypeParameter",
 								"start": 595,
 								"end": 596,
-								"loc": {
-									"start": {
-										"line": 23,
-										"column": 13
-									},
-									"end": {
-										"line": 23,
-										"column": 14
-									}
-								},
 								"name": "T"
 							}
 						]
@@ -1202,46 +472,16 @@
 						"type": "MemberExpression",
 						"start": 606,
 						"end": 609,
-						"loc": {
-							"start": {
-								"line": 23,
-								"column": 24
-							},
-							"end": {
-								"line": 23,
-								"column": 27
-							}
-						},
 						"object": {
 							"type": "Identifier",
 							"start": 606,
 							"end": 607,
-							"loc": {
-								"start": {
-									"line": 23,
-									"column": 24
-								},
-								"end": {
-									"line": 23,
-									"column": 25
-								}
-							},
 							"name": "A"
 						},
 						"property": {
 							"type": "Identifier",
 							"start": 608,
 							"end": 609,
-							"loc": {
-								"start": {
-									"line": 23,
-									"column": 26
-								},
-								"end": {
-									"line": 23,
-									"column": 27
-								}
-							},
 							"name": "B"
 						},
 						"computed": false,
@@ -1251,45 +491,15 @@
 						"type": "TSTypeParameterInstantiation",
 						"start": 609,
 						"end": 612,
-						"loc": {
-							"start": {
-								"line": 23,
-								"column": 27
-							},
-							"end": {
-								"line": 23,
-								"column": 30
-							}
-						},
 						"params": [
 							{
 								"type": "TSTypeReference",
 								"start": 610,
 								"end": 611,
-								"loc": {
-									"start": {
-										"line": 23,
-										"column": 28
-									},
-									"end": {
-										"line": 23,
-										"column": 29
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 610,
 									"end": 611,
-									"loc": {
-										"start": {
-											"line": 23,
-											"column": 28
-										},
-										"end": {
-											"line": 23,
-											"column": 29
-										}
-									},
 									"name": "T"
 								}
 							}
@@ -1299,16 +509,6 @@
 						"type": "ClassBody",
 						"start": 613,
 						"end": 615,
-						"loc": {
-							"start": {
-								"line": 23,
-								"column": 31
-							},
-							"end": {
-								"line": 23,
-								"column": 33
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -1329,18 +529,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

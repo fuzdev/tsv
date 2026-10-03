@@ -25,18 +25,6 @@
 				"start": 142,
 				"end": 323,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 143
-					},
-					"end": {
-						"line": 2,
-						"column": 4,
-						"character": 146
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -59,36 +47,12 @@
 							"start": 173,
 							"end": 213,
 							"name": "span",
-							"name_loc": {
-								"start": {
-									"line": 3,
-									"column": 26,
-									"character": 174
-								},
-								"end": {
-									"line": 3,
-									"column": 30,
-									"character": 178
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 181,
 									"end": 198,
 									"name": "data-attr",
-									"name_loc": {
-										"start": {
-											"line": 3,
-											"column": 33,
-											"character": 181
-										},
-										"end": {
-											"line": 3,
-											"column": 42,
-											"character": 190
-										}
-									},
 									"value": [
 										{
 											"start": 192,
@@ -122,16 +86,6 @@
 								"type": "Identifier",
 								"start": 218,
 								"end": 222,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 70
-									},
-									"end": {
-										"line": 3,
-										"column": 74
-									}
-								},
 								"name": "cond"
 							},
 							"consequent": {
@@ -149,36 +103,12 @@
 										"start": 226,
 										"end": 309,
 										"name": "Comp",
-										"name_loc": {
-											"start": {
-												"line": 4,
-												"column": 3,
-												"character": 227
-											},
-											"end": {
-												"line": 4,
-												"column": 7,
-												"character": 231
-											}
-										},
 										"attributes": [
 											{
 												"type": "Attribute",
 												"start": 232,
 												"end": 246,
 												"name": "prop1",
-												"name_loc": {
-													"start": {
-														"line": 4,
-														"column": 8,
-														"character": 232
-													},
-													"end": {
-														"line": 4,
-														"column": 13,
-														"character": 237
-													}
-												},
 												"value": {
 													"type": "ExpressionTag",
 													"start": 238,
@@ -187,16 +117,6 @@
 														"type": "Identifier",
 														"start": 239,
 														"end": 245,
-														"loc": {
-															"start": {
-																"line": 4,
-																"column": 15
-															},
-															"end": {
-																"line": 4,
-																"column": 21
-															}
-														},
 														"name": "value1"
 													}
 												}
@@ -206,18 +126,6 @@
 												"start": 247,
 												"end": 261,
 												"name": "prop2",
-												"name_loc": {
-													"start": {
-														"line": 4,
-														"column": 23,
-														"character": 247
-													},
-													"end": {
-														"line": 4,
-														"column": 28,
-														"character": 252
-													}
-												},
 												"value": {
 													"type": "ExpressionTag",
 													"start": 253,
@@ -226,16 +134,6 @@
 														"type": "Identifier",
 														"start": 254,
 														"end": 260,
-														"loc": {
-															"start": {
-																"line": 4,
-																"column": 30
-															},
-															"end": {
-																"line": 4,
-																"column": 36
-															}
-														},
 														"name": "value2"
 													}
 												}
@@ -245,18 +143,6 @@
 												"start": 262,
 												"end": 276,
 												"name": "prop3",
-												"name_loc": {
-													"start": {
-														"line": 4,
-														"column": 38,
-														"character": 262
-													},
-													"end": {
-														"line": 4,
-														"column": 43,
-														"character": 267
-													}
-												},
 												"value": {
 													"type": "ExpressionTag",
 													"start": 268,
@@ -265,16 +151,6 @@
 														"type": "Identifier",
 														"start": 269,
 														"end": 275,
-														"loc": {
-															"start": {
-																"line": 4,
-																"column": 45
-															},
-															"end": {
-																"line": 4,
-																"column": 51
-															}
-														},
 														"name": "value3"
 													}
 												}
@@ -284,18 +160,6 @@
 												"start": 277,
 												"end": 291,
 												"name": "prop4",
-												"name_loc": {
-													"start": {
-														"line": 4,
-														"column": 53,
-														"character": 277
-													},
-													"end": {
-														"line": 4,
-														"column": 58,
-														"character": 282
-													}
-												},
 												"value": {
 													"type": "ExpressionTag",
 													"start": 283,
@@ -304,16 +168,6 @@
 														"type": "Identifier",
 														"start": 284,
 														"end": 290,
-														"loc": {
-															"start": {
-																"line": 4,
-																"column": 60
-															},
-															"end": {
-																"line": 4,
-																"column": 66
-															}
-														},
 														"name": "value4"
 													}
 												}
@@ -323,18 +177,6 @@
 												"start": 292,
 												"end": 306,
 												"name": "prop5",
-												"name_loc": {
-													"start": {
-														"line": 4,
-														"column": 68,
-														"character": 292
-													},
-													"end": {
-														"line": 4,
-														"column": 73,
-														"character": 297
-													}
-												},
 												"value": {
 													"type": "ExpressionTag",
 													"start": 298,
@@ -343,16 +185,6 @@
 														"type": "Identifier",
 														"start": 299,
 														"end": 305,
-														"loc": {
-															"start": {
-																"line": 4,
-																"column": 75
-															},
-															"end": {
-																"line": 4,
-																"column": 81
-															}
-														},
 														"name": "value5"
 													}
 												}
@@ -409,18 +241,6 @@
 				"start": 365,
 				"end": 463,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 9,
-						"column": 1,
-						"character": 366
-					},
-					"end": {
-						"line": 9,
-						"column": 4,
-						"character": 369
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -443,36 +263,12 @@
 							"start": 396,
 							"end": 436,
 							"name": "span",
-							"name_loc": {
-								"start": {
-									"line": 10,
-									"column": 26,
-									"character": 397
-								},
-								"end": {
-									"line": 10,
-									"column": 30,
-									"character": 401
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 404,
 									"end": 421,
 									"name": "data-attr",
-									"name_loc": {
-										"start": {
-											"line": 10,
-											"column": 33,
-											"character": 404
-										},
-										"end": {
-											"line": 10,
-											"column": 42,
-											"character": 413
-										}
-									},
 									"value": [
 										{
 											"start": 415,
@@ -506,16 +302,6 @@
 								"type": "Identifier",
 								"start": 441,
 								"end": 445,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 70
-									},
-									"end": {
-										"line": 10,
-										"column": 74
-									}
-								},
 								"name": "cond"
 							},
 							"consequent": {

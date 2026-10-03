@@ -19,75 +19,25 @@
 			"type": "Program",
 			"start": 8,
 			"end": 41,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 3,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 10,
 					"end": 40,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 31
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 14,
 							"end": 39,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 5
-								},
-								"end": {
-									"line": 2,
-									"column": 30
-								}
-							},
 							"id": {
 								"type": "ObjectPattern",
 								"start": 14,
 								"end": 28,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 5
-									},
-									"end": {
-										"line": 2,
-										"column": 19
-									}
-								},
 								"properties": [
 									{
 										"type": "Property",
 										"start": 16,
 										"end": 17,
-										"loc": {
-											"start": {
-												"line": 2,
-												"column": 7
-											},
-											"end": {
-												"line": 2,
-												"column": 8
-											}
-										},
 										"method": false,
 										"shorthand": true,
 										"computed": false,
@@ -95,32 +45,12 @@
 											"type": "Identifier",
 											"start": 16,
 											"end": 17,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 7
-												},
-												"end": {
-													"line": 2,
-													"column": 8
-												}
-											},
 											"name": "a"
 										},
 										"value": {
 											"type": "Identifier",
 											"start": 16,
 											"end": 17,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 7
-												},
-												"end": {
-													"line": 2,
-													"column": 8
-												}
-											},
 											"name": "a"
 										},
 										"kind": "init"
@@ -129,30 +59,10 @@
 										"type": "RestElement",
 										"start": 19,
 										"end": 26,
-										"loc": {
-											"start": {
-												"line": 2,
-												"column": 10
-											},
-											"end": {
-												"line": 2,
-												"column": 17
-											}
-										},
 										"argument": {
 											"type": "Identifier",
 											"start": 22,
 											"end": 26,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 13
-												},
-												"end": {
-													"line": 2,
-													"column": 17
-												}
-											},
 											"name": "rest"
 										}
 									}
@@ -162,30 +72,10 @@
 								"type": "CallExpression",
 								"start": 31,
 								"end": 39,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 22
-									},
-									"end": {
-										"line": 2,
-										"column": 30
-									}
-								},
 								"callee": {
 									"type": "Identifier",
 									"start": 31,
 									"end": 37,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 22
-										},
-										"end": {
-											"line": 2,
-											"column": 28
-										}
-									},
 									"name": "$props"
 								},
 								"arguments": [],

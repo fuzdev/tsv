@@ -14,193 +14,73 @@
 			"type": "Line",
 			"value": " case A: a comment authored trailing a union member stays trailing in both",
 			"start": 20,
-			"end": 96,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 77
-				}
-			}
+			"end": 96
 		},
 		{
 			"type": "Line",
 			"value": " formatters (contrast a comment authored inside a LATER member's parens, which",
 			"start": 98,
-			"end": 178,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 81
-				}
-			}
+			"end": 178
 		},
 		{
 			"type": "Line",
 			"value": " tsv keeps inside — see union_intersection_retained_paren_leading_line_comment)",
 			"start": 180,
-			"end": 261,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 1
-				},
-				"end": {
-					"line": 4,
-					"column": 82
-				}
-			}
+			"end": 261
 		},
 		{
 			"type": "Line",
 			"value": " leading",
 			"start": 278,
-			"end": 288,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 6
-				},
-				"end": {
-					"line": 6,
-					"column": 16
-				}
-			}
+			"end": 288
 		},
 		{
 			"type": "Line",
 			"value": " case B: paren retained (intersection in union)",
 			"start": 298,
-			"end": 347,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 1
-				},
-				"end": {
-					"line": 9,
-					"column": 50
-				}
-			}
+			"end": 347
 		},
 		{
 			"type": "Line",
 			"value": " leading",
 			"start": 364,
-			"end": 374,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 6
-				},
-				"end": {
-					"line": 11,
-					"column": 16
-				}
-			}
+			"end": 374
 		},
 		{
 			"type": "Line",
 			"value": " case C: conditional extends",
 			"start": 390,
-			"end": 420,
-			"loc": {
-				"start": {
-					"line": 14,
-					"column": 1
-				},
-				"end": {
-					"line": 14,
-					"column": 31
-				}
-			}
+			"end": 420
 		},
 		{
 			"type": "Line",
 			"value": " comment",
 			"start": 443,
-			"end": 453,
-			"loc": {
-				"start": {
-					"line": 15,
-					"column": 22
-				},
-				"end": {
-					"line": 15,
-					"column": 32
-				}
-			}
+			"end": 453
 		},
 		{
 			"type": "Line",
 			"value": " case M1: 3-member union, leading on middle",
 			"start": 469,
-			"end": 514,
-			"loc": {
-				"start": {
-					"line": 19,
-					"column": 1
-				},
-				"end": {
-					"line": 19,
-					"column": 46
-				}
-			}
+			"end": 514
 		},
 		{
 			"type": "Line",
 			"value": " leading",
 			"start": 532,
-			"end": 542,
-			"loc": {
-				"start": {
-					"line": 21,
-					"column": 6
-				},
-				"end": {
-					"line": 21,
-					"column": 16
-				}
-			}
+			"end": 542
 		},
 		{
 			"type": "Line",
 			"value": " case M2: 3-member union, leading on last",
 			"start": 558,
-			"end": 601,
-			"loc": {
-				"start": {
-					"line": 25,
-					"column": 1
-				},
-				"end": {
-					"line": 25,
-					"column": 44
-				}
-			}
+			"end": 601
 		},
 		{
 			"type": "Line",
 			"value": " leading",
 			"start": 625,
-			"end": 635,
-			"loc": {
-				"start": {
-					"line": 28,
-					"column": 6
-				},
-				"end": {
-					"line": 28,
-					"column": 16
-				}
-			}
+			"end": 635
 		}
 	],
 	"instance": {
@@ -212,90 +92,30 @@
 			"type": "Program",
 			"start": 18,
 			"end": 643,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 30,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 263,
 					"end": 295,
-					"loc": {
-						"start": {
-							"line": 5,
-							"column": 1
-						},
-						"end": {
-							"line": 7,
-							"column": 6
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 268,
 						"end": 269,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 6
-							},
-							"end": {
-								"line": 5,
-								"column": 7
-							}
-						},
 						"name": "A"
 					},
 					"typeAnnotation": {
 						"type": "TSUnionType",
 						"start": 274,
 						"end": 294,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 2
-							},
-							"end": {
-								"line": 7,
-								"column": 5
-							}
-						},
 						"types": [
 							{
 								"type": "TSTypeReference",
 								"start": 276,
 								"end": 277,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 4
-									},
-									"end": {
-										"line": 6,
-										"column": 5
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 276,
 									"end": 277,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 4
-										},
-										"end": {
-											"line": 6,
-											"column": 5
-										}
-									},
 									"name": "a"
 								},
 								"trailingComments": [
@@ -311,30 +131,10 @@
 								"type": "TSTypeReference",
 								"start": 293,
 								"end": 294,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 4
-									},
-									"end": {
-										"line": 7,
-										"column": 5
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 293,
 									"end": 294,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 4
-										},
-										"end": {
-											"line": 7,
-											"column": 5
-										}
-									},
 									"name": "b"
 								}
 							}
@@ -365,75 +165,25 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 349,
 					"end": 387,
-					"loc": {
-						"start": {
-							"line": 10,
-							"column": 1
-						},
-						"end": {
-							"line": 12,
-							"column": 12
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 354,
 						"end": 355,
-						"loc": {
-							"start": {
-								"line": 10,
-								"column": 6
-							},
-							"end": {
-								"line": 10,
-								"column": 7
-							}
-						},
 						"name": "B"
 					},
 					"typeAnnotation": {
 						"type": "TSUnionType",
 						"start": 360,
 						"end": 386,
-						"loc": {
-							"start": {
-								"line": 11,
-								"column": 2
-							},
-							"end": {
-								"line": 12,
-								"column": 11
-							}
-						},
 						"types": [
 							{
 								"type": "TSTypeReference",
 								"start": 362,
 								"end": 363,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 4
-									},
-									"end": {
-										"line": 11,
-										"column": 5
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 362,
 									"end": 363,
-									"loc": {
-										"start": {
-											"line": 11,
-											"column": 4
-										},
-										"end": {
-											"line": 11,
-											"column": 5
-										}
-									},
 									"name": "a"
 								},
 								"trailingComments": [
@@ -449,59 +199,19 @@
 								"type": "TSParenthesizedType",
 								"start": 379,
 								"end": 386,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 4
-									},
-									"end": {
-										"line": 12,
-										"column": 11
-									}
-								},
 								"typeAnnotation": {
 									"type": "TSIntersectionType",
 									"start": 380,
 									"end": 385,
-									"loc": {
-										"start": {
-											"line": 12,
-											"column": 5
-										},
-										"end": {
-											"line": 12,
-											"column": 10
-										}
-									},
 									"types": [
 										{
 											"type": "TSTypeReference",
 											"start": 380,
 											"end": 381,
-											"loc": {
-												"start": {
-													"line": 12,
-													"column": 5
-												},
-												"end": {
-													"line": 12,
-													"column": 6
-												}
-											},
 											"typeName": {
 												"type": "Identifier",
 												"start": 380,
 												"end": 381,
-												"loc": {
-													"start": {
-														"line": 12,
-														"column": 5
-													},
-													"end": {
-														"line": 12,
-														"column": 6
-													}
-												},
 												"name": "b"
 											}
 										},
@@ -509,30 +219,10 @@
 											"type": "TSTypeReference",
 											"start": 384,
 											"end": 385,
-											"loc": {
-												"start": {
-													"line": 12,
-													"column": 9
-												},
-												"end": {
-													"line": 12,
-													"column": 10
-												}
-											},
 											"typeName": {
 												"type": "Identifier",
 												"start": 384,
 												"end": 385,
-												"loc": {
-													"start": {
-														"line": 12,
-														"column": 9
-													},
-													"end": {
-														"line": 12,
-														"column": 10
-													}
-												},
 												"name": "c"
 											}
 										}
@@ -554,74 +244,24 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 422,
 					"end": 466,
-					"loc": {
-						"start": {
-							"line": 15,
-							"column": 1
-						},
-						"end": {
-							"line": 17,
-							"column": 6
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 427,
 						"end": 428,
-						"loc": {
-							"start": {
-								"line": 15,
-								"column": 6
-							},
-							"end": {
-								"line": 15,
-								"column": 7
-							}
-						},
 						"name": "C"
 					},
 					"typeAnnotation": {
 						"type": "TSConditionalType",
 						"start": 431,
 						"end": 465,
-						"loc": {
-							"start": {
-								"line": 15,
-								"column": 10
-							},
-							"end": {
-								"line": 17,
-								"column": 5
-							}
-						},
 						"checkType": {
 							"type": "TSTypeReference",
 							"start": 431,
 							"end": 432,
-							"loc": {
-								"start": {
-									"line": 15,
-									"column": 10
-								},
-								"end": {
-									"line": 15,
-									"column": 11
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 431,
 								"end": 432,
-								"loc": {
-									"start": {
-										"line": 15,
-										"column": 10
-									},
-									"end": {
-										"line": 15,
-										"column": 11
-									}
-								},
 								"name": "a"
 							}
 						},
@@ -629,30 +269,10 @@
 							"type": "TSTypeReference",
 							"start": 441,
 							"end": 442,
-							"loc": {
-								"start": {
-									"line": 15,
-									"column": 20
-								},
-								"end": {
-									"line": 15,
-									"column": 21
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 441,
 								"end": 442,
-								"loc": {
-									"start": {
-										"line": 15,
-										"column": 20
-									},
-									"end": {
-										"line": 15,
-										"column": 21
-									}
-								},
 								"name": "b"
 							},
 							"trailingComments": [
@@ -668,30 +288,10 @@
 							"type": "TSTypeReference",
 							"start": 458,
 							"end": 459,
-							"loc": {
-								"start": {
-									"line": 16,
-									"column": 4
-								},
-								"end": {
-									"line": 16,
-									"column": 5
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 458,
 								"end": 459,
-								"loc": {
-									"start": {
-										"line": 16,
-										"column": 4
-									},
-									"end": {
-										"line": 16,
-										"column": 5
-									}
-								},
 								"name": "c"
 							}
 						},
@@ -699,30 +299,10 @@
 							"type": "TSTypeReference",
 							"start": 464,
 							"end": 465,
-							"loc": {
-								"start": {
-									"line": 17,
-									"column": 4
-								},
-								"end": {
-									"line": 17,
-									"column": 5
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 464,
 								"end": 465,
-								"loc": {
-									"start": {
-										"line": 17,
-										"column": 4
-									},
-									"end": {
-										"line": 17,
-										"column": 5
-									}
-								},
 								"name": "d"
 							}
 						}
@@ -740,75 +320,25 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 516,
 					"end": 555,
-					"loc": {
-						"start": {
-							"line": 20,
-							"column": 1
-						},
-						"end": {
-							"line": 23,
-							"column": 6
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 521,
 						"end": 523,
-						"loc": {
-							"start": {
-								"line": 20,
-								"column": 6
-							},
-							"end": {
-								"line": 20,
-								"column": 8
-							}
-						},
 						"name": "M1"
 					},
 					"typeAnnotation": {
 						"type": "TSUnionType",
 						"start": 528,
 						"end": 554,
-						"loc": {
-							"start": {
-								"line": 21,
-								"column": 2
-							},
-							"end": {
-								"line": 23,
-								"column": 5
-							}
-						},
 						"types": [
 							{
 								"type": "TSTypeReference",
 								"start": 530,
 								"end": 531,
-								"loc": {
-									"start": {
-										"line": 21,
-										"column": 4
-									},
-									"end": {
-										"line": 21,
-										"column": 5
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 530,
 									"end": 531,
-									"loc": {
-										"start": {
-											"line": 21,
-											"column": 4
-										},
-										"end": {
-											"line": 21,
-											"column": 5
-										}
-									},
 									"name": "a"
 								},
 								"trailingComments": [
@@ -824,30 +354,10 @@
 								"type": "TSTypeReference",
 								"start": 547,
 								"end": 548,
-								"loc": {
-									"start": {
-										"line": 22,
-										"column": 4
-									},
-									"end": {
-										"line": 22,
-										"column": 5
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 547,
 									"end": 548,
-									"loc": {
-										"start": {
-											"line": 22,
-											"column": 4
-										},
-										"end": {
-											"line": 22,
-											"column": 5
-										}
-									},
 									"name": "b"
 								}
 							},
@@ -855,30 +365,10 @@
 								"type": "TSTypeReference",
 								"start": 553,
 								"end": 554,
-								"loc": {
-									"start": {
-										"line": 23,
-										"column": 4
-									},
-									"end": {
-										"line": 23,
-										"column": 5
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 553,
 									"end": 554,
-									"loc": {
-										"start": {
-											"line": 23,
-											"column": 4
-										},
-										"end": {
-											"line": 23,
-											"column": 5
-										}
-									},
 									"name": "c"
 								}
 							}
@@ -897,75 +387,25 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 603,
 					"end": 642,
-					"loc": {
-						"start": {
-							"line": 26,
-							"column": 1
-						},
-						"end": {
-							"line": 29,
-							"column": 6
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 608,
 						"end": 610,
-						"loc": {
-							"start": {
-								"line": 26,
-								"column": 6
-							},
-							"end": {
-								"line": 26,
-								"column": 8
-							}
-						},
 						"name": "M2"
 					},
 					"typeAnnotation": {
 						"type": "TSUnionType",
 						"start": 615,
 						"end": 641,
-						"loc": {
-							"start": {
-								"line": 27,
-								"column": 2
-							},
-							"end": {
-								"line": 29,
-								"column": 5
-							}
-						},
 						"types": [
 							{
 								"type": "TSTypeReference",
 								"start": 617,
 								"end": 618,
-								"loc": {
-									"start": {
-										"line": 27,
-										"column": 4
-									},
-									"end": {
-										"line": 27,
-										"column": 5
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 617,
 									"end": 618,
-									"loc": {
-										"start": {
-											"line": 27,
-											"column": 4
-										},
-										"end": {
-											"line": 27,
-											"column": 5
-										}
-									},
 									"name": "a"
 								}
 							},
@@ -973,30 +413,10 @@
 								"type": "TSTypeReference",
 								"start": 623,
 								"end": 624,
-								"loc": {
-									"start": {
-										"line": 28,
-										"column": 4
-									},
-									"end": {
-										"line": 28,
-										"column": 5
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 623,
 									"end": 624,
-									"loc": {
-										"start": {
-											"line": 28,
-											"column": 4
-										},
-										"end": {
-											"line": 28,
-											"column": 5
-										}
-									},
 									"name": "b"
 								},
 								"trailingComments": [
@@ -1012,30 +432,10 @@
 								"type": "TSTypeReference",
 								"start": 640,
 								"end": 641,
-								"loc": {
-									"start": {
-										"line": 29,
-										"column": 4
-									},
-									"end": {
-										"line": 29,
-										"column": 5
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 640,
 									"end": 641,
-									"loc": {
-										"start": {
-											"line": 29,
-											"column": 4
-										},
-										"end": {
-											"line": 29,
-											"column": 5
-										}
-									},
 									"name": "c"
 								}
 							}
@@ -1059,18 +459,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

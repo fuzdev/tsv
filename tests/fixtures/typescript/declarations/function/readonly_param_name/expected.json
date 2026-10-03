@@ -14,33 +14,13 @@
 			"type": "Line",
 			"value": " `readonly` is a contextual keyword — a valid ordinary parameter name when",
 			"start": 20,
-			"end": 96,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 77
-				}
-			}
+			"end": 96
 		},
 		{
 			"type": "Line",
 			"value": " nothing binds after it (it is not a `readonly` modifier here).",
 			"start": 98,
-			"end": 163,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 66
-				}
-			}
+			"end": 163
 		}
 	],
 	"instance": {
@@ -52,45 +32,15 @@
 			"type": "Program",
 			"start": 18,
 			"end": 342,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 13,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "FunctionDeclaration",
 					"start": 165,
 					"end": 193,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 29
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 174,
 						"end": 177,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 10
-							},
-							"end": {
-								"line": 4,
-								"column": 13
-							}
-						},
 						"name": "fn1"
 					},
 					"expression": false,
@@ -101,32 +51,12 @@
 							"type": "Identifier",
 							"start": 178,
 							"end": 179,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 14
-								},
-								"end": {
-									"line": 4,
-									"column": 15
-								}
-							},
 							"name": "a"
 						},
 						{
 							"type": "Identifier",
 							"start": 181,
 							"end": 189,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 17
-								},
-								"end": {
-									"line": 4,
-									"column": 25
-								}
-							},
 							"name": "readonly"
 						}
 					],
@@ -134,16 +64,6 @@
 						"type": "BlockStatement",
 						"start": 191,
 						"end": 193,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 27
-							},
-							"end": {
-								"line": 4,
-								"column": 29
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -165,30 +85,10 @@
 					"type": "FunctionDeclaration",
 					"start": 196,
 					"end": 229,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 34
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 205,
 						"end": 208,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 10
-							},
-							"end": {
-								"line": 6,
-								"column": 13
-							}
-						},
 						"name": "fn2"
 					},
 					"expression": false,
@@ -199,45 +99,15 @@
 							"type": "Identifier",
 							"start": 209,
 							"end": 225,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 14
-								},
-								"end": {
-									"line": 6,
-									"column": 30
-								}
-							},
 							"name": "readonly",
 							"typeAnnotation": {
 								"type": "TSTypeAnnotation",
 								"start": 217,
 								"end": 225,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 22
-									},
-									"end": {
-										"line": 6,
-										"column": 30
-									}
-								},
 								"typeAnnotation": {
 									"type": "TSNumberKeyword",
 									"start": 219,
-									"end": 225,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 24
-										},
-										"end": {
-											"line": 6,
-											"column": 30
-										}
-									}
+									"end": 225
 								}
 							}
 						}
@@ -246,16 +116,6 @@
 						"type": "BlockStatement",
 						"start": 227,
 						"end": 229,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 32
-							},
-							"end": {
-								"line": 6,
-								"column": 34
-							}
-						},
 						"body": []
 					}
 				},
@@ -263,30 +123,10 @@
 					"type": "FunctionDeclaration",
 					"start": 232,
 					"end": 261,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 30
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 241,
 						"end": 244,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 10
-							},
-							"end": {
-								"line": 8,
-								"column": 13
-							}
-						},
 						"name": "fn3"
 					},
 					"expression": false,
@@ -297,46 +137,16 @@
 							"type": "AssignmentPattern",
 							"start": 245,
 							"end": 257,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 14
-								},
-								"end": {
-									"line": 8,
-									"column": 26
-								}
-							},
 							"left": {
 								"type": "Identifier",
 								"start": 245,
 								"end": 253,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 14
-									},
-									"end": {
-										"line": 8,
-										"column": 22
-									}
-								},
 								"name": "readonly"
 							},
 							"right": {
 								"type": "Literal",
 								"start": 256,
 								"end": 257,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 25
-									},
-									"end": {
-										"line": 8,
-										"column": 26
-									}
-								},
 								"value": 1,
 								"raw": "1"
 							}
@@ -346,16 +156,6 @@
 						"type": "BlockStatement",
 						"start": 259,
 						"end": 261,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 28
-							},
-							"end": {
-								"line": 8,
-								"column": 30
-							}
-						},
 						"body": []
 					}
 				},
@@ -363,30 +163,10 @@
 					"type": "FunctionDeclaration",
 					"start": 264,
 					"end": 298,
-					"loc": {
-						"start": {
-							"line": 10,
-							"column": 1
-						},
-						"end": {
-							"line": 10,
-							"column": 35
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 273,
 						"end": 276,
-						"loc": {
-							"start": {
-								"line": 10,
-								"column": 10
-							},
-							"end": {
-								"line": 10,
-								"column": 13
-							}
-						},
 						"name": "fn4"
 					},
 					"expression": false,
@@ -397,46 +177,16 @@
 							"type": "Identifier",
 							"start": 277,
 							"end": 294,
-							"loc": {
-								"start": {
-									"line": 10,
-									"column": 14
-								},
-								"end": {
-									"line": 10,
-									"column": 31
-								}
-							},
 							"name": "readonly",
 							"optional": true,
 							"typeAnnotation": {
 								"type": "TSTypeAnnotation",
 								"start": 286,
 								"end": 294,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 23
-									},
-									"end": {
-										"line": 10,
-										"column": 31
-									}
-								},
 								"typeAnnotation": {
 									"type": "TSStringKeyword",
 									"start": 288,
-									"end": 294,
-									"loc": {
-										"start": {
-											"line": 10,
-											"column": 25
-										},
-										"end": {
-											"line": 10,
-											"column": 31
-										}
-									}
+									"end": 294
 								}
 							}
 						}
@@ -445,16 +195,6 @@
 						"type": "BlockStatement",
 						"start": 296,
 						"end": 298,
-						"loc": {
-							"start": {
-								"line": 10,
-								"column": 33
-							},
-							"end": {
-								"line": 10,
-								"column": 35
-							}
-						},
 						"body": []
 					}
 				},
@@ -462,61 +202,21 @@
 					"type": "VariableDeclaration",
 					"start": 301,
 					"end": 341,
-					"loc": {
-						"start": {
-							"line": 12,
-							"column": 1
-						},
-						"end": {
-							"line": 12,
-							"column": 41
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 307,
 							"end": 340,
-							"loc": {
-								"start": {
-									"line": 12,
-									"column": 7
-								},
-								"end": {
-									"line": 12,
-									"column": 40
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 307,
 								"end": 312,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 7
-									},
-									"end": {
-										"line": 12,
-										"column": 12
-									}
-								},
 								"name": "arrow"
 							},
 							"init": {
 								"type": "ArrowFunctionExpression",
 								"start": 315,
 								"end": 340,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 15
-									},
-									"end": {
-										"line": 12,
-										"column": 40
-									}
-								},
 								"id": null,
 								"expression": true,
 								"generator": false,
@@ -526,32 +226,12 @@
 										"type": "Identifier",
 										"start": 316,
 										"end": 324,
-										"loc": {
-											"start": {
-												"line": 12,
-												"column": 16
-											},
-											"end": {
-												"line": 12,
-												"column": 24
-											}
-										},
 										"name": "readonly"
 									},
 									{
 										"type": "Identifier",
 										"start": 326,
 										"end": 327,
-										"loc": {
-											"start": {
-												"line": 12,
-												"column": 26
-											},
-											"end": {
-												"line": 12,
-												"column": 27
-											}
-										},
 										"name": "a"
 									}
 								],
@@ -559,16 +239,6 @@
 									"type": "Identifier",
 									"start": 332,
 									"end": 340,
-									"loc": {
-										"start": {
-											"line": 12,
-											"column": 32
-										},
-										"end": {
-											"line": 12,
-											"column": 40
-										}
-									},
 									"name": "readonly"
 								}
 							}
@@ -585,18 +255,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

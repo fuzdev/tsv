@@ -29,44 +29,14 @@
 					"type": "CallExpression",
 					"start": 84,
 					"end": 95,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 5
-						},
-						"end": {
-							"line": 2,
-							"column": 16
-						}
-					},
 					"callee": {
 						"type": "MemberExpression",
 						"start": 84,
 						"end": 92,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 5
-							},
-							"end": {
-								"line": 2,
-								"column": 13
-							}
-						},
 						"object": {
 							"type": "Literal",
 							"start": 84,
 							"end": 87,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 5
-								},
-								"end": {
-									"line": 2,
-									"column": 8
-								}
-							},
 							"value": {},
 							"raw": "/}/",
 							"regex": {
@@ -78,16 +48,6 @@
 							"type": "Identifier",
 							"start": 88,
 							"end": 92,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 9
-								},
-								"end": {
-									"line": 2,
-									"column": 13
-								}
-							},
 							"name": "test"
 						},
 						"computed": false,
@@ -98,16 +58,6 @@
 							"type": "Identifier",
 							"start": 93,
 							"end": 94,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 14
-								},
-								"end": {
-									"line": 2,
-									"column": 15
-								}
-							},
 							"name": "a"
 						}
 					],
@@ -143,60 +93,20 @@
 					"type": "UnaryExpression",
 					"start": 111,
 					"end": 123,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 5
-						},
-						"end": {
-							"line": 3,
-							"column": 17
-						}
-					},
 					"operator": "!",
 					"prefix": true,
 					"argument": {
 						"type": "CallExpression",
 						"start": 112,
 						"end": 123,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 6
-							},
-							"end": {
-								"line": 3,
-								"column": 17
-							}
-						},
 						"callee": {
 							"type": "MemberExpression",
 							"start": 112,
 							"end": 120,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 6
-								},
-								"end": {
-									"line": 3,
-									"column": 14
-								}
-							},
 							"object": {
 								"type": "Literal",
 								"start": 112,
 								"end": 115,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 6
-									},
-									"end": {
-										"line": 3,
-										"column": 9
-									}
-								},
 								"value": {},
 								"raw": "/}/",
 								"regex": {
@@ -208,16 +118,6 @@
 								"type": "Identifier",
 								"start": 116,
 								"end": 120,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 10
-									},
-									"end": {
-										"line": 3,
-										"column": 14
-									}
-								},
 								"name": "test"
 							},
 							"computed": false,
@@ -228,16 +128,6 @@
 								"type": "Identifier",
 								"start": 121,
 								"end": 122,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 15
-									},
-									"end": {
-										"line": 3,
-										"column": 16
-									}
-								},
 								"name": "a"
 							}
 						],
@@ -268,44 +158,14 @@
 								"type": "CallExpression",
 								"start": 138,
 								"end": 149,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 32
-									},
-									"end": {
-										"line": 3,
-										"column": 43
-									}
-								},
 								"callee": {
 									"type": "MemberExpression",
 									"start": 138,
 									"end": 146,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 32
-										},
-										"end": {
-											"line": 3,
-											"column": 40
-										}
-									},
 									"object": {
 										"type": "Literal",
 										"start": 138,
 										"end": 141,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 32
-											},
-											"end": {
-												"line": 3,
-												"column": 35
-											}
-										},
 										"value": {},
 										"raw": "/}/",
 										"regex": {
@@ -317,16 +177,6 @@
 										"type": "Identifier",
 										"start": 142,
 										"end": 146,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 36
-											},
-											"end": {
-												"line": 3,
-												"column": 40
-											}
-										},
 										"name": "test"
 									},
 									"computed": false,
@@ -337,16 +187,6 @@
 										"type": "Identifier",
 										"start": 147,
 										"end": 148,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 41
-											},
-											"end": {
-												"line": 3,
-												"column": 42
-											}
-										},
 										"name": "b"
 									}
 								],
@@ -384,30 +224,10 @@
 					"type": "MemberExpression",
 					"start": 166,
 					"end": 176,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 6
-						},
-						"end": {
-							"line": 4,
-							"column": 16
-						}
-					},
 					"object": {
 						"type": "Literal",
 						"start": 166,
 						"end": 169,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 6
-							},
-							"end": {
-								"line": 4,
-								"column": 9
-							}
-						},
 						"value": {},
 						"raw": "/}/",
 						"regex": {
@@ -419,16 +239,6 @@
 						"type": "Identifier",
 						"start": 170,
 						"end": 176,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 10
-							},
-							"end": {
-								"line": 4,
-								"column": 16
-							}
-						},
 						"name": "source"
 					},
 					"computed": false,
@@ -462,30 +272,10 @@
 					"type": "MemberExpression",
 					"start": 196,
 					"end": 206,
-					"loc": {
-						"start": {
-							"line": 5,
-							"column": 8
-						},
-						"end": {
-							"line": 5,
-							"column": 18
-						}
-					},
 					"object": {
 						"type": "Literal",
 						"start": 196,
 						"end": 199,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 8
-							},
-							"end": {
-								"line": 5,
-								"column": 11
-							}
-						},
 						"value": {},
 						"raw": "/}/",
 						"regex": {
@@ -497,16 +287,6 @@
 						"type": "Identifier",
 						"start": 200,
 						"end": 206,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 12
-							},
-							"end": {
-								"line": 5,
-								"column": 18
-							}
-						},
 						"name": "source"
 					},
 					"computed": false,
@@ -544,44 +324,14 @@
 					"type": "CallExpression",
 					"start": 227,
 					"end": 238,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 7
-						},
-						"end": {
-							"line": 6,
-							"column": 18
-						}
-					},
 					"callee": {
 						"type": "MemberExpression",
 						"start": 227,
 						"end": 235,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 7
-							},
-							"end": {
-								"line": 6,
-								"column": 15
-							}
-						},
 						"object": {
 							"type": "Literal",
 							"start": 227,
 							"end": 230,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 7
-								},
-								"end": {
-									"line": 6,
-									"column": 10
-								}
-							},
 							"value": {},
 							"raw": "/}/",
 							"regex": {
@@ -593,16 +343,6 @@
 							"type": "Identifier",
 							"start": 231,
 							"end": 235,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 11
-								},
-								"end": {
-									"line": 6,
-									"column": 15
-								}
-							},
 							"name": "exec"
 						},
 						"computed": false,
@@ -613,16 +353,6 @@
 							"type": "Identifier",
 							"start": 236,
 							"end": 237,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 16
-								},
-								"end": {
-									"line": 6,
-									"column": 17
-								}
-							},
 							"name": "a"
 						}
 					],
@@ -644,19 +374,7 @@
 					"type": "Identifier",
 					"name": "item",
 					"start": 242,
-					"end": 246,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 22,
-							"character": 242
-						},
-						"end": {
-							"line": 6,
-							"column": 26,
-							"character": 246
-						}
-					}
+					"end": 246
 				}
 			},
 			{
@@ -674,30 +392,10 @@
 					"type": "MemberExpression",
 					"start": 266,
 					"end": 276,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 7
-						},
-						"end": {
-							"line": 7,
-							"column": 17
-						}
-					},
 					"object": {
 						"type": "Literal",
 						"start": 266,
 						"end": 269,
-						"loc": {
-							"start": {
-								"line": 7,
-								"column": 7
-							},
-							"end": {
-								"line": 7,
-								"column": 10
-							}
-						},
 						"value": {},
 						"raw": "/}/",
 						"regex": {
@@ -709,16 +407,6 @@
 						"type": "Identifier",
 						"start": 270,
 						"end": 276,
-						"loc": {
-							"start": {
-								"line": 7,
-								"column": 11
-							},
-							"end": {
-								"line": 7,
-								"column": 17
-							}
-						},
 						"name": "source"
 					},
 					"computed": false,

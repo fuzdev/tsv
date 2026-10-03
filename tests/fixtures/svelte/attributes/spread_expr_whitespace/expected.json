@@ -12,18 +12,6 @@
 				"start": 0,
 				"end": 18,
 				"name": "Comp",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 5,
-						"character": 5
-					}
-				},
 				"attributes": [
 					{
 						"type": "SpreadAttribute",
@@ -33,16 +21,6 @@
 							"type": "Identifier",
 							"start": 10,
 							"end": 14,
-							"loc": {
-								"start": {
-									"line": 1,
-									"column": 10
-								},
-								"end": {
-									"line": 1,
-									"column": 14
-								}
-							},
 							"name": "rest"
 						}
 					}
@@ -64,18 +42,6 @@
 				"start": 19,
 				"end": 39,
 				"name": "Comp",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 20
-					},
-					"end": {
-						"line": 2,
-						"column": 5,
-						"character": 24
-					}
-				},
 				"attributes": [
 					{
 						"type": "SpreadAttribute",
@@ -85,30 +51,10 @@
 							"type": "CallExpression",
 							"start": 29,
 							"end": 35,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 10
-								},
-								"end": {
-									"line": 2,
-									"column": 16
-								}
-							},
 							"callee": {
 								"type": "Identifier",
 								"start": 29,
 								"end": 33,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 10
-									},
-									"end": {
-										"line": 2,
-										"column": 14
-									}
-								},
 								"name": "make"
 							},
 							"arguments": [],
@@ -133,18 +79,6 @@
 				"start": 40,
 				"end": 59,
 				"name": "Comp",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 1,
-						"character": 41
-					},
-					"end": {
-						"line": 3,
-						"column": 5,
-						"character": 45
-					}
-				},
 				"attributes": [
 					{
 						"type": "SpreadAttribute",
@@ -154,60 +88,20 @@
 							"type": "MemberExpression",
 							"start": 50,
 							"end": 55,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 10
-								},
-								"end": {
-									"line": 3,
-									"column": 15
-								}
-							},
 							"object": {
 								"type": "MemberExpression",
 								"start": 50,
 								"end": 53,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 10
-									},
-									"end": {
-										"line": 3,
-										"column": 13
-									}
-								},
 								"object": {
 									"type": "Identifier",
 									"start": 50,
 									"end": 51,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 10
-										},
-										"end": {
-											"line": 3,
-											"column": 11
-										}
-									},
 									"name": "x"
 								},
 								"property": {
 									"type": "Identifier",
 									"start": 52,
 									"end": 53,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 12
-										},
-										"end": {
-											"line": 3,
-											"column": 13
-										}
-									},
 									"name": "y"
 								},
 								"computed": false,
@@ -217,16 +111,6 @@
 								"type": "Identifier",
 								"start": 54,
 								"end": 55,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 14
-									},
-									"end": {
-										"line": 3,
-										"column": 15
-									}
-								},
 								"name": "z"
 							},
 							"computed": false,

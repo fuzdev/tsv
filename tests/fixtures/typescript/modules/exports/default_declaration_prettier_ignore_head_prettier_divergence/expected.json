@@ -14,145 +14,55 @@
 			"type": "Line",
 			"value": " an own-line directive in the `export default`→value gap freezes the value",
 			"start": 20,
-			"end": 96,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 77
-				}
-			}
+			"end": 96
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 115,
-			"end": 133,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 2
-				},
-				"end": {
-					"line": 4,
-					"column": 20
-				}
-			}
+			"end": 133
 		},
 		{
 			"type": "Line",
 			"value": " a declaration value is the same head",
 			"start": 153,
-			"end": 192,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 1
-				},
-				"end": {
-					"line": 7,
-					"column": 40
-				}
-			}
+			"end": 192
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 211,
-			"end": 229,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 2
-				},
-				"end": {
-					"line": 9,
-					"column": 20
-				}
-			}
+			"end": 229
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 272,
-			"end": 290,
-			"loc": {
-				"start": {
-					"line": 13,
-					"column": 2
-				},
-				"end": {
-					"line": 13,
-					"column": 20
-				}
-			}
+			"end": 290
 		},
 		{
 			"type": "Line",
 			"value": " decorators written after `default` belong to the class and ride inside its slice",
 			"start": 324,
-			"end": 407,
-			"loc": {
-				"start": {
-					"line": 18,
-					"column": 1
-				},
-				"end": {
-					"line": 18,
-					"column": 84
-				}
-			}
+			"end": 407
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 426,
-			"end": 444,
-			"loc": {
-				"start": {
-					"line": 20,
-					"column": 2
-				},
-				"end": {
-					"line": 20,
-					"column": 20
-				}
-			}
+			"end": 444
 		},
 		{
 			"type": "Line",
 			"value": " an own-line block comment behaves identically — placement keys the freeze",
 			"start": 469,
-			"end": 545,
-			"loc": {
-				"start": {
-					"line": 24,
-					"column": 1
-				},
-				"end": {
-					"line": 24,
-					"column": 77
-				}
-			}
+			"end": 545
 		},
 		{
 			"type": "Block",
 			"value": " prettier-ignore ",
 			"start": 564,
-			"end": 585,
-			"loc": {
-				"start": {
-					"line": 26,
-					"column": 2
-				},
-				"end": {
-					"line": 26,
-					"column": 23
-				}
-			}
+			"end": 585
 		}
 	],
 	"instance": {
@@ -164,60 +74,20 @@
 			"type": "Program",
 			"start": 18,
 			"end": 603,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 28,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExportDefaultDeclaration",
 					"start": 98,
 					"end": 150,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 16
-						}
-					},
 					"exportKind": "value",
 					"declaration": {
 						"type": "CallExpression",
 						"start": 136,
 						"end": 149,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 2
-							},
-							"end": {
-								"line": 5,
-								"column": 15
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 136,
 							"end": 138,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 2
-								},
-								"end": {
-									"line": 5,
-									"column": 4
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -225,16 +95,6 @@
 								"type": "Identifier",
 								"start": 143,
 								"end": 146,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 9
-									},
-									"end": {
-										"line": 5,
-										"column": 12
-									}
-								},
 								"name": "aaa"
 							}
 						],
@@ -261,45 +121,15 @@
 					"type": "ExportDefaultDeclaration",
 					"start": 194,
 					"end": 252,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 1
-						},
-						"end": {
-							"line": 10,
-							"column": 22
-						}
-					},
 					"exportKind": "value",
 					"declaration": {
 						"type": "FunctionDeclaration",
 						"start": 232,
 						"end": 252,
-						"loc": {
-							"start": {
-								"line": 10,
-								"column": 2
-							},
-							"end": {
-								"line": 10,
-								"column": 22
-							}
-						},
 						"id": {
 							"type": "Identifier",
 							"start": 242,
 							"end": 244,
-							"loc": {
-								"start": {
-									"line": 10,
-									"column": 12
-								},
-								"end": {
-									"line": 10,
-									"column": 14
-								}
-							},
 							"name": "fn"
 						},
 						"expression": false,
@@ -310,16 +140,6 @@
 							"type": "BlockStatement",
 							"start": 250,
 							"end": 252,
-							"loc": {
-								"start": {
-									"line": 10,
-									"column": 20
-								},
-								"end": {
-									"line": 10,
-									"column": 22
-								}
-							},
 							"body": []
 						},
 						"leadingComments": [
@@ -344,135 +164,45 @@
 					"type": "ExportDefaultDeclaration",
 					"start": 255,
 					"end": 321,
-					"loc": {
-						"start": {
-							"line": 12,
-							"column": 1
-						},
-						"end": {
-							"line": 16,
-							"column": 3
-						}
-					},
 					"exportKind": "value",
 					"declaration": {
 						"type": "TSInterfaceDeclaration",
 						"start": 293,
 						"end": 321,
-						"loc": {
-							"start": {
-								"line": 14,
-								"column": 2
-							},
-							"end": {
-								"line": 16,
-								"column": 3
-							}
-						},
 						"id": {
 							"type": "Identifier",
 							"start": 304,
 							"end": 305,
-							"loc": {
-								"start": {
-									"line": 14,
-									"column": 13
-								},
-								"end": {
-									"line": 14,
-									"column": 14
-								}
-							},
 							"name": "B"
 						},
 						"body": {
 							"type": "TSInterfaceBody",
 							"start": 307,
 							"end": 321,
-							"loc": {
-								"start": {
-									"line": 14,
-									"column": 16
-								},
-								"end": {
-									"line": 16,
-									"column": 3
-								}
-							},
 							"body": [
 								{
 									"type": "TSPropertySignature",
 									"start": 312,
 									"end": 317,
-									"loc": {
-										"start": {
-											"line": 15,
-											"column": 3
-										},
-										"end": {
-											"line": 15,
-											"column": 8
-										}
-									},
 									"computed": false,
 									"key": {
 										"type": "Identifier",
 										"start": 312,
 										"end": 313,
-										"loc": {
-											"start": {
-												"line": 15,
-												"column": 3
-											},
-											"end": {
-												"line": 15,
-												"column": 4
-											}
-										},
 										"name": "b"
 									},
 									"typeAnnotation": {
 										"type": "TSTypeAnnotation",
 										"start": 313,
 										"end": 317,
-										"loc": {
-											"start": {
-												"line": 15,
-												"column": 4
-											},
-											"end": {
-												"line": 15,
-												"column": 8
-											}
-										},
 										"typeAnnotation": {
 											"type": "TSLiteralType",
 											"start": 316,
 											"end": 317,
-											"loc": {
-												"start": {
-													"line": 15,
-													"column": 7
-												},
-												"end": {
-													"line": 15,
-													"column": 8
-												}
-											},
 											"literal": {
 												"type": "Literal",
 												"start": 316,
 												"end": 317,
-												"loc": {
-													"start": {
-														"line": 15,
-														"column": 7
-													},
-													"end": {
-														"line": 15,
-														"column": 8
-													}
-												},
 												"value": 2,
 												"raw": "2"
 											}
@@ -495,60 +225,20 @@
 					"type": "ExportDefaultDeclaration",
 					"start": 409,
 					"end": 466,
-					"loc": {
-						"start": {
-							"line": 19,
-							"column": 1
-						},
-						"end": {
-							"line": 22,
-							"column": 14
-						}
-					},
 					"exportKind": "value",
 					"declaration": {
 						"type": "ClassExpression",
 						"start": 447,
 						"end": 466,
-						"loc": {
-							"start": {
-								"line": 21,
-								"column": 2
-							},
-							"end": {
-								"line": 22,
-								"column": 14
-							}
-						},
 						"decorators": [
 							{
 								"type": "Decorator",
 								"start": 447,
 								"end": 451,
-								"loc": {
-									"start": {
-										"line": 21,
-										"column": 2
-									},
-									"end": {
-										"line": 21,
-										"column": 6
-									}
-								},
 								"expression": {
 									"type": "Identifier",
 									"start": 448,
 									"end": 451,
-									"loc": {
-										"start": {
-											"line": 21,
-											"column": 3
-										},
-										"end": {
-											"line": 21,
-											"column": 6
-										}
-									},
 									"name": "dec"
 								}
 							}
@@ -557,16 +247,6 @@
 							"type": "Identifier",
 							"start": 461,
 							"end": 462,
-							"loc": {
-								"start": {
-									"line": 22,
-									"column": 9
-								},
-								"end": {
-									"line": 22,
-									"column": 10
-								}
-							},
 							"name": "D"
 						},
 						"superClass": null,
@@ -574,16 +254,6 @@
 							"type": "ClassBody",
 							"start": 464,
 							"end": 466,
-							"loc": {
-								"start": {
-									"line": 22,
-									"column": 12
-								},
-								"end": {
-									"line": 22,
-									"column": 14
-								}
-							},
 							"body": []
 						},
 						"leadingComments": [
@@ -608,46 +278,16 @@
 					"type": "ExportDefaultDeclaration",
 					"start": 547,
 					"end": 602,
-					"loc": {
-						"start": {
-							"line": 25,
-							"column": 1
-						},
-						"end": {
-							"line": 27,
-							"column": 16
-						}
-					},
 					"exportKind": "value",
 					"declaration": {
 						"type": "ObjectExpression",
 						"start": 588,
 						"end": 601,
-						"loc": {
-							"start": {
-								"line": 27,
-								"column": 2
-							},
-							"end": {
-								"line": 27,
-								"column": 15
-							}
-						},
 						"properties": [
 							{
 								"type": "Property",
 								"start": 591,
 								"end": 598,
-								"loc": {
-									"start": {
-										"line": 27,
-										"column": 5
-									},
-									"end": {
-										"line": 27,
-										"column": 12
-									}
-								},
 								"method": false,
 								"shorthand": false,
 								"computed": false,
@@ -655,32 +295,12 @@
 									"type": "Identifier",
 									"start": 591,
 									"end": 594,
-									"loc": {
-										"start": {
-											"line": 27,
-											"column": 5
-										},
-										"end": {
-											"line": 27,
-											"column": 8
-										}
-									},
 									"name": "aaa"
 								},
 								"value": {
 									"type": "Literal",
 									"start": 597,
 									"end": 598,
-									"loc": {
-										"start": {
-											"line": 27,
-											"column": 11
-										},
-										"end": {
-											"line": 27,
-											"column": 12
-										}
-									},
 									"value": 1,
 									"raw": "1"
 								},
@@ -714,18 +334,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

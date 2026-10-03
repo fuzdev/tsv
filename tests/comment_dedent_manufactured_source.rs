@@ -486,9 +486,6 @@ const HEAD: &str = "<script lang=\"ts\">\n\tlet xs = [1];\n</script>\n{#if xs}\n
 /// The two spellings below put the newline at each end of that five-unit window. The glued
 /// spelling above is the null control: with the colon against the binding there is no newline
 /// for the insert to swallow, and the two line starts agree.
-///
-/// This is the same five code units that make an annotation's own line SEED non-identity
-/// (`tests/acorn_loc_line_terminators.rs`), one question over.
 #[test]
 fn the_as_insert_swallows_a_newline_before_the_colon() {
     assert_eq!(

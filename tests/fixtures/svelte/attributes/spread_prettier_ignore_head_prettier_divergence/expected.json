@@ -25,18 +25,6 @@
 				"start": 86,
 				"end": 142,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 87
-					},
-					"end": {
-						"line": 2,
-						"column": 4,
-						"character": 90
-					}
-				},
 				"attributes": [
 					{
 						"type": "SpreadAttribute",
@@ -46,46 +34,16 @@
 							"type": "MemberExpression",
 							"start": 120,
 							"end": 131,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 2
-								},
-								"end": {
-									"line": 5,
-									"column": 13
-								}
-							},
 							"object": {
 								"type": "Identifier",
 								"start": 120,
 								"end": 123,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 2
-									},
-									"end": {
-										"line": 5,
-										"column": 5
-									}
-								},
 								"name": "aaa"
 							},
 							"property": {
 								"type": "Identifier",
 								"start": 128,
 								"end": 131,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 10
-									},
-									"end": {
-										"line": 5,
-										"column": 13
-									}
-								},
 								"name": "bbb"
 							},
 							"computed": false,
@@ -131,18 +89,6 @@
 				"start": 213,
 				"end": 283,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 10,
-						"column": 1,
-						"character": 214
-					},
-					"end": {
-						"line": 10,
-						"column": 4,
-						"character": 217
-					}
-				},
 				"attributes": [
 					{
 						"type": "SpreadAttribute",
@@ -152,46 +98,16 @@
 							"type": "MemberExpression",
 							"start": 247,
 							"end": 258,
-							"loc": {
-								"start": {
-									"line": 13,
-									"column": 2
-								},
-								"end": {
-									"line": 13,
-									"column": 13
-								}
-							},
 							"object": {
 								"type": "Identifier",
 								"start": 247,
 								"end": 250,
-								"loc": {
-									"start": {
-										"line": 13,
-										"column": 2
-									},
-									"end": {
-										"line": 13,
-										"column": 5
-									}
-								},
 								"name": "ccc"
 							},
 							"property": {
 								"type": "Identifier",
 								"start": 255,
 								"end": 258,
-								"loc": {
-									"start": {
-										"line": 13,
-										"column": 10
-									},
-									"end": {
-										"line": 13,
-										"column": 13
-									}
-								},
 								"name": "ddd"
 							},
 							"computed": false,
@@ -214,46 +130,16 @@
 							"type": "MemberExpression",
 							"start": 267,
 							"end": 274,
-							"loc": {
-								"start": {
-									"line": 15,
-									"column": 5
-								},
-								"end": {
-									"line": 15,
-									"column": 12
-								}
-							},
 							"object": {
 								"type": "Identifier",
 								"start": 267,
 								"end": 270,
-								"loc": {
-									"start": {
-										"line": 15,
-										"column": 5
-									},
-									"end": {
-										"line": 15,
-										"column": 8
-									}
-								},
 								"name": "eee"
 							},
 							"property": {
 								"type": "Identifier",
 								"start": 271,
 								"end": 274,
-								"loc": {
-									"start": {
-										"line": 15,
-										"column": 9
-									},
-									"end": {
-										"line": 15,
-										"column": 12
-									}
-								},
 								"name": "fff"
 							},
 							"computed": false,
@@ -274,33 +160,13 @@
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 99,
-			"end": 117,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 2
-				},
-				"end": {
-					"line": 4,
-					"column": 20
-				}
-			}
+			"end": 117
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 226,
-			"end": 244,
-			"loc": {
-				"start": {
-					"line": 12,
-					"column": 2
-				},
-				"end": {
-					"line": 12,
-					"column": 20
-				}
-			}
+			"end": 244
 		}
 	]
 }

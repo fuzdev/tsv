@@ -12,18 +12,6 @@
 				"start": 0,
 				"end": 186,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 2,
-						"character": 2
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -40,36 +28,12 @@
 							"start": 100,
 							"end": 163,
 							"name": "a",
-							"name_loc": {
-								"start": {
-									"line": 3,
-									"column": 2,
-									"character": 101
-								},
-								"end": {
-									"line": 3,
-									"column": 3,
-									"character": 102
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 103,
 									"end": 112,
 									"name": "href",
-									"name_loc": {
-										"start": {
-											"line": 3,
-											"column": 4,
-											"character": 103
-										},
-										"end": {
-											"line": 3,
-											"column": 8,
-											"character": 107
-										}
-									},
 									"value": [
 										{
 											"start": 109,
@@ -85,18 +49,6 @@
 									"start": 113,
 									"end": 122,
 									"name": "class",
-									"name_loc": {
-										"start": {
-											"line": 3,
-											"column": 14,
-											"character": 113
-										},
-										"end": {
-											"line": 3,
-											"column": 19,
-											"character": 118
-										}
-									},
 									"value": [
 										{
 											"start": 120,
@@ -112,18 +64,6 @@
 									"start": 123,
 									"end": 133,
 									"name": "data-x",
-									"name_loc": {
-										"start": {
-											"line": 3,
-											"column": 24,
-											"character": 123
-										},
-										"end": {
-											"line": 3,
-											"column": 30,
-											"character": 129
-										}
-									},
 									"value": [
 										{
 											"start": 131,
@@ -139,18 +79,6 @@
 									"start": 134,
 									"end": 144,
 									"name": "data-y",
-									"name_loc": {
-										"start": {
-											"line": 3,
-											"column": 35,
-											"character": 134
-										},
-										"end": {
-											"line": 3,
-											"column": 41,
-											"character": 140
-										}
-									},
 									"value": [
 										{
 											"start": 142,
@@ -166,18 +94,6 @@
 									"start": 145,
 									"end": 154,
 									"name": "title",
-									"name_loc": {
-										"start": {
-											"line": 3,
-											"column": 46,
-											"character": 145
-										},
-										"end": {
-											"line": 3,
-											"column": 51,
-											"character": 150
-										}
-									},
 									"value": [
 										{
 											"start": 152,

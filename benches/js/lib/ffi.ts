@@ -52,9 +52,10 @@ const symbols = {
 	tsv_parse_css: ENTRY_POINT,
 	tsv_parse_internal_css: ENTRY_POINT,
 	tsv_format_css: ENTRY_POINT,
-	// no-locations parse (span-only wire) — svelte + typescript only (CSS emits no `loc`)
+	// no-locations parse (the span-only wire)
 	tsv_parse_svelte_no_locations: ENTRY_POINT,
 	tsv_parse_typescript_no_locations: ENTRY_POINT,
+	tsv_parse_css_no_locations: ENTRY_POINT,
 	tsv_free: {
 		parameters: ['pointer', 'usize'],
 		result: 'void'
@@ -138,8 +139,8 @@ interface MarshalState {
 interface FfiTables {
 	parse: Record<Language, FfiFn>;
 	parse_internal: Record<Language, FfiFn>;
-	/** Span-only wire — svelte + typescript only (CSS emits no `loc`). */
-	parse_no_locations: Partial<Record<Language, FfiFn>>;
+	/** The span-only wire. */
+	parse_no_locations: Record<Language, FfiFn>;
 	format: Record<Language, FfiFn>;
 }
 
@@ -225,7 +226,8 @@ export class NativeImplementation extends BaseImplementation {
 			},
 			parse_no_locations: {
 				svelte: this.symbols.tsv_parse_svelte_no_locations as FfiFn,
-				typescript: this.symbols.tsv_parse_typescript_no_locations as FfiFn
+				typescript: this.symbols.tsv_parse_typescript_no_locations as FfiFn,
+				css: this.symbols.tsv_parse_css_no_locations as FfiFn
 			},
 			format: {
 				svelte: this.symbols.tsv_format_svelte as FfiFn,
@@ -349,7 +351,6 @@ export class NativeImplementation extends BaseImplementation {
 
 	parse_no_locations(source: string, language: Language, goal?: ParseGoal): unknown {
 		const fn = this.tables.parse_no_locations[language];
-		if (!fn) throw new Error(`no-locations parse unsupported for ${language}`);
 		return JSON.parse(this.call_ffi(fn, source, parse_source_type_code(goal_for(language, goal))));
 	}
 

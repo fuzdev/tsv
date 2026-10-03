@@ -25,36 +25,12 @@
 				"start": 92,
 				"end": 134,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 93
-					},
-					"end": {
-						"line": 2,
-						"column": 4,
-						"character": 96
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 98,
 						"end": 126,
 						"name": "class",
-						"name_loc": {
-							"start": {
-								"line": 3,
-								"column": 1,
-								"character": 98
-							},
-							"end": {
-								"line": 3,
-								"column": 6,
-								"character": 103
-							}
-						},
 						"value": [
 							{
 								"start": 105,
@@ -71,16 +47,6 @@
 									"type": "Identifier",
 									"start": 114,
 									"end": 118,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 5
-										},
-										"end": {
-											"line": 4,
-											"column": 9
-										}
-									},
 									"name": "expr"
 								}
 							},
@@ -124,36 +90,12 @@
 				"start": 194,
 				"end": 230,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 9,
-						"column": 1,
-						"character": 195
-					},
-					"end": {
-						"line": 9,
-						"column": 4,
-						"character": 198
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 200,
 						"end": 222,
 						"name": "class",
-						"name_loc": {
-							"start": {
-								"line": 10,
-								"column": 1,
-								"character": 200
-							},
-							"end": {
-								"line": 10,
-								"column": 6,
-								"character": 205
-							}
-						},
 						"value": [
 							{
 								"start": 207,
@@ -170,16 +112,6 @@
 									"type": "Identifier",
 									"start": 216,
 									"end": 220,
-									"loc": {
-										"start": {
-											"line": 11,
-											"column": 5
-										},
-										"end": {
-											"line": 11,
-											"column": 9
-										}
-									},
 									"name": "expr"
 								}
 							}
@@ -216,36 +148,12 @@
 				"start": 292,
 				"end": 336,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 15,
-						"column": 1,
-						"character": 293
-					},
-					"end": {
-						"line": 15,
-						"column": 4,
-						"character": 296
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 298,
 						"end": 328,
 						"name": "class",
-						"name_loc": {
-							"start": {
-								"line": 16,
-								"column": 1,
-								"character": 298
-							},
-							"end": {
-								"line": 16,
-								"column": 6,
-								"character": 303
-							}
-						},
 						"value": [
 							{
 								"start": 305,
@@ -262,16 +170,6 @@
 									"type": "Identifier",
 									"start": 314,
 									"end": 318,
-									"loc": {
-										"start": {
-											"line": 17,
-											"column": 5
-										},
-										"end": {
-											"line": 17,
-											"column": 9
-										}
-									},
 									"name": "expr"
 								}
 							},
@@ -315,36 +213,12 @@
 				"start": 378,
 				"end": 414,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 22,
-						"column": 1,
-						"character": 379
-					},
-					"end": {
-						"line": 22,
-						"column": 4,
-						"character": 382
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 384,
 						"end": 406,
 						"name": "class",
-						"name_loc": {
-							"start": {
-								"line": 23,
-								"column": 1,
-								"character": 384
-							},
-							"end": {
-								"line": 23,
-								"column": 6,
-								"character": 389
-							}
-						},
 						"value": [
 							{
 								"start": 391,
@@ -361,16 +235,6 @@
 									"type": "Identifier",
 									"start": 397,
 									"end": 401,
-									"loc": {
-										"start": {
-											"line": 24,
-											"column": 2
-										},
-										"end": {
-											"line": 24,
-											"column": 6
-										}
-									},
 									"name": "expr"
 								}
 							},
@@ -414,36 +278,12 @@
 				"start": 499,
 				"end": 537,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 29,
-						"column": 1,
-						"character": 500
-					},
-					"end": {
-						"line": 29,
-						"column": 4,
-						"character": 503
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 505,
 						"end": 529,
 						"name": "class",
-						"name_loc": {
-							"start": {
-								"line": 30,
-								"column": 1,
-								"character": 505
-							},
-							"end": {
-								"line": 30,
-								"column": 6,
-								"character": 510
-							}
-						},
 						"value": [
 							{
 								"start": 512,
@@ -460,16 +300,6 @@
 									"type": "Identifier",
 									"start": 517,
 									"end": 521,
-									"loc": {
-										"start": {
-											"line": 30,
-											"column": 13
-										},
-										"end": {
-											"line": 30,
-											"column": 17
-										}
-									},
 									"name": "expr"
 								}
 							},

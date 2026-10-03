@@ -1365,7 +1365,6 @@ mod tests {
             multiline: false,
             span: Span::new(start, start + 4),
             emit_character_field: false,
-            bump_pattern_columns: false,
             owned_by_node: false,
         }
     }

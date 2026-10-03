@@ -12,18 +12,6 @@
 				"start": 0,
 				"end": 104,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 4,
-						"character": 4
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -37,16 +25,6 @@
 								"type": "Identifier",
 								"start": 10,
 								"end": 14,
-								"loc": {
-									"start": {
-										"line": 1,
-										"column": 10
-									},
-									"end": {
-										"line": 1,
-										"column": 14
-									}
-								},
 								"name": "cond"
 							},
 							"consequent": {
@@ -57,36 +35,12 @@
 										"start": 15,
 										"end": 93,
 										"name": "span",
-										"name_loc": {
-											"start": {
-												"line": 1,
-												"column": 16,
-												"character": 16
-											},
-											"end": {
-												"line": 1,
-												"column": 20,
-												"character": 20
-											}
-										},
 										"attributes": [
 											{
 												"type": "Attribute",
 												"start": 21,
 												"end": 30,
 												"name": "class",
-												"name_loc": {
-													"start": {
-														"line": 1,
-														"column": 21,
-														"character": 21
-													},
-													"end": {
-														"line": 1,
-														"column": 26,
-														"character": 26
-													}
-												},
 												"value": [
 													{
 														"start": 28,
@@ -109,16 +63,6 @@
 														"type": "Identifier",
 														"start": 32,
 														"end": 82,
-														"loc": {
-															"start": {
-																"line": 1,
-																"column": 32
-															},
-															"end": {
-																"line": 1,
-																"column": 82
-															}
-														},
 														"name": "some_longer_content_expression_value_here_xyz_pads"
 													}
 												}

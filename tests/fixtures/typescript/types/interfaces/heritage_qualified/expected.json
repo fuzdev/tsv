@@ -14,65 +14,25 @@
 			"type": "Line",
 			"value": " Qualified `extends`: the heritage `expression` is a `TSQualifiedName`",
 			"start": 20,
-			"end": 92,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 73
-				}
-			}
+			"end": 92
 		},
 		{
 			"type": "Line",
 			"value": " Deeply nested qualified `extends`",
 			"start": 132,
-			"end": 168,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 1
-				},
-				"end": {
-					"line": 5,
-					"column": 37
-				}
-			}
+			"end": 168
 		},
 		{
 			"type": "Line",
 			"value": " Qualified `implements`: the heritage `expression` is a `TSQualifiedName` too",
 			"start": 209,
-			"end": 288,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 1
-				},
-				"end": {
-					"line": 8,
-					"column": 80
-				}
-			}
+			"end": 288
 		},
 		{
 			"type": "Line",
 			"value": " Deeply nested qualified `implements`",
 			"start": 335,
-			"end": 374,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 1
-				},
-				"end": {
-					"line": 11,
-					"column": 40
-				}
-			}
+			"end": 374
 		}
 	],
 	"instance": {
@@ -84,45 +44,15 @@
 			"type": "Program",
 			"start": 18,
 			"end": 420,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 13,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "TSInterfaceDeclaration",
 					"start": 94,
 					"end": 129,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 36
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 104,
 						"end": 110,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 11
-							},
-							"end": {
-								"line": 3,
-								"column": 17
-							}
-						},
 						"name": "Single"
 					},
 					"extends": [
@@ -130,60 +60,20 @@
 							"type": "TSExpressionWithTypeArguments",
 							"start": 119,
 							"end": 126,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 26
-								},
-								"end": {
-									"line": 3,
-									"column": 33
-								}
-							},
 							"expression": {
 								"type": "TSQualifiedName",
 								"start": 119,
 								"end": 126,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 26
-									},
-									"end": {
-										"line": 3,
-										"column": 33
-									}
-								},
 								"left": {
 									"type": "Identifier",
 									"start": 119,
 									"end": 121,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 26
-										},
-										"end": {
-											"line": 3,
-											"column": 28
-										}
-									},
 									"name": "ns"
 								},
 								"right": {
 									"type": "Identifier",
 									"start": 122,
 									"end": 126,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 29
-										},
-										"end": {
-											"line": 3,
-											"column": 33
-										}
-									},
 									"name": "Base"
 								}
 							}
@@ -193,16 +83,6 @@
 						"type": "TSInterfaceBody",
 						"start": 127,
 						"end": 129,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 34
-							},
-							"end": {
-								"line": 3,
-								"column": 36
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -218,30 +98,10 @@
 					"type": "TSInterfaceDeclaration",
 					"start": 170,
 					"end": 206,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 37
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 180,
 						"end": 186,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 11
-							},
-							"end": {
-								"line": 6,
-								"column": 17
-							}
-						},
 						"name": "Nested"
 					},
 					"extends": [
@@ -249,74 +109,24 @@
 							"type": "TSExpressionWithTypeArguments",
 							"start": 195,
 							"end": 203,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 26
-								},
-								"end": {
-									"line": 6,
-									"column": 34
-								}
-							},
 							"expression": {
 								"type": "TSQualifiedName",
 								"start": 195,
 								"end": 203,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 26
-									},
-									"end": {
-										"line": 6,
-										"column": 34
-									}
-								},
 								"left": {
 									"type": "TSQualifiedName",
 									"start": 195,
 									"end": 198,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 26
-										},
-										"end": {
-											"line": 6,
-											"column": 29
-										}
-									},
 									"left": {
 										"type": "Identifier",
 										"start": 195,
 										"end": 196,
-										"loc": {
-											"start": {
-												"line": 6,
-												"column": 26
-											},
-											"end": {
-												"line": 6,
-												"column": 27
-											}
-										},
 										"name": "a"
 									},
 									"right": {
 										"type": "Identifier",
 										"start": 197,
 										"end": 198,
-										"loc": {
-											"start": {
-												"line": 6,
-												"column": 28
-											},
-											"end": {
-												"line": 6,
-												"column": 29
-											}
-										},
 										"name": "b"
 									}
 								},
@@ -324,16 +134,6 @@
 									"type": "Identifier",
 									"start": 199,
 									"end": 203,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 30
-										},
-										"end": {
-											"line": 6,
-											"column": 34
-										}
-									},
 									"name": "Base"
 								}
 							}
@@ -343,16 +143,6 @@
 						"type": "TSInterfaceBody",
 						"start": 204,
 						"end": 206,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 35
-							},
-							"end": {
-								"line": 6,
-								"column": 37
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -368,30 +158,10 @@
 					"type": "ClassDeclaration",
 					"start": 290,
 					"end": 332,
-					"loc": {
-						"start": {
-							"line": 9,
-							"column": 1
-						},
-						"end": {
-							"line": 9,
-							"column": 43
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 296,
 						"end": 306,
-						"loc": {
-							"start": {
-								"line": 9,
-								"column": 7
-							},
-							"end": {
-								"line": 9,
-								"column": 17
-							}
-						},
 						"name": "SingleImpl"
 					},
 					"superClass": null,
@@ -400,60 +170,20 @@
 							"type": "TSExpressionWithTypeArguments",
 							"start": 318,
 							"end": 329,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 29
-								},
-								"end": {
-									"line": 9,
-									"column": 40
-								}
-							},
 							"expression": {
 								"type": "TSQualifiedName",
 								"start": 318,
 								"end": 329,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 29
-									},
-									"end": {
-										"line": 9,
-										"column": 40
-									}
-								},
 								"left": {
 									"type": "Identifier",
 									"start": 318,
 									"end": 320,
-									"loc": {
-										"start": {
-											"line": 9,
-											"column": 29
-										},
-										"end": {
-											"line": 9,
-											"column": 31
-										}
-									},
 									"name": "ns"
 								},
 								"right": {
 									"type": "Identifier",
 									"start": 321,
 									"end": 329,
-									"loc": {
-										"start": {
-											"line": 9,
-											"column": 32
-										},
-										"end": {
-											"line": 9,
-											"column": 40
-										}
-									},
 									"name": "Contract"
 								}
 							}
@@ -463,16 +193,6 @@
 						"type": "ClassBody",
 						"start": 330,
 						"end": 332,
-						"loc": {
-							"start": {
-								"line": 9,
-								"column": 41
-							},
-							"end": {
-								"line": 9,
-								"column": 43
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -488,30 +208,10 @@
 					"type": "ClassDeclaration",
 					"start": 376,
 					"end": 419,
-					"loc": {
-						"start": {
-							"line": 12,
-							"column": 1
-						},
-						"end": {
-							"line": 12,
-							"column": 44
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 382,
 						"end": 392,
-						"loc": {
-							"start": {
-								"line": 12,
-								"column": 7
-							},
-							"end": {
-								"line": 12,
-								"column": 17
-							}
-						},
 						"name": "NestedImpl"
 					},
 					"superClass": null,
@@ -520,74 +220,24 @@
 							"type": "TSExpressionWithTypeArguments",
 							"start": 404,
 							"end": 416,
-							"loc": {
-								"start": {
-									"line": 12,
-									"column": 29
-								},
-								"end": {
-									"line": 12,
-									"column": 41
-								}
-							},
 							"expression": {
 								"type": "TSQualifiedName",
 								"start": 404,
 								"end": 416,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 29
-									},
-									"end": {
-										"line": 12,
-										"column": 41
-									}
-								},
 								"left": {
 									"type": "TSQualifiedName",
 									"start": 404,
 									"end": 407,
-									"loc": {
-										"start": {
-											"line": 12,
-											"column": 29
-										},
-										"end": {
-											"line": 12,
-											"column": 32
-										}
-									},
 									"left": {
 										"type": "Identifier",
 										"start": 404,
 										"end": 405,
-										"loc": {
-											"start": {
-												"line": 12,
-												"column": 29
-											},
-											"end": {
-												"line": 12,
-												"column": 30
-											}
-										},
 										"name": "a"
 									},
 									"right": {
 										"type": "Identifier",
 										"start": 406,
 										"end": 407,
-										"loc": {
-											"start": {
-												"line": 12,
-												"column": 31
-											},
-											"end": {
-												"line": 12,
-												"column": 32
-											}
-										},
 										"name": "b"
 									}
 								},
@@ -595,16 +245,6 @@
 									"type": "Identifier",
 									"start": 408,
 									"end": 416,
-									"loc": {
-										"start": {
-											"line": 12,
-											"column": 33
-										},
-										"end": {
-											"line": 12,
-											"column": 41
-										}
-									},
 									"name": "Contract"
 								}
 							}
@@ -614,16 +254,6 @@
 						"type": "ClassBody",
 						"start": 417,
 						"end": 419,
-						"loc": {
-							"start": {
-								"line": 12,
-								"column": 42
-							},
-							"end": {
-								"line": 12,
-								"column": 44
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -644,18 +274,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

@@ -37,15 +37,6 @@ pub struct Comment {
     // (a parallel comment collection on the language root, or per-element
     // attachment if a richer model is needed).
     pub emit_character_field: bool,
-    /// Public-AST serializer hint (Svelte): bump this comment's JSON `loc`
-    /// columns by one. Set for a comment collected inside a Svelte block
-    /// pattern (`read_pattern`'s synthetic `(pattern = 1)` parse) on the
-    /// pattern's start line when that line is `> 1` — the inserted `(` shifts
-    /// the line's columns right by one, the comment sibling of the
-    /// block-pattern node-`loc` quirk. The `end` column bumps only when the
-    /// comment is single-line (a multiline block comment ends on an unshifted
-    /// later line).
-    pub bump_pattern_columns: bool,
     /// Whether this comment is **bound to the token that follows it**, and so is printed by
     /// the AST node that token begins rather than by the enclosing gap. Set by `tsv_ts`'s
     /// parser; always a **block** comment, and only ever when glued to its token (a comment
@@ -1320,7 +1311,6 @@ mod tests {
             multiline: Comment::content_is_multiline(is_block, content),
             span: Span::new(start, end),
             emit_character_field: false,
-            bump_pattern_columns: false,
             owned_by_node: false,
         }
     }
@@ -1541,7 +1531,6 @@ mod tests {
             multiline: Comment::content_is_multiline(true, content),
             span: Span::new(start as u32, end as u32),
             emit_character_field: false,
-            bump_pattern_columns: false,
             owned_by_node: false,
         }
     }

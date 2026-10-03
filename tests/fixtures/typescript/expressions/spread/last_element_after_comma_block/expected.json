@@ -14,33 +14,13 @@
 			"type": "Line",
 			"value": " after-comma block glued to the last spread element",
 			"start": 10,
-			"end": 63,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 54
-				}
-			}
+			"end": 63
 		},
 		{
 			"type": "Block",
 			"value": " c1 ",
 			"start": 85,
-			"end": 93,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 21
-				},
-				"end": {
-					"line": 3,
-					"column": 29
-				}
-			}
+			"end": 93
 		}
 	],
 	"instance": {
@@ -52,91 +32,31 @@
 			"type": "Program",
 			"start": 8,
 			"end": 96,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 4,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 65,
 					"end": 95,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 31
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 71,
 							"end": 94,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 7
-								},
-								"end": {
-									"line": 3,
-									"column": 30
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 71,
 								"end": 72,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 7
-									},
-									"end": {
-										"line": 3,
-										"column": 8
-									}
-								},
 								"name": "a"
 							},
 							"init": {
 								"type": "ArrayExpression",
 								"start": 75,
 								"end": 94,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 11
-									},
-									"end": {
-										"line": 3,
-										"column": 30
-									}
-								},
 								"elements": [
 									{
 										"type": "Literal",
 										"start": 76,
 										"end": 77,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 12
-											},
-											"end": {
-												"line": 3,
-												"column": 13
-											}
-										},
 										"value": 1,
 										"raw": "1"
 									},
@@ -144,30 +64,10 @@
 										"type": "SpreadElement",
 										"start": 79,
 										"end": 84,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 15
-											},
-											"end": {
-												"line": 3,
-												"column": 20
-											}
-										},
 										"argument": {
 											"type": "Identifier",
 											"start": 82,
 											"end": 84,
-											"loc": {
-												"start": {
-													"line": 3,
-													"column": 18
-												},
-												"end": {
-													"line": 3,
-													"column": 20
-												}
-											},
 											"name": "x1"
 										},
 										"trailingComments": [

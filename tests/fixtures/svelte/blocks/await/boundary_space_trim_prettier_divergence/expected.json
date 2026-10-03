@@ -28,53 +28,19 @@
 					"type": "Identifier",
 					"start": 104,
 					"end": 111,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 8
-						},
-						"end": {
-							"line": 2,
-							"column": 15
-						}
-					},
 					"name": "promise"
 				},
 				"value": {
 					"type": "Identifier",
 					"name": "value",
 					"start": 124,
-					"end": 129,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 28,
-							"character": 124
-						},
-						"end": {
-							"line": 2,
-							"column": 33,
-							"character": 129
-						}
-					}
+					"end": 129
 				},
 				"error": {
 					"type": "Identifier",
 					"name": "error",
 					"start": 143,
-					"end": 148,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 47,
-							"character": 143
-						},
-						"end": {
-							"line": 2,
-							"column": 52,
-							"character": 148
-						}
-					}
+					"end": 148
 				},
 				"pending": {
 					"type": "Fragment",
@@ -128,35 +94,13 @@
 					"type": "Identifier",
 					"start": 172,
 					"end": 179,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 8
-						},
-						"end": {
-							"line": 4,
-							"column": 15
-						}
-					},
 					"name": "promise"
 				},
 				"value": {
 					"type": "Identifier",
 					"name": "value",
 					"start": 192,
-					"end": 197,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 28,
-							"character": 192
-						},
-						"end": {
-							"line": 4,
-							"column": 33,
-							"character": 197
-						}
-					}
+					"end": 197
 				},
 				"error": null,
 				"pending": {
@@ -200,16 +144,6 @@
 					"type": "Identifier",
 					"start": 221,
 					"end": 228,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 8
-						},
-						"end": {
-							"line": 6,
-							"column": 15
-						}
-					},
 					"name": "promise"
 				},
 				"value": null,
@@ -217,19 +151,7 @@
 					"type": "Identifier",
 					"name": "error",
 					"start": 242,
-					"end": 247,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 29,
-							"character": 242
-						},
-						"end": {
-							"line": 6,
-							"column": 34,
-							"character": 247
-						}
-					}
+					"end": 247
 				},
 				"pending": {
 					"type": "Fragment",
@@ -272,35 +194,13 @@
 					"type": "Identifier",
 					"start": 271,
 					"end": 278,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 8
-						},
-						"end": {
-							"line": 8,
-							"column": 15
-						}
-					},
 					"name": "promise"
 				},
 				"value": {
 					"type": "Identifier",
 					"name": "value",
 					"start": 284,
-					"end": 289,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 21,
-							"character": 284
-						},
-						"end": {
-							"line": 8,
-							"column": 26,
-							"character": 289
-						}
-					}
+					"end": 289
 				},
 				"error": null,
 				"pending": null,

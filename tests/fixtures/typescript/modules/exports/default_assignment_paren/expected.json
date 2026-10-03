@@ -14,33 +14,13 @@
 			"type": "Line",
 			"value": " An assignment as the exported value takes clarity parens, like any other value",
 			"start": 20,
-			"end": 101,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 82
-				}
-			}
+			"end": 101
 		},
 		{
 			"type": "Line",
 			"value": " position — the leftmost-token rule is a separate reason for a separate pair.",
 			"start": 103,
-			"end": 182,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 80
-				}
-			}
+			"end": 182
 		}
 	],
 	"instance": {
@@ -52,77 +32,27 @@
 			"type": "Program",
 			"start": 18,
 			"end": 208,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 5,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExportDefaultDeclaration",
 					"start": 184,
 					"end": 207,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 24
-						}
-					},
 					"exportKind": "value",
 					"declaration": {
 						"type": "AssignmentExpression",
 						"start": 200,
 						"end": 205,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 17
-							},
-							"end": {
-								"line": 4,
-								"column": 22
-							}
-						},
 						"operator": "=",
 						"left": {
 							"type": "Identifier",
 							"start": 200,
 							"end": 201,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 17
-								},
-								"end": {
-									"line": 4,
-									"column": 18
-								}
-							},
 							"name": "x"
 						},
 						"right": {
 							"type": "Identifier",
 							"start": 204,
 							"end": 205,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 21
-								},
-								"end": {
-									"line": 4,
-									"column": 22
-								}
-							},
 							"name": "y"
 						}
 					},
@@ -150,18 +80,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

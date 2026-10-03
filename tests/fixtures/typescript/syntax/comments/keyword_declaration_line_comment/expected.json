@@ -14,33 +14,13 @@
 			"type": "Line",
 			"value": " function keyword to name — block comment stays inline (both formatters)",
 			"start": 20,
-			"end": 94,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 75
-				}
-			}
+			"end": 94
 		},
 		{
 			"type": "Block",
 			"value": " c2 ",
 			"start": 105,
-			"end": 113,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 10
-				},
-				"end": {
-					"line": 3,
-					"column": 18
-				}
-			}
+			"end": 113
 		}
 	],
 	"instance": {
@@ -52,45 +32,15 @@
 			"type": "Program",
 			"start": 18,
 			"end": 122,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 4,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "FunctionDeclaration",
 					"start": 96,
 					"end": 121,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 26
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 114,
 						"end": 116,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 19
-							},
-							"end": {
-								"line": 3,
-								"column": 21
-							}
-						},
 						"name": "f2",
 						"leadingComments": [
 							{
@@ -109,16 +59,6 @@
 						"type": "BlockStatement",
 						"start": 119,
 						"end": 121,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 24
-							},
-							"end": {
-								"line": 3,
-								"column": 26
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -139,18 +79,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

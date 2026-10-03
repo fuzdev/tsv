@@ -14,49 +14,19 @@
 			"type": "Line",
 			"value": " Comment authored at the start of a method body stays there",
 			"start": 20,
-			"end": 81,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 62
-				}
-			}
+			"end": 81
 		},
 		{
 			"type": "Line",
 			"value": " comment",
 			"start": 105,
-			"end": 115,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 3
-				},
-				"end": {
-					"line": 5,
-					"column": 13
-				}
-			}
+			"end": 115
 		},
 		{
 			"type": "Line",
 			"value": " comment",
 			"start": 164,
-			"end": 174,
-			"loc": {
-				"start": {
-					"line": 12,
-					"column": 3
-				},
-				"end": {
-					"line": 12,
-					"column": 13
-				}
-			}
+			"end": 174
 		}
 	],
 	"instance": {
@@ -68,45 +38,15 @@
 			"type": "Program",
 			"start": 18,
 			"end": 196,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 16,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ClassDeclaration",
 					"start": 83,
 					"end": 135,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 89,
 						"end": 90,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 7
-							},
-							"end": {
-								"line": 3,
-								"column": 8
-							}
-						},
 						"name": "A"
 					},
 					"superClass": null,
@@ -114,47 +54,17 @@
 						"type": "ClassBody",
 						"start": 91,
 						"end": 135,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 9
-							},
-							"end": {
-								"line": 8,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "MethodDefinition",
 								"start": 95,
 								"end": 132,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 2
-									},
-									"end": {
-										"line": 7,
-										"column": 3
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
 									"start": 95,
 									"end": 97,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 2
-										},
-										"end": {
-											"line": 4,
-											"column": 4
-										}
-									},
 									"name": "fn"
 								},
 								"kind": "method",
@@ -162,16 +72,6 @@
 									"type": "FunctionExpression",
 									"start": 97,
 									"end": 132,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 4
-										},
-										"end": {
-											"line": 7,
-											"column": 3
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -181,45 +81,15 @@
 										"type": "BlockStatement",
 										"start": 100,
 										"end": 132,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 7
-											},
-											"end": {
-												"line": 7,
-												"column": 3
-											}
-										},
 										"body": [
 											{
 												"type": "ReturnStatement",
 												"start": 119,
 												"end": 128,
-												"loc": {
-													"start": {
-														"line": 6,
-														"column": 3
-													},
-													"end": {
-														"line": 6,
-														"column": 12
-													}
-												},
 												"argument": {
 													"type": "Literal",
 													"start": 126,
 													"end": 127,
-													"loc": {
-														"start": {
-															"line": 6,
-															"column": 10
-														},
-														"end": {
-															"line": 6,
-															"column": 11
-														}
-													},
 													"value": 1,
 													"raw": "1"
 												},
@@ -251,76 +121,26 @@
 					"type": "VariableDeclaration",
 					"start": 138,
 					"end": 195,
-					"loc": {
-						"start": {
-							"line": 10,
-							"column": 1
-						},
-						"end": {
-							"line": 15,
-							"column": 3
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 144,
 							"end": 194,
-							"loc": {
-								"start": {
-									"line": 10,
-									"column": 7
-								},
-								"end": {
-									"line": 15,
-									"column": 2
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 144,
 								"end": 147,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 7
-									},
-									"end": {
-										"line": 10,
-										"column": 10
-									}
-								},
 								"name": "obj"
 							},
 							"init": {
 								"type": "ObjectExpression",
 								"start": 150,
 								"end": 194,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 13
-									},
-									"end": {
-										"line": 15,
-										"column": 2
-									}
-								},
 								"properties": [
 									{
 										"type": "Property",
 										"start": 154,
 										"end": 191,
-										"loc": {
-											"start": {
-												"line": 11,
-												"column": 2
-											},
-											"end": {
-												"line": 14,
-												"column": 3
-											}
-										},
 										"method": true,
 										"shorthand": false,
 										"computed": false,
@@ -328,32 +148,12 @@
 											"type": "Identifier",
 											"start": 154,
 											"end": 156,
-											"loc": {
-												"start": {
-													"line": 11,
-													"column": 2
-												},
-												"end": {
-													"line": 11,
-													"column": 4
-												}
-											},
 											"name": "fn"
 										},
 										"value": {
 											"type": "FunctionExpression",
 											"start": 156,
 											"end": 191,
-											"loc": {
-												"start": {
-													"line": 11,
-													"column": 4
-												},
-												"end": {
-													"line": 14,
-													"column": 3
-												}
-											},
 											"id": null,
 											"expression": false,
 											"generator": false,
@@ -363,45 +163,15 @@
 												"type": "BlockStatement",
 												"start": 159,
 												"end": 191,
-												"loc": {
-													"start": {
-														"line": 11,
-														"column": 7
-													},
-													"end": {
-														"line": 14,
-														"column": 3
-													}
-												},
 												"body": [
 													{
 														"type": "ReturnStatement",
 														"start": 178,
 														"end": 187,
-														"loc": {
-															"start": {
-																"line": 13,
-																"column": 3
-															},
-															"end": {
-																"line": 13,
-																"column": 12
-															}
-														},
 														"argument": {
 															"type": "Literal",
 															"start": 185,
 															"end": 186,
-															"loc": {
-																"start": {
-																	"line": 13,
-																	"column": 10
-																},
-																"end": {
-																	"line": 13,
-																	"column": 11
-																}
-															},
 															"value": 1,
 															"raw": "1"
 														},
@@ -434,18 +204,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

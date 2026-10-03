@@ -14,225 +14,85 @@
 			"type": "Line",
 			"value": " A block glued to the next declarator leads it, even when a line comment shares the gap.",
 			"start": 10,
-			"end": 100,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 91
-				}
-			}
+			"end": 100
 		},
 		{
 			"type": "Line",
 			"value": " line",
 			"start": 114,
-			"end": 121,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 13
-				},
-				"end": {
-					"line": 3,
-					"column": 20
-				}
-			}
+			"end": 121
 		},
 		{
 			"type": "Block",
 			"value": " block ",
 			"start": 124,
-			"end": 135,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 2
-				},
-				"end": {
-					"line": 4,
-					"column": 13
-				}
-			}
+			"end": 135
 		},
 		{
 			"type": "Line",
 			"value": " Blocks glued to each other but not to the declarator stay together on their own line.",
 			"start": 146,
-			"end": 234,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 1
-				},
-				"end": {
-					"line": 6,
-					"column": 89
-				}
-			}
+			"end": 234
 		},
 		{
 			"type": "Block",
 			"value": " block1 ",
 			"start": 250,
-			"end": 262,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 2
-				},
-				"end": {
-					"line": 8,
-					"column": 14
-				}
-			}
+			"end": 262
 		},
 		{
 			"type": "Block",
 			"value": " block2 ",
 			"start": 263,
-			"end": 275,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 15
-				},
-				"end": {
-					"line": 8,
-					"column": 27
-				}
-			}
+			"end": 275
 		},
 		{
 			"type": "Line",
 			"value": " A glued pair after a line comment stays glued.",
 			"start": 288,
-			"end": 337,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 1
-				},
-				"end": {
-					"line": 11,
-					"column": 50
-				}
-			}
+			"end": 337
 		},
 		{
 			"type": "Line",
 			"value": " line",
 			"start": 351,
-			"end": 358,
-			"loc": {
-				"start": {
-					"line": 12,
-					"column": 13
-				},
-				"end": {
-					"line": 12,
-					"column": 20
-				}
-			}
+			"end": 358
 		},
 		{
 			"type": "Block",
 			"value": " block1 ",
 			"start": 361,
-			"end": 373,
-			"loc": {
-				"start": {
-					"line": 13,
-					"column": 2
-				},
-				"end": {
-					"line": 13,
-					"column": 14
-				}
-			}
+			"end": 373
 		},
 		{
 			"type": "Block",
 			"value": " block2 ",
 			"start": 374,
-			"end": 386,
-			"loc": {
-				"start": {
-					"line": 13,
-					"column": 15
-				},
-				"end": {
-					"line": 13,
-					"column": 27
-				}
-			}
+			"end": 386
 		},
 		{
 			"type": "Line",
 			"value": " Blocks the author put on separate lines keep them.",
 			"start": 399,
-			"end": 452,
-			"loc": {
-				"start": {
-					"line": 16,
-					"column": 1
-				},
-				"end": {
-					"line": 16,
-					"column": 54
-				}
-			}
+			"end": 452
 		},
 		{
 			"type": "Line",
 			"value": " line",
 			"start": 466,
-			"end": 473,
-			"loc": {
-				"start": {
-					"line": 17,
-					"column": 13
-				},
-				"end": {
-					"line": 17,
-					"column": 20
-				}
-			}
+			"end": 473
 		},
 		{
 			"type": "Block",
 			"value": " block1 ",
 			"start": 476,
-			"end": 488,
-			"loc": {
-				"start": {
-					"line": 18,
-					"column": 2
-				},
-				"end": {
-					"line": 18,
-					"column": 14
-				}
-			}
+			"end": 488
 		},
 		{
 			"type": "Block",
 			"value": " block2 ",
 			"start": 491,
-			"end": 503,
-			"loc": {
-				"start": {
-					"line": 19,
-					"column": 2
-				},
-				"end": {
-					"line": 19,
-					"column": 14
-				}
-			}
+			"end": 503
 		}
 	],
 	"instance": {
@@ -244,76 +104,26 @@
 			"type": "Program",
 			"start": 8,
 			"end": 514,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 21,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 102,
 					"end": 143,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 21
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 106,
 							"end": 112,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 5
-								},
-								"end": {
-									"line": 3,
-									"column": 11
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 106,
 								"end": 108,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 5
-									},
-									"end": {
-										"line": 3,
-										"column": 7
-									}
-								},
 								"name": "a1"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 111,
 								"end": 112,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 10
-									},
-									"end": {
-										"line": 3,
-										"column": 11
-									}
-								},
 								"value": 1,
 								"raw": "1"
 							},
@@ -330,46 +140,16 @@
 							"type": "VariableDeclarator",
 							"start": 136,
 							"end": 142,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 14
-								},
-								"end": {
-									"line": 4,
-									"column": 20
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 136,
 								"end": 138,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 14
-									},
-									"end": {
-										"line": 4,
-										"column": 16
-									}
-								},
 								"name": "b1"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 141,
 								"end": 142,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 19
-									},
-									"end": {
-										"line": 4,
-										"column": 20
-									}
-								},
 								"value": 2,
 								"raw": "2"
 							},
@@ -397,61 +177,21 @@
 					"type": "VariableDeclaration",
 					"start": 236,
 					"end": 285,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 1
-						},
-						"end": {
-							"line": 9,
-							"column": 9
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 240,
 							"end": 246,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 5
-								},
-								"end": {
-									"line": 7,
-									"column": 11
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 240,
 								"end": 242,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 5
-									},
-									"end": {
-										"line": 7,
-										"column": 7
-									}
-								},
 								"name": "a2"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 245,
 								"end": 246,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 10
-									},
-									"end": {
-										"line": 7,
-										"column": 11
-									}
-								},
 								"value": 1,
 								"raw": "1"
 							}
@@ -460,46 +200,16 @@
 							"type": "VariableDeclarator",
 							"start": 278,
 							"end": 284,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 2
-								},
-								"end": {
-									"line": 9,
-									"column": 8
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 278,
 								"end": 280,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 2
-									},
-									"end": {
-										"line": 9,
-										"column": 4
-									}
-								},
 								"name": "b2"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 283,
 								"end": 284,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 7
-									},
-									"end": {
-										"line": 9,
-										"column": 8
-									}
-								},
 								"value": 2,
 								"raw": "2"
 							},
@@ -533,61 +243,21 @@
 					"type": "VariableDeclaration",
 					"start": 339,
 					"end": 396,
-					"loc": {
-						"start": {
-							"line": 12,
-							"column": 1
-						},
-						"end": {
-							"line": 14,
-							"column": 9
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 343,
 							"end": 349,
-							"loc": {
-								"start": {
-									"line": 12,
-									"column": 5
-								},
-								"end": {
-									"line": 12,
-									"column": 11
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 343,
 								"end": 345,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 5
-									},
-									"end": {
-										"line": 12,
-										"column": 7
-									}
-								},
 								"name": "a3"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 348,
 								"end": 349,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 10
-									},
-									"end": {
-										"line": 12,
-										"column": 11
-									}
-								},
 								"value": 1,
 								"raw": "1"
 							},
@@ -604,46 +274,16 @@
 							"type": "VariableDeclarator",
 							"start": 389,
 							"end": 395,
-							"loc": {
-								"start": {
-									"line": 14,
-									"column": 2
-								},
-								"end": {
-									"line": 14,
-									"column": 8
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 389,
 								"end": 391,
-								"loc": {
-									"start": {
-										"line": 14,
-										"column": 2
-									},
-									"end": {
-										"line": 14,
-										"column": 4
-									}
-								},
 								"name": "b3"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 394,
 								"end": 395,
-								"loc": {
-									"start": {
-										"line": 14,
-										"column": 7
-									},
-									"end": {
-										"line": 14,
-										"column": 8
-									}
-								},
 								"value": 2,
 								"raw": "2"
 							},
@@ -677,61 +317,21 @@
 					"type": "VariableDeclaration",
 					"start": 454,
 					"end": 513,
-					"loc": {
-						"start": {
-							"line": 17,
-							"column": 1
-						},
-						"end": {
-							"line": 20,
-							"column": 9
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 458,
 							"end": 464,
-							"loc": {
-								"start": {
-									"line": 17,
-									"column": 5
-								},
-								"end": {
-									"line": 17,
-									"column": 11
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 458,
 								"end": 460,
-								"loc": {
-									"start": {
-										"line": 17,
-										"column": 5
-									},
-									"end": {
-										"line": 17,
-										"column": 7
-									}
-								},
 								"name": "a4"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 463,
 								"end": 464,
-								"loc": {
-									"start": {
-										"line": 17,
-										"column": 10
-									},
-									"end": {
-										"line": 17,
-										"column": 11
-									}
-								},
 								"value": 1,
 								"raw": "1"
 							},
@@ -748,46 +348,16 @@
 							"type": "VariableDeclarator",
 							"start": 506,
 							"end": 512,
-							"loc": {
-								"start": {
-									"line": 20,
-									"column": 2
-								},
-								"end": {
-									"line": 20,
-									"column": 8
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 506,
 								"end": 508,
-								"loc": {
-									"start": {
-										"line": 20,
-										"column": 2
-									},
-									"end": {
-										"line": 20,
-										"column": 4
-									}
-								},
 								"name": "b4"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 511,
 								"end": 512,
-								"loc": {
-									"start": {
-										"line": 20,
-										"column": 7
-									},
-									"end": {
-										"line": 20,
-										"column": 8
-									}
-								},
 								"value": 2,
 								"raw": "2"
 							},

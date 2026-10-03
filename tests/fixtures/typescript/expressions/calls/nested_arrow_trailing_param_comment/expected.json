@@ -14,33 +14,13 @@
 			"type": "Line",
 			"value": " comment",
 			"start": 41,
-			"end": 51,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 13
-				},
-				"end": {
-					"line": 4,
-					"column": 23
-				}
-			}
+			"end": 51
 		},
 		{
 			"type": "Line",
 			"value": " comment",
 			"start": 78,
-			"end": 88,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 14
-				},
-				"end": {
-					"line": 7,
-					"column": 24
-				}
-			}
+			"end": 88
 		}
 	],
 	"instance": {
@@ -52,59 +32,19 @@
 			"type": "Program",
 			"start": 18,
 			"end": 104,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 10,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
 					"start": 20,
 					"end": 103,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 9,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 20,
 						"end": 102,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 1
-							},
-							"end": {
-								"line": 9,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 20,
 							"end": 22,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 1
-								},
-								"end": {
-									"line": 2,
-									"column": 3
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -112,16 +52,6 @@
 								"type": "ArrowFunctionExpression",
 								"start": 26,
 								"end": 99,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 2
-									},
-									"end": {
-										"line": 8,
-										"column": 10
-									}
-								},
 								"id": null,
 								"expression": true,
 								"generator": false,
@@ -131,45 +61,15 @@
 										"type": "Identifier",
 										"start": 31,
 										"end": 40,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 3
-											},
-											"end": {
-												"line": 4,
-												"column": 12
-											}
-										},
 										"name": "a",
 										"typeAnnotation": {
 											"type": "TSTypeAnnotation",
 											"start": 32,
 											"end": 40,
-											"loc": {
-												"start": {
-													"line": 4,
-													"column": 4
-												},
-												"end": {
-													"line": 4,
-													"column": 12
-												}
-											},
 											"typeAnnotation": {
 												"type": "TSStringKeyword",
 												"start": 34,
-												"end": 40,
-												"loc": {
-													"start": {
-														"line": 4,
-														"column": 6
-													},
-													"end": {
-														"line": 4,
-														"column": 12
-													}
-												}
+												"end": 40
 											}
 										},
 										"trailingComments": [
@@ -186,16 +86,6 @@
 									"type": "ArrowFunctionExpression",
 									"start": 62,
 									"end": 99,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 3
-										},
-										"end": {
-											"line": 8,
-											"column": 10
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -205,45 +95,15 @@
 											"type": "Identifier",
 											"start": 68,
 											"end": 77,
-											"loc": {
-												"start": {
-													"line": 7,
-													"column": 4
-												},
-												"end": {
-													"line": 7,
-													"column": 13
-												}
-											},
 											"name": "b",
 											"typeAnnotation": {
 												"type": "TSTypeAnnotation",
 												"start": 69,
 												"end": 77,
-												"loc": {
-													"start": {
-														"line": 7,
-														"column": 5
-													},
-													"end": {
-														"line": 7,
-														"column": 13
-													}
-												},
 												"typeAnnotation": {
 													"type": "TSNumberKeyword",
 													"start": 71,
-													"end": 77,
-													"loc": {
-														"start": {
-															"line": 7,
-															"column": 7
-														},
-														"end": {
-															"line": 7,
-															"column": 13
-														}
-													}
+													"end": 77
 												}
 											},
 											"trailingComments": [
@@ -260,16 +120,6 @@
 										"type": "BlockStatement",
 										"start": 97,
 										"end": 99,
-										"loc": {
-											"start": {
-												"line": 8,
-												"column": 8
-											},
-											"end": {
-												"line": 8,
-												"column": 10
-											}
-										},
 										"body": []
 									}
 								}
@@ -287,18 +137,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

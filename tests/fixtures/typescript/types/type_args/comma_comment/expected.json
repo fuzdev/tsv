@@ -14,113 +14,43 @@
 			"type": "Line",
 			"value": " Inline block comment after comma (leading on next type argument)",
 			"start": 20,
-			"end": 87,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 68
-				}
-			}
+			"end": 87
 		},
 		{
 			"type": "Block",
 			"value": " c ",
 			"start": 110,
-			"end": 117,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 22
-				},
-				"end": {
-					"line": 3,
-					"column": 29
-				}
-			}
+			"end": 117
 		},
 		{
 			"type": "Line",
 			"value": " Inline block comment before comma (trailing on current type argument)",
 			"start": 129,
-			"end": 201,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 1
-				},
-				"end": {
-					"line": 5,
-					"column": 73
-				}
-			}
+			"end": 201
 		},
 		{
 			"type": "Block",
 			"value": " c ",
 			"start": 223,
-			"end": 230,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 21
-				},
-				"end": {
-					"line": 6,
-					"column": 28
-				}
-			}
+			"end": 230
 		},
 		{
 			"type": "Line",
 			"value": " Both trailing and leading comments around comma",
 			"start": 243,
-			"end": 293,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 1
-				},
-				"end": {
-					"line": 8,
-					"column": 51
-				}
-			}
+			"end": 293
 		},
 		{
 			"type": "Block",
 			"value": " c1 ",
 			"start": 315,
-			"end": 323,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 21
-				},
-				"end": {
-					"line": 9,
-					"column": 29
-				}
-			}
+			"end": 323
 		},
 		{
 			"type": "Block",
 			"value": " c2 ",
 			"start": 325,
-			"end": 333,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 31
-				},
-				"end": {
-					"line": 9,
-					"column": 39
-				}
-			}
+			"end": 333
 		}
 	],
 	"instance": {
@@ -132,106 +62,36 @@
 			"type": "Program",
 			"start": 18,
 			"end": 343,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 10,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 89,
 					"end": 126,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 38
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 94,
 						"end": 95,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 6
-							},
-							"end": {
-								"line": 3,
-								"column": 7
-							}
-						},
 						"name": "A"
 					},
 					"typeAnnotation": {
 						"type": "TSTypeReference",
 						"start": 98,
 						"end": 125,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 10
-							},
-							"end": {
-								"line": 3,
-								"column": 37
-							}
-						},
 						"typeName": {
 							"type": "Identifier",
 							"start": 98,
 							"end": 101,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 10
-								},
-								"end": {
-									"line": 3,
-									"column": 13
-								}
-							},
 							"name": "Map"
 						},
 						"typeArguments": {
 							"type": "TSTypeParameterInstantiation",
 							"start": 101,
 							"end": 125,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 13
-								},
-								"end": {
-									"line": 3,
-									"column": 37
-								}
-							},
 							"params": [
 								{
 									"type": "TSStringKeyword",
 									"start": 102,
 									"end": 108,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 14
-										},
-										"end": {
-											"line": 3,
-											"column": 20
-										}
-									},
 									"trailingComments": [
 										{
 											"type": "Block",
@@ -244,17 +104,7 @@
 								{
 									"type": "TSNumberKeyword",
 									"start": 118,
-									"end": 124,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 30
-										},
-										"end": {
-											"line": 3,
-											"column": 36
-										}
-									}
+									"end": 124
 								}
 							]
 						}
@@ -272,91 +122,31 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 203,
 					"end": 240,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 38
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 208,
 						"end": 209,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 6
-							},
-							"end": {
-								"line": 6,
-								"column": 7
-							}
-						},
 						"name": "B"
 					},
 					"typeAnnotation": {
 						"type": "TSTypeReference",
 						"start": 212,
 						"end": 239,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 10
-							},
-							"end": {
-								"line": 6,
-								"column": 37
-							}
-						},
 						"typeName": {
 							"type": "Identifier",
 							"start": 212,
 							"end": 215,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 10
-								},
-								"end": {
-									"line": 6,
-									"column": 13
-								}
-							},
 							"name": "Map"
 						},
 						"typeArguments": {
 							"type": "TSTypeParameterInstantiation",
 							"start": 215,
 							"end": 239,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 13
-								},
-								"end": {
-									"line": 6,
-									"column": 37
-								}
-							},
 							"params": [
 								{
 									"type": "TSStringKeyword",
 									"start": 216,
 									"end": 222,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 14
-										},
-										"end": {
-											"line": 6,
-											"column": 20
-										}
-									},
 									"trailingComments": [
 										{
 											"type": "Block",
@@ -369,17 +159,7 @@
 								{
 									"type": "TSNumberKeyword",
 									"start": 232,
-									"end": 238,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 30
-										},
-										"end": {
-											"line": 6,
-											"column": 36
-										}
-									}
+									"end": 238
 								}
 							]
 						}
@@ -397,91 +177,31 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 295,
 					"end": 342,
-					"loc": {
-						"start": {
-							"line": 9,
-							"column": 1
-						},
-						"end": {
-							"line": 9,
-							"column": 48
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 300,
 						"end": 301,
-						"loc": {
-							"start": {
-								"line": 9,
-								"column": 6
-							},
-							"end": {
-								"line": 9,
-								"column": 7
-							}
-						},
 						"name": "C"
 					},
 					"typeAnnotation": {
 						"type": "TSTypeReference",
 						"start": 304,
 						"end": 341,
-						"loc": {
-							"start": {
-								"line": 9,
-								"column": 10
-							},
-							"end": {
-								"line": 9,
-								"column": 47
-							}
-						},
 						"typeName": {
 							"type": "Identifier",
 							"start": 304,
 							"end": 307,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 10
-								},
-								"end": {
-									"line": 9,
-									"column": 13
-								}
-							},
 							"name": "Map"
 						},
 						"typeArguments": {
 							"type": "TSTypeParameterInstantiation",
 							"start": 307,
 							"end": 341,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 13
-								},
-								"end": {
-									"line": 9,
-									"column": 47
-								}
-							},
 							"params": [
 								{
 									"type": "TSStringKeyword",
 									"start": 308,
 									"end": 314,
-									"loc": {
-										"start": {
-											"line": 9,
-											"column": 14
-										},
-										"end": {
-											"line": 9,
-											"column": 20
-										}
-									},
 									"trailingComments": [
 										{
 											"type": "Block",
@@ -495,16 +215,6 @@
 									"type": "TSNumberKeyword",
 									"start": 334,
 									"end": 340,
-									"loc": {
-										"start": {
-											"line": 9,
-											"column": 40
-										},
-										"end": {
-											"line": 9,
-											"column": 46
-										}
-									},
 									"leadingComments": [
 										{
 											"type": "Block",
@@ -535,18 +245,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

@@ -14,49 +14,19 @@
 			"type": "Line",
 			"value": " a word tsc reads as a declaration head keeps its pair ahead of a cast",
 			"start": 20,
-			"end": 92,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 73
-				}
-			}
+			"end": 92
 		},
 		{
 			"type": "Line",
 			"value": " a modifier tsc reads ahead of a declaration keeps its pair too",
 			"start": 140,
-			"end": 205,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 1
-				},
-				"end": {
-					"line": 6,
-					"column": 66
-				}
-			}
+			"end": 205
 		},
 		{
 			"type": "Line",
 			"value": " a `for` init opens a `using` declaration the same way",
 			"start": 251,
-			"end": 307,
-			"loc": {
-				"start": {
-					"line": 10,
-					"column": 1
-				},
-				"end": {
-					"line": 10,
-					"column": 57
-				}
-			}
+			"end": 307
 		}
 	],
 	"instance": {
@@ -68,89 +38,29 @@
 			"type": "Program",
 			"start": 18,
 			"end": 334,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 12,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
 					"start": 94,
 					"end": 111,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 18
-						}
-					},
 					"expression": {
 						"type": "TSAsExpression",
 						"start": 94,
 						"end": 110,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 1
-							},
-							"end": {
-								"line": 3,
-								"column": 17
-							}
-						},
 						"expression": {
 							"type": "Identifier",
 							"start": 95,
 							"end": 104,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 2
-								},
-								"end": {
-									"line": 3,
-									"column": 11
-								}
-							},
 							"name": "namespace"
 						},
 						"typeAnnotation": {
 							"type": "TSTypeReference",
 							"start": 109,
 							"end": 110,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 16
-								},
-								"end": {
-									"line": 3,
-									"column": 17
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 109,
 								"end": 110,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 16
-									},
-									"end": {
-										"line": 3,
-										"column": 17
-									}
-								},
 								"name": "T"
 							}
 						}
@@ -168,74 +78,24 @@
 					"type": "ExpressionStatement",
 					"start": 113,
 					"end": 137,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 25
-						}
-					},
 					"expression": {
 						"type": "TSSatisfiesExpression",
 						"start": 113,
 						"end": 136,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 1
-							},
-							"end": {
-								"line": 4,
-								"column": 24
-							}
-						},
 						"expression": {
 							"type": "Identifier",
 							"start": 114,
 							"end": 123,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 2
-								},
-								"end": {
-									"line": 4,
-									"column": 11
-								}
-							},
 							"name": "namespace"
 						},
 						"typeAnnotation": {
 							"type": "TSTypeReference",
 							"start": 135,
 							"end": 136,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 23
-								},
-								"end": {
-									"line": 4,
-									"column": 24
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 135,
 								"end": 136,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 23
-									},
-									"end": {
-										"line": 4,
-										"column": 24
-									}
-								},
 								"name": "T"
 							}
 						}
@@ -245,74 +105,24 @@
 					"type": "ExpressionStatement",
 					"start": 207,
 					"end": 223,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 1
-						},
-						"end": {
-							"line": 7,
-							"column": 17
-						}
-					},
 					"expression": {
 						"type": "TSAsExpression",
 						"start": 207,
 						"end": 222,
-						"loc": {
-							"start": {
-								"line": 7,
-								"column": 1
-							},
-							"end": {
-								"line": 7,
-								"column": 16
-							}
-						},
 						"expression": {
 							"type": "Identifier",
 							"start": 208,
 							"end": 216,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 2
-								},
-								"end": {
-									"line": 7,
-									"column": 10
-								}
-							},
 							"name": "accessor"
 						},
 						"typeAnnotation": {
 							"type": "TSTypeReference",
 							"start": 221,
 							"end": 222,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 15
-								},
-								"end": {
-									"line": 7,
-									"column": 16
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 221,
 								"end": 222,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 15
-									},
-									"end": {
-										"line": 7,
-										"column": 16
-									}
-								},
 								"name": "T"
 							}
 						}
@@ -330,74 +140,24 @@
 					"type": "ExpressionStatement",
 					"start": 225,
 					"end": 248,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 24
-						}
-					},
 					"expression": {
 						"type": "TSSatisfiesExpression",
 						"start": 225,
 						"end": 247,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 1
-							},
-							"end": {
-								"line": 8,
-								"column": 23
-							}
-						},
 						"expression": {
 							"type": "Identifier",
 							"start": 226,
 							"end": 234,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 2
-								},
-								"end": {
-									"line": 8,
-									"column": 10
-								}
-							},
 							"name": "readonly"
 						},
 						"typeAnnotation": {
 							"type": "TSTypeReference",
 							"start": 246,
 							"end": 247,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 22
-								},
-								"end": {
-									"line": 8,
-									"column": 23
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 246,
 								"end": 247,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 22
-									},
-									"end": {
-										"line": 8,
-										"column": 23
-									}
-								},
 								"name": "T"
 							}
 						}
@@ -407,74 +167,24 @@
 					"type": "ForStatement",
 					"start": 309,
 					"end": 333,
-					"loc": {
-						"start": {
-							"line": 11,
-							"column": 1
-						},
-						"end": {
-							"line": 11,
-							"column": 25
-						}
-					},
 					"init": {
 						"type": "TSAsExpression",
 						"start": 314,
 						"end": 326,
-						"loc": {
-							"start": {
-								"line": 11,
-								"column": 6
-							},
-							"end": {
-								"line": 11,
-								"column": 18
-							}
-						},
 						"expression": {
 							"type": "Identifier",
 							"start": 315,
 							"end": 320,
-							"loc": {
-								"start": {
-									"line": 11,
-									"column": 7
-								},
-								"end": {
-									"line": 11,
-									"column": 12
-								}
-							},
 							"name": "using"
 						},
 						"typeAnnotation": {
 							"type": "TSTypeReference",
 							"start": 325,
 							"end": 326,
-							"loc": {
-								"start": {
-									"line": 11,
-									"column": 17
-								},
-								"end": {
-									"line": 11,
-									"column": 18
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 325,
 								"end": 326,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 17
-									},
-									"end": {
-										"line": 11,
-										"column": 18
-									}
-								},
 								"name": "T"
 							}
 						}
@@ -485,16 +195,6 @@
 						"type": "BlockStatement",
 						"start": 331,
 						"end": 333,
-						"loc": {
-							"start": {
-								"line": 11,
-								"column": 23
-							},
-							"end": {
-								"line": 11,
-								"column": 25
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -515,18 +215,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

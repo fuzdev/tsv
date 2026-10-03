@@ -16,16 +16,6 @@
 						"type": "Identifier",
 						"start": 8,
 						"end": 9,
-						"loc": {
-							"start": {
-								"line": 1,
-								"column": 8
-							},
-							"end": {
-								"line": 1,
-								"column": 9
-							}
-						},
 						"name": "a",
 						"trailingComments": [
 							{
@@ -40,16 +30,6 @@
 						"type": "Identifier",
 						"start": 19,
 						"end": 20,
-						"loc": {
-							"start": {
-								"line": 1,
-								"column": 19
-							},
-							"end": {
-								"line": 1,
-								"column": 20
-							}
-						},
 						"name": "b"
 					}
 				]
@@ -70,16 +50,6 @@
 						"type": "Identifier",
 						"start": 31,
 						"end": 32,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 8
-							},
-							"end": {
-								"line": 3,
-								"column": 9
-							}
-						},
 						"name": "x",
 						"trailingComments": [
 							{
@@ -94,16 +64,6 @@
 						"type": "Identifier",
 						"start": 42,
 						"end": 43,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 19
-							},
-							"end": {
-								"line": 3,
-								"column": 20
-							}
-						},
 						"name": "y"
 					}
 				]
@@ -124,32 +84,12 @@
 						"type": "Identifier",
 						"start": 62,
 						"end": 63,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 16
-							},
-							"end": {
-								"line": 5,
-								"column": 17
-							}
-						},
 						"name": "m"
 					},
 					{
 						"type": "Identifier",
 						"start": 65,
 						"end": 66,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 19
-							},
-							"end": {
-								"line": 5,
-								"column": 20
-							}
-						},
 						"name": "n"
 					}
 				]
@@ -162,49 +102,19 @@
 			"type": "Block",
 			"value": " c ",
 			"start": 11,
-			"end": 18,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 11
-				},
-				"end": {
-					"line": 1,
-					"column": 18
-				}
-			}
+			"end": 18
 		},
 		{
 			"type": "Block",
 			"value": " t ",
 			"start": 33,
-			"end": 40,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 10
-				},
-				"end": {
-					"line": 3,
-					"column": 17
-				}
-			}
+			"end": 40
 		},
 		{
 			"type": "Block",
 			"value": " l ",
 			"start": 54,
-			"end": 61,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 8
-				},
-				"end": {
-					"line": 5,
-					"column": 15
-				}
-			}
+			"end": 61
 		}
 	]
 }

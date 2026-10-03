@@ -12,18 +12,6 @@
 				"start": 0,
 				"end": 63,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 4,
-						"character": 4
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -33,18 +21,6 @@
 							"start": 5,
 							"end": 57,
 							"name": "code",
-							"name_loc": {
-								"start": {
-									"line": 1,
-									"column": 6,
-									"character": 6
-								},
-								"end": {
-									"line": 1,
-									"column": 10,
-									"character": 10
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",

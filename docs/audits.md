@@ -28,6 +28,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Engine parity](#engine-parity-audit-enginesaudit) | `engines:audit` | the WASM engine and the native engine formatting the same file to DIFFERENT bytes — a wasm32-only divergence every other gate is blind to, since they all grade the native build | CI's `artifacts` job ONLY (needs both packages built; NOT in `deno task check`, and not on the publish path either — `scripts/publish.ts` runs `validate:artifacts` and `test:npm`, neither of which compares engines) |
 | [Doc link](#doc-link-audit-docsaudit) | `docs:audit` | a doc-comment `[link]` that no longer resolves — a stale doc | `deno task check` |
 | [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts` no longer describing what the wire-JSON writers emit — plus a wire type it never declared at all | `deno task check` |
+| [Loc cross-grade](#loc-cross-grade-checkloc) | `check:loc` | tsv's loc wire and the shipped `locations.js` reconstruction of its span-only wire disagreeing on any fixture input — the two implementations of the one `loc` definition drifting apart | `deno task check` |
 | [Pin agreement](#canonical-pin-agreement-audit-pinsaudit) | `pins:audit` | the five canonical-oracle pin sites disagreeing — including the lockfile, which alone pins the oracle's own transitive deps | `deno task check` |
 | [Checkout alignment](#checkout-alignment-audit-pinsauditcheckouts) | `pins:audit:checkouts` | a present `../svelte` / `../acorn-typescript` clone that is not the pinned version; checkout drift (warn — HEAD, or the `../corpora` snapshot's `collections/` tree id) | `deno task conformance` (preflight) |
 | [Authoring independence](#authoring-independence-audit-authoringaudit) | `authoring:audit` | two render-equivalent authorings settling on two fixed points; non-idempotency | `deno task check`; `audit:corpus` (real code) |
@@ -214,7 +215,13 @@ deno task corpus:compare:parse <path> --filter svelte --inject [--inject-termina
 **What it proves.** That tsv's parse **wire** still matches the canonical parser after
 whitespace is injected into a Svelte tag or block head — `{#…}`, `{:…}`, `{@…}`. Each
 manufactured input is graded against the real external oracle (`svelte.parse`), through
-the same deep-diff and documented-divergence classifier `corpus:compare:parse` uses.
+the same deep-diff and documented-divergence classifier `corpus:compare:parse` uses, on
+both of its arms: the **loc arm** (tsv's `loc` first checked against the definition — the
+reconstruction of its own span-only wire — then the oracle's `loc` under the six named
+tolerance rows of `benches/js/lib/loc_tolerance.ts`, which the injections reach far more
+often than real code does: a newline before a binding's `:`, a destructure pattern pushed
+off line 1) and the **span arm** (the span-only wire against the oracle with `loc` /
+`name_loc` stripped).
 
 **Why it exists — the shape of the hole it fills.** Every other injection or fuzz audit
 in this repo grades a *formatter-side, self-referential* property: gap and blank
@@ -255,18 +262,21 @@ both the instant such an input exists; this audit makes them exist.
   reaches the gap through a lexer TOKEN's end rather than through byte arithmetic, so it is
   the spelling a `+ 2` sweep does not find).
 - **`terminators`** — a lone `\r`, `<LS>` or `<PS>` at every whitespace-run start in the
-  document, head or not. These are exactly the spellings on which the two `loc` line
-  classes DISAGREE, and which class a node was counted under is decided *per acorn parse*
-  by what Svelte did to the prefix it handed acorn (three preparations across five
-  readers — [architecture.md §`loc` lines](./architecture.md#loc-lines-two-classes-one-per-acorn-parse)).
-  That model is mirror-knowledge held by hand at seven call sites in `tsv_svelte`'s
-  parser, and **nothing else grades it**: no fixture can carry a raw `<CR>` (every
-  parse-then-format entry point folds it, so such a document is not the fixed point F1
-  requires), and no real repo contains one. `\n` and `\r\n` are deliberately not injected
-  — both classes count them identically, so a variant carrying one tests nothing.
-  Document-wide rather than head-scoped because the axis is: a terminator matters in the
-  prefix acorn measured, in the run acorn *skipped*, and inside the island itself, and
-  only the first of those is ever in a head.
+  document, head or not. These are exactly the spellings on which ECMAScript's line
+  terminators and `\n` DISAGREE. tsv's `loc` counts `\n` alone across a whole Svelte
+  document ([architecture.md §`loc` lines](./architecture.md#loc-lines-one-rule-per-document)),
+  while Svelte counts ECMAScript's on the nodes acorn parsed — so under this family the
+  oracle `loc` differences a terminator adds fall in the `two_line_classes` tolerance row
+  (the other rows fire too, on the shapes the base fixture already holds), and **as a `loc`
+  audit it grades little new** — though it is what exercises row 3's model: exact inside a
+  `<script>`, a band in a template island. What it grades is the **span arm** — whether a terminator in a
+  head, an island or the template moves an offset — and the loc arm's **definition check**
+  on inputs nothing else holds: no fixture can carry a raw `<CR>` (every parse-then-format
+  entry point folds it, so such a document is not the fixed point F1 requires), and no real
+  repo contains one. `\n` and `\r\n` are deliberately not injected — both classes count
+  them identically, so a variant carrying one tests nothing. Document-wide rather than
+  head-scoped because a terminator can move an offset anywhere in the document, and only
+  a sliver of that is a head.
 
   ⚠️ **It grades a second axis nothing else does, and its best yield so far came from that
   one**: U+2028 / U+2029 are also members of **JS `\s`**, so this family is the standing
@@ -295,8 +305,8 @@ one member to one type-literal fixture — a routine coverage extension, unrelat
 anything the family grades — moved that file's probed offsets from `[7, 37, 77, 106]` to
 `[7, 44, 82, 118]` and retired **12 of the terminator family's then-194 finding signatures**
 as stale, with every underlying divergence intact. (194 is the reading that measurement was
-taken against, kept because it is the evidence; the family's standing count is the 175
-above.) A ratchet would have hard-failed and been
+taken against, kept because it is the evidence; the family's standing findings are
+described below.) A ratchet would have hard-failed and been
 "fixed" by re-pinning, which is the rot [gap_audit.md](./gap_audit.md) designs against
 ("a gate that fails per added fixture would just get turned off"). The exposure is
 structural, not incidental: **96 of those 194 signatures are produced by a single base
@@ -319,8 +329,9 @@ files are controls and are dropped; only the delta is reported. Subtraction is b
 
 **Blind spots.**
 
-- **Svelte inputs only.** Standalone TS/CSS files are never perturbed (their `loc` has one
-  line class and no per-parse seed), and the `ws` family additionally reaches only heads.
+- **Svelte inputs only.** Standalone TS/CSS files are never perturbed (they have no heads,
+  and their `loc` follows the same one-rule-per-document definition the `check:loc` and
+  corpus legs already grade), and the `ws` family additionally reaches only heads.
 - **A base that already diverges at a signature masks a new divergence at that same
   signature** in its variants. A clean base is the better seed.
 - **A rejection is a finding on either side, and neither carries diffs to be found by.** A
@@ -360,9 +371,9 @@ the canonical parser, so it is conformance-tier at best). Standing findings:
   mirrors it — but four of Svelte's parses hand acorn a **manufactured** string whose line
   prefix is not the author's. `tsv_lang::AcornPrefix` is the model of them, resolved per
   COMMENT from `Root::acorn_regions` (a block binding's island is up to two parses, each
-  blanking a different span). Same shape as the per-parse `loc` line class (`AcornSeed`), one
-  field over: what acorn saw, not what the document says — and it is subtler than a width in
-  four ways, each of which was a live bug in the first cut: the two blankings differ
+  blanking a different span). It is a model of what acorn saw, not of what the document
+  says — and it is subtler than a width in four ways, each of which was a live bug in the
+  first cut: the two blankings differ
   (`/[^\n]/g` erases the author's tab, `{#snippet}`'s `/\S/g` keeps it and blanks past it);
   `read_pattern` deletes one blank from its prefix; a run that reaches `read_script`'s body
   carries on into the body's own whitespace; and `read_type_annotation`'s `_ as ` is spliced
@@ -418,10 +429,13 @@ the canonical parser, so it is conformance-tier at best). Standing findings:
   over-acceptance), and 1 splits `?:` into `? :`, feeding Svelte's own `/\?\s*:/g` template
   rewrite (pinned in
   [`block_pattern_annotation_span.rs`](../tests/block_pattern_annotation_span.rs)).
-- **`terminators`** (sampled: 277 files / 175 signature groups), by file count over
-  `tests/fixtures` — two groups, neither of them a line-*class* question despite the family
-  that surfaced them:
-  - a `{@debug}` identifier's `loc` line and column under a **lone `<CR>`** (54 / 51 files);
+- **`terminators`** (sampled), over `tests/fixtures` — every standing finding is a SPAN
+  finding: the `loc` differences a terminator adds all fall in the `two_line_classes` row,
+  since tsv's `loc` counts `\n` alone (the `{@debug}` identifier's `loc` under a lone `<CR>`
+  among them). Two groups:
+  - class-member, heritage-clause and type-literal shapes whose reading turns on a line
+    break before the next token — a lone terminator is one to acorn — the family the
+    `static_member_ladder` / `extends_instantiation_linebreak` matchers document for `\n`;
   - the An+B residue the CSS finding left behind — `REGEX_NTH_OF` is a JS regex and tsv's
     An+B scanner is ASCII, so a `<LS>`/`<PS>` in an `:nth-*()` argument diverges; enumerated
     and pinned in [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs)
@@ -1086,6 +1100,67 @@ C keeps reporting truthfully about the `.d.ts`. Oracle freshness is
 The per-field checklist in
 [crates/tsv_wasm/CLAUDE.md §TS Type Maintenance](../crates/tsv_wasm/CLAUDE.md#ts-type-maintenance)
 is what carries a writer change; this gate is the backstop.
+
+## Loc Cross-Grade (`check:loc`)
+
+```bash
+deno task check:loc       # builds target/corpus/tsv_debug, then scripts/check_loc.ts over tests/fixtures
+```
+
+**What it proves.** That tsv's two implementations of its one `loc` definition agree: the
+Rust writers' loc wire and the shipped `crates/tsv_wasm/npm/locations.js` reconstruction of
+the span-only wire of the same parse deep-equal each other (key order ignored — the writer
+places `loc` after `end`, the reconstruction appends it) on every document of the fixture
+tree, in all three languages. The definition — every object with numeric `start`/`end` gets
+the line and UTF-16 column of those offsets, one line-terminator rule per document — is
+stated in `locations.js`'s module doc and in [conformance_svelte.md](./conformance_svelte.md#svelte-template-corrections-corpus-enforced).
+
+**Why it exists.** The fixtures pin the **span-only** wire (`expected*.json` is the
+canonical output with `loc` and `name_loc` stripped), so `fixtures_tests` grades no `loc` at
+all; without this leg, `deno task check` would not see a writer and the shipped helper
+drifting apart. Neither side carries a hand-written expectation — each is the other's
+drift check.
+
+**How.** One `tsv_debug loc_wires` process (`cli/commands/loc_wires.rs`) parses every
+parseable source file in each fixture directory at its `goal` marker's goal — the
+`input.*` and its format variants, since `loc` needs no oracle (a lone leading BOM among
+them) — and streams both wires and the exact source as NDJSON; `scripts/check_loc.ts`
+reconstructs each span-only wire and compares (`benches/js/lib/loc_cross_grade.ts`, shared
+with the corpus comparator). No sidecar, no `node_modules`. A document the fixture tree
+requires tsv to parse — the input and every variant tsv's own formatter reads
+(`unformatted_*`, `unformatted_ours_*`, `prettier_variant_*`, `variant_*`,
+`divergent_variant_*`) — fails the run if it does not parse. A prettier-side form
+(`output_prettier.*`, `unformatted_prettier_*`, the `prettier_intermediate*_*` kinds), on
+which the tree makes no tsv-parse claim, is graded when tsv parses it — prettier's output is
+not always valid source — and the ones tsv rejects are a **ledger**,
+`scripts/check_loc_rejects.txt`: the exact documents, each one prettier emits that the
+validity oracle for the syntax it breaks rejects (Svelte's parser, tsc, the CSS spec — some
+of them ones the canonical acorn / Svelte parser accepts, since tsc is the TypeScript oracle
+per [CLAUDE.md §Strictness](../CLAUDE.md#strictness-module-strict-script-by-directive)),
+the fixture's README saying why. It is graded both ways: a prettier-side reject the ledger
+does not list fails the run (tsv started rejecting a prettier output it parsed, or a new
+fixture's prettier output is invalid and needs listing), and a listed document the run walked
+that tsv now parses fails as stale (a run over a narrowed root grades the entries under it). Not graded at
+all, each by a declaration: `input_invalid_*` (it must fail both parsers) and a
+`tsv_rejects.txt` fixture's input. A language that grades no document fails the run.
+
+**Blind spots.**
+
+- **Not an oracle.** A definition both implementations share and both get wrong passes.
+  Inside `check`, the independent grader is `tests/loc_definition.rs`: its own line-start
+  scan over every fixture input, sharing nothing with `tsv_lang`'s line table, grades each
+  `loc` and `name_loc` against the definition (a `name_loc` also against the name it spans),
+  plus the inputs no fixture can hold (a lone `<CR>` / `<LS>` / `<PS>`, a BOM, an astral
+  character). The outside reference is the canonical parsers' own `loc`, graded at
+  conformance cadence by `corpus:compare:parse`'s loc arm — exactly against acorn for
+  TypeScript, and against Svelte through its six cataloged tolerance rows
+  (`benches/js/lib/loc_tolerance.ts`), over the `gates` corpus and, with `--fixtures`, over
+  each fixture's parse-pinned documents (the input and its `expected_<stem>.json` variants,
+  the ones an oracle verdict is committed for). That arm runs this cross-grade first, so a
+  tolerance row can only ever excuse the oracle.
+- **The fixture tree's inputs are format fixed points**, so no input holds a raw `<CR>`; the
+  lone-`<CR>` rule is graded by the injection variants of `wire:audit:terminators` (whose
+  comparator runs the same check) and by the package tests in `scripts/test_npm.ts`.
 
 ## Canonical-Pin Agreement Audit (`pins:audit`)
 

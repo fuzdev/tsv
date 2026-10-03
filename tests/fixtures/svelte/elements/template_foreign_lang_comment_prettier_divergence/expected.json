@@ -25,36 +25,12 @@
 				"start": 140,
 				"end": 188,
 				"name": "template",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 1,
-						"character": 141
-					},
-					"end": {
-						"line": 3,
-						"column": 9,
-						"character": 149
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 156,
 						"end": 166,
 						"name": "lang",
-						"name_loc": {
-							"start": {
-								"line": 4,
-								"column": 1,
-								"character": 156
-							},
-							"end": {
-								"line": 4,
-								"column": 5,
-								"character": 160
-							}
-						},
 						"value": [
 							{
 								"start": 162,
@@ -87,19 +63,7 @@
 			"type": "Line",
 			"start": 150,
 			"end": 154,
-			"value": " c",
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 10,
-					"character": 150
-				},
-				"end": {
-					"line": 3,
-					"column": 14,
-					"character": 154
-				}
-			}
+			"value": " c"
 		}
 	]
 }

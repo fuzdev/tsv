@@ -12,36 +12,12 @@
 				"start": 0,
 				"end": 16,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 2,
-						"character": 2
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 3,
 						"end": 4,
 						"name": "}",
-						"name_loc": {
-							"start": {
-								"line": 1,
-								"column": 3,
-								"character": 3
-							},
-							"end": {
-								"line": 1,
-								"column": 4,
-								"character": 4
-							}
-						},
 						"value": true
 					}
 				],
@@ -70,36 +46,12 @@
 				"start": 17,
 				"end": 39,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 18
-					},
-					"end": {
-						"line": 2,
-						"column": 4,
-						"character": 21
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 22,
 						"end": 23,
 						"name": "a",
-						"name_loc": {
-							"start": {
-								"line": 2,
-								"column": 5,
-								"character": 22
-							},
-							"end": {
-								"line": 2,
-								"column": 6,
-								"character": 23
-							}
-						},
 						"value": true
 					},
 					{
@@ -107,18 +59,6 @@
 						"start": 24,
 						"end": 26,
 						"name": "}b",
-						"name_loc": {
-							"start": {
-								"line": 2,
-								"column": 7,
-								"character": 24
-							},
-							"end": {
-								"line": 2,
-								"column": 9,
-								"character": 26
-							}
-						},
 						"value": true
 					},
 					{
@@ -126,18 +66,6 @@
 						"start": 27,
 						"end": 28,
 						"name": "c",
-						"name_loc": {
-							"start": {
-								"line": 2,
-								"column": 10,
-								"character": 27
-							},
-							"end": {
-								"line": 2,
-								"column": 11,
-								"character": 28
-							}
-						},
 						"value": true
 					}
 				],

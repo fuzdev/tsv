@@ -15,16 +15,6 @@
 					"type": "Identifier",
 					"start": 7,
 					"end": 15,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 7
-						},
-						"end": {
-							"line": 1,
-							"column": 15
-						}
-					},
 					"name": "promises"
 				},
 				"body": {
@@ -45,35 +35,13 @@
 								"type": "Identifier",
 								"start": 37,
 								"end": 44,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 9
-									},
-									"end": {
-										"line": 2,
-										"column": 16
-									}
-								},
 								"name": "promise"
 							},
 							"value": {
 								"type": "Identifier",
 								"name": "value",
 								"start": 50,
-								"end": 55,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 22,
-										"character": 50
-									},
-									"end": {
-										"line": 2,
-										"column": 27,
-										"character": 55
-									}
-								}
+								"end": 55
 							},
 							"error": null,
 							"pending": null,
@@ -92,18 +60,6 @@
 										"start": 59,
 										"end": 77,
 										"name": "div",
-										"name_loc": {
-											"start": {
-												"line": 3,
-												"column": 3,
-												"character": 60
-											},
-											"end": {
-												"line": 3,
-												"column": 6,
-												"character": 63
-											}
-										},
 										"attributes": [],
 										"fragment": {
 											"type": "Fragment",
@@ -116,16 +72,6 @@
 														"type": "Identifier",
 														"start": 65,
 														"end": 70,
-														"loc": {
-															"start": {
-																"line": 3,
-																"column": 8
-															},
-															"end": {
-																"line": 3,
-																"column": 13
-															}
-														},
 														"name": "value"
 													}
 												}
@@ -156,19 +102,7 @@
 					"type": "Identifier",
 					"name": "promise",
 					"start": 19,
-					"end": 26,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 19,
-							"character": 19
-						},
-						"end": {
-							"line": 1,
-							"column": 26,
-							"character": 26
-						}
-					}
+					"end": 26
 				}
 			}
 		]

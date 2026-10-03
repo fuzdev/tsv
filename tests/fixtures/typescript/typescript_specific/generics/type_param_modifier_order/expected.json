@@ -14,33 +14,13 @@
 			"type": "Line",
 			"value": " `const in out` is the canonical modifier order, and the only one either",
 			"start": 20,
-			"end": 94,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 75
-				}
-			}
+			"end": 94
 		},
 		{
 			"type": "Line",
 			"value": " formatter emits — the reversed spellings normalize to it (see the variant).",
 			"start": 96,
-			"end": 174,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 79
-				}
-			}
+			"end": 174
 		}
 	],
 	"instance": {
@@ -52,76 +32,26 @@
 			"type": "Program",
 			"start": 18,
 			"end": 309,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 10,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ClassDeclaration",
 					"start": 176,
 					"end": 204,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 29
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 182,
 						"end": 189,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 7
-							},
-							"end": {
-								"line": 4,
-								"column": 14
-							}
-						},
 						"name": "Ordered"
 					},
 					"typeParameters": {
 						"type": "TSTypeParameterDeclaration",
 						"start": 189,
 						"end": 201,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 14
-							},
-							"end": {
-								"line": 4,
-								"column": 26
-							}
-						},
 						"params": [
 							{
 								"type": "TSTypeParameter",
 								"start": 190,
 								"end": 200,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 15
-									},
-									"end": {
-										"line": 4,
-										"column": 25
-									}
-								},
 								"const": true,
 								"in": true,
 								"name": "T"
@@ -133,16 +63,6 @@
 						"type": "ClassBody",
 						"start": 202,
 						"end": 204,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 27
-							},
-							"end": {
-								"line": 4,
-								"column": 29
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -164,61 +84,21 @@
 					"type": "ClassDeclaration",
 					"start": 206,
 					"end": 238,
-					"loc": {
-						"start": {
-							"line": 5,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 33
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 212,
 						"end": 222,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 7
-							},
-							"end": {
-								"line": 5,
-								"column": 17
-							}
-						},
 						"name": "OrderedOut"
 					},
 					"typeParameters": {
 						"type": "TSTypeParameterDeclaration",
 						"start": 222,
 						"end": 235,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 17
-							},
-							"end": {
-								"line": 5,
-								"column": 30
-							}
-						},
 						"params": [
 							{
 								"type": "TSTypeParameter",
 								"start": 223,
 								"end": 234,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 18
-									},
-									"end": {
-										"line": 5,
-										"column": 29
-									}
-								},
 								"const": true,
 								"out": true,
 								"name": "T"
@@ -230,16 +110,6 @@
 						"type": "ClassBody",
 						"start": 236,
 						"end": 238,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 31
-							},
-							"end": {
-								"line": 5,
-								"column": 33
-							}
-						},
 						"body": []
 					}
 				},
@@ -247,61 +117,21 @@
 					"type": "TSInterfaceDeclaration",
 					"start": 241,
 					"end": 273,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 1
-						},
-						"end": {
-							"line": 7,
-							"column": 33
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 251,
 						"end": 260,
-						"loc": {
-							"start": {
-								"line": 7,
-								"column": 11
-							},
-							"end": {
-								"line": 7,
-								"column": 20
-							}
-						},
 						"name": "Invariant"
 					},
 					"typeParameters": {
 						"type": "TSTypeParameterDeclaration",
 						"start": 260,
 						"end": 270,
-						"loc": {
-							"start": {
-								"line": 7,
-								"column": 20
-							},
-							"end": {
-								"line": 7,
-								"column": 30
-							}
-						},
 						"params": [
 							{
 								"type": "TSTypeParameter",
 								"start": 261,
 								"end": 269,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 21
-									},
-									"end": {
-										"line": 7,
-										"column": 29
-									}
-								},
 								"in": true,
 								"out": true,
 								"name": "T"
@@ -312,16 +142,6 @@
 						"type": "TSInterfaceBody",
 						"start": 271,
 						"end": 273,
-						"loc": {
-							"start": {
-								"line": 7,
-								"column": 31
-							},
-							"end": {
-								"line": 7,
-								"column": 33
-							}
-						},
 						"body": []
 					}
 				},
@@ -329,30 +149,10 @@
 					"type": "FunctionDeclaration",
 					"start": 276,
 					"end": 308,
-					"loc": {
-						"start": {
-							"line": 9,
-							"column": 1
-						},
-						"end": {
-							"line": 9,
-							"column": 33
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 285,
 						"end": 294,
-						"loc": {
-							"start": {
-								"line": 9,
-								"column": 10
-							},
-							"end": {
-								"line": 9,
-								"column": 19
-							}
-						},
 						"name": "withConst"
 					},
 					"expression": false,
@@ -362,31 +162,11 @@
 						"type": "TSTypeParameterDeclaration",
 						"start": 294,
 						"end": 303,
-						"loc": {
-							"start": {
-								"line": 9,
-								"column": 19
-							},
-							"end": {
-								"line": 9,
-								"column": 28
-							}
-						},
 						"params": [
 							{
 								"type": "TSTypeParameter",
 								"start": 295,
 								"end": 302,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 20
-									},
-									"end": {
-										"line": 9,
-										"column": 27
-									}
-								},
 								"const": true,
 								"name": "T"
 							}
@@ -397,16 +177,6 @@
 						"type": "BlockStatement",
 						"start": 306,
 						"end": 308,
-						"loc": {
-							"start": {
-								"line": 9,
-								"column": 31
-							},
-							"end": {
-								"line": 9,
-								"column": 33
-							}
-						},
 						"body": []
 					}
 				}
@@ -419,18 +189,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

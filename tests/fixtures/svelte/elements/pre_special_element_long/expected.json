@@ -38,18 +38,6 @@
 				"start": 299,
 				"end": 399,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 8,
-						"column": 1,
-						"character": 300
-					},
-					"end": {
-						"line": 8,
-						"column": 4,
-						"character": 303
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -66,18 +54,6 @@
 							"start": 305,
 							"end": 392,
 							"name": "svelte:element",
-							"name_loc": {
-								"start": {
-									"line": 8,
-									"column": 7,
-									"character": 306
-								},
-								"end": {
-									"line": 8,
-									"column": 21,
-									"character": 320
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -134,18 +110,6 @@
 				"start": 447,
 				"end": 550,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 11,
-						"column": 1,
-						"character": 448
-					},
-					"end": {
-						"line": 11,
-						"column": 4,
-						"character": 451
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -162,18 +126,6 @@
 							"start": 453,
 							"end": 543,
 							"name": "svelte:element",
-							"name_loc": {
-								"start": {
-									"line": 11,
-									"column": 7,
-									"character": 454
-								},
-								"end": {
-									"line": 11,
-									"column": 21,
-									"character": 468
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -230,18 +182,6 @@
 				"start": 604,
 				"end": 704,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 15,
-						"column": 1,
-						"character": 605
-					},
-					"end": {
-						"line": 15,
-						"column": 4,
-						"character": 608
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -258,18 +198,6 @@
 							"start": 610,
 							"end": 697,
 							"name": "svelte:component",
-							"name_loc": {
-								"start": {
-									"line": 15,
-									"column": 7,
-									"character": 611
-								},
-								"end": {
-									"line": 15,
-									"column": 23,
-									"character": 627
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -287,16 +215,6 @@
 								"type": "Identifier",
 								"start": 634,
 								"end": 638,
-								"loc": {
-									"start": {
-										"line": 15,
-										"column": 30
-									},
-									"end": {
-										"line": 15,
-										"column": 34
-									}
-								},
 								"name": "Comp"
 							}
 						},
@@ -322,18 +240,6 @@
 				"start": 706,
 				"end": 809,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 17,
-						"column": 1,
-						"character": 707
-					},
-					"end": {
-						"line": 17,
-						"column": 4,
-						"character": 710
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -350,18 +256,6 @@
 							"start": 712,
 							"end": 802,
 							"name": "svelte:component",
-							"name_loc": {
-								"start": {
-									"line": 17,
-									"column": 7,
-									"character": 713
-								},
-								"end": {
-									"line": 17,
-									"column": 23,
-									"character": 729
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -379,16 +273,6 @@
 								"type": "Identifier",
 								"start": 736,
 								"end": 740,
-								"loc": {
-									"start": {
-										"line": 17,
-										"column": 30
-									},
-									"end": {
-										"line": 17,
-										"column": 34
-									}
-								},
 								"name": "Comp"
 							}
 						},
@@ -427,18 +311,6 @@
 				"start": 899,
 				"end": 1051,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 21,
-						"column": 1,
-						"character": 900
-					},
-					"end": {
-						"line": 21,
-						"column": 4,
-						"character": 903
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -455,18 +327,6 @@
 							"start": 905,
 							"end": 1044,
 							"name": "svelte:element",
-							"name_loc": {
-								"start": {
-									"line": 21,
-									"column": 7,
-									"character": 906
-								},
-								"end": {
-									"line": 21,
-									"column": 21,
-									"character": 920
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -486,16 +346,6 @@
 											"type": "Identifier",
 											"start": 992,
 											"end": 996,
-											"loc": {
-												"start": {
-													"line": 22,
-													"column": 62
-												},
-												"end": {
-													"line": 22,
-													"column": 66
-												}
-											},
 											"name": "expr"
 										}
 									},
@@ -551,18 +401,6 @@
 				"start": 1178,
 				"end": 1322,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 27,
-						"column": 1,
-						"character": 1179
-					},
-					"end": {
-						"line": 27,
-						"column": 4,
-						"character": 1182
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -579,18 +417,6 @@
 							"start": 1184,
 							"end": 1315,
 							"name": "svelte:element",
-							"name_loc": {
-								"start": {
-									"line": 27,
-									"column": 7,
-									"character": 1185
-								},
-								"end": {
-									"line": 27,
-									"column": 21,
-									"character": 1199
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -647,18 +473,6 @@
 				"start": 1414,
 				"end": 1574,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 31,
-						"column": 1,
-						"character": 1415
-					},
-					"end": {
-						"line": 31,
-						"column": 4,
-						"character": 1418
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -675,36 +489,12 @@
 							"start": 1420,
 							"end": 1567,
 							"name": "svelte:element",
-							"name_loc": {
-								"start": {
-									"line": 31,
-									"column": 7,
-									"character": 1421
-								},
-								"end": {
-									"line": 31,
-									"column": 21,
-									"character": 1435
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 1449,
 									"end": 1512,
 									"name": "data-attr1",
-									"name_loc": {
-										"start": {
-											"line": 33,
-											"column": 2,
-											"character": 1449
-										},
-										"end": {
-											"line": 33,
-											"column": 12,
-											"character": 1459
-										}
-									},
 									"value": [
 										{
 											"start": 1461,
@@ -720,18 +510,6 @@
 									"start": 1515,
 									"end": 1534,
 									"name": "data-attr2",
-									"name_loc": {
-										"start": {
-											"line": 34,
-											"column": 2,
-											"character": 1515
-										},
-										"end": {
-											"line": 34,
-											"column": 12,
-											"character": 1525
-										}
-									},
 									"value": [
 										{
 											"start": 1527,

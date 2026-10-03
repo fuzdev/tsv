@@ -41,12 +41,13 @@ pub(crate) fn parse_input<'arena>(
     }
 }
 
-/// The parser phases' view of one input: the writer's wire and its tabbed form.
+/// The parser phases' view of one input: the writer's span-only wire and its tabbed form.
 pub(crate) struct InputAstPaths {
-    /// The compact wire `convert_ast_json_bytes` emitted (the sole emission
-    /// path). Read back into a `Value` only on a byte mismatch, to classify it
-    /// as field-order-only vs semantic ([`Self::wire_value`]) — so the happy
-    /// path deserializes nothing, like the CLI.
+    /// The compact span-only wire `convert_ast_json_bytes_no_locations` emitted
+    /// (fixtures pin spans; the `loc` gates grade `loc`, not this). Read back into
+    /// a `Value` only on a byte mismatch, to classify it as field-order-only vs
+    /// semantic ([`Self::wire_value`]) — so the happy path deserializes nothing,
+    /// like the CLI.
     pub wire: Vec<u8>,
     /// The same wire tab-indented + trailing newline — the exact bytes
     /// `expected*.json` files store (what `fixtures_update_parsed` writes); the
@@ -62,15 +63,18 @@ impl InputAstPaths {
 }
 
 /// Compute the JSON-AST for the parser-side phases from an already-parsed
-/// input. The tabbed text derives from the wire through the CLI's
-/// recursion-free re-indenter — the `--pretty` route, so the gate exercises it
-/// on every fixture. `expected.json` — pinned to the canonical parser by the
-/// P1/P3 freshness checks — is the oracle these phases compare against.
+/// input — the **span-only** wire, since every `expected*.json` pins the
+/// canonical parser's output with `loc` and `name_loc` stripped
+/// ([`canonical_expected_json`](crate::fixtures::canonical_expected_json)). The
+/// tabbed text derives from the wire through the CLI's recursion-free
+/// re-indenter — the `--pretty` route, so the gate exercises it on every
+/// fixture. `expected.json` — pinned to the canonical parser by the P1/P3
+/// freshness checks — is the oracle these phases compare against.
 pub(crate) fn input_ast_paths(parsed: &ParsedInput<'_>, content: &str) -> InputAstPaths {
     let wire = match parsed {
-        ParsedInput::Svelte(ast) => tsv_svelte::convert_ast_json_bytes(ast, content),
-        ParsedInput::Ts(ast) => tsv_ts::convert_ast_json_bytes(ast, content),
-        ParsedInput::Css(ast) => tsv_css::convert_ast_json_bytes(ast, content),
+        ParsedInput::Svelte(ast) => tsv_svelte::convert_ast_json_bytes_no_locations(ast, content),
+        ParsedInput::Ts(ast) => tsv_ts::convert_ast_json_bytes_no_locations(ast, content),
+        ParsedInput::Css(ast) => tsv_css::convert_ast_json_bytes_no_locations(ast, content),
     };
     let mut tabs = indent_json_with_tabs(&wire);
     // Trailing newline matches the expected*.json format

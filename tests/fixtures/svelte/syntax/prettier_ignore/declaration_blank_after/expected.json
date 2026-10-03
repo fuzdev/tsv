@@ -42,16 +42,6 @@
 					"type": "Identifier",
 					"start": 176,
 					"end": 180,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 5
-						},
-						"end": {
-							"line": 7,
-							"column": 9
-						}
-					},
 					"name": "cond"
 				},
 				"consequent": {
@@ -91,34 +81,12 @@
 											"type": "Identifier",
 											"name": "a",
 											"start": 219,
-											"end": 220,
-											"loc": {
-												"start": {
-													"line": 9,
-													"column": 11,
-													"character": 219
-												},
-												"end": {
-													"line": 9,
-													"column": 12,
-													"character": 220
-												}
-											}
+											"end": 220
 										},
 										"init": {
 											"type": "Literal",
 											"start": 223,
 											"end": 224,
-											"loc": {
-												"start": {
-													"line": 9,
-													"column": 15
-												},
-												"end": {
-													"line": 9,
-													"column": 16
-												}
-											},
 											"value": 1,
 											"raw": "1"
 										},
@@ -175,61 +143,21 @@
 					"type": "VariableDeclaration",
 					"start": 335,
 					"end": 346,
-					"loc": {
-						"start": {
-							"line": 15,
-							"column": 30
-						},
-						"end": {
-							"line": 15,
-							"column": 41
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 341,
 							"end": 346,
-							"loc": {
-								"start": {
-									"line": 15,
-									"column": 36
-								},
-								"end": {
-									"line": 15,
-									"column": 41
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 341,
 								"end": 342,
-								"loc": {
-									"start": {
-										"line": 15,
-										"column": 36
-									},
-									"end": {
-										"line": 15,
-										"column": 37
-									}
-								},
 								"name": "b"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 345,
 								"end": 346,
-								"loc": {
-									"start": {
-										"line": 15,
-										"column": 40
-									},
-									"end": {
-										"line": 15,
-										"column": 41
-									}
-								},
 								"value": 2,
 								"raw": "2"
 							}

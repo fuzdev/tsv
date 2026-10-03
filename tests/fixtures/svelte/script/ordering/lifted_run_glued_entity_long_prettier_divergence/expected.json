@@ -19,18 +19,6 @@
 				"start": 256,
 				"end": 264,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 9,
-						"column": 1,
-						"character": 257
-					},
-					"end": {
-						"line": 9,
-						"column": 2,
-						"character": 258
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -60,33 +48,13 @@
 			"type": "Line",
 			"value": " respelled, the text is 101 chars on the first line, so its last word wraps,",
 			"start": 10,
-			"end": 88,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 79
-				}
-			}
+			"end": 88
 		},
 		{
 			"type": "Line",
 			"value": " and exactly 100 on the second, which fits",
 			"start": 90,
-			"end": 134,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 45
-				}
-			}
+			"end": 134
 		}
 	],
 	"instance": {
@@ -98,60 +66,20 @@
 			"type": "Program",
 			"start": 8,
 			"end": 143,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 5,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 136,
 					"end": 142,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 7
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 140,
 							"end": 141,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 5
-								},
-								"end": {
-									"line": 4,
-									"column": 6
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 140,
 								"end": 141,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 5
-									},
-									"end": {
-										"line": 4,
-										"column": 6
-									}
-								},
 								"name": "a"
 							},
 							"init": null

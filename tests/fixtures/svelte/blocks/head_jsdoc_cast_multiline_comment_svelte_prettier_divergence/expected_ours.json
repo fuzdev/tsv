@@ -16,16 +16,6 @@
 					"type": "Identifier",
 					"start": 27,
 					"end": 29,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 5
-						},
-						"end": {
-							"line": 3,
-							"column": 7
-						}
-					},
 					"name": "aa",
 					"leadingComments": [
 						{
@@ -58,17 +48,7 @@
 			"type": "Block",
 			"value": "*\n * @type {A}\n ",
 			"start": 5,
-			"end": 25,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 5
-				},
-				"end": {
-					"line": 3,
-					"column": 3
-				}
-			}
+			"end": 25
 		}
 	]
 }

@@ -38,18 +38,6 @@
 				"start": 695,
 				"end": 820,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 13,
-						"column": 1,
-						"character": 696
-					},
-					"end": {
-						"line": 13,
-						"column": 2,
-						"character": 697
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -66,18 +54,6 @@
 							"start": 786,
 							"end": 805,
 							"name": "span",
-							"name_loc": {
-								"start": {
-									"line": 14,
-									"column": 88,
-									"character": 787
-								},
-								"end": {
-									"line": 14,
-									"column": 92,
-									"character": 791
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -127,18 +103,6 @@
 				"start": 903,
 				"end": 1011,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 20,
-						"column": 1,
-						"character": 904
-					},
-					"end": {
-						"line": 20,
-						"column": 2,
-						"character": 905
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -155,18 +119,6 @@
 							"start": 949,
 							"end": 963,
 							"name": "span",
-							"name_loc": {
-								"start": {
-									"line": 21,
-									"column": 43,
-									"character": 950
-								},
-								"end": {
-									"line": 21,
-									"column": 47,
-									"character": 954
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -216,18 +168,6 @@
 				"start": 1112,
 				"end": 1222,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 25,
-						"column": 1,
-						"character": 1113
-					},
-					"end": {
-						"line": 25,
-						"column": 2,
-						"character": 1114
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -244,18 +184,6 @@
 							"start": 1158,
 							"end": 1172,
 							"name": "span",
-							"name_loc": {
-								"start": {
-									"line": 26,
-									"column": 43,
-									"character": 1159
-								},
-								"end": {
-									"line": 26,
-									"column": 47,
-									"character": 1163
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",

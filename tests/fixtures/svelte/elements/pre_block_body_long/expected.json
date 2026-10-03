@@ -25,18 +25,6 @@
 				"start": 293,
 				"end": 411,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 294
-					},
-					"end": {
-						"line": 2,
-						"column": 4,
-						"character": 297
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -50,16 +38,6 @@
 								"type": "Identifier",
 								"start": 303,
 								"end": 307,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 10
-									},
-									"end": {
-										"line": 2,
-										"column": 14
-									}
-								},
 								"name": "cond"
 							},
 							"consequent": {
@@ -91,18 +69,6 @@
 				"start": 413,
 				"end": 537,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 4,
-						"column": 1,
-						"character": 414
-					},
-					"end": {
-						"line": 4,
-						"column": 4,
-						"character": 417
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -115,16 +81,6 @@
 								"type": "Identifier",
 								"start": 425,
 								"end": 430,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 12
-									},
-									"end": {
-										"line": 4,
-										"column": 17
-									}
-								},
 								"name": "items"
 							},
 							"body": {
@@ -143,19 +99,7 @@
 								"type": "Identifier",
 								"name": "item",
 								"start": 434,
-								"end": 438,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 21,
-										"character": 434
-									},
-									"end": {
-										"line": 4,
-										"column": 25,
-										"character": 438
-									}
-								}
+								"end": 438
 							}
 						}
 					]

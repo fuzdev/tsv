@@ -25,18 +25,6 @@
 				"start": 106,
 				"end": 244,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 107
-					},
-					"end": {
-						"line": 2,
-						"column": 2,
-						"character": 108
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -56,30 +44,10 @@
 								"type": "BinaryExpression",
 								"start": 198,
 								"end": 213,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 2
-									},
-									"end": {
-										"line": 4,
-										"column": 17
-									}
-								},
 								"left": {
 									"type": "Literal",
 									"start": 198,
 									"end": 204,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 2
-										},
-										"end": {
-											"line": 4,
-											"column": 8
-										}
-									},
 									"value": "rrrr",
 									"raw": "'rrrr'"
 								},
@@ -88,16 +56,6 @@
 									"type": "Literal",
 									"start": 207,
 									"end": 213,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 11
-										},
-										"end": {
-											"line": 4,
-											"column": 17
-										}
-									},
 									"value": "ssss",
 									"raw": "'ssss'"
 								}
@@ -138,18 +96,6 @@
 				"start": 339,
 				"end": 495,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 8,
-						"column": 1,
-						"character": 340
-					},
-					"end": {
-						"line": 8,
-						"column": 2,
-						"character": 341
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -169,30 +115,10 @@
 								"type": "BinaryExpression",
 								"start": 431,
 								"end": 446,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 2
-									},
-									"end": {
-										"line": 10,
-										"column": 17
-									}
-								},
 								"left": {
 									"type": "Literal",
 									"start": 431,
 									"end": 437,
-									"loc": {
-										"start": {
-											"line": 10,
-											"column": 2
-										},
-										"end": {
-											"line": 10,
-											"column": 8
-										}
-									},
 									"value": "rrrr",
 									"raw": "'rrrr'"
 								},
@@ -201,16 +127,6 @@
 									"type": "Literal",
 									"start": 440,
 									"end": 446,
-									"loc": {
-										"start": {
-											"line": 10,
-											"column": 11
-										},
-										"end": {
-											"line": 10,
-											"column": 17
-										}
-									},
 									"value": "ssss",
 									"raw": "'ssss'"
 								}
@@ -231,30 +147,10 @@
 								"type": "BinaryExpression",
 								"start": 459,
 								"end": 474,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 30
-									},
-									"end": {
-										"line": 10,
-										"column": 45
-									}
-								},
 								"left": {
 									"type": "Literal",
 									"start": 459,
 									"end": 465,
-									"loc": {
-										"start": {
-											"line": 10,
-											"column": 30
-										},
-										"end": {
-											"line": 10,
-											"column": 36
-										}
-									},
 									"value": "vvvv",
 									"raw": "'vvvv'"
 								},
@@ -263,16 +159,6 @@
 									"type": "Literal",
 									"start": 468,
 									"end": 474,
-									"loc": {
-										"start": {
-											"line": 10,
-											"column": 39
-										},
-										"end": {
-											"line": 10,
-											"column": 45
-										}
-									},
 									"value": "wwww",
 									"raw": "'wwww'"
 								}
@@ -313,18 +199,6 @@
 				"start": 546,
 				"end": 595,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 14,
-						"column": 1,
-						"character": 547
-					},
-					"end": {
-						"line": 14,
-						"column": 2,
-						"character": 548
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -344,30 +218,10 @@
 								"type": "BinaryExpression",
 								"start": 560,
 								"end": 575,
-								"loc": {
-									"start": {
-										"line": 14,
-										"column": 14
-									},
-									"end": {
-										"line": 14,
-										"column": 29
-									}
-								},
 								"left": {
 									"type": "Literal",
 									"start": 560,
 									"end": 566,
-									"loc": {
-										"start": {
-											"line": 14,
-											"column": 14
-										},
-										"end": {
-											"line": 14,
-											"column": 20
-										}
-									},
 									"value": "cccc",
 									"raw": "'cccc'"
 								},
@@ -376,16 +230,6 @@
 									"type": "Literal",
 									"start": 569,
 									"end": 575,
-									"loc": {
-										"start": {
-											"line": 14,
-											"column": 23
-										},
-										"end": {
-											"line": 14,
-											"column": 29
-										}
-									},
 									"value": "dddd",
 									"raw": "'dddd'"
 								}

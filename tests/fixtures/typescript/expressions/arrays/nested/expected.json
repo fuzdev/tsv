@@ -14,17 +14,7 @@
 			"type": "Block",
 			"value": " array of short objects - inline if fits ",
 			"start": 10,
-			"end": 55,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 46
-				}
-			}
+			"end": 55
 		}
 	],
 	"instance": {
@@ -36,106 +26,36 @@
 			"type": "Program",
 			"start": 8,
 			"end": 100,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 4,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 57,
 					"end": 99,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 43
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 63,
 							"end": 98,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 7
-								},
-								"end": {
-									"line": 3,
-									"column": 42
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 63,
 								"end": 75,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 7
-									},
-									"end": {
-										"line": 3,
-										"column": 19
-									}
-								},
 								"name": "shortObjects"
 							},
 							"init": {
 								"type": "ArrayExpression",
 								"start": 78,
 								"end": 98,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 22
-									},
-									"end": {
-										"line": 3,
-										"column": 42
-									}
-								},
 								"elements": [
 									{
 										"type": "ObjectExpression",
 										"start": 79,
 										"end": 87,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 23
-											},
-											"end": {
-												"line": 3,
-												"column": 31
-											}
-										},
 										"properties": [
 											{
 												"type": "Property",
 												"start": 81,
 												"end": 85,
-												"loc": {
-													"start": {
-														"line": 3,
-														"column": 25
-													},
-													"end": {
-														"line": 3,
-														"column": 29
-													}
-												},
 												"method": false,
 												"shorthand": false,
 												"computed": false,
@@ -143,32 +63,12 @@
 													"type": "Identifier",
 													"start": 81,
 													"end": 82,
-													"loc": {
-														"start": {
-															"line": 3,
-															"column": 25
-														},
-														"end": {
-															"line": 3,
-															"column": 26
-														}
-													},
 													"name": "a"
 												},
 												"value": {
 													"type": "Literal",
 													"start": 84,
 													"end": 85,
-													"loc": {
-														"start": {
-															"line": 3,
-															"column": 28
-														},
-														"end": {
-															"line": 3,
-															"column": 29
-														}
-													},
 													"value": 1,
 													"raw": "1"
 												},
@@ -180,31 +80,11 @@
 										"type": "ObjectExpression",
 										"start": 89,
 										"end": 97,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 33
-											},
-											"end": {
-												"line": 3,
-												"column": 41
-											}
-										},
 										"properties": [
 											{
 												"type": "Property",
 												"start": 91,
 												"end": 95,
-												"loc": {
-													"start": {
-														"line": 3,
-														"column": 35
-													},
-													"end": {
-														"line": 3,
-														"column": 39
-													}
-												},
 												"method": false,
 												"shorthand": false,
 												"computed": false,
@@ -212,32 +92,12 @@
 													"type": "Identifier",
 													"start": 91,
 													"end": 92,
-													"loc": {
-														"start": {
-															"line": 3,
-															"column": 35
-														},
-														"end": {
-															"line": 3,
-															"column": 36
-														}
-													},
 													"name": "b"
 												},
 												"value": {
 													"type": "Literal",
 													"start": 94,
 													"end": 95,
-													"loc": {
-														"start": {
-															"line": 3,
-															"column": 38
-														},
-														"end": {
-															"line": 3,
-															"column": 39
-														}
-													},
 													"value": 2,
 													"raw": "2"
 												},

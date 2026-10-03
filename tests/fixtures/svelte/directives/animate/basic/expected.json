@@ -15,16 +15,6 @@
 					"type": "Identifier",
 					"start": 7,
 					"end": 12,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 7
-						},
-						"end": {
-							"line": 1,
-							"column": 12
-						}
-					},
 					"name": "items"
 				},
 				"body": {
@@ -42,36 +32,12 @@
 							"start": 33,
 							"end": 57,
 							"name": "div",
-							"name_loc": {
-								"start": {
-									"line": 2,
-									"column": 2,
-									"character": 34
-								},
-								"end": {
-									"line": 2,
-									"column": 5,
-									"character": 37
-								}
-							},
 							"attributes": [
 								{
 									"start": 38,
 									"end": 50,
 									"type": "AnimateDirective",
 									"name": "flip",
-									"name_loc": {
-										"start": {
-											"line": 2,
-											"column": 6,
-											"character": 38
-										},
-										"end": {
-											"line": 2,
-											"column": 18,
-											"character": 50
-										}
-									},
 									"expression": null,
 									"modifiers": []
 								}
@@ -94,64 +60,22 @@
 					"type": "Identifier",
 					"name": "item",
 					"start": 16,
-					"end": 20,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 16,
-							"character": 16
-						},
-						"end": {
-							"line": 1,
-							"column": 20,
-							"character": 20
-						}
-					}
+					"end": 20
 				},
 				"key": {
 					"type": "MemberExpression",
 					"start": 22,
 					"end": 29,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 22
-						},
-						"end": {
-							"line": 1,
-							"column": 29
-						}
-					},
 					"object": {
 						"type": "Identifier",
 						"start": 22,
 						"end": 26,
-						"loc": {
-							"start": {
-								"line": 1,
-								"column": 22
-							},
-							"end": {
-								"line": 1,
-								"column": 26
-							}
-						},
 						"name": "item"
 					},
 					"property": {
 						"type": "Identifier",
 						"start": 27,
 						"end": 29,
-						"loc": {
-							"start": {
-								"line": 1,
-								"column": 27
-							},
-							"end": {
-								"line": 1,
-								"column": 29
-							}
-						},
 						"name": "id"
 					},
 					"computed": false,
@@ -173,16 +97,6 @@
 					"type": "Identifier",
 					"start": 74,
 					"end": 79,
-					"loc": {
-						"start": {
-							"line": 5,
-							"column": 7
-						},
-						"end": {
-							"line": 5,
-							"column": 12
-						}
-					},
 					"name": "items"
 				},
 				"body": {
@@ -200,65 +114,21 @@
 							"start": 100,
 							"end": 144,
 							"name": "div",
-							"name_loc": {
-								"start": {
-									"line": 6,
-									"column": 2,
-									"character": 101
-								},
-								"end": {
-									"line": 6,
-									"column": 5,
-									"character": 104
-								}
-							},
 							"attributes": [
 								{
 									"start": 105,
 									"end": 137,
 									"type": "AnimateDirective",
 									"name": "flip",
-									"name_loc": {
-										"start": {
-											"line": 6,
-											"column": 6,
-											"character": 105
-										},
-										"end": {
-											"line": 6,
-											"column": 18,
-											"character": 117
-										}
-									},
 									"expression": {
 										"type": "ObjectExpression",
 										"start": 119,
 										"end": 136,
-										"loc": {
-											"start": {
-												"line": 6,
-												"column": 20
-											},
-											"end": {
-												"line": 6,
-												"column": 37
-											}
-										},
 										"properties": [
 											{
 												"type": "Property",
 												"start": 121,
 												"end": 134,
-												"loc": {
-													"start": {
-														"line": 6,
-														"column": 22
-													},
-													"end": {
-														"line": 6,
-														"column": 35
-													}
-												},
 												"method": false,
 												"shorthand": false,
 												"computed": false,
@@ -266,32 +136,12 @@
 													"type": "Identifier",
 													"start": 121,
 													"end": 129,
-													"loc": {
-														"start": {
-															"line": 6,
-															"column": 22
-														},
-														"end": {
-															"line": 6,
-															"column": 30
-														}
-													},
 													"name": "duration"
 												},
 												"value": {
 													"type": "Literal",
 													"start": 131,
 													"end": 134,
-													"loc": {
-														"start": {
-															"line": 6,
-															"column": 32
-														},
-														"end": {
-															"line": 6,
-															"column": 35
-														}
-													},
 													"value": 200,
 													"raw": "200"
 												},
@@ -320,64 +170,22 @@
 					"type": "Identifier",
 					"name": "item",
 					"start": 83,
-					"end": 87,
-					"loc": {
-						"start": {
-							"line": 5,
-							"column": 16,
-							"character": 83
-						},
-						"end": {
-							"line": 5,
-							"column": 20,
-							"character": 87
-						}
-					}
+					"end": 87
 				},
 				"key": {
 					"type": "MemberExpression",
 					"start": 89,
 					"end": 96,
-					"loc": {
-						"start": {
-							"line": 5,
-							"column": 22
-						},
-						"end": {
-							"line": 5,
-							"column": 29
-						}
-					},
 					"object": {
 						"type": "Identifier",
 						"start": 89,
 						"end": 93,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 22
-							},
-							"end": {
-								"line": 5,
-								"column": 26
-							}
-						},
 						"name": "item"
 					},
 					"property": {
 						"type": "Identifier",
 						"start": 94,
 						"end": 96,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 27
-							},
-							"end": {
-								"line": 5,
-								"column": 29
-							}
-						},
 						"name": "id"
 					},
 					"computed": false,

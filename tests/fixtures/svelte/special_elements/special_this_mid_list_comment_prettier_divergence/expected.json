@@ -51,36 +51,12 @@
 				"start": 257,
 				"end": 311,
 				"name": "svelte:element",
-				"name_loc": {
-					"start": {
-						"line": 4,
-						"column": 1,
-						"character": 258
-					},
-					"end": {
-						"line": 4,
-						"column": 15,
-						"character": 272
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 291,
 						"end": 308,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 4,
-								"column": 34,
-								"character": 291
-							},
-							"end": {
-								"line": 4,
-								"column": 43,
-								"character": 300
-							}
-						},
 						"value": [
 							{
 								"start": 302,
@@ -100,16 +76,6 @@
 					"type": "Identifier",
 					"start": 288,
 					"end": 289,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 31
-						},
-						"end": {
-							"line": 4,
-							"column": 32
-						}
-					},
 					"name": "x"
 				}
 			},
@@ -138,36 +104,12 @@
 				"start": 403,
 				"end": 456,
 				"name": "svelte:element",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 1,
-						"character": 404
-					},
-					"end": {
-						"line": 7,
-						"column": 15,
-						"character": 418
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 436,
 						"end": 453,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 9,
-								"column": 1,
-								"character": 436
-							},
-							"end": {
-								"line": 9,
-								"column": 10,
-								"character": 445
-							}
-						},
 						"value": [
 							{
 								"start": 447,
@@ -187,16 +129,6 @@
 					"type": "Identifier",
 					"start": 432,
 					"end": 433,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 7
-						},
-						"end": {
-							"line": 8,
-							"column": 8
-						}
-					},
 					"name": "x"
 				}
 			},
@@ -225,36 +157,12 @@
 				"start": 561,
 				"end": 618,
 				"name": "svelte:element",
-				"name_loc": {
-					"start": {
-						"line": 13,
-						"column": 1,
-						"character": 562
-					},
-					"end": {
-						"line": 13,
-						"column": 15,
-						"character": 576
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 598,
 						"end": 615,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 16,
-								"column": 1,
-								"character": 598
-							},
-							"end": {
-								"line": 16,
-								"column": 10,
-								"character": 607
-							}
-						},
 						"value": [
 							{
 								"start": 609,
@@ -274,16 +182,6 @@
 					"type": "Identifier",
 					"start": 594,
 					"end": 595,
-					"loc": {
-						"start": {
-							"line": 15,
-							"column": 7
-						},
-						"end": {
-							"line": 15,
-							"column": 8
-						}
-					},
 					"name": "x"
 				}
 			},
@@ -325,36 +223,12 @@
 				"start": 754,
 				"end": 808,
 				"name": "svelte:component",
-				"name_loc": {
-					"start": {
-						"line": 21,
-						"column": 1,
-						"character": 755
-					},
-					"end": {
-						"line": 21,
-						"column": 17,
-						"character": 771
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 793,
 						"end": 805,
 						"name": "prop",
-						"name_loc": {
-							"start": {
-								"line": 21,
-								"column": 39,
-								"character": 793
-							},
-							"end": {
-								"line": 21,
-								"column": 43,
-								"character": 797
-							}
-						},
 						"value": [
 							{
 								"start": 799,
@@ -374,16 +248,6 @@
 					"type": "Identifier",
 					"start": 787,
 					"end": 791,
-					"loc": {
-						"start": {
-							"line": 21,
-							"column": 33
-						},
-						"end": {
-							"line": 21,
-							"column": 37
-						}
-					},
 					"name": "Comp"
 				}
 			}
@@ -395,73 +259,25 @@
 			"type": "Block",
 			"start": 273,
 			"end": 281,
-			"value": " c1 ",
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 16,
-					"character": 273
-				},
-				"end": {
-					"line": 4,
-					"column": 24,
-					"character": 281
-				}
-			}
+			"value": " c1 "
 		},
 		{
 			"type": "Line",
 			"start": 419,
 			"end": 424,
-			"value": " c2",
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 16,
-					"character": 419
-				},
-				"end": {
-					"line": 7,
-					"column": 21,
-					"character": 424
-				}
-			}
+			"value": " c2"
 		},
 		{
 			"type": "Block",
 			"start": 578,
 			"end": 586,
-			"value": " c3 ",
-			"loc": {
-				"start": {
-					"line": 14,
-					"column": 1,
-					"character": 578
-				},
-				"end": {
-					"line": 14,
-					"column": 9,
-					"character": 586
-				}
-			}
+			"value": " c3 "
 		},
 		{
 			"type": "Block",
 			"start": 772,
 			"end": 780,
-			"value": " c4 ",
-			"loc": {
-				"start": {
-					"line": 21,
-					"column": 18,
-					"character": 772
-				},
-				"end": {
-					"line": 21,
-					"column": 26,
-					"character": 780
-				}
-			}
+			"value": " c4 "
 		}
 	]
 }

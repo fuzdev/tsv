@@ -12,36 +12,12 @@
 				"start": 0,
 				"end": 36,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 4,
-						"character": 4
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 5,
 						"end": 16,
 						"name": "class",
-						"name_loc": {
-							"start": {
-								"line": 1,
-								"column": 5,
-								"character": 5
-							},
-							"end": {
-								"line": 1,
-								"column": 10,
-								"character": 10
-							}
-						},
 						"value": [
 							{
 								"start": 12,
@@ -60,16 +36,6 @@
 							"type": "Identifier",
 							"start": 26,
 							"end": 28,
-							"loc": {
-								"start": {
-									"line": 1,
-									"column": 26
-								},
-								"end": {
-									"line": 1,
-									"column": 28
-								}
-							},
 							"name": "fn"
 						}
 					}
@@ -91,18 +57,6 @@
 				"start": 38,
 				"end": 74,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 1,
-						"character": 39
-					},
-					"end": {
-						"line": 3,
-						"column": 4,
-						"character": 42
-					}
-				},
 				"attributes": [
 					{
 						"type": "AttachTag",
@@ -112,16 +66,6 @@
 							"type": "Identifier",
 							"start": 52,
 							"end": 54,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 14
-								},
-								"end": {
-									"line": 3,
-									"column": 16
-								}
-							},
 							"name": "fn"
 						}
 					},
@@ -130,18 +74,6 @@
 						"start": 56,
 						"end": 67,
 						"name": "class",
-						"name_loc": {
-							"start": {
-								"line": 3,
-								"column": 18,
-								"character": 56
-							},
-							"end": {
-								"line": 3,
-								"column": 23,
-								"character": 61
-							}
-						},
 						"value": [
 							{
 								"start": 63,
@@ -170,36 +102,12 @@
 				"start": 76,
 				"end": 136,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 1,
-						"character": 77
-					},
-					"end": {
-						"line": 5,
-						"column": 4,
-						"character": 80
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 81,
 						"end": 92,
 						"name": "class",
-						"name_loc": {
-							"start": {
-								"line": 5,
-								"column": 5,
-								"character": 81
-							},
-							"end": {
-								"line": 5,
-								"column": 10,
-								"character": 86
-							}
-						},
 						"value": [
 							{
 								"start": 88,
@@ -218,16 +126,6 @@
 							"type": "Identifier",
 							"start": 102,
 							"end": 105,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 26
-								},
-								"end": {
-									"line": 5,
-									"column": 29
-								}
-							},
 							"name": "fn1"
 						}
 					},
@@ -236,18 +134,6 @@
 						"start": 107,
 						"end": 115,
 						"name": "id",
-						"name_loc": {
-							"start": {
-								"line": 5,
-								"column": 31,
-								"character": 107
-							},
-							"end": {
-								"line": 5,
-								"column": 33,
-								"character": 109
-							}
-						},
 						"value": [
 							{
 								"start": 111,
@@ -266,16 +152,6 @@
 							"type": "Identifier",
 							"start": 125,
 							"end": 128,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 49
-								},
-								"end": {
-									"line": 5,
-									"column": 52
-								}
-							},
 							"name": "fn2"
 						}
 					}

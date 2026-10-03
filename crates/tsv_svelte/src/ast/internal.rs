@@ -70,13 +70,12 @@ pub struct SnippetWireParameters<'arena> {
 /// One embedded **acorn parse**: where it began reading the component's own
 /// bytes, and what Svelte did to the text ahead of it.
 ///
-/// Svelte runs acorn once per island over a *purpose-built* string, and the
-/// wire `loc` those nodes carry is acorn's, seeded from that string — see
-/// [`tsv_ts::AcornSeed`]. Recording the parse start here is what lets the wire
-/// writer rebuild the seed: it cannot be recovered from a node's own span (a
-/// leading comment, or whitespace Svelte had already stepped over, sits between
-/// them), and the root `comments` array is emitted outside the tree walk that
-/// would otherwise carry it.
+/// Svelte runs acorn once per island over a *purpose-built* string, and a
+/// multi-line block comment's wire `value` is dedented against that string.
+/// Recording the parse start here is what lets the wire writer rebuild it: it
+/// cannot be recovered from a node's own span (a leading comment, or whitespace
+/// Svelte had already stepped over, sits between them), and the root `comments`
+/// array is emitted outside the tree walk that would otherwise carry it.
 ///
 /// Regions are recorded in strict source order, so "the region a position belongs
 /// to" is the last one starting at or before it.
@@ -94,21 +93,18 @@ pub struct AcornRegion {
     /// One past the last byte of the slice this sub-parse was handed — the extent
     /// a position resolving to this region must fall inside.
     ///
-    /// Carried so the position→parse lookup can be **checked**. Without it the
-    /// lookup's failure mode is silent: a caller that passes a position ahead of
-    /// its own island (a container start, an enclosing tag's span) resolves to the
-    /// *previous* parse, the wire stays well-formed, and only its lines move. With
-    /// it, `Ctx::acorn_seed`'s `debug_assert` catches that in every test, fixture
-    /// run and audit. Inclusive at the bound — an empty `<script>` records a
-    /// zero-length region whose `Program` starts exactly at `end`.
+    /// Carried so the position→parse lookup can tell a position inside a region
+    /// from one past it ([`AcornPrefixes::at`]). Inclusive at the bound — an empty
+    /// `<script>` records a zero-length region whose `Program` starts exactly at
+    /// `end`.
     pub end: u32,
     /// acorn's `startPos` for this parse. Behind `lex_start` only where Svelte
     /// *inserts* synthetic text there (`read_type_annotation`'s `_ as `), which
     /// acorn lexes in place of the bytes it covers.
     pub origin: u32,
-    /// How Svelte prepared the text ahead of `origin` — which decides both the line
-    /// class acorn counted over it and the indentation `onComment` dedents a
-    /// multi-line block comment by ([`AcornPrefixText`]).
+    /// How Svelte prepared the text ahead of `origin` — which decides the
+    /// indentation `onComment` dedents a multi-line block comment by
+    /// ([`AcornPrefixText`]).
     pub prefix: AcornPrefixText,
 }
 
@@ -141,16 +137,9 @@ impl AcornRegion {
     /// anything else means this is not an annotation at all and no region was
     /// recorded.
     ///
-    /// Stated once because two sides must agree on it: the parser RECORDS the
-    /// annotation's region at this position, and the wire writer LOOKS IT UP by it.
-    /// A disagreement resolves to the *pattern's* region instead — the enclosing
-    /// parse, which nests this one — and the annotation's type nodes take the wrong
-    /// line seed. `AcornRegion::end` is what makes that loud rather than silent, but
-    /// only for a position that leaves the pattern's extent too; inside it the two
-    /// regions are indistinguishable to any check, which is why the derivation lives
-    /// here in one place rather than at each side. That is also why the lookup cannot
-    /// just pass the annotation's span start: it is behind `lex_start`, and now by an
-    /// author-controlled distance rather than exactly one byte.
+    /// The annotation's span start is behind `lex_start` by an author-controlled
+    /// distance, so the parser records the region at this position rather than at
+    /// the span start.
     pub(crate) fn annotation_lex_start(source: &str, annotation_start: u32) -> u32 {
         // The colon is the first NON-WHITESPACE byte, so this steps over the run
         // rather than searching for the glyph. Not a stylistic choice: a `:` scan
@@ -173,8 +162,7 @@ impl AcornRegion {
 /// about the same comment.
 #[derive(Debug, Clone, Copy)]
 pub struct AcornPrefixes<'a> {
-    /// The parse-fact ledger, ascending by `lex_start` — shared with the `loc` seed
-    /// lookup (`Ctx::acorn_seed` indexes its seeds parallel to this slice).
+    /// The parse-fact ledger, ascending by `lex_start`.
     pub(crate) regions: &'a [AcornRegion],
 }
 
@@ -186,13 +174,9 @@ impl<'a> AcornPrefixes<'a> {
     }
 
     /// The **index** of the last region starting at or before `pos` — the one "which
-    /// parse lexed this position" rule, stated once so its two askers cannot resolve one
-    /// position to two parses. Where regions nest (a block pattern and its `: T`) the
-    /// later start is the inner parse, which is the one that lexed the position.
-    ///
-    /// Whether that region also CONTAINS `pos` is deliberately NOT asked here, because
-    /// the two askers answer it differently: [`at`](Self::at) falls back to
-    /// [`AcornPrefix::DOCUMENT`], `Ctx::acorn_seed` asserts.
+    /// parse lexed this position" rule. Where regions nest (a block pattern and its `: T`)
+    /// the later start is the inner parse, which is the one that lexed the position.
+    /// Whether that region also CONTAINS `pos` is [`at`](Self::at)'s question.
     #[inline]
     pub(crate) fn index_at(self, pos: u32) -> Option<usize> {
         self.regions
@@ -208,9 +192,8 @@ impl<'a> AcornPrefixes<'a> {
     /// answer for the whole island is wrong for whichever half it did not come from.
     ///
     /// A position outside every region is [`AcornPrefix::DOCUMENT`] rather than an
-    /// assertion — unlike `Ctx::acorn_seed`, which is only ever asked about a position
-    /// inside its own island, this is asked about every comment in the document,
-    /// including ones no acorn parse covers.
+    /// assertion: this is asked about every comment in the document, including ones no
+    /// acorn parse covers.
     #[must_use]
     pub fn at(self, pos: u32) -> AcornPrefix {
         match self.index_at(pos) {

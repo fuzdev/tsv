@@ -12,18 +12,6 @@
 				"start": 0,
 				"end": 7,
 				"name": "Foo",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 4,
-						"character": 4
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -42,18 +30,6 @@
 				"start": 8,
 				"end": 15,
 				"name": "Bar",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 9
-					},
-					"end": {
-						"line": 2,
-						"column": 4,
-						"character": 12
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -75,16 +51,6 @@
 					"type": "Identifier",
 					"start": 18,
 					"end": 19,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 2
-						}
-					},
 					"name": "a"
 				}
 			},
@@ -103,16 +69,6 @@
 					"type": "Identifier",
 					"start": 22,
 					"end": 23,
-					"loc": {
-						"start": {
-							"line": 5,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 2
-						}
-					},
 					"name": "b"
 				}
 			},
@@ -128,18 +84,6 @@
 				"start": 26,
 				"end": 77,
 				"name": "section",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 1,
-						"character": 27
-					},
-					"end": {
-						"line": 7,
-						"column": 8,
-						"character": 34
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -156,18 +100,6 @@
 							"start": 37,
 							"end": 44,
 							"name": "Baz",
-							"name_loc": {
-								"start": {
-									"line": 8,
-									"column": 2,
-									"character": 38
-								},
-								"end": {
-									"line": 8,
-									"column": 5,
-									"character": 41
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -186,18 +118,6 @@
 							"start": 46,
 							"end": 53,
 							"name": "Qux",
-							"name_loc": {
-								"start": {
-									"line": 9,
-									"column": 2,
-									"character": 47
-								},
-								"end": {
-									"line": 9,
-									"column": 5,
-									"character": 50
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -216,18 +136,6 @@
 							"start": 55,
 							"end": 66,
 							"name": "p",
-							"name_loc": {
-								"start": {
-									"line": 10,
-									"column": 2,
-									"character": 56
-								},
-								"end": {
-									"line": 10,
-									"column": 3,
-									"character": 57
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",

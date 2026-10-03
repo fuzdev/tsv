@@ -16,16 +16,6 @@
 					"type": "Identifier",
 					"start": 5,
 					"end": 6,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 5
-						},
-						"end": {
-							"line": 1,
-							"column": 6
-						}
-					},
 					"name": "a"
 				},
 				"consequent": {
@@ -52,48 +42,16 @@
 											"type": "Identifier",
 											"name": "b",
 											"start": 17,
-											"end": 18,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 9,
-													"character": 17
-												},
-												"end": {
-													"line": 2,
-													"column": 10,
-													"character": 18
-												}
-											}
+											"end": 18
 										},
 										"init": {
 											"type": "BinaryExpression",
 											"start": 21,
 											"end": 26,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 13
-												},
-												"end": {
-													"line": 2,
-													"column": 18
-												}
-											},
 											"left": {
 												"type": "Identifier",
 												"start": 21,
 												"end": 22,
-												"loc": {
-													"start": {
-														"line": 2,
-														"column": 13
-													},
-													"end": {
-														"line": 2,
-														"column": 14
-													}
-												},
 												"name": "a"
 											},
 											"operator": "+",
@@ -101,16 +59,6 @@
 												"type": "Literal",
 												"start": 25,
 												"end": 26,
-												"loc": {
-													"start": {
-														"line": 2,
-														"column": 17
-													},
-													"end": {
-														"line": 2,
-														"column": 18
-													}
-												},
 												"value": 1,
 												"raw": "1"
 											}
@@ -138,16 +86,6 @@
 								"type": "Identifier",
 								"start": 30,
 								"end": 31,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 2
-									},
-									"end": {
-										"line": 3,
-										"column": 3
-									}
-								},
 								"name": "b"
 							}
 						},

@@ -14,49 +14,19 @@
 			"type": "Line",
 			"value": " An `import X = ...` reference is `require('...')` or an entity name (A.B.C)",
 			"start": 20,
-			"end": 98,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 79
-				}
-			}
+			"end": 98
 		},
 		{
 			"type": "Line",
 			"value": " `import type X = ...` is valid ONLY for an external module reference;",
 			"start": 150,
-			"end": 222,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 1
-				},
-				"end": {
-					"line": 6,
-					"column": 73
-				}
-			}
+			"end": 222
 		},
 		{
 			"type": "Line",
 			"value": " an entity-name alias is rejected (see input_invalid_type_modifier).",
 			"start": 224,
-			"end": 294,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 1
-				},
-				"end": {
-					"line": 7,
-					"column": 71
-				}
-			}
+			"end": 294
 		}
 	],
 	"instance": {
@@ -68,77 +38,27 @@
 			"type": "Program",
 			"start": 18,
 			"end": 328,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 9,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "TSImportEqualsDeclaration",
 					"start": 100,
 					"end": 126,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 27
-						}
-					},
 					"importKind": "value",
 					"isExport": false,
 					"id": {
 						"type": "Identifier",
 						"start": 107,
 						"end": 110,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 8
-							},
-							"end": {
-								"line": 3,
-								"column": 11
-							}
-						},
 						"name": "req"
 					},
 					"moduleReference": {
 						"type": "TSExternalModuleReference",
 						"start": 113,
 						"end": 125,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 14
-							},
-							"end": {
-								"line": 3,
-								"column": 26
-							}
-						},
 						"expression": {
 							"type": "Literal",
 							"start": 121,
 							"end": 124,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 22
-								},
-								"end": {
-									"line": 3,
-									"column": 25
-								}
-							},
 							"value": "y",
 							"raw": "'y'"
 						}
@@ -156,92 +76,32 @@
 					"type": "TSImportEqualsDeclaration",
 					"start": 128,
 					"end": 147,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 20
-						}
-					},
 					"importKind": "value",
 					"isExport": false,
 					"id": {
 						"type": "Identifier",
 						"start": 135,
 						"end": 138,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 8
-							},
-							"end": {
-								"line": 4,
-								"column": 11
-							}
-						},
 						"name": "ent"
 					},
 					"moduleReference": {
 						"type": "TSQualifiedName",
 						"start": 141,
 						"end": 146,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 14
-							},
-							"end": {
-								"line": 4,
-								"column": 19
-							}
-						},
 						"left": {
 							"type": "TSQualifiedName",
 							"start": 141,
 							"end": 144,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 14
-								},
-								"end": {
-									"line": 4,
-									"column": 17
-								}
-							},
 							"left": {
 								"type": "Identifier",
 								"start": 141,
 								"end": 142,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 14
-									},
-									"end": {
-										"line": 4,
-										"column": 15
-									}
-								},
 								"name": "A"
 							},
 							"right": {
 								"type": "Identifier",
 								"start": 143,
 								"end": 144,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 16
-									},
-									"end": {
-										"line": 4,
-										"column": 17
-									}
-								},
 								"name": "B"
 							}
 						},
@@ -249,16 +109,6 @@
 							"type": "Identifier",
 							"start": 145,
 							"end": 146,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 18
-								},
-								"end": {
-									"line": 4,
-									"column": 19
-								}
-							},
 							"name": "C"
 						}
 					}
@@ -267,62 +117,22 @@
 					"type": "TSImportEqualsDeclaration",
 					"start": 296,
 					"end": 327,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 32
-						}
-					},
 					"importKind": "type",
 					"isExport": false,
 					"id": {
 						"type": "Identifier",
 						"start": 308,
 						"end": 311,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 13
-							},
-							"end": {
-								"line": 8,
-								"column": 16
-							}
-						},
 						"name": "ext"
 					},
 					"moduleReference": {
 						"type": "TSExternalModuleReference",
 						"start": 314,
 						"end": 326,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 19
-							},
-							"end": {
-								"line": 8,
-								"column": 31
-							}
-						},
 						"expression": {
 							"type": "Literal",
 							"start": 322,
 							"end": 325,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 27
-								},
-								"end": {
-									"line": 8,
-									"column": 30
-								}
-							},
 							"value": "z",
 							"raw": "'z'"
 						}
@@ -351,18 +161,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

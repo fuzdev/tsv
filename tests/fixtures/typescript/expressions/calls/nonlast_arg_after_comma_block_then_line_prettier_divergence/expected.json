@@ -14,129 +14,49 @@
 			"type": "Line",
 			"value": " A non-last argument with a block comment after the comma and a line comment",
 			"start": 20,
-			"end": 98,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 79
-				}
-			}
+			"end": 98
 		},
 		{
 			"type": "Line",
 			"value": " after it: the block stays on the comma line where it was written, the line",
 			"start": 100,
-			"end": 177,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 78
-				}
-			}
+			"end": 177
 		},
 		{
 			"type": "Line",
 			"value": " comment trails the comma.",
 			"start": 179,
-			"end": 207,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 1
-				},
-				"end": {
-					"line": 4,
-					"column": 29
-				}
-			}
+			"end": 207
 		},
 		{
 			"type": "Block",
 			"value": " c1 ",
 			"start": 218,
-			"end": 226,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 5
-				},
-				"end": {
-					"line": 6,
-					"column": 13
-				}
-			}
+			"end": 226
 		},
 		{
 			"type": "Line",
 			"value": " c2",
 			"start": 227,
-			"end": 232,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 14
-				},
-				"end": {
-					"line": 6,
-					"column": 19
-				}
-			}
+			"end": 232
 		},
 		{
 			"type": "Line",
 			"value": " The after-comma block+line in the middle of three args (not just the first).",
 			"start": 243,
-			"end": 322,
-			"loc": {
-				"start": {
-					"line": 10,
-					"column": 1
-				},
-				"end": {
-					"line": 10,
-					"column": 80
-				}
-			}
+			"end": 322
 		},
 		{
 			"type": "Block",
 			"value": " c1 ",
 			"start": 333,
-			"end": 341,
-			"loc": {
-				"start": {
-					"line": 12,
-					"column": 5
-				},
-				"end": {
-					"line": 12,
-					"column": 13
-				}
-			}
+			"end": 341
 		},
 		{
 			"type": "Line",
 			"value": " c2",
 			"start": 342,
-			"end": 347,
-			"loc": {
-				"start": {
-					"line": 12,
-					"column": 14
-				},
-				"end": {
-					"line": 12,
-					"column": 19
-				}
-			}
+			"end": 347
 		}
 	],
 	"instance": {
@@ -148,59 +68,19 @@
 			"type": "Program",
 			"start": 18,
 			"end": 361,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 16,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
 					"start": 209,
 					"end": 240,
-					"loc": {
-						"start": {
-							"line": 5,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 209,
 						"end": 239,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 1
-							},
-							"end": {
-								"line": 8,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 209,
 							"end": 211,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 1
-								},
-								"end": {
-									"line": 5,
-									"column": 3
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -208,16 +88,6 @@
 								"type": "Identifier",
 								"start": 215,
 								"end": 216,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 2
-									},
-									"end": {
-										"line": 6,
-										"column": 3
-									}
-								},
 								"name": "a",
 								"trailingComments": [
 									{
@@ -232,16 +102,6 @@
 								"type": "Identifier",
 								"start": 235,
 								"end": 236,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 2
-									},
-									"end": {
-										"line": 7,
-										"column": 3
-									}
-								},
 								"name": "b",
 								"leadingComments": [
 									{
@@ -280,44 +140,14 @@
 					"type": "ExpressionStatement",
 					"start": 324,
 					"end": 360,
-					"loc": {
-						"start": {
-							"line": 11,
-							"column": 1
-						},
-						"end": {
-							"line": 15,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 324,
 						"end": 359,
-						"loc": {
-							"start": {
-								"line": 11,
-								"column": 1
-							},
-							"end": {
-								"line": 15,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 324,
 							"end": 326,
-							"loc": {
-								"start": {
-									"line": 11,
-									"column": 1
-								},
-								"end": {
-									"line": 11,
-									"column": 3
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -325,16 +155,6 @@
 								"type": "Identifier",
 								"start": 330,
 								"end": 331,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 2
-									},
-									"end": {
-										"line": 12,
-										"column": 3
-									}
-								},
 								"name": "a",
 								"trailingComments": [
 									{
@@ -349,16 +169,6 @@
 								"type": "Identifier",
 								"start": 350,
 								"end": 351,
-								"loc": {
-									"start": {
-										"line": 13,
-										"column": 2
-									},
-									"end": {
-										"line": 13,
-										"column": 3
-									}
-								},
 								"name": "b",
 								"leadingComments": [
 									{
@@ -373,16 +183,6 @@
 								"type": "Identifier",
 								"start": 355,
 								"end": 356,
-								"loc": {
-									"start": {
-										"line": 14,
-										"column": 2
-									},
-									"end": {
-										"line": 14,
-										"column": 3
-									}
-								},
 								"name": "c"
 							}
 						],
@@ -406,18 +206,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

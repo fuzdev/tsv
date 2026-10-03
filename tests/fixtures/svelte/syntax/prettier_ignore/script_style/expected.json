@@ -90,18 +90,6 @@
 				"start": 53,
 				"end": 66,
 				"name": "h1",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 1,
-						"character": 54
-					},
-					"end": {
-						"line": 7,
-						"column": 3,
-						"character": 56
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -149,59 +137,19 @@
 			"type": "Program",
 			"start": 33,
 			"end": 42,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 0
-				},
-				"end": {
-					"line": 5,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
 					"start": 36,
 					"end": 41,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 2
-						},
-						"end": {
-							"line": 4,
-							"column": 1
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 36,
 						"end": 41,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 2
-							},
-							"end": {
-								"line": 4,
-								"column": 1
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 36,
 							"end": 38,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 2
-								},
-								"end": {
-									"line": 3,
-									"column": 4
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [],

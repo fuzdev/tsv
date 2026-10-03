@@ -12,18 +12,6 @@
 				"start": 0,
 				"end": 34,
 				"name": "Comp",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 5,
-						"character": 5
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -40,18 +28,6 @@
 							"start": 8,
 							"end": 26,
 							"name": "div",
-							"name_loc": {
-								"start": {
-									"line": 2,
-									"column": 2,
-									"character": 9
-								},
-								"end": {
-									"line": 2,
-									"column": 5,
-									"character": 12
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -92,16 +68,6 @@
 					"type": "Identifier",
 					"start": 40,
 					"end": 41,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 5
-						},
-						"end": {
-							"line": 4,
-							"column": 6
-						}
-					},
 					"name": "a"
 				},
 				"consequent": {
@@ -119,18 +85,6 @@
 							"start": 44,
 							"end": 52,
 							"name": "p",
-							"name_loc": {
-								"start": {
-									"line": 5,
-									"column": 2,
-									"character": 45
-								},
-								"end": {
-									"line": 5,
-									"column": 3,
-									"character": 46
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -172,16 +126,6 @@
 					"type": "Identifier",
 					"start": 64,
 					"end": 65,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 5
-						},
-						"end": {
-							"line": 7,
-							"column": 6
-						}
-					},
 					"name": "b"
 				},
 				"consequent": {
@@ -199,18 +143,6 @@
 							"start": 68,
 							"end": 76,
 							"name": "p",
-							"name_loc": {
-								"start": {
-									"line": 8,
-									"column": 2,
-									"character": 69
-								},
-								"end": {
-									"line": 8,
-									"column": 3,
-									"character": 70
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",

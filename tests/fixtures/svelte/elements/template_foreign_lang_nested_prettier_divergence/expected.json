@@ -25,18 +25,6 @@
 				"start": 200,
 				"end": 267,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 4,
-						"column": 1,
-						"character": 201
-					},
-					"end": {
-						"line": 4,
-						"column": 4,
-						"character": 204
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -53,36 +41,12 @@
 							"start": 207,
 							"end": 260,
 							"name": "template",
-							"name_loc": {
-								"start": {
-									"line": 5,
-									"column": 2,
-									"character": 208
-								},
-								"end": {
-									"line": 5,
-									"column": 10,
-									"character": 216
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 217,
 									"end": 230,
 									"name": "lang",
-									"name_loc": {
-										"start": {
-											"line": 5,
-											"column": 11,
-											"character": 217
-										},
-										"end": {
-											"line": 5,
-											"column": 15,
-											"character": 221
-										}
-									},
 									"value": [
 										{
 											"start": 223,

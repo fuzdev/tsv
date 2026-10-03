@@ -14,129 +14,49 @@
 			"type": "Line",
 			"value": " A single-line block comment between a prefix type operator and its operand is",
 			"start": 20,
-			"end": 100,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 81
-				}
-			}
+			"end": 100
 		},
 		{
 			"type": "Line",
 			"value": " inline; the own-line authoring (unformatted_ours_own_line) collapses to this.",
 			"start": 102,
-			"end": 182,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 81
-				}
-			}
+			"end": 182
 		},
 		{
 			"type": "Line",
 			"value": " keyof",
 			"start": 185,
-			"end": 193,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 1
-				},
-				"end": {
-					"line": 5,
-					"column": 9
-				}
-			}
+			"end": 193
 		},
 		{
 			"type": "Block",
 			"value": " a ",
 			"start": 210,
-			"end": 217,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 16
-				},
-				"end": {
-					"line": 6,
-					"column": 23
-				}
-			}
+			"end": 217
 		},
 		{
 			"type": "Line",
 			"value": " typeof (a TypeQuery node)",
 			"start": 223,
-			"end": 251,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 1
-				},
-				"end": {
-					"line": 8,
-					"column": 29
-				}
-			}
+			"end": 251
 		},
 		{
 			"type": "Block",
 			"value": " b ",
 			"start": 269,
-			"end": 276,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 17
-				},
-				"end": {
-					"line": 9,
-					"column": 24
-				}
-			}
+			"end": 276
 		},
 		{
 			"type": "Line",
 			"value": " readonly",
 			"start": 282,
-			"end": 293,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 1
-				},
-				"end": {
-					"line": 11,
-					"column": 12
-				}
-			}
+			"end": 293
 		},
 		{
 			"type": "Block",
 			"value": " c ",
 			"start": 313,
-			"end": 320,
-			"loc": {
-				"start": {
-					"line": 12,
-					"column": 19
-				},
-				"end": {
-					"line": 12,
-					"column": 26
-				}
-			}
+			"end": 320
 		}
 	],
 	"instance": {
@@ -148,90 +68,30 @@
 			"type": "Program",
 			"start": 18,
 			"end": 331,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 13,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 195,
 					"end": 220,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 26
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 200,
 						"end": 201,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 6
-							},
-							"end": {
-								"line": 6,
-								"column": 7
-							}
-						},
 						"name": "A"
 					},
 					"typeAnnotation": {
 						"type": "TSTypeOperator",
 						"start": 204,
 						"end": 219,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 10
-							},
-							"end": {
-								"line": 6,
-								"column": 25
-							}
-						},
 						"operator": "keyof",
 						"typeAnnotation": {
 							"type": "TSTypeReference",
 							"start": 218,
 							"end": 219,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 24
-								},
-								"end": {
-									"line": 6,
-									"column": 25
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 218,
 								"end": 219,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 24
-									},
-									"end": {
-										"line": 6,
-										"column": 25
-									}
-								},
 								"name": "B"
 							},
 							"leadingComments": [
@@ -269,60 +129,20 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 253,
 					"end": 279,
-					"loc": {
-						"start": {
-							"line": 9,
-							"column": 1
-						},
-						"end": {
-							"line": 9,
-							"column": 27
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 258,
 						"end": 259,
-						"loc": {
-							"start": {
-								"line": 9,
-								"column": 6
-							},
-							"end": {
-								"line": 9,
-								"column": 7
-							}
-						},
 						"name": "B"
 					},
 					"typeAnnotation": {
 						"type": "TSTypeQuery",
 						"start": 262,
 						"end": 278,
-						"loc": {
-							"start": {
-								"line": 9,
-								"column": 10
-							},
-							"end": {
-								"line": 9,
-								"column": 26
-							}
-						},
 						"exprName": {
 							"type": "Identifier",
 							"start": 277,
 							"end": 278,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 25
-								},
-								"end": {
-									"line": 9,
-									"column": 26
-								}
-							},
 							"name": "x",
 							"leadingComments": [
 								{
@@ -347,75 +167,25 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 295,
 					"end": 330,
-					"loc": {
-						"start": {
-							"line": 12,
-							"column": 1
-						},
-						"end": {
-							"line": 12,
-							"column": 36
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 300,
 						"end": 301,
-						"loc": {
-							"start": {
-								"line": 12,
-								"column": 6
-							},
-							"end": {
-								"line": 12,
-								"column": 7
-							}
-						},
 						"name": "C"
 					},
 					"typeAnnotation": {
 						"type": "TSTypeOperator",
 						"start": 304,
 						"end": 329,
-						"loc": {
-							"start": {
-								"line": 12,
-								"column": 10
-							},
-							"end": {
-								"line": 12,
-								"column": 35
-							}
-						},
 						"operator": "readonly",
 						"typeAnnotation": {
 							"type": "TSArrayType",
 							"start": 321,
 							"end": 329,
-							"loc": {
-								"start": {
-									"line": 12,
-									"column": 27
-								},
-								"end": {
-									"line": 12,
-									"column": 35
-								}
-							},
 							"elementType": {
 								"type": "TSStringKeyword",
 								"start": 321,
-								"end": 327,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 27
-									},
-									"end": {
-										"line": 12,
-										"column": 33
-									}
-								}
+								"end": 327
 							},
 							"leadingComments": [
 								{
@@ -445,18 +215,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

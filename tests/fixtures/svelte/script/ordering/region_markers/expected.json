@@ -203,18 +203,6 @@
 				"start": 284,
 				"end": 298,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 21,
-						"column": 1,
-						"character": 285
-					},
-					"end": {
-						"line": 21,
-						"column": 4,
-						"character": 288
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -227,16 +215,6 @@
 								"type": "Identifier",
 								"start": 290,
 								"end": 291,
-								"loc": {
-									"start": {
-										"line": 21,
-										"column": 6
-									},
-									"end": {
-										"line": 21,
-										"column": 7
-									}
-								},
 								"name": "a"
 							}
 						}
@@ -300,18 +278,6 @@
 				"start": 41,
 				"end": 46,
 				"name": "runes",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 16,
-						"character": 41
-					},
-					"end": {
-						"line": 2,
-						"column": 21,
-						"character": 46
-					}
-				},
 				"value": true
 			}
 		],
@@ -327,76 +293,26 @@
 			"type": "Program",
 			"start": 111,
 			"end": 126,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 0
-				},
-				"end": {
-					"line": 9,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 113,
 					"end": 125,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 13
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 119,
 							"end": 124,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 7
-								},
-								"end": {
-									"line": 8,
-									"column": 12
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 119,
 								"end": 120,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 7
-									},
-									"end": {
-										"line": 8,
-										"column": 8
-									}
-								},
 								"name": "m"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 123,
 								"end": 124,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 11
-									},
-									"end": {
-										"line": 8,
-										"column": 12
-									}
-								},
 								"value": 1,
 								"raw": "1"
 							}
@@ -419,18 +335,6 @@
 				"start": 104,
 				"end": 110,
 				"name": "module",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 8,
-						"character": 104
-					},
-					"end": {
-						"line": 7,
-						"column": 14,
-						"character": 110
-					}
-				},
 				"value": true
 			}
 		]
@@ -444,76 +348,26 @@
 			"type": "Program",
 			"start": 197,
 			"end": 212,
-			"loc": {
-				"start": {
-					"line": 14,
-					"column": 0
-				},
-				"end": {
-					"line": 16,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 199,
 					"end": 211,
-					"loc": {
-						"start": {
-							"line": 15,
-							"column": 1
-						},
-						"end": {
-							"line": 15,
-							"column": 13
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 205,
 							"end": 210,
-							"loc": {
-								"start": {
-									"line": 15,
-									"column": 7
-								},
-								"end": {
-									"line": 15,
-									"column": 12
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 205,
 								"end": 206,
-								"loc": {
-									"start": {
-										"line": 15,
-										"column": 7
-									},
-									"end": {
-										"line": 15,
-										"column": 8
-									}
-								},
 								"name": "a"
 							},
 							"init": {
 								"type": "Identifier",
 								"start": 209,
 								"end": 210,
-								"loc": {
-									"start": {
-										"line": 15,
-										"column": 11
-									},
-									"end": {
-										"line": 15,
-										"column": 12
-									}
-								},
 								"name": "m"
 							}
 						}

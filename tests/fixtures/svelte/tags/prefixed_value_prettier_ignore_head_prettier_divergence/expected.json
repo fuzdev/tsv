@@ -28,30 +28,10 @@
 					"type": "BinaryExpression",
 					"start": 112,
 					"end": 123,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 12
-						}
-					},
 					"left": {
 						"type": "Identifier",
 						"start": 112,
 						"end": 115,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 1
-							},
-							"end": {
-								"line": 4,
-								"column": 4
-							}
-						},
 						"name": "aaa"
 					},
 					"operator": "+",
@@ -59,16 +39,6 @@
 						"type": "Identifier",
 						"start": 120,
 						"end": 123,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 9
-							},
-							"end": {
-								"line": 4,
-								"column": 12
-							}
-						},
 						"name": "bbb"
 					},
 					"leadingComments": [
@@ -109,30 +79,10 @@
 					"type": "BinaryExpression",
 					"start": 213,
 					"end": 224,
-					"loc": {
-						"start": {
-							"line": 10,
-							"column": 1
-						},
-						"end": {
-							"line": 10,
-							"column": 12
-						}
-					},
 					"left": {
 						"type": "Identifier",
 						"start": 213,
 						"end": 216,
-						"loc": {
-							"start": {
-								"line": 10,
-								"column": 1
-							},
-							"end": {
-								"line": 10,
-								"column": 4
-							}
-						},
 						"name": "ccc"
 					},
 					"operator": "+",
@@ -140,16 +90,6 @@
 						"type": "Identifier",
 						"start": 221,
 						"end": 224,
-						"loc": {
-							"start": {
-								"line": 10,
-								"column": 9
-							},
-							"end": {
-								"line": 10,
-								"column": 12
-							}
-						},
 						"name": "ddd"
 					},
 					"leadingComments": [
@@ -190,30 +130,10 @@
 					"type": "CallExpression",
 					"start": 313,
 					"end": 326,
-					"loc": {
-						"start": {
-							"line": 16,
-							"column": 1
-						},
-						"end": {
-							"line": 16,
-							"column": 14
-						}
-					},
 					"callee": {
 						"type": "Identifier",
 						"start": 313,
 						"end": 315,
-						"loc": {
-							"start": {
-								"line": 16,
-								"column": 1
-							},
-							"end": {
-								"line": 16,
-								"column": 3
-							}
-						},
 						"name": "fn"
 					},
 					"arguments": [
@@ -221,16 +141,6 @@
 							"type": "Identifier",
 							"start": 320,
 							"end": 323,
-							"loc": {
-								"start": {
-									"line": 16,
-									"column": 8
-								},
-								"end": {
-									"line": 16,
-									"column": 11
-								}
-							},
 							"name": "eee"
 						}
 					],
@@ -270,18 +180,6 @@
 				"start": 383,
 				"end": 445,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 20,
-						"column": 1,
-						"character": 384
-					},
-					"end": {
-						"line": 20,
-						"column": 4,
-						"character": 387
-					}
-				},
 				"attributes": [
 					{
 						"type": "AttachTag",
@@ -291,30 +189,10 @@
 							"type": "CallExpression",
 							"start": 421,
 							"end": 434,
-							"loc": {
-								"start": {
-									"line": 23,
-									"column": 2
-								},
-								"end": {
-									"line": 23,
-									"column": 15
-								}
-							},
 							"callee": {
 								"type": "Identifier",
 								"start": 421,
 								"end": 423,
-								"loc": {
-									"start": {
-										"line": 23,
-										"column": 2
-									},
-									"end": {
-										"line": 23,
-										"column": 4
-									}
-								},
 								"name": "fn"
 							},
 							"arguments": [
@@ -322,16 +200,6 @@
 									"type": "Identifier",
 									"start": 428,
 									"end": 431,
-									"loc": {
-										"start": {
-											"line": 23,
-											"column": 9
-										},
-										"end": {
-											"line": 23,
-											"column": 12
-										}
-									},
 									"name": "ggg"
 								}
 							],
@@ -380,30 +248,10 @@
 					"type": "BinaryExpression",
 					"start": 703,
 					"end": 714,
-					"loc": {
-						"start": {
-							"line": 32,
-							"column": 1
-						},
-						"end": {
-							"line": 32,
-							"column": 12
-						}
-					},
 					"left": {
 						"type": "Identifier",
 						"start": 703,
 						"end": 706,
-						"loc": {
-							"start": {
-								"line": 32,
-								"column": 1
-							},
-							"end": {
-								"line": 32,
-								"column": 4
-							}
-						},
 						"name": "jjj"
 					},
 					"operator": "+",
@@ -411,16 +259,6 @@
 						"type": "Identifier",
 						"start": 711,
 						"end": 714,
-						"loc": {
-							"start": {
-								"line": 32,
-								"column": 9
-							},
-							"end": {
-								"line": 32,
-								"column": 12
-							}
-						},
 						"name": "kkk"
 					},
 					"leadingComments": [
@@ -469,30 +307,10 @@
 					"type": "BinaryExpression",
 					"start": 803,
 					"end": 812,
-					"loc": {
-						"start": {
-							"line": 36,
-							"column": 7
-						},
-						"end": {
-							"line": 36,
-							"column": 16
-						}
-					},
 					"left": {
 						"type": "Identifier",
 						"start": 803,
 						"end": 806,
-						"loc": {
-							"start": {
-								"line": 36,
-								"column": 7
-							},
-							"end": {
-								"line": 36,
-								"column": 10
-							}
-						},
 						"name": "hhh"
 					},
 					"operator": "+",
@@ -500,16 +318,6 @@
 						"type": "Identifier",
 						"start": 809,
 						"end": 812,
-						"loc": {
-							"start": {
-								"line": 36,
-								"column": 13
-							},
-							"end": {
-								"line": 36,
-								"column": 16
-							}
-						},
 						"name": "iii"
 					}
 				}
@@ -522,97 +330,37 @@
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 92,
-			"end": 110,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 19
-				}
-			}
+			"end": 110
 		},
 		{
 			"type": "Block",
 			"value": " prettier-ignore ",
 			"start": 190,
-			"end": 211,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 1
-				},
-				"end": {
-					"line": 9,
-					"column": 22
-				}
-			}
+			"end": 211
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 293,
-			"end": 311,
-			"loc": {
-				"start": {
-					"line": 15,
-					"column": 1
-				},
-				"end": {
-					"line": 15,
-					"column": 19
-				}
-			}
+			"end": 311
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 400,
-			"end": 418,
-			"loc": {
-				"start": {
-					"line": 22,
-					"column": 2
-				},
-				"end": {
-					"line": 22,
-					"column": 20
-				}
-			}
+			"end": 418
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 683,
-			"end": 701,
-			"loc": {
-				"start": {
-					"line": 31,
-					"column": 1
-				},
-				"end": {
-					"line": 31,
-					"column": 19
-				}
-			}
+			"end": 701
 		},
 		{
 			"type": "Line",
 			"value": " trailing",
 			"start": 715,
-			"end": 726,
-			"loc": {
-				"start": {
-					"line": 32,
-					"column": 13
-				},
-				"end": {
-					"line": 32,
-					"column": 24
-				}
-			}
+			"end": 726
 		}
 	]
 }

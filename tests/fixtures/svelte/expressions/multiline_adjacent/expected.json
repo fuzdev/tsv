@@ -15,16 +15,6 @@
 					"type": "Literal",
 					"start": 1,
 					"end": 4,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 1
-						},
-						"end": {
-							"line": 1,
-							"column": 4
-						}
-					},
 					"value": "<",
 					"raw": "'<'"
 				}
@@ -44,16 +34,6 @@
 					"type": "Literal",
 					"start": 10,
 					"end": 13,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 10
-						},
-						"end": {
-							"line": 1,
-							"column": 13
-						}
-					},
 					"value": ">",
 					"raw": "'>'"
 				}
@@ -66,30 +46,10 @@
 					"type": "BinaryExpression",
 					"start": 15,
 					"end": 24,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 15
-						},
-						"end": {
-							"line": 1,
-							"column": 24
-						}
-					},
 					"left": {
 						"type": "Literal",
 						"start": 15,
 						"end": 18,
-						"loc": {
-							"start": {
-								"line": 1,
-								"column": 15
-							},
-							"end": {
-								"line": 1,
-								"column": 18
-							}
-						},
 						"value": "<",
 						"raw": "'<'"
 					},
@@ -98,16 +58,6 @@
 						"type": "Literal",
 						"start": 21,
 						"end": 24,
-						"loc": {
-							"start": {
-								"line": 1,
-								"column": 21
-							},
-							"end": {
-								"line": 1,
-								"column": 24
-							}
-						},
 						"value": ">",
 						"raw": "'>'"
 					}
@@ -128,30 +78,10 @@
 					"type": "BinaryExpression",
 					"start": 31,
 					"end": 40,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 31
-						},
-						"end": {
-							"line": 1,
-							"column": 40
-						}
-					},
 					"left": {
 						"type": "Literal",
 						"start": 31,
 						"end": 34,
-						"loc": {
-							"start": {
-								"line": 1,
-								"column": 31
-							},
-							"end": {
-								"line": 1,
-								"column": 34
-							}
-						},
 						"value": ">",
 						"raw": "'>'"
 					},
@@ -160,16 +90,6 @@
 						"type": "Literal",
 						"start": 37,
 						"end": 40,
-						"loc": {
-							"start": {
-								"line": 1,
-								"column": 37
-							},
-							"end": {
-								"line": 1,
-								"column": 40
-							}
-						},
 						"value": ">",
 						"raw": "'>'"
 					}

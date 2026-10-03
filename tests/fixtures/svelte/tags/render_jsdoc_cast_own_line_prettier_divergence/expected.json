@@ -15,30 +15,10 @@
 					"type": "CallExpression",
 					"start": 26,
 					"end": 32,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 26
-						},
-						"end": {
-							"line": 1,
-							"column": 32
-						}
-					},
 					"callee": {
 						"type": "Identifier",
 						"start": 27,
 						"end": 29,
-						"loc": {
-							"start": {
-								"line": 1,
-								"column": 27
-							},
-							"end": {
-								"line": 1,
-								"column": 29
-							}
-						},
 						"name": "fn"
 					},
 					"arguments": [],
@@ -61,17 +41,7 @@
 			"type": "Block",
 			"value": "* @type {A} ",
 			"start": 9,
-			"end": 25,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 9
-				},
-				"end": {
-					"line": 1,
-					"column": 25
-				}
-			}
+			"end": 25
 		}
 	]
 }

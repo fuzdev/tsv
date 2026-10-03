@@ -38,36 +38,12 @@
 				"start": 275,
 				"end": 323,
 				"name": "template",
-				"name_loc": {
-					"start": {
-						"line": 6,
-						"column": 1,
-						"character": 276
-					},
-					"end": {
-						"line": 6,
-						"column": 9,
-						"character": 284
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 286,
 						"end": 296,
 						"name": "lang",
-						"name_loc": {
-							"start": {
-								"line": 7,
-								"column": 1,
-								"character": 286
-							},
-							"end": {
-								"line": 7,
-								"column": 5,
-								"character": 290
-							}
-						},
 						"value": [
 							{
 								"start": 292,
@@ -117,36 +93,12 @@
 				"start": 407,
 				"end": 456,
 				"name": "template",
-				"name_loc": {
-					"start": {
-						"line": 13,
-						"column": 1,
-						"character": 408
-					},
-					"end": {
-						"line": 13,
-						"column": 9,
-						"character": 416
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 417,
 						"end": 427,
 						"name": "lang",
-						"name_loc": {
-							"start": {
-								"line": 13,
-								"column": 10,
-								"character": 417
-							},
-							"end": {
-								"line": 13,
-								"column": 14,
-								"character": 421
-							}
-						},
 						"value": [
 							{
 								"start": 423,
@@ -196,36 +148,12 @@
 				"start": 518,
 				"end": 570,
 				"name": "template",
-				"name_loc": {
-					"start": {
-						"line": 18,
-						"column": 1,
-						"character": 519
-					},
-					"end": {
-						"line": 18,
-						"column": 9,
-						"character": 527
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 529,
 						"end": 539,
 						"name": "lang",
-						"name_loc": {
-							"start": {
-								"line": 19,
-								"column": 1,
-								"character": 529
-							},
-							"end": {
-								"line": 19,
-								"column": 5,
-								"character": 533
-							}
-						},
 						"value": [
 							{
 								"start": 535,
@@ -258,55 +186,19 @@
 			"type": "Line",
 			"start": 297,
 			"end": 301,
-			"value": " c",
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 12,
-					"character": 297
-				},
-				"end": {
-					"line": 7,
-					"column": 16,
-					"character": 301
-				}
-			}
+			"value": " c"
 		},
 		{
 			"type": "Block",
 			"start": 428,
 			"end": 435,
-			"value": " c ",
-			"loc": {
-				"start": {
-					"line": 13,
-					"column": 21,
-					"character": 428
-				},
-				"end": {
-					"line": 13,
-					"column": 28,
-					"character": 435
-				}
-			}
+			"value": " c "
 		},
 		{
 			"type": "Block",
 			"start": 541,
 			"end": 548,
-			"value": " c ",
-			"loc": {
-				"start": {
-					"line": 20,
-					"column": 1,
-					"character": 541
-				},
-				"end": {
-					"line": 20,
-					"column": 8,
-					"character": 548
-				}
-			}
+			"value": " c "
 		}
 	]
 }

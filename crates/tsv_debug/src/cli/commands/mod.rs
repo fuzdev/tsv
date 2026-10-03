@@ -42,6 +42,7 @@ pub mod ignore_audit;
 pub mod json_profile;
 pub mod lex_diff;
 pub mod line_width;
+pub mod loc_wires;
 pub mod metrics;
 pub mod neutrality_audit;
 pub mod paren_audit;

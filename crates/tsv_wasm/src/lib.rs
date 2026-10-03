@@ -333,14 +333,15 @@ const TS_AST_REEXPORT: &'static str = r#"
 export type * from "./tsv_ast.js";
 "#;
 
+// TODO: `tsv_ast.d.ts` declares `loc` optional, so the typed overload names the
+// span-only shape too — drop the `any` overload with the one-wire JS surface.
 /// Hand-written declarations for the parse exports, which are all
 /// `#[wasm_bindgen(skip_typescript)]`: wasm-bindgen can't express an
-/// options-dependent return type, and `{locations: false}` deliberately
-/// returns a shape `tsv_ast.d.ts` can't name (its interfaces declare `loc`
-/// required), so that overload returns `any` and must come first (the more
-/// specific signature). A signature change in `lang_bindings!` must update
-/// this block too; `ParseOptions` / `TypeScriptParseOptions` are re-exported
-/// through the npm facade (`scripts/patch_npm_package.ts`).
+/// options-dependent return type, so the `{locations: false}` overload
+/// returns `any` and must come first (the more specific signature). A signature
+/// change in `lang_bindings!` must update this block too; `ParseOptions` /
+/// `TypeScriptParseOptions` are re-exported through the npm facade
+/// (`scripts/patch_npm_package.ts`).
 ///
 /// Every option key spells `| undefined` on top of `?`, here and in
 /// `TS_FORMAT_DECLS`. That is not redundant: under a consumer's
@@ -366,9 +367,7 @@ export interface ParseOptions {
 	 * `false` emits the span-only wire (much smaller; Svelte also omits
 	 * `name_loc`): `loc` stays derivable from `start`/`end` plus the source,
 	 * via this package's own `reconstruct_locations` / `create_locator` /
-	 * `loc_of` (which throw on a Svelte source holding a lone CR / U+2028 /
-	 * U+2029, and a Svelte `loc_of` also throws without the span-only tree as
-	 * `{ast}` — see `locations.d.ts`). Inert for CSS (its wire has no `loc`).
+	 * `loc_of`, whose result equals the loc-bearing wire (see `locations.d.ts`).
 	 * @default true
 	 */
 	locations?: boolean | undefined;
@@ -536,8 +535,8 @@ impl OptionsSpec {
 /// `locations` (default `true`) selects the wire: the loc-bearing drop-in
 /// contract, or the span-only variant (the language crates'
 /// `convert_ast_json_string_no_locations`). It is accepted by every parse
-/// export and inert where nothing reads it (CSS emits no `loc`;
-/// `parse_internal_*` emits no wire), and rides the `parse` feature — the
+/// export and inert where nothing reads it (`parse_internal_*` emits no
+/// wire), and rides the `parse` feature — the
 /// format-only build has no wire for it to shape. `sourceType` is
 /// TypeScript-only — Svelte hard-wires `Module` and CSS has no goal — so the
 /// other languages reject the key rather than silently ignoring a semantic

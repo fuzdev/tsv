@@ -14,17 +14,7 @@
 			"type": "Line",
 			"value": " comment",
 			"start": 38,
-			"end": 48,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 11
-				},
-				"end": {
-					"line": 3,
-					"column": 21
-				}
-			}
+			"end": 48
 		}
 	],
 	"instance": {
@@ -36,59 +26,19 @@
 			"type": "Program",
 			"start": 18,
 			"end": 53,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 5,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
 					"start": 20,
 					"end": 52,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "NewExpression",
 						"start": 20,
 						"end": 51,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 1
-							},
-							"end": {
-								"line": 4,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 24,
 							"end": 25,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 5
-								},
-								"end": {
-									"line": 2,
-									"column": 6
-								}
-							},
 							"name": "A"
 						},
 						"arguments": [
@@ -96,16 +46,6 @@
 								"type": "ArrowFunctionExpression",
 								"start": 29,
 								"end": 37,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 2
-									},
-									"end": {
-										"line": 3,
-										"column": 10
-									}
-								},
 								"id": null,
 								"expression": false,
 								"generator": false,
@@ -115,16 +55,6 @@
 									"type": "BlockStatement",
 									"start": 35,
 									"end": 37,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 8
-										},
-										"end": {
-											"line": 3,
-											"column": 10
-										}
-									},
 									"body": []
 								},
 								"trailingComments": [
@@ -148,18 +78,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

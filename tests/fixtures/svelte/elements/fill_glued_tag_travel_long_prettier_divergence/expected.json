@@ -25,18 +25,6 @@
 				"start": 914,
 				"end": 1022,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 14,
-						"column": 1,
-						"character": 915
-					},
-					"end": {
-						"line": 14,
-						"column": 2,
-						"character": 916
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -56,16 +44,6 @@
 								"type": "Identifier",
 								"start": 1004,
 								"end": 1016,
-								"loc": {
-									"start": {
-										"line": 15,
-										"column": 86
-									},
-									"end": {
-										"line": 15,
-										"column": 98
-									}
-								},
 								"name": "expr12345678"
 							}
 						},
@@ -91,18 +69,6 @@
 				"start": 1023,
 				"end": 1133,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 17,
-						"column": 1,
-						"character": 1024
-					},
-					"end": {
-						"line": 17,
-						"column": 2,
-						"character": 1025
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -122,16 +88,6 @@
 								"type": "Identifier",
 								"start": 1115,
 								"end": 1127,
-								"loc": {
-									"start": {
-										"line": 19,
-										"column": 7
-									},
-									"end": {
-										"line": 19,
-										"column": 19
-									}
-								},
 								"name": "expr12345678"
 							}
 						},
@@ -157,18 +113,6 @@
 				"start": 1134,
 				"end": 1256,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 21,
-						"column": 1,
-						"character": 1135
-					},
-					"end": {
-						"line": 21,
-						"column": 2,
-						"character": 1136
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -188,16 +132,6 @@
 								"type": "Identifier",
 								"start": 1226,
 								"end": 1238,
-								"loc": {
-									"start": {
-										"line": 23,
-										"column": 7
-									},
-									"end": {
-										"line": 23,
-										"column": 19
-									}
-								},
 								"name": "expr12345678"
 							}
 						},
@@ -223,18 +157,6 @@
 				"start": 1257,
 				"end": 1435,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 25,
-						"column": 1,
-						"character": 1258
-					},
-					"end": {
-						"line": 25,
-						"column": 2,
-						"character": 1259
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -254,44 +176,14 @@
 								"type": "ConditionalExpression",
 								"start": 1330,
 								"end": 1429,
-								"loc": {
-									"start": {
-										"line": 27,
-										"column": 7
-									},
-									"end": {
-										"line": 29,
-										"column": 41
-									}
-								},
 								"test": {
 									"type": "BinaryExpression",
 									"start": 1330,
 									"end": 1345,
-									"loc": {
-										"start": {
-											"line": 27,
-											"column": 7
-										},
-										"end": {
-											"line": 27,
-											"column": 22
-										}
-									},
 									"left": {
 										"type": "Identifier",
 										"start": 1330,
 										"end": 1335,
-										"loc": {
-											"start": {
-												"line": 27,
-												"column": 7
-											},
-											"end": {
-												"line": 27,
-												"column": 12
-											}
-										},
 										"name": "cond1"
 									},
 									"operator": "===",
@@ -299,16 +191,6 @@
 										"type": "Identifier",
 										"start": 1340,
 										"end": 1345,
-										"loc": {
-											"start": {
-												"line": 27,
-												"column": 17
-											},
-											"end": {
-												"line": 27,
-												"column": 22
-											}
-										},
 										"name": "cond2"
 									}
 								},
@@ -316,16 +198,6 @@
 									"type": "Literal",
 									"start": 1350,
 									"end": 1387,
-									"loc": {
-										"start": {
-											"line": 28,
-											"column": 4
-										},
-										"end": {
-											"line": 28,
-											"column": 41
-										}
-									},
 									"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 									"raw": "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'"
 								},
@@ -333,16 +205,6 @@
 									"type": "Literal",
 									"start": 1392,
 									"end": 1429,
-									"loc": {
-										"start": {
-											"line": 29,
-											"column": 4
-										},
-										"end": {
-											"line": 29,
-											"column": 41
-										}
-									},
 									"value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 									"raw": "'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
 								}

@@ -25,36 +25,12 @@
 				"start": 39,
 				"end": 75,
 				"name": "textarea",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 40
-					},
-					"end": {
-						"line": 2,
-						"column": 9,
-						"character": 48
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 49,
 						"end": 63,
 						"name": "class",
-						"name_loc": {
-							"start": {
-								"line": 2,
-								"column": 10,
-								"character": 49
-							},
-							"end": {
-								"line": 2,
-								"column": 15,
-								"character": 54
-							}
-						},
 						"value": [
 							{
 								"start": 56,
@@ -96,36 +72,12 @@
 				"start": 164,
 				"end": 316,
 				"name": "textarea",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 1,
-						"character": 165
-					},
-					"end": {
-						"line": 5,
-						"column": 9,
-						"character": 173
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 175,
 						"end": 220,
 						"name": "class",
-						"name_loc": {
-							"start": {
-								"line": 6,
-								"column": 1,
-								"character": 175
-							},
-							"end": {
-								"line": 6,
-								"column": 6,
-								"character": 180
-							}
-						},
 						"value": [
 							{
 								"start": 182,
@@ -141,18 +93,6 @@
 						"start": 222,
 						"end": 263,
 						"name": "id",
-						"name_loc": {
-							"start": {
-								"line": 7,
-								"column": 1,
-								"character": 222
-							},
-							"end": {
-								"line": 7,
-								"column": 3,
-								"character": 224
-							}
-						},
 						"value": [
 							{
 								"start": 226,
@@ -168,18 +108,6 @@
 						"start": 265,
 						"end": 304,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 8,
-								"column": 1,
-								"character": 265
-							},
-							"end": {
-								"line": 8,
-								"column": 10,
-								"character": 274
-							}
-						},
 						"value": [
 							{
 								"start": 276,
@@ -221,36 +149,12 @@
 				"start": 414,
 				"end": 533,
 				"name": "textarea",
-				"name_loc": {
-					"start": {
-						"line": 11,
-						"column": 1,
-						"character": 415
-					},
-					"end": {
-						"line": 11,
-						"column": 9,
-						"character": 423
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 424,
 						"end": 469,
 						"name": "data-attr1",
-						"name_loc": {
-							"start": {
-								"line": 11,
-								"column": 10,
-								"character": 424
-							},
-							"end": {
-								"line": 11,
-								"column": 20,
-								"character": 434
-							}
-						},
 						"value": [
 							{
 								"start": 436,
@@ -266,18 +170,6 @@
 						"start": 470,
 						"end": 514,
 						"name": "data-attr2",
-						"name_loc": {
-							"start": {
-								"line": 11,
-								"column": 56,
-								"character": 470
-							},
-							"end": {
-								"line": 11,
-								"column": 66,
-								"character": 480
-							}
-						},
 						"value": [
 							{
 								"start": 482,
@@ -327,36 +219,12 @@
 				"start": 614,
 				"end": 734,
 				"name": "textarea",
-				"name_loc": {
-					"start": {
-						"line": 16,
-						"column": 1,
-						"character": 615
-					},
-					"end": {
-						"line": 16,
-						"column": 9,
-						"character": 623
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 625,
 						"end": 670,
 						"name": "data-attr1",
-						"name_loc": {
-							"start": {
-								"line": 17,
-								"column": 1,
-								"character": 625
-							},
-							"end": {
-								"line": 17,
-								"column": 11,
-								"character": 635
-							}
-						},
 						"value": [
 							{
 								"start": 637,
@@ -372,18 +240,6 @@
 						"start": 672,
 						"end": 717,
 						"name": "data-attr2",
-						"name_loc": {
-							"start": {
-								"line": 18,
-								"column": 1,
-								"character": 672
-							},
-							"end": {
-								"line": 18,
-								"column": 11,
-								"character": 682
-							}
-						},
 						"value": [
 							{
 								"start": 684,
@@ -433,50 +289,16 @@
 				"start": 809,
 				"end": 927,
 				"name": "textarea",
-				"name_loc": {
-					"start": {
-						"line": 22,
-						"column": 1,
-						"character": 810
-					},
-					"end": {
-						"line": 22,
-						"column": 9,
-						"character": 818
-					}
-				},
 				"attributes": [
 					{
 						"start": 820,
 						"end": 837,
 						"type": "BindDirective",
 						"name": "value",
-						"name_loc": {
-							"start": {
-								"line": 23,
-								"column": 1,
-								"character": 820
-							},
-							"end": {
-								"line": 23,
-								"column": 11,
-								"character": 830
-							}
-						},
 						"expression": {
 							"type": "Identifier",
 							"start": 832,
 							"end": 836,
-							"loc": {
-								"start": {
-									"line": 23,
-									"column": 13
-								},
-								"end": {
-									"line": 23,
-									"column": 17
-								}
-							},
 							"name": "expr"
 						},
 						"modifiers": []
@@ -486,18 +308,6 @@
 						"start": 839,
 						"end": 884,
 						"name": "class",
-						"name_loc": {
-							"start": {
-								"line": 24,
-								"column": 1,
-								"character": 839
-							},
-							"end": {
-								"line": 24,
-								"column": 6,
-								"character": 844
-							}
-						},
 						"value": [
 							{
 								"start": 846,
@@ -513,18 +323,6 @@
 						"start": 886,
 						"end": 915,
 						"name": "placeholder",
-						"name_loc": {
-							"start": {
-								"line": 25,
-								"column": 1,
-								"character": 886
-							},
-							"end": {
-								"line": 25,
-								"column": 12,
-								"character": 897
-							}
-						},
 						"value": {
 							"type": "ExpressionTag",
 							"start": 898,
@@ -533,30 +331,10 @@
 								"type": "LogicalExpression",
 								"start": 899,
 								"end": 914,
-								"loc": {
-									"start": {
-										"line": 25,
-										"column": 14
-									},
-									"end": {
-										"line": 25,
-										"column": 29
-									}
-								},
 								"left": {
 									"type": "Identifier",
 									"start": 899,
 									"end": 904,
-									"loc": {
-										"start": {
-											"line": 25,
-											"column": 14
-										},
-										"end": {
-											"line": 25,
-											"column": 19
-										}
-									},
 									"name": "value"
 								},
 								"operator": "||",
@@ -564,16 +342,6 @@
 									"type": "Literal",
 									"start": 908,
 									"end": 914,
-									"loc": {
-										"start": {
-											"line": 25,
-											"column": 23
-										},
-										"end": {
-											"line": 25,
-											"column": 29
-										}
-									},
 									"value": "text",
 									"raw": "'text'"
 								}

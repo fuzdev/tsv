@@ -42,64 +42,24 @@
 						"type": "Identifier",
 						"start": 127,
 						"end": 148,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 8
-							},
-							"end": {
-								"line": 4,
-								"column": 29
-							}
-						},
 						"name": "aaaaaaaaaaaaaaaaaaaaa"
 					},
 					{
 						"type": "Identifier",
 						"start": 150,
 						"end": 171,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 31
-							},
-							"end": {
-								"line": 4,
-								"column": 52
-							}
-						},
 						"name": "bbbbbbbbbbbbbbbbbbbbb"
 					},
 					{
 						"type": "Identifier",
 						"start": 173,
 						"end": 194,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 54
-							},
-							"end": {
-								"line": 4,
-								"column": 75
-							}
-						},
 						"name": "ccccccccccccccccccccc"
 					},
 					{
 						"type": "Identifier",
 						"start": 196,
 						"end": 218,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 77
-							},
-							"end": {
-								"line": 4,
-								"column": 99
-							}
-						},
 						"name": "dddddddddddddddddddddd"
 					}
 				]
@@ -133,64 +93,24 @@
 						"type": "Identifier",
 						"start": 294,
 						"end": 315,
-						"loc": {
-							"start": {
-								"line": 7,
-								"column": 8
-							},
-							"end": {
-								"line": 7,
-								"column": 29
-							}
-						},
 						"name": "aaaaaaaaaaaaaaaaaaaaa"
 					},
 					{
 						"type": "Identifier",
 						"start": 317,
 						"end": 338,
-						"loc": {
-							"start": {
-								"line": 7,
-								"column": 31
-							},
-							"end": {
-								"line": 7,
-								"column": 52
-							}
-						},
 						"name": "bbbbbbbbbbbbbbbbbbbbb"
 					},
 					{
 						"type": "Identifier",
 						"start": 340,
 						"end": 361,
-						"loc": {
-							"start": {
-								"line": 7,
-								"column": 54
-							},
-							"end": {
-								"line": 7,
-								"column": 75
-							}
-						},
 						"name": "ccccccccccccccccccccc"
 					},
 					{
 						"type": "Identifier",
 						"start": 363,
 						"end": 386,
-						"loc": {
-							"start": {
-								"line": 7,
-								"column": 77
-							},
-							"end": {
-								"line": 7,
-								"column": 100
-							}
-						},
 						"name": "ddddddddddddddddddddddd"
 					}
 				]
@@ -224,80 +144,30 @@
 						"type": "Identifier",
 						"start": 437,
 						"end": 458,
-						"loc": {
-							"start": {
-								"line": 10,
-								"column": 8
-							},
-							"end": {
-								"line": 10,
-								"column": 29
-							}
-						},
 						"name": "aaaaaaaaaaaaaaaaaaaaa"
 					},
 					{
 						"type": "Identifier",
 						"start": 460,
 						"end": 481,
-						"loc": {
-							"start": {
-								"line": 10,
-								"column": 31
-							},
-							"end": {
-								"line": 10,
-								"column": 52
-							}
-						},
 						"name": "bbbbbbbbbbbbbbbbbbbbb"
 					},
 					{
 						"type": "Identifier",
 						"start": 483,
 						"end": 504,
-						"loc": {
-							"start": {
-								"line": 10,
-								"column": 54
-							},
-							"end": {
-								"line": 10,
-								"column": 75
-							}
-						},
 						"name": "ccccccccccccccccccccc"
 					},
 					{
 						"type": "Identifier",
 						"start": 506,
 						"end": 528,
-						"loc": {
-							"start": {
-								"line": 10,
-								"column": 77
-							},
-							"end": {
-								"line": 10,
-								"column": 99
-							}
-						},
 						"name": "dddddddddddddddddddddd"
 					},
 					{
 						"type": "Identifier",
 						"start": 530,
 						"end": 551,
-						"loc": {
-							"start": {
-								"line": 10,
-								"column": 101
-							},
-							"end": {
-								"line": 10,
-								"column": 122
-							}
-						},
 						"name": "eeeeeeeeeeeeeeeeeeeee"
 					}
 				]

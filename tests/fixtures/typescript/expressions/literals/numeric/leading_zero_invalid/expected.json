@@ -14,65 +14,25 @@
 			"type": "Line",
 			"value": " In a module — always strict code — a leading `0` is a valid numeric literal only",
 			"start": 10,
-			"end": 93,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 84
-				}
-			}
+			"end": 93
 		},
 		{
 			"type": "Line",
 			"value": " before `.`, `e`, `n`, a radix prefix (`x`/`b`/`o`), or end, never before another",
 			"start": 95,
-			"end": 178,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 84
-				}
-			}
+			"end": 178
 		},
 		{
 			"type": "Line",
 			"value": " digit (the legacy-octal / non-octal-decimal forms strict code disallows). A `_`",
 			"start": 180,
-			"end": 262,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 1
-				},
-				"end": {
-					"line": 4,
-					"column": 83
-				}
-			}
+			"end": 262
 		},
 		{
 			"type": "Line",
 			"value": " separator after the leading `0` is a syntax error in every mode.",
 			"start": 264,
-			"end": 331,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 1
-				},
-				"end": {
-					"line": 5,
-					"column": 68
-				}
-			}
+			"end": 331
 		}
 	],
 	"instance": {
@@ -84,76 +44,26 @@
 			"type": "Program",
 			"start": 8,
 			"end": 483,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 14,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 333,
 					"end": 348,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 16
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 339,
 							"end": 347,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 7
-								},
-								"end": {
-									"line": 6,
-									"column": 15
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 339,
 								"end": 343,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 7
-									},
-									"end": {
-										"line": 6,
-										"column": 11
-									}
-								},
 								"name": "zero"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 346,
 								"end": 347,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 14
-									},
-									"end": {
-										"line": 6,
-										"column": 15
-									}
-								},
 								"value": 0,
 								"raw": "0"
 							}
@@ -191,61 +101,21 @@
 					"type": "VariableDeclaration",
 					"start": 350,
 					"end": 367,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 1
-						},
-						"end": {
-							"line": 7,
-							"column": 18
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 356,
 							"end": 366,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 7
-								},
-								"end": {
-									"line": 7,
-									"column": 17
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 356,
 								"end": 360,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 7
-									},
-									"end": {
-										"line": 7,
-										"column": 11
-									}
-								},
 								"name": "frac"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 363,
 								"end": 366,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 14
-									},
-									"end": {
-										"line": 7,
-										"column": 17
-									}
-								},
 								"value": 0.5,
 								"raw": "0.5"
 							}
@@ -257,61 +127,21 @@
 					"type": "VariableDeclaration",
 					"start": 369,
 					"end": 385,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 17
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 375,
 							"end": 384,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 7
-								},
-								"end": {
-									"line": 8,
-									"column": 16
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 375,
 								"end": 378,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 7
-									},
-									"end": {
-										"line": 8,
-										"column": 10
-									}
-								},
 								"name": "exp"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 381,
 								"end": 384,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 13
-									},
-									"end": {
-										"line": 8,
-										"column": 16
-									}
-								},
 								"value": 0,
 								"raw": "0e1"
 							}
@@ -323,61 +153,21 @@
 					"type": "VariableDeclaration",
 					"start": 387,
 					"end": 402,
-					"loc": {
-						"start": {
-							"line": 9,
-							"column": 1
-						},
-						"end": {
-							"line": 9,
-							"column": 16
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 393,
 							"end": 401,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 7
-								},
-								"end": {
-									"line": 9,
-									"column": 15
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 393,
 								"end": 396,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 7
-									},
-									"end": {
-										"line": 9,
-										"column": 10
-									}
-								},
 								"name": "big"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 399,
 								"end": 401,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 13
-									},
-									"end": {
-										"line": 9,
-										"column": 15
-									}
-								},
 								"value": "0",
 								"raw": "0n",
 								"bigint": "0"
@@ -390,61 +180,21 @@
 					"type": "VariableDeclaration",
 					"start": 404,
 					"end": 421,
-					"loc": {
-						"start": {
-							"line": 10,
-							"column": 1
-						},
-						"end": {
-							"line": 10,
-							"column": 18
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 410,
 							"end": 420,
-							"loc": {
-								"start": {
-									"line": 10,
-									"column": 7
-								},
-								"end": {
-									"line": 10,
-									"column": 17
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 410,
 								"end": 413,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 7
-									},
-									"end": {
-										"line": 10,
-										"column": 10
-									}
-								},
 								"name": "hex"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 416,
 								"end": 420,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 13
-									},
-									"end": {
-										"line": 10,
-										"column": 17
-									}
-								},
 								"value": 8,
 								"raw": "0x08"
 							}
@@ -456,61 +206,21 @@
 					"type": "VariableDeclaration",
 					"start": 423,
 					"end": 439,
-					"loc": {
-						"start": {
-							"line": 11,
-							"column": 1
-						},
-						"end": {
-							"line": 11,
-							"column": 17
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 429,
 							"end": 438,
-							"loc": {
-								"start": {
-									"line": 11,
-									"column": 7
-								},
-								"end": {
-									"line": 11,
-									"column": 16
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 429,
 								"end": 432,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 7
-									},
-									"end": {
-										"line": 11,
-										"column": 10
-									}
-								},
 								"name": "bin"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 435,
 								"end": 438,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 13
-									},
-									"end": {
-										"line": 11,
-										"column": 16
-									}
-								},
 								"value": 0,
 								"raw": "0b0"
 							}
@@ -522,61 +232,21 @@
 					"type": "VariableDeclaration",
 					"start": 441,
 					"end": 457,
-					"loc": {
-						"start": {
-							"line": 12,
-							"column": 1
-						},
-						"end": {
-							"line": 12,
-							"column": 17
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 447,
 							"end": 456,
-							"loc": {
-								"start": {
-									"line": 12,
-									"column": 7
-								},
-								"end": {
-									"line": 12,
-									"column": 16
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 447,
 								"end": 450,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 7
-									},
-									"end": {
-										"line": 12,
-										"column": 10
-									}
-								},
 								"name": "oct"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 453,
 								"end": 456,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 13
-									},
-									"end": {
-										"line": 12,
-										"column": 16
-									}
-								},
 								"value": 7,
 								"raw": "0o7"
 							}
@@ -588,61 +258,21 @@
 					"type": "VariableDeclaration",
 					"start": 459,
 					"end": 482,
-					"loc": {
-						"start": {
-							"line": 13,
-							"column": 1
-						},
-						"end": {
-							"line": 13,
-							"column": 24
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 465,
 							"end": 481,
-							"loc": {
-								"start": {
-									"line": 13,
-									"column": 7
-								},
-								"end": {
-									"line": 13,
-									"column": 23
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 465,
 								"end": 474,
-								"loc": {
-									"start": {
-										"line": 13,
-										"column": 7
-									},
-									"end": {
-										"line": 13,
-										"column": 16
-									}
-								},
 								"name": "after_dot"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 477,
 								"end": 481,
-								"loc": {
-									"start": {
-										"line": 13,
-										"column": 19
-									},
-									"end": {
-										"line": 13,
-										"column": 23
-									}
-								},
 								"value": 0.08,
 								"raw": "0.08"
 							}

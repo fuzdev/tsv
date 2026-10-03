@@ -12,18 +12,6 @@
 				"start": 0,
 				"end": 32,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 4,
-						"character": 4
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -36,92 +24,32 @@
 								"type": "ConditionalExpression",
 								"start": 6,
 								"end": 25,
-								"loc": {
-									"start": {
-										"line": 1,
-										"column": 6
-									},
-									"end": {
-										"line": 1,
-										"column": 25
-									}
-								},
 								"test": {
 									"type": "Identifier",
 									"start": 6,
 									"end": 7,
-									"loc": {
-										"start": {
-											"line": 1,
-											"column": 6
-										},
-										"end": {
-											"line": 1,
-											"column": 7
-										}
-									},
 									"name": "a"
 								},
 								"consequent": {
 									"type": "ConditionalExpression",
 									"start": 11,
 									"end": 20,
-									"loc": {
-										"start": {
-											"line": 1,
-											"column": 11
-										},
-										"end": {
-											"line": 1,
-											"column": 20
-										}
-									},
 									"test": {
 										"type": "Identifier",
 										"start": 11,
 										"end": 12,
-										"loc": {
-											"start": {
-												"line": 1,
-												"column": 11
-											},
-											"end": {
-												"line": 1,
-												"column": 12
-											}
-										},
 										"name": "b"
 									},
 									"consequent": {
 										"type": "Identifier",
 										"start": 15,
 										"end": 16,
-										"loc": {
-											"start": {
-												"line": 1,
-												"column": 15
-											},
-											"end": {
-												"line": 1,
-												"column": 16
-											}
-										},
 										"name": "c"
 									},
 									"alternate": {
 										"type": "Identifier",
 										"start": 19,
 										"end": 20,
-										"loc": {
-											"start": {
-												"line": 1,
-												"column": 19
-											},
-											"end": {
-												"line": 1,
-												"column": 20
-											}
-										},
 										"name": "d"
 									}
 								},
@@ -129,16 +57,6 @@
 									"type": "Identifier",
 									"start": 24,
 									"end": 25,
-									"loc": {
-										"start": {
-											"line": 1,
-											"column": 24
-										},
-										"end": {
-											"line": 1,
-											"column": 25
-										}
-									},
 									"name": "e"
 								}
 							}
@@ -158,18 +76,6 @@
 				"start": 33,
 				"end": 75,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 34
-					},
-					"end": {
-						"line": 2,
-						"column": 4,
-						"character": 37
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -182,122 +88,42 @@
 								"type": "ConditionalExpression",
 								"start": 39,
 								"end": 68,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 6
-									},
-									"end": {
-										"line": 2,
-										"column": 35
-									}
-								},
 								"test": {
 									"type": "Identifier",
 									"start": 39,
 									"end": 40,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 6
-										},
-										"end": {
-											"line": 2,
-											"column": 7
-										}
-									},
 									"name": "a"
 								},
 								"consequent": {
 									"type": "ConditionalExpression",
 									"start": 44,
 									"end": 63,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 11
-										},
-										"end": {
-											"line": 2,
-											"column": 30
-										}
-									},
 									"test": {
 										"type": "Identifier",
 										"start": 44,
 										"end": 45,
-										"loc": {
-											"start": {
-												"line": 2,
-												"column": 11
-											},
-											"end": {
-												"line": 2,
-												"column": 12
-											}
-										},
 										"name": "b"
 									},
 									"consequent": {
 										"type": "ConditionalExpression",
 										"start": 49,
 										"end": 58,
-										"loc": {
-											"start": {
-												"line": 2,
-												"column": 16
-											},
-											"end": {
-												"line": 2,
-												"column": 25
-											}
-										},
 										"test": {
 											"type": "Identifier",
 											"start": 49,
 											"end": 50,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 16
-												},
-												"end": {
-													"line": 2,
-													"column": 17
-												}
-											},
 											"name": "c"
 										},
 										"consequent": {
 											"type": "Identifier",
 											"start": 53,
 											"end": 54,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 20
-												},
-												"end": {
-													"line": 2,
-													"column": 21
-												}
-											},
 											"name": "d"
 										},
 										"alternate": {
 											"type": "Identifier",
 											"start": 57,
 											"end": 58,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 24
-												},
-												"end": {
-													"line": 2,
-													"column": 25
-												}
-											},
 											"name": "e"
 										}
 									},
@@ -305,16 +131,6 @@
 										"type": "Identifier",
 										"start": 62,
 										"end": 63,
-										"loc": {
-											"start": {
-												"line": 2,
-												"column": 29
-											},
-											"end": {
-												"line": 2,
-												"column": 30
-											}
-										},
 										"name": "f"
 									}
 								},
@@ -322,16 +138,6 @@
 									"type": "Identifier",
 									"start": 67,
 									"end": 68,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 34
-										},
-										"end": {
-											"line": 2,
-											"column": 35
-										}
-									},
 									"name": "g"
 								}
 							}

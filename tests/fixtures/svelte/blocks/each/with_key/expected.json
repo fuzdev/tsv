@@ -15,16 +15,6 @@
 					"type": "Identifier",
 					"start": 7,
 					"end": 12,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 7
-						},
-						"end": {
-							"line": 1,
-							"column": 12
-						}
-					},
 					"name": "items"
 				},
 				"body": {
@@ -42,18 +32,6 @@
 							"start": 33,
 							"end": 50,
 							"name": "div",
-							"name_loc": {
-								"start": {
-									"line": 2,
-									"column": 2,
-									"character": 34
-								},
-								"end": {
-									"line": 2,
-									"column": 5,
-									"character": 37
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -66,16 +44,6 @@
 											"type": "Identifier",
 											"start": 39,
 											"end": 43,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 7
-												},
-												"end": {
-													"line": 2,
-													"column": 11
-												}
-											},
 											"name": "item"
 										}
 									}
@@ -95,64 +63,22 @@
 					"type": "Identifier",
 					"name": "item",
 					"start": 16,
-					"end": 20,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 16,
-							"character": 16
-						},
-						"end": {
-							"line": 1,
-							"column": 20,
-							"character": 20
-						}
-					}
+					"end": 20
 				},
 				"key": {
 					"type": "MemberExpression",
 					"start": 22,
 					"end": 29,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 22
-						},
-						"end": {
-							"line": 1,
-							"column": 29
-						}
-					},
 					"object": {
 						"type": "Identifier",
 						"start": 22,
 						"end": 26,
-						"loc": {
-							"start": {
-								"line": 1,
-								"column": 22
-							},
-							"end": {
-								"line": 1,
-								"column": 26
-							}
-						},
 						"name": "item"
 					},
 					"property": {
 						"type": "Identifier",
 						"start": 27,
 						"end": 29,
-						"loc": {
-							"start": {
-								"line": 1,
-								"column": 27
-							},
-							"end": {
-								"line": 1,
-								"column": 29
-							}
-						},
 						"name": "id"
 					},
 					"computed": false,

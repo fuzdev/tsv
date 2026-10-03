@@ -19,91 +19,31 @@
 			"type": "Program",
 			"start": 8,
 			"end": 56,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 3,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 10,
 					"end": 55,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 46
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 16,
 							"end": 54,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 7
-								},
-								"end": {
-									"line": 2,
-									"column": 45
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 16,
 								"end": 17,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 7
-									},
-									"end": {
-										"line": 2,
-										"column": 8
-									}
-								},
 								"name": "o"
 							},
 							"init": {
 								"type": "ObjectExpression",
 								"start": 20,
 								"end": 54,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 11
-									},
-									"end": {
-										"line": 2,
-										"column": 45
-									}
-								},
 								"properties": [
 									{
 										"type": "Property",
 										"start": 22,
 										"end": 29,
-										"loc": {
-											"start": {
-												"line": 2,
-												"column": 13
-											},
-											"end": {
-												"line": 2,
-												"column": 20
-											}
-										},
 										"method": false,
 										"shorthand": false,
 										"computed": false,
@@ -111,32 +51,12 @@
 											"type": "Identifier",
 											"start": 22,
 											"end": 26,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 13
-												},
-												"end": {
-													"line": 2,
-													"column": 17
-												}
-											},
 											"name": "café"
 										},
 										"value": {
 											"type": "Literal",
 											"start": 28,
 											"end": 29,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 19
-												},
-												"end": {
-													"line": 2,
-													"column": 20
-												}
-											},
 											"value": 1,
 											"raw": "1"
 										},
@@ -146,16 +66,6 @@
 										"type": "Property",
 										"start": 31,
 										"end": 35,
-										"loc": {
-											"start": {
-												"line": 2,
-												"column": 22
-											},
-											"end": {
-												"line": 2,
-												"column": 26
-											}
-										},
 										"method": false,
 										"shorthand": false,
 										"computed": false,
@@ -163,32 +73,12 @@
 											"type": "Identifier",
 											"start": 31,
 											"end": 32,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 22
-												},
-												"end": {
-													"line": 2,
-													"column": 23
-												}
-											},
 											"name": "π"
 										},
 										"value": {
 											"type": "Literal",
 											"start": 34,
 											"end": 35,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 25
-												},
-												"end": {
-													"line": 2,
-													"column": 26
-												}
-											},
 											"value": 2,
 											"raw": "2"
 										},
@@ -198,16 +88,6 @@
 										"type": "Property",
 										"start": 37,
 										"end": 42,
-										"loc": {
-											"start": {
-												"line": 2,
-												"column": 28
-											},
-											"end": {
-												"line": 2,
-												"column": 33
-											}
-										},
 										"method": false,
 										"shorthand": false,
 										"computed": false,
@@ -215,32 +95,12 @@
 											"type": "Identifier",
 											"start": 37,
 											"end": 39,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 28
-												},
-												"end": {
-													"line": 2,
-													"column": 30
-												}
-											},
 											"name": "_ü"
 										},
 										"value": {
 											"type": "Literal",
 											"start": 41,
 											"end": 42,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 32
-												},
-												"end": {
-													"line": 2,
-													"column": 33
-												}
-											},
 											"value": 3,
 											"raw": "3"
 										},
@@ -250,16 +110,6 @@
 										"type": "Property",
 										"start": 44,
 										"end": 52,
-										"loc": {
-											"start": {
-												"line": 2,
-												"column": 35
-											},
-											"end": {
-												"line": 2,
-												"column": 43
-											}
-										},
 										"method": false,
 										"shorthand": false,
 										"computed": false,
@@ -267,32 +117,12 @@
 											"type": "Identifier",
 											"start": 44,
 											"end": 49,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 35
-												},
-												"end": {
-													"line": 2,
-													"column": 40
-												}
-											},
 											"name": "Ωμέγα"
 										},
 										"value": {
 											"type": "Literal",
 											"start": 51,
 											"end": 52,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 42
-												},
-												"end": {
-													"line": 2,
-													"column": 43
-												}
-											},
 											"value": 4,
 											"raw": "4"
 										},

@@ -14,193 +14,73 @@
 			"type": "Line",
 			"value": " own-line line comment after last specifier",
 			"start": 10,
-			"end": 55,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 46
-				}
-			}
+			"end": 55
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 72,
-			"end": 76,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 2
-				},
-				"end": {
-					"line": 5,
-					"column": 6
-				}
-			}
+			"end": 76
 		},
 		{
 			"type": "Line",
 			"value": " same-line + own-line line comments after last specifier",
 			"start": 94,
-			"end": 152,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 1
-				},
-				"end": {
-					"line": 8,
-					"column": 59
-				}
-			}
+			"end": 152
 		},
 		{
 			"type": "Line",
 			"value": " c1",
 			"start": 167,
-			"end": 172,
-			"loc": {
-				"start": {
-					"line": 10,
-					"column": 4
-				},
-				"end": {
-					"line": 10,
-					"column": 9
-				}
-			}
+			"end": 172
 		},
 		{
 			"type": "Line",
 			"value": " c2",
 			"start": 175,
-			"end": 180,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 2
-				},
-				"end": {
-					"line": 11,
-					"column": 7
-				}
-			}
+			"end": 180
 		},
 		{
 			"type": "Line",
 			"value": " own-line block comment after last specifier",
 			"start": 198,
-			"end": 244,
-			"loc": {
-				"start": {
-					"line": 14,
-					"column": 1
-				},
-				"end": {
-					"line": 14,
-					"column": 47
-				}
-			}
+			"end": 244
 		},
 		{
 			"type": "Block",
 			"value": " c ",
 			"start": 261,
-			"end": 268,
-			"loc": {
-				"start": {
-					"line": 17,
-					"column": 2
-				},
-				"end": {
-					"line": 17,
-					"column": 9
-				}
-			}
+			"end": 268
 		},
 		{
 			"type": "Line",
 			"value": " multiple own-line comments after last specifier",
 			"start": 286,
-			"end": 336,
-			"loc": {
-				"start": {
-					"line": 20,
-					"column": 1
-				},
-				"end": {
-					"line": 20,
-					"column": 51
-				}
-			}
+			"end": 336
 		},
 		{
 			"type": "Line",
 			"value": " c1",
 			"start": 353,
-			"end": 358,
-			"loc": {
-				"start": {
-					"line": 23,
-					"column": 2
-				},
-				"end": {
-					"line": 23,
-					"column": 7
-				}
-			}
+			"end": 358
 		},
 		{
 			"type": "Line",
 			"value": " c2",
 			"start": 361,
-			"end": 366,
-			"loc": {
-				"start": {
-					"line": 24,
-					"column": 2
-				},
-				"end": {
-					"line": 24,
-					"column": 7
-				}
-			}
+			"end": 366
 		},
 		{
 			"type": "Line",
 			"value": " blank line preserved between last specifier and own-line comment",
 			"start": 384,
-			"end": 451,
-			"loc": {
-				"start": {
-					"line": 27,
-					"column": 1
-				},
-				"end": {
-					"line": 27,
-					"column": 68
-				}
-			}
+			"end": 451
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 469,
-			"end": 473,
-			"loc": {
-				"start": {
-					"line": 31,
-					"column": 2
-				},
-				"end": {
-					"line": 31,
-					"column": 6
-				}
-			}
+			"end": 473
 		}
 	],
 	"instance": {
@@ -212,76 +92,26 @@
 			"type": "Program",
 			"start": 8,
 			"end": 489,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 33,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ImportDeclaration",
 					"start": 57,
 					"end": 91,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 14
-						}
-					},
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
 							"start": 68,
 							"end": 69,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 2
-								},
-								"end": {
-									"line": 4,
-									"column": 3
-								}
-							},
 							"imported": {
 								"type": "Identifier",
 								"start": 68,
 								"end": 69,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 2
-									},
-									"end": {
-										"line": 4,
-										"column": 3
-									}
-								},
 								"name": "a"
 							},
 							"local": {
 								"type": "Identifier",
 								"start": 68,
 								"end": 69,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 2
-									},
-									"end": {
-										"line": 4,
-										"column": 3
-									}
-								},
 								"name": "a"
 							}
 						}
@@ -290,16 +120,6 @@
 						"type": "Literal",
 						"start": 85,
 						"end": 90,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 8
-							},
-							"end": {
-								"line": 6,
-								"column": 13
-							}
-						},
 						"value": "./a",
 						"raw": "'./a'",
 						"leadingComments": [
@@ -325,61 +145,21 @@
 					"type": "ImportDeclaration",
 					"start": 154,
 					"end": 195,
-					"loc": {
-						"start": {
-							"line": 9,
-							"column": 1
-						},
-						"end": {
-							"line": 12,
-							"column": 14
-						}
-					},
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
 							"start": 165,
 							"end": 166,
-							"loc": {
-								"start": {
-									"line": 10,
-									"column": 2
-								},
-								"end": {
-									"line": 10,
-									"column": 3
-								}
-							},
 							"imported": {
 								"type": "Identifier",
 								"start": 165,
 								"end": 166,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 2
-									},
-									"end": {
-										"line": 10,
-										"column": 3
-									}
-								},
 								"name": "b"
 							},
 							"local": {
 								"type": "Identifier",
 								"start": 165,
 								"end": 166,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 2
-									},
-									"end": {
-										"line": 10,
-										"column": 3
-									}
-								},
 								"name": "b"
 							},
 							"trailingComments": [
@@ -396,16 +176,6 @@
 						"type": "Literal",
 						"start": 189,
 						"end": 194,
-						"loc": {
-							"start": {
-								"line": 12,
-								"column": 8
-							},
-							"end": {
-								"line": 12,
-								"column": 13
-							}
-						},
 						"value": "./b",
 						"raw": "'./b'",
 						"leadingComments": [
@@ -431,61 +201,21 @@
 					"type": "ImportDeclaration",
 					"start": 246,
 					"end": 283,
-					"loc": {
-						"start": {
-							"line": 15,
-							"column": 1
-						},
-						"end": {
-							"line": 18,
-							"column": 14
-						}
-					},
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
 							"start": 257,
 							"end": 258,
-							"loc": {
-								"start": {
-									"line": 16,
-									"column": 2
-								},
-								"end": {
-									"line": 16,
-									"column": 3
-								}
-							},
 							"imported": {
 								"type": "Identifier",
 								"start": 257,
 								"end": 258,
-								"loc": {
-									"start": {
-										"line": 16,
-										"column": 2
-									},
-									"end": {
-										"line": 16,
-										"column": 3
-									}
-								},
 								"name": "c"
 							},
 							"local": {
 								"type": "Identifier",
 								"start": 257,
 								"end": 258,
-								"loc": {
-									"start": {
-										"line": 16,
-										"column": 2
-									},
-									"end": {
-										"line": 16,
-										"column": 3
-									}
-								},
 								"name": "c"
 							}
 						}
@@ -494,16 +224,6 @@
 						"type": "Literal",
 						"start": 277,
 						"end": 282,
-						"loc": {
-							"start": {
-								"line": 18,
-								"column": 8
-							},
-							"end": {
-								"line": 18,
-								"column": 13
-							}
-						},
 						"value": "./c",
 						"raw": "'./c'",
 						"leadingComments": [
@@ -529,61 +249,21 @@
 					"type": "ImportDeclaration",
 					"start": 338,
 					"end": 381,
-					"loc": {
-						"start": {
-							"line": 21,
-							"column": 1
-						},
-						"end": {
-							"line": 25,
-							"column": 14
-						}
-					},
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
 							"start": 349,
 							"end": 350,
-							"loc": {
-								"start": {
-									"line": 22,
-									"column": 2
-								},
-								"end": {
-									"line": 22,
-									"column": 3
-								}
-							},
 							"imported": {
 								"type": "Identifier",
 								"start": 349,
 								"end": 350,
-								"loc": {
-									"start": {
-										"line": 22,
-										"column": 2
-									},
-									"end": {
-										"line": 22,
-										"column": 3
-									}
-								},
 								"name": "d"
 							},
 							"local": {
 								"type": "Identifier",
 								"start": 349,
 								"end": 350,
-								"loc": {
-									"start": {
-										"line": 22,
-										"column": 2
-									},
-									"end": {
-										"line": 22,
-										"column": 3
-									}
-								},
 								"name": "d"
 							}
 						}
@@ -592,16 +272,6 @@
 						"type": "Literal",
 						"start": 375,
 						"end": 380,
-						"loc": {
-							"start": {
-								"line": 25,
-								"column": 8
-							},
-							"end": {
-								"line": 25,
-								"column": 13
-							}
-						},
 						"value": "./d",
 						"raw": "'./d'",
 						"leadingComments": [
@@ -633,61 +303,21 @@
 					"type": "ImportDeclaration",
 					"start": 453,
 					"end": 488,
-					"loc": {
-						"start": {
-							"line": 28,
-							"column": 1
-						},
-						"end": {
-							"line": 32,
-							"column": 14
-						}
-					},
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
 							"start": 464,
 							"end": 465,
-							"loc": {
-								"start": {
-									"line": 29,
-									"column": 2
-								},
-								"end": {
-									"line": 29,
-									"column": 3
-								}
-							},
 							"imported": {
 								"type": "Identifier",
 								"start": 464,
 								"end": 465,
-								"loc": {
-									"start": {
-										"line": 29,
-										"column": 2
-									},
-									"end": {
-										"line": 29,
-										"column": 3
-									}
-								},
 								"name": "e"
 							},
 							"local": {
 								"type": "Identifier",
 								"start": 464,
 								"end": 465,
-								"loc": {
-									"start": {
-										"line": 29,
-										"column": 2
-									},
-									"end": {
-										"line": 29,
-										"column": 3
-									}
-								},
 								"name": "e"
 							}
 						}
@@ -696,16 +326,6 @@
 						"type": "Literal",
 						"start": 482,
 						"end": 487,
-						"loc": {
-							"start": {
-								"line": 32,
-								"column": 8
-							},
-							"end": {
-								"line": 32,
-								"column": 13
-							}
-						},
 						"value": "./e",
 						"raw": "'./e'",
 						"leadingComments": [

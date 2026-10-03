@@ -25,18 +25,6 @@
 				"start": 223,
 				"end": 247,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 6,
-						"column": 1,
-						"character": 224
-					},
-					"end": {
-						"line": 6,
-						"column": 4,
-						"character": 227
-					}
-				},
 				"attributes": [
 					{
 						"type": "SpreadAttribute",
@@ -46,30 +34,10 @@
 							"type": "BinaryExpression",
 							"start": 232,
 							"end": 239,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 9
-								},
-								"end": {
-									"line": 6,
-									"column": 16
-								}
-							},
 							"left": {
 								"type": "PrivateIdentifier",
 								"start": 232,
 								"end": 234,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 9
-									},
-									"end": {
-										"line": 6,
-										"column": 11
-									}
-								},
 								"name": "x"
 							},
 							"operator": "in",
@@ -77,16 +45,6 @@
 								"type": "Identifier",
 								"start": 238,
 								"end": 239,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 15
-									},
-									"end": {
-										"line": 6,
-										"column": 16
-									}
-								},
 								"name": "y"
 							}
 						}
@@ -109,36 +67,12 @@
 				"start": 248,
 				"end": 287,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 1,
-						"character": 249
-					},
-					"end": {
-						"line": 7,
-						"column": 4,
-						"character": 252
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 253,
 						"end": 280,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 7,
-								"column": 5,
-								"character": 253
-							},
-							"end": {
-								"line": 7,
-								"column": 14,
-								"character": 262
-							}
-						},
 						"value": {
 							"type": "ExpressionTag",
 							"start": 263,
@@ -147,30 +81,10 @@
 								"type": "BinaryExpression",
 								"start": 272,
 								"end": 279,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 24
-									},
-									"end": {
-										"line": 7,
-										"column": 31
-									}
-								},
 								"left": {
 									"type": "PrivateIdentifier",
 									"start": 272,
 									"end": 274,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 24
-										},
-										"end": {
-											"line": 7,
-											"column": 26
-										}
-									},
 									"name": "x"
 								},
 								"operator": "in",
@@ -178,16 +92,6 @@
 									"type": "Identifier",
 									"start": 278,
 									"end": 279,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 30
-										},
-										"end": {
-											"line": 7,
-											"column": 31
-										}
-									},
 									"name": "y"
 								},
 								"leadingComments": [
@@ -219,18 +123,6 @@
 				"start": 288,
 				"end": 326,
 				"name": "textarea",
-				"name_loc": {
-					"start": {
-						"line": 8,
-						"column": 1,
-						"character": 289
-					},
-					"end": {
-						"line": 8,
-						"column": 9,
-						"character": 297
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -243,30 +135,10 @@
 								"type": "BinaryExpression",
 								"start": 307,
 								"end": 314,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 19
-									},
-									"end": {
-										"line": 8,
-										"column": 26
-									}
-								},
 								"left": {
 									"type": "PrivateIdentifier",
 									"start": 307,
 									"end": 309,
-									"loc": {
-										"start": {
-											"line": 8,
-											"column": 19
-										},
-										"end": {
-											"line": 8,
-											"column": 21
-										}
-									},
 									"name": "x"
 								},
 								"operator": "in",
@@ -274,16 +146,6 @@
 									"type": "Identifier",
 									"start": 313,
 									"end": 314,
-									"loc": {
-										"start": {
-											"line": 8,
-											"column": 25
-										},
-										"end": {
-											"line": 8,
-											"column": 26
-										}
-									},
 									"name": "y"
 								},
 								"leadingComments": [
@@ -307,33 +169,13 @@
 			"type": "Block",
 			"value": " c ",
 			"start": 264,
-			"end": 271,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 16
-				},
-				"end": {
-					"line": 7,
-					"column": 23
-				}
-			}
+			"end": 271
 		},
 		{
 			"type": "Block",
 			"value": " c ",
 			"start": 299,
-			"end": 306,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 11
-				},
-				"end": {
-					"line": 8,
-					"column": 18
-				}
-			}
+			"end": 306
 		}
 	]
 }

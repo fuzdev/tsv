@@ -12,18 +12,6 @@
 				"start": 0,
 				"end": 21,
 				"name": "slot",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 5,
-						"character": 5
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -50,18 +38,6 @@
 				"start": 23,
 				"end": 62,
 				"name": "svelte:fragment",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 1,
-						"character": 24
-					},
-					"end": {
-						"line": 3,
-						"column": 16,
-						"character": 39
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",

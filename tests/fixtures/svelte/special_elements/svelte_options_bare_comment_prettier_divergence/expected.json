@@ -32,19 +32,7 @@
 			"type": "Block",
 			"start": 105,
 			"end": 112,
-			"value": " c ",
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 16,
-					"character": 105
-				},
-				"end": {
-					"line": 2,
-					"column": 23,
-					"character": 112
-				}
-			}
+			"value": " c "
 		}
 	]
 }

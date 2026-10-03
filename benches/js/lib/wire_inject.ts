@@ -15,19 +15,24 @@
  * 9441 fixtures and every real repo, because everyone writes `x: T`. The comparison
  * catches both the instant such an input exists. This module makes them exist.
  *
- * **Two families, because there are two kinds of claim to break.**
+ * **Two families, because there are two kinds of claim to break.** Both run through the
+ * comparison's two arms — the loc arm (the definition check, then the oracle's `loc` under the
+ * six tolerance rows of `lib/loc_tolerance.ts`) and the span arm — each variant graded against
+ * its own base.
  *
  * - `ws` — whitespace inside a Svelte tag or block head (`{#…}`, `{:…}`, `{@…}`). Heads
  *   are where tsv hand-rolls its scanning (head splitting, binding/annotation
  *   separation, delimiter finding) rather than delegating to acorn, so they are where a
  *   position rule can be wrong without any well-formed document noticing.
  * - `terminators` — a lone `\r`, `<LS>` or `<PS>` anywhere in the document. These are the
- *   spellings on which the two line classes DISAGREE, and which class a `loc` was counted
- *   under is decided per acorn parse by what Svelte did to the prefix it handed acorn —
- *   three different preparations across five readers, so a document holding one of these
- *   carries two line counts at once. That model is mirror-knowledge about upstream, held
- *   by hand at seven call sites in tsv's Svelte parser, and nothing else grades it: no
- *   fixture can carry a raw `<CR>` (the format path folds it), and real code has none.
+ *   spellings on which ECMAScript's line terminators and `\n` disagree. tsv's `loc` counts
+ *   `\n` alone across a whole Svelte document, while Svelte counts ECMAScript's on the nodes
+ *   acorn parsed, so the oracle `loc` differences a terminator adds fall in the comparator's
+ *   `two_line_classes` row (the other rows fire on these inputs too, on the shapes the base
+ *   file already holds) and the loc arm grades little new; what the family grades is
+ *   the SPAN arm — whether a terminator in a head, an island or the template moves an
+ *   offset — and the definition check, which no fixture can feed a raw `<CR>` (the format
+ *   path folds it) and real code never does.
  *
  * Both are cheap to reason about: inserting beside existing whitespace is usually
  * parse-preserving, which keeps the oracle-accepts rate high, and where it isn't the
@@ -57,12 +62,11 @@ export type InjectKind = 'ws' | 'terminators';
 /**
  * What gets inserted, per kind, in the order a file's variants are emitted.
  *
- * The `terminators` set is exactly the spellings on which the two line classes DISAGREE —
- * a lone `\r`, `<LS>`, `<PS>`. `\n` and `\r\n` are deliberately absent: both classes count
- * them identically, so injecting one perturbs layout without ever testing the axis. (They
- * are the null controls in `tests/acorn_loc_line_terminators.rs`, where an expectation
- * table can state what "unchanged" means; here a variant that changes nothing is simply
- * dropped by the subtraction pass, so a null control would cost parses and prove nothing.)
+ * The `terminators` set is exactly the spellings on which ECMAScript's line terminators and
+ * `\n` DISAGREE — a lone `\r`, `<LS>`, `<PS>`. `\n` and `\r\n` are deliberately absent: both
+ * classes count them identically, so injecting one perturbs layout without ever testing the
+ * axis, and a variant that changes nothing is simply dropped by the subtraction pass — a
+ * null control would cost parses and prove nothing.
  */
 const INSERTS: Record<InjectKind, readonly string[]> = {
 	ws: [' ', '\n\t'],

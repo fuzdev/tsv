@@ -190,25 +190,26 @@ impl HostBoundaryScan {
 /// byte→char offset translation into the walk (each position through a
 /// `ByteToCharMap`; identity on ASCII). The output is a standalone
 /// `StyleSheetFile` matching Svelte's `parseCss()` JSON shape (no `attributes`
-/// or `content` fields, `end` set to the full source length). The hot path for
-/// the FFI parse binding and the CLI's compact output — the bytes are valid
-/// UTF-8 by construction (source slices + ASCII fragments), and byte-oriented
-/// consumers skip the O(output) validation a `String` requires.
+/// or `content` fields, `end` set to the full source length), plus a `loc` on
+/// every object carrying `start`/`end` — `parseCss` emits none; tsv's is the
+/// line (1-based, LF-only) and column (0-based, UTF-16 code units) of those
+/// offsets. The hot path for the FFI parse binding and the CLI's compact output
+/// — the bytes are valid UTF-8 by construction (source slices + ASCII
+/// fragments), and byte-oriented consumers skip the O(output) validation a
+/// `String` requires.
 #[cfg(feature = "convert")]
 pub fn convert_ast_json_bytes(stylesheet: &CssStyleSheet<'_>, source: &str) -> Vec<u8> {
-    ast::convert::write_stylesheet_file_bytes(stylesheet, source)
+    ast::convert::write_stylesheet_file_bytes(stylesheet, source, true)
 }
 
-/// The `no-locations` variant, for parity with the TS/Svelte writers and the
-/// uniform `lang_bindings!` macro. `parseCss` emits no per-node `loc`, so the
-/// CSS wire already carries only `start`/`end` offsets — this is an exact alias
-/// of `convert_ast_json_bytes` (a documented no-op, not a distinct shape).
+/// The span-only twin of `convert_ast_json_bytes`: `start`/`end` offsets with no
+/// `loc` — `parseCss`'s own shape — and no line table built at all.
 #[cfg(feature = "convert")]
 pub fn convert_ast_json_bytes_no_locations(
     stylesheet: &CssStyleSheet<'_>,
     source: &str,
 ) -> Vec<u8> {
-    convert_ast_json_bytes(stylesheet, source)
+    ast::convert::write_stylesheet_file_bytes(stylesheet, source, false)
 }
 
 /// Like `convert_ast_json_bytes`, as a `String` for `&str` boundaries (the
@@ -221,14 +222,15 @@ pub fn convert_ast_json_string(stylesheet: &CssStyleSheet<'_>, source: &str) -> 
         .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
 }
 
-/// The `String` form of `convert_ast_json_bytes_no_locations` (an alias — CSS
-/// has no `loc`).
+/// The `String` form of `convert_ast_json_bytes_no_locations`.
 #[cfg(feature = "convert")]
+#[expect(clippy::expect_used)]
 pub fn convert_ast_json_string_no_locations(
     stylesheet: &CssStyleSheet<'_>,
     source: &str,
 ) -> String {
-    convert_ast_json_string(stylesheet, source)
+    String::from_utf8(convert_ast_json_bytes_no_locations(stylesheet, source))
+        .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
 }
 
 /// Drive the raw lexer over `source` and return a deterministic, line-per-token

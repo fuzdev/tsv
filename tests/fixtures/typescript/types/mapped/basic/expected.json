@@ -19,119 +19,39 @@
 			"type": "Program",
 			"start": 18,
 			"end": 325,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 10,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 20,
 					"end": 51,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 32
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 25,
 						"end": 26,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 6
-							},
-							"end": {
-								"line": 2,
-								"column": 7
-							}
-						},
 						"name": "A"
 					},
 					"typeAnnotation": {
 						"type": "TSMappedType",
 						"start": 29,
 						"end": 50,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 10
-							},
-							"end": {
-								"line": 2,
-								"column": 31
-							}
-						},
 						"typeParameter": {
 							"type": "TSTypeParameter",
 							"start": 32,
 							"end": 44,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 13
-								},
-								"end": {
-									"line": 2,
-									"column": 25
-								}
-							},
 							"name": "K",
 							"constraint": {
 								"type": "TSTypeOperator",
 								"start": 37,
 								"end": 44,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 18
-									},
-									"end": {
-										"line": 2,
-										"column": 25
-									}
-								},
 								"operator": "keyof",
 								"typeAnnotation": {
 									"type": "TSTypeReference",
 									"start": 43,
 									"end": 44,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 24
-										},
-										"end": {
-											"line": 2,
-											"column": 25
-										}
-									},
 									"typeName": {
 										"type": "Identifier",
 										"start": 43,
 										"end": 44,
-										"loc": {
-											"start": {
-												"line": 2,
-												"column": 24
-											},
-											"end": {
-												"line": 2,
-												"column": 25
-											}
-										},
 										"name": "U"
 									}
 								}
@@ -142,30 +62,10 @@
 							"type": "TSTypeReference",
 							"start": 47,
 							"end": 48,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 28
-								},
-								"end": {
-									"line": 2,
-									"column": 29
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 47,
 								"end": 48,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 28
-									},
-									"end": {
-										"line": 2,
-										"column": 29
-									}
-								},
 								"name": "V"
 							}
 						}
@@ -175,104 +75,34 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 53,
 					"end": 85,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 33
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 58,
 						"end": 59,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 6
-							},
-							"end": {
-								"line": 3,
-								"column": 7
-							}
-						},
 						"name": "B"
 					},
 					"typeAnnotation": {
 						"type": "TSMappedType",
 						"start": 62,
 						"end": 84,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 10
-							},
-							"end": {
-								"line": 3,
-								"column": 32
-							}
-						},
 						"typeParameter": {
 							"type": "TSTypeParameter",
 							"start": 65,
 							"end": 77,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 13
-								},
-								"end": {
-									"line": 3,
-									"column": 25
-								}
-							},
 							"name": "K",
 							"constraint": {
 								"type": "TSTypeOperator",
 								"start": 70,
 								"end": 77,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 18
-									},
-									"end": {
-										"line": 3,
-										"column": 25
-									}
-								},
 								"operator": "keyof",
 								"typeAnnotation": {
 									"type": "TSTypeReference",
 									"start": 76,
 									"end": 77,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 24
-										},
-										"end": {
-											"line": 3,
-											"column": 25
-										}
-									},
 									"typeName": {
 										"type": "Identifier",
 										"start": 76,
 										"end": 77,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 24
-											},
-											"end": {
-												"line": 3,
-												"column": 25
-											}
-										},
 										"name": "U"
 									}
 								}
@@ -284,30 +114,10 @@
 							"type": "TSTypeReference",
 							"start": 81,
 							"end": 82,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 29
-								},
-								"end": {
-									"line": 3,
-									"column": 30
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 81,
 								"end": 82,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 29
-									},
-									"end": {
-										"line": 3,
-										"column": 30
-									}
-								},
 								"name": "V"
 							}
 						}
@@ -317,105 +127,35 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 87,
 					"end": 127,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 41
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 92,
 						"end": 93,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 6
-							},
-							"end": {
-								"line": 4,
-								"column": 7
-							}
-						},
 						"name": "C"
 					},
 					"typeAnnotation": {
 						"type": "TSMappedType",
 						"start": 96,
 						"end": 126,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 10
-							},
-							"end": {
-								"line": 4,
-								"column": 40
-							}
-						},
 						"readonly": true,
 						"typeParameter": {
 							"type": "TSTypeParameter",
 							"start": 108,
 							"end": 120,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 22
-								},
-								"end": {
-									"line": 4,
-									"column": 34
-								}
-							},
 							"name": "K",
 							"constraint": {
 								"type": "TSTypeOperator",
 								"start": 113,
 								"end": 120,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 27
-									},
-									"end": {
-										"line": 4,
-										"column": 34
-									}
-								},
 								"operator": "keyof",
 								"typeAnnotation": {
 									"type": "TSTypeReference",
 									"start": 119,
 									"end": 120,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 33
-										},
-										"end": {
-											"line": 4,
-											"column": 34
-										}
-									},
 									"typeName": {
 										"type": "Identifier",
 										"start": 119,
 										"end": 120,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 33
-											},
-											"end": {
-												"line": 4,
-												"column": 34
-											}
-										},
 										"name": "U"
 									}
 								}
@@ -426,30 +166,10 @@
 							"type": "TSTypeReference",
 							"start": 123,
 							"end": 124,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 37
-								},
-								"end": {
-									"line": 4,
-									"column": 38
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 123,
 								"end": 124,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 37
-									},
-									"end": {
-										"line": 4,
-										"column": 38
-									}
-								},
 								"name": "V"
 							}
 						}
@@ -459,105 +179,35 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 129,
 					"end": 170,
-					"loc": {
-						"start": {
-							"line": 5,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 42
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 134,
 						"end": 135,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 6
-							},
-							"end": {
-								"line": 5,
-								"column": 7
-							}
-						},
 						"name": "D"
 					},
 					"typeAnnotation": {
 						"type": "TSMappedType",
 						"start": 138,
 						"end": 169,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 10
-							},
-							"end": {
-								"line": 5,
-								"column": 41
-							}
-						},
 						"readonly": "-",
 						"typeParameter": {
 							"type": "TSTypeParameter",
 							"start": 151,
 							"end": 163,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 23
-								},
-								"end": {
-									"line": 5,
-									"column": 35
-								}
-							},
 							"name": "K",
 							"constraint": {
 								"type": "TSTypeOperator",
 								"start": 156,
 								"end": 163,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 28
-									},
-									"end": {
-										"line": 5,
-										"column": 35
-									}
-								},
 								"operator": "keyof",
 								"typeAnnotation": {
 									"type": "TSTypeReference",
 									"start": 162,
 									"end": 163,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 34
-										},
-										"end": {
-											"line": 5,
-											"column": 35
-										}
-									},
 									"typeName": {
 										"type": "Identifier",
 										"start": 162,
 										"end": 163,
-										"loc": {
-											"start": {
-												"line": 5,
-												"column": 34
-											},
-											"end": {
-												"line": 5,
-												"column": 35
-											}
-										},
 										"name": "U"
 									}
 								}
@@ -568,30 +218,10 @@
 							"type": "TSTypeReference",
 							"start": 166,
 							"end": 167,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 38
-								},
-								"end": {
-									"line": 5,
-									"column": 39
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 166,
 								"end": 167,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 38
-									},
-									"end": {
-										"line": 5,
-										"column": 39
-									}
-								},
 								"name": "V"
 							}
 						}
@@ -601,105 +231,35 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 172,
 					"end": 213,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 42
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 177,
 						"end": 178,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 6
-							},
-							"end": {
-								"line": 6,
-								"column": 7
-							}
-						},
 						"name": "E"
 					},
 					"typeAnnotation": {
 						"type": "TSMappedType",
 						"start": 181,
 						"end": 212,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 10
-							},
-							"end": {
-								"line": 6,
-								"column": 41
-							}
-						},
 						"readonly": "+",
 						"typeParameter": {
 							"type": "TSTypeParameter",
 							"start": 194,
 							"end": 206,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 23
-								},
-								"end": {
-									"line": 6,
-									"column": 35
-								}
-							},
 							"name": "K",
 							"constraint": {
 								"type": "TSTypeOperator",
 								"start": 199,
 								"end": 206,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 28
-									},
-									"end": {
-										"line": 6,
-										"column": 35
-									}
-								},
 								"operator": "keyof",
 								"typeAnnotation": {
 									"type": "TSTypeReference",
 									"start": 205,
 									"end": 206,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 34
-										},
-										"end": {
-											"line": 6,
-											"column": 35
-										}
-									},
 									"typeName": {
 										"type": "Identifier",
 										"start": 205,
 										"end": 206,
-										"loc": {
-											"start": {
-												"line": 6,
-												"column": 34
-											},
-											"end": {
-												"line": 6,
-												"column": 35
-											}
-										},
 										"name": "U"
 									}
 								}
@@ -710,30 +270,10 @@
 							"type": "TSTypeReference",
 							"start": 209,
 							"end": 210,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 38
-								},
-								"end": {
-									"line": 6,
-									"column": 39
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 209,
 								"end": 210,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 38
-									},
-									"end": {
-										"line": 6,
-										"column": 39
-									}
-								},
 								"name": "V"
 							}
 						}
@@ -743,104 +283,34 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 215,
 					"end": 248,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 1
-						},
-						"end": {
-							"line": 7,
-							"column": 34
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 220,
 						"end": 221,
-						"loc": {
-							"start": {
-								"line": 7,
-								"column": 6
-							},
-							"end": {
-								"line": 7,
-								"column": 7
-							}
-						},
 						"name": "F"
 					},
 					"typeAnnotation": {
 						"type": "TSMappedType",
 						"start": 224,
 						"end": 247,
-						"loc": {
-							"start": {
-								"line": 7,
-								"column": 10
-							},
-							"end": {
-								"line": 7,
-								"column": 33
-							}
-						},
 						"typeParameter": {
 							"type": "TSTypeParameter",
 							"start": 227,
 							"end": 239,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 13
-								},
-								"end": {
-									"line": 7,
-									"column": 25
-								}
-							},
 							"name": "K",
 							"constraint": {
 								"type": "TSTypeOperator",
 								"start": 232,
 								"end": 239,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 18
-									},
-									"end": {
-										"line": 7,
-										"column": 25
-									}
-								},
 								"operator": "keyof",
 								"typeAnnotation": {
 									"type": "TSTypeReference",
 									"start": 238,
 									"end": 239,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 24
-										},
-										"end": {
-											"line": 7,
-											"column": 25
-										}
-									},
 									"typeName": {
 										"type": "Identifier",
 										"start": 238,
 										"end": 239,
-										"loc": {
-											"start": {
-												"line": 7,
-												"column": 24
-											},
-											"end": {
-												"line": 7,
-												"column": 25
-											}
-										},
 										"name": "U"
 									}
 								}
@@ -852,30 +322,10 @@
 							"type": "TSTypeReference",
 							"start": 244,
 							"end": 245,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 30
-								},
-								"end": {
-									"line": 7,
-									"column": 31
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 244,
 								"end": 245,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 30
-									},
-									"end": {
-										"line": 7,
-										"column": 31
-									}
-								},
 								"name": "V"
 							}
 						}
@@ -885,104 +335,34 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 250,
 					"end": 283,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 34
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 255,
 						"end": 256,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 6
-							},
-							"end": {
-								"line": 8,
-								"column": 7
-							}
-						},
 						"name": "G"
 					},
 					"typeAnnotation": {
 						"type": "TSMappedType",
 						"start": 259,
 						"end": 282,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 10
-							},
-							"end": {
-								"line": 8,
-								"column": 33
-							}
-						},
 						"typeParameter": {
 							"type": "TSTypeParameter",
 							"start": 262,
 							"end": 274,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 13
-								},
-								"end": {
-									"line": 8,
-									"column": 25
-								}
-							},
 							"name": "K",
 							"constraint": {
 								"type": "TSTypeOperator",
 								"start": 267,
 								"end": 274,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 18
-									},
-									"end": {
-										"line": 8,
-										"column": 25
-									}
-								},
 								"operator": "keyof",
 								"typeAnnotation": {
 									"type": "TSTypeReference",
 									"start": 273,
 									"end": 274,
-									"loc": {
-										"start": {
-											"line": 8,
-											"column": 24
-										},
-										"end": {
-											"line": 8,
-											"column": 25
-										}
-									},
 									"typeName": {
 										"type": "Identifier",
 										"start": 273,
 										"end": 274,
-										"loc": {
-											"start": {
-												"line": 8,
-												"column": 24
-											},
-											"end": {
-												"line": 8,
-												"column": 25
-											}
-										},
 										"name": "U"
 									}
 								}
@@ -994,30 +374,10 @@
 							"type": "TSTypeReference",
 							"start": 279,
 							"end": 280,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 30
-								},
-								"end": {
-									"line": 8,
-									"column": 31
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 279,
 								"end": 280,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 30
-									},
-									"end": {
-										"line": 8,
-										"column": 31
-									}
-								},
 								"name": "V"
 							}
 						}
@@ -1027,104 +387,34 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 285,
 					"end": 324,
-					"loc": {
-						"start": {
-							"line": 9,
-							"column": 1
-						},
-						"end": {
-							"line": 9,
-							"column": 40
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 290,
 						"end": 291,
-						"loc": {
-							"start": {
-								"line": 9,
-								"column": 6
-							},
-							"end": {
-								"line": 9,
-								"column": 7
-							}
-						},
 						"name": "H"
 					},
 					"typeAnnotation": {
 						"type": "TSMappedType",
 						"start": 294,
 						"end": 323,
-						"loc": {
-							"start": {
-								"line": 9,
-								"column": 10
-							},
-							"end": {
-								"line": 9,
-								"column": 39
-							}
-						},
 						"typeParameter": {
 							"type": "TSTypeParameter",
 							"start": 297,
 							"end": 309,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 13
-								},
-								"end": {
-									"line": 9,
-									"column": 25
-								}
-							},
 							"name": "K",
 							"constraint": {
 								"type": "TSTypeOperator",
 								"start": 302,
 								"end": 309,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 18
-									},
-									"end": {
-										"line": 9,
-										"column": 25
-									}
-								},
 								"operator": "keyof",
 								"typeAnnotation": {
 									"type": "TSTypeReference",
 									"start": 308,
 									"end": 309,
-									"loc": {
-										"start": {
-											"line": 9,
-											"column": 24
-										},
-										"end": {
-											"line": 9,
-											"column": 25
-										}
-									},
 									"typeName": {
 										"type": "Identifier",
 										"start": 308,
 										"end": 309,
-										"loc": {
-											"start": {
-												"line": 9,
-												"column": 24
-											},
-											"end": {
-												"line": 9,
-												"column": 25
-											}
-										},
 										"name": "U"
 									}
 								}
@@ -1134,30 +424,10 @@
 							"type": "TSTypeReference",
 							"start": 313,
 							"end": 317,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 29
-								},
-								"end": {
-									"line": 9,
-									"column": 33
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 313,
 								"end": 317,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 29
-									},
-									"end": {
-										"line": 9,
-										"column": 33
-									}
-								},
 								"name": "NewK"
 							}
 						},
@@ -1165,30 +435,10 @@
 							"type": "TSTypeReference",
 							"start": 320,
 							"end": 321,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 36
-								},
-								"end": {
-									"line": 9,
-									"column": 37
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 320,
 								"end": 321,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 36
-									},
-									"end": {
-										"line": 9,
-										"column": 37
-									}
-								},
 								"name": "V"
 							}
 						}
@@ -1203,18 +453,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

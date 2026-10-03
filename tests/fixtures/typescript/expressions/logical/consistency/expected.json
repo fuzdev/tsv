@@ -14,33 +14,13 @@
 			"type": "Line",
 			"value": " Logical expression wrapping in call args (PR #18205)",
 			"start": 10,
-			"end": 65,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 56
-				}
-			}
+			"end": 65
 		},
 		{
 			"type": "Line",
 			"value": " fn() and new Fn() wrap consistently when line exceeds print width",
 			"start": 67,
-			"end": 135,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 69
-				}
-			}
+			"end": 135
 		}
 	],
 	"instance": {
@@ -52,59 +32,19 @@
 			"type": "Program",
 			"start": 8,
 			"end": 409,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 15,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
 					"start": 137,
 					"end": 269,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 137,
 						"end": 268,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 1
-							},
-							"end": {
-								"line": 8,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 137,
 							"end": 139,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 1
-								},
-								"end": {
-									"line": 4,
-									"column": 3
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -112,44 +52,14 @@
 								"type": "ConditionalExpression",
 								"start": 143,
 								"end": 265,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 2
-									},
-									"end": {
-										"line": 7,
-										"column": 14
-									}
-								},
 								"test": {
 									"type": "LogicalExpression",
 									"start": 143,
 									"end": 234,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 2
-										},
-										"end": {
-											"line": 5,
-											"column": 93
-										}
-									},
 									"left": {
 										"type": "Identifier",
 										"start": 143,
 										"end": 144,
-										"loc": {
-											"start": {
-												"line": 5,
-												"column": 2
-											},
-											"end": {
-												"line": 5,
-												"column": 3
-											}
-										},
 										"name": "a"
 									},
 									"operator": "&&",
@@ -157,16 +67,6 @@
 										"type": "Identifier",
 										"start": 148,
 										"end": 234,
-										"loc": {
-											"start": {
-												"line": 5,
-												"column": 7
-											},
-											"end": {
-												"line": 5,
-												"column": 93
-											}
-										},
 										"name": "a_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_condition"
 									}
 								},
@@ -174,32 +74,12 @@
 									"type": "Identifier",
 									"start": 240,
 									"end": 250,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 5
-										},
-										"end": {
-											"line": 6,
-											"column": 15
-										}
-									},
 									"name": "consequent"
 								},
 								"alternate": {
 									"type": "Identifier",
 									"start": 256,
 									"end": 265,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 5
-										},
-										"end": {
-											"line": 7,
-											"column": 14
-										}
-									},
 									"name": "alternate"
 								}
 							}
@@ -225,44 +105,14 @@
 					"type": "ExpressionStatement",
 					"start": 272,
 					"end": 408,
-					"loc": {
-						"start": {
-							"line": 10,
-							"column": 1
-						},
-						"end": {
-							"line": 14,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "NewExpression",
 						"start": 272,
 						"end": 407,
-						"loc": {
-							"start": {
-								"line": 10,
-								"column": 1
-							},
-							"end": {
-								"line": 14,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 276,
 							"end": 278,
-							"loc": {
-								"start": {
-									"line": 10,
-									"column": 5
-								},
-								"end": {
-									"line": 10,
-									"column": 7
-								}
-							},
 							"name": "Fn"
 						},
 						"arguments": [
@@ -270,44 +120,14 @@
 								"type": "ConditionalExpression",
 								"start": 282,
 								"end": 404,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 2
-									},
-									"end": {
-										"line": 13,
-										"column": 14
-									}
-								},
 								"test": {
 									"type": "LogicalExpression",
 									"start": 282,
 									"end": 373,
-									"loc": {
-										"start": {
-											"line": 11,
-											"column": 2
-										},
-										"end": {
-											"line": 11,
-											"column": 93
-										}
-									},
 									"left": {
 										"type": "Identifier",
 										"start": 282,
 										"end": 283,
-										"loc": {
-											"start": {
-												"line": 11,
-												"column": 2
-											},
-											"end": {
-												"line": 11,
-												"column": 3
-											}
-										},
 										"name": "a"
 									},
 									"operator": "&&",
@@ -315,16 +135,6 @@
 										"type": "Identifier",
 										"start": 287,
 										"end": 373,
-										"loc": {
-											"start": {
-												"line": 11,
-												"column": 7
-											},
-											"end": {
-												"line": 11,
-												"column": 93
-											}
-										},
 										"name": "a_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_condition"
 									}
 								},
@@ -332,32 +142,12 @@
 									"type": "Identifier",
 									"start": 379,
 									"end": 389,
-									"loc": {
-										"start": {
-											"line": 12,
-											"column": 5
-										},
-										"end": {
-											"line": 12,
-											"column": 15
-										}
-									},
 									"name": "consequent"
 								},
 								"alternate": {
 									"type": "Identifier",
 									"start": 395,
 									"end": 404,
-									"loc": {
-										"start": {
-											"line": 13,
-											"column": 5
-										},
-										"end": {
-											"line": 13,
-											"column": 14
-										}
-									},
 									"name": "alternate"
 								}
 							}

@@ -15,31 +15,11 @@
 					"type": "ObjectExpression",
 					"start": 7,
 					"end": 20,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 7
-						},
-						"end": {
-							"line": 1,
-							"column": 20
-						}
-					},
 					"properties": [
 						{
 							"type": "Property",
 							"start": 9,
 							"end": 18,
-							"loc": {
-								"start": {
-									"line": 1,
-									"column": 9
-								},
-								"end": {
-									"line": 1,
-									"column": 18
-								}
-							},
 							"method": false,
 							"shorthand": false,
 							"computed": false,
@@ -47,32 +27,12 @@
 								"type": "Identifier",
 								"start": 9,
 								"end": 15,
-								"loc": {
-									"start": {
-										"line": 1,
-										"column": 9
-									},
-									"end": {
-										"line": 1,
-										"column": 15
-									}
-								},
 								"name": "length"
 							},
 							"value": {
 								"type": "Literal",
 								"start": 17,
 								"end": 18,
-								"loc": {
-									"start": {
-										"line": 1,
-										"column": 17
-									},
-									"end": {
-										"line": 1,
-										"column": 18
-									}
-								},
 								"value": 5,
 								"raw": "5"
 							},
@@ -88,18 +48,6 @@
 							"start": 24,
 							"end": 38,
 							"name": "div",
-							"name_loc": {
-								"start": {
-									"line": 1,
-									"column": 25,
-									"character": 25
-								},
-								"end": {
-									"line": 1,
-									"column": 28,
-									"character": 28
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -112,16 +60,6 @@
 											"type": "Identifier",
 											"start": 30,
 											"end": 31,
-											"loc": {
-												"start": {
-													"line": 1,
-													"column": 30
-												},
-												"end": {
-													"line": 1,
-													"column": 31
-												}
-											},
 											"name": "i"
 										}
 									}

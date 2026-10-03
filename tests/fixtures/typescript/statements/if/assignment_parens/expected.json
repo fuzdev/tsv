@@ -19,90 +19,30 @@
 			"type": "Program",
 			"start": 18,
 			"end": 60,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 6,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "IfStatement",
 					"start": 20,
 					"end": 40,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 2
-						}
-					},
 					"test": {
 						"type": "AssignmentExpression",
 						"start": 25,
 						"end": 33,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 6
-							},
-							"end": {
-								"line": 2,
-								"column": 14
-							}
-						},
 						"operator": "=",
 						"left": {
 							"type": "Identifier",
 							"start": 25,
 							"end": 26,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 6
-								},
-								"end": {
-									"line": 2,
-									"column": 7
-								}
-							},
 							"name": "x"
 						},
 						"right": {
 							"type": "CallExpression",
 							"start": 29,
 							"end": 33,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 10
-								},
-								"end": {
-									"line": 2,
-									"column": 14
-								}
-							},
 							"callee": {
 								"type": "Identifier",
 								"start": 29,
 								"end": 31,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 10
-									},
-									"end": {
-										"line": 2,
-										"column": 12
-									}
-								},
 								"name": "fn"
 							},
 							"arguments": [],
@@ -113,16 +53,6 @@
 						"type": "BlockStatement",
 						"start": 36,
 						"end": 40,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 17
-							},
-							"end": {
-								"line": 3,
-								"column": 2
-							}
-						},
 						"body": []
 					},
 					"alternate": null
@@ -131,61 +61,21 @@
 					"type": "IfStatement",
 					"start": 42,
 					"end": 59,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 2
-						}
-					},
 					"test": {
 						"type": "AssignmentExpression",
 						"start": 47,
 						"end": 52,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 6
-							},
-							"end": {
-								"line": 4,
-								"column": 11
-							}
-						},
 						"operator": "=",
 						"left": {
 							"type": "Identifier",
 							"start": 47,
 							"end": 48,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 6
-								},
-								"end": {
-									"line": 4,
-									"column": 7
-								}
-							},
 							"name": "x"
 						},
 						"right": {
 							"type": "Identifier",
 							"start": 51,
 							"end": 52,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 10
-								},
-								"end": {
-									"line": 4,
-									"column": 11
-								}
-							},
 							"name": "y"
 						}
 					},
@@ -193,16 +83,6 @@
 						"type": "BlockStatement",
 						"start": 55,
 						"end": 59,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 14
-							},
-							"end": {
-								"line": 5,
-								"column": 2
-							}
-						},
 						"body": []
 					},
 					"alternate": null
@@ -216,18 +96,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

@@ -14,81 +14,31 @@
 			"type": "Line",
 			"value": " A single-line block comment after `as`/`satisfies` collapses inline; the",
 			"start": 20,
-			"end": 95,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 76
-				}
-			}
+			"end": 95
 		},
 		{
 			"type": "Line",
 			"value": " own-line authoring (unformatted_ours_own_line) collapses to this. Prettier",
 			"start": 97,
-			"end": 174,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 78
-				}
-			}
+			"end": 174
 		},
 		{
 			"type": "Line",
 			"value": " relocates the comment before the keyword (`x /* a */ as A`).",
 			"start": 176,
-			"end": 239,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 1
-				},
-				"end": {
-					"line": 4,
-					"column": 64
-				}
-			}
+			"end": 239
 		},
 		{
 			"type": "Block",
 			"value": " a ",
 			"start": 256,
-			"end": 263,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 16
-				},
-				"end": {
-					"line": 5,
-					"column": 23
-				}
-			}
+			"end": 263
 		},
 		{
 			"type": "Block",
 			"value": " b ",
 			"start": 291,
-			"end": 298,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 23
-				},
-				"end": {
-					"line": 7,
-					"column": 30
-				}
-			}
+			"end": 298
 		}
 	],
 	"instance": {
@@ -100,120 +50,40 @@
 			"type": "Program",
 			"start": 18,
 			"end": 302,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 8,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 241,
 					"end": 266,
-					"loc": {
-						"start": {
-							"line": 5,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 26
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 247,
 							"end": 265,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 7
-								},
-								"end": {
-									"line": 5,
-									"column": 25
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 247,
 								"end": 248,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 7
-									},
-									"end": {
-										"line": 5,
-										"column": 8
-									}
-								},
 								"name": "a"
 							},
 							"init": {
 								"type": "TSAsExpression",
 								"start": 251,
 								"end": 265,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 11
-									},
-									"end": {
-										"line": 5,
-										"column": 25
-									}
-								},
 								"expression": {
 									"type": "Identifier",
 									"start": 251,
 									"end": 252,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 11
-										},
-										"end": {
-											"line": 5,
-											"column": 12
-										}
-									},
 									"name": "x"
 								},
 								"typeAnnotation": {
 									"type": "TSTypeReference",
 									"start": 264,
 									"end": 265,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 24
-										},
-										"end": {
-											"line": 5,
-											"column": 25
-										}
-									},
 									"typeName": {
 										"type": "Identifier",
 										"start": 264,
 										"end": 265,
-										"loc": {
-											"start": {
-												"line": 5,
-												"column": 24
-											},
-											"end": {
-												"line": 5,
-												"column": 25
-											}
-										},
 										"name": "A"
 									},
 									"leadingComments": [
@@ -254,105 +124,35 @@
 					"type": "VariableDeclaration",
 					"start": 269,
 					"end": 301,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 1
-						},
-						"end": {
-							"line": 7,
-							"column": 33
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 275,
 							"end": 300,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 7
-								},
-								"end": {
-									"line": 7,
-									"column": 32
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 275,
 								"end": 276,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 7
-									},
-									"end": {
-										"line": 7,
-										"column": 8
-									}
-								},
 								"name": "b"
 							},
 							"init": {
 								"type": "TSSatisfiesExpression",
 								"start": 279,
 								"end": 300,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 11
-									},
-									"end": {
-										"line": 7,
-										"column": 32
-									}
-								},
 								"expression": {
 									"type": "Identifier",
 									"start": 279,
 									"end": 280,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 11
-										},
-										"end": {
-											"line": 7,
-											"column": 12
-										}
-									},
 									"name": "x"
 								},
 								"typeAnnotation": {
 									"type": "TSTypeReference",
 									"start": 299,
 									"end": 300,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 31
-										},
-										"end": {
-											"line": 7,
-											"column": 32
-										}
-									},
 									"typeName": {
 										"type": "Identifier",
 										"start": 299,
 										"end": 300,
-										"loc": {
-											"start": {
-												"line": 7,
-												"column": 31
-											},
-											"end": {
-												"line": 7,
-												"column": 32
-											}
-										},
 										"name": "B"
 									},
 									"leadingComments": [
@@ -378,18 +178,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

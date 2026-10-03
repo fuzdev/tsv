@@ -38,18 +38,6 @@
 				"start": 82,
 				"end": 182,
 				"name": "Comp",
-				"name_loc": {
-					"start": {
-						"line": 4,
-						"column": 1,
-						"character": 83
-					},
-					"end": {
-						"line": 4,
-						"column": 5,
-						"character": 87
-					}
-				},
 				"attributes": [
 					{
 						"type": "SpreadAttribute",
@@ -59,16 +47,6 @@
 							"type": "Identifier",
 							"start": 92,
 							"end": 178,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 10
-								},
-								"end": {
-									"line": 4,
-									"column": 96
-								}
-							},
 							"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 						}
 					}
@@ -103,18 +81,6 @@
 				"start": 211,
 				"end": 313,
 				"name": "Comp",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 1,
-						"character": 212
-					},
-					"end": {
-						"line": 7,
-						"column": 5,
-						"character": 216
-					}
-				},
 				"attributes": [
 					{
 						"type": "SpreadAttribute",
@@ -124,16 +90,6 @@
 							"type": "Identifier",
 							"start": 222,
 							"end": 309,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 5
-								},
-								"end": {
-									"line": 8,
-									"column": 92
-								}
-							},
 							"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 						}
 					}
@@ -181,18 +137,6 @@
 				"start": 400,
 				"end": 500,
 				"name": "Comp",
-				"name_loc": {
-					"start": {
-						"line": 14,
-						"column": 1,
-						"character": 401
-					},
-					"end": {
-						"line": 14,
-						"column": 5,
-						"character": 405
-					}
-				},
 				"attributes": [
 					{
 						"type": "SpreadAttribute",
@@ -202,16 +146,6 @@
 							"type": "Identifier",
 							"start": 410,
 							"end": 450,
-							"loc": {
-								"start": {
-									"line": 14,
-									"column": 10
-								},
-								"end": {
-									"line": 14,
-									"column": 50
-								}
-							},
 							"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 						}
 					},
@@ -223,16 +157,6 @@
 							"type": "Identifier",
 							"start": 456,
 							"end": 496,
-							"loc": {
-								"start": {
-									"line": 14,
-									"column": 56
-								},
-								"end": {
-									"line": 14,
-									"column": 96
-								}
-							},
 							"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 						}
 					}
@@ -267,18 +191,6 @@
 				"start": 544,
 				"end": 647,
 				"name": "Comp",
-				"name_loc": {
-					"start": {
-						"line": 17,
-						"column": 1,
-						"character": 545
-					},
-					"end": {
-						"line": 17,
-						"column": 5,
-						"character": 549
-					}
-				},
 				"attributes": [
 					{
 						"type": "SpreadAttribute",
@@ -288,16 +200,6 @@
 							"type": "Identifier",
 							"start": 555,
 							"end": 595,
-							"loc": {
-								"start": {
-									"line": 18,
-									"column": 5
-								},
-								"end": {
-									"line": 18,
-									"column": 45
-								}
-							},
 							"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 						}
 					},
@@ -309,16 +211,6 @@
 							"type": "Identifier",
 							"start": 602,
 							"end": 643,
-							"loc": {
-								"start": {
-									"line": 19,
-									"column": 5
-								},
-								"end": {
-									"line": 19,
-									"column": 46
-								}
-							},
 							"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 						}
 					}

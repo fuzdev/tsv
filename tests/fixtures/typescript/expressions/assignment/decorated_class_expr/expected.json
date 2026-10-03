@@ -14,17 +14,7 @@
 			"type": "Line",
 			"value": " property-value position routes through the same assignment-layout engine",
 			"start": 173,
-			"end": 248,
-			"loc": {
-				"start": {
-					"line": 18,
-					"column": 1
-				},
-				"end": {
-					"line": 18,
-					"column": 76
-				}
-			}
+			"end": 248
 		}
 	],
 	"instance": {
@@ -36,60 +26,20 @@
 			"type": "Program",
 			"start": 18,
 			"end": 287,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 24,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 20,
 					"end": 40,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 21
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 24,
 							"end": 25,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 5
-								},
-								"end": {
-									"line": 2,
-									"column": 6
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 24,
 								"end": 25,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 5
-									},
-									"end": {
-										"line": 2,
-										"column": 6
-									}
-								},
 								"name": "C"
 							},
 							"init": null
@@ -98,30 +48,10 @@
 							"type": "VariableDeclarator",
 							"start": 27,
 							"end": 28,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 8
-								},
-								"end": {
-									"line": 2,
-									"column": 9
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 27,
 								"end": 28,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 8
-									},
-									"end": {
-										"line": 2,
-										"column": 9
-									}
-								},
 								"name": "D"
 							},
 							"init": null
@@ -130,30 +60,10 @@
 							"type": "VariableDeclarator",
 							"start": 30,
 							"end": 31,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 11
-								},
-								"end": {
-									"line": 2,
-									"column": 12
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 30,
 								"end": 31,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 11
-									},
-									"end": {
-										"line": 2,
-										"column": 12
-									}
-								},
 								"name": "E"
 							},
 							"init": null
@@ -162,30 +72,10 @@
 							"type": "VariableDeclarator",
 							"start": 33,
 							"end": 34,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 14
-								},
-								"end": {
-									"line": 2,
-									"column": 15
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 33,
 								"end": 34,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 14
-									},
-									"end": {
-										"line": 2,
-										"column": 15
-									}
-								},
 								"name": "M"
 							},
 							"init": null
@@ -194,30 +84,10 @@
 							"type": "VariableDeclarator",
 							"start": 36,
 							"end": 39,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 17
-								},
-								"end": {
-									"line": 2,
-									"column": 20
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 36,
 								"end": 39,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 17
-									},
-									"end": {
-										"line": 2,
-										"column": 20
-									}
-								},
 								"name": "obj"
 							},
 							"init": null
@@ -229,90 +99,30 @@
 					"type": "ExpressionStatement",
 					"start": 42,
 					"end": 64,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 11
-						}
-					},
 					"expression": {
 						"type": "AssignmentExpression",
 						"start": 42,
 						"end": 63,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 1
-							},
-							"end": {
-								"line": 5,
-								"column": 10
-							}
-						},
 						"operator": "=",
 						"left": {
 							"type": "Identifier",
 							"start": 42,
 							"end": 43,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 1
-								},
-								"end": {
-									"line": 3,
-									"column": 2
-								}
-							},
 							"name": "C"
 						},
 						"right": {
 							"type": "ClassExpression",
 							"start": 48,
 							"end": 63,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 2
-								},
-								"end": {
-									"line": 5,
-									"column": 10
-								}
-							},
 							"decorators": [
 								{
 									"type": "Decorator",
 									"start": 48,
 									"end": 52,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 2
-										},
-										"end": {
-											"line": 4,
-											"column": 6
-										}
-									},
 									"expression": {
 										"type": "Identifier",
 										"start": 49,
 										"end": 52,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 3
-											},
-											"end": {
-												"line": 4,
-												"column": 6
-											}
-										},
 										"name": "dec"
 									}
 								}
@@ -323,16 +133,6 @@
 								"type": "ClassBody",
 								"start": 61,
 								"end": 63,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 8
-									},
-									"end": {
-										"line": 5,
-										"column": 10
-									}
-								},
 								"body": []
 							}
 						}
@@ -342,120 +142,40 @@
 					"type": "ExpressionStatement",
 					"start": 66,
 					"end": 105,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 24
-						}
-					},
 					"expression": {
 						"type": "AssignmentExpression",
 						"start": 66,
 						"end": 104,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 1
-							},
-							"end": {
-								"line": 8,
-								"column": 23
-							}
-						},
 						"operator": "=",
 						"left": {
 							"type": "Identifier",
 							"start": 66,
 							"end": 67,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 1
-								},
-								"end": {
-									"line": 6,
-									"column": 2
-								}
-							},
 							"name": "D"
 						},
 						"right": {
 							"type": "ClassExpression",
 							"start": 72,
 							"end": 104,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 2
-								},
-								"end": {
-									"line": 8,
-									"column": 23
-								}
-							},
 							"decorators": [
 								{
 									"type": "Decorator",
 									"start": 72,
 									"end": 80,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 2
-										},
-										"end": {
-											"line": 7,
-											"column": 10
-										}
-									},
 									"expression": {
 										"type": "MemberExpression",
 										"start": 73,
 										"end": 80,
-										"loc": {
-											"start": {
-												"line": 7,
-												"column": 3
-											},
-											"end": {
-												"line": 7,
-												"column": 10
-											}
-										},
 										"object": {
 											"type": "Identifier",
 											"start": 73,
 											"end": 76,
-											"loc": {
-												"start": {
-													"line": 7,
-													"column": 3
-												},
-												"end": {
-													"line": 7,
-													"column": 6
-												}
-											},
 											"name": "dec"
 										},
 										"property": {
 											"type": "Identifier",
 											"start": 77,
 											"end": 80,
-											"loc": {
-												"start": {
-													"line": 7,
-													"column": 7
-												},
-												"end": {
-													"line": 7,
-													"column": 10
-												}
-											},
 											"name": "foo"
 										},
 										"computed": false
@@ -467,32 +187,12 @@
 								"type": "Identifier",
 								"start": 97,
 								"end": 101,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 16
-									},
-									"end": {
-										"line": 8,
-										"column": 20
-									}
-								},
 								"name": "Base"
 							},
 							"body": {
 								"type": "ClassBody",
 								"start": 102,
 								"end": 104,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 21
-									},
-									"end": {
-										"line": 8,
-										"column": 23
-									}
-								},
 								"body": []
 							}
 						}
@@ -502,104 +202,34 @@
 					"type": "ExpressionStatement",
 					"start": 107,
 					"end": 144,
-					"loc": {
-						"start": {
-							"line": 9,
-							"column": 1
-						},
-						"end": {
-							"line": 13,
-							"column": 4
-						}
-					},
 					"expression": {
 						"type": "AssignmentExpression",
 						"start": 107,
 						"end": 143,
-						"loc": {
-							"start": {
-								"line": 9,
-								"column": 1
-							},
-							"end": {
-								"line": 13,
-								"column": 3
-							}
-						},
 						"operator": "=",
 						"left": {
 							"type": "Identifier",
 							"start": 107,
 							"end": 108,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 1
-								},
-								"end": {
-									"line": 9,
-									"column": 2
-								}
-							},
 							"name": "E"
 						},
 						"right": {
 							"type": "ClassExpression",
 							"start": 113,
 							"end": 143,
-							"loc": {
-								"start": {
-									"line": 10,
-									"column": 2
-								},
-								"end": {
-									"line": 13,
-									"column": 3
-								}
-							},
 							"decorators": [
 								{
 									"type": "Decorator",
 									"start": 113,
 									"end": 119,
-									"loc": {
-										"start": {
-											"line": 10,
-											"column": 2
-										},
-										"end": {
-											"line": 10,
-											"column": 8
-										}
-									},
 									"expression": {
 										"type": "CallExpression",
 										"start": 114,
 										"end": 119,
-										"loc": {
-											"start": {
-												"line": 10,
-												"column": 3
-											},
-											"end": {
-												"line": 10,
-												"column": 8
-											}
-										},
 										"callee": {
 											"type": "Identifier",
 											"start": 114,
 											"end": 117,
-											"loc": {
-												"start": {
-													"line": 10,
-													"column": 3
-												},
-												"end": {
-													"line": 10,
-													"column": 6
-												}
-											},
 											"name": "dec"
 										},
 										"arguments": []
@@ -612,63 +242,23 @@
 								"type": "ClassBody",
 								"start": 128,
 								"end": 143,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 8
-									},
-									"end": {
-										"line": 13,
-										"column": 3
-									}
-								},
 								"body": [
 									{
 										"type": "PropertyDefinition",
 										"start": 133,
 										"end": 139,
-										"loc": {
-											"start": {
-												"line": 12,
-												"column": 3
-											},
-											"end": {
-												"line": 12,
-												"column": 9
-											}
-										},
 										"static": false,
 										"computed": false,
 										"key": {
 											"type": "Identifier",
 											"start": 133,
 											"end": 134,
-											"loc": {
-												"start": {
-													"line": 12,
-													"column": 3
-												},
-												"end": {
-													"line": 12,
-													"column": 4
-												}
-											},
 											"name": "a"
 										},
 										"value": {
 											"type": "Literal",
 											"start": 137,
 											"end": 138,
-											"loc": {
-												"start": {
-													"line": 12,
-													"column": 7
-												},
-												"end": {
-													"line": 12,
-													"column": 8
-												}
-											},
 											"value": 1,
 											"raw": "1"
 										}
@@ -682,90 +272,30 @@
 					"type": "ExpressionStatement",
 					"start": 146,
 					"end": 171,
-					"loc": {
-						"start": {
-							"line": 14,
-							"column": 1
-						},
-						"end": {
-							"line": 17,
-							"column": 11
-						}
-					},
 					"expression": {
 						"type": "AssignmentExpression",
 						"start": 146,
 						"end": 170,
-						"loc": {
-							"start": {
-								"line": 14,
-								"column": 1
-							},
-							"end": {
-								"line": 17,
-								"column": 10
-							}
-						},
 						"operator": "=",
 						"left": {
 							"type": "Identifier",
 							"start": 146,
 							"end": 147,
-							"loc": {
-								"start": {
-									"line": 14,
-									"column": 1
-								},
-								"end": {
-									"line": 14,
-									"column": 2
-								}
-							},
 							"name": "M"
 						},
 						"right": {
 							"type": "ClassExpression",
 							"start": 152,
 							"end": 170,
-							"loc": {
-								"start": {
-									"line": 15,
-									"column": 2
-								},
-								"end": {
-									"line": 17,
-									"column": 10
-								}
-							},
 							"decorators": [
 								{
 									"type": "Decorator",
 									"start": 152,
 									"end": 154,
-									"loc": {
-										"start": {
-											"line": 15,
-											"column": 2
-										},
-										"end": {
-											"line": 15,
-											"column": 4
-										}
-									},
 									"expression": {
 										"type": "Identifier",
 										"start": 153,
 										"end": 154,
-										"loc": {
-											"start": {
-												"line": 15,
-												"column": 3
-											},
-											"end": {
-												"line": 15,
-												"column": 4
-											}
-										},
 										"name": "a"
 									}
 								},
@@ -773,30 +303,10 @@
 									"type": "Decorator",
 									"start": 157,
 									"end": 159,
-									"loc": {
-										"start": {
-											"line": 16,
-											"column": 2
-										},
-										"end": {
-											"line": 16,
-											"column": 4
-										}
-									},
 									"expression": {
 										"type": "Identifier",
 										"start": 158,
 										"end": 159,
-										"loc": {
-											"start": {
-												"line": 16,
-												"column": 3
-											},
-											"end": {
-												"line": 16,
-												"column": 4
-											}
-										},
 										"name": "b"
 									}
 								}
@@ -807,16 +317,6 @@
 								"type": "ClassBody",
 								"start": 168,
 								"end": 170,
-								"loc": {
-									"start": {
-										"line": 17,
-										"column": 8
-									},
-									"end": {
-										"line": 17,
-										"column": 10
-									}
-								},
 								"body": []
 							}
 						}
@@ -826,76 +326,26 @@
 					"type": "ExpressionStatement",
 					"start": 250,
 					"end": 286,
-					"loc": {
-						"start": {
-							"line": 19,
-							"column": 1
-						},
-						"end": {
-							"line": 23,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "AssignmentExpression",
 						"start": 250,
 						"end": 285,
-						"loc": {
-							"start": {
-								"line": 19,
-								"column": 1
-							},
-							"end": {
-								"line": 23,
-								"column": 2
-							}
-						},
 						"operator": "=",
 						"left": {
 							"type": "Identifier",
 							"start": 250,
 							"end": 253,
-							"loc": {
-								"start": {
-									"line": 19,
-									"column": 1
-								},
-								"end": {
-									"line": 19,
-									"column": 4
-								}
-							},
 							"name": "obj"
 						},
 						"right": {
 							"type": "ObjectExpression",
 							"start": 256,
 							"end": 285,
-							"loc": {
-								"start": {
-									"line": 19,
-									"column": 7
-								},
-								"end": {
-									"line": 23,
-									"column": 2
-								}
-							},
 							"properties": [
 								{
 									"type": "Property",
 									"start": 260,
 									"end": 282,
-									"loc": {
-										"start": {
-											"line": 20,
-											"column": 2
-										},
-										"end": {
-											"line": 22,
-											"column": 11
-										}
-									},
 									"method": false,
 									"shorthand": false,
 									"computed": false,
@@ -903,61 +353,21 @@
 										"type": "Identifier",
 										"start": 260,
 										"end": 261,
-										"loc": {
-											"start": {
-												"line": 20,
-												"column": 2
-											},
-											"end": {
-												"line": 20,
-												"column": 3
-											}
-										},
 										"name": "k"
 									},
 									"value": {
 										"type": "ClassExpression",
 										"start": 266,
 										"end": 282,
-										"loc": {
-											"start": {
-												"line": 21,
-												"column": 3
-											},
-											"end": {
-												"line": 22,
-												"column": 11
-											}
-										},
 										"decorators": [
 											{
 												"type": "Decorator",
 												"start": 266,
 												"end": 270,
-												"loc": {
-													"start": {
-														"line": 21,
-														"column": 3
-													},
-													"end": {
-														"line": 21,
-														"column": 7
-													}
-												},
 												"expression": {
 													"type": "Identifier",
 													"start": 267,
 													"end": 270,
-													"loc": {
-														"start": {
-															"line": 21,
-															"column": 4
-														},
-														"end": {
-															"line": 21,
-															"column": 7
-														}
-													},
 													"name": "dec"
 												}
 											}
@@ -968,16 +378,6 @@
 											"type": "ClassBody",
 											"start": 280,
 											"end": 282,
-											"loc": {
-												"start": {
-													"line": 22,
-													"column": 9
-												},
-												"end": {
-													"line": 22,
-													"column": 11
-												}
-											},
 											"body": []
 										}
 									},
@@ -1004,18 +404,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

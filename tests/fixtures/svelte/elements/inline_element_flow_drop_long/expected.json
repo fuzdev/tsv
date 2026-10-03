@@ -25,18 +25,6 @@
 				"start": 363,
 				"end": 650,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 1,
-						"character": 364
-					},
-					"end": {
-						"line": 7,
-						"column": 2,
-						"character": 365
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -53,36 +41,12 @@
 							"start": 472,
 							"end": 513,
 							"name": "a",
-							"name_loc": {
-								"start": {
-									"line": 9,
-									"column": 11,
-									"character": 473
-								},
-								"end": {
-									"line": 9,
-									"column": 12,
-									"character": 474
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 475,
 									"end": 503,
 									"name": "href",
-									"name_loc": {
-										"start": {
-											"line": 9,
-											"column": 13,
-											"character": 475
-										},
-										"end": {
-											"line": 9,
-											"column": 17,
-											"character": 479
-										}
-									},
 									"value": [
 										{
 											"start": 481,
@@ -119,36 +83,12 @@
 							"start": 560,
 							"end": 613,
 							"name": "a",
-							"name_loc": {
-								"start": {
-									"line": 10,
-									"column": 2,
-									"character": 561
-								},
-								"end": {
-									"line": 10,
-									"column": 3,
-									"character": 562
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 563,
 									"end": 602,
 									"name": "href",
-									"name_loc": {
-										"start": {
-											"line": 10,
-											"column": 4,
-											"character": 563
-										},
-										"end": {
-											"line": 10,
-											"column": 8,
-											"character": 567
-										}
-									},
 									"value": [
 										{
 											"start": 569,

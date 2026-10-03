@@ -15,16 +15,6 @@
 					"type": "Identifier",
 					"start": 1,
 					"end": 6,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 1
-						},
-						"end": {
-							"line": 1,
-							"column": 6
-						}
-					},
 					"name": "expr1"
 				}
 			},
@@ -56,16 +46,6 @@
 					"type": "Identifier",
 					"start": 26,
 					"end": 31,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 6
-						}
-					},
 					"name": "expr2"
 				}
 			}

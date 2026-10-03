@@ -14,193 +14,73 @@
 			"type": "Line",
 			"value": " single specifier with trailing line comment",
 			"start": 10,
-			"end": 56,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 47
-				}
-			}
+			"end": 56
 		},
 		{
 			"type": "Line",
 			"value": " comment",
 			"start": 71,
-			"end": 81,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 4
-				},
-				"end": {
-					"line": 4,
-					"column": 14
-				}
-			}
+			"end": 81
 		},
 		{
 			"type": "Line",
 			"value": " last specifier trailing line comment",
 			"start": 99,
-			"end": 138,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 1
-				},
-				"end": {
-					"line": 7,
-					"column": 40
-				}
-			}
+			"end": 138
 		},
 		{
 			"type": "Line",
 			"value": " comment",
 			"start": 158,
-			"end": 168,
-			"loc": {
-				"start": {
-					"line": 10,
-					"column": 4
-				},
-				"end": {
-					"line": 10,
-					"column": 14
-				}
-			}
+			"end": 168
 		},
 		{
 			"type": "Line",
 			"value": " all specifiers with trailing line comments",
 			"start": 186,
-			"end": 231,
-			"loc": {
-				"start": {
-					"line": 13,
-					"column": 1
-				},
-				"end": {
-					"line": 13,
-					"column": 46
-				}
-			}
+			"end": 231
 		},
 		{
 			"type": "Line",
 			"value": " comment1",
 			"start": 247,
-			"end": 258,
-			"loc": {
-				"start": {
-					"line": 15,
-					"column": 5
-				},
-				"end": {
-					"line": 15,
-					"column": 16
-				}
-			}
+			"end": 258
 		},
 		{
 			"type": "Line",
 			"value": " comment2",
 			"start": 263,
-			"end": 274,
-			"loc": {
-				"start": {
-					"line": 16,
-					"column": 4
-				},
-				"end": {
-					"line": 16,
-					"column": 15
-				}
-			}
+			"end": 274
 		},
 		{
 			"type": "Line",
 			"value": " hardline path (expanding comment) + last trailing line comment",
 			"start": 292,
-			"end": 357,
-			"loc": {
-				"start": {
-					"line": 19,
-					"column": 1
-				},
-				"end": {
-					"line": 19,
-					"column": 66
-				}
-			}
+			"end": 357
 		},
 		{
 			"type": "Line",
 			"value": " group",
 			"start": 370,
-			"end": 378,
-			"loc": {
-				"start": {
-					"line": 21,
-					"column": 2
-				},
-				"end": {
-					"line": 21,
-					"column": 10
-				}
-			}
+			"end": 378
 		},
 		{
 			"type": "Line",
 			"value": " comment",
 			"start": 388,
-			"end": 398,
-			"loc": {
-				"start": {
-					"line": 23,
-					"column": 4
-				},
-				"end": {
-					"line": 23,
-					"column": 14
-				}
-			}
+			"end": 398
 		},
 		{
 			"type": "Line",
 			"value": " block comment on last specifier (should work - contrast case)",
 			"start": 416,
-			"end": 480,
-			"loc": {
-				"start": {
-					"line": 26,
-					"column": 1
-				},
-				"end": {
-					"line": 26,
-					"column": 65
-				}
-			}
+			"end": 480
 		},
 		{
 			"type": "Block",
 			"value": " comment ",
 			"start": 493,
-			"end": 506,
-			"loc": {
-				"start": {
-					"line": 27,
-					"column": 12
-				},
-				"end": {
-					"line": 27,
-					"column": 25
-				}
-			}
+			"end": 506
 		}
 	],
 	"instance": {
@@ -212,76 +92,26 @@
 			"type": "Program",
 			"start": 8,
 			"end": 521,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 28,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ImportDeclaration",
 					"start": 58,
 					"end": 96,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 14
-						}
-					},
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
 							"start": 69,
 							"end": 70,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 2
-								},
-								"end": {
-									"line": 4,
-									"column": 3
-								}
-							},
 							"imported": {
 								"type": "Identifier",
 								"start": 69,
 								"end": 70,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 2
-									},
-									"end": {
-										"line": 4,
-										"column": 3
-									}
-								},
 								"name": "a"
 							},
 							"local": {
 								"type": "Identifier",
 								"start": 69,
 								"end": 70,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 2
-									},
-									"end": {
-										"line": 4,
-										"column": 3
-									}
-								},
 								"name": "a"
 							},
 							"trailingComments": [
@@ -298,16 +128,6 @@
 						"type": "Literal",
 						"start": 90,
 						"end": 95,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 8
-							},
-							"end": {
-								"line": 5,
-								"column": 13
-							}
-						},
 						"value": "./a",
 						"raw": "'./a'"
 					},
@@ -325,61 +145,21 @@
 					"type": "ImportDeclaration",
 					"start": 140,
 					"end": 183,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 1
-						},
-						"end": {
-							"line": 11,
-							"column": 14
-						}
-					},
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
 							"start": 151,
 							"end": 152,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 2
-								},
-								"end": {
-									"line": 9,
-									"column": 3
-								}
-							},
 							"imported": {
 								"type": "Identifier",
 								"start": 151,
 								"end": 152,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 2
-									},
-									"end": {
-										"line": 9,
-										"column": 3
-									}
-								},
 								"name": "b"
 							},
 							"local": {
 								"type": "Identifier",
 								"start": 151,
 								"end": 152,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 2
-									},
-									"end": {
-										"line": 9,
-										"column": 3
-									}
-								},
 								"name": "b"
 							}
 						},
@@ -387,46 +167,16 @@
 							"type": "ImportSpecifier",
 							"start": 156,
 							"end": 157,
-							"loc": {
-								"start": {
-									"line": 10,
-									"column": 2
-								},
-								"end": {
-									"line": 10,
-									"column": 3
-								}
-							},
 							"imported": {
 								"type": "Identifier",
 								"start": 156,
 								"end": 157,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 2
-									},
-									"end": {
-										"line": 10,
-										"column": 3
-									}
-								},
 								"name": "c"
 							},
 							"local": {
 								"type": "Identifier",
 								"start": 156,
 								"end": 157,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 2
-									},
-									"end": {
-										"line": 10,
-										"column": 3
-									}
-								},
 								"name": "c"
 							},
 							"trailingComments": [
@@ -443,16 +193,6 @@
 						"type": "Literal",
 						"start": 177,
 						"end": 182,
-						"loc": {
-							"start": {
-								"line": 11,
-								"column": 8
-							},
-							"end": {
-								"line": 11,
-								"column": 13
-							}
-						},
 						"value": "./b",
 						"raw": "'./b'"
 					},
@@ -470,61 +210,21 @@
 					"type": "ImportDeclaration",
 					"start": 233,
 					"end": 289,
-					"loc": {
-						"start": {
-							"line": 14,
-							"column": 1
-						},
-						"end": {
-							"line": 17,
-							"column": 14
-						}
-					},
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
 							"start": 244,
 							"end": 245,
-							"loc": {
-								"start": {
-									"line": 15,
-									"column": 2
-								},
-								"end": {
-									"line": 15,
-									"column": 3
-								}
-							},
 							"imported": {
 								"type": "Identifier",
 								"start": 244,
 								"end": 245,
-								"loc": {
-									"start": {
-										"line": 15,
-										"column": 2
-									},
-									"end": {
-										"line": 15,
-										"column": 3
-									}
-								},
 								"name": "d"
 							},
 							"local": {
 								"type": "Identifier",
 								"start": 244,
 								"end": 245,
-								"loc": {
-									"start": {
-										"line": 15,
-										"column": 2
-									},
-									"end": {
-										"line": 15,
-										"column": 3
-									}
-								},
 								"name": "d"
 							},
 							"trailingComments": [
@@ -540,46 +240,16 @@
 							"type": "ImportSpecifier",
 							"start": 261,
 							"end": 262,
-							"loc": {
-								"start": {
-									"line": 16,
-									"column": 2
-								},
-								"end": {
-									"line": 16,
-									"column": 3
-								}
-							},
 							"imported": {
 								"type": "Identifier",
 								"start": 261,
 								"end": 262,
-								"loc": {
-									"start": {
-										"line": 16,
-										"column": 2
-									},
-									"end": {
-										"line": 16,
-										"column": 3
-									}
-								},
 								"name": "e"
 							},
 							"local": {
 								"type": "Identifier",
 								"start": 261,
 								"end": 262,
-								"loc": {
-									"start": {
-										"line": 16,
-										"column": 2
-									},
-									"end": {
-										"line": 16,
-										"column": 3
-									}
-								},
 								"name": "e"
 							},
 							"trailingComments": [
@@ -596,16 +266,6 @@
 						"type": "Literal",
 						"start": 283,
 						"end": 288,
-						"loc": {
-							"start": {
-								"line": 17,
-								"column": 8
-							},
-							"end": {
-								"line": 17,
-								"column": 13
-							}
-						},
 						"value": "./c",
 						"raw": "'./c'"
 					},
@@ -623,61 +283,21 @@
 					"type": "ImportDeclaration",
 					"start": 359,
 					"end": 413,
-					"loc": {
-						"start": {
-							"line": 20,
-							"column": 1
-						},
-						"end": {
-							"line": 24,
-							"column": 14
-						}
-					},
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
 							"start": 381,
 							"end": 382,
-							"loc": {
-								"start": {
-									"line": 22,
-									"column": 2
-								},
-								"end": {
-									"line": 22,
-									"column": 3
-								}
-							},
 							"imported": {
 								"type": "Identifier",
 								"start": 381,
 								"end": 382,
-								"loc": {
-									"start": {
-										"line": 22,
-										"column": 2
-									},
-									"end": {
-										"line": 22,
-										"column": 3
-									}
-								},
 								"name": "f"
 							},
 							"local": {
 								"type": "Identifier",
 								"start": 381,
 								"end": 382,
-								"loc": {
-									"start": {
-										"line": 22,
-										"column": 2
-									},
-									"end": {
-										"line": 22,
-										"column": 3
-									}
-								},
 								"name": "f"
 							},
 							"leadingComments": [
@@ -693,46 +313,16 @@
 							"type": "ImportSpecifier",
 							"start": 386,
 							"end": 387,
-							"loc": {
-								"start": {
-									"line": 23,
-									"column": 2
-								},
-								"end": {
-									"line": 23,
-									"column": 3
-								}
-							},
 							"imported": {
 								"type": "Identifier",
 								"start": 386,
 								"end": 387,
-								"loc": {
-									"start": {
-										"line": 23,
-										"column": 2
-									},
-									"end": {
-										"line": 23,
-										"column": 3
-									}
-								},
 								"name": "g"
 							},
 							"local": {
 								"type": "Identifier",
 								"start": 386,
 								"end": 387,
-								"loc": {
-									"start": {
-										"line": 23,
-										"column": 2
-									},
-									"end": {
-										"line": 23,
-										"column": 3
-									}
-								},
 								"name": "g"
 							},
 							"trailingComments": [
@@ -749,16 +339,6 @@
 						"type": "Literal",
 						"start": 407,
 						"end": 412,
-						"loc": {
-							"start": {
-								"line": 24,
-								"column": 8
-							},
-							"end": {
-								"line": 24,
-								"column": 13
-							}
-						},
 						"value": "./d",
 						"raw": "'./d'"
 					},
@@ -776,61 +356,21 @@
 					"type": "ImportDeclaration",
 					"start": 482,
 					"end": 520,
-					"loc": {
-						"start": {
-							"line": 27,
-							"column": 1
-						},
-						"end": {
-							"line": 27,
-							"column": 39
-						}
-					},
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
 							"start": 491,
 							"end": 492,
-							"loc": {
-								"start": {
-									"line": 27,
-									"column": 10
-								},
-								"end": {
-									"line": 27,
-									"column": 11
-								}
-							},
 							"imported": {
 								"type": "Identifier",
 								"start": 491,
 								"end": 492,
-								"loc": {
-									"start": {
-										"line": 27,
-										"column": 10
-									},
-									"end": {
-										"line": 27,
-										"column": 11
-									}
-								},
 								"name": "h"
 							},
 							"local": {
 								"type": "Identifier",
 								"start": 491,
 								"end": 492,
-								"loc": {
-									"start": {
-										"line": 27,
-										"column": 10
-									},
-									"end": {
-										"line": 27,
-										"column": 11
-									}
-								},
 								"name": "h"
 							},
 							"trailingComments": [
@@ -847,16 +387,6 @@
 						"type": "Literal",
 						"start": 514,
 						"end": 519,
-						"loc": {
-							"start": {
-								"line": 27,
-								"column": 33
-							},
-							"end": {
-								"line": 27,
-								"column": 38
-							}
-						},
 						"value": "./e",
 						"raw": "'./e'"
 					},

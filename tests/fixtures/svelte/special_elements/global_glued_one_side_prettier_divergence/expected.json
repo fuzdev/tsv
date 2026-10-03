@@ -25,50 +25,16 @@
 				"start": 262,
 				"end": 292,
 				"name": "svelte:document",
-				"name_loc": {
-					"start": {
-						"line": 6,
-						"column": 1,
-						"character": 263
-					},
-					"end": {
-						"line": 6,
-						"column": 16,
-						"character": 278
-					}
-				},
 				"attributes": [
 					{
 						"start": 279,
 						"end": 289,
 						"type": "OnDirective",
 						"name": "x",
-						"name_loc": {
-							"start": {
-								"line": 6,
-								"column": 17,
-								"character": 279
-							},
-							"end": {
-								"line": 6,
-								"column": 21,
-								"character": 283
-							}
-						},
 						"expression": {
 							"type": "Identifier",
 							"start": 285,
 							"end": 288,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 23
-								},
-								"end": {
-									"line": 6,
-									"column": 26
-								}
-							},
 							"name": "fn1"
 						},
 						"modifiers": []
@@ -91,50 +57,16 @@
 				"start": 299,
 				"end": 327,
 				"name": "svelte:window",
-				"name_loc": {
-					"start": {
-						"line": 8,
-						"column": 1,
-						"character": 300
-					},
-					"end": {
-						"line": 8,
-						"column": 14,
-						"character": 313
-					}
-				},
 				"attributes": [
 					{
 						"start": 314,
 						"end": 324,
 						"type": "OnDirective",
 						"name": "x",
-						"name_loc": {
-							"start": {
-								"line": 8,
-								"column": 15,
-								"character": 314
-							},
-							"end": {
-								"line": 8,
-								"column": 19,
-								"character": 318
-							}
-						},
 						"expression": {
 							"type": "Identifier",
 							"start": 320,
 							"end": 323,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 21
-								},
-								"end": {
-									"line": 8,
-									"column": 24
-								}
-							},
 							"name": "fn2"
 						},
 						"modifiers": []
@@ -157,50 +89,16 @@
 				"start": 334,
 				"end": 360,
 				"name": "svelte:body",
-				"name_loc": {
-					"start": {
-						"line": 10,
-						"column": 1,
-						"character": 335
-					},
-					"end": {
-						"line": 10,
-						"column": 12,
-						"character": 346
-					}
-				},
 				"attributes": [
 					{
 						"start": 347,
 						"end": 357,
 						"type": "OnDirective",
 						"name": "x",
-						"name_loc": {
-							"start": {
-								"line": 10,
-								"column": 13,
-								"character": 347
-							},
-							"end": {
-								"line": 10,
-								"column": 17,
-								"character": 351
-							}
-						},
 						"expression": {
 							"type": "Identifier",
 							"start": 353,
 							"end": 356,
-							"loc": {
-								"start": {
-									"line": 10,
-									"column": 19
-								},
-								"end": {
-									"line": 10,
-									"column": 22
-								}
-							},
 							"name": "fn3"
 						},
 						"modifiers": []

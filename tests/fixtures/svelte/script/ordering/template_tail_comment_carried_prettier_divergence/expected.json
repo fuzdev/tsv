@@ -40,60 +40,20 @@
 			"type": "Program",
 			"start": 19,
 			"end": 28,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 0
-				},
-				"end": {
-					"line": 4,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 21,
 					"end": 27,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 7
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 25,
 							"end": 26,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 5
-								},
-								"end": {
-									"line": 3,
-									"column": 6
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 25,
 								"end": 26,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 5
-									},
-									"end": {
-										"line": 3,
-										"column": 6
-									}
-								},
 								"name": "a"
 							},
 							"init": null

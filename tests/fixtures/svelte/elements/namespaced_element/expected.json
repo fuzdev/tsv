@@ -12,18 +12,6 @@
 				"start": 0,
 				"end": 11,
 				"name": "foo:bar",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -42,18 +30,6 @@
 				"start": 12,
 				"end": 31,
 				"name": "foo:bar",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 13
-					},
-					"end": {
-						"line": 2,
-						"column": 8,
-						"character": 20
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -72,18 +48,6 @@
 				"start": 32,
 				"end": 55,
 				"name": "foo:bar",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 1,
-						"character": 33
-					},
-					"end": {
-						"line": 3,
-						"column": 8,
-						"character": 40
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -110,18 +74,6 @@
 				"start": 56,
 				"end": 91,
 				"name": "foo:bar",
-				"name_loc": {
-					"start": {
-						"line": 4,
-						"column": 1,
-						"character": 57
-					},
-					"end": {
-						"line": 4,
-						"column": 8,
-						"character": 64
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -131,18 +83,6 @@
 							"start": 65,
 							"end": 81,
 							"name": "div",
-							"name_loc": {
-								"start": {
-									"line": 4,
-									"column": 10,
-									"character": 66
-								},
-								"end": {
-									"line": 4,
-									"column": 13,
-									"character": 69
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -172,36 +112,12 @@
 				"start": 92,
 				"end": 136,
 				"name": "foo:bar",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 1,
-						"character": 93
-					},
-					"end": {
-						"line": 5,
-						"column": 8,
-						"character": 100
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 101,
 						"end": 114,
 						"name": "prop",
-						"name_loc": {
-							"start": {
-								"line": 5,
-								"column": 9,
-								"character": 101
-							},
-							"end": {
-								"line": 5,
-								"column": 13,
-								"character": 105
-							}
-						},
 						"value": [
 							{
 								"start": 107,
@@ -217,18 +133,6 @@
 						"start": 115,
 						"end": 133,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 5,
-								"column": 23,
-								"character": 115
-							},
-							"end": {
-								"line": 5,
-								"column": 32,
-								"character": 124
-							}
-						},
 						"value": [
 							{
 								"start": 126,
@@ -257,18 +161,6 @@
 				"start": 137,
 				"end": 148,
 				"name": "Foo:bar",
-				"name_loc": {
-					"start": {
-						"line": 6,
-						"column": 1,
-						"character": 138
-					},
-					"end": {
-						"line": 6,
-						"column": 8,
-						"character": 145
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -287,18 +179,6 @@
 				"start": 149,
 				"end": 172,
 				"name": "Foo:bar",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 1,
-						"character": 150
-					},
-					"end": {
-						"line": 7,
-						"column": 8,
-						"character": 157
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",

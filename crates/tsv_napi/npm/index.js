@@ -155,16 +155,13 @@ export const parse_typescript = (source, options) =>
 export const parse_typescript_json = (source, options) =>
 	ts_parse_json(source, read_options(options, 'parse', true, true));
 
-// `locations` is accepted and inert for CSS — its wire carries no `loc`
-// (parity with the WASM package, whose `parse_css` reads the same bag).
-export const parse_css = (source, options) => {
-	read_options(options, 'parse', true, false);
-	return JSON.parse(addon.parse_css(source));
-};
-export const parse_css_json = (source, options) => {
-	read_options(options, 'parse', true, false);
-	return addon.parse_css(source);
-};
+const css_parse_json = (source, opts) =>
+	opts.locations ? addon.parse_css(source) : addon.parse_css_no_locations(source);
+
+export const parse_css = (source, options) =>
+	JSON.parse(css_parse_json(source, read_options(options, 'parse', true, false)));
+export const parse_css_json = (source, options) =>
+	css_parse_json(source, read_options(options, 'parse', true, false));
 
 export const format_svelte = (source, options) => {
 	read_options(options, 'format', false, false);

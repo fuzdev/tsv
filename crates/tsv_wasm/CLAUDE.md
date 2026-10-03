@@ -27,8 +27,7 @@ exact-string tests). A semantics or message change here must update that
 mirror and its tests in the same edit.
 `locations` (default `true`) selects the wire: the loc-bearing drop-in
 contract, or the span-only variant (see below); it is accepted everywhere and
-inert where nothing reads it (CSS emits no `loc`; `parse_internal_*` emits no
-wire). `sourceType` (`'script'` / `'module'`) is TypeScript-only
+inert where nothing reads it (`parse_internal_*` emits no wire). `sourceType` (`'script'` / `'module'`) is TypeScript-only
 — Svelte hard-wires `Module`, CSS has no goal — so the other languages reject
 the key. Unset, it means `'module'` **for a parse** (the wire's `Program.sourceType`
 is a claim one settled grammar has to produce); the format exports read the same
@@ -42,10 +41,11 @@ errors, arrays included.
 
 The parse exports are all `#[wasm_bindgen(skip_typescript)]`; their `.d.ts` is
 the hand-written `TS_PARSE_DECLS` `typescript_custom_section` in `src/lib.rs`.
-wasm-bindgen can't express an options-dependent return type, and
-`{locations: false}` returns a shape `tsv_ast.d.ts` can't name (its interfaces
-declare `loc` required), so that overload returns `any` and comes first (the
-more specific signature). The section also declares `ParseOptions` /
+wasm-bindgen can't express an options-dependent return type, so the
+`{locations: false}` overload returns `any` and comes first (the more specific
+signature). `tsv_ast.d.ts` declares `loc` optional, so the typed overload
+already names the span-only shape too — the `any` overload is a leftover the
+one-wire JS surface drops. The section also declares `ParseOptions` /
 `TypeScriptParseOptions`, which `scripts/patch_npm_package.ts` re-exports by
 name through the npm facade; their exact shape — and why neither is empty and
 neither `extends` the other — is
@@ -229,67 +229,68 @@ option; see [../../docs/cli.md §Input Handling](../../docs/cli.md).
 
 The opt-in **span-only** parse wire — the same AST minus the per-node `loc`
 (Svelte also minus `name_loc`) — is the `{locations: false}` option on every
-parse export, uniform in `lang_bindings!` (for CSS it's accepted and inert —
-`parseCss` emits no `loc`). Goal and locations compose (goal drives the
+parse export, uniform in `lang_bindings!`. Goal and locations compose (goal drives the
 parser, locations the writer), mirroring `tsv_cli`'s `--source-type` +
 `--no-locations`, which `npm/cli.js` routes through the same options. A
 `{locations: false}` object call materializes in Rust via `js_sys::JSON::parse`
 exactly as the loc-bearing call does, keeping benchmarks of the two
-mechanism-matched; its return is `any` in the `.d.ts` (the shape omits the
-`loc` that `tsv_ast.d.ts` requires). `loc` is derivable from `start`/`end` +
+mechanism-matched; its return is `any` in the `.d.ts` (see above). `loc` is derivable from `start`/`end` +
 source (see [../tsv_ts/CLAUDE.md](../tsv_ts/CLAUDE.md) §Public API), so this is
 a distinct narrower product, not a second encoding of the drop-in contract.
 
 ### Line/Column Reconstruction Helper (`npm/locations.js`)
 
-Because `loc` is a pure function of `start`/`end` + source — with two exceptions,
-below: one refused, one read off the tree — a consumer holding only the span-only wire recovers it in JS — and, for a consumer that needs full
-`loc`, no-loc-wire + JS-reconstruct beats the full loc-bearing wire end-to-end
-(the full wire's `loc` bytes cost real `JSON.parse` tokenization; a line-start
-table + binary search is cheaper). `npm/locations.js` (pure JS, zero deps, no
-WASM) is that reconstruction, shipped so callers don't reimplement the line
-rules — in every package that parses, native `@fuzdev/tsv` included: `reconstruct_locations(ast, source, opts?)` (one-shot, adds `loc` to every
-node, **mutates in place**), `create_locator(source, opts?)` (amortized — holds
-the prebuilt line table, exposes `loc_of(node)` / `reconstruct(ast)`; a Svelte `loc_of`
-needs `opts.ast`, below), and a bare `loc_of(node, source, opts?)` convenience. **Exact for TypeScript**; **approximate
-for Svelte** (doesn't replicate the `<script>` tag-position or destructure
-`+1`-column parser quirks, and adds `loc` to template nodes Svelte's own wire
-omits — but `name_loc` is restored exactly, its span derived from each node's own
-`start`/`end` + type, as is the name-shaped `loc` on shorthand-attribute
-identifiers, snippet names, and simple-identifier block patterns, and the
-`character` field on an in-tag comment, recovered structurally: a comment sitting
-between an element's attributes, i.e. inside its opening tag at brace depth 0 —
-including the `<svelte:options>` head, whose wire node carries no `type` and is
-pushed into the host-element pass explicitly);
-**a no-op for CSS**. A leading BOM is stripped ahead of the Svelte and CSS line tables and
-kept for the TypeScript one, because that is what each wire indexes: Svelte's `parse` and
-`parseCss` strip it before parsing, acorn counts it as whitespace (`tsv_lang::LeadingBom`
-on the Rust side). The first exception is not an approximation but a **refusal**: a Svelte
-source holding a lone CR, U+2028 or U+2029 carries two line counts — acorn's on the nodes
-it parsed, `locate-character`'s on the rest — and which one a node takes is not a function
-of its offsets, so every entry point throws rather than returning quietly-wrong lines
-(parse those with `loc`; see [docs/architecture.md §`loc` lines](../../docs/architecture.md#loc-lines-two-classes-one-per-acorn-parse)). The second is **reconstructed exactly from the tree**: a block binding's `: T` (`{#each xs as e: T}`, `{:then}` / `{:catch}` / `{@const}`) is read by its own acorn parse over a template whose five code units ending at the colon are overwritten with `_ as `, so a newline in the four units before the colon is never counted and the annotation's nodes sit that many lines higher — and a destructure binding's `loc.end` stops at its closing bracket though its `end` runs over the annotation. Both follow from the binding, which only the tree identifies (by slot — `EachBlock.context`, `AwaitBlock.value`/`error`, the `ConstTag` declarator's `id` — never by shape), so `reconstruct` applies them on its walk, and a Svelte `loc_of` requires the span-only tree as `opts.ast` and throws without it rather than answer a node differently from `reconstruct`.
+Because `loc` is a pure function of `start`/`end` + source, a consumer holding only the
+span-only wire recovers it in JS — and, for a consumer that needs full `loc`,
+no-loc-wire + JS-reconstruct beats the full loc-bearing wire end-to-end (the full wire's
+`loc` bytes cost real `JSON.parse` tokenization; a line-start table + binary search is
+cheaper). `npm/locations.js` (pure JS, zero deps, no WASM) is that reconstruction, shipped
+so callers don't reimplement the line rules — in every package that parses, native
+`@fuzdev/tsv` included: `reconstruct_locations(ast, source, opts?)` (one-shot, adds `loc`
+to every object carrying `start`/`end`, **mutates in place**), `create_locator(source,
+opts?)` (amortized — holds the prebuilt line table, exposes `loc_of(node)` /
+`reconstruct(ast)`), and a bare `loc_of(node, source, opts?)` convenience. `opts.language`
+selects the document's rule (`create_locator` and `loc_of` default to `typescript`;
+`reconstruct_locations` infers it from the root).
+
+**It implements the same definition the Rust writers do**, so its result deep-equals the
+loc-bearing wire of the same parse in every language: every object with numeric
+`start`/`end` (objects without a `type` included — `options`, `StyleSheet.content`,
+comments) gets the line (1-based) and UTF-16 column (0-based) of its own offsets, under one
+line-terminator rule per document — ECMAScript's for TypeScript, `\n` alone for a whole
+Svelte document and for CSS — with a leading BOM counted for TypeScript and elided for
+Svelte and CSS, as each canonical parser does (`tsv_lang::LeadingBom` on the Rust side).
+On top of that it restores the Svelte-only fields, each an exact function of a node's span
+and type: `name_loc` on elements, attributes and directives, and the `character` field on
+the positions Svelte's own template reader creates — a shorthand attribute's identifier, a
+snippet name, a simple-identifier block pattern, and an in-tag comment, recovered
+structurally (a comment sitting between an element's attributes, i.e. inside its opening
+tag at brace depth 0 — including the `<svelte:options>` head, whose wire node carries no
+`type` and is pushed into the host-element pass explicitly). Svelte's own `loc` quirks are
+reproduced by neither implementation; the corpus comparator grades them as named
+tolerances (see [docs/conformance_svelte.md](../../docs/conformance_svelte.md)).
+
 It rides every package that parses —
 `@fuzdev/tsv-parse-wasm`, `@fuzdev/tsv-wasm`, and the native `@fuzdev/tsv` loader
 (`build_napi_packages.ts` stages it there) — it operates on the
 parse wire, so only the format-only package has no use for it. `patch_npm_package.ts`
 copies it + the hand-written `npm/locations.d.ts` into the package root and
 re-exports the functions from index.js/browser.js/index.d.ts (directly, with no
-init guard — it never touches WASM). Its correctness is gated by the package Node
-tests (`scripts/test_npm.ts`); at corpus scale,
-`benches/js/diagnostics/no_locations_parity.ts` proves the reconstruction *rules*
-(its own re-derived transcription — it never imports the shipped helper) while
-the bench's `tsv-json-no-locations+reconstruct` / `tsv-wasm-json-no-locations+reconstruct`
-rows run the shipped helper itself over the perf corpus, timing what a consumer who
-wants every node's `loc` pays against the loc-bearing wire.
+init guard — it never touches WASM). Its agreement with the Rust writer is gated at three
+cadences: `deno task check:loc` (`scripts/check_loc.ts`) deep-equals the two over every
+fixture input in `deno task check`; the package Node tests (`scripts/test_npm.ts`,
+`scripts/test_napi_npm.ts`) do the same through the shipped packages; and
+`corpus:compare:parse`'s loc arm requires it of every corpus file before grading tsv's
+`loc` against the canonical parser's. The bench's `tsv-json-no-locations+reconstruct` /
+`tsv-wasm-json-no-locations+reconstruct` rows run the shipped helper over the perf
+corpus, timing what a consumer who wants every node's `loc` pays against the loc-bearing
+wire.
 
-⚠️ **The re-derivation is an independent IMPLEMENTATION, not an independent oracle.** Both
-sides of that comparison come from tsv — the loc-bearing wire, and a JS transcription of
-`tsv_lang::LocationTracker`'s rules — so what it grades is the transcription, never the model
-both sides share. A `loc` model that is wrong makes both halves wrong the same way and the
-check stays green; the same mirror then reports red against a *corrected* model, which reads
-as a regression and is not one. The canonical parser's own `loc` is available in the same
-harness, and is the reference that would make this an oracle.
+⚠️ **Two implementations of one definition are each other's drift check, not an oracle.**
+A definition that is itself wrong makes both halves wrong the same way, and the
+cross-grade stays green. The outside reference is the canonical parsers' own `loc`,
+graded by `corpus:compare:parse` — exactly against acorn for TypeScript, against Svelte
+through its six cataloged tolerance rows.
 
 **`.d.ts` export-name constraint.** `index.d.ts` re-exports both `tsv_ast.d.ts`
 (`export type *`) and `locations.d.ts` (`export *`), so a name exported by BOTH is
@@ -493,17 +494,19 @@ and C need no maintenance — they follow the fixture tree. A `.d.ts` field
 typed `unknown` is invisible to arm C, so widening one (as `Script.content`
 was, from `unknown` to `Program`) is what puts a region behind the gate.
 
-⚠️ **A node SVELTE builds is not the acorn node of the same `type`, and the tell is
-`loc`.** Where Svelte constructs a node instead of handing the text to acorn, the
-result carries the acorn discriminator but a different field set — so it needs its
-own interface rather than reuse, and a position holding either takes a union. The
-four in the wire today, each with its own type:
+⚠️ **A node SVELTE builds is not the acorn node of the same `type`, and the tell — in
+Svelte's own wire — is `loc`.** Where Svelte constructs a node instead of handing the
+text to acorn, the result carries the acorn discriminator but a different field set —
+so it needs its own interface rather than reuse, and a position holding either takes a
+union. The tell is Svelte's alone: tsv's wire gives every positioned object a `loc`,
+these four included (each interface types it `loc?`), so on tsv's wire the difference
+is the field set, not the `loc`. The four in the wire today, each with its own type:
 
 | position | shape | why |
 | --- | --- | --- |
-| shorthand `bind:x` / `class:x` `expression` | `SvelteShorthandIdentifier` | the directive name IS the expression; nothing parsed it, so **no `loc`** |
-| `<svelte:element this="div">` `tag` | `SvelteFusedLiteral` | no `loc`, and `raw` is Svelte's re-quoted form, not the author's bytes |
-| `{@const}` `declaration` | `SvelteConstDeclaration` / `…Declarator` | Svelte builds the wrapper: no `loc` on either, though the `id` inside has one (from Svelte's own reader, so its `loc` carries `character`) |
+| shorthand `bind:x` / `class:x` `expression` | `SvelteShorthandIdentifier` | the directive name IS the expression; nothing parsed it, so Svelte writes **no `loc`** |
+| `<svelte:element this="div">` `tag` | `SvelteFusedLiteral` | no `loc` in Svelte's wire, and `raw` is Svelte's re-quoted form, not the author's bytes |
+| `{@const}` `declaration` | `SvelteConstDeclaration` / `…Declarator` | Svelte builds the wrapper: no `loc` on either in its wire, though the `id` inside has one (from Svelte's own reader, so its `loc` carries `character`) |
 | `{const}` / `{let}` `declaration` | the ordinary acorn `VariableDeclaration` | parsed, so `loc` throughout — and unlike `{@const}` it may carry MORE THAN ONE declarator |
 
 The inverse mistake is just as easy: typing one of these as its acorn namesake

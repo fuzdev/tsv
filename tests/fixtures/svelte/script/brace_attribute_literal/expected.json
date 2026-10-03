@@ -9,18 +9,6 @@
 				"start": 76,
 				"end": 87,
 				"name": "{shorthand}",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 7,
-						"character": 76
-					},
-					"end": {
-						"line": 5,
-						"column": 18,
-						"character": 87
-					}
-				},
 				"value": true
 			},
 			{
@@ -28,18 +16,6 @@
 				"start": 88,
 				"end": 89,
 				"name": "{",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 19,
-						"character": 88
-					},
-					"end": {
-						"line": 5,
-						"column": 20,
-						"character": 89
-					}
-				},
 				"value": true
 			},
 			{
@@ -47,18 +23,6 @@
 				"start": 90,
 				"end": 93,
 				"name": ":c}",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 21,
-						"character": 90
-					},
-					"end": {
-						"line": 5,
-						"column": 24,
-						"character": 93
-					}
-				},
 				"value": true
 			}
 		],
@@ -105,16 +69,6 @@
 			"type": "Program",
 			"start": 21,
 			"end": 21,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 1,
-					"column": 30
-				}
-			},
 			"body": [],
 			"sourceType": "module"
 		},
@@ -124,18 +78,6 @@
 				"start": 8,
 				"end": 14,
 				"name": "module",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 14,
-						"character": 14
-					}
-				},
 				"value": true
 			},
 			{
@@ -143,18 +85,6 @@
 				"start": 15,
 				"end": 16,
 				"name": "{",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 15,
-						"character": 15
-					},
-					"end": {
-						"line": 1,
-						"column": 16,
-						"character": 16
-					}
-				},
 				"value": true
 			},
 			{
@@ -162,18 +92,6 @@
 				"start": 17,
 				"end": 20,
 				"name": "#a}",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 17,
-						"character": 17
-					},
-					"end": {
-						"line": 1,
-						"column": 20,
-						"character": 20
-					}
-				},
 				"value": true
 			}
 		]
@@ -187,16 +105,6 @@
 			"type": "Program",
 			"start": 58,
 			"end": 58,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 0
-				},
-				"end": {
-					"line": 3,
-					"column": 35
-				}
-			},
 			"body": [],
 			"sourceType": "module"
 		},
@@ -206,18 +114,6 @@
 				"start": 40,
 				"end": 51,
 				"name": "{...spread}",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 8,
-						"character": 40
-					},
-					"end": {
-						"line": 3,
-						"column": 19,
-						"character": 51
-					}
-				},
 				"value": true
 			},
 			{
@@ -225,18 +121,6 @@
 				"start": 52,
 				"end": 53,
 				"name": "{",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 20,
-						"character": 52
-					},
-					"end": {
-						"line": 3,
-						"column": 21,
-						"character": 53
-					}
-				},
 				"value": true
 			},
 			{
@@ -244,18 +128,6 @@
 				"start": 54,
 				"end": 57,
 				"name": "@b}",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 22,
-						"character": 54
-					},
-					"end": {
-						"line": 3,
-						"column": 25,
-						"character": 57
-					}
-				},
 				"value": true
 			}
 		]

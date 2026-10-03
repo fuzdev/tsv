@@ -25,18 +25,6 @@
 				"start": 154,
 				"end": 249,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 6,
-						"column": 1,
-						"character": 155
-					},
-					"end": {
-						"line": 6,
-						"column": 4,
-						"character": 158
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -53,18 +41,6 @@
 							"start": 160,
 							"end": 242,
 							"name": "svelte:element",
-							"name_loc": {
-								"start": {
-									"line": 6,
-									"column": 7,
-									"character": 161
-								},
-								"end": {
-									"line": 6,
-									"column": 21,
-									"character": 175
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -74,18 +50,6 @@
 										"start": 185,
 										"end": 212,
 										"name": "script",
-										"name_loc": {
-											"start": {
-												"line": 6,
-												"column": 32,
-												"character": 186
-											},
-											"end": {
-												"line": 6,
-												"column": 38,
-												"character": 192
-											}
-										},
 										"attributes": [],
 										"fragment": {
 											"type": "Fragment",
@@ -139,18 +103,6 @@
 				"start": 251,
 				"end": 365,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 8,
-						"column": 1,
-						"character": 252
-					},
-					"end": {
-						"line": 8,
-						"column": 4,
-						"character": 255
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -167,18 +119,6 @@
 							"start": 257,
 							"end": 358,
 							"name": "svelte:component",
-							"name_loc": {
-								"start": {
-									"line": 8,
-									"column": 7,
-									"character": 258
-								},
-								"end": {
-									"line": 8,
-									"column": 23,
-									"character": 274
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -195,18 +135,6 @@
 										"start": 303,
 										"end": 337,
 										"name": "style",
-										"name_loc": {
-											"start": {
-												"line": 9,
-												"column": 17,
-												"character": 304
-											},
-											"end": {
-												"line": 9,
-												"column": 22,
-												"character": 309
-											}
-										},
 										"attributes": [],
 										"fragment": {
 											"type": "Fragment",
@@ -227,16 +155,6 @@
 								"type": "Identifier",
 								"start": 281,
 								"end": 285,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 30
-									},
-									"end": {
-										"line": 8,
-										"column": 34
-									}
-								},
 								"name": "Comp"
 							}
 						},

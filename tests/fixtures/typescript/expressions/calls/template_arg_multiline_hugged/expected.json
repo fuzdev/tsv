@@ -14,145 +14,55 @@
 			"type": "Line",
 			"value": " Multiline template literal as single call arg — hugged form.",
 			"start": 20,
-			"end": 83,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 64
-				}
-			}
+			"end": 83
 		},
 		{
 			"type": "Line",
 			"value": " When the template starts on the same line as (, prettier hugs it.",
 			"start": 85,
-			"end": 153,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 69
-				}
-			}
+			"end": 153
 		},
 		{
 			"type": "Line",
 			"value": " Simple callee",
 			"start": 156,
-			"end": 172,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 1
-				},
-				"end": {
-					"line": 5,
-					"column": 17
-				}
-			}
+			"end": 172
 		},
 		{
 			"type": "Line",
 			"value": " Member expression callee",
 			"start": 205,
-			"end": 232,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 1
-				},
-				"end": {
-					"line": 11,
-					"column": 28
-				}
-			}
+			"end": 232
 		},
 		{
 			"type": "Line",
 			"value": " With interpolation",
 			"start": 269,
-			"end": 290,
-			"loc": {
-				"start": {
-					"line": 17,
-					"column": 1
-				},
-				"end": {
-					"line": 17,
-					"column": 22
-				}
-			}
+			"end": 290
 		},
 		{
 			"type": "Line",
 			"value": " Short control (single line — no multiline)",
 			"start": 336,
-			"end": 381,
-			"loc": {
-				"start": {
-					"line": 22,
-					"column": 1
-				},
-				"end": {
-					"line": 22,
-					"column": 46
-				}
-			}
+			"end": 381
 		},
 		{
 			"type": "Line",
 			"value": " Dynamic import — the same rule, its fourth spelling",
 			"start": 398,
-			"end": 452,
-			"loc": {
-				"start": {
-					"line": 25,
-					"column": 1
-				},
-				"end": {
-					"line": 25,
-					"column": 55
-				}
-			}
+			"end": 452
 		},
 		{
 			"type": "Line",
 			"value": " Control: a second argument defeats the hug (the rule is sole-argument only)",
 			"start": 489,
-			"end": 567,
-			"loc": {
-				"start": {
-					"line": 31,
-					"column": 1
-				},
-				"end": {
-					"line": 31,
-					"column": 79
-				}
-			}
+			"end": 567
 		},
 		{
 			"type": "Line",
 			"value": " Member chain — the rule outranks chain routing, so the heads stay flat",
 			"start": 617,
-			"end": 690,
-			"loc": {
-				"start": {
-					"line": 40,
-					"column": 1
-				},
-				"end": {
-					"line": 40,
-					"column": 74
-				}
-			}
+			"end": 690
 		}
 	],
 	"instance": {
@@ -164,59 +74,19 @@
 			"type": "Program",
 			"start": 18,
 			"end": 730,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 45,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
 					"start": 174,
 					"end": 202,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 9,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 174,
 						"end": 201,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 1
-							},
-							"end": {
-								"line": 9,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 174,
 							"end": 176,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 1
-								},
-								"end": {
-									"line": 6,
-									"column": 3
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -224,32 +94,12 @@
 								"type": "TemplateLiteral",
 								"start": 177,
 								"end": 200,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 4
-									},
-									"end": {
-										"line": 9,
-										"column": 1
-									}
-								},
 								"expressions": [],
 								"quasis": [
 									{
 										"type": "TemplateElement",
 										"start": 178,
 										"end": 199,
-										"loc": {
-											"start": {
-												"line": 6,
-												"column": 5
-											},
-											"end": {
-												"line": 9,
-												"column": 0
-											}
-										},
 										"value": {
 											"raw": "line 1\nline 2\nline 3\n",
 											"cooked": "line 1\nline 2\nline 3\n"
@@ -286,74 +136,24 @@
 					"type": "ExpressionStatement",
 					"start": 234,
 					"end": 266,
-					"loc": {
-						"start": {
-							"line": 12,
-							"column": 1
-						},
-						"end": {
-							"line": 15,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 234,
 						"end": 265,
-						"loc": {
-							"start": {
-								"line": 12,
-								"column": 1
-							},
-							"end": {
-								"line": 15,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "MemberExpression",
 							"start": 234,
 							"end": 240,
-							"loc": {
-								"start": {
-									"line": 12,
-									"column": 1
-								},
-								"end": {
-									"line": 12,
-									"column": 7
-								}
-							},
 							"object": {
 								"type": "Identifier",
 								"start": 234,
 								"end": 235,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 1
-									},
-									"end": {
-										"line": 12,
-										"column": 2
-									}
-								},
 								"name": "a"
 							},
 							"property": {
 								"type": "Identifier",
 								"start": 236,
 								"end": 240,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 3
-									},
-									"end": {
-										"line": 12,
-										"column": 7
-									}
-								},
 								"name": "push"
 							},
 							"computed": false,
@@ -364,32 +164,12 @@
 								"type": "TemplateLiteral",
 								"start": 241,
 								"end": 264,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 8
-									},
-									"end": {
-										"line": 15,
-										"column": 1
-									}
-								},
 								"expressions": [],
 								"quasis": [
 									{
 										"type": "TemplateElement",
 										"start": 242,
 										"end": 263,
-										"loc": {
-											"start": {
-												"line": 12,
-												"column": 9
-											},
-											"end": {
-												"line": 15,
-												"column": 0
-											}
-										},
 										"value": {
 											"raw": "line 1\nline 2\nline 3\n",
 											"cooked": "line 1\nline 2\nline 3\n"
@@ -414,74 +194,24 @@
 					"type": "ExpressionStatement",
 					"start": 292,
 					"end": 333,
-					"loc": {
-						"start": {
-							"line": 18,
-							"column": 1
-						},
-						"end": {
-							"line": 20,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 292,
 						"end": 332,
-						"loc": {
-							"start": {
-								"line": 18,
-								"column": 1
-							},
-							"end": {
-								"line": 20,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "MemberExpression",
 							"start": 292,
 							"end": 303,
-							"loc": {
-								"start": {
-									"line": 18,
-									"column": 1
-								},
-								"end": {
-									"line": 18,
-									"column": 12
-								}
-							},
 							"object": {
 								"type": "Identifier",
 								"start": 292,
 								"end": 299,
-								"loc": {
-									"start": {
-										"line": 18,
-										"column": 1
-									},
-									"end": {
-										"line": 18,
-										"column": 8
-									}
-								},
 								"name": "console"
 							},
 							"property": {
 								"type": "Identifier",
 								"start": 300,
 								"end": 303,
-								"loc": {
-									"start": {
-										"line": 18,
-										"column": 9
-									},
-									"end": {
-										"line": 18,
-										"column": 12
-									}
-								},
 								"name": "log"
 							},
 							"computed": false,
@@ -492,47 +222,17 @@
 								"type": "TemplateLiteral",
 								"start": 304,
 								"end": 331,
-								"loc": {
-									"start": {
-										"line": 18,
-										"column": 13
-									},
-									"end": {
-										"line": 20,
-										"column": 1
-									}
-								},
 								"expressions": [
 									{
 										"type": "Identifier",
 										"start": 312,
 										"end": 313,
-										"loc": {
-											"start": {
-												"line": 18,
-												"column": 21
-											},
-											"end": {
-												"line": 18,
-												"column": 22
-											}
-										},
 										"name": "a"
 									},
 									{
 										"type": "Identifier",
 										"start": 327,
 										"end": 328,
-										"loc": {
-											"start": {
-												"line": 19,
-												"column": 12
-											},
-											"end": {
-												"line": 19,
-												"column": 13
-											}
-										},
 										"name": "b"
 									}
 								],
@@ -541,16 +241,6 @@
 										"type": "TemplateElement",
 										"start": 305,
 										"end": 310,
-										"loc": {
-											"start": {
-												"line": 18,
-												"column": 14
-											},
-											"end": {
-												"line": 18,
-												"column": 19
-											}
-										},
 										"value": {
 											"raw": "text ",
 											"cooked": "text "
@@ -561,16 +251,6 @@
 										"type": "TemplateElement",
 										"start": 314,
 										"end": 325,
-										"loc": {
-											"start": {
-												"line": 18,
-												"column": 23
-											},
-											"end": {
-												"line": 19,
-												"column": 10
-											}
-										},
 										"value": {
 											"raw": "\nmore text ",
 											"cooked": "\nmore text "
@@ -581,16 +261,6 @@
 										"type": "TemplateElement",
 										"start": 329,
 										"end": 330,
-										"loc": {
-											"start": {
-												"line": 19,
-												"column": 14
-											},
-											"end": {
-												"line": 20,
-												"column": 0
-											}
-										},
 										"value": {
 											"raw": "\n",
 											"cooked": "\n"
@@ -615,44 +285,14 @@
 					"type": "ExpressionStatement",
 					"start": 383,
 					"end": 395,
-					"loc": {
-						"start": {
-							"line": 23,
-							"column": 1
-						},
-						"end": {
-							"line": 23,
-							"column": 13
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 383,
 						"end": 394,
-						"loc": {
-							"start": {
-								"line": 23,
-								"column": 1
-							},
-							"end": {
-								"line": 23,
-								"column": 12
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 383,
 							"end": 385,
-							"loc": {
-								"start": {
-									"line": 23,
-									"column": 1
-								},
-								"end": {
-									"line": 23,
-									"column": 3
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -660,32 +300,12 @@
 								"type": "TemplateLiteral",
 								"start": 386,
 								"end": 393,
-								"loc": {
-									"start": {
-										"line": 23,
-										"column": 4
-									},
-									"end": {
-										"line": 23,
-										"column": 11
-									}
-								},
 								"expressions": [],
 								"quasis": [
 									{
 										"type": "TemplateElement",
 										"start": 387,
 										"end": 392,
-										"loc": {
-											"start": {
-												"line": 23,
-												"column": 5
-											},
-											"end": {
-												"line": 23,
-												"column": 10
-											}
-										},
 										"value": {
 											"raw": "short",
 											"cooked": "short"
@@ -710,60 +330,20 @@
 					"type": "ExpressionStatement",
 					"start": 454,
 					"end": 486,
-					"loc": {
-						"start": {
-							"line": 26,
-							"column": 1
-						},
-						"end": {
-							"line": 29,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "ImportExpression",
 						"start": 454,
 						"end": 485,
-						"loc": {
-							"start": {
-								"line": 26,
-								"column": 1
-							},
-							"end": {
-								"line": 29,
-								"column": 2
-							}
-						},
 						"source": {
 							"type": "TemplateLiteral",
 							"start": 461,
 							"end": 484,
-							"loc": {
-								"start": {
-									"line": 26,
-									"column": 8
-								},
-								"end": {
-									"line": 29,
-									"column": 1
-								}
-							},
 							"expressions": [],
 							"quasis": [
 								{
 									"type": "TemplateElement",
 									"start": 462,
 									"end": 483,
-									"loc": {
-										"start": {
-											"line": 26,
-											"column": 9
-										},
-										"end": {
-											"line": 29,
-											"column": 0
-										}
-									},
 									"value": {
 										"raw": "line 1\nline 2\nline 3\n",
 										"cooked": "line 1\nline 2\nline 3\n"
@@ -786,60 +366,20 @@
 					"type": "ExpressionStatement",
 					"start": 569,
 					"end": 614,
-					"loc": {
-						"start": {
-							"line": 32,
-							"column": 1
-						},
-						"end": {
-							"line": 38,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "ImportExpression",
 						"start": 569,
 						"end": 613,
-						"loc": {
-							"start": {
-								"line": 32,
-								"column": 1
-							},
-							"end": {
-								"line": 38,
-								"column": 2
-							}
-						},
 						"source": {
 							"type": "TemplateLiteral",
 							"start": 579,
 							"end": 602,
-							"loc": {
-								"start": {
-									"line": 33,
-									"column": 2
-								},
-								"end": {
-									"line": 36,
-									"column": 1
-								}
-							},
 							"expressions": [],
 							"quasis": [
 								{
 									"type": "TemplateElement",
 									"start": 580,
 									"end": 601,
-									"loc": {
-										"start": {
-											"line": 33,
-											"column": 3
-										},
-										"end": {
-											"line": 36,
-											"column": 0
-										}
-									},
 									"value": {
 										"raw": "line 1\nline 2\nline 3\n",
 										"cooked": "line 1\nline 2\nline 3\n"
@@ -853,16 +393,6 @@
 								"type": "Identifier",
 								"start": 606,
 								"end": 610,
-								"loc": {
-									"start": {
-										"line": 37,
-										"column": 2
-									},
-									"end": {
-										"line": 37,
-										"column": 6
-									}
-								},
 								"name": "opts"
 							}
 						]
@@ -880,130 +410,40 @@
 					"type": "ExpressionStatement",
 					"start": 692,
 					"end": 729,
-					"loc": {
-						"start": {
-							"line": 41,
-							"column": 1
-						},
-						"end": {
-							"line": 44,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 692,
 						"end": 728,
-						"loc": {
-							"start": {
-								"line": 41,
-								"column": 1
-							},
-							"end": {
-								"line": 44,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "MemberExpression",
 							"start": 692,
 							"end": 703,
-							"loc": {
-								"start": {
-									"line": 41,
-									"column": 1
-								},
-								"end": {
-									"line": 41,
-									"column": 12
-								}
-							},
 							"object": {
 								"type": "CallExpression",
 								"start": 692,
 								"end": 701,
-								"loc": {
-									"start": {
-										"line": 41,
-										"column": 1
-									},
-									"end": {
-										"line": 41,
-										"column": 10
-									}
-								},
 								"callee": {
 									"type": "MemberExpression",
 									"start": 692,
 									"end": 699,
-									"loc": {
-										"start": {
-											"line": 41,
-											"column": 1
-										},
-										"end": {
-											"line": 41,
-											"column": 8
-										}
-									},
 									"object": {
 										"type": "CallExpression",
 										"start": 692,
 										"end": 697,
-										"loc": {
-											"start": {
-												"line": 41,
-												"column": 1
-											},
-											"end": {
-												"line": 41,
-												"column": 6
-											}
-										},
 										"callee": {
 											"type": "MemberExpression",
 											"start": 692,
 											"end": 695,
-											"loc": {
-												"start": {
-													"line": 41,
-													"column": 1
-												},
-												"end": {
-													"line": 41,
-													"column": 4
-												}
-											},
 											"object": {
 												"type": "Identifier",
 												"start": 692,
 												"end": 693,
-												"loc": {
-													"start": {
-														"line": 41,
-														"column": 1
-													},
-													"end": {
-														"line": 41,
-														"column": 2
-													}
-												},
 												"name": "a"
 											},
 											"property": {
 												"type": "Identifier",
 												"start": 694,
 												"end": 695,
-												"loc": {
-													"start": {
-														"line": 41,
-														"column": 3
-													},
-													"end": {
-														"line": 41,
-														"column": 4
-													}
-												},
 												"name": "b"
 											},
 											"computed": false,
@@ -1016,16 +456,6 @@
 										"type": "Identifier",
 										"start": 698,
 										"end": 699,
-										"loc": {
-											"start": {
-												"line": 41,
-												"column": 7
-											},
-											"end": {
-												"line": 41,
-												"column": 8
-											}
-										},
 										"name": "c"
 									},
 									"computed": false,
@@ -1038,16 +468,6 @@
 								"type": "Identifier",
 								"start": 702,
 								"end": 703,
-								"loc": {
-									"start": {
-										"line": 41,
-										"column": 11
-									},
-									"end": {
-										"line": 41,
-										"column": 12
-									}
-								},
 								"name": "d"
 							},
 							"computed": false,
@@ -1058,32 +478,12 @@
 								"type": "TemplateLiteral",
 								"start": 704,
 								"end": 727,
-								"loc": {
-									"start": {
-										"line": 41,
-										"column": 13
-									},
-									"end": {
-										"line": 44,
-										"column": 1
-									}
-								},
 								"expressions": [],
 								"quasis": [
 									{
 										"type": "TemplateElement",
 										"start": 705,
 										"end": 726,
-										"loc": {
-											"start": {
-												"line": 41,
-												"column": 14
-											},
-											"end": {
-												"line": 44,
-												"column": 0
-											}
-										},
 										"value": {
 											"raw": "line 1\nline 2\nline 3\n",
 											"cooked": "line 1\nline 2\nline 3\n"
@@ -1113,18 +513,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

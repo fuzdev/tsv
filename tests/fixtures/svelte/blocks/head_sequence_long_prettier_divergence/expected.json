@@ -29,47 +29,17 @@
 					"type": "SequenceExpression",
 					"start": 45,
 					"end": 127,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 6
-						},
-						"end": {
-							"line": 2,
-							"column": 88
-						}
-					},
 					"expressions": [
 						{
 							"type": "Identifier",
 							"start": 45,
 							"end": 85,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 6
-								},
-								"end": {
-									"line": 2,
-									"column": 46
-								}
-							},
 							"name": "expr_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 						},
 						{
 							"type": "Identifier",
 							"start": 87,
 							"end": 127,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 48
-								},
-								"end": {
-									"line": 2,
-									"column": 88
-								}
-							},
 							"name": "expr_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 						}
 					]
@@ -117,47 +87,17 @@
 					"type": "SequenceExpression",
 					"start": 205,
 					"end": 297,
-					"loc": {
-						"start": {
-							"line": 5,
-							"column": 6
-						},
-						"end": {
-							"line": 5,
-							"column": 98
-						}
-					},
 					"expressions": [
 						{
 							"type": "Identifier",
 							"start": 205,
 							"end": 250,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 6
-								},
-								"end": {
-									"line": 5,
-									"column": 51
-								}
-							},
 							"name": "expr_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 						},
 						{
 							"type": "Identifier",
 							"start": 252,
 							"end": 297,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 53
-								},
-								"end": {
-									"line": 5,
-									"column": 98
-								}
-							},
 							"name": "expr_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 						}
 					]
@@ -205,47 +145,17 @@
 					"type": "SequenceExpression",
 					"start": 388,
 					"end": 482,
-					"loc": {
-						"start": {
-							"line": 10,
-							"column": 6
-						},
-						"end": {
-							"line": 11,
-							"column": 47
-						}
-					},
 					"expressions": [
 						{
 							"type": "Identifier",
 							"start": 388,
 							"end": 433,
-							"loc": {
-								"start": {
-									"line": 10,
-									"column": 6
-								},
-								"end": {
-									"line": 10,
-									"column": 51
-								}
-							},
 							"name": "expr_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 						},
 						{
 							"type": "Identifier",
 							"start": 436,
 							"end": 482,
-							"loc": {
-								"start": {
-									"line": 11,
-									"column": 1
-								},
-								"end": {
-									"line": 11,
-									"column": 47
-								}
-							},
 							"name": "expr_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 						}
 					]
@@ -292,47 +202,17 @@
 					"type": "SequenceExpression",
 					"start": 581,
 					"end": 675,
-					"loc": {
-						"start": {
-							"line": 17,
-							"column": 8
-						},
-						"end": {
-							"line": 18,
-							"column": 47
-						}
-					},
 					"expressions": [
 						{
 							"type": "Identifier",
 							"start": 581,
 							"end": 626,
-							"loc": {
-								"start": {
-									"line": 17,
-									"column": 8
-								},
-								"end": {
-									"line": 17,
-									"column": 53
-								}
-							},
 							"name": "expr_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 						},
 						{
 							"type": "Identifier",
 							"start": 629,
 							"end": 675,
-							"loc": {
-								"start": {
-									"line": 18,
-									"column": 1
-								},
-								"end": {
-									"line": 18,
-									"column": 47
-								}
-							},
 							"name": "expr_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 						}
 					]
@@ -355,16 +235,6 @@
 								"type": "Identifier",
 								"start": 688,
 								"end": 692,
-								"loc": {
-									"start": {
-										"line": 20,
-										"column": 2
-									},
-									"end": {
-										"line": 20,
-										"column": 6
-									}
-								},
 								"name": "item"
 							}
 						},
@@ -381,19 +251,7 @@
 					"type": "Identifier",
 					"name": "item",
 					"start": 680,
-					"end": 684,
-					"loc": {
-						"start": {
-							"line": 19,
-							"column": 3,
-							"character": 680
-						},
-						"end": {
-							"line": 19,
-							"column": 7,
-							"character": 684
-						}
-					}
+					"end": 684
 				}
 			},
 			{
@@ -424,16 +282,6 @@
 					"type": "Identifier",
 					"start": 780,
 					"end": 782,
-					"loc": {
-						"start": {
-							"line": 24,
-							"column": 7
-						},
-						"end": {
-							"line": 24,
-							"column": 9
-						}
-					},
 					"name": "xs"
 				},
 				"body": {
@@ -454,16 +302,6 @@
 								"type": "Identifier",
 								"start": 876,
 								"end": 877,
-								"loc": {
-									"start": {
-										"line": 25,
-										"column": 2
-									},
-									"end": {
-										"line": 25,
-										"column": 3
-									}
-								},
 								"name": "x"
 							}
 						},
@@ -480,65 +318,23 @@
 					"type": "Identifier",
 					"name": "x",
 					"start": 786,
-					"end": 787,
-					"loc": {
-						"start": {
-							"line": 24,
-							"column": 13,
-							"character": 786
-						},
-						"end": {
-							"line": 24,
-							"column": 14,
-							"character": 787
-						}
-					}
+					"end": 787
 				},
 				"key": {
 					"type": "SequenceExpression",
 					"start": 790,
 					"end": 870,
-					"loc": {
-						"start": {
-							"line": 24,
-							"column": 17
-						},
-						"end": {
-							"line": 24,
-							"column": 97
-						}
-					},
 					"expressions": [
 						{
 							"type": "Identifier",
 							"start": 790,
 							"end": 830,
-							"loc": {
-								"start": {
-									"line": 24,
-									"column": 17
-								},
-								"end": {
-									"line": 24,
-									"column": 57
-								}
-							},
 							"name": "expr_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 						},
 						{
 							"type": "Identifier",
 							"start": 832,
 							"end": 870,
-							"loc": {
-								"start": {
-									"line": 24,
-									"column": 59
-								},
-								"end": {
-									"line": 24,
-									"column": 97
-								}
-							},
 							"name": "expr_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 						}
 					]
@@ -572,16 +368,6 @@
 					"type": "Identifier",
 					"start": 980,
 					"end": 982,
-					"loc": {
-						"start": {
-							"line": 29,
-							"column": 7
-						},
-						"end": {
-							"line": 29,
-							"column": 9
-						}
-					},
 					"name": "xs"
 				},
 				"body": {
@@ -602,16 +388,6 @@
 								"type": "Identifier",
 								"start": 1079,
 								"end": 1080,
-								"loc": {
-									"start": {
-										"line": 32,
-										"column": 2
-									},
-									"end": {
-										"line": 32,
-										"column": 3
-									}
-								},
 								"name": "x"
 							}
 						},
@@ -628,65 +404,23 @@
 					"type": "Identifier",
 					"name": "x",
 					"start": 986,
-					"end": 987,
-					"loc": {
-						"start": {
-							"line": 29,
-							"column": 13,
-							"character": 986
-						},
-						"end": {
-							"line": 29,
-							"column": 14,
-							"character": 987
-						}
-					}
+					"end": 987
 				},
 				"key": {
 					"type": "SequenceExpression",
 					"start": 990,
 					"end": 1072,
-					"loc": {
-						"start": {
-							"line": 29,
-							"column": 17
-						},
-						"end": {
-							"line": 30,
-							"column": 40
-						}
-					},
 					"expressions": [
 						{
 							"type": "Identifier",
 							"start": 990,
 							"end": 1030,
-							"loc": {
-								"start": {
-									"line": 29,
-									"column": 17
-								},
-								"end": {
-									"line": 29,
-									"column": 57
-								}
-							},
 							"name": "expr_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 						},
 						{
 							"type": "Identifier",
 							"start": 1033,
 							"end": 1072,
-							"loc": {
-								"start": {
-									"line": 30,
-									"column": 1
-								},
-								"end": {
-									"line": 30,
-									"column": 40
-								}
-							},
 							"name": "expr_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 						}
 					]

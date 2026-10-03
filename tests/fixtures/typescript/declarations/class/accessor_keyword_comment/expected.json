@@ -14,113 +14,43 @@
 			"type": "Line",
 			"value": " Comment between accessor keyword and name is preserved",
 			"start": 20,
-			"end": 77,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 58
-				}
-			}
+			"end": 77
 		},
 		{
 			"type": "Block",
 			"value": " c1 ",
 			"start": 95,
-			"end": 103,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 6
-				},
-				"end": {
-					"line": 4,
-					"column": 14
-				}
-			}
+			"end": 103
 		},
 		{
 			"type": "Block",
 			"value": " c2 ",
 			"start": 133,
-			"end": 141,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 6
-				},
-				"end": {
-					"line": 7,
-					"column": 14
-				}
-			}
+			"end": 141
 		},
 		{
 			"type": "Line",
 			"value": " A run the author GLUED — a multi-line block ahead of a single-line one — and broke",
 			"start": 155,
-			"end": 240,
-			"loc": {
-				"start": {
-					"line": 10,
-					"column": 1
-				},
-				"end": {
-					"line": 10,
-					"column": 86
-				}
-			}
+			"end": 240
 		},
 		{
 			"type": "Line",
 			"value": " after, in the accessor keyword→name gap: both formatters drop the name below the run",
 			"start": 242,
-			"end": 329,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 1
-				},
-				"end": {
-					"line": 11,
-					"column": 88
-				}
-			}
+			"end": 329
 		},
 		{
 			"type": "Block",
 			"value": " c3\n\td3 ",
 			"start": 347,
-			"end": 359,
-			"loc": {
-				"start": {
-					"line": 13,
-					"column": 6
-				},
-				"end": {
-					"line": 14,
-					"column": 6
-				}
-			}
+			"end": 359
 		},
 		{
 			"type": "Block",
 			"value": " c4 ",
 			"start": 360,
-			"end": 368,
-			"loc": {
-				"start": {
-					"line": 14,
-					"column": 7
-				},
-				"end": {
-					"line": 14,
-					"column": 15
-				}
-			}
+			"end": 368
 		}
 	],
 	"instance": {
@@ -132,45 +62,15 @@
 			"type": "Program",
 			"start": 18,
 			"end": 397,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 19,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ClassDeclaration",
 					"start": 79,
 					"end": 152,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 85,
 						"end": 86,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 7
-							},
-							"end": {
-								"line": 3,
-								"column": 8
-							}
-						},
 						"name": "A"
 					},
 					"superClass": null,
@@ -178,47 +78,17 @@
 						"type": "ClassBody",
 						"start": 87,
 						"end": 152,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 9
-							},
-							"end": {
-								"line": 8,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "MethodDefinition",
 								"start": 91,
 								"end": 126,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 2
-									},
-									"end": {
-										"line": 6,
-										"column": 3
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
 									"start": 104,
 									"end": 105,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 15
-										},
-										"end": {
-											"line": 4,
-											"column": 16
-										}
-									},
 									"name": "a",
 									"leadingComments": [
 										{
@@ -234,16 +104,6 @@
 									"type": "FunctionExpression",
 									"start": 105,
 									"end": 126,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 16
-										},
-										"end": {
-											"line": 6,
-											"column": 3
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -253,45 +113,15 @@
 										"type": "BlockStatement",
 										"start": 108,
 										"end": 126,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 19
-											},
-											"end": {
-												"line": 6,
-												"column": 3
-											}
-										},
 										"body": [
 											{
 												"type": "ReturnStatement",
 												"start": 113,
 												"end": 122,
-												"loc": {
-													"start": {
-														"line": 5,
-														"column": 3
-													},
-													"end": {
-														"line": 5,
-														"column": 12
-													}
-												},
 												"argument": {
 													"type": "Literal",
 													"start": 120,
 													"end": 121,
-													"loc": {
-														"start": {
-															"line": 5,
-															"column": 10
-														},
-														"end": {
-															"line": 5,
-															"column": 11
-														}
-													},
 													"value": 1,
 													"raw": "1"
 												}
@@ -304,32 +134,12 @@
 								"type": "MethodDefinition",
 								"start": 129,
 								"end": 149,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 2
-									},
-									"end": {
-										"line": 7,
-										"column": 22
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
 									"start": 142,
 									"end": 143,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 15
-										},
-										"end": {
-											"line": 7,
-											"column": 16
-										}
-									},
 									"name": "a",
 									"leadingComments": [
 										{
@@ -345,16 +155,6 @@
 									"type": "FunctionExpression",
 									"start": 143,
 									"end": 149,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 16
-										},
-										"end": {
-											"line": 7,
-											"column": 22
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -364,16 +164,6 @@
 											"type": "Identifier",
 											"start": 144,
 											"end": 145,
-											"loc": {
-												"start": {
-													"line": 7,
-													"column": 17
-												},
-												"end": {
-													"line": 7,
-													"column": 18
-												}
-											},
 											"name": "v"
 										}
 									],
@@ -381,16 +171,6 @@
 										"type": "BlockStatement",
 										"start": 147,
 										"end": 149,
-										"loc": {
-											"start": {
-												"line": 7,
-												"column": 20
-											},
-											"end": {
-												"line": 7,
-												"column": 22
-											}
-										},
 										"body": []
 									}
 								}
@@ -410,30 +190,10 @@
 					"type": "ClassDeclaration",
 					"start": 331,
 					"end": 396,
-					"loc": {
-						"start": {
-							"line": 12,
-							"column": 1
-						},
-						"end": {
-							"line": 18,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 337,
 						"end": 338,
-						"loc": {
-							"start": {
-								"line": 12,
-								"column": 7
-							},
-							"end": {
-								"line": 12,
-								"column": 8
-							}
-						},
 						"name": "B"
 					},
 					"superClass": null,
@@ -441,47 +201,17 @@
 						"type": "ClassBody",
 						"start": 339,
 						"end": 396,
-						"loc": {
-							"start": {
-								"line": 12,
-								"column": 9
-							},
-							"end": {
-								"line": 18,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "MethodDefinition",
 								"start": 343,
 								"end": 393,
-								"loc": {
-									"start": {
-										"line": 13,
-										"column": 2
-									},
-									"end": {
-										"line": 17,
-										"column": 3
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
 									"start": 371,
 									"end": 372,
-									"loc": {
-										"start": {
-											"line": 15,
-											"column": 2
-										},
-										"end": {
-											"line": 15,
-											"column": 3
-										}
-									},
 									"name": "b",
 									"leadingComments": [
 										{
@@ -503,16 +233,6 @@
 									"type": "FunctionExpression",
 									"start": 372,
 									"end": 393,
-									"loc": {
-										"start": {
-											"line": 15,
-											"column": 3
-										},
-										"end": {
-											"line": 17,
-											"column": 3
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -522,45 +242,15 @@
 										"type": "BlockStatement",
 										"start": 375,
 										"end": 393,
-										"loc": {
-											"start": {
-												"line": 15,
-												"column": 6
-											},
-											"end": {
-												"line": 17,
-												"column": 3
-											}
-										},
 										"body": [
 											{
 												"type": "ReturnStatement",
 												"start": 380,
 												"end": 389,
-												"loc": {
-													"start": {
-														"line": 16,
-														"column": 3
-													},
-													"end": {
-														"line": 16,
-														"column": 12
-													}
-												},
 												"argument": {
 													"type": "Literal",
 													"start": 387,
 													"end": 388,
-													"loc": {
-														"start": {
-															"line": 16,
-															"column": 10
-														},
-														"end": {
-															"line": 16,
-															"column": 11
-														}
-													},
 													"value": 1,
 													"raw": "1"
 												}
@@ -595,18 +285,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

@@ -9,18 +9,6 @@
 				"start": 159,
 				"end": 174,
 				"name": "on:click",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 7,
-						"character": 159
-					},
-					"end": {
-						"line": 5,
-						"column": 15,
-						"character": 167
-					}
-				},
 				"value": [
 					{
 						"start": 169,
@@ -36,18 +24,6 @@
 				"start": 175,
 				"end": 187,
 				"name": "bind:a",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 23,
-						"character": 175
-					},
-					"end": {
-						"line": 5,
-						"column": 29,
-						"character": 181
-					}
-				},
 				"value": [
 					{
 						"start": 183,
@@ -63,18 +39,6 @@
 				"start": 188,
 				"end": 199,
 				"name": "style:c",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 36,
-						"character": 188
-					},
-					"end": {
-						"line": 5,
-						"column": 43,
-						"character": 195
-					}
-				},
 				"value": [
 					{
 						"start": 197,
@@ -90,18 +54,6 @@
 				"start": 200,
 				"end": 205,
 				"name": "use:e",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 48,
-						"character": 200
-					},
-					"end": {
-						"line": 5,
-						"column": 53,
-						"character": 205
-					}
-				},
 				"value": true
 			},
 			{
@@ -109,18 +61,6 @@
 				"start": 206,
 				"end": 211,
 				"name": "let:f",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 54,
-						"character": 206
-					},
-					"end": {
-						"line": 5,
-						"column": 59,
-						"character": 211
-					}
-				},
 				"value": true
 			},
 			{
@@ -128,18 +68,6 @@
 				"start": 212,
 				"end": 224,
 				"name": "on:g|h",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 60,
-						"character": 212
-					},
-					"end": {
-						"line": 5,
-						"column": 66,
-						"character": 218
-					}
-				},
 				"value": [
 					{
 						"start": 220,
@@ -155,18 +83,6 @@
 				"start": 225,
 				"end": 228,
 				"name": "on:",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 73,
-						"character": 225
-					},
-					"end": {
-						"line": 5,
-						"column": 76,
-						"character": 228
-					}
-				},
 				"value": true
 			}
 		],
@@ -213,16 +129,6 @@
 			"type": "Program",
 			"start": 50,
 			"end": 50,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 1,
-					"column": 59
-				}
-			},
 			"body": [],
 			"sourceType": "module"
 		},
@@ -232,18 +138,6 @@
 				"start": 8,
 				"end": 14,
 				"name": "module",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 14,
-						"character": 14
-					}
-				},
 				"value": true
 			},
 			{
@@ -251,18 +145,6 @@
 				"start": 15,
 				"end": 22,
 				"name": "{a}",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 15,
-						"character": 15
-					},
-					"end": {
-						"line": 1,
-						"column": 18,
-						"character": 18
-					}
-				},
 				"value": [
 					{
 						"start": 20,
@@ -278,18 +160,6 @@
 				"start": 23,
 				"end": 33,
 				"name": "{...c}",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 23,
-						"character": 23
-					},
-					"end": {
-						"line": 1,
-						"column": 29,
-						"character": 29
-					}
-				},
 				"value": [
 					{
 						"start": 31,
@@ -305,18 +175,6 @@
 				"start": 34,
 				"end": 42,
 				"name": "{@attach",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 34,
-						"character": 34
-					},
-					"end": {
-						"line": 1,
-						"column": 42,
-						"character": 42
-					}
-				},
 				"value": true
 			},
 			{
@@ -324,18 +182,6 @@
 				"start": 43,
 				"end": 49,
 				"name": "e}",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 43,
-						"character": 43
-					},
-					"end": {
-						"line": 1,
-						"column": 45,
-						"character": 45
-					}
-				},
 				"value": [
 					{
 						"start": 47,
@@ -357,16 +203,6 @@
 			"type": "Program",
 			"start": 141,
 			"end": 141,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 0
-				},
-				"end": {
-					"line": 3,
-					"column": 89
-				}
-			},
 			"body": [],
 			"sourceType": "module"
 		},
@@ -376,18 +212,6 @@
 				"start": 69,
 				"end": 74,
 				"name": "a",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 8,
-						"character": 69
-					},
-					"end": {
-						"line": 3,
-						"column": 9,
-						"character": 70
-					}
-				},
 				"value": [
 					{
 						"start": 72,
@@ -403,18 +227,6 @@
 				"start": 75,
 				"end": 82,
 				"name": "b",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 14,
-						"character": 75
-					},
-					"end": {
-						"line": 3,
-						"column": 15,
-						"character": 76
-					}
-				},
 				"value": [
 					{
 						"start": 78,
@@ -430,18 +242,6 @@
 				"start": 83,
 				"end": 88,
 				"name": "c",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 22,
-						"character": 83
-					},
-					"end": {
-						"line": 3,
-						"column": 23,
-						"character": 84
-					}
-				},
 				"value": [
 					{
 						"start": 86,
@@ -457,18 +257,6 @@
 				"start": 89,
 				"end": 94,
 				"name": "d",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 28,
-						"character": 89
-					},
-					"end": {
-						"line": 3,
-						"column": 29,
-						"character": 90
-					}
-				},
 				"value": [
 					{
 						"start": 92,
@@ -484,18 +272,6 @@
 				"start": 95,
 				"end": 102,
 				"name": "e",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 34,
-						"character": 95
-					},
-					"end": {
-						"line": 3,
-						"column": 35,
-						"character": 96
-					}
-				},
 				"value": [
 					{
 						"start": 98,
@@ -511,18 +287,6 @@
 				"start": 103,
 				"end": 112,
 				"name": "g",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 42,
-						"character": 103
-					},
-					"end": {
-						"line": 3,
-						"column": 43,
-						"character": 104
-					}
-				},
 				"value": [
 					{
 						"start": 106,
@@ -538,18 +302,6 @@
 				"start": 113,
 				"end": 117,
 				"name": "h",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 52,
-						"character": 113
-					},
-					"end": {
-						"line": 3,
-						"column": 53,
-						"character": 114
-					}
-				},
 				"value": [
 					{
 						"start": 116,
@@ -565,18 +317,6 @@
 				"start": 118,
 				"end": 124,
 				"name": "i",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 57,
-						"character": 118
-					},
-					"end": {
-						"line": 3,
-						"column": 58,
-						"character": 119
-					}
-				},
 				"value": [
 					{
 						"start": 121,
@@ -592,18 +332,6 @@
 				"start": 125,
 				"end": 132,
 				"name": "k",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 64,
-						"character": 125
-					},
-					"end": {
-						"line": 3,
-						"column": 65,
-						"character": 126
-					}
-				},
 				"value": [
 					{
 						"start": 128,
@@ -619,18 +347,6 @@
 				"start": 133,
 				"end": 140,
 				"name": "m",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 72,
-						"character": 133
-					},
-					"end": {
-						"line": 3,
-						"column": 73,
-						"character": 134
-					}
-				},
 				"value": [
 					{
 						"start": 136,

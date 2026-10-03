@@ -1,19 +1,18 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
 #![allow(clippy::expect_used)]
 
-//! The `no-locations` wire variant invariant.
+//! The span-only wire variant invariant.
 //!
 //! `convert_ast_json_bytes_no_locations` must emit exactly the default wire with
 //! every line/column object removed — nothing else. Concretely: the default
 //! output with all `loc` keys stripped (and, for Svelte, `name_loc` — which the
-//! variant also drops) must equal the no-locations output byte-for-byte (compared
-//! as parsed `Value`s). This proves the variant drops *only* line/column data and
-//! leaves `type`/`start`/`end`/payload untouched — so a stray field change, a
-//! dropped comma, or a reordered key in the gated writer is caught here.
+//! variant also drops) must equal the no-locations output (compared as parsed
+//! `Value`s, key order included). This proves the two wires differ in line/column
+//! data alone and agree on `type`/`start`/`end`/payload — so a stray field
+//! change, a dropped comma, or a reordered key in either is caught here.
 //!
-//! No new oracle files: the default `expected.json` (already gated against the
-//! canonical parsers) is the source of truth; `strip_locations` derives the
-//! expected no-locations shape from it.
+//! The fixtures pin the span-only wire against the canonical parsers; this is
+//! what carries that grade over to the `loc` wire.
 
 use serde_json::Value;
 
@@ -48,6 +47,20 @@ fn assert_ts(src: &str) {
     assert_eq!(
         full, no_loc,
         "TS no-locations != strip_loc(full) for: {src:?}"
+    );
+}
+
+fn assert_css(src: &str) {
+    let arena = bumpalo::Bump::new();
+    let ast = tsv_css::parse(src, &arena).expect("CSS source should parse");
+    let mut full = tsv_debug::json::wire_value(&tsv_css::convert_ast_json_bytes(&ast, src));
+    strip_locations(&mut full);
+    let no_loc: Value =
+        serde_json::from_slice(&tsv_css::convert_ast_json_bytes_no_locations(&ast, src))
+            .expect("no-locations output is valid JSON");
+    assert_eq!(
+        full, no_loc,
+        "CSS no-locations != strip_loc(full) for: {src:?}"
     );
 }
 
@@ -97,6 +110,28 @@ fn ts_types_and_comments() {
 }
 
 #[test]
+fn css_rules_selectors_and_comments() {
+    // Every node shape the CSS writer fuses into a head or tail window, plus the
+    // root's comment run — the loc wire writes each burst piecewise.
+    assert_css(
+        "/* lead */\n@media (min-width: 1px) {\n\ta > b + c ~ d, [x='y' i] { color: red; /* c */ }\n}\n\
+         p:nth-child(2n + 1 of .k)::before, :is(.a, #b) &.e { --v: 1; }\n@keyframes k { 50% { top: 0 } }",
+    );
+}
+
+#[test]
+fn css_multibyte_and_line_separators() {
+    // A multibyte character before later nodes, CRLF, and a U+2028 in a comment —
+    // the byte→UTF-16 path and the LF-only line rule the dropped `loc` encodes.
+    assert_css("a::after { content: 'é😀'; }\r\n/* \u{2028} */ b { }");
+}
+
+#[test]
+fn svelte_style_sheet() {
+    assert_svelte("<p>x</p>\n<style>\n\t/* c */\n\tp { color: red; }\n</style>");
+}
+
+#[test]
 fn svelte_elements_attributes_directives() {
     // Elements/attributes/directives carry `name_loc`; the variant drops it.
     assert_svelte(
@@ -131,13 +166,11 @@ fn svelte_const_tag_and_snippet() {
 /// comment-bearing Svelte island, and its per-node assignment is driven by the
 /// writer's own node opens (`attach_open`) rather than by anything `loc`-shaped.
 ///
-/// ⭐ That independence is what these cases gate, and nothing else does. The
-/// attach walks the emit, so an `attach_open` that ever became conditional on
-/// `emit_loc` would silently stop opening nodes in *this* variant only —
-/// comments would re-attach to whatever node opened next, and every other gate
-/// would stay green, because they all run with `loc` on. Mutation-tested:
-/// gating `attach_open` on `ctx.emit_loc` passes the whole workspace suite
-/// without these.
+/// ⭐ That independence is what these cases gate. The attach walks the emit, so
+/// an `attach_open` that ever became conditional on whether the wire carries
+/// `loc` would silently stop opening nodes in one variant only — comments would
+/// re-attach to whatever node opened next, and the fixtures, which grade the
+/// span-only variant alone, would stay green on the other.
 #[test]
 fn svelte_script_attached_comments() {
     // Leading + trailing on a statement, and a comment inside a nested block —
@@ -180,14 +213,10 @@ fn svelte_expression_list_island_attached_comments() {
 /// at four of its readers (`tsv_lang::AcornPrefix`) — so the writer must resolve the
 /// preparation per island on **both** variants.
 ///
-/// ⭐ That is what this case gates, and nothing else does. The preparation ledger
-/// (`Root::acorn_regions`) sits beside the `loc` seeds, which the `no-locations` path builds
-/// none of; parked with them — its pre-refactor home — the dedent silently reverts to the
-/// document on this variant alone, and every other gate stays green because they all run with
-/// `loc` on. The newline before the `:` is load-bearing twice over: it is what makes the
-/// annotation's seed non-identity (so the seed route is live and the two could be conflated),
-/// and `read_type_annotation`'s `_ as ` swallows it, so the line acorn measured is the
-/// binding's.
+/// ⭐ That is what this case gates: the preparation ledger (`Root::acorn_regions`) must be
+/// read on both variants, and the fixtures grade only the span-only one. The newline before
+/// the `:` is load-bearing: `read_type_annotation`'s `_ as ` swallows it, so the line acorn
+/// measured is the binding's.
 #[test]
 fn svelte_manufactured_multiline_comment_dedent() {
     assert_svelte(

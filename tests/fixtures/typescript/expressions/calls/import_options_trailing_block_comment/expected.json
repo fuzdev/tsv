@@ -14,17 +14,7 @@
 			"type": "Block",
 			"value": " block comment ",
 			"start": 79,
-			"end": 98,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 60
-				},
-				"end": {
-					"line": 2,
-					"column": 79
-				}
-			}
+			"end": 98
 		}
 	],
 	"instance": {
@@ -36,104 +26,34 @@
 			"type": "Program",
 			"start": 18,
 			"end": 101,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 3,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 20,
 					"end": 100,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 81
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 26,
 							"end": 99,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 7
-								},
-								"end": {
-									"line": 2,
-									"column": 80
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 26,
 								"end": 29,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 7
-									},
-									"end": {
-										"line": 2,
-										"column": 10
-									}
-								},
 								"name": "mod"
 							},
 							"init": {
 								"type": "AwaitExpression",
 								"start": 32,
 								"end": 99,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 13
-									},
-									"end": {
-										"line": 2,
-										"column": 80
-									}
-								},
 								"argument": {
 									"type": "ImportExpression",
 									"start": 38,
 									"end": 99,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 19
-										},
-										"end": {
-											"line": 2,
-											"column": 80
-										}
-									},
 									"source": {
 										"type": "Literal",
 										"start": 45,
 										"end": 50,
-										"loc": {
-											"start": {
-												"line": 2,
-												"column": 26
-											},
-											"end": {
-												"line": 2,
-												"column": 31
-											}
-										},
 										"value": "./a",
 										"raw": "'./a'"
 									},
@@ -142,31 +62,11 @@
 											"type": "ObjectExpression",
 											"start": 52,
 											"end": 78,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 33
-												},
-												"end": {
-													"line": 2,
-													"column": 59
-												}
-											},
 											"properties": [
 												{
 													"type": "Property",
 													"start": 54,
 													"end": 76,
-													"loc": {
-														"start": {
-															"line": 2,
-															"column": 35
-														},
-														"end": {
-															"line": 2,
-															"column": 57
-														}
-													},
 													"method": false,
 													"shorthand": false,
 													"computed": false,
@@ -174,47 +74,17 @@
 														"type": "Identifier",
 														"start": 54,
 														"end": 58,
-														"loc": {
-															"start": {
-																"line": 2,
-																"column": 35
-															},
-															"end": {
-																"line": 2,
-																"column": 39
-															}
-														},
 														"name": "with"
 													},
 													"value": {
 														"type": "ObjectExpression",
 														"start": 60,
 														"end": 76,
-														"loc": {
-															"start": {
-																"line": 2,
-																"column": 41
-															},
-															"end": {
-																"line": 2,
-																"column": 57
-															}
-														},
 														"properties": [
 															{
 																"type": "Property",
 																"start": 62,
 																"end": 74,
-																"loc": {
-																	"start": {
-																		"line": 2,
-																		"column": 43
-																	},
-																	"end": {
-																		"line": 2,
-																		"column": 55
-																	}
-																},
 																"method": false,
 																"shorthand": false,
 																"computed": false,
@@ -222,32 +92,12 @@
 																	"type": "Identifier",
 																	"start": 62,
 																	"end": 66,
-																	"loc": {
-																		"start": {
-																			"line": 2,
-																			"column": 43
-																		},
-																		"end": {
-																			"line": 2,
-																			"column": 47
-																		}
-																	},
 																	"name": "type"
 																},
 																"value": {
 																	"type": "Literal",
 																	"start": 68,
 																	"end": 74,
-																	"loc": {
-																		"start": {
-																			"line": 2,
-																			"column": 49
-																		},
-																		"end": {
-																			"line": 2,
-																			"column": 55
-																		}
-																	},
 																	"value": "json",
 																	"raw": "'json'"
 																},
@@ -283,18 +133,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

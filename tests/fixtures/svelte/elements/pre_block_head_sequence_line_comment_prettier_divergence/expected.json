@@ -25,18 +25,6 @@
 				"start": 224,
 				"end": 259,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 4,
-						"column": 1,
-						"character": 225
-					},
-					"end": {
-						"line": 4,
-						"column": 4,
-						"character": 228
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -50,31 +38,11 @@
 								"type": "SequenceExpression",
 								"start": 235,
 								"end": 245,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 11
-									},
-									"end": {
-										"line": 5,
-										"column": 2
-									}
-								},
 								"expressions": [
 									{
 										"type": "Identifier",
 										"start": 235,
 										"end": 236,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 11
-											},
-											"end": {
-												"line": 4,
-												"column": 12
-											}
-										},
 										"name": "a",
 										"trailingComments": [
 											{
@@ -89,16 +57,6 @@
 										"type": "Identifier",
 										"start": 244,
 										"end": 245,
-										"loc": {
-											"start": {
-												"line": 5,
-												"column": 1
-											},
-											"end": {
-												"line": 5,
-												"column": 2
-											}
-										},
 										"name": "b"
 									}
 								]
@@ -132,18 +90,6 @@
 				"start": 261,
 				"end": 313,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 1,
-						"character": 262
-					},
-					"end": {
-						"line": 7,
-						"column": 4,
-						"character": 265
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -156,31 +102,11 @@
 								"type": "SequenceExpression",
 								"start": 274,
 								"end": 284,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 13
-									},
-									"end": {
-										"line": 8,
-										"column": 2
-									}
-								},
 								"expressions": [
 									{
 										"type": "Identifier",
 										"start": 274,
 										"end": 275,
-										"loc": {
-											"start": {
-												"line": 7,
-												"column": 13
-											},
-											"end": {
-												"line": 7,
-												"column": 14
-											}
-										},
 										"name": "a",
 										"trailingComments": [
 											{
@@ -195,16 +121,6 @@
 										"type": "Identifier",
 										"start": 283,
 										"end": 284,
-										"loc": {
-											"start": {
-												"line": 8,
-												"column": 1
-											},
-											"end": {
-												"line": 8,
-												"column": 2
-											}
-										},
 										"name": "b"
 									}
 								]
@@ -220,16 +136,6 @@
 											"type": "Identifier",
 											"start": 295,
 											"end": 299,
-											"loc": {
-												"start": {
-													"line": 8,
-													"column": 13
-												},
-												"end": {
-													"line": 8,
-													"column": 17
-												}
-											},
 											"name": "item"
 										}
 									}
@@ -239,19 +145,7 @@
 								"type": "Identifier",
 								"name": "item",
 								"start": 289,
-								"end": 293,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 7,
-										"character": 289
-									},
-									"end": {
-										"line": 8,
-										"column": 11,
-										"character": 293
-									}
-								}
+								"end": 293
 							}
 						}
 					]
@@ -282,18 +176,6 @@
 				"start": 391,
 				"end": 451,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 11,
-						"column": 1,
-						"character": 392
-					},
-					"end": {
-						"line": 11,
-						"column": 4,
-						"character": 395
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -306,16 +188,6 @@
 								"type": "Identifier",
 								"start": 403,
 								"end": 408,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 12
-									},
-									"end": {
-										"line": 11,
-										"column": 17
-									}
-								},
 								"name": "items"
 							},
 							"body": {
@@ -329,16 +201,6 @@
 											"type": "Identifier",
 											"start": 433,
 											"end": 437,
-											"loc": {
-												"start": {
-													"line": 12,
-													"column": 6
-												},
-												"end": {
-													"line": 12,
-													"column": 10
-												}
-											},
 											"name": "item"
 										}
 									}
@@ -348,49 +210,17 @@
 								"type": "Identifier",
 								"name": "item",
 								"start": 412,
-								"end": 416,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 21,
-										"character": 412
-									},
-									"end": {
-										"line": 11,
-										"column": 25,
-										"character": 416
-									}
-								}
+								"end": 416
 							},
 							"key": {
 								"type": "SequenceExpression",
 								"start": 419,
 								"end": 429,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 28
-									},
-									"end": {
-										"line": 12,
-										"column": 2
-									}
-								},
 								"expressions": [
 									{
 										"type": "Identifier",
 										"start": 419,
 										"end": 420,
-										"loc": {
-											"start": {
-												"line": 11,
-												"column": 28
-											},
-											"end": {
-												"line": 11,
-												"column": 29
-											}
-										},
 										"name": "a",
 										"trailingComments": [
 											{
@@ -405,16 +235,6 @@
 										"type": "Identifier",
 										"start": 428,
 										"end": 429,
-										"loc": {
-											"start": {
-												"line": 12,
-												"column": 1
-											},
-											"end": {
-												"line": 12,
-												"column": 2
-											}
-										},
 										"name": "b"
 									}
 								]
@@ -448,18 +268,6 @@
 				"start": 513,
 				"end": 558,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 15,
-						"column": 1,
-						"character": 514
-					},
-					"end": {
-						"line": 15,
-						"column": 4,
-						"character": 517
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -473,31 +281,11 @@
 								"type": "SequenceExpression",
 								"start": 524,
 								"end": 544,
-								"loc": {
-									"start": {
-										"line": 15,
-										"column": 11
-									},
-									"end": {
-										"line": 17,
-										"column": 2
-									}
-								},
 								"expressions": [
 									{
 										"type": "Identifier",
 										"start": 524,
 										"end": 525,
-										"loc": {
-											"start": {
-												"line": 15,
-												"column": 11
-											},
-											"end": {
-												"line": 15,
-												"column": 12
-											}
-										},
 										"name": "a",
 										"trailingComments": [
 											{
@@ -512,16 +300,6 @@
 										"type": "Identifier",
 										"start": 533,
 										"end": 534,
-										"loc": {
-											"start": {
-												"line": 16,
-												"column": 1
-											},
-											"end": {
-												"line": 16,
-												"column": 2
-											}
-										},
 										"name": "b",
 										"trailingComments": [
 											{
@@ -536,16 +314,6 @@
 										"type": "Identifier",
 										"start": 543,
 										"end": 544,
-										"loc": {
-											"start": {
-												"line": 17,
-												"column": 1
-											},
-											"end": {
-												"line": 17,
-												"column": 2
-											}
-										},
 										"name": "c"
 									}
 								]
@@ -592,18 +360,6 @@
 				"start": 634,
 				"end": 670,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 20,
-						"column": 1,
-						"character": 635
-					},
-					"end": {
-						"line": 20,
-						"column": 4,
-						"character": 638
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -617,47 +373,17 @@
 								"type": "UnaryExpression",
 								"start": 644,
 								"end": 657,
-								"loc": {
-									"start": {
-										"line": 20,
-										"column": 10
-									},
-									"end": {
-										"line": 21,
-										"column": 3
-									}
-								},
 								"operator": "!",
 								"prefix": true,
 								"argument": {
 									"type": "SequenceExpression",
 									"start": 646,
 									"end": 656,
-									"loc": {
-										"start": {
-											"line": 20,
-											"column": 12
-										},
-										"end": {
-											"line": 21,
-											"column": 2
-										}
-									},
 									"expressions": [
 										{
 											"type": "Identifier",
 											"start": 646,
 											"end": 647,
-											"loc": {
-												"start": {
-													"line": 20,
-													"column": 12
-												},
-												"end": {
-													"line": 20,
-													"column": 13
-												}
-											},
 											"name": "a",
 											"trailingComments": [
 												{
@@ -672,16 +398,6 @@
 											"type": "Identifier",
 											"start": 655,
 											"end": 656,
-											"loc": {
-												"start": {
-													"line": 21,
-													"column": 1
-												},
-												"end": {
-													"line": 21,
-													"column": 2
-												}
-											},
 											"name": "b"
 										}
 									]
@@ -712,97 +428,37 @@
 			"type": "Line",
 			"value": " c",
 			"start": 238,
-			"end": 242,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 14
-				},
-				"end": {
-					"line": 4,
-					"column": 18
-				}
-			}
+			"end": 242
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 277,
-			"end": 281,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 16
-				},
-				"end": {
-					"line": 7,
-					"column": 20
-				}
-			}
+			"end": 281
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 422,
-			"end": 426,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 31
-				},
-				"end": {
-					"line": 11,
-					"column": 35
-				}
-			}
+			"end": 426
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 527,
-			"end": 531,
-			"loc": {
-				"start": {
-					"line": 15,
-					"column": 14
-				},
-				"end": {
-					"line": 15,
-					"column": 18
-				}
-			}
+			"end": 531
 		},
 		{
 			"type": "Line",
 			"value": " c2",
 			"start": 536,
-			"end": 541,
-			"loc": {
-				"start": {
-					"line": 16,
-					"column": 4
-				},
-				"end": {
-					"line": 16,
-					"column": 9
-				}
-			}
+			"end": 541
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 649,
-			"end": 653,
-			"loc": {
-				"start": {
-					"line": 20,
-					"column": 15
-				},
-				"end": {
-					"line": 20,
-					"column": 19
-				}
-			}
+			"end": 653
 		}
 	]
 }

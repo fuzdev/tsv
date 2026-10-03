@@ -29,7 +29,6 @@ fn expression_comment(
         multiline: Comment::content_is_multiline(is_block, content),
         span,
         emit_character_field,
-        bump_pattern_columns: false,
         owned_by_node: false,
     };
     comment.debug_assert_span_len();
@@ -700,37 +699,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             tsv_ts::pattern_type_annotation(&pattern).is_none(),
             "a block pattern's `: T` is its own sub-parse (`parse_block_pattern`)"
         );
-        // Canonical reads a destructure via a synthetic `(pattern = 1)` acorn
-        // parse whose inserted `(` shifts the pattern's start line one column
-        // right when that line is `> 1` — the same quirk the pattern nodes get
-        // (`adjust_read_pattern_columns`) also lands on comments collected on
-        // that line, and the wire serializes them with the shifted columns.
-        //
-        // The shift stops at the **bare** pattern's end. Canonical's `read_pattern`
-        // hands the trailing `: T` to `read_type_annotation`, a separate parse that
-        // prefixes `_ as ` and so preserves every column — and a plain identifier
-        // binding never runs the synthetic parse at all, its only comment-bearing
-        // region being that annotation. So a comment at or past the bare end keeps
-        // its true column.
-        let pattern_on_first_line = !self.source[..base_offset].contains('\n');
-        let bare_pattern_end = pattern.span().end;
-        self.expression_comments
-            .extend(comments.iter().copied().map(|mut c| {
-                if !pattern_on_first_line
-                    && c.span.start < bare_pattern_end
-                    && !self.source[base_offset..c.span.start as usize].contains('\n')
-                {
-                    c.bump_pattern_columns = true;
-                }
-                c
-            }));
+        self.expression_comments.extend(comments.iter().copied());
         Ok(self.arena.alloc(pattern))
     }
 
     /// Record the embedded **acorn parse** Svelte runs over this component
     /// starting around `origin` — the fact `Root.acorn_regions` carries to the
-    /// wire writer, which rebuilds acorn's line/column seed from it
-    /// ([`tsv_ts::AcornSeed`]).
+    /// wire writer, which reads from it the source acorn was handed (what a
+    /// multi-line block comment's `value` is dedented by).
     ///
     /// Svelte calls `allow_whitespace()` before every one of these reads, so
     /// acorn's `startPos` is the first non-whitespace byte — while tsv's own
@@ -738,8 +714,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// [`skip_svelte_ws`] is that same `allow_whitespace()` over a raw offset. The
     /// skip lives here rather than at each call site because it is one rule, and
     /// getting it wrong is invisible until it isn't: a terminator tsv is still
-    /// standing behind belongs to the prefix acorn **skipped**, and counting it
-    /// moves every position in the island a line.
+    /// standing behind belongs to the prefix acorn **skipped**.
     ///
     /// `slice` is the source the sub-parse is about to be handed, so the region's
     /// extent is `origin + slice.len()` — taken from the same value the parse gets,
@@ -756,8 +731,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     /// Record the acorn parse of a block pattern's trailing `: T`, given any position
     /// `at` that reaches the `:` over whitespace alone — the annotation's own span start
-    /// (which is anchored at the *binding's* end) or the colon itself. The parser records
-    /// it from the colon and the wire writer looks it up from the span start, and
+    /// (which is anchored at the *binding's* end) or the colon itself;
     /// `annotation_lex_start` steps the run either way.
     ///
     /// Svelte reads it with a second parse over `blanked_prefix + "_ as " +
@@ -766,7 +740,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// code units ending at the colon, and starts lexing real source again one
     /// past it. Those five units (the colon's included) are the ones the
     /// synthetic `_ as ` overwrites, which is why `origin` may sit mid-token: the
-    /// seed only reads the source *behind* it.
+    /// comment dedent only reads the source *behind* it.
     ///
     /// The window is counted in **code units**, because Svelte indexes a JS string:
     /// behind a non-ASCII binding it reaches more than five bytes back, and it may
@@ -841,7 +815,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// One value rather than a mark per ledger because the ledgers fail differently
     /// and only one of the failures is loud: a comment registered twice is printed
     /// twice, while a repeated [`internal::AcornRegion`] is (today) an exact duplicate
-    /// that `partition_point` resolves to the same seed, and a repeated
+    /// that `partition_point` resolves to the same region, and a repeated
     /// [`internal::SnippetWireParameters`] entry is a second list under one key that the
     /// writer's binary search may or may not pick — so rewinding one and forgetting
     /// another reads as correct until the entries stop being identical.

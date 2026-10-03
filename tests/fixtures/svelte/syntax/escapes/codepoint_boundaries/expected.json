@@ -174,18 +174,6 @@
 				"start": 112,
 				"end": 136,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 1,
-						"character": 113
-					},
-					"end": {
-						"line": 7,
-						"column": 2,
-						"character": 114
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -212,18 +200,6 @@
 				"start": 137,
 				"end": 160,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 8,
-						"column": 1,
-						"character": 138
-					},
-					"end": {
-						"line": 8,
-						"column": 2,
-						"character": 139
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -258,76 +234,26 @@
 			"type": "Program",
 			"start": 8,
 			"end": 101,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 5,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 10,
 					"end": 40,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 31
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 16,
 							"end": 39,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 7
-								},
-								"end": {
-									"line": 2,
-									"column": 30
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 16,
 								"end": 24,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 7
-									},
-									"end": {
-										"line": 2,
-										"column": 15
-									}
-								},
 								"name": "maxValid"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 27,
 								"end": 39,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 18
-									},
-									"end": {
-										"line": 2,
-										"column": 30
-									}
-								},
 								"value": "􏿿",
 								"raw": "'\\u{10FFFF}'"
 							}
@@ -339,61 +265,21 @@
 					"type": "VariableDeclaration",
 					"start": 42,
 					"end": 66,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 25
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 48,
 							"end": 65,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 7
-								},
-								"end": {
-									"line": 3,
-									"column": 24
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 48,
 								"end": 54,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 7
-									},
-									"end": {
-										"line": 3,
-										"column": 13
-									}
-								},
 								"name": "bmpMax"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 57,
 								"end": 65,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 16
-									},
-									"end": {
-										"line": 3,
-										"column": 24
-									}
-								},
 								"value": "￿",
 								"raw": "'\\uFFFF'"
 							}
@@ -405,61 +291,21 @@
 					"type": "VariableDeclaration",
 					"start": 68,
 					"end": 100,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 33
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 74,
 							"end": 99,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 7
-								},
-								"end": {
-									"line": 4,
-									"column": 32
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 74,
 								"end": 85,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 7
-									},
-									"end": {
-										"line": 4,
-										"column": 18
-									}
-								},
 								"name": "astralPlane"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 88,
 								"end": 99,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 21
-									},
-									"end": {
-										"line": 4,
-										"column": 32
-									}
-								},
 								"value": "😀",
 								"raw": "'\\u{1F600}'"
 							}

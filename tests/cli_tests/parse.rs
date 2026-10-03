@@ -177,9 +177,9 @@ fn test_parse_no_locations_svelte_omits_name_loc() {
 }
 
 #[test]
-fn test_parse_no_locations_css_is_noop() {
-    // `parseCss` emits no `loc`, so `--no-locations` is a documented no-op for CSS
-    // — byte-identical to the default wire.
+fn test_parse_no_locations_drops_css_loc() {
+    // `parseCss` emits no `loc`, but tsv's CSS wire carries one on every node like
+    // the other two languages, and `--no-locations` drops it: the span-only wire.
     let full = tsv(&["parse", "--content", "a { color: red }", "--parser", "css"]);
     let no_loc = tsv(&[
         "parse",
@@ -189,9 +189,15 @@ fn test_parse_no_locations_css_is_noop() {
         "css",
         "--no-locations",
     ]);
-    assert_eq!(
-        full.stdout, no_loc.stdout,
-        "CSS no-locations must equal the default wire"
+    let full_out = String::from_utf8_lossy(&full.stdout);
+    let no_loc_out = String::from_utf8_lossy(&no_loc.stdout);
+    assert!(
+        full_out.contains(r#""loc":{"#),
+        "default CSS wire carries loc: {full_out}"
+    );
+    assert!(
+        !no_loc_out.contains(r#""loc""#),
+        "no-locations CSS wire drops loc: {no_loc_out}"
     );
 }
 

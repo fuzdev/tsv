@@ -29,16 +29,6 @@
 						"type": "Identifier",
 						"start": 18,
 						"end": 19,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 8
-							},
-							"end": {
-								"line": 3,
-								"column": 9
-							}
-						},
 						"name": "a"
 					}
 				]
@@ -59,48 +49,18 @@
 						"type": "Identifier",
 						"start": 30,
 						"end": 31,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 8
-							},
-							"end": {
-								"line": 5,
-								"column": 9
-							}
-						},
 						"name": "a"
 					},
 					{
 						"type": "Identifier",
 						"start": 33,
 						"end": 34,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 11
-							},
-							"end": {
-								"line": 5,
-								"column": 12
-							}
-						},
 						"name": "b"
 					},
 					{
 						"type": "Identifier",
 						"start": 36,
 						"end": 37,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 14
-							},
-							"end": {
-								"line": 5,
-								"column": 15
-							}
-						},
 						"name": "c"
 					}
 				]

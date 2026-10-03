@@ -14,33 +14,13 @@
 			"type": "Line",
 			"value": " enum keyword to name — block comment stays inline (both formatters)",
 			"start": 20,
-			"end": 90,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 71
-				}
-			}
+			"end": 90
 		},
 		{
 			"type": "Block",
 			"value": " c2 ",
 			"start": 97,
-			"end": 105,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 6
-				},
-				"end": {
-					"line": 3,
-					"column": 14
-				}
-			}
+			"end": 105
 		}
 	],
 	"instance": {
@@ -52,45 +32,15 @@
 			"type": "Program",
 			"start": 18,
 			"end": 111,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 4,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "TSEnumDeclaration",
 					"start": 92,
 					"end": 110,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 19
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 106,
 						"end": 107,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 15
-							},
-							"end": {
-								"line": 3,
-								"column": 16
-							}
-						},
 						"name": "B",
 						"leadingComments": [
 							{
@@ -120,18 +70,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

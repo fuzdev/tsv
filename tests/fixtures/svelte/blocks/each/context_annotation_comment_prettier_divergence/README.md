@@ -28,17 +28,16 @@ print-once ledger knows. The consumed extent is the annotation's own end
 instead.
 
 The wire is a **parser match**: canonical attaches the comment to the adjacent
-node inside the annotation as `leadingComments`, and tsv reproduces it. The
-`loc` columns agree too — the synthetic-`(` shift belongs to the destructure
-parse alone, so an annotation comment keeps its true column.
+node inside the annotation as `leadingComments`, and tsv reproduces it.
 
 `unformatted_ours_colon_newline.svelte` puts each annotation's colon on a line of its own,
 which tsv joins back up (prettier, dropping the comment, never reaches `input`). That newline
 sits inside the `_ as ` window Svelte's `read_type_annotation` writes over the four code units
-before the colon, so canonical places the annotation's nodes — and the root `comments`
-entry for its comment (the attached copy carries no `loc`) — a line up, on the binding's line.
-`expected_unformatted_ours_colon_newline.json` pins canonical's AST of that spelling, which no
-`input.*` can hold (P4).
+before the colon. `expected_unformatted_ours_colon_newline.json` pins canonical's AST of that
+spelling, which no `input.*` can hold (P4): the spans and the comment attachment across the
+overwritten window. (Svelte's own `loc` places the annotation's nodes a line up there, on the
+binding's line; tsv's `loc` does not reproduce that — see
+[conformance_svelte.md](../../../../../../docs/conformance_svelte.md).)
 
 ## Prettier divergence (formatter)
 

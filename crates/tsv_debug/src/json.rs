@@ -187,7 +187,10 @@ mod tests {
                         let Ok(ast) = tsv_css::parse(&source, &arena) else {
                             continue;
                         };
-                        vec![tsv_css::convert_ast_json_bytes(&ast, &source)]
+                        vec![
+                            tsv_css::convert_ast_json_bytes(&ast, &source),
+                            tsv_css::convert_ast_json_bytes_no_locations(&ast, &source),
+                        ]
                     }
                 };
                 for wire in wires {

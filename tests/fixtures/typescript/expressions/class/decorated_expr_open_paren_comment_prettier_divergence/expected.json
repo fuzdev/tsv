@@ -14,65 +14,25 @@
 			"type": "Line",
 			"value": " own-line line comment after the open paren of a bare parenthesized decorated class expression",
 			"start": 20,
-			"end": 116,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 97
-				}
-			}
+			"end": 116
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 122,
-			"end": 126,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 2
-				},
-				"end": {
-					"line": 4,
-					"column": 6
-				}
-			}
+			"end": 126
 		},
 		{
 			"type": "Line",
 			"value": " own-line block comment after the open paren — same divergence",
 			"start": 157,
-			"end": 221,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 1
-				},
-				"end": {
-					"line": 9,
-					"column": 65
-				}
-			}
+			"end": 221
 		},
 		{
 			"type": "Block",
 			"value": " d ",
 			"start": 227,
-			"end": 234,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 2
-				},
-				"end": {
-					"line": 11,
-					"column": 9
-				}
-			}
+			"end": 234
 		}
 	],
 	"instance": {
@@ -84,74 +44,24 @@
 			"type": "Program",
 			"start": 18,
 			"end": 263,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 15,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
 					"start": 118,
 					"end": 154,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 7,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "ClassExpression",
 						"start": 129,
 						"end": 150,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 2
-							},
-							"end": {
-								"line": 6,
-								"column": 10
-							}
-						},
 						"decorators": [
 							{
 								"type": "Decorator",
 								"start": 129,
 								"end": 139,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 2
-									},
-									"end": {
-										"line": 5,
-										"column": 12
-									}
-								},
 								"expression": {
 									"type": "Identifier",
 									"start": 130,
 									"end": 139,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 3
-										},
-										"end": {
-											"line": 5,
-											"column": 12
-										}
-									},
 									"name": "decorator"
 								}
 							}
@@ -162,16 +72,6 @@
 							"type": "ClassBody",
 							"start": 148,
 							"end": 150,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 8
-								},
-								"end": {
-									"line": 6,
-									"column": 10
-								}
-							},
 							"body": []
 						},
 						"leadingComments": [
@@ -196,59 +96,19 @@
 					"type": "ExpressionStatement",
 					"start": 223,
 					"end": 262,
-					"loc": {
-						"start": {
-							"line": 10,
-							"column": 1
-						},
-						"end": {
-							"line": 14,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "ClassExpression",
 						"start": 237,
 						"end": 258,
-						"loc": {
-							"start": {
-								"line": 12,
-								"column": 2
-							},
-							"end": {
-								"line": 13,
-								"column": 10
-							}
-						},
 						"decorators": [
 							{
 								"type": "Decorator",
 								"start": 237,
 								"end": 247,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 2
-									},
-									"end": {
-										"line": 12,
-										"column": 12
-									}
-								},
 								"expression": {
 									"type": "Identifier",
 									"start": 238,
 									"end": 247,
-									"loc": {
-										"start": {
-											"line": 12,
-											"column": 3
-										},
-										"end": {
-											"line": 12,
-											"column": 12
-										}
-									},
 									"name": "decorator"
 								}
 							}
@@ -259,16 +119,6 @@
 							"type": "ClassBody",
 							"start": 256,
 							"end": 258,
-							"loc": {
-								"start": {
-									"line": 13,
-									"column": 8
-								},
-								"end": {
-									"line": 13,
-									"column": 10
-								}
-							},
 							"body": []
 						},
 						"leadingComments": [
@@ -298,18 +148,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

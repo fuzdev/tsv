@@ -25,78 +25,24 @@
 				"start": 95,
 				"end": 133,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 96
-					},
-					"end": {
-						"line": 2,
-						"column": 4,
-						"character": 99
-					}
-				},
 				"attributes": [
 					{
 						"start": 100,
 						"end": 126,
 						"type": "ClassDirective",
 						"name": "class1",
-						"name_loc": {
-							"start": {
-								"line": 2,
-								"column": 5,
-								"character": 100
-							},
-							"end": {
-								"line": 2,
-								"column": 17,
-								"character": 112
-							}
-						},
 						"expression": {
 							"type": "CallExpression",
 							"start": 114,
 							"end": 125,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 19
-								},
-								"end": {
-									"line": 2,
-									"column": 30
-								}
-							},
 							"callee": {
 								"type": "MemberExpression",
 								"start": 114,
 								"end": 122,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 19
-									},
-									"end": {
-										"line": 2,
-										"column": 27
-									}
-								},
 								"object": {
 									"type": "Literal",
 									"start": 114,
 									"end": 117,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 19
-										},
-										"end": {
-											"line": 2,
-											"column": 22
-										}
-									},
 									"value": {},
 									"raw": "/a/",
 									"regex": {
@@ -108,16 +54,6 @@
 									"type": "Identifier",
 									"start": 118,
 									"end": 122,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 23
-										},
-										"end": {
-											"line": 2,
-											"column": 27
-										}
-									},
 									"name": "test"
 								},
 								"computed": false,
@@ -128,16 +64,6 @@
 									"type": "Identifier",
 									"start": 123,
 									"end": 124,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 28
-										},
-										"end": {
-											"line": 2,
-											"column": 29
-										}
-									},
 									"name": "b"
 								}
 							],
@@ -163,36 +89,12 @@
 				"start": 134,
 				"end": 170,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 1,
-						"character": 135
-					},
-					"end": {
-						"line": 3,
-						"column": 4,
-						"character": 138
-					}
-				},
 				"attributes": [
 					{
 						"start": 139,
 						"end": 163,
 						"type": "StyleDirective",
 						"name": "color",
-						"name_loc": {
-							"start": {
-								"line": 3,
-								"column": 5,
-								"character": 139
-							},
-							"end": {
-								"line": 3,
-								"column": 16,
-								"character": 150
-							}
-						},
 						"modifiers": [],
 						"value": {
 							"type": "ExpressionTag",
@@ -202,30 +104,10 @@
 								"type": "MemberExpression",
 								"start": 152,
 								"end": 162,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 18
-									},
-									"end": {
-										"line": 3,
-										"column": 28
-									}
-								},
 								"object": {
 									"type": "Literal",
 									"start": 152,
 									"end": 155,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 18
-										},
-										"end": {
-											"line": 3,
-											"column": 21
-										}
-									},
 									"value": {},
 									"raw": "/a/",
 									"regex": {
@@ -237,16 +119,6 @@
 									"type": "Identifier",
 									"start": 156,
 									"end": 162,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 22
-										},
-										"end": {
-											"line": 3,
-											"column": 28
-										}
-									},
 									"name": "source"
 								},
 								"computed": false,
@@ -272,50 +144,16 @@
 				"start": 171,
 				"end": 207,
 				"name": "button",
-				"name_loc": {
-					"start": {
-						"line": 4,
-						"column": 1,
-						"character": 172
-					},
-					"end": {
-						"line": 4,
-						"column": 7,
-						"character": 178
-					}
-				},
 				"attributes": [
 					{
 						"start": 179,
 						"end": 193,
 						"type": "OnDirective",
 						"name": "click",
-						"name_loc": {
-							"start": {
-								"line": 4,
-								"column": 8,
-								"character": 179
-							},
-							"end": {
-								"line": 4,
-								"column": 16,
-								"character": 187
-							}
-						},
 						"expression": {
 							"type": "Literal",
 							"start": 189,
 							"end": 192,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 18
-								},
-								"end": {
-									"line": 4,
-									"column": 21
-								}
-							},
 							"value": {},
 							"raw": "/a/",
 							"regex": {
@@ -351,50 +189,16 @@
 				"start": 208,
 				"end": 236,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 1,
-						"character": 209
-					},
-					"end": {
-						"line": 5,
-						"column": 4,
-						"character": 212
-					}
-				},
 				"attributes": [
 					{
 						"start": 213,
 						"end": 229,
 						"type": "UseDirective",
 						"name": "action",
-						"name_loc": {
-							"start": {
-								"line": 5,
-								"column": 5,
-								"character": 213
-							},
-							"end": {
-								"line": 5,
-								"column": 15,
-								"character": 223
-							}
-						},
 						"expression": {
 							"type": "Literal",
 							"start": 225,
 							"end": 228,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 17
-								},
-								"end": {
-									"line": 5,
-									"column": 20
-								}
-							},
 							"value": {},
 							"raw": "/a/",
 							"regex": {
@@ -422,50 +226,16 @@
 				"start": 237,
 				"end": 270,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 6,
-						"column": 1,
-						"character": 238
-					},
-					"end": {
-						"line": 6,
-						"column": 4,
-						"character": 241
-					}
-				},
 				"attributes": [
 					{
 						"start": 242,
 						"end": 263,
 						"type": "TransitionDirective",
 						"name": "fade",
-						"name_loc": {
-							"start": {
-								"line": 6,
-								"column": 5,
-								"character": 242
-							},
-							"end": {
-								"line": 6,
-								"column": 20,
-								"character": 257
-							}
-						},
 						"expression": {
 							"type": "Literal",
 							"start": 259,
 							"end": 262,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 22
-								},
-								"end": {
-									"line": 6,
-									"column": 25
-								}
-							},
 							"value": {},
 							"raw": "/a/",
 							"regex": {
@@ -498,16 +268,6 @@
 					"type": "Identifier",
 					"start": 278,
 					"end": 283,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 7
-						},
-						"end": {
-							"line": 7,
-							"column": 12
-						}
-					},
 					"name": "items"
 				},
 				"body": {
@@ -525,50 +285,16 @@
 							"start": 304,
 							"end": 334,
 							"name": "div",
-							"name_loc": {
-								"start": {
-									"line": 8,
-									"column": 2,
-									"character": 305
-								},
-								"end": {
-									"line": 8,
-									"column": 5,
-									"character": 308
-								}
-							},
 							"attributes": [
 								{
 									"start": 309,
 									"end": 327,
 									"type": "AnimateDirective",
 									"name": "flip",
-									"name_loc": {
-										"start": {
-											"line": 8,
-											"column": 6,
-											"character": 309
-										},
-										"end": {
-											"line": 8,
-											"column": 18,
-											"character": 321
-										}
-									},
 									"expression": {
 										"type": "Literal",
 										"start": 323,
 										"end": 326,
-										"loc": {
-											"start": {
-												"line": 8,
-												"column": 20
-											},
-											"end": {
-												"line": 8,
-												"column": 23
-											}
-										},
 										"value": {},
 										"raw": "/a/",
 										"regex": {
@@ -597,64 +323,22 @@
 					"type": "Identifier",
 					"name": "item",
 					"start": 287,
-					"end": 291,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 16,
-							"character": 287
-						},
-						"end": {
-							"line": 7,
-							"column": 20,
-							"character": 291
-						}
-					}
+					"end": 291
 				},
 				"key": {
 					"type": "MemberExpression",
 					"start": 293,
 					"end": 300,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 22
-						},
-						"end": {
-							"line": 7,
-							"column": 29
-						}
-					},
 					"object": {
 						"type": "Identifier",
 						"start": 293,
 						"end": 297,
-						"loc": {
-							"start": {
-								"line": 7,
-								"column": 22
-							},
-							"end": {
-								"line": 7,
-								"column": 26
-							}
-						},
 						"name": "item"
 					},
 					"property": {
 						"type": "Identifier",
 						"start": 298,
 						"end": 300,
-						"loc": {
-							"start": {
-								"line": 7,
-								"column": 27
-							},
-							"end": {
-								"line": 7,
-								"column": 29
-							}
-						},
 						"name": "id"
 					},
 					"computed": false,

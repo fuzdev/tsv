@@ -19,7 +19,6 @@
 //! let json_bytes = convert_ast_json_bytes(&ast, source);
 //! ```
 
-mod acorn_loc;
 pub mod ast;
 mod goal;
 mod lexer;
@@ -32,7 +31,6 @@ use tsv_lang::printing::{FoldedSource, LineBreaks, LineTable};
 use tsv_lang::{CommentFreeWindow, EmbedContext, Span};
 pub use tsv_lang::{ParseError, Result};
 
-pub use acorn_loc::AcornSeed;
 pub use goal::Goal;
 pub use parser::TopLevelAs;
 
@@ -466,13 +464,17 @@ fn format_program_in(
 /// walk of the internal AST (the writer in `ast/convert/write/`), never
 /// materializing a typed public tree or an intermediate `Value`, and
 /// fuses the byte→UTF-16 offset translation into that walk: the writer receives
-/// the `ByteToCharMap` via `LocationMapper` and emits final char-space
+/// the `ByteToCharMap` via `WirePositions` and emits final char-space
 /// positions directly, so no post-conversion translation walk runs. For ASCII
 /// sources the map is empty and emission is byte-space passthrough. This is
 /// the hot path for the FFI parse binding and the CLI's compact output — both
 /// hand the bytes on without ever needing `&str`, so they skip the O(output)
 /// UTF-8 validation `convert_ast_json_string` pays (the output is ~15× the
 /// source).
+///
+/// Every node carries `loc` — the line (1-based) and column (0-based, UTF-16
+/// code units) of its own `start` / `end` under ECMAScript's line terminators
+/// (CR, LF, CRLF, LS, PS), which is acorn's.
 #[cfg(feature = "convert")]
 pub fn convert_ast_json_bytes(program: &Program<'_>, source: &str) -> Vec<u8> {
     convert_ast_json_bytes_variant(program, source, true)
@@ -480,16 +482,13 @@ pub fn convert_ast_json_bytes(program: &Program<'_>, source: &str) -> Vec<u8> {
 
 /// Convert internal AST to compact JSON wire bytes **without** per-node `loc`.
 ///
-/// The opt-in `no-locations` variant of `convert_ast_json_bytes`: emits
-/// `start`/`end` offsets but drops the per-node `loc` object (line/column) that
-/// the acorn/svelte drop-in wire carries. `loc` is a pure function of a node's
-/// `start`/`end` (UTF-16 offsets) plus the source, so a consumer that has the
-/// source loses nothing — line/column is derived lazily. Dropping it removes
-/// ~46% of the wire and ~61% of the downstream `JSON.parse` cost (three nested
-/// objects per node), and lets emission skip the per-node line/column lookup
-/// entirely. This is a distinct, narrower product from the default wire — not a
-/// second encoding of the acorn contract — mirroring acorn's own
-/// `locations: false`.
+/// The span-only twin of `convert_ast_json_bytes`: emits `start`/`end` offsets
+/// but drops the per-node `loc` object (line/column). `loc` is a pure function
+/// of a node's `start`/`end` (UTF-16 offsets) plus the source, so a consumer that
+/// has the source loses nothing — line/column is derived lazily. Dropping it
+/// removes ~46% of the wire and ~61% of the downstream `JSON.parse` cost (three
+/// nested objects per node), and lets emission skip the line table entirely —
+/// mirroring acorn's own `locations: false`.
 #[cfg(feature = "convert")]
 pub fn convert_ast_json_bytes_no_locations(program: &Program<'_>, source: &str) -> Vec<u8> {
     convert_ast_json_bytes_variant(program, source, false)
@@ -497,24 +496,21 @@ pub fn convert_ast_json_bytes_no_locations(program: &Program<'_>, source: &str) 
 
 #[cfg(feature = "convert")]
 fn convert_ast_json_bytes_variant(program: &Program<'_>, source: &str, locations: bool) -> Vec<u8> {
-    // One fused source scan builds both; ASCII sources take a byte-level line
-    // scan and get the identity map. The `no-locations` path emits no line/column,
-    // so it skips the line-start scan entirely (`new_map_only` builds just the
-    // byte→char map) — a once-per-file entry branch, no per-node cost.
+    // The line table is built only when `loc` is written — one fused source scan
+    // builds it with the map; ASCII sources take a byte-level line scan and get
+    // the identity map. The span-only wire builds the map alone.
+    let bom = tsv_lang::LeadingBom::Counted;
     let (tracker, map) = if locations {
-        tsv_lang::LocationTracker::new_ecmascript_with_map(source, tsv_lang::LeadingBom::Counted)
+        let (tracker, map) = tsv_lang::LocationTracker::new_ecmascript_with_map(source, bom);
+        (Some(tracker), map)
     } else {
-        tsv_lang::LocationTracker::new_map_only(source, tsv_lang::LeadingBom::Counted)
+        (None, tsv_lang::ByteToCharMap::new(source, bom))
     };
     ast::convert::write_program_json(
         program,
         source,
-        tsv_lang::LocationMapper {
-            tracker: &tracker,
-            map: &map,
-        },
+        tsv_lang::WirePositions::new(&map, tracker.as_ref()),
         ast::convert::Schema::Acorn,
-        locations,
     )
 }
 
@@ -746,11 +742,9 @@ pub fn attach_pattern_type_annotation<'arena>(
 /// destructuring patterns in a field of their own). Callers wanting the binding's **end**
 /// take [`pattern_binding_end`] rather than reading `span.end` themselves.
 ///
-/// Its **span start** is also the boundary between the two acorn parses Svelte's
-/// `read_pattern` runs — the pattern, then `read_type_annotation` for the `: T` — so
-/// every per-position rule that differs across them keys on it: the annotation's `loc`
-/// is omitted (Svelte builds that node itself), its type nodes take no `(` column shift,
-/// and they carry the other parse's line seed. That is why the wire writer and the Svelte
+/// Its **span** also marks the boundary between the two acorn parses Svelte's
+/// `read_pattern` runs — the pattern, then `read_type_annotation` for the `: T` — so the
+/// annotation is its own comment island. That is why the wire writer and the Svelte
 /// parser both ask *this* function rather than matching the three kinds again; a block
 /// pattern's root is always an identifier or a destructure, so no other root can carry one.
 pub fn pattern_type_annotation<'a, 'arena>(

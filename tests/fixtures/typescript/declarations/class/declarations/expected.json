@@ -19,45 +19,15 @@
 			"type": "Program",
 			"start": 18,
 			"end": 133,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 11,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ClassDeclaration",
 					"start": 20,
 					"end": 132,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 10,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 26,
 						"end": 33,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 7
-							},
-							"end": {
-								"line": 2,
-								"column": 14
-							}
-						},
 						"name": "Greeter"
 					},
 					"superClass": null,
@@ -65,47 +35,17 @@
 						"type": "ClassBody",
 						"start": 34,
 						"end": 132,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 15
-							},
-							"end": {
-								"line": 10,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "MethodDefinition",
 								"start": 38,
 								"end": 54,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 2
-									},
-									"end": {
-										"line": 3,
-										"column": 18
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
 									"start": 38,
 									"end": 49,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 2
-										},
-										"end": {
-											"line": 3,
-											"column": 13
-										}
-									},
 									"name": "constructor"
 								},
 								"kind": "constructor",
@@ -113,16 +53,6 @@
 									"type": "FunctionExpression",
 									"start": 49,
 									"end": 54,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 13
-										},
-										"end": {
-											"line": 3,
-											"column": 18
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -132,16 +62,6 @@
 										"type": "BlockStatement",
 										"start": 52,
 										"end": 54,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 16
-											},
-											"end": {
-												"line": 3,
-												"column": 18
-											}
-										},
 										"body": []
 									}
 								}
@@ -150,32 +70,12 @@
 								"type": "MethodDefinition",
 								"start": 57,
 								"end": 89,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 2
-									},
-									"end": {
-										"line": 6,
-										"column": 3
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
 									"start": 57,
 									"end": 62,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 2
-										},
-										"end": {
-											"line": 4,
-											"column": 7
-										}
-									},
 									"name": "greet"
 								},
 								"kind": "method",
@@ -183,16 +83,6 @@
 									"type": "FunctionExpression",
 									"start": 62,
 									"end": 89,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 7
-										},
-										"end": {
-											"line": 6,
-											"column": 3
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -202,45 +92,15 @@
 										"type": "BlockStatement",
 										"start": 65,
 										"end": 89,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 10
-											},
-											"end": {
-												"line": 6,
-												"column": 3
-											}
-										},
 										"body": [
 											{
 												"type": "ReturnStatement",
 												"start": 70,
 												"end": 85,
-												"loc": {
-													"start": {
-														"line": 5,
-														"column": 3
-													},
-													"end": {
-														"line": 5,
-														"column": 18
-													}
-												},
 												"argument": {
 													"type": "Literal",
 													"start": 77,
 													"end": 84,
-													"loc": {
-														"start": {
-															"line": 5,
-															"column": 10
-														},
-														"end": {
-															"line": 5,
-															"column": 17
-														}
-													},
 													"value": "hello",
 													"raw": "'hello'"
 												}
@@ -253,32 +113,12 @@
 								"type": "MethodDefinition",
 								"start": 92,
 								"end": 129,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 2
-									},
-									"end": {
-										"line": 9,
-										"column": 3
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
 									"start": 92,
 									"end": 100,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 2
-										},
-										"end": {
-											"line": 7,
-											"column": 10
-										}
-									},
 									"name": "farewell"
 								},
 								"kind": "method",
@@ -286,16 +126,6 @@
 									"type": "FunctionExpression",
 									"start": 100,
 									"end": 129,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 10
-										},
-										"end": {
-											"line": 9,
-											"column": 3
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -305,45 +135,15 @@
 										"type": "BlockStatement",
 										"start": 103,
 										"end": 129,
-										"loc": {
-											"start": {
-												"line": 7,
-												"column": 13
-											},
-											"end": {
-												"line": 9,
-												"column": 3
-											}
-										},
 										"body": [
 											{
 												"type": "ReturnStatement",
 												"start": 108,
 												"end": 125,
-												"loc": {
-													"start": {
-														"line": 8,
-														"column": 3
-													},
-													"end": {
-														"line": 8,
-														"column": 20
-													}
-												},
 												"argument": {
 													"type": "Literal",
 													"start": 115,
 													"end": 124,
-													"loc": {
-														"start": {
-															"line": 8,
-															"column": 10
-														},
-														"end": {
-															"line": 8,
-															"column": 19
-														}
-													},
 													"value": "goodbye",
 													"raw": "'goodbye'"
 												}
@@ -364,18 +164,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

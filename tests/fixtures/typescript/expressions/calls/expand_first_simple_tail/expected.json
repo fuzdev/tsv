@@ -14,161 +14,61 @@
 			"type": "Line",
 			"value": " A block-body first callback keeps a \"simple\" tail arg inline after `}`",
 			"start": 20,
-			"end": 93,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 74
-				}
-			}
+			"end": 93
 		},
 		{
 			"type": "Line",
 			"value": " (isSimpleCallArgument). A template literal, an update, and a unary with one of the",
 			"start": 95,
-			"end": 180,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 86
-				}
-			}
+			"end": 180
 		},
 		{
 			"type": "Line",
 			"value": " four operators that predicate accepts (`!`, `-`, `+`, `~`) all qualify, so each stays",
 			"start": 182,
-			"end": 270,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 1
-				},
-				"end": {
-					"line": 4,
-					"column": 89
-				}
-			}
+			"end": 270
 		},
 		{
 			"type": "Line",
 			"value": " inline; `typeof` / `void` and a meta property do not, so those break all args.",
 			"start": 272,
-			"end": 353,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 1
-				},
-				"end": {
-					"line": 5,
-					"column": 82
-				}
-			}
+			"end": 353
 		},
 		{
 			"type": "Line",
 			"value": " template literal tail",
 			"start": 356,
-			"end": 380,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 1
-				},
-				"end": {
-					"line": 7,
-					"column": 25
-				}
-			}
+			"end": 380
 		},
 		{
 			"type": "Line",
 			"value": " unary tail",
 			"start": 424,
-			"end": 437,
-			"loc": {
-				"start": {
-					"line": 12,
-					"column": 1
-				},
-				"end": {
-					"line": 12,
-					"column": 14
-				}
-			}
+			"end": 437
 		},
 		{
 			"type": "Line",
 			"value": " update tail",
 			"start": 475,
-			"end": 489,
-			"loc": {
-				"start": {
-					"line": 17,
-					"column": 1
-				},
-				"end": {
-					"line": 17,
-					"column": 15
-				}
-			}
+			"end": 489
 		},
 		{
 			"type": "Line",
 			"value": " `typeof` is not one of the four simple unary operators — all args break",
 			"start": 528,
-			"end": 602,
-			"loc": {
-				"start": {
-					"line": 22,
-					"column": 1
-				},
-				"end": {
-					"line": 22,
-					"column": 75
-				}
-			}
+			"end": 602
 		},
 		{
 			"type": "Line",
 			"value": " nor is `void`",
 			"start": 655,
-			"end": 671,
-			"loc": {
-				"start": {
-					"line": 30,
-					"column": 1
-				},
-				"end": {
-					"line": 30,
-					"column": 17
-				}
-			}
+			"end": 671
 		},
 		{
 			"type": "Line",
 			"value": " a meta property is not a simple argument — all args break",
 			"start": 722,
-			"end": 782,
-			"loc": {
-				"start": {
-					"line": 38,
-					"column": 1
-				},
-				"end": {
-					"line": 38,
-					"column": 61
-				}
-			}
+			"end": 782
 		}
 	],
 	"instance": {
@@ -180,59 +80,19 @@
 			"type": "Program",
 			"start": 18,
 			"end": 836,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 45,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
 					"start": 382,
 					"end": 421,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 1
-						},
-						"end": {
-							"line": 10,
-							"column": 14
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 382,
 						"end": 420,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 1
-							},
-							"end": {
-								"line": 10,
-								"column": 13
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 382,
 							"end": 385,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 1
-								},
-								"end": {
-									"line": 8,
-									"column": 4
-								}
-							},
 							"name": "foo"
 						},
 						"arguments": [
@@ -240,16 +100,6 @@
 								"type": "ArrowFunctionExpression",
 								"start": 386,
 								"end": 409,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 5
-									},
-									"end": {
-										"line": 10,
-										"column": 2
-									}
-								},
 								"id": null,
 								"expression": false,
 								"generator": false,
@@ -259,59 +109,19 @@
 									"type": "BlockStatement",
 									"start": 392,
 									"end": 409,
-									"loc": {
-										"start": {
-											"line": 8,
-											"column": 11
-										},
-										"end": {
-											"line": 10,
-											"column": 2
-										}
-									},
 									"body": [
 										{
 											"type": "ExpressionStatement",
 											"start": 396,
 											"end": 406,
-											"loc": {
-												"start": {
-													"line": 9,
-													"column": 2
-												},
-												"end": {
-													"line": 9,
-													"column": 12
-												}
-											},
 											"expression": {
 												"type": "CallExpression",
 												"start": 396,
 												"end": 405,
-												"loc": {
-													"start": {
-														"line": 9,
-														"column": 2
-													},
-													"end": {
-														"line": 9,
-														"column": 11
-													}
-												},
 												"callee": {
 													"type": "Identifier",
 													"start": 396,
 													"end": 403,
-													"loc": {
-														"start": {
-															"line": 9,
-															"column": 2
-														},
-														"end": {
-															"line": 9,
-															"column": 9
-														}
-													},
 													"name": "doThing"
 												},
 												"arguments": [],
@@ -325,31 +135,11 @@
 								"type": "TemplateLiteral",
 								"start": 411,
 								"end": 419,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 4
-									},
-									"end": {
-										"line": 10,
-										"column": 12
-									}
-								},
 								"expressions": [
 									{
 										"type": "Identifier",
 										"start": 415,
 										"end": 416,
-										"loc": {
-											"start": {
-												"line": 10,
-												"column": 8
-											},
-											"end": {
-												"line": 10,
-												"column": 9
-											}
-										},
 										"name": "x"
 									}
 								],
@@ -358,16 +148,6 @@
 										"type": "TemplateElement",
 										"start": 412,
 										"end": 413,
-										"loc": {
-											"start": {
-												"line": 10,
-												"column": 5
-											},
-											"end": {
-												"line": 10,
-												"column": 6
-											}
-										},
 										"value": {
 											"raw": "a",
 											"cooked": "a"
@@ -378,16 +158,6 @@
 										"type": "TemplateElement",
 										"start": 417,
 										"end": 418,
-										"loc": {
-											"start": {
-												"line": 10,
-												"column": 10
-											},
-											"end": {
-												"line": 10,
-												"column": 11
-											}
-										},
 										"value": {
 											"raw": "b",
 											"cooked": "b"
@@ -436,44 +206,14 @@
 					"type": "ExpressionStatement",
 					"start": 439,
 					"end": 472,
-					"loc": {
-						"start": {
-							"line": 13,
-							"column": 1
-						},
-						"end": {
-							"line": 15,
-							"column": 8
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 439,
 						"end": 471,
-						"loc": {
-							"start": {
-								"line": 13,
-								"column": 1
-							},
-							"end": {
-								"line": 15,
-								"column": 7
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 439,
 							"end": 442,
-							"loc": {
-								"start": {
-									"line": 13,
-									"column": 1
-								},
-								"end": {
-									"line": 13,
-									"column": 4
-								}
-							},
 							"name": "foo"
 						},
 						"arguments": [
@@ -481,16 +221,6 @@
 								"type": "ArrowFunctionExpression",
 								"start": 443,
 								"end": 466,
-								"loc": {
-									"start": {
-										"line": 13,
-										"column": 5
-									},
-									"end": {
-										"line": 15,
-										"column": 2
-									}
-								},
 								"id": null,
 								"expression": false,
 								"generator": false,
@@ -500,59 +230,19 @@
 									"type": "BlockStatement",
 									"start": 449,
 									"end": 466,
-									"loc": {
-										"start": {
-											"line": 13,
-											"column": 11
-										},
-										"end": {
-											"line": 15,
-											"column": 2
-										}
-									},
 									"body": [
 										{
 											"type": "ExpressionStatement",
 											"start": 453,
 											"end": 463,
-											"loc": {
-												"start": {
-													"line": 14,
-													"column": 2
-												},
-												"end": {
-													"line": 14,
-													"column": 12
-												}
-											},
 											"expression": {
 												"type": "CallExpression",
 												"start": 453,
 												"end": 462,
-												"loc": {
-													"start": {
-														"line": 14,
-														"column": 2
-													},
-													"end": {
-														"line": 14,
-														"column": 11
-													}
-												},
 												"callee": {
 													"type": "Identifier",
 													"start": 453,
 													"end": 460,
-													"loc": {
-														"start": {
-															"line": 14,
-															"column": 2
-														},
-														"end": {
-															"line": 14,
-															"column": 9
-														}
-													},
 													"name": "doThing"
 												},
 												"arguments": [],
@@ -566,32 +256,12 @@
 								"type": "UnaryExpression",
 								"start": 468,
 								"end": 470,
-								"loc": {
-									"start": {
-										"line": 15,
-										"column": 4
-									},
-									"end": {
-										"line": 15,
-										"column": 6
-									}
-								},
 								"operator": "-",
 								"prefix": true,
 								"argument": {
 									"type": "Identifier",
 									"start": 469,
 									"end": 470,
-									"loc": {
-										"start": {
-											"line": 15,
-											"column": 5
-										},
-										"end": {
-											"line": 15,
-											"column": 6
-										}
-									},
 									"name": "x"
 								}
 							}
@@ -611,44 +281,14 @@
 					"type": "ExpressionStatement",
 					"start": 491,
 					"end": 525,
-					"loc": {
-						"start": {
-							"line": 18,
-							"column": 1
-						},
-						"end": {
-							"line": 20,
-							"column": 9
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 491,
 						"end": 524,
-						"loc": {
-							"start": {
-								"line": 18,
-								"column": 1
-							},
-							"end": {
-								"line": 20,
-								"column": 8
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 491,
 							"end": 494,
-							"loc": {
-								"start": {
-									"line": 18,
-									"column": 1
-								},
-								"end": {
-									"line": 18,
-									"column": 4
-								}
-							},
 							"name": "foo"
 						},
 						"arguments": [
@@ -656,16 +296,6 @@
 								"type": "ArrowFunctionExpression",
 								"start": 495,
 								"end": 518,
-								"loc": {
-									"start": {
-										"line": 18,
-										"column": 5
-									},
-									"end": {
-										"line": 20,
-										"column": 2
-									}
-								},
 								"id": null,
 								"expression": false,
 								"generator": false,
@@ -675,59 +305,19 @@
 									"type": "BlockStatement",
 									"start": 501,
 									"end": 518,
-									"loc": {
-										"start": {
-											"line": 18,
-											"column": 11
-										},
-										"end": {
-											"line": 20,
-											"column": 2
-										}
-									},
 									"body": [
 										{
 											"type": "ExpressionStatement",
 											"start": 505,
 											"end": 515,
-											"loc": {
-												"start": {
-													"line": 19,
-													"column": 2
-												},
-												"end": {
-													"line": 19,
-													"column": 12
-												}
-											},
 											"expression": {
 												"type": "CallExpression",
 												"start": 505,
 												"end": 514,
-												"loc": {
-													"start": {
-														"line": 19,
-														"column": 2
-													},
-													"end": {
-														"line": 19,
-														"column": 11
-													}
-												},
 												"callee": {
 													"type": "Identifier",
 													"start": 505,
 													"end": 512,
-													"loc": {
-														"start": {
-															"line": 19,
-															"column": 2
-														},
-														"end": {
-															"line": 19,
-															"column": 9
-														}
-													},
 													"name": "doThing"
 												},
 												"arguments": [],
@@ -741,32 +331,12 @@
 								"type": "UpdateExpression",
 								"start": 520,
 								"end": 523,
-								"loc": {
-									"start": {
-										"line": 20,
-										"column": 4
-									},
-									"end": {
-										"line": 20,
-										"column": 7
-									}
-								},
 								"operator": "++",
 								"prefix": false,
 								"argument": {
 									"type": "Identifier",
 									"start": 520,
 									"end": 521,
-									"loc": {
-										"start": {
-											"line": 20,
-											"column": 4
-										},
-										"end": {
-											"line": 20,
-											"column": 5
-										}
-									},
 									"name": "x"
 								}
 							}
@@ -786,44 +356,14 @@
 					"type": "ExpressionStatement",
 					"start": 604,
 					"end": 652,
-					"loc": {
-						"start": {
-							"line": 23,
-							"column": 1
-						},
-						"end": {
-							"line": 28,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 604,
 						"end": 651,
-						"loc": {
-							"start": {
-								"line": 23,
-								"column": 1
-							},
-							"end": {
-								"line": 28,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 604,
 							"end": 607,
-							"loc": {
-								"start": {
-									"line": 23,
-									"column": 1
-								},
-								"end": {
-									"line": 23,
-									"column": 4
-								}
-							},
 							"name": "foo"
 						},
 						"arguments": [
@@ -831,16 +371,6 @@
 								"type": "ArrowFunctionExpression",
 								"start": 611,
 								"end": 636,
-								"loc": {
-									"start": {
-										"line": 24,
-										"column": 2
-									},
-									"end": {
-										"line": 26,
-										"column": 3
-									}
-								},
 								"id": null,
 								"expression": false,
 								"generator": false,
@@ -850,59 +380,19 @@
 									"type": "BlockStatement",
 									"start": 617,
 									"end": 636,
-									"loc": {
-										"start": {
-											"line": 24,
-											"column": 8
-										},
-										"end": {
-											"line": 26,
-											"column": 3
-										}
-									},
 									"body": [
 										{
 											"type": "ExpressionStatement",
 											"start": 622,
 											"end": 632,
-											"loc": {
-												"start": {
-													"line": 25,
-													"column": 3
-												},
-												"end": {
-													"line": 25,
-													"column": 13
-												}
-											},
 											"expression": {
 												"type": "CallExpression",
 												"start": 622,
 												"end": 631,
-												"loc": {
-													"start": {
-														"line": 25,
-														"column": 3
-													},
-													"end": {
-														"line": 25,
-														"column": 12
-													}
-												},
 												"callee": {
 													"type": "Identifier",
 													"start": 622,
 													"end": 629,
-													"loc": {
-														"start": {
-															"line": 25,
-															"column": 3
-														},
-														"end": {
-															"line": 25,
-															"column": 10
-														}
-													},
 													"name": "doThing"
 												},
 												"arguments": [],
@@ -916,32 +406,12 @@
 								"type": "UnaryExpression",
 								"start": 640,
 								"end": 648,
-								"loc": {
-									"start": {
-										"line": 27,
-										"column": 2
-									},
-									"end": {
-										"line": 27,
-										"column": 10
-									}
-								},
 								"operator": "typeof",
 								"prefix": true,
 								"argument": {
 									"type": "Identifier",
 									"start": 647,
 									"end": 648,
-									"loc": {
-										"start": {
-											"line": 27,
-											"column": 9
-										},
-										"end": {
-											"line": 27,
-											"column": 10
-										}
-									},
 									"name": "x"
 								}
 							}
@@ -961,44 +431,14 @@
 					"type": "ExpressionStatement",
 					"start": 673,
 					"end": 719,
-					"loc": {
-						"start": {
-							"line": 31,
-							"column": 1
-						},
-						"end": {
-							"line": 36,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 673,
 						"end": 718,
-						"loc": {
-							"start": {
-								"line": 31,
-								"column": 1
-							},
-							"end": {
-								"line": 36,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 673,
 							"end": 676,
-							"loc": {
-								"start": {
-									"line": 31,
-									"column": 1
-								},
-								"end": {
-									"line": 31,
-									"column": 4
-								}
-							},
 							"name": "foo"
 						},
 						"arguments": [
@@ -1006,16 +446,6 @@
 								"type": "ArrowFunctionExpression",
 								"start": 680,
 								"end": 705,
-								"loc": {
-									"start": {
-										"line": 32,
-										"column": 2
-									},
-									"end": {
-										"line": 34,
-										"column": 3
-									}
-								},
 								"id": null,
 								"expression": false,
 								"generator": false,
@@ -1025,59 +455,19 @@
 									"type": "BlockStatement",
 									"start": 686,
 									"end": 705,
-									"loc": {
-										"start": {
-											"line": 32,
-											"column": 8
-										},
-										"end": {
-											"line": 34,
-											"column": 3
-										}
-									},
 									"body": [
 										{
 											"type": "ExpressionStatement",
 											"start": 691,
 											"end": 701,
-											"loc": {
-												"start": {
-													"line": 33,
-													"column": 3
-												},
-												"end": {
-													"line": 33,
-													"column": 13
-												}
-											},
 											"expression": {
 												"type": "CallExpression",
 												"start": 691,
 												"end": 700,
-												"loc": {
-													"start": {
-														"line": 33,
-														"column": 3
-													},
-													"end": {
-														"line": 33,
-														"column": 12
-													}
-												},
 												"callee": {
 													"type": "Identifier",
 													"start": 691,
 													"end": 698,
-													"loc": {
-														"start": {
-															"line": 33,
-															"column": 3
-														},
-														"end": {
-															"line": 33,
-															"column": 10
-														}
-													},
 													"name": "doThing"
 												},
 												"arguments": [],
@@ -1091,32 +481,12 @@
 								"type": "UnaryExpression",
 								"start": 709,
 								"end": 715,
-								"loc": {
-									"start": {
-										"line": 35,
-										"column": 2
-									},
-									"end": {
-										"line": 35,
-										"column": 8
-									}
-								},
 								"operator": "void",
 								"prefix": true,
 								"argument": {
 									"type": "Identifier",
 									"start": 714,
 									"end": 715,
-									"loc": {
-										"start": {
-											"line": 35,
-											"column": 7
-										},
-										"end": {
-											"line": 35,
-											"column": 8
-										}
-									},
 									"name": "x"
 								}
 							}
@@ -1136,44 +506,14 @@
 					"type": "ExpressionStatement",
 					"start": 784,
 					"end": 835,
-					"loc": {
-						"start": {
-							"line": 39,
-							"column": 1
-						},
-						"end": {
-							"line": 44,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 784,
 						"end": 834,
-						"loc": {
-							"start": {
-								"line": 39,
-								"column": 1
-							},
-							"end": {
-								"line": 44,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 784,
 							"end": 787,
-							"loc": {
-								"start": {
-									"line": 39,
-									"column": 1
-								},
-								"end": {
-									"line": 39,
-									"column": 4
-								}
-							},
 							"name": "foo"
 						},
 						"arguments": [
@@ -1181,16 +521,6 @@
 								"type": "ArrowFunctionExpression",
 								"start": 791,
 								"end": 816,
-								"loc": {
-									"start": {
-										"line": 40,
-										"column": 2
-									},
-									"end": {
-										"line": 42,
-										"column": 3
-									}
-								},
 								"id": null,
 								"expression": false,
 								"generator": false,
@@ -1200,59 +530,19 @@
 									"type": "BlockStatement",
 									"start": 797,
 									"end": 816,
-									"loc": {
-										"start": {
-											"line": 40,
-											"column": 8
-										},
-										"end": {
-											"line": 42,
-											"column": 3
-										}
-									},
 									"body": [
 										{
 											"type": "ExpressionStatement",
 											"start": 802,
 											"end": 812,
-											"loc": {
-												"start": {
-													"line": 41,
-													"column": 3
-												},
-												"end": {
-													"line": 41,
-													"column": 13
-												}
-											},
 											"expression": {
 												"type": "CallExpression",
 												"start": 802,
 												"end": 811,
-												"loc": {
-													"start": {
-														"line": 41,
-														"column": 3
-													},
-													"end": {
-														"line": 41,
-														"column": 12
-													}
-												},
 												"callee": {
 													"type": "Identifier",
 													"start": 802,
 													"end": 809,
-													"loc": {
-														"start": {
-															"line": 41,
-															"column": 3
-														},
-														"end": {
-															"line": 41,
-															"column": 10
-														}
-													},
 													"name": "doThing"
 												},
 												"arguments": [],
@@ -1266,46 +556,16 @@
 								"type": "MetaProperty",
 								"start": 820,
 								"end": 831,
-								"loc": {
-									"start": {
-										"line": 43,
-										"column": 2
-									},
-									"end": {
-										"line": 43,
-										"column": 13
-									}
-								},
 								"meta": {
 									"type": "Identifier",
 									"start": 820,
 									"end": 826,
-									"loc": {
-										"start": {
-											"line": 43,
-											"column": 2
-										},
-										"end": {
-											"line": 43,
-											"column": 8
-										}
-									},
 									"name": "import"
 								},
 								"property": {
 									"type": "Identifier",
 									"start": 827,
 									"end": 831,
-									"loc": {
-										"start": {
-											"line": 43,
-											"column": 9
-										},
-										"end": {
-											"line": 43,
-											"column": 13
-										}
-									},
 									"name": "meta"
 								}
 							}
@@ -1330,18 +590,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

@@ -14,49 +14,19 @@
 			"type": "Line",
 			"value": " group 1",
 			"start": 21,
-			"end": 31,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 2
-				},
-				"end": {
-					"line": 3,
-					"column": 12
-				}
-			}
+			"end": 31
 		},
 		{
 			"type": "Line",
 			"value": " group 2",
 			"start": 49,
-			"end": 59,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 2
-				},
-				"end": {
-					"line": 7,
-					"column": 12
-				}
-			}
+			"end": 59
 		},
 		{
 			"type": "Line",
 			"value": " mid comment",
 			"start": 103,
-			"end": 117,
-			"loc": {
-				"start": {
-					"line": 14,
-					"column": 2
-				},
-				"end": {
-					"line": 14,
-					"column": 16
-				}
-			}
+			"end": 117
 		}
 	],
 	"instance": {
@@ -68,76 +38,26 @@
 			"type": "Program",
 			"start": 8,
 			"end": 138,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 17,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ImportDeclaration",
 					"start": 10,
 					"end": 83,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 10,
-							"column": 14
-						}
-					},
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
 							"start": 34,
 							"end": 35,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 2
-								},
-								"end": {
-									"line": 4,
-									"column": 3
-								}
-							},
 							"imported": {
 								"type": "Identifier",
 								"start": 34,
 								"end": 35,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 2
-									},
-									"end": {
-										"line": 4,
-										"column": 3
-									}
-								},
 								"name": "a"
 							},
 							"local": {
 								"type": "Identifier",
 								"start": 34,
 								"end": 35,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 2
-									},
-									"end": {
-										"line": 4,
-										"column": 3
-									}
-								},
 								"name": "a"
 							},
 							"leadingComments": [
@@ -153,46 +73,16 @@
 							"type": "ImportSpecifier",
 							"start": 39,
 							"end": 40,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 2
-								},
-								"end": {
-									"line": 5,
-									"column": 3
-								}
-							},
 							"imported": {
 								"type": "Identifier",
 								"start": 39,
 								"end": 40,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 2
-									},
-									"end": {
-										"line": 5,
-										"column": 3
-									}
-								},
 								"name": "b"
 							},
 							"local": {
 								"type": "Identifier",
 								"start": 39,
 								"end": 40,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 2
-									},
-									"end": {
-										"line": 5,
-										"column": 3
-									}
-								},
 								"name": "b"
 							}
 						},
@@ -200,46 +90,16 @@
 							"type": "ImportSpecifier",
 							"start": 44,
 							"end": 45,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 2
-								},
-								"end": {
-									"line": 6,
-									"column": 3
-								}
-							},
 							"imported": {
 								"type": "Identifier",
 								"start": 44,
 								"end": 45,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 2
-									},
-									"end": {
-										"line": 6,
-										"column": 3
-									}
-								},
 								"name": "c"
 							},
 							"local": {
 								"type": "Identifier",
 								"start": 44,
 								"end": 45,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 2
-									},
-									"end": {
-										"line": 6,
-										"column": 3
-									}
-								},
 								"name": "c"
 							}
 						},
@@ -247,46 +107,16 @@
 							"type": "ImportSpecifier",
 							"start": 62,
 							"end": 63,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 2
-								},
-								"end": {
-									"line": 8,
-									"column": 3
-								}
-							},
 							"imported": {
 								"type": "Identifier",
 								"start": 62,
 								"end": 63,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 2
-									},
-									"end": {
-										"line": 8,
-										"column": 3
-									}
-								},
 								"name": "d"
 							},
 							"local": {
 								"type": "Identifier",
 								"start": 62,
 								"end": 63,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 2
-									},
-									"end": {
-										"line": 8,
-										"column": 3
-									}
-								},
 								"name": "d"
 							},
 							"leadingComments": [
@@ -302,46 +132,16 @@
 							"type": "ImportSpecifier",
 							"start": 67,
 							"end": 68,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 2
-								},
-								"end": {
-									"line": 9,
-									"column": 3
-								}
-							},
 							"imported": {
 								"type": "Identifier",
 								"start": 67,
 								"end": 68,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 2
-									},
-									"end": {
-										"line": 9,
-										"column": 3
-									}
-								},
 								"name": "e"
 							},
 							"local": {
 								"type": "Identifier",
 								"start": 67,
 								"end": 68,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 2
-									},
-									"end": {
-										"line": 9,
-										"column": 3
-									}
-								},
 								"name": "e"
 							}
 						}
@@ -350,16 +150,6 @@
 						"type": "Literal",
 						"start": 77,
 						"end": 82,
-						"loc": {
-							"start": {
-								"line": 10,
-								"column": 8
-							},
-							"end": {
-								"line": 10,
-								"column": 13
-							}
-						},
 						"value": "./a",
 						"raw": "'./a'"
 					},
@@ -369,61 +159,21 @@
 					"type": "ImportDeclaration",
 					"start": 86,
 					"end": 137,
-					"loc": {
-						"start": {
-							"line": 12,
-							"column": 1
-						},
-						"end": {
-							"line": 16,
-							"column": 14
-						}
-					},
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
 							"start": 97,
 							"end": 99,
-							"loc": {
-								"start": {
-									"line": 13,
-									"column": 2
-								},
-								"end": {
-									"line": 13,
-									"column": 4
-								}
-							},
 							"imported": {
 								"type": "Identifier",
 								"start": 97,
 								"end": 99,
-								"loc": {
-									"start": {
-										"line": 13,
-										"column": 2
-									},
-									"end": {
-										"line": 13,
-										"column": 4
-									}
-								},
 								"name": "a1"
 							},
 							"local": {
 								"type": "Identifier",
 								"start": 97,
 								"end": 99,
-								"loc": {
-									"start": {
-										"line": 13,
-										"column": 2
-									},
-									"end": {
-										"line": 13,
-										"column": 4
-									}
-								},
 								"name": "a1"
 							}
 						},
@@ -431,46 +181,16 @@
 							"type": "ImportSpecifier",
 							"start": 120,
 							"end": 122,
-							"loc": {
-								"start": {
-									"line": 15,
-									"column": 2
-								},
-								"end": {
-									"line": 15,
-									"column": 4
-								}
-							},
 							"imported": {
 								"type": "Identifier",
 								"start": 120,
 								"end": 122,
-								"loc": {
-									"start": {
-										"line": 15,
-										"column": 2
-									},
-									"end": {
-										"line": 15,
-										"column": 4
-									}
-								},
 								"name": "b1"
 							},
 							"local": {
 								"type": "Identifier",
 								"start": 120,
 								"end": 122,
-								"loc": {
-									"start": {
-										"line": 15,
-										"column": 2
-									},
-									"end": {
-										"line": 15,
-										"column": 4
-									}
-								},
 								"name": "b1"
 							},
 							"leadingComments": [
@@ -487,16 +207,6 @@
 						"type": "Literal",
 						"start": 131,
 						"end": 136,
-						"loc": {
-							"start": {
-								"line": 16,
-								"column": 8
-							},
-							"end": {
-								"line": 16,
-								"column": 13
-							}
-						},
 						"value": "./b",
 						"raw": "'./b'"
 					},

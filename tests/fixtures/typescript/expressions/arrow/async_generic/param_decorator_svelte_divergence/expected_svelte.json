@@ -19,105 +19,35 @@
 			"type": "Program",
 			"start": 18,
 			"end": 57,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 3,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 20,
 					"end": 56,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 37
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 26,
 							"end": 55,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 7
-								},
-								"end": {
-									"line": 2,
-									"column": 36
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 26,
 								"end": 27,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 7
-									},
-									"end": {
-										"line": 2,
-										"column": 8
-									}
-								},
 								"name": "f"
 							},
 							"init": {
 								"type": "ArrowFunctionExpression",
 								"start": 30,
 								"end": 55,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 11
-									},
-									"end": {
-										"line": 2,
-										"column": 36
-									}
-								},
 								"typeParameters": {
 									"type": "TSTypeParameterDeclaration",
 									"start": 36,
 									"end": 39,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 17
-										},
-										"end": {
-											"line": 2,
-											"column": 20
-										}
-									},
 									"params": [
 										{
 											"type": "TSTypeParameter",
 											"start": 37,
 											"end": 38,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 18
-												},
-												"end": {
-													"line": 2,
-													"column": 19
-												}
-											},
 											"name": "T"
 										}
 									]
@@ -127,59 +57,19 @@
 										"type": "Identifier",
 										"start": 45,
 										"end": 49,
-										"loc": {
-											"start": {
-												"line": 2,
-												"column": 26
-											},
-											"end": {
-												"line": 2,
-												"column": 30
-											}
-										},
 										"name": "a",
 										"typeAnnotation": {
 											"type": "TSTypeAnnotation",
 											"start": 46,
 											"end": 49,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 27
-												},
-												"end": {
-													"line": 2,
-													"column": 30
-												}
-											},
 											"typeAnnotation": {
 												"type": "TSTypeReference",
 												"start": 48,
 												"end": 49,
-												"loc": {
-													"start": {
-														"line": 2,
-														"column": 29
-													},
-													"end": {
-														"line": 2,
-														"column": 30
-													}
-												},
 												"typeName": {
 													"type": "Identifier",
 													"start": 48,
 													"end": 49,
-													"loc": {
-														"start": {
-															"line": 2,
-															"column": 29
-														},
-														"end": {
-															"line": 2,
-															"column": 30
-														}
-													},
 													"name": "T"
 												}
 											}
@@ -189,30 +79,10 @@
 												"type": "Decorator",
 												"start": 40,
 												"end": 44,
-												"loc": {
-													"start": {
-														"line": 2,
-														"column": 21
-													},
-													"end": {
-														"line": 2,
-														"column": 25
-													}
-												},
 												"expression": {
 													"type": "Identifier",
 													"start": 41,
 													"end": 44,
-													"loc": {
-														"start": {
-															"line": 2,
-															"column": 22
-														},
-														"end": {
-															"line": 2,
-															"column": 25
-														}
-													},
 													"name": "dec"
 												}
 											}
@@ -227,16 +97,6 @@
 									"type": "Identifier",
 									"start": 54,
 									"end": 55,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 35
-										},
-										"end": {
-											"line": 2,
-											"column": 36
-										}
-									},
 									"name": "a"
 								}
 							}
@@ -253,18 +113,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

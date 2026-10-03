@@ -14,97 +14,37 @@
 			"type": "Line",
 			"value": " Comment inside require() on separate line (#18037)",
 			"start": 20,
-			"end": 73,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 54
-				}
-			}
+			"end": 73
 		},
 		{
 			"type": "Line",
 			"value": " comment",
 			"start": 86,
-			"end": 96,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 2
-				},
-				"end": {
-					"line": 4,
-					"column": 12
-				}
-			}
+			"end": 96
 		},
 		{
 			"type": "Line",
 			"value": " Inline comment",
 			"start": 109,
-			"end": 126,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 1
-				},
-				"end": {
-					"line": 8,
-					"column": 18
-				}
-			}
+			"end": 126
 		},
 		{
 			"type": "Block",
 			"value": " comment ",
 			"start": 136,
-			"end": 149,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 9
-				},
-				"end": {
-					"line": 9,
-					"column": 22
-				}
-			}
+			"end": 149
 		},
 		{
 			"type": "Line",
 			"value": " TypeScript import = require with comment (#18035)",
 			"start": 158,
-			"end": 210,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 1
-				},
-				"end": {
-					"line": 11,
-					"column": 53
-				}
-			}
+			"end": 210
 		},
 		{
 			"type": "Line",
 			"value": " comment",
 			"start": 234,
-			"end": 244,
-			"loc": {
-				"start": {
-					"line": 13,
-					"column": 2
-				},
-				"end": {
-					"line": 13,
-					"column": 12
-				}
-			}
+			"end": 244
 		}
 	],
 	"instance": {
@@ -116,59 +56,19 @@
 			"type": "Program",
 			"start": 18,
 			"end": 255,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 16,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
 					"start": 75,
 					"end": 106,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 75,
 						"end": 105,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 1
-							},
-							"end": {
-								"line": 6,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 75,
 							"end": 82,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 1
-								},
-								"end": {
-									"line": 3,
-									"column": 8
-								}
-							},
 							"name": "require"
 						},
 						"arguments": [
@@ -176,16 +76,6 @@
 								"type": "Literal",
 								"start": 99,
 								"end": 102,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 2
-									},
-									"end": {
-										"line": 5,
-										"column": 5
-									}
-								},
 								"value": "a",
 								"raw": "'a'",
 								"leadingComments": [
@@ -213,44 +103,14 @@
 					"type": "ExpressionStatement",
 					"start": 128,
 					"end": 155,
-					"loc": {
-						"start": {
-							"line": 9,
-							"column": 1
-						},
-						"end": {
-							"line": 9,
-							"column": 28
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 128,
 						"end": 154,
-						"loc": {
-							"start": {
-								"line": 9,
-								"column": 1
-							},
-							"end": {
-								"line": 9,
-								"column": 27
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 128,
 							"end": 135,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 1
-								},
-								"end": {
-									"line": 9,
-									"column": 8
-								}
-							},
 							"name": "require"
 						},
 						"arguments": [
@@ -258,16 +118,6 @@
 								"type": "Literal",
 								"start": 150,
 								"end": 153,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 23
-									},
-									"end": {
-										"line": 9,
-										"column": 26
-									}
-								},
 								"value": "b",
 								"raw": "'b'",
 								"leadingComments": [
@@ -295,62 +145,22 @@
 					"type": "TSImportEqualsDeclaration",
 					"start": 212,
 					"end": 254,
-					"loc": {
-						"start": {
-							"line": 12,
-							"column": 1
-						},
-						"end": {
-							"line": 15,
-							"column": 3
-						}
-					},
 					"importKind": "value",
 					"isExport": false,
 					"id": {
 						"type": "Identifier",
 						"start": 219,
 						"end": 220,
-						"loc": {
-							"start": {
-								"line": 12,
-								"column": 8
-							},
-							"end": {
-								"line": 12,
-								"column": 9
-							}
-						},
 						"name": "c"
 					},
 					"moduleReference": {
 						"type": "TSExternalModuleReference",
 						"start": 223,
 						"end": 253,
-						"loc": {
-							"start": {
-								"line": 12,
-								"column": 12
-							},
-							"end": {
-								"line": 15,
-								"column": 2
-							}
-						},
 						"expression": {
 							"type": "Literal",
 							"start": 247,
 							"end": 250,
-							"loc": {
-								"start": {
-									"line": 14,
-									"column": 2
-								},
-								"end": {
-									"line": 14,
-									"column": 5
-								}
-							},
 							"value": "c",
 							"raw": "'c'",
 							"leadingComments": [
@@ -381,18 +191,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

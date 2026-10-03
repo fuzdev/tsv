@@ -12,36 +12,12 @@
 				"start": 0,
 				"end": 55,
 				"name": "template",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 9,
-						"character": 9
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 10,
 						"end": 26,
 						"name": "type",
-						"name_loc": {
-							"start": {
-								"line": 1,
-								"column": 10,
-								"character": 10
-							},
-							"end": {
-								"line": 1,
-								"column": 14,
-								"character": 14
-							}
-						},
 						"value": [
 							{
 								"start": 16,
@@ -57,18 +33,6 @@
 						"start": 27,
 						"end": 37,
 						"name": "lang",
-						"name_loc": {
-							"start": {
-								"line": 1,
-								"column": 27,
-								"character": 27
-							},
-							"end": {
-								"line": 1,
-								"column": 31,
-								"character": 31
-							}
-						},
 						"value": [
 							{
 								"start": 33,
@@ -105,36 +69,12 @@
 				"start": 57,
 				"end": 98,
 				"name": "template",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 1,
-						"character": 58
-					},
-					"end": {
-						"line": 5,
-						"column": 9,
-						"character": 66
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 67,
 						"end": 74,
 						"name": "lang",
-						"name_loc": {
-							"start": {
-								"line": 5,
-								"column": 10,
-								"character": 67
-							},
-							"end": {
-								"line": 5,
-								"column": 14,
-								"character": 71
-							}
-						},
 						"value": [
 							{
 								"start": 73,
@@ -154,18 +94,6 @@
 							"start": 75,
 							"end": 87,
 							"name": "div",
-							"name_loc": {
-								"start": {
-									"line": 5,
-									"column": 19,
-									"character": 76
-								},
-								"end": {
-									"line": 5,
-									"column": 22,
-									"character": 79
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",

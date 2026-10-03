@@ -35,7 +35,7 @@ pub struct ParseCommand {
     /// omit per-node `loc` (line/column). Emits `start`/`end` offsets only — the
     /// opt-in span-only wire (mirrors acorn's `locations: false`). `loc` is
     /// derivable from the offsets plus source, so nothing is lost for a consumer
-    /// that has the source. No-op for css (`parseCss` emits no `loc`).
+    /// that has the source.
     #[argh(switch)]
     no_locations: bool,
 

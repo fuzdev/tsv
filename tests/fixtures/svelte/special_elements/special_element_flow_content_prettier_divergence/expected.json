@@ -25,18 +25,6 @@
 				"start": 196,
 				"end": 249,
 				"name": "svelte:element",
-				"name_loc": {
-					"start": {
-						"line": 6,
-						"column": 1,
-						"character": 197
-					},
-					"end": {
-						"line": 6,
-						"column": 15,
-						"character": 211
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -70,18 +58,6 @@
 				"start": 251,
 				"end": 388,
 				"name": "svelte:element",
-				"name_loc": {
-					"start": {
-						"line": 8,
-						"column": 1,
-						"character": 252
-					},
-					"end": {
-						"line": 8,
-						"column": 15,
-						"character": 266
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -115,18 +91,6 @@
 				"start": 390,
 				"end": 529,
 				"name": "svelte:element",
-				"name_loc": {
-					"start": {
-						"line": 12,
-						"column": 1,
-						"character": 391
-					},
-					"end": {
-						"line": 12,
-						"column": 15,
-						"character": 405
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -144,16 +108,6 @@
 					"type": "Identifier",
 					"start": 412,
 					"end": 415,
-					"loc": {
-						"start": {
-							"line": 12,
-							"column": 22
-						},
-						"end": {
-							"line": 12,
-							"column": 25
-						}
-					},
 					"name": "tag"
 				}
 			},
@@ -169,18 +123,6 @@
 				"start": 531,
 				"end": 675,
 				"name": "svelte:component",
-				"name_loc": {
-					"start": {
-						"line": 16,
-						"column": 1,
-						"character": 532
-					},
-					"end": {
-						"line": 16,
-						"column": 17,
-						"character": 548
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -198,16 +140,6 @@
 					"type": "Identifier",
 					"start": 555,
 					"end": 559,
-					"loc": {
-						"start": {
-							"line": 16,
-							"column": 24
-						},
-						"end": {
-							"line": 16,
-							"column": 28
-						}
-					},
 					"name": "Comp"
 				}
 			},
@@ -227,16 +159,6 @@
 					"type": "Identifier",
 					"start": 682,
 					"end": 686,
-					"loc": {
-						"start": {
-							"line": 20,
-							"column": 5
-						},
-						"end": {
-							"line": 20,
-							"column": 9
-						}
-					},
 					"name": "cond"
 				},
 				"consequent": {
@@ -254,18 +176,6 @@
 							"start": 689,
 							"end": 813,
 							"name": "svelte:self",
-							"name_loc": {
-								"start": {
-									"line": 21,
-									"column": 2,
-									"character": 690
-								},
-								"end": {
-									"line": 21,
-									"column": 13,
-									"character": 701
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -303,18 +213,6 @@
 				"start": 821,
 				"end": 951,
 				"name": "svelte:boundary",
-				"name_loc": {
-					"start": {
-						"line": 26,
-						"column": 1,
-						"character": 822
-					},
-					"end": {
-						"line": 26,
-						"column": 16,
-						"character": 837
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -341,18 +239,6 @@
 				"start": 953,
 				"end": 1113,
 				"name": "Comp",
-				"name_loc": {
-					"start": {
-						"line": 30,
-						"column": 1,
-						"character": 954
-					},
-					"end": {
-						"line": 30,
-						"column": 5,
-						"character": 958
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -369,36 +255,12 @@
 							"start": 961,
 							"end": 1105,
 							"name": "svelte:fragment",
-							"name_loc": {
-								"start": {
-									"line": 31,
-									"column": 2,
-									"character": 962
-								},
-								"end": {
-									"line": 31,
-									"column": 17,
-									"character": 977
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 978,
 									"end": 989,
 									"name": "slot",
-									"name_loc": {
-										"start": {
-											"line": 31,
-											"column": 18,
-											"character": 978
-										},
-										"end": {
-											"line": 31,
-											"column": 22,
-											"character": 982
-										}
-									},
 									"value": [
 										{
 											"start": 984,
@@ -445,18 +307,6 @@
 				"start": 1115,
 				"end": 1223,
 				"name": "slot",
-				"name_loc": {
-					"start": {
-						"line": 36,
-						"column": 1,
-						"character": 1116
-					},
-					"end": {
-						"line": 36,
-						"column": 5,
-						"character": 1120
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",

@@ -14,225 +14,85 @@
 			"type": "Line",
 			"value": " arithmetic operator: the blank between the operator's trailing comment and the",
 			"start": 20,
-			"end": 101,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 82
-				}
-			}
+			"end": 101
 		},
 		{
 			"type": "Line",
 			"value": " own-line comment below it survives",
 			"start": 103,
-			"end": 140,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 38
-				}
-			}
+			"end": 140
 		},
 		{
 			"type": "Line",
 			"value": " c1",
 			"start": 158,
-			"end": 163,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 6
-				},
-				"end": {
-					"line": 5,
-					"column": 11
-				}
-			}
+			"end": 163
 		},
 		{
 			"type": "Line",
 			"value": " c2",
 			"start": 167,
-			"end": 172,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 2
-				},
-				"end": {
-					"line": 7,
-					"column": 7
-				}
-			}
+			"end": 172
 		},
 		{
 			"type": "Line",
 			"value": " logical operator: the same",
 			"start": 180,
-			"end": 209,
-			"loc": {
-				"start": {
-					"line": 10,
-					"column": 1
-				},
-				"end": {
-					"line": 10,
-					"column": 30
-				}
-			}
+			"end": 209
 		},
 		{
 			"type": "Line",
 			"value": " c1",
 			"start": 228,
-			"end": 233,
-			"loc": {
-				"start": {
-					"line": 12,
-					"column": 7
-				},
-				"end": {
-					"line": 12,
-					"column": 12
-				}
-			}
+			"end": 233
 		},
 		{
 			"type": "Line",
 			"value": " c2",
 			"start": 237,
-			"end": 242,
-			"loc": {
-				"start": {
-					"line": 14,
-					"column": 2
-				},
-				"end": {
-					"line": 14,
-					"column": 7
-				}
-			}
+			"end": 242
 		},
 		{
 			"type": "Line",
 			"value": " a longer run keeps every blank the author wrote",
 			"start": 250,
-			"end": 300,
-			"loc": {
-				"start": {
-					"line": 17,
-					"column": 1
-				},
-				"end": {
-					"line": 17,
-					"column": 51
-				}
-			}
+			"end": 300
 		},
 		{
 			"type": "Line",
 			"value": " c1",
 			"start": 318,
-			"end": 323,
-			"loc": {
-				"start": {
-					"line": 19,
-					"column": 6
-				},
-				"end": {
-					"line": 19,
-					"column": 11
-				}
-			}
+			"end": 323
 		},
 		{
 			"type": "Line",
 			"value": " c2",
 			"start": 327,
-			"end": 332,
-			"loc": {
-				"start": {
-					"line": 21,
-					"column": 2
-				},
-				"end": {
-					"line": 21,
-					"column": 7
-				}
-			}
+			"end": 332
 		},
 		{
 			"type": "Line",
 			"value": " c3",
 			"start": 336,
-			"end": 341,
-			"loc": {
-				"start": {
-					"line": 23,
-					"column": 2
-				},
-				"end": {
-					"line": 23,
-					"column": 7
-				}
-			}
+			"end": 341
 		},
 		{
 			"type": "Line",
 			"value": " both comments own-line: prettier keeps the blank too, so this is a control",
 			"start": 349,
-			"end": 426,
-			"loc": {
-				"start": {
-					"line": 26,
-					"column": 1
-				},
-				"end": {
-					"line": 26,
-					"column": 78
-				}
-			}
+			"end": 426
 		},
 		{
 			"type": "Line",
 			"value": " c1",
 			"start": 446,
-			"end": 451,
-			"loc": {
-				"start": {
-					"line": 29,
-					"column": 2
-				},
-				"end": {
-					"line": 29,
-					"column": 7
-				}
-			}
+			"end": 451
 		},
 		{
 			"type": "Line",
 			"value": " c2",
 			"start": 455,
-			"end": 460,
-			"loc": {
-				"start": {
-					"line": 31,
-					"column": 2
-				},
-				"end": {
-					"line": 31,
-					"column": 7
-				}
-			}
+			"end": 460
 		}
 	],
 	"instance": {
@@ -244,90 +104,30 @@
 			"type": "Program",
 			"start": 18,
 			"end": 466,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 33,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 142,
 					"end": 177,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 4
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 148,
 							"end": 176,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 7
-								},
-								"end": {
-									"line": 8,
-									"column": 3
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 148,
 								"end": 149,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 7
-									},
-									"end": {
-										"line": 4,
-										"column": 8
-									}
-								},
 								"name": "a"
 							},
 							"init": {
 								"type": "BinaryExpression",
 								"start": 154,
 								"end": 176,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 2
-									},
-									"end": {
-										"line": 8,
-										"column": 3
-									}
-								},
 								"left": {
 									"type": "Identifier",
 									"start": 154,
 									"end": 155,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 2
-										},
-										"end": {
-											"line": 5,
-											"column": 3
-										}
-									},
 									"name": "x"
 								},
 								"operator": "+",
@@ -335,16 +135,6 @@
 									"type": "Identifier",
 									"start": 175,
 									"end": 176,
-									"loc": {
-										"start": {
-											"line": 8,
-											"column": 2
-										},
-										"end": {
-											"line": 8,
-											"column": 3
-										}
-									},
 									"name": "y",
 									"leadingComments": [
 										{
@@ -384,75 +174,25 @@
 					"type": "VariableDeclaration",
 					"start": 211,
 					"end": 247,
-					"loc": {
-						"start": {
-							"line": 11,
-							"column": 1
-						},
-						"end": {
-							"line": 15,
-							"column": 4
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 217,
 							"end": 246,
-							"loc": {
-								"start": {
-									"line": 11,
-									"column": 7
-								},
-								"end": {
-									"line": 15,
-									"column": 3
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 217,
 								"end": 218,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 7
-									},
-									"end": {
-										"line": 11,
-										"column": 8
-									}
-								},
 								"name": "b"
 							},
 							"init": {
 								"type": "LogicalExpression",
 								"start": 223,
 								"end": 246,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 2
-									},
-									"end": {
-										"line": 15,
-										"column": 3
-									}
-								},
 								"left": {
 									"type": "Identifier",
 									"start": 223,
 									"end": 224,
-									"loc": {
-										"start": {
-											"line": 12,
-											"column": 2
-										},
-										"end": {
-											"line": 12,
-											"column": 3
-										}
-									},
 									"name": "x"
 								},
 								"operator": "&&",
@@ -460,16 +200,6 @@
 									"type": "Identifier",
 									"start": 245,
 									"end": 246,
-									"loc": {
-										"start": {
-											"line": 15,
-											"column": 2
-										},
-										"end": {
-											"line": 15,
-											"column": 3
-										}
-									},
 									"name": "y",
 									"leadingComments": [
 										{
@@ -503,75 +233,25 @@
 					"type": "VariableDeclaration",
 					"start": 302,
 					"end": 346,
-					"loc": {
-						"start": {
-							"line": 18,
-							"column": 1
-						},
-						"end": {
-							"line": 24,
-							"column": 4
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 308,
 							"end": 345,
-							"loc": {
-								"start": {
-									"line": 18,
-									"column": 7
-								},
-								"end": {
-									"line": 24,
-									"column": 3
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 308,
 								"end": 309,
-								"loc": {
-									"start": {
-										"line": 18,
-										"column": 7
-									},
-									"end": {
-										"line": 18,
-										"column": 8
-									}
-								},
 								"name": "c"
 							},
 							"init": {
 								"type": "BinaryExpression",
 								"start": 314,
 								"end": 345,
-								"loc": {
-									"start": {
-										"line": 19,
-										"column": 2
-									},
-									"end": {
-										"line": 24,
-										"column": 3
-									}
-								},
 								"left": {
 									"type": "Identifier",
 									"start": 314,
 									"end": 315,
-									"loc": {
-										"start": {
-											"line": 19,
-											"column": 2
-										},
-										"end": {
-											"line": 19,
-											"column": 3
-										}
-									},
 									"name": "x"
 								},
 								"operator": "+",
@@ -579,16 +259,6 @@
 									"type": "Identifier",
 									"start": 344,
 									"end": 345,
-									"loc": {
-										"start": {
-											"line": 24,
-											"column": 2
-										},
-										"end": {
-											"line": 24,
-											"column": 3
-										}
-									},
 									"name": "y",
 									"leadingComments": [
 										{
@@ -628,75 +298,25 @@
 					"type": "VariableDeclaration",
 					"start": 428,
 					"end": 465,
-					"loc": {
-						"start": {
-							"line": 27,
-							"column": 1
-						},
-						"end": {
-							"line": 32,
-							"column": 4
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 434,
 							"end": 464,
-							"loc": {
-								"start": {
-									"line": 27,
-									"column": 7
-								},
-								"end": {
-									"line": 32,
-									"column": 3
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 434,
 								"end": 435,
-								"loc": {
-									"start": {
-										"line": 27,
-										"column": 7
-									},
-									"end": {
-										"line": 27,
-										"column": 8
-									}
-								},
 								"name": "d"
 							},
 							"init": {
 								"type": "BinaryExpression",
 								"start": 440,
 								"end": 464,
-								"loc": {
-									"start": {
-										"line": 28,
-										"column": 2
-									},
-									"end": {
-										"line": 32,
-										"column": 3
-									}
-								},
 								"left": {
 									"type": "Identifier",
 									"start": 440,
 									"end": 441,
-									"loc": {
-										"start": {
-											"line": 28,
-											"column": 2
-										},
-										"end": {
-											"line": 28,
-											"column": 3
-										}
-									},
 									"name": "x"
 								},
 								"operator": "+",
@@ -704,16 +324,6 @@
 									"type": "Identifier",
 									"start": 463,
 									"end": 464,
-									"loc": {
-										"start": {
-											"line": 32,
-											"column": 2
-										},
-										"end": {
-											"line": 32,
-											"column": 3
-										}
-									},
 									"name": "y",
 									"leadingComments": [
 										{
@@ -752,18 +362,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

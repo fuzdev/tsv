@@ -38,18 +38,6 @@
 				"start": 329,
 				"end": 395,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 8,
-						"column": 1,
-						"character": 330
-					},
-					"end": {
-						"line": 8,
-						"column": 4,
-						"character": 333
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -66,18 +54,6 @@
 							"start": 335,
 							"end": 388,
 							"name": "svelte:boundary",
-							"name_loc": {
-								"start": {
-									"line": 8,
-									"column": 7,
-									"character": 336
-								},
-								"end": {
-									"line": 8,
-									"column": 22,
-									"character": 351
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -127,18 +103,6 @@
 				"start": 441,
 				"end": 541,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 14,
-						"column": 1,
-						"character": 442
-					},
-					"end": {
-						"line": 14,
-						"column": 4,
-						"character": 445
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -155,18 +119,6 @@
 							"start": 447,
 							"end": 534,
 							"name": "svelte:boundary",
-							"name_loc": {
-								"start": {
-									"line": 14,
-									"column": 7,
-									"character": 448
-								},
-								"end": {
-									"line": 14,
-									"column": 22,
-									"character": 463
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -216,18 +168,6 @@
 				"start": 589,
 				"end": 692,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 17,
-						"column": 1,
-						"character": 590
-					},
-					"end": {
-						"line": 17,
-						"column": 4,
-						"character": 593
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -244,18 +184,6 @@
 							"start": 595,
 							"end": 685,
 							"name": "svelte:boundary",
-							"name_loc": {
-								"start": {
-									"line": 17,
-									"column": 7,
-									"character": 596
-								},
-								"end": {
-									"line": 17,
-									"column": 22,
-									"character": 611
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -305,18 +233,6 @@
 				"start": 790,
 				"end": 945,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 21,
-						"column": 1,
-						"character": 791
-					},
-					"end": {
-						"line": 21,
-						"column": 4,
-						"character": 794
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -333,36 +249,12 @@
 							"start": 796,
 							"end": 938,
 							"name": "svelte:boundary",
-							"name_loc": {
-								"start": {
-									"line": 21,
-									"column": 7,
-									"character": 797
-								},
-								"end": {
-									"line": 21,
-									"column": 22,
-									"character": 812
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 815,
 									"end": 862,
 									"name": "onerror",
-									"name_loc": {
-										"start": {
-											"line": 22,
-											"column": 2,
-											"character": 815
-										},
-										"end": {
-											"line": 22,
-											"column": 9,
-											"character": 822
-										}
-									},
 									"value": {
 										"type": "ExpressionTag",
 										"start": 823,
@@ -371,16 +263,6 @@
 											"type": "Identifier",
 											"start": 824,
 											"end": 861,
-											"loc": {
-												"start": {
-													"line": 22,
-													"column": 11
-												},
-												"end": {
-													"line": 22,
-													"column": 48
-												}
-											},
 											"name": "handle_error_aaaaaaaaaaaaaaaaaaaaaaaa"
 										}
 									}
@@ -390,18 +272,6 @@
 									"start": 865,
 									"end": 904,
 									"name": "failed",
-									"name_loc": {
-										"start": {
-											"line": 23,
-											"column": 2,
-											"character": 865
-										},
-										"end": {
-											"line": 23,
-											"column": 8,
-											"character": 871
-										}
-									},
 									"value": {
 										"type": "ExpressionTag",
 										"start": 872,
@@ -410,16 +280,6 @@
 											"type": "Identifier",
 											"start": 873,
 											"end": 903,
-											"loc": {
-												"start": {
-													"line": 23,
-													"column": 10
-												},
-												"end": {
-													"line": 23,
-													"column": 40
-												}
-											},
 											"name": "failed_aaaaaaaaaaaaaaaaaaaaaaa"
 										}
 									}

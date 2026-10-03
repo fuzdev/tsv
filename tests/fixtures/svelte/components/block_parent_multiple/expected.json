@@ -12,18 +12,6 @@
 				"start": 0,
 				"end": 55,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 2,
-						"character": 2
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -40,18 +28,6 @@
 							"start": 9,
 							"end": 18,
 							"name": "Comp1",
-							"name_loc": {
-								"start": {
-									"line": 1,
-									"column": 10,
-									"character": 10
-								},
-								"end": {
-									"line": 1,
-									"column": 15,
-									"character": 15
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -70,18 +46,6 @@
 							"start": 25,
 							"end": 45,
 							"name": "Comp2",
-							"name_loc": {
-								"start": {
-									"line": 1,
-									"column": 26,
-									"character": 26
-								},
-								"end": {
-									"line": 1,
-									"column": 31,
-									"character": 31
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",

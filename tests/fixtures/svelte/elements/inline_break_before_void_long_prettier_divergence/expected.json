@@ -25,18 +25,6 @@
 				"start": 340,
 				"end": 457,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 1,
-						"character": 341
-					},
-					"end": {
-						"line": 7,
-						"column": 2,
-						"character": 342
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -53,36 +41,12 @@
 							"start": 428,
 							"end": 452,
 							"name": "img",
-							"name_loc": {
-								"start": {
-									"line": 9,
-									"column": 2,
-									"character": 429
-								},
-								"end": {
-									"line": 9,
-									"column": 5,
-									"character": 432
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 433,
 									"end": 441,
 									"name": "src",
-									"name_loc": {
-										"start": {
-											"line": 9,
-											"column": 6,
-											"character": 433
-										},
-										"end": {
-											"line": 9,
-											"column": 9,
-											"character": 436
-										}
-									},
 									"value": [
 										{
 											"start": 438,
@@ -98,18 +62,6 @@
 									"start": 442,
 									"end": 449,
 									"name": "alt",
-									"name_loc": {
-										"start": {
-											"line": 9,
-											"column": 15,
-											"character": 442
-										},
-										"end": {
-											"line": 9,
-											"column": 18,
-											"character": 445
-										}
-									},
 									"value": [
 										{
 											"start": 447,

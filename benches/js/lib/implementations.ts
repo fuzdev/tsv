@@ -608,8 +608,9 @@ export function get_benchmark_tasks(
 		// The no-locations wire (span-only: no per-node `loc`) — the payload-matched
 		// opponent to oxc-parser and yuku-parser, whose default ASTs are also
 		// span-only. Materialized in Rust either side, so native and wasm stay
-		// mechanism-matched to their `-json` siblings. CSS is skipped — `parseCss`
-		// emits no `loc`, so a CSS no-locations row would duplicate `tsv-json`.
+		// mechanism-matched to their `-json` siblings. No CSS row is registered.
+		// TODO: a CSS row — the CSS wire carries `loc` now, so its span-only twin is a
+		// distinct product, as it is in the other two languages.
 		add(
 			'native',
 			language !== 'css',
@@ -634,14 +635,12 @@ export function get_benchmark_tasks(
 		//
 		// ⚠ The language is NAMED, never left to a default: a locator built without one
 		// reads every source as TypeScript — the ECMAScript line rule and none of the
-		// Svelte stamping (`name_loc`, the in-tag comment `character`, the block-binding
-		// annotation placement) — and would time a cheaper walk than a Svelte consumer
-		// runs. CSS is skipped for the reason the no-locations rows skip it.
+		// Svelte stamping (`name_loc`, the `character` field) — and would time a cheaper
+		// walk than a Svelte consumer runs. CSS has no row, as it has no no-locations row.
 		//
 		// PERF-ONLY: a consumer-cost row, and the parse it runs is the no-locations row's,
-		// so on the coverage surface it would add nothing but the helper's refusal (a Svelte
-		// source holding a lone CR / U+2028 / U+2029) published as a tsv parse gap. Its
-		// absence there is disclosed (`SURFACE_DISCLOSURES` in bench.ts).
+		// so on the coverage surface it would add nothing. Its absence there is disclosed
+		// (`SURFACE_DISCLOSURES` in bench.ts).
 		const reconstruct_enabled = language !== 'css' && options.corpus_kind !== 'conformance';
 		add(
 			'native',

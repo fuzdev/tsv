@@ -13,30 +13,23 @@ use super::{
 use internal::TSKeywordKind;
 
 /// Emits a `TSTypeAnnotation` node. A Svelte block pattern's top-level
-/// annotation (`ctx.pattern_ann_span`) omits the `loc` field — Svelte's
-/// `read_context` synthesizes that node itself, without `loc`; nested
-/// annotations keep theirs — and is its own comment island
+/// annotation (`ctx.pattern_ann_span`) is its own comment island
 /// (`ctx.annotation_comments`), since Svelte reads it with a second acorn parse.
 pub(super) fn write_type_annotation(
     w: &mut JsonWriter,
     type_annotation: &internal::TSTypeAnnotation<'_>,
     ctx: &Ctx<'_>,
 ) {
-    if type_annotation.span == ctx.pattern_ann_span {
-        let ctx = &Ctx {
+    let annotation_ctx;
+    let ctx = if type_annotation.span == ctx.pattern_ann_span {
+        annotation_ctx = Ctx {
             comments: ctx.annotation_comments,
             ..*ctx
         };
-        // `{type, start, end, typeAnnotation}` — no `loc` (the block-pattern quirk).
-        let span = type_annotation.span;
-        super::attach_open("TSTypeAnnotation", span, ctx);
-        w.raw("{\"type\":\"TSTypeAnnotation\",\"start\":");
-        w.start_end(ctx.loc.pos(span.start), ctx.loc.pos(span.end));
-        w.raw(",\"typeAnnotation\":");
-        write_type(w, type_annotation.type_annotation, ctx);
-        close_node(w, "TSTypeAnnotation", span, ctx);
-        return;
-    }
+        &annotation_ctx
+    } else {
+        ctx
+    };
     node_header(w, "TSTypeAnnotation", type_annotation.span, ctx);
     w.raw(",\"typeAnnotation\":");
     write_type(w, type_annotation.type_annotation, ctx);

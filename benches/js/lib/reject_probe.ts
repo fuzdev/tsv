@@ -234,7 +234,7 @@ export interface RejectProbeTarget {
  * and goal for the same reason one level down: each `<operation>_<language>` is its own
  * generated export, and the goal selects the source-type code the call hands it — the
  * unset one being `format`'s module-then-script fallback, which no other code reaches.
- * `parse_no_locations` skips CSS, where no such row exists (`parseCss` emits no `loc`).
+ * `parse_no_locations` skips CSS, where the bench registers no such row (`implementations.ts`).
  *
  * @param binding - the row-facing name, so the throw names which one failed
  * @param impl - the binding, called through its own methods so each keeps its receiver

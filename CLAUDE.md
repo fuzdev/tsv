@@ -208,6 +208,7 @@ deno task fanout:audit               # no super-linear doc-node rebuild fanout (
 deno task roundtrip:audit            # format(tests/fixtures) must reparse with its NODE POPULATION conserved (every node by type, minus the shells and separators the formatter rewrites by design, plus every word of template text — the zero-tolerance census that names a dropped element on its own, where the skeleton compare filed it into the report-only divergent bucket) — pure-Rust tripwire, real yield on external corpora
 deno task roundtrip:audit:prettier   # the same audit over the pinned prettier suites — `check`'s ONLY non-format-stable corpus, so the only leg there that can reach a valid→unreparseable regression. ~0.17 s; warn-skips when `../prettier` is absent (sibling checkout, so `check` still runs on a bare clone)
 deno task discovery:audit            # `tsv format --list ../corpora/collections` must name EXACTLY the snapshot's committed files in tsv's extensions — the corpus is defined by the snapshot's tree, not by tsv's discovery, and this is what keeps a discovery prune from silently shrinking every consumer's corpus. Refuses a dirty checkout. ~0.1 s; warn-skips when `../corpora` is absent
+deno task check:loc                  # `loc` CROSS-GRADE: tsv's loc wire must deep-equal the shipped `locations.js` reconstruction of its span-only wire, over every fixture input (one `tsv_debug loc_wires` process, no sidecar) — the one `check` leg that grades `loc`, since the fixtures pin the span-only wire
 deno task binding:audit              # comment↔token re-binding (HARD fails the gate, SOFT informational)
 deno task authoring:audit            # authoring-independence over Svelte boundary whitespace: one fixed point per document
 deno task paren:audit                # authoring-independence over redundant PARENS: a same-operator logical chain
@@ -238,8 +239,8 @@ deno task engines:audit              # ENGINE PARITY: the wasm32 build and the n
 deno task render:audit <paths>       # render-equivalence over REAL Svelte (sidecar — NOT in check; release-gated leg of `deno task conformance`)
 deno task idempotency:sweep          # F1 idempotency sweep over the real-code corpus (minutes — NOT in check; conformance cadence)
 deno task audit:corpus               # the standing content-loss/robustness bundle over REAL code (publish Step 3c; NOT in check)
-deno task wire:audit                 # WIRE-INJECTION: whitespace injected into every Svelte tag/block head, the resulting wire graded against the canonical parser — the parse-side sibling of gaps/blanks, which grade the formatter. Each variant is graded against its OWN base, so a deliberate divergence fixture contributes nothing. Runs as a CENSUS (`--inject-limit 0`, every site) — the sampled form hid 8x its findings and redrew its sample on every fixture edit, so only a census is gradeable. ⚠️ RED BY DESIGN (a discovery tool, like compile:fuzz); needs the canonical parser, so NOT in check
-deno task wire:audit:terminators     # the same harness, injecting a lone CR / U+2028 / U+2029 anywhere in the document — the spellings on which the two `loc` line classes DISAGREE. The ONLY grader of that model: no fixture can carry a raw CR (the format path folds it) and no real repo has one. Its sites are ~57x denser, so it stays a strided SAMPLE and therefore CANNOT be ratcheted — the stride divisor is each file's own site count, so an unrelated fixture edit redraws it. ⚠️ RED BY DESIGN
+deno task wire:audit                 # WIRE-INJECTION: whitespace injected into every Svelte tag/block head, the resulting wire graded against the canonical parser on both arms (the loc arm's definition check + six `loc` tolerance rows, and the span arm) — the parse-side sibling of gaps/blanks, which grade the formatter. Each variant is graded against its OWN base, so a deliberate divergence fixture contributes nothing. Runs as a CENSUS (`--inject-limit 0`, every site) — the sampled form hid 8x its findings and redrew its sample on every fixture edit, so only a census is gradeable. ⚠️ RED BY DESIGN (a discovery tool, like compile:fuzz); needs the canonical parser, so NOT in check
+deno task wire:audit:terminators     # the same harness, injecting a lone CR / U+2028 / U+2029 anywhere in the document — the spellings on which ECMAScript's terminators and `\n` disagree. tsv's `loc` counts `\n` alone, so the oracle `loc` differences these add fall in the `two_line_classes` tolerance row (the other rows fire there too, on the shapes the base file already holds): it grades the SPAN arm (and the loc arm's definition check) on inputs no fixture can carry (the format path folds a raw CR) and no real repo has. Its sites are ~57x denser, so it stays a strided SAMPLE and therefore CANNOT be ratcheted — the stride divisor is each file's own site count, so an unrelated fixture edit redraws it. ⚠️ RED BY DESIGN
 deno task compile:corpus:compare     # compile-parity wide net over the whole ../corpora snapshot, the private live roots and Svelte's suites (sidecar, on demand; ./docs/compile_tooling.md)
 deno task compile:validation         # validation-suite RATCHET over Svelte's compiler-errors + validator suites (sidecar, on demand; :update re-pins, never a MISMATCH; ./docs/compile_validation_ratchet.md)
 deno task compile:fuzz               # differential compile fuzzer over feature cross-products — a discovery tool, currently RED by design (sidecar, on demand; ./docs/compile_tooling.md)
@@ -323,7 +324,7 @@ deno task validate:artifacts             # tight wasm size bounds + Deno smoke o
 
 `scripts/validate_artifacts.ts` holds deliberately tight (~±8%) size bounds — a legitimate binary size change fails the publish until the constants are updated, keeping size moves visible and intentional.
 
-**TS type maintenance**: `crates/tsv_wasm/types/tsv_ast.d.ts` is hand-maintained. Any PR changing the wire JSON a writer emits (`crates/tsv_*/src/ast/convert/write*`) must also update the `.d.ts`. Drift is caught by `deno task check:ast-types` (part of `deno task check`), which asks three things: the curated `tsv parse` samples still type (the live writer), every `type` discriminant the fixture corpus produces is declared or explicitly opaque, and a computed minimal cover of the corpus's committed `expected*.json` — every gradable field slot (`ParentType.key -> ChildType`) — types against the `.d.ts`. That last arm grades the file against the **canonical** wire rather than tsv's own, and composes with `fixtures_tests` (which pins `tsv == expected.json`) to cover every position tsv emits. Per-field checklist, the Svelte-built-node rule (a node Svelte constructs is not the acorn node of the same `type` — the tell is a missing `loc`), and the comment-attachment rule: ./crates/tsv_wasm/CLAUDE.md §TS type maintenance.
+**TS type maintenance**: `crates/tsv_wasm/types/tsv_ast.d.ts` is hand-maintained. Any PR changing the wire JSON a writer emits (`crates/tsv_*/src/ast/convert/write*`) must also update the `.d.ts`. Drift is caught by `deno task check:ast-types` (part of `deno task check`), which asks three things: the curated `tsv parse` samples still type (the live writer), every `type` discriminant the fixture corpus produces is declared or explicitly opaque, and a computed minimal cover of the corpus's committed `expected*.json` — every gradable field slot (`ParentType.key -> ChildType`) — types against the `.d.ts`. That last arm grades the file against the **canonical** wire rather than tsv's own, and composes with `fixtures_tests` (which pins `tsv == expected.json`) to cover every position tsv's span-only wire emits — the committed files are span-only, so the `loc` fields themselves are typed by the curated `tsv parse` samples, the first arm. Per-field checklist, the Svelte-built-node rule (a node Svelte constructs is not the acorn node of the same `type` — the tell is a missing `loc` in Svelte's own wire), and the comment-attachment rule: ./crates/tsv_wasm/CLAUDE.md §TS type maintenance.
 
 ### Corpus Comparison
 
@@ -357,13 +358,14 @@ deno task conformance                  # pre-release aggregate: preflights pins:
 # sidecar-free slice, which grades tsv against the committed file and so cannot see the oracle itself moving;
 # only a run that re-formats through prettier can, ~17 s for all ~4,300 parser/formatter fixtures), then
 # bench:harvest:svelte-styles (re-extracting the CSS the `gates` view grades, beside the legs that read it), then the
-# three gates above + corpus:compare:parse --all +
+# three gates above + corpus:compare:parse --all + corpus:compare:parse tests/fixtures --fixtures (each fixture's
+# parse-pinned documents, where the `loc` tolerance rows real code rarely reaches are graded) +
 # corpus:compare:format --all in ONE process (benches/js/conformance.ts; oracles load once, fail-fast, FFI built once),
 # then render:audit over the version-pinned checkouts (a subprocess — drives its own sidecar). The format leg's prettier
 # calls ride a content-addressed cache (benches/js/lib/prettier_cache.ts; TSV_PRETTIER_CACHE=0 disables).
 deno task conformance:test262          # tsv's JS parser vs test262 POSITIVES (pure Rust, `test262 --gate`); negatives
 # (the deferred early-error frontier) are reported, not gated. Exact POSITIVE_PASSED_PIN in the command.
-deno task conformance:all              # the full drop-in gate = `conformance` (5 FFI legs) + `conformance:test262`.
+deno task conformance:all              # the full drop-in gate = `conformance` (its FFI legs) + `conformance:test262`.
 # What publish Step 3b runs. CSS-WPT harvest stays manual.
 
 deno task divergence:audit         # audit divergence pattern coverage (--json)
@@ -760,6 +762,11 @@ cargo run -p tsv_debug ts_fixture_audit [pattern...]
 # frame's §Catalogs table). Pure Rust; gated in `deno task check`. --json.
 cargo run -p tsv_debug conformance_audit
 
+# loc_wires - both parse wires (loc + span-only) of every fixture input (at its `goal`) and every
+# `expected_<stem>.json` variant, streamed as NDJSON `{path, language, source, loc, span}` — the
+# Rust half of `deno task check:loc` (scripts/check_loc.ts reconstructs and compares). Pure Rust.
+cargo run -p tsv_debug loc_wires [root]
+
 # compile_conformance_audit - the compiler analog, deliberately minimal: _compiled_divergence
 # fixtures must be cataloged in docs/conformance_svelte_compiler.md (expected to stay EMPTY — a
 # tripwire) + checklist ↔ `Refusal` drift (a bucket key the catalog can't produce GATES; the
@@ -896,14 +903,17 @@ it, so it is never its own fixed point; a BOM ahead of a content U+FEFF is writt
 the `leading_zwnbsp_prettier_divergence` inputs carry one — see
 ./docs/conformance_prettier.md#whitespace-bom-handling).
 
-**Counting lines is a separate question, and the Svelte wire answers it TWO ways** — because
-Svelte's parser does: Svelte's own positions open a line at `\n` alone, everything acorn parses
-carries the ECMAScript class, seeded **once per acorn parse** over whatever prefix Svelte
-prepared for that island (`tsv_ts::AcornSeed`, `Root::acorn_regions`), and the ECMAScript
-tracker is built only when the two classes actually differ. Full rationale, spec citations and
-the per-island seeding table:
+**Counting lines is a separate question, answered once: `loc` has one definition.** Every
+object on the `loc` wire with numeric `start`/`end` — in all three languages, objects without a
+`type` included — gets `loc` immediately after `end`: the line (1-based) and column (0-based,
+UTF-16 code units) of its own emitted offsets, under one line rule per DOCUMENT — ECMAScript's
+terminators for TypeScript (acorn's), `\n` alone for a Svelte document and everything embedded
+in it and for CSS. A superset of Svelte's wire, reproducing none of its `loc` quirks (each a
+named tolerance in the corpus comparison); the line table is built at write time only when `loc`
+is requested (`tsv_lang::WirePositions`), and fixtures pin the span-only wire —
+`tests/loc_definition.rs` grades the definition. Full rationale:
 ./docs/architecture.md#line-terminators-parse-takes-the-authors-bytes-format-folds-first and
-./docs/architecture.md#loc-lines-two-classes-one-per-acorn-parse.
+./docs/architecture.md#loc-lines-one-rule-per-document.
 
 ### Language-Level concerns (classification)
 

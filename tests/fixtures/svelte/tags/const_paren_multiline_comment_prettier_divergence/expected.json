@@ -16,16 +16,6 @@
 					"type": "Identifier",
 					"start": 5,
 					"end": 9,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 5
-						},
-						"end": {
-							"line": 1,
-							"column": 9
-						}
-					},
 					"name": "cond"
 				},
 				"consequent": {
@@ -52,48 +42,16 @@
 											"type": "Identifier",
 											"name": "x",
 											"start": 20,
-											"end": 21,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 9,
-													"character": 20
-												},
-												"end": {
-													"line": 2,
-													"column": 10,
-													"character": 21
-												}
-											}
+											"end": 21
 										},
 										"init": {
 											"type": "BinaryExpression",
 											"start": 37,
 											"end": 42,
-											"loc": {
-												"start": {
-													"line": 4,
-													"column": 6
-												},
-												"end": {
-													"line": 4,
-													"column": 11
-												}
-											},
 											"left": {
 												"type": "Identifier",
 												"start": 37,
 												"end": 38,
-												"loc": {
-													"start": {
-														"line": 4,
-														"column": 6
-													},
-													"end": {
-														"line": 4,
-														"column": 7
-													}
-												},
 												"name": "a"
 											},
 											"operator": ">",
@@ -101,16 +59,6 @@
 												"type": "Identifier",
 												"start": 41,
 												"end": 42,
-												"loc": {
-													"start": {
-														"line": 4,
-														"column": 10
-													},
-													"end": {
-														"line": 4,
-														"column": 11
-													}
-												},
 												"name": "b"
 											},
 											"leadingComments": [
@@ -149,17 +97,7 @@
 			"type": "Block",
 			"value": " c\n ",
 			"start": 26,
-			"end": 36,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 2
-				},
-				"end": {
-					"line": 4,
-					"column": 5
-				}
-			}
+			"end": 36
 		}
 	]
 }

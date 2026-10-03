@@ -28,30 +28,10 @@
 					"type": "CallExpression",
 					"start": 99,
 					"end": 182,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 8
-						},
-						"end": {
-							"line": 2,
-							"column": 91
-						}
-					},
 					"callee": {
 						"type": "Identifier",
 						"start": 99,
 						"end": 101,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 8
-							},
-							"end": {
-								"line": 2,
-								"column": 10
-							}
-						},
 						"name": "fn"
 					},
 					"arguments": [
@@ -59,32 +39,12 @@
 							"type": "Identifier",
 							"start": 102,
 							"end": 149,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 11
-								},
-								"end": {
-									"line": 2,
-									"column": 58
-								}
-							},
 							"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 						},
 						{
 							"type": "Identifier",
 							"start": 151,
 							"end": 181,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 60
-								},
-								"end": {
-									"line": 2,
-									"column": 90
-								}
-							},
 							"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 						}
 					],
@@ -114,30 +74,10 @@
 					"type": "CallExpression",
 					"start": 201,
 					"end": 289,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 8
-						},
-						"end": {
-							"line": 7,
-							"column": 1
-						}
-					},
 					"callee": {
 						"type": "Identifier",
 						"start": 201,
 						"end": 203,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 8
-							},
-							"end": {
-								"line": 4,
-								"column": 10
-							}
-						},
 						"name": "fn"
 					},
 					"arguments": [
@@ -145,32 +85,12 @@
 							"type": "Identifier",
 							"start": 206,
 							"end": 254,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 1
-								},
-								"end": {
-									"line": 5,
-									"column": 49
-								}
-							},
 							"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 						},
 						{
 							"type": "Identifier",
 							"start": 257,
 							"end": 287,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 1
-								},
-								"end": {
-									"line": 6,
-									"column": 31
-								}
-							},
 							"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 						}
 					],

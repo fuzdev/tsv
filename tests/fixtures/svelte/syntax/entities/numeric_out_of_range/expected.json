@@ -25,18 +25,6 @@
 				"start": 285,
 				"end": 328,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 1,
-						"character": 286
-					},
-					"end": {
-						"line": 7,
-						"column": 2,
-						"character": 287
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -63,18 +51,6 @@
 				"start": 329,
 				"end": 395,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 8,
-						"column": 1,
-						"character": 330
-					},
-					"end": {
-						"line": 8,
-						"column": 2,
-						"character": 331
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -101,18 +77,6 @@
 				"start": 396,
 				"end": 427,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 9,
-						"column": 1,
-						"character": 397
-					},
-					"end": {
-						"line": 9,
-						"column": 2,
-						"character": 398
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",

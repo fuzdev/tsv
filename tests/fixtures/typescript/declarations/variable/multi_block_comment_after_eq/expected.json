@@ -14,369 +14,139 @@
 			"type": "Line",
 			"value": " two own-line block comments after = both stay after = (neither is promoted before =)",
 			"start": 20,
-			"end": 107,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 88
-				}
-			}
+			"end": 107
 		},
 		{
 			"type": "Block",
 			"value": " a1 ",
 			"start": 121,
-			"end": 129,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 2
-				},
-				"end": {
-					"line": 4,
-					"column": 10
-				}
-			}
+			"end": 129
 		},
 		{
 			"type": "Block",
 			"value": " a2 ",
 			"start": 132,
-			"end": 140,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 2
-				},
-				"end": {
-					"line": 5,
-					"column": 10
-				}
-			}
+			"end": 140
 		},
 		{
 			"type": "Line",
 			"value": " with a blank line preserved between them",
 			"start": 148,
-			"end": 191,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 1
-				},
-				"end": {
-					"line": 8,
-					"column": 44
-				}
-			}
+			"end": 191
 		},
 		{
 			"type": "Block",
 			"value": " b1 ",
 			"start": 205,
-			"end": 213,
-			"loc": {
-				"start": {
-					"line": 10,
-					"column": 2
-				},
-				"end": {
-					"line": 10,
-					"column": 10
-				}
-			}
+			"end": 213
 		},
 		{
 			"type": "Block",
 			"value": " b2 ",
 			"start": 217,
-			"end": 225,
-			"loc": {
-				"start": {
-					"line": 12,
-					"column": 2
-				},
-				"end": {
-					"line": 12,
-					"column": 10
-				}
-			}
+			"end": 225
 		},
 		{
 			"type": "Line",
 			"value": " three block comments, all stay after =",
 			"start": 233,
-			"end": 274,
-			"loc": {
-				"start": {
-					"line": 15,
-					"column": 1
-				},
-				"end": {
-					"line": 15,
-					"column": 42
-				}
-			}
+			"end": 274
 		},
 		{
 			"type": "Block",
 			"value": " c1 ",
 			"start": 288,
-			"end": 296,
-			"loc": {
-				"start": {
-					"line": 17,
-					"column": 2
-				},
-				"end": {
-					"line": 17,
-					"column": 10
-				}
-			}
+			"end": 296
 		},
 		{
 			"type": "Block",
 			"value": " c2 ",
 			"start": 299,
-			"end": 307,
-			"loc": {
-				"start": {
-					"line": 18,
-					"column": 2
-				},
-				"end": {
-					"line": 18,
-					"column": 10
-				}
-			}
+			"end": 307
 		},
 		{
 			"type": "Block",
 			"value": " c3 ",
 			"start": 310,
-			"end": 318,
-			"loc": {
-				"start": {
-					"line": 19,
-					"column": 2
-				},
-				"end": {
-					"line": 19,
-					"column": 10
-				}
-			}
+			"end": 318
 		},
 		{
 			"type": "Line",
 			"value": " a glued run whose later member is multiline stays glued (the run is not split)",
 			"start": 326,
-			"end": 407,
-			"loc": {
-				"start": {
-					"line": 22,
-					"column": 1
-				},
-				"end": {
-					"line": 22,
-					"column": 82
-				}
-			}
+			"end": 407
 		},
 		{
 			"type": "Block",
 			"value": " d1 ",
 			"start": 421,
-			"end": 429,
-			"loc": {
-				"start": {
-					"line": 24,
-					"column": 2
-				},
-				"end": {
-					"line": 24,
-					"column": 10
-				}
-			}
+			"end": 429
 		},
 		{
 			"type": "Block",
 			"value": " d2\n ",
 			"start": 430,
-			"end": 441,
-			"loc": {
-				"start": {
-					"line": 24,
-					"column": 11
-				},
-				"end": {
-					"line": 25,
-					"column": 5
-				}
-			}
+			"end": 441
 		},
 		{
 			"type": "Line",
 			"value": " a line comment after `=` forces the break; a following own-line block and a",
 			"start": 447,
-			"end": 525,
-			"loc": {
-				"start": {
-					"line": 27,
-					"column": 1
-				},
-				"end": {
-					"line": 27,
-					"column": 79
-				}
-			}
+			"end": 525
 		},
 		{
 			"type": "Line",
 			"value": " glued multiline block stay on consecutive lines (no blank between them)",
 			"start": 527,
-			"end": 601,
-			"loc": {
-				"start": {
-					"line": 28,
-					"column": 1
-				},
-				"end": {
-					"line": 28,
-					"column": 75
-				}
-			}
+			"end": 601
 		},
 		{
 			"type": "Line",
 			"value": " line",
 			"start": 613,
-			"end": 620,
-			"loc": {
-				"start": {
-					"line": 29,
-					"column": 11
-				},
-				"end": {
-					"line": 29,
-					"column": 18
-				}
-			}
+			"end": 620
 		},
 		{
 			"type": "Block",
 			"value": " e1 ",
 			"start": 623,
-			"end": 631,
-			"loc": {
-				"start": {
-					"line": 30,
-					"column": 2
-				},
-				"end": {
-					"line": 30,
-					"column": 10
-				}
-			}
+			"end": 631
 		},
 		{
 			"type": "Block",
 			"value": " e2\n ",
 			"start": 634,
-			"end": 645,
-			"loc": {
-				"start": {
-					"line": 31,
-					"column": 2
-				},
-				"end": {
-					"line": 32,
-					"column": 5
-				}
-			}
+			"end": 645
 		},
 		{
 			"type": "Line",
 			"value": " a glued block run stays glued even when a line comment forced the break — its",
 			"start": 651,
-			"end": 731,
-			"loc": {
-				"start": {
-					"line": 34,
-					"column": 1
-				},
-				"end": {
-					"line": 34,
-					"column": 81
-				}
-			}
+			"end": 731
 		},
 		{
 			"type": "Line",
 			"value": " later multiline member is not split onto its own line",
 			"start": 733,
-			"end": 789,
-			"loc": {
-				"start": {
-					"line": 35,
-					"column": 1
-				},
-				"end": {
-					"line": 35,
-					"column": 57
-				}
-			}
+			"end": 789
 		},
 		{
 			"type": "Line",
 			"value": " line",
 			"start": 801,
-			"end": 808,
-			"loc": {
-				"start": {
-					"line": 36,
-					"column": 11
-				},
-				"end": {
-					"line": 36,
-					"column": 18
-				}
-			}
+			"end": 808
 		},
 		{
 			"type": "Block",
 			"value": " f1 ",
 			"start": 811,
-			"end": 819,
-			"loc": {
-				"start": {
-					"line": 37,
-					"column": 2
-				},
-				"end": {
-					"line": 37,
-					"column": 10
-				}
-			}
+			"end": 819
 		},
 		{
 			"type": "Block",
 			"value": " f2\n ",
 			"start": 820,
-			"end": 831,
-			"loc": {
-				"start": {
-					"line": 37,
-					"column": 11
-				},
-				"end": {
-					"line": 38,
-					"column": 5
-				}
-			}
+			"end": 831
 		}
 	],
 	"instance": {
@@ -388,76 +158,26 @@
 			"type": "Program",
 			"start": 18,
 			"end": 835,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 39,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 109,
 					"end": 145,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 4
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 115,
 							"end": 144,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 7
-								},
-								"end": {
-									"line": 6,
-									"column": 3
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 115,
 								"end": 116,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 7
-									},
-									"end": {
-										"line": 3,
-										"column": 8
-									}
-								},
 								"name": "a"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 143,
 								"end": 144,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 2
-									},
-									"end": {
-										"line": 6,
-										"column": 3
-									}
-								},
 								"value": 1,
 								"raw": "1",
 								"leadingComments": [
@@ -491,61 +211,21 @@
 					"type": "VariableDeclaration",
 					"start": 193,
 					"end": 230,
-					"loc": {
-						"start": {
-							"line": 9,
-							"column": 1
-						},
-						"end": {
-							"line": 13,
-							"column": 4
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 199,
 							"end": 229,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 7
-								},
-								"end": {
-									"line": 13,
-									"column": 3
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 199,
 								"end": 200,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 7
-									},
-									"end": {
-										"line": 9,
-										"column": 8
-									}
-								},
 								"name": "b"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 228,
 								"end": 229,
-								"loc": {
-									"start": {
-										"line": 13,
-										"column": 2
-									},
-									"end": {
-										"line": 13,
-										"column": 3
-									}
-								},
 								"value": 2,
 								"raw": "2",
 								"leadingComments": [
@@ -579,61 +259,21 @@
 					"type": "VariableDeclaration",
 					"start": 276,
 					"end": 323,
-					"loc": {
-						"start": {
-							"line": 16,
-							"column": 1
-						},
-						"end": {
-							"line": 20,
-							"column": 4
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 282,
 							"end": 322,
-							"loc": {
-								"start": {
-									"line": 16,
-									"column": 7
-								},
-								"end": {
-									"line": 20,
-									"column": 3
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 282,
 								"end": 283,
-								"loc": {
-									"start": {
-										"line": 16,
-										"column": 7
-									},
-									"end": {
-										"line": 16,
-										"column": 8
-									}
-								},
 								"name": "c"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 321,
 								"end": 322,
-								"loc": {
-									"start": {
-										"line": 20,
-										"column": 2
-									},
-									"end": {
-										"line": 20,
-										"column": 3
-									}
-								},
 								"value": 3,
 								"raw": "3",
 								"leadingComments": [
@@ -673,61 +313,21 @@
 					"type": "VariableDeclaration",
 					"start": 409,
 					"end": 444,
-					"loc": {
-						"start": {
-							"line": 23,
-							"column": 1
-						},
-						"end": {
-							"line": 25,
-							"column": 8
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 415,
 							"end": 443,
-							"loc": {
-								"start": {
-									"line": 23,
-									"column": 7
-								},
-								"end": {
-									"line": 25,
-									"column": 7
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 415,
 								"end": 416,
-								"loc": {
-									"start": {
-										"line": 23,
-										"column": 7
-									},
-									"end": {
-										"line": 23,
-										"column": 8
-									}
-								},
 								"name": "d"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 442,
 								"end": 443,
-								"loc": {
-									"start": {
-										"line": 25,
-										"column": 6
-									},
-									"end": {
-										"line": 25,
-										"column": 7
-									}
-								},
 								"value": 4,
 								"raw": "4",
 								"leadingComments": [
@@ -761,61 +361,21 @@
 					"type": "VariableDeclaration",
 					"start": 603,
 					"end": 648,
-					"loc": {
-						"start": {
-							"line": 29,
-							"column": 1
-						},
-						"end": {
-							"line": 32,
-							"column": 8
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 609,
 							"end": 647,
-							"loc": {
-								"start": {
-									"line": 29,
-									"column": 7
-								},
-								"end": {
-									"line": 32,
-									"column": 7
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 609,
 								"end": 610,
-								"loc": {
-									"start": {
-										"line": 29,
-										"column": 7
-									},
-									"end": {
-										"line": 29,
-										"column": 8
-									}
-								},
 								"name": "e"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 646,
 								"end": 647,
-								"loc": {
-									"start": {
-										"line": 32,
-										"column": 6
-									},
-									"end": {
-										"line": 32,
-										"column": 7
-									}
-								},
 								"value": 5,
 								"raw": "5",
 								"leadingComments": [
@@ -861,61 +421,21 @@
 					"type": "VariableDeclaration",
 					"start": 791,
 					"end": 834,
-					"loc": {
-						"start": {
-							"line": 36,
-							"column": 1
-						},
-						"end": {
-							"line": 38,
-							"column": 8
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 797,
 							"end": 833,
-							"loc": {
-								"start": {
-									"line": 36,
-									"column": 7
-								},
-								"end": {
-									"line": 38,
-									"column": 7
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 797,
 								"end": 798,
-								"loc": {
-									"start": {
-										"line": 36,
-										"column": 7
-									},
-									"end": {
-										"line": 36,
-										"column": 8
-									}
-								},
 								"name": "f"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 832,
 								"end": 833,
-								"loc": {
-									"start": {
-										"line": 38,
-										"column": 6
-									},
-									"end": {
-										"line": 38,
-										"column": 7
-									}
-								},
 								"value": 6,
 								"raw": "6",
 								"leadingComments": [
@@ -966,18 +486,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

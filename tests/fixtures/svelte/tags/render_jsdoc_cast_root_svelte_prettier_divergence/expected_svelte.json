@@ -15,30 +15,10 @@
 					"type": "CallExpression",
 					"start": 27,
 					"end": 32,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 27
-						},
-						"end": {
-							"line": 1,
-							"column": 32
-						}
-					},
 					"callee": {
 						"type": "Identifier",
 						"start": 27,
 						"end": 30,
-						"loc": {
-							"start": {
-								"line": 1,
-								"column": 27
-							},
-							"end": {
-								"line": 1,
-								"column": 30
-							}
-						},
 						"name": "fn1"
 					},
 					"arguments": [],
@@ -60,44 +40,14 @@
 					"type": "ChainExpression",
 					"start": 63,
 					"end": 70,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 27
-						},
-						"end": {
-							"line": 3,
-							"column": 34
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 63,
 						"end": 70,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 27
-							},
-							"end": {
-								"line": 3,
-								"column": 34
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 63,
 							"end": 66,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 27
-								},
-								"end": {
-									"line": 3,
-									"column": 30
-								}
-							},
 							"name": "fn2"
 						},
 						"arguments": [],
@@ -113,33 +63,13 @@
 			"type": "Block",
 			"value": "* @type {A} ",
 			"start": 9,
-			"end": 25,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 9
-				},
-				"end": {
-					"line": 1,
-					"column": 25
-				}
-			}
+			"end": 25
 		},
 		{
 			"type": "Block",
 			"value": "* @type {B} ",
 			"start": 45,
-			"end": 61,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 9
-				},
-				"end": {
-					"line": 3,
-					"column": 25
-				}
-			}
+			"end": 61
 		}
 	]
 }

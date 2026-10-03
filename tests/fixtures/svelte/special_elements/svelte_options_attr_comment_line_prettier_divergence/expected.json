@@ -31,18 +31,6 @@
 				"start": 115,
 				"end": 120,
 				"name": "runes",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 1,
-						"character": 115
-					},
-					"end": {
-						"line": 3,
-						"column": 6,
-						"character": 120
-					}
-				},
 				"value": true
 			}
 		],
@@ -53,37 +41,13 @@
 			"type": "Line",
 			"start": 108,
 			"end": 113,
-			"value": " c1",
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 16,
-					"character": 108
-				},
-				"end": {
-					"line": 2,
-					"column": 21,
-					"character": 113
-				}
-			}
+			"value": " c1"
 		},
 		{
 			"type": "Line",
 			"start": 121,
 			"end": 126,
-			"value": " c2",
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 7,
-					"character": 121
-				},
-				"end": {
-					"line": 3,
-					"column": 12,
-					"character": 126
-				}
-			}
+			"value": " c2"
 		}
 	]
 }

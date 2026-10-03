@@ -14,17 +14,7 @@
 			"type": "Block",
 			"value": " c ",
 			"start": 16,
-			"end": 23,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 7
-				},
-				"end": {
-					"line": 2,
-					"column": 14
-				}
-			}
+			"end": 23
 		}
 	],
 	"instance": {
@@ -36,45 +26,15 @@
 			"type": "Program",
 			"start": 8,
 			"end": 41,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 3,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "LabeledStatement",
 					"start": 10,
 					"end": 40,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 31
-						}
-					},
 					"body": {
 						"type": "ForStatement",
 						"start": 25,
 						"end": 40,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 16
-							},
-							"end": {
-								"line": 2,
-								"column": 31
-							}
-						},
 						"init": null,
 						"test": null,
 						"update": null,
@@ -82,16 +42,6 @@
 							"type": "BreakStatement",
 							"start": 34,
 							"end": 40,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 25
-								},
-								"end": {
-									"line": 2,
-									"column": 31
-								}
-							},
 							"label": null
 						},
 						"leadingComments": [
@@ -107,16 +57,6 @@
 						"type": "Identifier",
 						"start": 10,
 						"end": 15,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 1
-							},
-							"end": {
-								"line": 2,
-								"column": 6
-							}
-						},
 						"name": "label"
 					}
 				}

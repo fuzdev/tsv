@@ -14,33 +14,13 @@
 			"type": "Block",
 			"value": " comment1 ",
 			"start": 23,
-			"end": 37,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 14
-				},
-				"end": {
-					"line": 2,
-					"column": 28
-				}
-			}
+			"end": 37
 		},
 		{
 			"type": "Block",
 			"value": " comment2 ",
 			"start": 40,
-			"end": 54,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 31
-				},
-				"end": {
-					"line": 2,
-					"column": 45
-				}
-			}
+			"end": 54
 		}
 	],
 	"instance": {
@@ -52,60 +32,20 @@
 			"type": "Program",
 			"start": 8,
 			"end": 58,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 3,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 10,
 					"end": 57,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 48
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 16,
 							"end": 56,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 7
-								},
-								"end": {
-									"line": 2,
-									"column": 47
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 16,
 								"end": 22,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 7
-									},
-									"end": {
-										"line": 2,
-										"column": 13
-									}
-								},
 								"name": "value1",
 								"trailingComments": [
 									{
@@ -120,16 +60,6 @@
 								"type": "Literal",
 								"start": 55,
 								"end": 56,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 46
-									},
-									"end": {
-										"line": 2,
-										"column": 47
-									}
-								},
 								"value": 1,
 								"raw": "1",
 								"leadingComments": [

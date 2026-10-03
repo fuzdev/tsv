@@ -19,93 +19,33 @@
 			"type": "Program",
 			"start": 18,
 			"end": 86,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 4,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "TSImportEqualsDeclaration",
 					"start": 20,
 					"end": 51,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 32
-						}
-					},
 					"importKind": "value",
 					"isExport": false,
 					"id": {
 						"type": "Identifier",
 						"start": 27,
 						"end": 32,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 8
-							},
-							"end": {
-								"line": 2,
-								"column": 13
-							}
-						},
 						"name": "Types"
 					},
 					"moduleReference": {
 						"type": "TSQualifiedName",
 						"start": 35,
 						"end": 50,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 16
-							},
-							"end": {
-								"line": 2,
-								"column": 31
-							}
-						},
 						"left": {
 							"type": "Identifier",
 							"start": 35,
 							"end": 44,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 16
-								},
-								"end": {
-									"line": 2,
-									"column": 25
-								}
-							},
 							"name": "Namespace"
 						},
 						"right": {
 							"type": "Identifier",
 							"start": 45,
 							"end": 50,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 26
-								},
-								"end": {
-									"line": 2,
-									"column": 31
-								}
-							},
 							"name": "Types"
 						}
 					}
@@ -114,92 +54,32 @@
 					"type": "TSImportEqualsDeclaration",
 					"start": 53,
 					"end": 85,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 33
-						}
-					},
 					"importKind": "value",
 					"isExport": false,
 					"id": {
 						"type": "Identifier",
 						"start": 60,
 						"end": 65,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 8
-							},
-							"end": {
-								"line": 3,
-								"column": 13
-							}
-						},
 						"name": "Inner"
 					},
 					"moduleReference": {
 						"type": "TSQualifiedName",
 						"start": 68,
 						"end": 84,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 16
-							},
-							"end": {
-								"line": 3,
-								"column": 32
-							}
-						},
 						"left": {
 							"type": "TSQualifiedName",
 							"start": 68,
 							"end": 79,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 16
-								},
-								"end": {
-									"line": 3,
-									"column": 27
-								}
-							},
 							"left": {
 								"type": "Identifier",
 								"start": 68,
 								"end": 73,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 16
-									},
-									"end": {
-										"line": 3,
-										"column": 21
-									}
-								},
 								"name": "Outer"
 							},
 							"right": {
 								"type": "Identifier",
 								"start": 74,
 								"end": 79,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 22
-									},
-									"end": {
-										"line": 3,
-										"column": 27
-									}
-								},
 								"name": "Inner"
 							}
 						},
@@ -207,16 +87,6 @@
 							"type": "Identifier",
 							"start": 80,
 							"end": 84,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 28
-								},
-								"end": {
-									"line": 3,
-									"column": 32
-								}
-							},
 							"name": "Deep"
 						}
 					}
@@ -230,18 +100,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

@@ -25,18 +25,6 @@
 				"start": 565,
 				"end": 600,
 				"name": "slot",
-				"name_loc": {
-					"start": {
-						"line": 9,
-						"column": 1,
-						"character": 566
-					},
-					"end": {
-						"line": 9,
-						"column": 5,
-						"character": 570
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -57,16 +45,6 @@
 								"type": "Identifier",
 								"start": 578,
 								"end": 582,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 6
-									},
-									"end": {
-										"line": 10,
-										"column": 10
-									}
-								},
 								"name": "cond"
 							},
 							"consequent": {
@@ -105,36 +83,12 @@
 				"start": 602,
 				"end": 661,
 				"name": "slot",
-				"name_loc": {
-					"start": {
-						"line": 13,
-						"column": 1,
-						"character": 603
-					},
-					"end": {
-						"line": 13,
-						"column": 5,
-						"character": 607
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 608,
 						"end": 616,
 						"name": "name",
-						"name_loc": {
-							"start": {
-								"line": 13,
-								"column": 6,
-								"character": 608
-							},
-							"end": {
-								"line": 13,
-								"column": 10,
-								"character": 612
-							}
-						},
 						"value": [
 							{
 								"start": 614,
@@ -164,16 +118,6 @@
 								"type": "Identifier",
 								"start": 626,
 								"end": 631,
-								"loc": {
-									"start": {
-										"line": 14,
-										"column": 8
-									},
-									"end": {
-										"line": 14,
-										"column": 13
-									}
-								},
 								"name": "items"
 							},
 							"body": {
@@ -187,16 +131,6 @@
 											"type": "Identifier",
 											"start": 641,
 											"end": 645,
-											"loc": {
-												"start": {
-													"line": 14,
-													"column": 23
-												},
-												"end": {
-													"line": 14,
-													"column": 27
-												}
-											},
 											"name": "item"
 										}
 									}
@@ -206,19 +140,7 @@
 								"type": "Identifier",
 								"name": "item",
 								"start": 635,
-								"end": 639,
-								"loc": {
-									"start": {
-										"line": 14,
-										"column": 17,
-										"character": 635
-									},
-									"end": {
-										"line": 14,
-										"column": 21,
-										"character": 639
-									}
-								}
+								"end": 639
 							}
 						},
 						{
@@ -243,18 +165,6 @@
 				"start": 663,
 				"end": 698,
 				"name": "slot",
-				"name_loc": {
-					"start": {
-						"line": 17,
-						"column": 1,
-						"character": 664
-					},
-					"end": {
-						"line": 17,
-						"column": 5,
-						"character": 668
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -274,16 +184,6 @@
 								"type": "Identifier",
 								"start": 677,
 								"end": 679,
-								"loc": {
-									"start": {
-										"line": 18,
-										"column": 7
-									},
-									"end": {
-										"line": 18,
-										"column": 9
-									}
-								},
 								"name": "id"
 							},
 							"fragment": {

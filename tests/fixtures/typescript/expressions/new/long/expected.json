@@ -14,177 +14,67 @@
 			"type": "Line",
 			"value": " Short new (contrast case)",
 			"start": 20,
-			"end": 48,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 29
-				}
-			}
+			"end": 48
 		},
 		{
 			"type": "Line",
 			"value": " 100 chars - stays inline (at boundary)",
 			"start": 63,
-			"end": 104,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 1
-				},
-				"end": {
-					"line": 5,
-					"column": 42
-				}
-			}
+			"end": 104
 		},
 		{
 			"type": "Line",
 			"value": " 101 chars - still inline for new expressions (no natural break point)",
 			"start": 207,
-			"end": 279,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 1
-				},
-				"end": {
-					"line": 8,
-					"column": 73
-				}
-			}
+			"end": 279
 		},
 		{
 			"type": "Line",
 			"value": " Long constructor with generic types",
 			"start": 383,
-			"end": 421,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 1
-				},
-				"end": {
-					"line": 11,
-					"column": 39
-				}
-			}
+			"end": 421
 		},
 		{
 			"type": "Line",
 			"value": " Long constructor arguments - wrap",
 			"start": 532,
-			"end": 568,
-			"loc": {
-				"start": {
-					"line": 17,
-					"column": 1
-				},
-				"end": {
-					"line": 17,
-					"column": 37
-				}
-			}
+			"end": 568
 		},
 		{
 			"type": "Line",
 			"value": " Long generic constructor with arguments - type params wrap",
 			"start": 704,
-			"end": 765,
-			"loc": {
-				"start": {
-					"line": 25,
-					"column": 1
-				},
-				"end": {
-					"line": 25,
-					"column": 62
-				}
-			}
+			"end": 765
 		},
 		{
 			"type": "Line",
 			"value": " Chained new with long method calls",
 			"start": 910,
-			"end": 947,
-			"loc": {
-				"start": {
-					"line": 31,
-					"column": 1
-				},
-				"end": {
-					"line": 31,
-					"column": 38
-				}
-			}
+			"end": 947
 		},
 		{
 			"type": "Line",
 			"value": " Long new in variable declaration",
 			"start": 1060,
-			"end": 1095,
-			"loc": {
-				"start": {
-					"line": 37,
-					"column": 1
-				},
-				"end": {
-					"line": 37,
-					"column": 36
-				}
-			}
+			"end": 1095
 		},
 		{
 			"type": "Line",
 			"value": " Long new with object literal argument",
 			"start": 1224,
-			"end": 1264,
-			"loc": {
-				"start": {
-					"line": 44,
-					"column": 1
-				},
-				"end": {
-					"line": 44,
-					"column": 41
-				}
-			}
+			"end": 1264
 		},
 		{
 			"type": "Line",
 			"value": " Long new with callback argument",
 			"start": 1410,
-			"end": 1444,
-			"loc": {
-				"start": {
-					"line": 51,
-					"column": 1
-				},
-				"end": {
-					"line": 51,
-					"column": 35
-				}
-			}
+			"end": 1444
 		},
 		{
 			"type": "Line",
 			"value": " Nested long new expressions",
 			"start": 1608,
-			"end": 1638,
-			"loc": {
-				"start": {
-					"line": 58,
-					"column": 1
-				},
-				"end": {
-					"line": 58,
-					"column": 31
-				}
-			}
+			"end": 1638
 		}
 	],
 	"instance": {
@@ -196,59 +86,19 @@
 			"type": "Program",
 			"start": 18,
 			"end": 1793,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 65,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
 					"start": 50,
 					"end": 60,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 11
-						}
-					},
 					"expression": {
 						"type": "NewExpression",
 						"start": 50,
 						"end": 59,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 1
-							},
-							"end": {
-								"line": 3,
-								"column": 10
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 54,
 							"end": 57,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 5
-								},
-								"end": {
-									"line": 3,
-									"column": 8
-								}
-							},
 							"name": "Map"
 						},
 						"arguments": []
@@ -266,44 +116,14 @@
 					"type": "ExpressionStatement",
 					"start": 106,
 					"end": 204,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 99
-						}
-					},
 					"expression": {
 						"type": "NewExpression",
 						"start": 106,
 						"end": 203,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 1
-							},
-							"end": {
-								"line": 6,
-								"column": 98
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 110,
 							"end": 201,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 5
-								},
-								"end": {
-									"line": 6,
-									"column": 96
-								}
-							},
 							"name": "VeryLongConstructorClassName000000000000000000000000000000000000000000000000000000000000000"
 						},
 						"arguments": []
@@ -321,44 +141,14 @@
 					"type": "ExpressionStatement",
 					"start": 281,
 					"end": 380,
-					"loc": {
-						"start": {
-							"line": 9,
-							"column": 1
-						},
-						"end": {
-							"line": 9,
-							"column": 100
-						}
-					},
 					"expression": {
 						"type": "NewExpression",
 						"start": 281,
 						"end": 379,
-						"loc": {
-							"start": {
-								"line": 9,
-								"column": 1
-							},
-							"end": {
-								"line": 9,
-								"column": 99
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 285,
 							"end": 377,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 5
-								},
-								"end": {
-									"line": 9,
-									"column": 97
-								}
-							},
 							"name": "VeryLongConstructorClassName0000000000000000000000000000000000000000000000000000000000000000"
 						},
 						"arguments": []
@@ -376,89 +166,29 @@
 					"type": "ExpressionStatement",
 					"start": 423,
 					"end": 529,
-					"loc": {
-						"start": {
-							"line": 12,
-							"column": 1
-						},
-						"end": {
-							"line": 15,
-							"column": 5
-						}
-					},
 					"expression": {
 						"type": "NewExpression",
 						"start": 423,
 						"end": 528,
-						"loc": {
-							"start": {
-								"line": 12,
-								"column": 1
-							},
-							"end": {
-								"line": 15,
-								"column": 4
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 427,
 							"end": 430,
-							"loc": {
-								"start": {
-									"line": 12,
-									"column": 5
-								},
-								"end": {
-									"line": 12,
-									"column": 8
-								}
-							},
 							"name": "Map"
 						},
 						"typeArguments": {
 							"type": "TSTypeParameterInstantiation",
 							"start": 430,
 							"end": 526,
-							"loc": {
-								"start": {
-									"line": 12,
-									"column": 8
-								},
-								"end": {
-									"line": 15,
-									"column": 2
-								}
-							},
 							"params": [
 								{
 									"type": "TSTypeReference",
 									"start": 434,
 									"end": 474,
-									"loc": {
-										"start": {
-											"line": 13,
-											"column": 2
-										},
-										"end": {
-											"line": 13,
-											"column": 42
-										}
-									},
 									"typeName": {
 										"type": "Identifier",
 										"start": 434,
 										"end": 474,
-										"loc": {
-											"start": {
-												"line": 13,
-												"column": 2
-											},
-											"end": {
-												"line": 13,
-												"column": 42
-											}
-										},
 										"name": "VeryLongKeyTypeName000000000000000000000"
 									}
 								},
@@ -466,30 +196,10 @@
 									"type": "TSTypeReference",
 									"start": 478,
 									"end": 523,
-									"loc": {
-										"start": {
-											"line": 14,
-											"column": 2
-										},
-										"end": {
-											"line": 14,
-											"column": 47
-										}
-									},
 									"typeName": {
 										"type": "Identifier",
 										"start": 478,
 										"end": 523,
-										"loc": {
-											"start": {
-												"line": 14,
-												"column": 2
-											},
-											"end": {
-												"line": 14,
-												"column": 47
-											}
-										},
 										"name": "VeryLongValueTypeName000000000000000000000000"
 									}
 								}
@@ -510,44 +220,14 @@
 					"type": "ExpressionStatement",
 					"start": 570,
 					"end": 701,
-					"loc": {
-						"start": {
-							"line": 18,
-							"column": 1
-						},
-						"end": {
-							"line": 23,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "NewExpression",
 						"start": 570,
 						"end": 700,
-						"loc": {
-							"start": {
-								"line": 18,
-								"column": 1
-							},
-							"end": {
-								"line": 23,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 574,
 							"end": 602,
-							"loc": {
-								"start": {
-									"line": 18,
-									"column": 5
-								},
-								"end": {
-									"line": 18,
-									"column": 33
-								}
-							},
 							"name": "VeryLongConstructorClassName"
 						},
 						"arguments": [
@@ -555,64 +235,24 @@
 								"type": "Identifier",
 								"start": 606,
 								"end": 625,
-								"loc": {
-									"start": {
-										"line": 19,
-										"column": 2
-									},
-									"end": {
-										"line": 19,
-										"column": 21
-									}
-								},
 								"name": "veryLongArgumentOne"
 							},
 							{
 								"type": "Identifier",
 								"start": 629,
 								"end": 648,
-								"loc": {
-									"start": {
-										"line": 20,
-										"column": 2
-									},
-									"end": {
-										"line": 20,
-										"column": 21
-									}
-								},
 								"name": "veryLongArgumentTwo"
 							},
 							{
 								"type": "Identifier",
 								"start": 652,
 								"end": 673,
-								"loc": {
-									"start": {
-										"line": 21,
-										"column": 2
-									},
-									"end": {
-										"line": 21,
-										"column": 23
-									}
-								},
 								"name": "veryLongArgumentThree"
 							},
 							{
 								"type": "Identifier",
 								"start": 677,
 								"end": 697,
-								"loc": {
-									"start": {
-										"line": 22,
-										"column": 2
-									},
-									"end": {
-										"line": 22,
-										"column": 22
-									}
-								},
 								"name": "veryLongArgumentFour"
 							}
 						]
@@ -630,89 +270,29 @@
 					"type": "ExpressionStatement",
 					"start": 767,
 					"end": 907,
-					"loc": {
-						"start": {
-							"line": 26,
-							"column": 1
-						},
-						"end": {
-							"line": 29,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "NewExpression",
 						"start": 767,
 						"end": 906,
-						"loc": {
-							"start": {
-								"line": 26,
-								"column": 1
-							},
-							"end": {
-								"line": 29,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 771,
 							"end": 783,
-							"loc": {
-								"start": {
-									"line": 26,
-									"column": 5
-								},
-								"end": {
-									"line": 26,
-									"column": 17
-								}
-							},
 							"name": "GenericClass"
 						},
 						"typeArguments": {
 							"type": "TSTypeParameterInstantiation",
 							"start": 783,
 							"end": 857,
-							"loc": {
-								"start": {
-									"line": 26,
-									"column": 17
-								},
-								"end": {
-									"line": 26,
-									"column": 91
-								}
-							},
 							"params": [
 								{
 									"type": "TSTypeReference",
 									"start": 784,
 									"end": 819,
-									"loc": {
-										"start": {
-											"line": 26,
-											"column": 18
-										},
-										"end": {
-											"line": 26,
-											"column": 53
-										}
-									},
 									"typeName": {
 										"type": "Identifier",
 										"start": 784,
 										"end": 819,
-										"loc": {
-											"start": {
-												"line": 26,
-												"column": 18
-											},
-											"end": {
-												"line": 26,
-												"column": 53
-											}
-										},
 										"name": "VeryLongTypeParameterOne00000000000"
 									}
 								},
@@ -720,30 +300,10 @@
 									"type": "TSTypeReference",
 									"start": 821,
 									"end": 856,
-									"loc": {
-										"start": {
-											"line": 26,
-											"column": 55
-										},
-										"end": {
-											"line": 26,
-											"column": 90
-										}
-									},
 									"typeName": {
 										"type": "Identifier",
 										"start": 821,
 										"end": 856,
-										"loc": {
-											"start": {
-												"line": 26,
-												"column": 55
-											},
-											"end": {
-												"line": 26,
-												"column": 90
-											}
-										},
 										"name": "VeryLongTypeParameterTwo00000000000"
 									}
 								}
@@ -754,32 +314,12 @@
 								"type": "Identifier",
 								"start": 861,
 								"end": 880,
-								"loc": {
-									"start": {
-										"line": 27,
-										"column": 2
-									},
-									"end": {
-										"line": 27,
-										"column": 21
-									}
-								},
 								"name": "veryLongArgumentOne"
 							},
 							{
 								"type": "Identifier",
 								"start": 884,
 								"end": 903,
-								"loc": {
-									"start": {
-										"line": 28,
-										"column": 2
-									},
-									"end": {
-										"line": 28,
-										"column": 21
-									}
-								},
 								"name": "veryLongArgumentTwo"
 							}
 						]
@@ -797,128 +337,38 @@
 					"type": "ExpressionStatement",
 					"start": 949,
 					"end": 1057,
-					"loc": {
-						"start": {
-							"line": 32,
-							"column": 1
-						},
-						"end": {
-							"line": 35,
-							"column": 17
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 949,
 						"end": 1056,
-						"loc": {
-							"start": {
-								"line": 32,
-								"column": 1
-							},
-							"end": {
-								"line": 35,
-								"column": 16
-							}
-						},
 						"callee": {
 							"type": "MemberExpression",
 							"start": 949,
 							"end": 1054,
-							"loc": {
-								"start": {
-									"line": 32,
-									"column": 1
-								},
-								"end": {
-									"line": 35,
-									"column": 14
-								}
-							},
 							"object": {
 								"type": "CallExpression",
 								"start": 949,
 								"end": 1039,
-								"loc": {
-									"start": {
-										"line": 32,
-										"column": 1
-									},
-									"end": {
-										"line": 34,
-										"column": 30
-									}
-								},
 								"callee": {
 									"type": "MemberExpression",
 									"start": 949,
 									"end": 1037,
-									"loc": {
-										"start": {
-											"line": 32,
-											"column": 1
-										},
-										"end": {
-											"line": 34,
-											"column": 28
-										}
-									},
 									"object": {
 										"type": "CallExpression",
 										"start": 949,
 										"end": 1008,
-										"loc": {
-											"start": {
-												"line": 32,
-												"column": 1
-											},
-											"end": {
-												"line": 33,
-												"column": 23
-											}
-										},
 										"callee": {
 											"type": "MemberExpression",
 											"start": 949,
 											"end": 1006,
-											"loc": {
-												"start": {
-													"line": 32,
-													"column": 1
-												},
-												"end": {
-													"line": 33,
-													"column": 21
-												}
-											},
 											"object": {
 												"type": "NewExpression",
 												"start": 949,
 												"end": 984,
-												"loc": {
-													"start": {
-														"line": 32,
-														"column": 1
-													},
-													"end": {
-														"line": 32,
-														"column": 36
-													}
-												},
 												"callee": {
 													"type": "Identifier",
 													"start": 953,
 													"end": 982,
-													"loc": {
-														"start": {
-															"line": 32,
-															"column": 5
-														},
-														"end": {
-															"line": 32,
-															"column": 34
-														}
-													},
 													"name": "VeryLongConstructorClassName0"
 												},
 												"arguments": []
@@ -927,16 +377,6 @@
 												"type": "Identifier",
 												"start": 988,
 												"end": 1006,
-												"loc": {
-													"start": {
-														"line": 33,
-														"column": 3
-													},
-													"end": {
-														"line": 33,
-														"column": 21
-													}
-												},
 												"name": "veryLongMethodName"
 											},
 											"computed": false,
@@ -949,16 +389,6 @@
 										"type": "Identifier",
 										"start": 1012,
 										"end": 1037,
-										"loc": {
-											"start": {
-												"line": 34,
-												"column": 3
-											},
-											"end": {
-												"line": 34,
-												"column": 28
-											}
-										},
 										"name": "anotherVeryLongMethodName"
 									},
 									"computed": false,
@@ -971,16 +401,6 @@
 								"type": "Identifier",
 								"start": 1043,
 								"end": 1054,
-								"loc": {
-									"start": {
-										"line": 35,
-										"column": 3
-									},
-									"end": {
-										"line": 35,
-										"column": 14
-									}
-								},
 								"name": "finalMethod"
 							},
 							"computed": false,
@@ -1002,75 +422,25 @@
 					"type": "VariableDeclaration",
 					"start": 1097,
 					"end": 1221,
-					"loc": {
-						"start": {
-							"line": 38,
-							"column": 1
-						},
-						"end": {
-							"line": 42,
-							"column": 3
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 1103,
 							"end": 1220,
-							"loc": {
-								"start": {
-									"line": 38,
-									"column": 7
-								},
-								"end": {
-									"line": 42,
-									"column": 2
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 1103,
 								"end": 1111,
-								"loc": {
-									"start": {
-										"line": 38,
-										"column": 7
-									},
-									"end": {
-										"line": 38,
-										"column": 15
-									}
-								},
 								"name": "instance"
 							},
 							"init": {
 								"type": "NewExpression",
 								"start": 1114,
 								"end": 1220,
-								"loc": {
-									"start": {
-										"line": 38,
-										"column": 18
-									},
-									"end": {
-										"line": 42,
-										"column": 2
-									}
-								},
 								"callee": {
 									"type": "Identifier",
 									"start": 1118,
 									"end": 1146,
-									"loc": {
-										"start": {
-											"line": 38,
-											"column": 22
-										},
-										"end": {
-											"line": 38,
-											"column": 50
-										}
-									},
 									"name": "VeryLongConstructorClassName"
 								},
 								"arguments": [
@@ -1078,48 +448,18 @@
 										"type": "Identifier",
 										"start": 1150,
 										"end": 1169,
-										"loc": {
-											"start": {
-												"line": 39,
-												"column": 2
-											},
-											"end": {
-												"line": 39,
-												"column": 21
-											}
-										},
 										"name": "veryLongArgumentOne"
 									},
 									{
 										"type": "Identifier",
 										"start": 1173,
 										"end": 1192,
-										"loc": {
-											"start": {
-												"line": 40,
-												"column": 2
-											},
-											"end": {
-												"line": 40,
-												"column": 21
-											}
-										},
 										"name": "veryLongArgumentTwo"
 									},
 									{
 										"type": "Identifier",
 										"start": 1196,
 										"end": 1217,
-										"loc": {
-											"start": {
-												"line": 41,
-												"column": 2
-											},
-											"end": {
-												"line": 41,
-												"column": 23
-											}
-										},
 										"name": "veryLongArgumentThree"
 									}
 								]
@@ -1140,44 +480,14 @@
 					"type": "ExpressionStatement",
 					"start": 1266,
 					"end": 1407,
-					"loc": {
-						"start": {
-							"line": 45,
-							"column": 1
-						},
-						"end": {
-							"line": 49,
-							"column": 4
-						}
-					},
 					"expression": {
 						"type": "NewExpression",
 						"start": 1266,
 						"end": 1406,
-						"loc": {
-							"start": {
-								"line": 45,
-								"column": 1
-							},
-							"end": {
-								"line": 49,
-								"column": 3
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 1270,
 							"end": 1298,
-							"loc": {
-								"start": {
-									"line": 45,
-									"column": 5
-								},
-								"end": {
-									"line": 45,
-									"column": 33
-								}
-							},
 							"name": "VeryLongConstructorClassName"
 						},
 						"arguments": [
@@ -1185,31 +495,11 @@
 								"type": "ObjectExpression",
 								"start": 1299,
 								"end": 1405,
-								"loc": {
-									"start": {
-										"line": 45,
-										"column": 34
-									},
-									"end": {
-										"line": 49,
-										"column": 2
-									}
-								},
 								"properties": [
 									{
 										"type": "Property",
 										"start": 1303,
 										"end": 1332,
-										"loc": {
-											"start": {
-												"line": 46,
-												"column": 2
-											},
-											"end": {
-												"line": 46,
-												"column": 31
-											}
-										},
 										"method": false,
 										"shorthand": false,
 										"computed": false,
@@ -1217,32 +507,12 @@
 											"type": "Identifier",
 											"start": 1303,
 											"end": 1322,
-											"loc": {
-												"start": {
-													"line": 46,
-													"column": 2
-												},
-												"end": {
-													"line": 46,
-													"column": 21
-												}
-											},
 											"name": "veryLongPropertyOne"
 										},
 										"value": {
 											"type": "Identifier",
 											"start": 1324,
 											"end": 1332,
-											"loc": {
-												"start": {
-													"line": 46,
-													"column": 23
-												},
-												"end": {
-													"line": 46,
-													"column": 31
-												}
-											},
 											"name": "valueOne"
 										},
 										"kind": "init"
@@ -1251,16 +521,6 @@
 										"type": "Property",
 										"start": 1336,
 										"end": 1365,
-										"loc": {
-											"start": {
-												"line": 47,
-												"column": 2
-											},
-											"end": {
-												"line": 47,
-												"column": 31
-											}
-										},
 										"method": false,
 										"shorthand": false,
 										"computed": false,
@@ -1268,32 +528,12 @@
 											"type": "Identifier",
 											"start": 1336,
 											"end": 1355,
-											"loc": {
-												"start": {
-													"line": 47,
-													"column": 2
-												},
-												"end": {
-													"line": 47,
-													"column": 21
-												}
-											},
 											"name": "veryLongPropertyTwo"
 										},
 										"value": {
 											"type": "Identifier",
 											"start": 1357,
 											"end": 1365,
-											"loc": {
-												"start": {
-													"line": 47,
-													"column": 23
-												},
-												"end": {
-													"line": 47,
-													"column": 31
-												}
-											},
 											"name": "valueTwo"
 										},
 										"kind": "init"
@@ -1302,16 +542,6 @@
 										"type": "Property",
 										"start": 1369,
 										"end": 1402,
-										"loc": {
-											"start": {
-												"line": 48,
-												"column": 2
-											},
-											"end": {
-												"line": 48,
-												"column": 35
-											}
-										},
 										"method": false,
 										"shorthand": false,
 										"computed": false,
@@ -1319,32 +549,12 @@
 											"type": "Identifier",
 											"start": 1369,
 											"end": 1390,
-											"loc": {
-												"start": {
-													"line": 48,
-													"column": 2
-												},
-												"end": {
-													"line": 48,
-													"column": 23
-												}
-											},
 											"name": "veryLongPropertyThree"
 										},
 										"value": {
 											"type": "Identifier",
 											"start": 1392,
 											"end": 1402,
-											"loc": {
-												"start": {
-													"line": 48,
-													"column": 25
-												},
-												"end": {
-													"line": 48,
-													"column": 35
-												}
-											},
 											"name": "valueThree"
 										},
 										"kind": "init"
@@ -1366,44 +576,14 @@
 					"type": "ExpressionStatement",
 					"start": 1446,
 					"end": 1605,
-					"loc": {
-						"start": {
-							"line": 52,
-							"column": 1
-						},
-						"end": {
-							"line": 56,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "NewExpression",
 						"start": 1446,
 						"end": 1604,
-						"loc": {
-							"start": {
-								"line": 52,
-								"column": 1
-							},
-							"end": {
-								"line": 56,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 1450,
 							"end": 1512,
-							"loc": {
-								"start": {
-									"line": 52,
-									"column": 5
-								},
-								"end": {
-									"line": 52,
-									"column": 67
-								}
-							},
 							"name": "VeryLongConstructorClassName0000000000000000000000000000000000"
 						},
 						"arguments": [
@@ -1411,16 +591,6 @@
 								"type": "ArrowFunctionExpression",
 								"start": 1516,
 								"end": 1601,
-								"loc": {
-									"start": {
-										"line": 53,
-										"column": 2
-									},
-									"end": {
-										"line": 55,
-										"column": 3
-									}
-								},
 								"id": null,
 								"expression": false,
 								"generator": false,
@@ -1430,16 +600,6 @@
 										"type": "Identifier",
 										"start": 1517,
 										"end": 1542,
-										"loc": {
-											"start": {
-												"line": 53,
-												"column": 3
-											},
-											"end": {
-												"line": 53,
-												"column": 28
-											}
-										},
 										"name": "veryLongCallbackParameter"
 									}
 								],
@@ -1447,89 +607,29 @@
 									"type": "BlockStatement",
 									"start": 1547,
 									"end": 1601,
-									"loc": {
-										"start": {
-											"line": 53,
-											"column": 33
-										},
-										"end": {
-											"line": 55,
-											"column": 3
-										}
-									},
 									"body": [
 										{
 											"type": "ReturnStatement",
 											"start": 1552,
 											"end": 1597,
-											"loc": {
-												"start": {
-													"line": 54,
-													"column": 3
-												},
-												"end": {
-													"line": 54,
-													"column": 48
-												}
-											},
 											"argument": {
 												"type": "CallExpression",
 												"start": 1559,
 												"end": 1596,
-												"loc": {
-													"start": {
-														"line": 54,
-														"column": 10
-													},
-													"end": {
-														"line": 54,
-														"column": 47
-													}
-												},
 												"callee": {
 													"type": "MemberExpression",
 													"start": 1559,
 													"end": 1594,
-													"loc": {
-														"start": {
-															"line": 54,
-															"column": 10
-														},
-														"end": {
-															"line": 54,
-															"column": 45
-														}
-													},
 													"object": {
 														"type": "Identifier",
 														"start": 1559,
 														"end": 1584,
-														"loc": {
-															"start": {
-																"line": 54,
-																"column": 10
-															},
-															"end": {
-																"line": 54,
-																"column": 35
-															}
-														},
 														"name": "veryLongCallbackParameter"
 													},
 													"property": {
 														"type": "Identifier",
 														"start": 1585,
 														"end": 1594,
-														"loc": {
-															"start": {
-																"line": 54,
-																"column": 36
-															},
-															"end": {
-																"line": 54,
-																"column": 45
-															}
-														},
 														"name": "transform"
 													},
 													"computed": false,
@@ -1557,44 +657,14 @@
 					"type": "ExpressionStatement",
 					"start": 1640,
 					"end": 1792,
-					"loc": {
-						"start": {
-							"line": 59,
-							"column": 1
-						},
-						"end": {
-							"line": 64,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "NewExpression",
 						"start": 1640,
 						"end": 1791,
-						"loc": {
-							"start": {
-								"line": 59,
-								"column": 1
-							},
-							"end": {
-								"line": 64,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 1644,
 							"end": 1677,
-							"loc": {
-								"start": {
-									"line": 59,
-									"column": 5
-								},
-								"end": {
-									"line": 59,
-									"column": 38
-								}
-							},
 							"name": "OuterVeryLongConstructorClassName"
 						},
 						"arguments": [
@@ -1602,30 +672,10 @@
 								"type": "NewExpression",
 								"start": 1681,
 								"end": 1788,
-								"loc": {
-									"start": {
-										"line": 60,
-										"column": 2
-									},
-									"end": {
-										"line": 63,
-										"column": 3
-									}
-								},
 								"callee": {
 									"type": "Identifier",
 									"start": 1685,
 									"end": 1718,
-									"loc": {
-										"start": {
-											"line": 60,
-											"column": 6
-										},
-										"end": {
-											"line": 60,
-											"column": 39
-										}
-									},
 									"name": "InnerVeryLongConstructorClassName"
 								},
 								"arguments": [
@@ -1633,32 +683,12 @@
 										"type": "Identifier",
 										"start": 1723,
 										"end": 1751,
-										"loc": {
-											"start": {
-												"line": 61,
-												"column": 3
-											},
-											"end": {
-												"line": 61,
-												"column": 31
-											}
-										},
 										"name": "veryLongArgumentOne000000000"
 									},
 									{
 										"type": "Identifier",
 										"start": 1756,
 										"end": 1784,
-										"loc": {
-											"start": {
-												"line": 62,
-												"column": 3
-											},
-											"end": {
-												"line": 62,
-												"column": 31
-											}
-										},
 										"name": "veryLongArgumentTwo000000000"
 									}
 								]
@@ -1683,18 +713,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

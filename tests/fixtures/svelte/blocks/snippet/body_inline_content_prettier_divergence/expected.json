@@ -15,19 +15,7 @@
 					"type": "Identifier",
 					"name": "badge",
 					"start": 10,
-					"end": 15,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 10,
-							"character": 10
-						},
-						"end": {
-							"line": 1,
-							"column": 15,
-							"character": 15
-						}
-					}
+					"end": 15
 				},
 				"parameters": [],
 				"body": {
@@ -38,18 +26,6 @@
 							"start": 18,
 							"end": 34,
 							"name": "span",
-							"name_loc": {
-								"start": {
-									"line": 1,
-									"column": 19,
-									"character": 19
-								},
-								"end": {
-									"line": 1,
-									"column": 23,
-									"character": 23
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -82,19 +58,7 @@
 					"type": "Identifier",
 					"name": "row",
 					"start": 56,
-					"end": 59,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 10,
-							"character": 56
-						},
-						"end": {
-							"line": 3,
-							"column": 13,
-							"character": 59
-						}
-					}
+					"end": 59
 				},
 				"parameters": [],
 				"body": {
@@ -112,18 +76,6 @@
 							"start": 64,
 							"end": 169,
 							"name": "span",
-							"name_loc": {
-								"start": {
-									"line": 4,
-									"column": 2,
-									"character": 65
-								},
-								"end": {
-									"line": 4,
-									"column": 6,
-									"character": 69
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",

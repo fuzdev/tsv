@@ -14,49 +14,19 @@
 			"type": "Line",
 			"value": " A line comment between a parameter name and its `:` keeps the comment after",
 			"start": 20,
-			"end": 98,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 79
-				}
-			}
+			"end": 98
 		},
 		{
 			"type": "Line",
 			"value": " the name; the `: type` continuation indents one level.",
 			"start": 100,
-			"end": 157,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 58
-				}
-			}
+			"end": 157
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 176,
-			"end": 180,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 4
-				},
-				"end": {
-					"line": 5,
-					"column": 8
-				}
-			}
+			"end": 180
 		}
 	],
 	"instance": {
@@ -68,45 +38,15 @@
 			"type": "Program",
 			"start": 18,
 			"end": 199,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 8,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "FunctionDeclaration",
 					"start": 159,
 					"end": 198,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 7,
-							"column": 5
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 168,
 						"end": 170,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 10
-							},
-							"end": {
-								"line": 4,
-								"column": 12
-							}
-						},
 						"name": "fn"
 					},
 					"expression": false,
@@ -117,45 +57,15 @@
 							"type": "Identifier",
 							"start": 174,
 							"end": 192,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 2
-								},
-								"end": {
-									"line": 6,
-									"column": 11
-								}
-							},
 							"name": "a",
 							"typeAnnotation": {
 								"type": "TSTypeAnnotation",
 								"start": 184,
 								"end": 192,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 3
-									},
-									"end": {
-										"line": 6,
-										"column": 11
-									}
-								},
 								"typeAnnotation": {
 									"type": "TSStringKeyword",
 									"start": 186,
-									"end": 192,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 5
-										},
-										"end": {
-											"line": 6,
-											"column": 11
-										}
-									}
+									"end": 192
 								},
 								"leadingComments": [
 									{
@@ -172,16 +82,6 @@
 						"type": "BlockStatement",
 						"start": 196,
 						"end": 198,
-						"loc": {
-							"start": {
-								"line": 7,
-								"column": 3
-							},
-							"end": {
-								"line": 7,
-								"column": 5
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -208,18 +108,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

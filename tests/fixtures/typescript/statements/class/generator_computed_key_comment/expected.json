@@ -14,49 +14,19 @@
 			"type": "Line",
 			"value": " Comment inside a computed generator-method key is preserved once (not duplicated onto the `*`)",
 			"start": 20,
-			"end": 117,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 98
-				}
-			}
+			"end": 117
 		},
 		{
 			"type": "Block",
 			"value": " c1 ",
 			"start": 133,
-			"end": 141,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 4
-				},
-				"end": {
-					"line": 4,
-					"column": 12
-				}
-			}
+			"end": 141
 		},
 		{
 			"type": "Block",
 			"value": " c2 ",
 			"start": 160,
-			"end": 168,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 10
-				},
-				"end": {
-					"line": 5,
-					"column": 18
-				}
-			}
+			"end": 168
 		}
 	],
 	"instance": {
@@ -68,45 +38,15 @@
 			"type": "Program",
 			"start": 18,
 			"end": 180,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 7,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ClassDeclaration",
 					"start": 119,
 					"end": 179,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 125,
 						"end": 126,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 7
-							},
-							"end": {
-								"line": 3,
-								"column": 8
-							}
-						},
 						"name": "A"
 					},
 					"superClass": null,
@@ -114,47 +54,17 @@
 						"type": "ClassBody",
 						"start": 127,
 						"end": 179,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 9
-							},
-							"end": {
-								"line": 6,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "MethodDefinition",
 								"start": 131,
 								"end": 149,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 2
-									},
-									"end": {
-										"line": 4,
-										"column": 20
-									}
-								},
 								"static": false,
 								"computed": true,
 								"key": {
 									"type": "Identifier",
 									"start": 142,
 									"end": 143,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 13
-										},
-										"end": {
-											"line": 4,
-											"column": 14
-										}
-									},
 									"name": "a",
 									"leadingComments": [
 										{
@@ -170,16 +80,6 @@
 									"type": "FunctionExpression",
 									"start": 144,
 									"end": 149,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 15
-										},
-										"end": {
-											"line": 4,
-											"column": 20
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": true,
@@ -189,16 +89,6 @@
 										"type": "BlockStatement",
 										"start": 147,
 										"end": 149,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 18
-											},
-											"end": {
-												"line": 4,
-												"column": 20
-											}
-										},
 										"body": []
 									}
 								}
@@ -207,32 +97,12 @@
 								"type": "MethodDefinition",
 								"start": 152,
 								"end": 176,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 2
-									},
-									"end": {
-										"line": 5,
-										"column": 26
-									}
-								},
 								"static": false,
 								"computed": true,
 								"key": {
 									"type": "Identifier",
 									"start": 169,
 									"end": 170,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 19
-										},
-										"end": {
-											"line": 5,
-											"column": 20
-										}
-									},
 									"name": "b",
 									"leadingComments": [
 										{
@@ -248,16 +118,6 @@
 									"type": "FunctionExpression",
 									"start": 171,
 									"end": 176,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 21
-										},
-										"end": {
-											"line": 5,
-											"column": 26
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": true,
@@ -267,16 +127,6 @@
 										"type": "BlockStatement",
 										"start": 174,
 										"end": 176,
-										"loc": {
-											"start": {
-												"line": 5,
-												"column": 24
-											},
-											"end": {
-												"line": 5,
-												"column": 26
-											}
-										},
 										"body": []
 									}
 								}
@@ -301,18 +151,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

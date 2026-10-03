@@ -14,65 +14,25 @@
 			"type": "Line",
 			"value": " binary operand in an array spread",
 			"start": 10,
-			"end": 46,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 37
-				}
-			}
+			"end": 46
 		},
 		{
 			"type": "Block",
 			"value": " c ",
 			"start": 69,
-			"end": 76,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 22
-				},
-				"end": {
-					"line": 3,
-					"column": 29
-				}
-			}
+			"end": 76
 		},
 		{
 			"type": "Line",
 			"value": " binary operand in a call spread",
 			"start": 82,
-			"end": 116,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 1
-				},
-				"end": {
-					"line": 5,
-					"column": 35
-				}
-			}
+			"end": 116
 		},
 		{
 			"type": "Block",
 			"value": " c ",
 			"start": 131,
-			"end": 138,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 14
-				},
-				"end": {
-					"line": 6,
-					"column": 21
-				}
-			}
+			"end": 138
 		}
 	],
 	"instance": {
@@ -84,119 +44,39 @@
 			"type": "Program",
 			"start": 8,
 			"end": 142,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 7,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 48,
 					"end": 79,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 32
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 54,
 							"end": 78,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 7
-								},
-								"end": {
-									"line": 3,
-									"column": 31
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 54,
 								"end": 55,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 7
-									},
-									"end": {
-										"line": 3,
-										"column": 8
-									}
-								},
 								"name": "a"
 							},
 							"init": {
 								"type": "ArrayExpression",
 								"start": 58,
 								"end": 78,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 11
-									},
-									"end": {
-										"line": 3,
-										"column": 31
-									}
-								},
 								"elements": [
 									{
 										"type": "SpreadElement",
 										"start": 59,
 										"end": 77,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 12
-											},
-											"end": {
-												"line": 3,
-												"column": 30
-											}
-										},
 										"argument": {
 											"type": "BinaryExpression",
 											"start": 63,
 											"end": 68,
-											"loc": {
-												"start": {
-													"line": 3,
-													"column": 16
-												},
-												"end": {
-													"line": 3,
-													"column": 21
-												}
-											},
 											"left": {
 												"type": "Identifier",
 												"start": 63,
 												"end": 64,
-												"loc": {
-													"start": {
-														"line": 3,
-														"column": 16
-													},
-													"end": {
-														"line": 3,
-														"column": 17
-													}
-												},
 												"name": "x"
 											},
 											"operator": "+",
@@ -204,16 +84,6 @@
 												"type": "Identifier",
 												"start": 67,
 												"end": 68,
-												"loc": {
-													"start": {
-														"line": 3,
-														"column": 20
-													},
-													"end": {
-														"line": 3,
-														"column": 21
-													}
-												},
 												"name": "y"
 											},
 											"trailingComments": [
@@ -244,44 +114,14 @@
 					"type": "ExpressionStatement",
 					"start": 118,
 					"end": 141,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 24
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 118,
 						"end": 140,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 1
-							},
-							"end": {
-								"line": 6,
-								"column": 23
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 118,
 							"end": 120,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 1
-								},
-								"end": {
-									"line": 6,
-									"column": 3
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -289,44 +129,14 @@
 								"type": "SpreadElement",
 								"start": 121,
 								"end": 139,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 4
-									},
-									"end": {
-										"line": 6,
-										"column": 22
-									}
-								},
 								"argument": {
 									"type": "BinaryExpression",
 									"start": 125,
 									"end": 130,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 8
-										},
-										"end": {
-											"line": 6,
-											"column": 13
-										}
-									},
 									"left": {
 										"type": "Identifier",
 										"start": 125,
 										"end": 126,
-										"loc": {
-											"start": {
-												"line": 6,
-												"column": 8
-											},
-											"end": {
-												"line": 6,
-												"column": 9
-											}
-										},
 										"name": "x"
 									},
 									"operator": "+",
@@ -334,16 +144,6 @@
 										"type": "Identifier",
 										"start": 129,
 										"end": 130,
-										"loc": {
-											"start": {
-												"line": 6,
-												"column": 12
-											},
-											"end": {
-												"line": 6,
-												"column": 13
-											}
-										},
 										"name": "y"
 									},
 									"trailingComments": [

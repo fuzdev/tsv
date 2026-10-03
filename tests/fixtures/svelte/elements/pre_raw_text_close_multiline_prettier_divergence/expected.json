@@ -38,18 +38,6 @@
 				"start": 295,
 				"end": 347,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 8,
-						"column": 1,
-						"character": 296
-					},
-					"end": {
-						"line": 8,
-						"column": 4,
-						"character": 299
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -59,18 +47,6 @@
 							"start": 300,
 							"end": 341,
 							"name": "script",
-							"name_loc": {
-								"start": {
-									"line": 8,
-									"column": 6,
-									"character": 301
-								},
-								"end": {
-									"line": 8,
-									"column": 12,
-									"character": 307
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -113,18 +89,6 @@
 				"start": 390,
 				"end": 472,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 13,
-						"column": 1,
-						"character": 391
-					},
-					"end": {
-						"line": 13,
-						"column": 4,
-						"character": 394
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -141,36 +105,12 @@
 							"start": 401,
 							"end": 460,
 							"name": "script",
-							"name_loc": {
-								"start": {
-									"line": 13,
-									"column": 12,
-									"character": 402
-								},
-								"end": {
-									"line": 13,
-									"column": 18,
-									"character": 408
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 409,
 									"end": 426,
 									"name": "data-attr",
-									"name_loc": {
-										"start": {
-											"line": 13,
-											"column": 19,
-											"character": 409
-										},
-										"end": {
-											"line": 13,
-											"column": 28,
-											"character": 418
-										}
-									},
 									"value": [
 										{
 											"start": 420,
@@ -230,18 +170,6 @@
 				"start": 491,
 				"end": 531,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 18,
-						"column": 1,
-						"character": 492
-					},
-					"end": {
-						"line": 18,
-						"column": 4,
-						"character": 495
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -251,18 +179,6 @@
 							"start": 496,
 							"end": 525,
 							"name": "style",
-							"name_loc": {
-								"start": {
-									"line": 18,
-									"column": 6,
-									"character": 497
-								},
-								"end": {
-									"line": 18,
-									"column": 11,
-									"character": 502
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",

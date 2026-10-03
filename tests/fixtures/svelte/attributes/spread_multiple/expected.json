@@ -12,18 +12,6 @@
 				"start": 0,
 				"end": 29,
 				"name": "Comp",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 5,
-						"character": 5
-					}
-				},
 				"attributes": [
 					{
 						"type": "SpreadAttribute",
@@ -33,16 +21,6 @@
 							"type": "Identifier",
 							"start": 10,
 							"end": 11,
-							"loc": {
-								"start": {
-									"line": 1,
-									"column": 10
-								},
-								"end": {
-									"line": 1,
-									"column": 11
-								}
-							},
 							"name": "a"
 						}
 					},
@@ -54,16 +32,6 @@
 							"type": "Identifier",
 							"start": 17,
 							"end": 18,
-							"loc": {
-								"start": {
-									"line": 1,
-									"column": 17
-								},
-								"end": {
-									"line": 1,
-									"column": 18
-								}
-							},
 							"name": "b"
 						}
 					},
@@ -75,16 +43,6 @@
 							"type": "Identifier",
 							"start": 24,
 							"end": 25,
-							"loc": {
-								"start": {
-									"line": 1,
-									"column": 24
-								},
-								"end": {
-									"line": 1,
-									"column": 25
-								}
-							},
 							"name": "c"
 						}
 					}

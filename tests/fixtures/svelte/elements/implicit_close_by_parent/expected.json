@@ -12,18 +12,6 @@
 				"start": 0,
 				"end": 38,
 				"name": "main",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 5,
-						"character": 5
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -33,36 +21,12 @@
 							"start": 6,
 							"end": 31,
 							"name": "div",
-							"name_loc": {
-								"start": {
-									"line": 1,
-									"column": 7,
-									"character": 7
-								},
-								"end": {
-									"line": 1,
-									"column": 10,
-									"character": 10
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 11,
 									"end": 22,
 									"name": "class",
-									"name_loc": {
-										"start": {
-											"line": 1,
-											"column": 11,
-											"character": 11
-										},
-										"end": {
-											"line": 1,
-											"column": 16,
-											"character": 16
-										}
-									},
 									"value": [
 										{
 											"start": 18,

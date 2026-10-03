@@ -22,6 +22,12 @@
  * omits exactly those keys), not a tolerance; everything else is raw-diffed as
  * above.
  *
+ * `loc` is graded by its own rules on the loc arm (see `diff_asts`): tsv's `loc` must
+ * first be the definition — the shipped `locations.js` reconstruction of its own
+ * span-only wire (`lib/loc_cross_grade.ts`) — and only then is it compared with the
+ * oracle's: exactly for TypeScript, and for Svelte with the pinned superset and the six
+ * named tolerance rows (`lib/loc_tolerance.ts`), where a seventh difference fails.
+ *
  * Multibyte files are the high-value slice: byte→UTF-16 offset translation vs
  * the canonical parsers' native offsets is the riskiest machinery. Use
  * --multibyte-only for fast iteration on it.
@@ -38,6 +44,8 @@
  */
 
 import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.ts';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import { z } from 'zod';
 
 import {
@@ -57,7 +65,19 @@ import {
 } from './lib/compare_cli.ts';
 import { is_native_panic_error } from './lib/divergence/panic_errors.ts';
 import { CORPUS_PARSE_COMPARED_PIN, CORPUS_PARSE_TSV_ERRORS_PIN } from './lib/gate_counts.ts';
-import { type Language, LANGUAGES } from './lib/types.ts';
+import { first_difference, loc_definition_violation } from './lib/loc_cross_grade.ts';
+import {
+	classify_loc_difference,
+	get_at_path,
+	is_loc_leaf,
+	LOC_ROWS,
+	type LocRow,
+	superset_key,
+	superset_kinds_of,
+	type SupersetAnchor,
+	wire_text
+} from './lib/loc_tolerance.ts';
+import { type Language, LANGUAGES, type ParseGoal } from './lib/types.ts';
 import {
 	type InjectKind,
 	subtract_baseline_diffs,
@@ -82,7 +102,8 @@ const CorpusCompareParseArgs = z.object({
 		.meta({ aliases: ['m'] }),
 	inject: z.boolean().default(false),
 	'inject-terminators': z.boolean().default(false),
-	'inject-limit': z.coerce.number().int().nonnegative().default(DEFAULT_INJECT_LIMIT)
+	'inject-limit': z.coerce.number().int().nonnegative().default(DEFAULT_INJECT_LIMIT),
+	fixtures: z.boolean().default(false)
 });
 
 /** Per-file diff cap — collection stops here and the file is flagged truncated. */
@@ -170,18 +191,19 @@ export function bigint_replacer(_key: string, value: unknown): unknown {
 // --- The span-only arm -----------------------------------------------------------
 //
 // tsv's `no-locations` wire is graded against the SAME oracle output with its line/column
-// objects removed — the definition `tests/no_locations.rs` (`strip_locations`) and
-// `diagnostics/no_locations_parity.ts` both encode: every `loc` key and every Svelte
-// `name_loc` key, anywhere in the tree (the `character` field Svelte puts on a name-shaped
-// or in-tag-comment position lives inside one of those, so it goes too). Nothing else
-// differs between the two wires, so the arm reuses the diff engine and the documented
-// matchers unchanged: a span difference the loc arm excuses is excused identically here,
-// and a loc-only matcher (`each_as_stale_loc`) has nothing to match.
-
-/** The languages with a span-only export — CSS has none, because its wire carries no `loc`. */
-type SpanLanguage = Exclude<Language, 'css'>;
-const SPAN_ONLY_LANGUAGES: readonly SpanLanguage[] = ['svelte', 'typescript'];
-const is_span_language = (lang: Language): lang is SpanLanguage => lang !== 'css';
+// objects removed — the definition `tests/no_locations.rs` (`strip_locations`) encodes:
+// every `loc` key and every Svelte `name_loc` key, anywhere in the tree (the `character`
+// field Svelte puts on a name-shaped or in-tag-comment position lives inside one of those,
+// so it goes too). Nothing else differs between the two wires, so the arm reuses the diff
+// engine and the documented matchers unchanged: a span difference the loc arm excuses is
+// excused identically here, and the `loc` rules have no `loc` to grade. Every language has
+// the arm, CSS included — `parseCss` emits no `loc`, so for CSS the stripped oracle is the
+// oracle itself.
+//
+// The same span-only wire is what the loc arm's definition check reconstructs from: before
+// tsv's loc wire is graded against the oracle, `loc_definition_violation` requires it to
+// equal the shipped reconstruction of this wire, so a tolerance row can only excuse the
+// oracle's departure from the definition, never tsv's.
 
 /** The keys the span-only wire drops — see the section comment above. */
 const LOCATION_KEYS: ReadonlySet<string> = new Set(['loc', 'name_loc']);
@@ -215,6 +237,64 @@ interface SpanVerdictMismatch {
 	language: Language;
 	loc_wire: string;
 	span_wire: string;
+}
+
+/** A file whose loc wire is not the reconstruction of its span-only wire — a tsv bug. */
+interface LocDefinitionViolation {
+	path: string;
+	language: Language;
+	/** The first difference, as `path: wire vs reconstruct`. */
+	difference: string;
+}
+
+/** The loc arm's books beside its diff results: the definition check and the tolerances. */
+interface LocBooks {
+	/** Files whose loc wire was checked against the definition, per language. */
+	checked: Record<Language, number>;
+	violations: LocDefinitionViolation[];
+	/** Per tolerance row: the files it absorbed a difference in, and how many differences. */
+	rows: Record<LocRow, { files: number; sites: number }>;
+	/** Objects carrying a tsv `loc` the oracle gives none (Svelte and CSS). */
+	superset: Record<Language, number>;
+	/** The superset objects by kind (`superset_key`), per language. */
+	superset_kinds: Record<Language, Record<string, number>>;
+	/** `loc` halves left to the span grading because the two sides' offsets there disagree. */
+	span_skipped: Record<Language, number>;
+}
+
+function empty_loc_books(): LocBooks {
+	const zero = (): Record<Language, number> => ({ svelte: 0, typescript: 0, css: 0 });
+	return {
+		checked: zero(),
+		violations: [],
+		rows: Object.fromEntries(LOC_ROWS.map((row) => [row, { files: 0, sites: 0 }])) as Record<
+			LocRow,
+			{ files: number; sites: number }
+		>,
+		superset: zero(),
+		superset_kinds: { svelte: {}, typescript: {}, css: {} },
+		span_skipped: zero()
+	};
+}
+
+/** Fold one file's `diff_asts` loc tallies into the books. */
+function record_loc_tolerances(
+	books: LocBooks,
+	lang: Language,
+	rows: LocRowCounts,
+	superset: Record<string, number>,
+	span_skipped: number
+): void {
+	for (const [row, sites] of Object.entries(rows) as [LocRow, number][]) {
+		books.rows[row].files++;
+		books.rows[row].sites += sites;
+	}
+	const kinds = books.superset_kinds[lang];
+	for (const [kind, count] of Object.entries(superset)) {
+		books.superset[lang] += count;
+		kinds[kind] = (kinds[kind] ?? 0) + count;
+	}
+	books.span_skipped[lang] += span_skipped;
 }
 
 /** Truncated single-line preview of a leaf value for reports. */
@@ -252,22 +332,27 @@ export interface MatchContext {
 	source: string;
 	/** Root of the canonical AST — lets matchers resolve ancestors from the entry path. */
 	canonical_root: unknown;
-}
-
-/** Resolve a node by concrete diff path (`fragment.nodes[3].expression`). */
-function get_at_path(root: unknown, path: string): unknown {
-	let node = root;
-	for (const seg of path.split('.')) {
-		if (node == null) return null;
-		const m = seg.match(/^([^[]+)((?:\[\d+\])*)$/);
-		if (!m) return null;
-		node = (node as Record<string, unknown>)[m[1]];
-		for (const idx of m[2].matchAll(/\[(\d+)\]/g)) {
-			if (!Array.isArray(node)) return null;
-			node = node[Number(idx[1])];
-		}
-	}
-	return node;
+	/**
+	 * The document's language, which decides how `loc` is graded: exactly for TypeScript
+	 * (acorn is the outside reference), with the pinned superset and the six tolerance rows
+	 * for Svelte (`lib/loc_tolerance.ts`), and as a pinned superset for CSS (`parseCss`
+	 * emits no `loc`).
+	 */
+	language: Language;
+	/**
+	 * `--fixtures` only: this document is a `_svelte_divergence` fixture's input whose two
+	 * parses equal its committed `expected_ours.json` / `expected_svelte.json` — so every
+	 * span difference is the one the fixture declares (and `fixtures:validate` grades).
+	 * Never excuses a `loc` or `name_loc` difference.
+	 *
+	 * Its reach is the whole document, not the declared difference: while both parses
+	 * equal their pins, EVERY span difference in it reads as declared — the same as
+	 * excluding those fixtures from span grading while still grading their `loc`. So a
+	 * divergence baked into `expected_ours.json` stays invisible here, exactly as it does
+	 * to `fixtures:validate`, which compares tsv against that same pin; the pins' review
+	 * is what grades it.
+	 */
+	declared_divergence?: boolean;
 }
 
 /** Svelte's `Nth.value` tell for an `of S` argument — see `subtree_has_nth_of`. */
@@ -445,22 +530,6 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 			entry.kind === 'missing_canonical' &&
 			/^fragment\./.test(entry.path) &&
 			/(^|\.)(leadingComments|trailingComments)$/.test(entry.path)
-	},
-	{
-		// Under lang="ts", Svelte parses `{#each expr as binding}` by letting the TS
-		// parser read `expr as binding` as an as-expression, then unwraps it — patching
-		// the expression's `end` OFFSET back to the real expression but leaving
-		// `loc.end` at the as-expression's end (after the binding). tsv's loc agrees
-		// with the corrected offset. Scoped to EachBlock expressions; the offsets and
-		// loc.start are not absorbed, so a real loc bug still surfaces undocumented.
-		name: 'each_as_stale_loc',
-		conformance_section: 'Svelte Template Corrections (corpus-enforced) — each-as stale loc.end',
-		matches: (entry, _canonical_parent, ctx) => {
-			const m = entry.path.match(/^(.*)\.expression\.loc\.end\.(line|column)$/);
-			if (!m) return false;
-			const owner = get_at_path(ctx.canonical_root, m[1]) as { type?: unknown } | null;
-			return owner?.type === 'EachBlock';
-		}
 	},
 	{
 		// acorn-typescript ends a typed RestElement at the binding, excluding the
@@ -667,11 +736,92 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 	}
 ];
 
+/** A path inside a `loc` or `name_loc` — what a fixture's span-only pins say nothing about. */
+const LINE_COLUMN_PATH = /(^|\.)(name_)?loc(\.|$)/;
+
+/**
+ * The classification `--fixtures` gives a `_svelte_divergence` fixture's declared difference
+ * — every span difference in a document whose parses still equal the committed pins (see
+ * `MatchContext.declared_divergence` for what that reach hides).
+ */
+const FIXTURE_DECLARED_DIVERGENCE = 'fixture_declared_divergence';
+
+// --- `--fixtures`: a fixture tree's parse-pinned documents ---------------------------
+
+/** A fixture document's parse claim, as `--fixtures` reads it off the fixture directory. */
+interface FixtureDocument {
+	/** The fixture's `goal` marker (`script`), or `undefined` for the module default. */
+	goal: ParseGoal | undefined;
+	/** A `_svelte_divergence` input's committed pins: tsv's wire and the oracle's. */
+	declared: { ours: unknown; svelte: unknown } | null;
+}
+
+/** Each fixture directory's documents, keyed by basename — read once per directory. */
+const fixture_dirs = new Map<string, Map<string, FixtureDocument> | null>();
+
+/** The fixture input filenames, in `find_input_file`'s precedence order. */
+const FIXTURE_INPUTS = ['input.svelte', 'input.svelte.ts', 'input.ts', 'input.css'];
+
+/**
+ * The parse claim a fixture tree makes about the document at `path`, or `null` when it
+ * makes none: a fixture's `input.*` (at its `goal` marker's goal) and every variant an
+ * `expected_<stem>.json` pins are parse-pinned; every other file — the `unformatted_*` and
+ * prettier-side variants, `input_invalid_*` — carries no parse claim, and a `tsv_rejects.txt`
+ * fixture has no tsv wire. The parse-pinned subset of `tsv_debug loc_wires`' documents: that
+ * leg also grades the format variants, which need no oracle, where this one grades only the
+ * documents a committed oracle verdict exists for.
+ */
+function fixture_document(path: string): FixtureDocument | null {
+	const dir = dirname(path);
+	let docs = fixture_dirs.get(dir);
+	if (docs === undefined) {
+		docs = read_fixture_dir(dir);
+		fixture_dirs.set(dir, docs);
+	}
+	return docs?.get(basename(path)) ?? null;
+}
+
+function read_fixture_dir(dir: string): Map<string, FixtureDocument> | null {
+	const entries = new Set(readdirSync(dir));
+	const input = FIXTURE_INPUTS.find((name) => entries.has(name));
+	if (input === undefined || entries.has('tsv_rejects.txt')) return null;
+	const goal: ParseGoal | undefined =
+		entries.has('goal') && readFileSync(join(dir, 'goal'), 'utf8').trim() === 'script'
+			? 'script'
+			: undefined;
+	const read_json = (name: string): unknown => JSON.parse(readFileSync(join(dir, name), 'utf8'));
+	const declared =
+		/_svelte(_prettier)?_divergence$/.test(basename(dir)) &&
+		entries.has('expected_ours.json') &&
+		entries.has('expected_svelte.json')
+			? { ours: read_json('expected_ours.json'), svelte: read_json('expected_svelte.json') }
+			: null;
+	const docs = new Map<string, FixtureDocument>([[input, { goal, declared }]]);
+	const ext = input.slice('input'.length);
+	for (const name of entries) {
+		const stem = /^expected_(.+)\.json$/.exec(name)?.[1];
+		if (stem === undefined || stem === 'ours' || stem === 'svelte') continue;
+		if (existsSync(join(dir, `${stem}${ext}`))) {
+			docs.set(`${stem}${ext}`, { goal, declared: null });
+		}
+	}
+	return docs;
+}
+
 function classify(
 	entry: Omit<DiffEntry, 'documented' | 'signature'>,
 	canonical_parent: unknown,
 	ctx: MatchContext
 ): string | null {
+	// A `loc` line or column is classified by the tolerance rows alone (see `diff_asts`) —
+	// a whole-subtree matcher written for a span divergence must not excuse one.
+	if (is_loc_leaf(entry.path)) return null;
+	// A tsv `loc` the oracle lacks is graded by the superset rule alone (see `diff_asts`):
+	// one that reaches here is outside `LOC_SUPERSET_KEYS`, which no matcher may excuse.
+	if (entry.kind === 'missing_canonical' && /(^|\.)loc$/.test(entry.path)) return null;
+	if (ctx.declared_divergence && !LINE_COLUMN_PATH.test(entry.path)) {
+		return FIXTURE_DECLARED_DIVERGENCE;
+	}
 	for (const matcher of DOCUMENTED_MATCHERS) {
 		if (matcher.matches(entry, canonical_parent, ctx)) return matcher.name;
 	}
@@ -685,18 +835,55 @@ function path_signature(path: string): string {
 	return path.replace(/\[\d+\]/g, '[]');
 }
 
+/** Per-row counts of the `loc` differences a diff tolerated (`lib/loc_tolerance.ts`). */
+export type LocRowCounts = Partial<Record<LocRow, number>>;
+
+/** What one deep diff found. */
+export interface DiffResult {
+	diffs: DiffEntry[];
+	truncated: boolean;
+	/**
+	 * The `loc` differences the six tolerance rows absorbed, per row — counted rather than
+	 * stored, so a tolerated row neither fills the per-file cap nor hides a finding behind it.
+	 */
+	loc_rows: LocRowCounts;
+	/**
+	 * Objects carrying a tsv `loc` the oracle gives none, by `superset_key` — the accepted
+	 * superset (Svelte and CSS, kinds in `LOC_SUPERSET_KEYS` only).
+	 */
+	loc_superset: Record<string, number>;
+	/** `loc` halves left ungraded because the two sides' offsets at that half disagree. */
+	loc_span_skipped: number;
+}
+
+/** Whether an object carries numeric `start` and `end`. */
+const has_span = (o: Record<string, unknown>): boolean =>
+	typeof o.start === 'number' && typeof o.end === 'number';
+
 /**
  * Recursively diff two JSON-shaped values, collecting up to MAX_DIFFS_PER_FILE
  * entries. Arrays with differing lengths report one length_mismatch and still
  * recurse the shared prefix so positional drift inside is visible.
+ *
+ * **`loc` is graded by its own rules**, keyed on `ctx.language`:
+ * - per half, only where both sides' offset at that half agrees — a span difference is
+ *   graded (and classified) at the span itself, and a `loc.start` / `loc.end` that follows
+ *   a differing `start` / `end` says nothing more, while the other half is still graded;
+ * - a tsv `loc` on an object the oracle gives none is accepted for Svelte and CSS — the
+ *   definition's superset (template, style and option objects, every CSS node) — when its
+ *   kind is one `LOC_SUPERSET_KEYS` pins for the language, and is a difference otherwise,
+ *   and always for TypeScript, where acorn gives every node one;
+ * - a differing `loc` line or column is a finding unless one of the six tolerance rows
+ *   claims it, which applies to Svelte only. A TypeScript `loc` is exact.
  */
-export function diff_asts(
-	ours: unknown,
-	canonical: unknown,
-	ctx: MatchContext
-): { diffs: DiffEntry[]; truncated: boolean } {
+export function diff_asts(ours: unknown, canonical: unknown, ctx: MatchContext): DiffResult {
 	const diffs: DiffEntry[] = [];
 	let truncated = false;
+	const loc_rows: LocRowCounts = {};
+	const loc_superset: Record<string, number> = {};
+	let loc_span_skipped = 0;
+	const superset_kinds = superset_kinds_of(ctx.language);
+	const superset_text = superset_kinds === null ? '' : wire_text(ctx.source);
 
 	const push = (
 		kind: DiffKind,
@@ -705,6 +892,13 @@ export function diff_asts(
 		c: unknown,
 		canonical_parent: unknown
 	): void => {
+		if (kind === 'value_mismatch' && is_loc_leaf(path)) {
+			const row = classify_loc_difference(path, o, c, ctx);
+			if (row !== null) {
+				loc_rows[row] = (loc_rows[row] ?? 0) + 1;
+				return;
+			}
+		}
 		if (diffs.length >= MAX_DIFFS_PER_FILE) {
 			truncated = true;
 			return;
@@ -717,11 +911,16 @@ export function diff_asts(
 		});
 	};
 
-	const walk = (o: unknown, c: unknown, path: string, canonical_parent: unknown): void => {
-		if (truncated || diffs.length >= MAX_DIFFS_PER_FILE) {
-			truncated = true;
-			return;
-		}
+	// `anchor` is the nearest enclosing object of a pinned superset type — the context a
+	// superset object outside those types is keyed by (`superset_key`)
+	const walk = (
+		o: unknown,
+		c: unknown,
+		path: string,
+		canonical_parent: unknown,
+		anchor: SupersetAnchor | null
+	): void => {
+		if (truncated) return;
 		if (o === c) return;
 		const o_type = value_type(o);
 		const c_type = value_type(c);
@@ -738,7 +937,7 @@ export function diff_asts(
 				}
 				const shared = Math.min(o_arr.length, c_arr.length);
 				for (let i = 0; i < shared; i++) {
-					walk(o_arr[i], c_arr[i], `${path}[${i}]`, c);
+					walk(o_arr[i], c_arr[i], `${path}[${i}]`, c, anchor);
 				}
 				break;
 			}
@@ -746,16 +945,51 @@ export function diff_asts(
 				const o_obj = o as Record<string, unknown>;
 				const c_obj = c as Record<string, unknown>;
 				const keys = new Set([...Object.keys(o_obj), ...Object.keys(c_obj)]);
+				const child_anchor =
+					superset_kinds !== null &&
+					typeof o_obj.type === 'string' &&
+					superset_kinds.has(o_obj.type)
+						? { type: o_obj.type, path }
+						: anchor;
 				for (const key of keys) {
 					const child_path = path === '' ? key : `${path}.${key}`;
 					const in_ours = key in o_obj;
 					const in_canonical = key in c_obj;
+					if (key === 'loc') {
+						if (in_ours && !in_canonical && superset_kinds !== null && has_span(o_obj)) {
+							const kind = superset_key(o_obj, path, anchor, superset_kinds, superset_text);
+							if (superset_kinds.has(kind)) {
+								loc_superset[kind] = (loc_superset[kind] ?? 0) + 1;
+								continue;
+							}
+						}
+						if (
+							in_ours &&
+							in_canonical &&
+							has_span(o_obj) &&
+							has_span(c_obj) &&
+							(o_obj.start !== c_obj.start || o_obj.end !== c_obj.end)
+						) {
+							// grade the half whose offset agrees; the other follows a span
+							// difference already graded at the span
+							const o_loc = o_obj.loc as Record<string, unknown> | null;
+							const c_loc = c_obj.loc as Record<string, unknown> | null;
+							for (const side of ['start', 'end'] as const) {
+								if (o_obj[side] === c_obj[side]) {
+									walk(o_loc?.[side], c_loc?.[side], `${child_path}.${side}`, c_loc, null);
+								} else {
+									loc_span_skipped++;
+								}
+							}
+							continue;
+						}
+					}
 					if (!in_ours) {
 						push('missing_ours', child_path, undefined, c_obj[key], c);
 					} else if (!in_canonical) {
 						push('missing_canonical', child_path, o_obj[key], undefined, c);
 					} else {
-						walk(o_obj[key], c_obj[key], child_path, c);
+						walk(o_obj[key], c_obj[key], child_path, c, child_anchor);
 					}
 				}
 				break;
@@ -765,8 +999,8 @@ export function diff_asts(
 		}
 	};
 
-	walk(ours, canonical, '', null);
-	return { diffs, truncated };
+	walk(ours, canonical, '', null, null);
+	return { diffs, truncated, loc_rows, loc_superset, loc_span_skipped };
 }
 
 // --- Reporting -------------------------------------------------------------------
@@ -843,8 +1077,15 @@ Options:
                      it multiplies canonical parses, and its findings are about spellings
                      no corpus contains rather than about the corpus
   --inject-terminators  The same, injecting a lone CR / U+2028 / U+2029 anywhere in the
-                     document — the spellings on which the two line classes disagree.
-                     Composes with --inject; the per-file budget is split between them
+                     document — where ECMAScript's terminators and \\n disagree, so its
+                     \`loc\` differences are all one tolerance row and it grades the span
+                     arm. Composes with --inject; the per-file budget is split between them
+  --fixtures         Treat <path> as a fixture tree: grade each fixture's parse-pinned
+                     documents (its input.* at its \`goal\` marker's goal, plus the variants an
+                     expected_<stem>.json pins) and nothing else. A _svelte_divergence input
+                     whose two parses equal its expected_ours.json / expected_svelte.json is
+                     classified \`fixture_declared_divergence\` on its span differences
+                     only. What \`deno task conformance\` runs over tests/fixtures
   --inject-limit <n> Injected variants per file, across all kinds (default 12).
                      0 = CENSUS: every site, no cap — the only mode whose finding set is
                      stable across fixture edits, and what wire:audit runs
@@ -919,7 +1160,7 @@ function group_to_json(g: DiffGroup, base_path: string) {
 
 /** The span-only arm's books, as the run hands them to the JSON report. */
 interface SpanReport {
-	stats: Map<SpanLanguage, SpanStats>;
+	stats: Map<Language, SpanStats>;
 	groups: DiffGroup[];
 	verdict_mismatches: SpanVerdictMismatch[];
 }
@@ -952,12 +1193,21 @@ function build_json_report(
 	stats: Map<Language, LanguageStats>,
 	groups: DiffGroup[],
 	span: SpanReport,
+	loc: LocBooks,
 	base_path: string
 ): Record<string, unknown> {
 	return {
 		stats: build_stats_block(stats),
 		groups: groups.map((g) => group_to_json(g, base_path)),
 		span_only: build_span_json(span, base_path),
+		loc_arm: {
+			checked: loc.checked,
+			violations: loc.violations.map((v) => ({ ...v, path: rel_path(v.path, base_path) })),
+			rows: loc.rows,
+			superset: loc.superset,
+			superset_kinds: loc.superset_kinds,
+			span_skipped: loc.span_skipped
+		},
 		errors: LANGUAGES.flatMap((lang) =>
 			results
 				.get(lang)!
@@ -1028,6 +1278,20 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		...(args['inject-terminators'] ? (['terminators'] as const) : [])
 	];
 	const injecting = inject_kinds.length > 0;
+	const fixtures_mode = args.fixtures;
+	if (fixtures_mode && (injecting || use_all_repos)) {
+		console.error(
+			'Error: --fixtures grades a fixture tree as authored; it takes neither --all nor --inject*'
+		);
+		Deno.exit(1);
+	}
+	if (fixtures_mode) {
+		console.log(
+			"Mode: fixture tree — each fixture's parse-pinned documents, at its `goal` marker's goal"
+		);
+	}
+	// `--fixtures`: documents whose differences were all their fixture's declared divergence.
+	let declared_divergences = 0;
 	if (injecting) {
 		console.log(
 			`Mode: +injection into Svelte inputs [${inject_kinds.join(', ')}] ` +
@@ -1048,16 +1312,19 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	}
 
 	// The span-only arm's own books, kept apart from the loc arm's so neither table blends
-	// the two wires. Every language is keyed (CSS stays empty) so `build_groups` reads it.
+	// the two wires.
 	const span_results: Map<Language, FileResult[]> = new Map(LANGUAGES.map((lang) => [lang, []]));
-	const span_stats_by_lang: Map<SpanLanguage, SpanStats> = new Map(
-		SPAN_ONLY_LANGUAGES.map((lang) => [lang, empty_span_stats()])
+	const span_stats_by_lang: Map<Language, SpanStats> = new Map(
+		LANGUAGES.map((lang) => [lang, empty_span_stats()])
 	);
 	const span_verdict_mismatches: SpanVerdictMismatch[] = [];
 	// Span-wire panics, held for `gate_on_panics` beside the loc arm's failures: a file
 	// whose loc wire throws a plain rejection while the span wire panics reads as
 	// both-errored (no verdict mismatch) and is skipped, so nothing else would see it.
 	const span_panics: CompareFailure[] = [];
+	// The loc arm's own books: tsv's loc wire against the definition (the reconstruction of
+	// its span-only wire — any violation fails), and the oracle departures it tolerated.
+	const loc_books = empty_loc_books();
 
 	const lang_counts: Record<Language, number> = { svelte: 0, typescript: 0, css: 0 };
 	// Inject-mode split of `lang_counts`: the base files parsed only to seed the
@@ -1078,8 +1345,11 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		if (filter_lang && lang !== filter_lang) continue;
 		const multibyte = has_non_ascii(file.content);
 		if (multibyte_only && !multibyte) continue;
+		const fixture = fixtures_mode ? fixture_document(file.path) : null;
+		if (fixtures_mode && fixture === null) continue;
 		if (limit && lang_counts[lang] >= limit) continue;
 		lang_counts[lang]++;
+		const goal = fixture?.goal ?? file.goal;
 
 		// In inject mode a base file is a CONTROL: it is parsed so its own divergences can
 		// be subtracted from its variants, and counted in neither the results nor the
@@ -1099,7 +1369,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		let ours: unknown;
 		let tsv_error: string | null = null;
 		try {
-			ours = native.parse(file.content, lang);
+			ours = native.parse(file.content, lang, goal);
 		} catch (e) {
 			tsv_error = String(e instanceof Error ? e.message : e).split('\n')[0];
 		}
@@ -1107,7 +1377,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		let canonical_error: string | null = null;
 		let canonical_raw: unknown;
 		try {
-			canonical_raw = canonical.parse(file.content, lang);
+			canonical_raw = canonical.parse(file.content, lang, goal);
 			// Serialize exactly like the fixture sidecar does (BigInt → string;
 			// RegExp values collapse to {}), so corpus and fixture semantics match.
 			canonical_ast = JSON.parse(JSON.stringify(canonical_raw, bigint_replacer));
@@ -1115,51 +1385,73 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 			canonical_error = String(e instanceof Error ? e.message : e).split('\n')[0];
 		}
 
-		// The span-only arm (see `SPAN_ONLY_LANGUAGES`). Off under injection: those runs
-		// grade manufactured variants against their own base files, and the subtraction
-		// that makes that sound is built for the loc arm's results alone.
-		if (!injecting && is_span_language(lang)) {
-			const span_stats = span_stats_by_lang.get(lang)!;
-			let ours_span: unknown;
-			let span_error: string | null = null;
-			try {
-				ours_span = native.parse_no_locations(file.content, lang);
-			} catch (e) {
-				span_error = String(e instanceof Error ? e.message : e).split('\n')[0];
-				if (is_native_panic_error(span_error)) {
-					span_panics.push({ path: file.path, error: span_error });
-				}
+		// The span-only arm (see `LOCATION_KEYS`). Its controls are recorded but not counted,
+		// like the loc arm's, so `subtract_baseline_diffs` can grade a variant against them.
+		const span_stats = span_stats_by_lang.get(lang)!;
+		let declared_divergence = false;
+		let ours_span: unknown;
+		let span_error: string | null = null;
+		try {
+			ours_span = native.parse_no_locations(file.content, lang, goal);
+		} catch (e) {
+			span_error = String(e instanceof Error ? e.message : e).split('\n')[0];
+			if (is_native_panic_error(span_error)) {
+				span_panics.push({ path: file.path, error: span_error });
 			}
-			if ((span_error === null) !== (tsv_error === null)) {
-				span_stats.verdict_mismatch++;
-				span_verdict_mismatches.push({
-					path: file.path,
-					language: lang,
-					loc_wire: tsv_error ?? 'parsed',
-					span_wire: span_error ?? 'parsed'
-				});
-			} else if (span_error === null && canonical_error === null) {
-				span_stats.compared++;
-				const canonical_span = JSON.parse(JSON.stringify(canonical_raw, span_only_replacer));
-				const span = diff_asts(ours_span, canonical_span, {
-					source: file.content,
-					canonical_root: canonical_span
-				});
-				if (span.diffs.length === 0) {
-					span_stats.match++;
-				} else {
-					const all_documented = span.diffs.every((d) => d.documented !== null);
+		}
+		if ((span_error === null) !== (tsv_error === null)) {
+			span_stats.verdict_mismatch++;
+			span_verdict_mismatches.push({
+				path: file.path,
+				language: lang,
+				loc_wire: tsv_error ?? 'parsed',
+				span_wire: span_error ?? 'parsed'
+			});
+		} else if (span_error === null && canonical_error === null) {
+			if (!is_control) span_stats.compared++;
+			const canonical_span = JSON.parse(JSON.stringify(canonical_raw, span_only_replacer));
+			// A `_svelte_divergence` fixture's difference is declared only while both parses
+			// still ARE its committed pins — the moment either moves, every difference grades.
+			declared_divergence =
+				fixture?.declared != null &&
+				first_difference(ours_span, fixture.declared.ours) === null &&
+				first_difference(canonical_span, fixture.declared.svelte) === null;
+			if (declared_divergence) declared_divergences++;
+			const span = diff_asts(ours_span, canonical_span, {
+				source: file.content,
+				canonical_root: canonical_span,
+				language: lang,
+				declared_divergence
+			});
+			if (span.diffs.length === 0) {
+				if (!is_control) span_stats.match++;
+			} else {
+				const all_documented = span.diffs.every((d) => d.documented !== null);
+				if (!is_control) {
 					if (all_documented) span_stats.documented++;
 					else span_stats.undocumented++;
-					span_results.get(lang)!.push({
-						path: file.path,
-						bytes: file.bytes,
-						multibyte,
-						status: all_documented ? 'documented' : 'undocumented',
-						diffs: span.diffs,
-						truncated: span.truncated
-					});
 				}
+				span_results.get(lang)!.push({
+					path: file.path,
+					bytes: file.bytes,
+					multibyte,
+					status: all_documented ? 'documented' : 'undocumented',
+					diffs: span.diffs,
+					truncated: span.truncated
+				});
+			}
+		}
+
+		// The definition check, ahead of the oracle: tsv's loc wire must equal the shipped
+		// reconstruction of its span-only wire. A violation is a tsv bug on every run —
+		// controls included, since a control's loc wire is no less tsv's — and is never
+		// tolerated. The reconstruction runs on a clone, so the span arm's stored samples
+		// above keep the span-only wire they graded.
+		if (tsv_error === null && span_error === null) {
+			const violation = loc_definition_violation(ours, ours_span, file.content, lang);
+			loc_books.checked[lang]++;
+			if (violation !== null) {
+				loc_books.violations.push({ path: file.path, language: lang, difference: violation });
 			}
 		}
 
@@ -1186,13 +1478,21 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 			if (multibyte) lang_stats.multibyte++;
 		}
 
-		const { diffs, truncated } = diff_asts(ours, canonical_ast, {
-			source: file.content,
-			canonical_root: canonical_ast
-		});
+		const { diffs, truncated, loc_rows, loc_superset, loc_span_skipped } = diff_asts(
+			ours,
+			canonical_ast,
+			{ source: file.content, canonical_root: canonical_ast, language: lang, declared_divergence }
+		);
+		if (!is_control)
+			record_loc_tolerances(loc_books, lang, loc_rows, loc_superset, loc_span_skipped);
 		if (diffs.length === 0) {
-			if (!is_control) lang_stats.match++;
-			continue; // exact matches are counted, not stored
+			// exact matches are counted, not stored — and so is a file whose only differences
+			// are tolerated `loc` rows, which is documented rather than exact
+			if (!is_control) {
+				if (Object.keys(loc_rows).length > 0) lang_stats.documented++;
+				else lang_stats.match++;
+			}
+			continue;
 		}
 
 		const all_documented = diffs.every((d) => d.documented !== null);
@@ -1251,6 +1551,16 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 			// the right home for it.
 			s.tsv_errors = count('tsv_error');
 			s.canonical_errors = count('canonical_error');
+
+			// The span arm, the same way. Its rows hold only diverging files (its parse
+			// failures are the loc arm's to count), so the pass reduces to the signature
+			// subtraction, and `match` is re-derived for the same reason as above.
+			const span_kept = subtract_baseline_diffs(span_results.get(lang)!);
+			span_results.set(lang, span_kept);
+			const ss = span_stats_by_lang.get(lang)!;
+			ss.undocumented = span_kept.filter((r) => r.status === 'undocumented').length;
+			ss.documented = span_kept.filter((r) => r.status === 'documented').length;
+			ss.match = ss.compared - ss.documented - ss.undocumented;
 		}
 	}
 
@@ -1266,6 +1576,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 					stats,
 					[],
 					{ stats: span_stats_by_lang, groups: [], verdict_mismatches: [] },
+					loc_books,
 					base_path
 				)
 			);
@@ -1337,7 +1648,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	}
 
 	// The span-only arm's table: the same deep diff over the `no-locations` wire, against
-	// the oracle with its line/column objects stripped (see `SPAN_ONLY_LANGUAGES`).
+	// the oracle with its line/column objects stripped (see `LOCATION_KEYS`).
 	const span_totals = empty_span_stats();
 	for (const s of span_stats_by_lang.values()) {
 		span_totals.compared += s.compared;
@@ -1346,7 +1657,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		span_totals.undocumented += s.undocumented;
 		span_totals.verdict_mismatch += s.verdict_mismatch;
 	}
-	if (!injecting && span_totals.compared + span_totals.verdict_mismatch > 0) {
+	if (span_totals.compared + span_totals.verdict_mismatch > 0) {
 		console.log('\nSpan-only arm (no-locations wire vs canonical with `loc`/`name_loc` stripped):');
 		const rows: [string, SpanStats][] = [
 			...[...span_stats_by_lang].filter(([, s]) => s.compared + s.verdict_mismatch > 0),
@@ -1366,6 +1677,40 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		}
 	}
 
+	// The loc arm's own lines: the definition check (tsv's loc wire against the
+	// reconstruction of its span-only wire), then what the oracle comparison tolerated.
+	const loc_checked = LANGUAGES.reduce((n, lang) => n + loc_books.checked[lang], 0);
+	console.log(
+		`\nLoc arm: definition check over ${loc_checked} files — ` +
+			(loc_books.violations.length === 0
+				? "tsv's loc wire is the reconstruction of its span-only wire on every one"
+				: `\x1b[31m${loc_books.violations.length} VIOLATION(S)\x1b[0m`)
+	);
+	const superset_total = LANGUAGES.reduce((n, lang) => n + loc_books.superset[lang], 0);
+	const span_skipped_total = LANGUAGES.reduce((n, lang) => n + loc_books.span_skipped[lang], 0);
+	console.log(
+		`  superset (tsv \`loc\`, oracle none): ${superset_total} objects` +
+			` (${LANGUAGES.filter((l) => loc_books.superset[l] > 0)
+				.map((l) => {
+					const kinds = Object.keys(loc_books.superset_kinds[l]).length;
+					return `${l} ${loc_books.superset[l]} over ${kinds} pinned kinds`;
+				})
+				.join(', ')})` +
+			` | halves left to the span grading (offsets differ): ${span_skipped_total}`
+	);
+	if (fixtures_mode) {
+		console.log(
+			`  _svelte_divergence inputs at their committed pins (their span difference is the declared one): ${declared_divergences}`
+		);
+	}
+	console.log('  tolerance rows (oracle departs from the definition; Svelte only):');
+	LOC_ROWS.forEach((row, i) => {
+		const r = loc_books.rows[row];
+		console.log(
+			`    ${i + 1}. ${row.padEnd(24)} ${String(r.files).padStart(5)} files ${String(r.sites).padStart(7)} sites`
+		);
+	});
+
 	const groups = build_groups(results);
 	const undocumented_groups = groups.filter((g) => g.documented === null);
 	const documented_groups = groups.filter((g) => g.documented !== null);
@@ -1383,6 +1728,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 					groups: span_groups,
 					verdict_mismatches: span_verdict_mismatches
 				},
+				loc_books,
 				base_path
 			)
 		);
@@ -1417,26 +1763,31 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 
 	// The span-only arm's vacuity guard, structural rather than pinned: it diffs exactly the
 	// files the loc arm compares (both tsv wires and the oracle parsed — a verdict mismatch
-	// fails on its own), so per language its `compared` must EQUAL the loc arm's. An arm
-	// that silently stopped running would otherwise read as zero findings, not a failure.
-	// Unlike a count pin this holds on a narrowed root too, and a corpus refresh costs no
-	// re-pin. Off under injection, where the arm does not run, and for a language with a
+	// fails on its own), so per language its `compared` must EQUAL the loc arm's — controls
+	// excluded from both under injection. An arm that silently stopped running would
+	// otherwise read as zero findings, not a failure. Unlike a count pin this holds on a
+	// narrowed root too, and a corpus refresh costs no re-pin. Skipped for a language with a
 	// verdict mismatch, which the loc arm counts and the span arm cannot — that failure
-	// reports itself below, with its paths.
-	if (!injecting) {
-		const span_population_failures = SPAN_ONLY_LANGUAGES.filter((lang) => {
-			const span = span_stats_by_lang.get(lang)!;
-			return span.verdict_mismatch === 0 && span.compared !== stats.get(lang)!.compared;
-		}).map(
-			(lang) =>
-				`${lang} span-only compared ${span_stats_by_lang.get(lang)!.compared} ≠ loc-arm compared ${stats.get(lang)!.compared}`
-		);
-		if (span_population_failures.length > 0) {
-			console.log(
-				`\x1b[31mFAIL: span-only arm population — ${span_population_failures.join('; ')}\x1b[0m`
-			);
-			exit_compare_failure(impls);
+	// reports itself below, with its paths. The definition check rides the same guard: it
+	// runs on every file both tsv wires parsed, so it can never have checked fewer than the
+	// loc arm compared.
+	const population_failures = LANGUAGES.flatMap((lang) => {
+		const span = span_stats_by_lang.get(lang)!;
+		const compared = stats.get(lang)!.compared;
+		const out: string[] = [];
+		if (span.verdict_mismatch === 0 && span.compared !== compared) {
+			out.push(`${lang} span-only compared ${span.compared} ≠ loc-arm compared ${compared}`);
 		}
+		if (span.verdict_mismatch === 0 && loc_books.checked[lang] < compared) {
+			out.push(
+				`${lang} loc definition checked ${loc_books.checked[lang]} < loc-arm compared ${compared}`
+			);
+		}
+		return out;
+	});
+	if (population_failures.length > 0) {
+		console.log(`\x1b[31mFAIL: arm population — ${population_failures.join('; ')}\x1b[0m`);
+		exit_compare_failure(impls);
 	}
 
 	// Pinned counts (--all only — see lib/gate_counts.ts): EXACT per-language
@@ -1500,6 +1851,16 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		}
 	}
 
+	if (loc_books.violations.length > 0) {
+		console.log(
+			`\n\x1b[31mLOC DEFINITION VIOLATIONS — tsv's loc wire is not the reconstruction of its span-only wire (${loc_books.violations.length}):\x1b[0m`
+		);
+		for (const v of loc_books.violations.slice(0, 10)) {
+			console.log(`  [${v.language}] ${rel_path(v.path, base_path)}`);
+			console.log(`    wire vs reconstruct at ${v.difference}`);
+		}
+	}
+
 	// Documented groups — compact summary only
 	if (documented_groups.length > 0) {
 		console.log(`\nDocumented divergence groups (${documented_groups.length}):`);
@@ -1533,6 +1894,9 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 			: []),
 		...(span_totals.verdict_mismatch > 0
 			? [`${span_totals.verdict_mismatch} file(s) the loc and span-only wires parse differently`]
+			: []),
+		...(loc_books.violations.length > 0
+			? [`${loc_books.violations.length} file(s) whose loc wire breaks the loc definition`]
 			: [])
 	];
 	if (failures.length > 0) {
@@ -1540,9 +1904,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		exit_compare_failure(impls);
 	} else {
 		console.log(
-			injecting
-				? '\x1b[32mPASS: no undocumented AST diffs vs canonical\x1b[0m'
-				: '\x1b[32mPASS: no undocumented AST diffs vs canonical, on either wire\x1b[0m'
+			'\x1b[32mPASS: no undocumented AST diffs vs canonical, on either wire, and the loc wire is the definition\x1b[0m'
 		);
 	}
 
@@ -1557,17 +1919,26 @@ function build_error_json_report(message: string): Record<string, unknown> {
 	const empty: Map<Language, LanguageStats> = new Map(
 		LANGUAGES.map((lang) => [lang, empty_stats()])
 	);
+	const empty_loc = empty_loc_books();
 	return {
 		stats: build_stats_block(empty),
 		groups: [],
 		span_only: build_span_json(
 			{
-				stats: new Map(SPAN_ONLY_LANGUAGES.map((lang) => [lang, empty_span_stats()])),
+				stats: new Map(LANGUAGES.map((lang) => [lang, empty_span_stats()])),
 				groups: [],
 				verdict_mismatches: []
 			},
 			''
 		),
+		loc_arm: {
+			checked: empty_loc.checked,
+			violations: [],
+			rows: empty_loc.rows,
+			superset: empty_loc.superset,
+			superset_kinds: empty_loc.superset_kinds,
+			span_skipped: empty_loc.span_skipped
+		},
 		errors: [],
 		truncated_files: [],
 		error: message

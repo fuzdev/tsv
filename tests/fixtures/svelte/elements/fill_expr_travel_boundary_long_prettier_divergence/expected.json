@@ -25,18 +25,6 @@
 				"start": 173,
 				"end": 387,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 1,
-						"character": 174
-					},
-					"end": {
-						"line": 3,
-						"column": 2,
-						"character": 175
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -56,30 +44,10 @@
 								"type": "BinaryExpression",
 								"start": 265,
 								"end": 280,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 2
-									},
-									"end": {
-										"line": 5,
-										"column": 17
-									}
-								},
 								"left": {
 									"type": "Literal",
 									"start": 265,
 									"end": 271,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 2
-										},
-										"end": {
-											"line": 5,
-											"column": 8
-										}
-									},
 									"value": "rrrr",
 									"raw": "'rrrr'"
 								},
@@ -88,16 +56,6 @@
 									"type": "Literal",
 									"start": 274,
 									"end": 280,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 11
-										},
-										"end": {
-											"line": 5,
-											"column": 17
-										}
-									},
 									"value": "ssss",
 									"raw": "'ssss'"
 								}

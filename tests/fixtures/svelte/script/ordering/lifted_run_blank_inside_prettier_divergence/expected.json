@@ -65,18 +65,6 @@
 				"start": 101,
 				"end": 109,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 14,
-						"column": 1,
-						"character": 102
-					},
-					"end": {
-						"line": 14,
-						"column": 2,
-						"character": 103
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -103,18 +91,6 @@
 				"start": 110,
 				"end": 118,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 15,
-						"column": 1,
-						"character": 111
-					},
-					"end": {
-						"line": 15,
-						"column": 2,
-						"character": 112
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -149,60 +125,20 @@
 			"type": "Program",
 			"start": 28,
 			"end": 37,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 0
-				},
-				"end": {
-					"line": 5,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 30,
 					"end": 36,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 7
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 34,
 							"end": 35,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 5
-								},
-								"end": {
-									"line": 4,
-									"column": 6
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 34,
 								"end": 35,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 5
-									},
-									"end": {
-										"line": 4,
-										"column": 6
-									}
-								},
 								"name": "m"
 							},
 							"init": null
@@ -225,18 +161,6 @@
 				"start": 21,
 				"end": 27,
 				"name": "module",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 8,
-						"character": 21
-					},
-					"end": {
-						"line": 3,
-						"column": 14,
-						"character": 27
-					}
-				},
 				"value": true
 			}
 		]
@@ -250,60 +174,20 @@
 			"type": "Program",
 			"start": 81,
 			"end": 90,
-			"loc": {
-				"start": {
-					"line": 10,
-					"column": 0
-				},
-				"end": {
-					"line": 12,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 83,
 					"end": 89,
-					"loc": {
-						"start": {
-							"line": 11,
-							"column": 1
-						},
-						"end": {
-							"line": 11,
-							"column": 7
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 87,
 							"end": 88,
-							"loc": {
-								"start": {
-									"line": 11,
-									"column": 5
-								},
-								"end": {
-									"line": 11,
-									"column": 6
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 87,
 								"end": 88,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 5
-									},
-									"end": {
-										"line": 11,
-										"column": 6
-									}
-								},
 								"name": "a"
 							},
 							"init": null

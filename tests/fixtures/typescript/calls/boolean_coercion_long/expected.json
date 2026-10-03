@@ -14,81 +14,31 @@
 			"type": "Block",
 			"value": " Two arguments is not a coercion - 100 chars, the chain stays inline ",
 			"start": 10,
-			"end": 83,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 74
-				}
-			}
+			"end": 83
 		},
 		{
 			"type": "Block",
 			"value": " 101 chars - the chain breaks with continuation indent ",
 			"start": 217,
-			"end": 276,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 1
-				},
-				"end": {
-					"line": 8,
-					"column": 60
-				}
-			}
+			"end": 276
 		},
 		{
 			"type": "Block",
 			"value": " Optional call is not a coercion - continuation indent ",
 			"start": 414,
-			"end": 473,
-			"loc": {
-				"start": {
-					"line": 15,
-					"column": 1
-				},
-				"end": {
-					"line": 15,
-					"column": 60
-				}
-			}
+			"end": 473
 		},
 		{
 			"type": "Block",
 			"value": " new Boolean() is not a coercion - continuation indent ",
 			"start": 605,
-			"end": 664,
-			"loc": {
-				"start": {
-					"line": 21,
-					"column": 1
-				},
-				"end": {
-					"line": 21,
-					"column": 60
-				}
-			}
+			"end": 664
 		},
 		{
 			"type": "Block",
 			"value": " Coercion heading a member chain - no continuation indent ",
 			"start": 798,
-			"end": 860,
-			"loc": {
-				"start": {
-					"line": 27,
-					"column": 1
-				},
-				"end": {
-					"line": 27,
-					"column": 63
-				}
-			}
+			"end": 860
 		}
 	],
 	"instance": {
@@ -100,90 +50,30 @@
 			"type": "Program",
 			"start": 8,
 			"end": 1136,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 36,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 85,
 					"end": 214,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 3
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 91,
 							"end": 213,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 7
-								},
-								"end": {
-									"line": 6,
-									"column": 2
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 91,
 								"end": 92,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 7
-									},
-									"end": {
-										"line": 3,
-										"column": 8
-									}
-								},
 								"name": "a"
 							},
 							"init": {
 								"type": "CallExpression",
 								"start": 95,
 								"end": 213,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 11
-									},
-									"end": {
-										"line": 6,
-										"column": 2
-									}
-								},
 								"callee": {
 									"type": "Identifier",
 									"start": 95,
 									"end": 102,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 11
-										},
-										"end": {
-											"line": 3,
-											"column": 18
-										}
-									},
 									"name": "Boolean"
 								},
 								"arguments": [
@@ -191,30 +81,10 @@
 										"type": "LogicalExpression",
 										"start": 106,
 										"end": 201,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 2
-											},
-											"end": {
-												"line": 4,
-												"column": 97
-											}
-										},
 										"left": {
 											"type": "Identifier",
 											"start": 106,
 											"end": 140,
-											"loc": {
-												"start": {
-													"line": 4,
-													"column": 2
-												},
-												"end": {
-													"line": 4,
-													"column": 36
-												}
-											},
 											"name": "cond_aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 										},
 										"operator": "||",
@@ -222,16 +92,6 @@
 											"type": "Identifier",
 											"start": 144,
 											"end": 201,
-											"loc": {
-												"start": {
-													"line": 4,
-													"column": 40
-												},
-												"end": {
-													"line": 4,
-													"column": 97
-												}
-											},
 											"name": "cond_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 										}
 									},
@@ -239,16 +99,6 @@
 										"type": "Identifier",
 										"start": 205,
 										"end": 210,
-										"loc": {
-											"start": {
-												"line": 5,
-												"column": 2
-											},
-											"end": {
-												"line": 5,
-												"column": 7
-											}
-										},
 										"name": "other"
 									}
 								],
@@ -270,75 +120,25 @@
 					"type": "VariableDeclaration",
 					"start": 278,
 					"end": 411,
-					"loc": {
-						"start": {
-							"line": 9,
-							"column": 1
-						},
-						"end": {
-							"line": 13,
-							"column": 3
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 284,
 							"end": 410,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 7
-								},
-								"end": {
-									"line": 13,
-									"column": 2
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 284,
 								"end": 285,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 7
-									},
-									"end": {
-										"line": 9,
-										"column": 8
-									}
-								},
 								"name": "b"
 							},
 							"init": {
 								"type": "CallExpression",
 								"start": 288,
 								"end": 410,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 11
-									},
-									"end": {
-										"line": 13,
-										"column": 2
-									}
-								},
 								"callee": {
 									"type": "Identifier",
 									"start": 288,
 									"end": 295,
-									"loc": {
-										"start": {
-											"line": 9,
-											"column": 11
-										},
-										"end": {
-											"line": 9,
-											"column": 18
-										}
-									},
 									"name": "Boolean"
 								},
 								"arguments": [
@@ -346,30 +146,10 @@
 										"type": "LogicalExpression",
 										"start": 299,
 										"end": 398,
-										"loc": {
-											"start": {
-												"line": 10,
-												"column": 2
-											},
-											"end": {
-												"line": 11,
-												"column": 61
-											}
-										},
 										"left": {
 											"type": "Identifier",
 											"start": 299,
 											"end": 333,
-											"loc": {
-												"start": {
-													"line": 10,
-													"column": 2
-												},
-												"end": {
-													"line": 10,
-													"column": 36
-												}
-											},
 											"name": "cond_aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 										},
 										"operator": "||",
@@ -377,16 +157,6 @@
 											"type": "Identifier",
 											"start": 340,
 											"end": 398,
-											"loc": {
-												"start": {
-													"line": 11,
-													"column": 3
-												},
-												"end": {
-													"line": 11,
-													"column": 61
-												}
-											},
 											"name": "cond_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 										}
 									},
@@ -394,16 +164,6 @@
 										"type": "Identifier",
 										"start": 402,
 										"end": 407,
-										"loc": {
-											"start": {
-												"line": 12,
-												"column": 2
-											},
-											"end": {
-												"line": 12,
-												"column": 7
-											}
-										},
 										"name": "other"
 									}
 								],
@@ -425,89 +185,29 @@
 					"type": "VariableDeclaration",
 					"start": 475,
 					"end": 602,
-					"loc": {
-						"start": {
-							"line": 16,
-							"column": 1
-						},
-						"end": {
-							"line": 19,
-							"column": 3
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 481,
 							"end": 601,
-							"loc": {
-								"start": {
-									"line": 16,
-									"column": 7
-								},
-								"end": {
-									"line": 19,
-									"column": 2
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 481,
 								"end": 482,
-								"loc": {
-									"start": {
-										"line": 16,
-										"column": 7
-									},
-									"end": {
-										"line": 16,
-										"column": 8
-									}
-								},
 								"name": "c"
 							},
 							"init": {
 								"type": "ChainExpression",
 								"start": 485,
 								"end": 601,
-								"loc": {
-									"start": {
-										"line": 16,
-										"column": 11
-									},
-									"end": {
-										"line": 19,
-										"column": 2
-									}
-								},
 								"expression": {
 									"type": "CallExpression",
 									"start": 485,
 									"end": 601,
-									"loc": {
-										"start": {
-											"line": 16,
-											"column": 11
-										},
-										"end": {
-											"line": 19,
-											"column": 2
-										}
-									},
 									"callee": {
 										"type": "Identifier",
 										"start": 485,
 										"end": 492,
-										"loc": {
-											"start": {
-												"line": 16,
-												"column": 11
-											},
-											"end": {
-												"line": 16,
-												"column": 18
-											}
-										},
 										"name": "Boolean"
 									},
 									"arguments": [
@@ -515,30 +215,10 @@
 											"type": "LogicalExpression",
 											"start": 498,
 											"end": 598,
-											"loc": {
-												"start": {
-													"line": 17,
-													"column": 2
-												},
-												"end": {
-													"line": 18,
-													"column": 62
-												}
-											},
 											"left": {
 												"type": "Identifier",
 												"start": 498,
 												"end": 532,
-												"loc": {
-													"start": {
-														"line": 17,
-														"column": 2
-													},
-													"end": {
-														"line": 17,
-														"column": 36
-													}
-												},
 												"name": "cond_aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 											},
 											"operator": "||",
@@ -546,16 +226,6 @@
 												"type": "Identifier",
 												"start": 539,
 												"end": 598,
-												"loc": {
-													"start": {
-														"line": 18,
-														"column": 3
-													},
-													"end": {
-														"line": 18,
-														"column": 62
-													}
-												},
 												"name": "cond_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 											}
 										}
@@ -579,75 +249,25 @@
 					"type": "VariableDeclaration",
 					"start": 666,
 					"end": 795,
-					"loc": {
-						"start": {
-							"line": 22,
-							"column": 1
-						},
-						"end": {
-							"line": 25,
-							"column": 3
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 672,
 							"end": 794,
-							"loc": {
-								"start": {
-									"line": 22,
-									"column": 7
-								},
-								"end": {
-									"line": 25,
-									"column": 2
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 672,
 								"end": 673,
-								"loc": {
-									"start": {
-										"line": 22,
-										"column": 7
-									},
-									"end": {
-										"line": 22,
-										"column": 8
-									}
-								},
 								"name": "d"
 							},
 							"init": {
 								"type": "NewExpression",
 								"start": 676,
 								"end": 794,
-								"loc": {
-									"start": {
-										"line": 22,
-										"column": 11
-									},
-									"end": {
-										"line": 25,
-										"column": 2
-									}
-								},
 								"callee": {
 									"type": "Identifier",
 									"start": 680,
 									"end": 687,
-									"loc": {
-										"start": {
-											"line": 22,
-											"column": 15
-										},
-										"end": {
-											"line": 22,
-											"column": 22
-										}
-									},
 									"name": "Boolean"
 								},
 								"arguments": [
@@ -655,30 +275,10 @@
 										"type": "LogicalExpression",
 										"start": 691,
 										"end": 791,
-										"loc": {
-											"start": {
-												"line": 23,
-												"column": 2
-											},
-											"end": {
-												"line": 24,
-												"column": 62
-											}
-										},
 										"left": {
 											"type": "Identifier",
 											"start": 691,
 											"end": 725,
-											"loc": {
-												"start": {
-													"line": 23,
-													"column": 2
-												},
-												"end": {
-													"line": 23,
-													"column": 36
-												}
-											},
 											"name": "cond_aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 										},
 										"operator": "||",
@@ -686,16 +286,6 @@
 											"type": "Identifier",
 											"start": 732,
 											"end": 791,
-											"loc": {
-												"start": {
-													"line": 24,
-													"column": 3
-												},
-												"end": {
-													"line": 24,
-													"column": 62
-												}
-											},
 											"name": "cond_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 										}
 									}
@@ -717,103 +307,33 @@
 					"type": "VariableDeclaration",
 					"start": 862,
 					"end": 997,
-					"loc": {
-						"start": {
-							"line": 28,
-							"column": 1
-						},
-						"end": {
-							"line": 31,
-							"column": 14
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 868,
 							"end": 996,
-							"loc": {
-								"start": {
-									"line": 28,
-									"column": 7
-								},
-								"end": {
-									"line": 31,
-									"column": 13
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 868,
 								"end": 869,
-								"loc": {
-									"start": {
-										"line": 28,
-										"column": 7
-									},
-									"end": {
-										"line": 28,
-										"column": 8
-									}
-								},
 								"name": "e"
 							},
 							"init": {
 								"type": "CallExpression",
 								"start": 872,
 								"end": 996,
-								"loc": {
-									"start": {
-										"line": 28,
-										"column": 11
-									},
-									"end": {
-										"line": 31,
-										"column": 13
-									}
-								},
 								"callee": {
 									"type": "MemberExpression",
 									"start": 872,
 									"end": 994,
-									"loc": {
-										"start": {
-											"line": 28,
-											"column": 11
-										},
-										"end": {
-											"line": 31,
-											"column": 11
-										}
-									},
 									"object": {
 										"type": "CallExpression",
 										"start": 872,
 										"end": 985,
-										"loc": {
-											"start": {
-												"line": 28,
-												"column": 11
-											},
-											"end": {
-												"line": 31,
-												"column": 2
-											}
-										},
 										"callee": {
 											"type": "Identifier",
 											"start": 872,
 											"end": 879,
-											"loc": {
-												"start": {
-													"line": 28,
-													"column": 11
-												},
-												"end": {
-													"line": 28,
-													"column": 18
-												}
-											},
 											"name": "Boolean"
 										},
 										"arguments": [
@@ -821,30 +341,10 @@
 												"type": "LogicalExpression",
 												"start": 883,
 												"end": 982,
-												"loc": {
-													"start": {
-														"line": 29,
-														"column": 2
-													},
-													"end": {
-														"line": 30,
-														"column": 61
-													}
-												},
 												"left": {
 													"type": "Identifier",
 													"start": 883,
 													"end": 917,
-													"loc": {
-														"start": {
-															"line": 29,
-															"column": 2
-														},
-														"end": {
-															"line": 29,
-															"column": 36
-														}
-													},
 													"name": "cond_aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 												},
 												"operator": "||",
@@ -852,16 +352,6 @@
 													"type": "Identifier",
 													"start": 923,
 													"end": 982,
-													"loc": {
-														"start": {
-															"line": 30,
-															"column": 2
-														},
-														"end": {
-															"line": 30,
-															"column": 61
-														}
-													},
 													"name": "cond_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 												}
 											}
@@ -872,16 +362,6 @@
 										"type": "Identifier",
 										"start": 986,
 										"end": 994,
-										"loc": {
-											"start": {
-												"line": 31,
-												"column": 3
-											},
-											"end": {
-												"line": 31,
-												"column": 11
-											}
-										},
 										"name": "toString"
 									},
 									"computed": false,
@@ -906,117 +386,37 @@
 					"type": "VariableDeclaration",
 					"start": 999,
 					"end": 1135,
-					"loc": {
-						"start": {
-							"line": 32,
-							"column": 1
-						},
-						"end": {
-							"line": 35,
-							"column": 15
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 1005,
 							"end": 1134,
-							"loc": {
-								"start": {
-									"line": 32,
-									"column": 7
-								},
-								"end": {
-									"line": 35,
-									"column": 14
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 1005,
 								"end": 1006,
-								"loc": {
-									"start": {
-										"line": 32,
-										"column": 7
-									},
-									"end": {
-										"line": 32,
-										"column": 8
-									}
-								},
 								"name": "f"
 							},
 							"init": {
 								"type": "ChainExpression",
 								"start": 1009,
 								"end": 1134,
-								"loc": {
-									"start": {
-										"line": 32,
-										"column": 11
-									},
-									"end": {
-										"line": 35,
-										"column": 14
-									}
-								},
 								"expression": {
 									"type": "CallExpression",
 									"start": 1009,
 									"end": 1134,
-									"loc": {
-										"start": {
-											"line": 32,
-											"column": 11
-										},
-										"end": {
-											"line": 35,
-											"column": 14
-										}
-									},
 									"callee": {
 										"type": "MemberExpression",
 										"start": 1009,
 										"end": 1132,
-										"loc": {
-											"start": {
-												"line": 32,
-												"column": 11
-											},
-											"end": {
-												"line": 35,
-												"column": 12
-											}
-										},
 										"object": {
 											"type": "CallExpression",
 											"start": 1009,
 											"end": 1122,
-											"loc": {
-												"start": {
-													"line": 32,
-													"column": 11
-												},
-												"end": {
-													"line": 35,
-													"column": 2
-												}
-											},
 											"callee": {
 												"type": "Identifier",
 												"start": 1009,
 												"end": 1016,
-												"loc": {
-													"start": {
-														"line": 32,
-														"column": 11
-													},
-													"end": {
-														"line": 32,
-														"column": 18
-													}
-												},
 												"name": "Boolean"
 											},
 											"arguments": [
@@ -1024,30 +424,10 @@
 													"type": "LogicalExpression",
 													"start": 1020,
 													"end": 1119,
-													"loc": {
-														"start": {
-															"line": 33,
-															"column": 2
-														},
-														"end": {
-															"line": 34,
-															"column": 61
-														}
-													},
 													"left": {
 														"type": "Identifier",
 														"start": 1020,
 														"end": 1054,
-														"loc": {
-															"start": {
-																"line": 33,
-																"column": 2
-															},
-															"end": {
-																"line": 33,
-																"column": 36
-															}
-														},
 														"name": "cond_aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 													},
 													"operator": "||",
@@ -1055,16 +435,6 @@
 														"type": "Identifier",
 														"start": 1060,
 														"end": 1119,
-														"loc": {
-															"start": {
-																"line": 34,
-																"column": 2
-															},
-															"end": {
-																"line": 34,
-																"column": 61
-															}
-														},
 														"name": "cond_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 													}
 												}
@@ -1075,16 +445,6 @@
 											"type": "Identifier",
 											"start": 1124,
 											"end": 1132,
-											"loc": {
-												"start": {
-													"line": 35,
-													"column": 4
-												},
-												"end": {
-													"line": 35,
-													"column": 12
-												}
-											},
 											"name": "toString"
 										},
 										"computed": false,

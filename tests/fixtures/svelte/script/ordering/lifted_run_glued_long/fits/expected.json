@@ -19,18 +19,6 @@
 				"start": 73,
 				"end": 92,
 				"name": "svelte:document",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 46,
-						"character": 74
-					},
-					"end": {
-						"line": 5,
-						"column": 61,
-						"character": 89
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -49,18 +37,6 @@
 				"start": 96,
 				"end": 113,
 				"name": "svelte:window",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 69,
-						"character": 97
-					},
-					"end": {
-						"line": 5,
-						"column": 82,
-						"character": 110
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -79,18 +55,6 @@
 				"start": 129,
 				"end": 137,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 6,
-						"column": 1,
-						"character": 130
-					},
-					"end": {
-						"line": 6,
-						"column": 2,
-						"character": 131
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -120,16 +84,6 @@
 					"type": "Identifier",
 					"start": 232,
 					"end": 233,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 94
-						},
-						"end": {
-							"line": 7,
-							"column": 95
-						}
-					},
 					"name": "c"
 				}
 			},
@@ -153,60 +107,20 @@
 			"type": "Program",
 			"start": 8,
 			"end": 17,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 3,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 10,
 					"end": 16,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 7
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 14,
 							"end": 15,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 5
-								},
-								"end": {
-									"line": 2,
-									"column": 6
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 14,
 								"end": 15,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 5
-									},
-									"end": {
-										"line": 2,
-										"column": 6
-									}
-								},
 								"name": "a"
 							},
 							"init": null

@@ -25,36 +25,12 @@
 				"start": 78,
 				"end": 110,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 79
-					},
-					"end": {
-						"line": 2,
-						"column": 4,
-						"character": 82
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 84,
 						"end": 102,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 3,
-								"column": 1,
-								"character": 84
-							},
-							"end": {
-								"line": 3,
-								"column": 10,
-								"character": 93
-							}
-						},
 						"value": [
 							{
 								"start": 95,
@@ -96,36 +72,12 @@
 				"start": 171,
 				"end": 200,
 				"name": "input",
-				"name_loc": {
-					"start": {
-						"line": 8,
-						"column": 1,
-						"character": 172
-					},
-					"end": {
-						"line": 8,
-						"column": 6,
-						"character": 177
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 179,
 						"end": 197,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 9,
-								"column": 1,
-								"character": 179
-							},
-							"end": {
-								"line": 9,
-								"column": 10,
-								"character": 188
-							}
-						},
 						"value": [
 							{
 								"start": 190,
@@ -167,36 +119,12 @@
 				"start": 269,
 				"end": 323,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 14,
-						"column": 1,
-						"character": 270
-					},
-					"end": {
-						"line": 14,
-						"column": 4,
-						"character": 273
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 275,
 						"end": 294,
 						"name": "data-attr1",
-						"name_loc": {
-							"start": {
-								"line": 15,
-								"column": 1,
-								"character": 275
-							},
-							"end": {
-								"line": 15,
-								"column": 11,
-								"character": 285
-							}
-						},
 						"value": [
 							{
 								"start": 287,
@@ -212,18 +140,6 @@
 						"start": 296,
 						"end": 315,
 						"name": "data-attr2",
-						"name_loc": {
-							"start": {
-								"line": 16,
-								"column": 1,
-								"character": 296
-							},
-							"end": {
-								"line": 16,
-								"column": 11,
-								"character": 306
-							}
-						},
 						"value": [
 							{
 								"start": 308,
@@ -265,36 +181,12 @@
 				"start": 421,
 				"end": 528,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 21,
-						"column": 1,
-						"character": 422
-					},
-					"end": {
-						"line": 21,
-						"column": 4,
-						"character": 425
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 427,
 						"end": 520,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 22,
-								"column": 1,
-								"character": 427
-							},
-							"end": {
-								"line": 22,
-								"column": 10,
-								"character": 436
-							}
-						},
 						"value": [
 							{
 								"start": 438,
@@ -336,36 +228,12 @@
 				"start": 612,
 				"end": 721,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 27,
-						"column": 1,
-						"character": 613
-					},
-					"end": {
-						"line": 27,
-						"column": 4,
-						"character": 616
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 618,
 						"end": 713,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 28,
-								"column": 1,
-								"character": 618
-							},
-							"end": {
-								"line": 28,
-								"column": 10,
-								"character": 627
-							}
-						},
 						"value": [
 							{
 								"start": 629,
@@ -407,36 +275,12 @@
 				"start": 788,
 				"end": 888,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 33,
-						"column": 1,
-						"character": 789
-					},
-					"end": {
-						"line": 33,
-						"column": 4,
-						"character": 792
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 793,
 						"end": 881,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 33,
-								"column": 5,
-								"character": 793
-							},
-							"end": {
-								"line": 33,
-								"column": 14,
-								"character": 802
-							}
-						},
 						"value": [
 							{
 								"start": 804,
@@ -478,36 +322,12 @@
 				"start": 971,
 				"end": 1074,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 36,
-						"column": 1,
-						"character": 972
-					},
-					"end": {
-						"line": 36,
-						"column": 4,
-						"character": 975
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 977,
 						"end": 1066,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 37,
-								"column": 1,
-								"character": 977
-							},
-							"end": {
-								"line": 37,
-								"column": 10,
-								"character": 986
-							}
-						},
 						"value": [
 							{
 								"start": 988,

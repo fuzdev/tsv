@@ -25,18 +25,6 @@
 				"start": 79,
 				"end": 104,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 80
-					},
-					"end": {
-						"line": 2,
-						"column": 4,
-						"character": 83
-					}
-				},
 				"attributes": [
 					{
 						"type": "SpreadAttribute",
@@ -46,30 +34,10 @@
 							"type": "CallExpression",
 							"start": 88,
 							"end": 96,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 9
-								},
-								"end": {
-									"line": 2,
-									"column": 17
-								}
-							},
 							"callee": {
 								"type": "Identifier",
 								"start": 88,
 								"end": 89,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 9
-									},
-									"end": {
-										"line": 2,
-										"column": 10
-									}
-								},
 								"name": "f"
 							},
 							"arguments": [
@@ -77,16 +45,6 @@
 									"type": "Literal",
 									"start": 90,
 									"end": 95,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 11
-										},
-										"end": {
-											"line": 2,
-											"column": 16
-										}
-									},
 									"value": {},
 									"raw": "/[}]/",
 									"regex": {
@@ -116,18 +74,6 @@
 				"start": 105,
 				"end": 128,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 1,
-						"character": 106
-					},
-					"end": {
-						"line": 3,
-						"column": 4,
-						"character": 109
-					}
-				},
 				"attributes": [
 					{
 						"type": "SpreadAttribute",
@@ -137,30 +83,10 @@
 							"type": "CallExpression",
 							"start": 114,
 							"end": 120,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 9
-								},
-								"end": {
-									"line": 3,
-									"column": 15
-								}
-							},
 							"callee": {
 								"type": "Identifier",
 								"start": 114,
 								"end": 115,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 9
-									},
-									"end": {
-										"line": 3,
-										"column": 10
-									}
-								},
 								"name": "g"
 							},
 							"arguments": [
@@ -168,16 +94,6 @@
 									"type": "Literal",
 									"start": 116,
 									"end": 119,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 11
-										},
-										"end": {
-											"line": 3,
-											"column": 14
-										}
-									},
 									"value": "}",
 									"raw": "'}'"
 								}
@@ -203,18 +119,6 @@
 				"start": 129,
 				"end": 158,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 4,
-						"column": 1,
-						"character": 130
-					},
-					"end": {
-						"line": 4,
-						"column": 4,
-						"character": 133
-					}
-				},
 				"attributes": [
 					{
 						"type": "SpreadAttribute",
@@ -224,30 +128,10 @@
 							"type": "CallExpression",
 							"start": 138,
 							"end": 150,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 9
-								},
-								"end": {
-									"line": 4,
-									"column": 21
-								}
-							},
 							"callee": {
 								"type": "Identifier",
 								"start": 138,
 								"end": 139,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 9
-									},
-									"end": {
-										"line": 4,
-										"column": 10
-									}
-								},
 								"name": "h"
 							},
 							"arguments": [
@@ -255,16 +139,6 @@
 									"type": "Identifier",
 									"start": 148,
 									"end": 149,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 19
-										},
-										"end": {
-											"line": 4,
-											"column": 20
-										}
-									},
 									"name": "k",
 									"leadingComments": [
 										{
@@ -293,17 +167,7 @@
 			"type": "Block",
 			"value": " } ",
 			"start": 140,
-			"end": 147,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 11
-				},
-				"end": {
-					"line": 4,
-					"column": 18
-				}
-			}
+			"end": 147
 		}
 	]
 }

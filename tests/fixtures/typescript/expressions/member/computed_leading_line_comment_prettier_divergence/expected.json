@@ -14,241 +14,91 @@
 			"type": "Line",
 			"value": " Line comment before the index: tsv keeps it inside the brackets, dropping the",
 			"start": 20,
-			"end": 100,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 81
-				}
-			}
+			"end": 100
 		},
 		{
 			"type": "Line",
 			"value": " index and `]` to their own lines so the `//` can't swallow them.",
 			"start": 102,
-			"end": 169,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 68
-				}
-			}
+			"end": 169
 		},
 		{
 			"type": "Line",
 			"value": " c1",
 			"start": 188,
-			"end": 193,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 2
-				},
-				"end": {
-					"line": 5,
-					"column": 7
-				}
-			}
+			"end": 193
 		},
 		{
 			"type": "Line",
 			"value": " Optional chain, same shape.",
 			"start": 204,
-			"end": 234,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 1
-				},
-				"end": {
-					"line": 9,
-					"column": 31
-				}
-			}
+			"end": 234
 		},
 		{
 			"type": "Line",
 			"value": " c2",
 			"start": 255,
-			"end": 260,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 2
-				},
-				"end": {
-					"line": 11,
-					"column": 7
-				}
-			}
+			"end": 260
 		},
 		{
 			"type": "Line",
 			"value": " Comment on the `[` line (not its own line): tsv keeps it trailing the `[`",
 			"start": 271,
-			"end": 347,
-			"loc": {
-				"start": {
-					"line": 15,
-					"column": 1
-				},
-				"end": {
-					"line": 15,
-					"column": 77
-				}
-			}
+			"end": 347
 		},
 		{
 			"type": "Line",
 			"value": " (the open-delimiter-trailing rule), prettier relocates it.",
 			"start": 349,
-			"end": 410,
-			"loc": {
-				"start": {
-					"line": 16,
-					"column": 1
-				},
-				"end": {
-					"line": 16,
-					"column": 62
-				}
-			}
+			"end": 410
 		},
 		{
 			"type": "Line",
 			"value": " c3",
 			"start": 427,
-			"end": 432,
-			"loc": {
-				"start": {
-					"line": 17,
-					"column": 16
-				},
-				"end": {
-					"line": 17,
-					"column": 21
-				}
-			}
+			"end": 432
 		},
 		{
 			"type": "Line",
 			"value": " Inside a CHAIN, with a numeric index — the one accessor kind the chain grouping",
 			"start": 443,
-			"end": 525,
-			"loc": {
-				"start": {
-					"line": 21,
-					"column": 1
-				},
-				"end": {
-					"line": 21,
-					"column": 83
-				}
-			}
+			"end": 525
 		},
 		{
 			"type": "Line",
 			"value": " otherwise glues into the preceding group. The `//` makes it start a group",
 			"start": 527,
-			"end": 603,
-			"loc": {
-				"start": {
-					"line": 22,
-					"column": 1
-				},
-				"end": {
-					"line": 22,
-					"column": 77
-				}
-			}
+			"end": 603
 		},
 		{
 			"type": "Line",
 			"value": " instead, and the bracket-interior rule above is unchanged by that.",
 			"start": 605,
-			"end": 674,
-			"loc": {
-				"start": {
-					"line": 23,
-					"column": 1
-				},
-				"end": {
-					"line": 23,
-					"column": 70
-				}
-			}
+			"end": 674
 		},
 		{
 			"type": "Line",
 			"value": " c4",
 			"start": 687,
-			"end": 692,
-			"loc": {
-				"start": {
-					"line": 24,
-					"column": 12
-				},
-				"end": {
-					"line": 24,
-					"column": 17
-				}
-			}
+			"end": 692
 		},
 		{
 			"type": "Line",
 			"value": " The `?.[` spelling of that same `[`-line case. The authored form may space the",
 			"start": 703,
-			"end": 784,
-			"loc": {
-				"start": {
-					"line": 28,
-					"column": 1
-				},
-				"end": {
-					"line": 28,
-					"column": 82
-				}
-			}
+			"end": 784
 		},
 		{
 			"type": "Line",
 			"value": " `?.` off the `[` (`obj ?. [`), which must reach the identical output.",
 			"start": 786,
-			"end": 858,
-			"loc": {
-				"start": {
-					"line": 29,
-					"column": 1
-				},
-				"end": {
-					"line": 29,
-					"column": 73
-				}
-			}
+			"end": 858
 		},
 		{
 			"type": "Line",
 			"value": " c5",
 			"start": 877,
-			"end": 882,
-			"loc": {
-				"start": {
-					"line": 30,
-					"column": 18
-				},
-				"end": {
-					"line": 30,
-					"column": 23
-				}
-			}
+			"end": 882
 		}
 	],
 	"instance": {
@@ -260,106 +110,36 @@
 			"type": "Program",
 			"start": 18,
 			"end": 891,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 33,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 171,
 					"end": 201,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 7,
-							"column": 3
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 177,
 							"end": 200,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 7
-								},
-								"end": {
-									"line": 7,
-									"column": 2
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 177,
 								"end": 178,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 7
-									},
-									"end": {
-										"line": 4,
-										"column": 8
-									}
-								},
 								"name": "a"
 							},
 							"init": {
 								"type": "MemberExpression",
 								"start": 181,
 								"end": 200,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 11
-									},
-									"end": {
-										"line": 7,
-										"column": 2
-									}
-								},
 								"object": {
 									"type": "Identifier",
 									"start": 181,
 									"end": 184,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 11
-										},
-										"end": {
-											"line": 4,
-											"column": 14
-										}
-									},
 									"name": "arr"
 								},
 								"property": {
 									"type": "Identifier",
 									"start": 196,
 									"end": 197,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 2
-										},
-										"end": {
-											"line": 6,
-											"column": 3
-										}
-									},
 									"name": "i",
 									"leadingComments": [
 										{
@@ -395,105 +175,35 @@
 					"type": "VariableDeclaration",
 					"start": 236,
 					"end": 268,
-					"loc": {
-						"start": {
-							"line": 10,
-							"column": 1
-						},
-						"end": {
-							"line": 13,
-							"column": 3
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 242,
 							"end": 267,
-							"loc": {
-								"start": {
-									"line": 10,
-									"column": 7
-								},
-								"end": {
-									"line": 13,
-									"column": 2
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 242,
 								"end": 243,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 7
-									},
-									"end": {
-										"line": 10,
-										"column": 8
-									}
-								},
 								"name": "b"
 							},
 							"init": {
 								"type": "ChainExpression",
 								"start": 246,
 								"end": 267,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 11
-									},
-									"end": {
-										"line": 13,
-										"column": 2
-									}
-								},
 								"expression": {
 									"type": "MemberExpression",
 									"start": 246,
 									"end": 267,
-									"loc": {
-										"start": {
-											"line": 10,
-											"column": 11
-										},
-										"end": {
-											"line": 13,
-											"column": 2
-										}
-									},
 									"object": {
 										"type": "Identifier",
 										"start": 246,
 										"end": 249,
-										"loc": {
-											"start": {
-												"line": 10,
-												"column": 11
-											},
-											"end": {
-												"line": 10,
-												"column": 14
-											}
-										},
 										"name": "obj"
 									},
 									"property": {
 										"type": "Identifier",
 										"start": 263,
 										"end": 264,
-										"loc": {
-											"start": {
-												"line": 12,
-												"column": 2
-											},
-											"end": {
-												"line": 12,
-												"column": 3
-											}
-										},
 										"name": "i",
 										"leadingComments": [
 											{
@@ -524,91 +234,31 @@
 					"type": "VariableDeclaration",
 					"start": 412,
 					"end": 440,
-					"loc": {
-						"start": {
-							"line": 17,
-							"column": 1
-						},
-						"end": {
-							"line": 19,
-							"column": 3
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 418,
 							"end": 439,
-							"loc": {
-								"start": {
-									"line": 17,
-									"column": 7
-								},
-								"end": {
-									"line": 19,
-									"column": 2
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 418,
 								"end": 419,
-								"loc": {
-									"start": {
-										"line": 17,
-										"column": 7
-									},
-									"end": {
-										"line": 17,
-										"column": 8
-									}
-								},
 								"name": "c"
 							},
 							"init": {
 								"type": "MemberExpression",
 								"start": 422,
 								"end": 439,
-								"loc": {
-									"start": {
-										"line": 17,
-										"column": 11
-									},
-									"end": {
-										"line": 19,
-										"column": 2
-									}
-								},
 								"object": {
 									"type": "Identifier",
 									"start": 422,
 									"end": 425,
-									"loc": {
-										"start": {
-											"line": 17,
-											"column": 11
-										},
-										"end": {
-											"line": 17,
-											"column": 14
-										}
-									},
 									"name": "arr"
 								},
 								"property": {
 									"type": "Identifier",
 									"start": 435,
 									"end": 436,
-									"loc": {
-										"start": {
-											"line": 18,
-											"column": 2
-										},
-										"end": {
-											"line": 18,
-											"column": 3
-										}
-									},
 									"name": "i",
 									"leadingComments": [
 										{
@@ -644,88 +294,28 @@
 					"type": "ExpressionStatement",
 					"start": 676,
 					"end": 700,
-					"loc": {
-						"start": {
-							"line": 24,
-							"column": 1
-						},
-						"end": {
-							"line": 26,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "MemberExpression",
 						"start": 676,
 						"end": 699,
-						"loc": {
-							"start": {
-								"line": 24,
-								"column": 1
-							},
-							"end": {
-								"line": 26,
-								"column": 2
-							}
-						},
 						"object": {
 							"type": "CallExpression",
 							"start": 676,
 							"end": 685,
-							"loc": {
-								"start": {
-									"line": 24,
-									"column": 1
-								},
-								"end": {
-									"line": 24,
-									"column": 10
-								}
-							},
 							"callee": {
 								"type": "MemberExpression",
 								"start": 676,
 								"end": 683,
-								"loc": {
-									"start": {
-										"line": 24,
-										"column": 1
-									},
-									"end": {
-										"line": 24,
-										"column": 8
-									}
-								},
 								"object": {
 									"type": "Identifier",
 									"start": 676,
 									"end": 679,
-									"loc": {
-										"start": {
-											"line": 24,
-											"column": 1
-										},
-										"end": {
-											"line": 24,
-											"column": 4
-										}
-									},
 									"name": "arr"
 								},
 								"property": {
 									"type": "Identifier",
 									"start": 680,
 									"end": 683,
-									"loc": {
-										"start": {
-											"line": 24,
-											"column": 5
-										},
-										"end": {
-											"line": 24,
-											"column": 8
-										}
-									},
 									"name": "foo"
 								},
 								"computed": false,
@@ -738,16 +328,6 @@
 							"type": "Literal",
 							"start": 695,
 							"end": 696,
-							"loc": {
-								"start": {
-									"line": 25,
-									"column": 2
-								},
-								"end": {
-									"line": 25,
-									"column": 3
-								}
-							},
 							"value": 0,
 							"raw": "0",
 							"leadingComments": [
@@ -787,105 +367,35 @@
 					"type": "VariableDeclaration",
 					"start": 860,
 					"end": 890,
-					"loc": {
-						"start": {
-							"line": 30,
-							"column": 1
-						},
-						"end": {
-							"line": 32,
-							"column": 3
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 866,
 							"end": 889,
-							"loc": {
-								"start": {
-									"line": 30,
-									"column": 7
-								},
-								"end": {
-									"line": 32,
-									"column": 2
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 866,
 								"end": 867,
-								"loc": {
-									"start": {
-										"line": 30,
-										"column": 7
-									},
-									"end": {
-										"line": 30,
-										"column": 8
-									}
-								},
 								"name": "d"
 							},
 							"init": {
 								"type": "ChainExpression",
 								"start": 870,
 								"end": 889,
-								"loc": {
-									"start": {
-										"line": 30,
-										"column": 11
-									},
-									"end": {
-										"line": 32,
-										"column": 2
-									}
-								},
 								"expression": {
 									"type": "MemberExpression",
 									"start": 870,
 									"end": 889,
-									"loc": {
-										"start": {
-											"line": 30,
-											"column": 11
-										},
-										"end": {
-											"line": 32,
-											"column": 2
-										}
-									},
 									"object": {
 										"type": "Identifier",
 										"start": 870,
 										"end": 873,
-										"loc": {
-											"start": {
-												"line": 30,
-												"column": 11
-											},
-											"end": {
-												"line": 30,
-												"column": 14
-											}
-										},
 										"name": "obj"
 									},
 									"property": {
 										"type": "Identifier",
 										"start": 885,
 										"end": 886,
-										"loc": {
-											"start": {
-												"line": 31,
-												"column": 2
-											},
-											"end": {
-												"line": 31,
-												"column": 3
-											}
-										},
 										"name": "i",
 										"leadingComments": [
 											{
@@ -927,18 +437,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

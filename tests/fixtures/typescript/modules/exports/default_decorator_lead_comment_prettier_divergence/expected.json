@@ -14,49 +14,19 @@
 			"type": "Line",
 			"value": " Block comment glued to the first decorator — stays glued to it, since that is",
 			"start": 20,
-			"end": 100,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 81
-				}
-			}
+			"end": 100
 		},
 		{
 			"type": "Line",
 			"value": " the token the author bound it to",
 			"start": 102,
-			"end": 137,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 36
-				}
-			}
+			"end": 137
 		},
 		{
 			"type": "Block",
 			"value": " c ",
 			"start": 155,
-			"end": 162,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 1
-				},
-				"end": {
-					"line": 5,
-					"column": 8
-				}
-			}
+			"end": 162
 		}
 	],
 	"instance": {
@@ -68,75 +38,25 @@
 			"type": "Program",
 			"start": 18,
 			"end": 178,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 7,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExportDefaultDeclaration",
 					"start": 139,
 					"end": 177,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 9
-						}
-					},
 					"exportKind": "value",
 					"declaration": {
 						"type": "ClassExpression",
 						"start": 163,
 						"end": 177,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 9
-							},
-							"end": {
-								"line": 6,
-								"column": 9
-							}
-						},
 						"decorators": [
 							{
 								"type": "Decorator",
 								"start": 163,
 								"end": 167,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 9
-									},
-									"end": {
-										"line": 5,
-										"column": 13
-									}
-								},
 								"expression": {
 									"type": "Identifier",
 									"start": 164,
 									"end": 167,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 10
-										},
-										"end": {
-											"line": 5,
-											"column": 13
-										}
-									},
 									"name": "dec"
 								}
 							}
@@ -147,16 +67,6 @@
 							"type": "ClassBody",
 							"start": 175,
 							"end": 177,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 7
-								},
-								"end": {
-									"line": 6,
-									"column": 9
-								}
-							},
 							"body": []
 						},
 						"leadingComments": [
@@ -192,18 +102,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

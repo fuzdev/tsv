@@ -45,6 +45,7 @@ import {
 import { availableParallelism, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 import { Worker } from 'node:worker_threads';
 
 import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/tsv_artifacts.ts';
@@ -523,10 +524,11 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		assert.match(JSON.stringify(node_entry.parse_svelte(sv)), /"name_loc"/);
 		const sv_span_only = JSON.stringify(node_entry.parse_svelte(sv, { locations: false }));
 		assert.doesNotMatch(sv_span_only, /"name_loc"|"loc"/);
-		// css accepts the option as an inert no-op (its wire has no loc either way)
-		assert.deepEqual(
-			node_entry.parse_css('a { color: red }', { locations: false }),
-			node_entry.parse_css('a { color: red }')
+		// css carries loc on the default wire like the other two, and drops it span-only
+		assert.ok(node_entry.parse_css('a { color: red }').children[0].loc);
+		assert.doesNotMatch(
+			JSON.stringify(node_entry.parse_css('a { color: red }', { locations: false })),
+			/"loc"/
 		);
 	});
 
@@ -643,78 +645,61 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 		assert.deepEqual(locator.loc_of(noloc.body[1]), full.body[1].loc);
 	});
 
-	it('reconstruct_locations is a no-op for CSS (parseCss emits no loc)', () => {
-		// CSS has no `loc` in the wire, so reconstruct must leave the tree untouched.
-		// Language inferred from the `StyleSheetFile` root.
-		const css = node_entry.parse_css('a {\n\tcolor: red;\n}\n');
-		const out = node_entry.reconstruct_locations(css, 'a {\n\tcolor: red;\n}\n');
-		assert.equal(out, css);
-		assert.equal('loc' in css, false); // root gained no loc
-		assert.equal('loc' in css.children[0], false); // nor did a rule node
+	it('reconstruct_locations is EXACT for CSS (equals the full wire)', () => {
+		// CSS follows the same definition as the other two: LF-only lines, a leading BOM
+		// elided as `parseCss` strips it. Language inferred from the `StyleSheetFile` root.
+		for (const css of [
+			'a {\n\tcolor: red;\n}\n',
+			'/* c */\n@media (x) {\n\tp::after { content: "😀"; }\n}\r\nb { }',
+			'\ufeffa {\u2028color: red; }\n'
+		]) {
+			const out = node_entry.reconstruct_locations(
+				node_entry.parse_css(css, { locations: false }),
+				css
+			);
+			assert.deepEqual(out, node_entry.parse_css(css), JSON.stringify(css));
+		}
 	});
 
-	it('reconstruct_locations matches Svelte acorn-node loc, except the documented quirks', () => {
-		// No destructure pattern here, so the Svelte +1-column quirk can't appear;
-		// the `<script>` Program loc (Svelte's tag-position override) is skipped.
-		// Covers each `name_loc` shape (tag name, attribute, shorthand padded and
-		// not, a directive head with modifiers) and each identifier Svelte gives the
-		// name-shaped `loc` (shorthand expansion, snippet name, block patterns).
-		const sv =
-			'<script>\nconst x = 1;\n</script>\n\n<div class="a" on:click|preventDefault={x} {x} { x }>\n\t{@const y = x}\n\t{#each [x] as item}{item}{/each}\n\t{#await x}p{:then value}{value}{:catch err}{err}{/await}\n</div>\n<svelte:head><title>t</title></svelte:head>\n{#snippet row(a)}{a}{/snippet}';
-		const full = node_entry.parse_svelte(sv);
-		const recon = node_entry.reconstruct_locations(
-			node_entry.parse_svelte(sv, { locations: false }),
-			sv
-		);
-		let checked = 0;
-		let name_locs_checked = 0;
-		const walk = (r: any, f: any): void => {
-			if (Array.isArray(f)) {
-				f.forEach((x, i) => walk(r[i], x));
-			} else if (f && typeof f === 'object') {
-				// Svelte's wire carries `loc` only on embedded ECMAScript nodes; where
-				// it does, the reconstruction must match — except `Program`.
-				if (f.loc && f.type !== 'Program') {
-					assert.deepEqual(r.loc, f.loc, `loc mismatch at ${f.type}@${f.start}`);
-					checked++;
-				}
-				// `name_loc` (elements, attributes, directives) is exact — its span is a
-				// function of the node's own start/end + type.
-				if (f.name_loc) {
-					assert.deepEqual(r.name_loc, f.name_loc, `name_loc mismatch at ${f.type}@${f.start}`);
-					name_locs_checked++;
-				}
-				for (const k of Object.keys(f)) {
-					if (k === 'loc' || k === 'name_loc') continue;
-					walk(r[k], f[k]);
-				}
-			}
-		};
-		walk(recon, full);
-		assert.ok(checked > 0, 'expected at least one acorn node to compare');
-		assert.ok(name_locs_checked > 0, 'expected at least one name_loc to compare');
-		// The walk is a superset: it adds `loc` to template nodes Svelte's wire omits.
-		assert.ok(recon.loc, 'reconstruct added loc to the Root (template node)');
+	// Svelte reconstructs EXACTLY too: the wire and the helper implement one definition —
+	// each object's own `start`/`end`, LF-only for the whole document — and neither models a
+	// quirk of Svelte's own `loc`. The sources cover every `name_loc` shape (tag name,
+	// attribute, shorthand padded and not, a directive head with modifiers), each position
+	// Svelte gives `character` (shorthand expansion, snippet name, simple block patterns, an
+	// in-tag comment, the `<svelte:options>` head), the objects with no `type` (`options`,
+	// `StyleSheet.content`, comments), destructured and typed block bindings off line 1, a
+	// newline before a binding's `:`, and a `<script>` program whose content starts mid-line.
+	it('reconstruct_locations is EXACT for Svelte (equals the full wire)', () => {
+		const sources = [
+			'<script>\nconst x = 1;\n</script>\n\n<div class="a" on:click|preventDefault={x} {x} { x }>\n\t{@const y = x}\n\t{#each [x] as item}{item}{/each}\n\t{#await x}p{:then value}{value}{:catch err}{err}{/await}\n</div>\n<svelte:head><title>t</title></svelte:head>\n{#snippet row(a)}{a}{/snippet}',
+			'<svelte:options /* o */ runes />\n<div /* c */ class="a" {@attach /* d */ x}>\n\t{#each xs as { a, b: [c] }, i (a)}{a}{/each}\n\t{#await p then [v, /* e */ w]}{v}{:catch { message }}{message}{/await}\n\t{@const { k } = o}\n</div>\n<style>\n/* s */\np { color: red; }\n</style>\n',
+			'<script lang="ts">let xs: any;</script>\n{#each xs as\ne: T}{e}{/each}\n{#each xs as { a }\n  : { x: A; /* t */ }}{a}{/each}\n{#each xs as [\na\n]: T}{a}{/each}\n',
+			'<div></div>\t<script>\n  let a = 1;\n</script>\n<script module>export const m = 1;</script>'
+		];
+		for (const sv of sources) {
+			const recon = node_entry.reconstruct_locations(
+				node_entry.parse_svelte(sv, { locations: false }),
+				sv
+			);
+			assert.deepEqual(recon, node_entry.parse_svelte(sv), JSON.stringify(sv.slice(0, 60)));
+		}
 	});
 
-	it('a leading BOM is elided for Svelte (as its wire is) and counted for TypeScript', () => {
+	it('a leading BOM is elided for Svelte and CSS (as their wires are) and counted for TypeScript', () => {
 		// Svelte's `parse` strips the BOM before parsing, so the wire's first element
 		// starts at 0 and its `name_loc` is column 1; the helper must index the same
 		// BOM-less string, or every line-1 column and name span reads one off.
-		const sv = '\uFEFF<div class="a">x</div>\n<span>y</span>';
+		const sv = '\ufeff<div class="a">x</div>\n<span>y</span>';
 		const full = node_entry.parse_svelte(sv);
-		const div = full.fragment.nodes[0];
-		assert.equal(div.start, 0);
-		assert.equal(div.name_loc.start.column, 1);
-		const recon = node_entry.reconstruct_locations(
-			node_entry.parse_svelte(sv, { locations: false }),
-			sv
+		assert.equal(full.fragment.nodes[0].start, 0);
+		assert.equal(full.fragment.nodes[0].name_loc.start.column, 1);
+		assert.deepEqual(
+			node_entry.reconstruct_locations(node_entry.parse_svelte(sv, { locations: false }), sv),
+			full
 		);
-		assert.deepEqual(recon.fragment.nodes[0].name_loc, div.name_loc);
-		assert.deepEqual(recon.fragment.nodes[2].name_loc, full.fragment.nodes[2].name_loc);
 		// acorn counts the BOM as whitespace: the first statement sits at offset 1, column 1,
 		// and the reconstruction over the caller's string reproduces that exactly.
-		const ts = '\uFEFFconst x = 1;';
+		const ts = '\ufeffconst x = 1;';
 		const ts_full = node_entry.parse_typescript(ts);
 		assert.equal(ts_full.body[0].start, 1);
 		assert.deepEqual(
@@ -723,213 +708,61 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 		);
 	});
 
-	// A block binding's `: T` is read by Svelte's SECOND acorn parse, over a template whose
-	// five code units ending at the colon are overwritten with `_ as ` — so a newline in the
-	// four units before the colon is never counted, while one further back survives. Each
-	// row's expectation is the pinned canonical Svelte (`sidecar.ts`)'s `loc` for the annotation's first type
-	// reference, written down rather than read off tsv's own wire; `shifted` says whether it
-	// differs from the plain LF line table, so both directions stay under test.
-	it("places a block binding's `: T` where Svelte's second acorn parse does", () => {
-		const head = '<script lang="ts">let xs: any; let p: any;</script>\n';
-		const rows: Array<[string, [number, number], boolean]> = [
-			[`${head}{#each xs as e\n: T}{e}{/each}\n`, [2, 17], true],
-			// the newline at the window's far edge, then one unit past it
-			[`${head}{#each xs as e\n   : T}{e}{/each}\n`, [2, 20], true],
-			[`${head}{#each xs as e\n    : T}{e}{/each}\n`, [3, 6], false],
-			[`${head}{#each xs as e\n        : T}{e}{/each}\n`, [3, 10], false],
-			// the window reaches back past the binding itself
-			[`${head}{#each xs as\ne: T}{e}{/each}\n`, [2, 16], true],
-			[`${head}{#each xs as\n  ab: T}{ab}{/each}\n`, [3, 6], false],
-			[`${head}{#each xs as\n\n\ne: T}{e}{/each}\n`, [2, 18], true],
-			// a destructure binding, whose own closing line is inside the window
-			[`${head}{#each xs as [\na\n]: T}{a}{/each}\n`, [2, 20], true],
-			[`${head}{#each xs as {\n\ta,\n\tb\n}: T}{a}{b}{/each}\n`, [4, 6], true],
-			[`${head}{#each xs as e\r\n: T}{e}{/each}\r\n`, [2, 18], true],
-			[`﻿${head}{#each xs as e\n: T}{e}{/each}\n`, [2, 17], true],
-			[`${head}{#await p then v\n: T}{v}{/await}\n`, [2, 19], true],
-			[`${head}{#await p}x{:catch err\n: T}{err}{/await}\n`, [2, 25], true],
-			[`${head}{#if 1}{@const a\n: T = 1}{a}{/if}\n`, [2, 19], true],
-			[`${head}{#if 1}{@const\na: T = 1}{a}{/if}\n`, [2, 18], true],
-			// a reference below the colon's line keeps its own column, one line up
-			[`${head}{#each xs as e\n: {\n\tx: A;\n\ty: B\n}}{e}{/each}\n`, [3, 4], true],
-			[`${head}{#each xs as e : T}{e}{/each}\n`, [2, 17], false],
-			// the window is five UTF-16 code units: behind non-ASCII text it reaches more
-			// than five bytes back, and an astral character counts two units
-			[`${head}{#each xs as\néé: T}{éé}{/each}\n`, [2, 17], true],
-			[`${head}{#each xs as\n中中: T}{中中}{/each}\n`, [2, 17], true],
-			[`${head}{#each xs as\n\u{1d44e}: T}{\u{1d44e}}{/each}\n`, [2, 17], true],
-			[`${head}{#each xs as\n\u{1d44e}\u{1d44e}: T}{\u{1d44e}\u{1d44e}}{/each}\n`, [3, 6], false],
-			// a window opening between the halves of a surrogate pair
-			[`${head}{#each xs as \u{1d44e}é\n\t: T}{\u{1d44e}é}{/each}\n`, [2, 20], true],
-			[`${head}{#each xs as e\n\u3000\u3000: T}{e}{/each}\n`, [2, 19], true],
-			[`${head}{#each xs as [\ne\n]\u00a0\n: T}{e}{/each}\n`, [3, 7], true],
-			// a window splitting a CRLF: the `\r` is blanked, the `\n` overwritten
-			[`${head}{#each xs as\r\nééé: T}{ééé}{/each}\n`, [2, 19], true],
-			[`${head}{#await p then\néé: T}{éé}{/await}\n`, [2, 19], true],
-			[`${head}{#if 1}{@const\n中中: T = 1}{中中}{/if}\n`, [2, 19], true]
-		];
-		const first_type_reference = (node: any): any => {
-			if (Array.isArray(node)) {
-				for (const x of node) {
-					const found = first_type_reference(x);
-					if (found) return found;
-				}
-				return null;
-			}
-			if (!node || typeof node !== 'object') return null;
-			if (node.type === 'TSTypeReference') return node;
-			for (const k of Object.keys(node)) {
-				if (k === 'loc' || k === 'name_loc') continue;
-				const found = first_type_reference(node[k]);
-				if (found) return found;
-			}
-			return null;
-		};
-		for (const [source, [line, column], shifted] of rows) {
-			const label = JSON.stringify(source.slice(source.indexOf('</script>') + 10));
-			// Svelte's offsets index the BOM-less string
-			const text = source.charCodeAt(0) === 0xfeff ? source.slice(1) : source;
-			const full_ref = first_type_reference(node_entry.parse_svelte(source));
-			assert.deepEqual(full_ref.loc.start, { line, column }, `${label}: tsv's full wire`);
-			const before = text.slice(0, full_ref.start);
-			const plain = {
-				line: before.split('\n').length,
-				column: full_ref.start - (before.lastIndexOf('\n') + 1)
-			};
-			assert.equal(
-				plain.line !== line || plain.column !== column,
-				shifted,
-				`${label}: the row ${shifted ? 'must' : 'must not'} differ from the plain line table`
-			);
-			const span_only = node_entry.parse_svelte(source, { locations: false });
-			const locator = node_entry.create_locator(source, { ast: span_only });
-			assert.deepEqual(
-				locator.loc_of(first_type_reference(span_only)),
-				full_ref.loc,
-				`${label}: create_locator(...).loc_of`
-			);
-			const recon = node_entry.reconstruct_locations(span_only, source);
-			assert.deepEqual(first_type_reference(recon).loc, full_ref.loc, `${label}: reconstruct`);
-		}
-
-		// A destructure binding's `end` runs over its annotation, but its `loc.end` still
-		// names the closing bracket — here on its own line, clear of the `+1`-column quirk.
-		const each = `${head}{#each xs as [\na\n]: T}{a}{/each}\n`;
-		const context = (root: any): any =>
-			root.fragment.nodes.find((n: any) => n.type === 'EachBlock').context;
-		const each_span_only = node_entry.parse_svelte(each, { locations: false });
-		assert.deepEqual(context(node_entry.parse_svelte(each)).loc.end, { line: 4, column: 1 });
+	// One line rule per DOCUMENT: a TypeScript document counts ECMAScript's terminators, a
+	// Svelte document `\n` alone — in its `<script>`, template expressions and `<style>` too —
+	// so a lone CR / U+2028 / U+2029 reconstructs like any other source, in both languages.
+	it('a lone CR / U+2028 / U+2029 follows its document rule in both languages', () => {
+		const script = 'let a = 1;\rlet b = 2;\u2028let c = 3;\u2029let d = 4;\r\nlet e = 5;';
+		const ts_full = node_entry.parse_typescript(script);
+		assert.equal(ts_full.body[4].loc.start.line, 5, 'TypeScript counts every terminator');
 		assert.deepEqual(
-			node_entry.create_locator(each, { ast: each_span_only }).loc_of(context(each_span_only)).end,
-			{ line: 4, column: 1 }
+			node_entry.reconstruct_locations(
+				node_entry.parse_typescript(script, { locations: false }),
+				script
+			),
+			ts_full
 		);
-		assert.deepEqual(context(node_entry.reconstruct_locations(each_span_only, each)).loc.end, {
-			line: 4,
-			column: 1
-		});
-
-		// Without the tree a Svelte `loc_of` cannot tell an annotation's node from any other,
-		// so it refuses rather than answer differently from `reconstruct`.
-		const plain_span_only = node_entry.parse_svelte(each, { locations: false });
-		assert.throws(
-			() => node_entry.create_locator(each, { language: 'svelte' }).loc_of(plain_span_only),
-			/needs the span-only tree/
-		);
-		assert.throws(
-			() => node_entry.loc_of(plain_span_only, each, { language: 'svelte' }),
-			/needs the span-only tree/
+		const sv = `<script>\n${script}\n</script>\n<p>{x\r+\u2028y}</p>\n<style>\np { }\r/* \u2029 */ a { }\n</style>\n`;
+		const sv_full = node_entry.parse_svelte(sv);
+		// the script's lone CR / LS / PS open no line; its CRLF is one LF
+		assert.equal(sv_full.instance.content.body[3].loc.start.line, 2, 'Svelte counts LF alone');
+		assert.equal(sv_full.instance.content.body[4].loc.start.line, 3);
+		assert.deepEqual(
+			node_entry.reconstruct_locations(node_entry.parse_svelte(sv, { locations: false }), sv),
+			sv_full
 		);
 	});
 
-	// A comment inside a shifted annotation is moved with it — and is listed twice on the
-	// wire: attached under the annotation, and in the root `comments` list, which a walk
-	// reaches outside every block. Each row's expectation is the pinned canonical Svelte (`sidecar.ts`)'s for
-	// the root copy; the last is the unshifted control.
-	it("places a comment inside a block binding's `: T` where Svelte's second acorn parse does", () => {
-		const head = '<script lang="ts">let xs: any; let p: any;</script>\n';
-		const rows: Array<[string, [number, number], string, boolean]> = [
-			[`${head}{#each xs as e\n: /* c */ T}{e}{/each}\n`, [2, 17], ' c ', true],
-			[`${head}{#each xs as\néé: /* a\n\t b */ T}{éé}{/each}\n`, [2, 17], ' a\n\t b ', true],
-			[`${head}{#each xs as e\n: // c\nT}{e}{/each}\n`, [2, 17], ' c', true],
-			[`${head}{#await p then\n\u{1d44e}: /* c */ T}{\u{1d44e}}{/await}\n`, [2, 19], ' c ', true],
-			[`${head}{#if 1}{@const\n中中: /* c */ T = 1}{中中}{/if}\n`, [2, 19], ' c ', true],
-			[`${head}{#each xs as e: /* c */ T}{e}{/each}\n`, [2, 16], ' c ', false]
-		];
-		for (const [source, [line, column], value, shifted] of rows) {
-			const label = JSON.stringify(source.slice(source.indexOf('</script>') + 10));
-			const full = node_entry.parse_svelte(source).comments[0];
-			assert.deepEqual(full.loc.start, { line, column }, `${label}: tsv's full wire`);
-			assert.equal(full.value, value, `${label}: tsv's full wire value`);
-			const before = source.slice(0, full.start);
-			const plain_line = before.split('\n').length;
-			const plain_column = full.start - (before.lastIndexOf('\n') + 1);
-			assert.equal(plain_line !== line || plain_column !== column, shifted, label);
-			const span_only = node_entry.parse_svelte(source, { locations: false });
-			assert.deepEqual(
-				node_entry.create_locator(source, { ast: span_only }).loc_of(span_only.comments[0]),
-				full.loc,
-				`${label}: create_locator(...).loc_of`
-			);
-			const recon = node_entry.reconstruct_locations(span_only, source);
-			assert.deepEqual(recon.comments[0].loc, full.loc, `${label}: reconstruct`);
-		}
-	});
-
-	// The hand-written case above pins the shapes a reader can follow; this one drives
-	// the SAME helper over every `.svelte` fixture in the repo, so the tables it carries
-	// (`NAME_LOC_KINDS`, the character-bearing shapes) are graded against what the writer
-	// actually emits rather than against a remembered list. Every mismatch must fall into
-	// one of the two documented Svelte divergences, and every refusal must be the documented
-	// two-line-class one — anything else fails. `create_locator(...).loc_of` is graded against
-	// the same reconstruction node for node, so the two entry points cannot drift apart.
-	//
-	// Self-oracle by construction: it grades `reconstruct(no-loc) == full wire`, so it
-	// proves reconstruction fidelity, NOT conformance to Svelte. The conformance oracle is
-	// `deno task corpus:compare:parse` plus the root Rust span tests (and the canonical rows
-	// in the test above).
-	it('reconstructs every .svelte fixture, or refuses it for two line classes', () => {
+	// The hand-written cases above pin the shapes a reader can follow; this one drives the
+	// SAME helper over every fixture source in the repo — `.svelte`, `.ts` and `.css`, inputs
+	// and variants alike — so the tables it carries (`NAME_LOC_KINDS`, the `character`-bearing
+	// shapes) are graded against what the writer actually emits rather than against a
+	// remembered list. The reconstruction must deep-equal the full wire of the same parse,
+	// and `create_locator(...).loc_of` must agree with it node for node, so the two entry
+	// points cannot drift apart. `deno task check:loc` grades the same equality over the
+	// native writer; this grades it through the shipped package.
+	it('reconstructs every fixture source exactly', () => {
 		const roots = [join(repo_root, 'tests/fixtures'), join(repo_root, 'tests/fixtures_compile')];
-		const files: Array<string> = [];
+		const files: Array<[string, 'svelte' | 'typescript' | 'css']> = [];
 		const collect = (dir: string): void => {
 			for (const entry of readdirSync(dir, { withFileTypes: true })) {
 				const p = join(dir, entry.name);
 				if (entry.isDirectory()) collect(p);
-				else if (entry.name.endsWith('.svelte')) files.push(p);
+				else if (entry.name.endsWith('.svelte')) files.push([p, 'svelte']);
+				else if (entry.name.endsWith('.ts')) files.push([p, 'typescript']);
+				else if (entry.name.endsWith('.css')) files.push([p, 'css']);
 			}
 		};
 		for (const r of roots) if (existsSync(r)) collect(r);
-		assert.ok(files.length > 500, `expected the fixture tree, found ${files.length} .svelte files`);
+		assert.ok(files.length > 500, `expected the fixture tree, found ${files.length} sources`);
 
-		const findings: Array<string> = [];
-		let compared = 0;
-		let character_locs = 0;
-		let scanned = 0;
-		let refused = 0;
-		let seeded_annotation_docs = 0;
-		let loc_of_checked = 0;
-
-		// Whether the FULL wire places a block binding's annotation somewhere the plain LF line
-		// table does not — derived from the wire alone, never from the helper's own rule, so it
-		// counts the documents that exercise the helper's correction without restating it. A
-		// block binding's `: T` is the one `TSTypeAnnotation` Svelte builds by hand (no `loc`,
-		// where every acorn-built one has one); a node under it whose `loc.start` disagrees with
-		// its plain line/column is one Svelte's second acorn parse moved.
-		const plain_loc_at = (text: string, offset: number) => {
-			const before = text.slice(0, offset);
-			return { line: before.split('\n').length, column: offset - (before.lastIndexOf('\n') + 1) };
-		};
-		const wire_moved_an_annotation = (node: any, text: string, inside = false): boolean => {
-			if (Array.isArray(node)) return node.some((x) => wire_moved_an_annotation(x, text, inside));
-			if (!node || typeof node !== 'object') return false;
-			const here = inside || (node.type === 'TSTypeAnnotation' && !('loc' in node));
-			if (here && node.loc && !deep_equal_json(node.loc.start, plain_loc_at(text, node.start))) {
-				return true;
-			}
-			return Object.keys(node).some(
-				(k) => k !== 'loc' && k !== 'name_loc' && wire_moved_an_annotation(node[k], text, here)
-			);
-		};
-		// every node with numeric `start`/`end`, in walk order
+		const parse = (language: string, source: string, options: object): any =>
+			language === 'svelte'
+				? node_entry.parse_svelte(source, options)
+				: language === 'css'
+					? node_entry.parse_css(source, options)
+					: node_entry.parse_typescript(source, options);
+		// every object with numeric `start`/`end`, in walk order
 		const spanned = (node: any, out: Array<any> = []): Array<any> => {
 			if (Array.isArray(node)) {
 				for (const x of node) spanned(x, out);
@@ -941,123 +774,38 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 			}
 			return out;
 		};
-		// documented quirk 2, the destructure-pattern synthetic-`(` column shift: one endpoint
-		// read one column late on its own line — graded per endpoint, so a `start` inside the
-		// quirk cannot mask an `end` outside it, and granted only inside a block binding
-		// (`in_binding` below), the one parse that carries it
-		const point_matches = (recon_point: any, full_point: any): boolean =>
-			deep_equal_json(recon_point, full_point) ||
-			(recon_point?.line === full_point.line && full_point.column - recon_point?.column === 1);
-		// the block-binding patterns `read_pattern` parses under its synthetic `(` — the `{#each}`
-		// context, the `{:then}` / `{:catch}` values and the `{@const}` declarator's `id` — of
-		// one document, gathered before `compare` walks it
-		const binding_patterns = (node: any, out: Set<any> = new Set()): Set<any> => {
-			if (Array.isArray(node)) {
-				for (const x of node) binding_patterns(x, out);
-			} else if (node && typeof node === 'object') {
-				if (node.type === 'EachBlock') out.add(node.context);
-				if (node.type === 'AwaitBlock') {
-					out.add(node.value);
-					out.add(node.error);
-				}
-				if (node.type === 'ConstTag') {
-					for (const d of node.declaration?.declarations ?? []) out.add(d?.id);
-				}
-				for (const k of Object.keys(node)) {
-					if (k !== 'loc' && k !== 'name_loc') binding_patterns(node[k], out);
-				}
-			}
-			return out;
-		};
-		let patterns: Set<any> = new Set();
-		// the same parse's comments sit in the root `comments` list, not under the pattern, so
-		// they are placed by span: inside a pattern, short of its annotation
-		const in_pattern_span = (comment: any): boolean => {
-			for (const p of patterns) {
-				if (!p || typeof p.start !== 'number') continue;
-				const end = p.typeAnnotation ? p.typeAnnotation.start : p.end;
-				if (comment.start >= p.start && comment.end <= end) return true;
-			}
-			return false;
-		};
 
-		// `in_binding`: inside a block-binding pattern, short of its `typeAnnotation` — which a
-		// different acorn parse reads, under no synthetic `(`
-		const compare = (recon: any, full: any, file: string, in_binding = false): void => {
-			if (Array.isArray(full)) {
-				full.forEach((x, i) => compare(recon?.[i], x, file, in_binding));
-				return;
-			}
-			if (!full || typeof full !== 'object') return;
-			const binding =
-				in_binding ||
-				patterns.has(full) ||
-				((full.type === 'Block' || full.type === 'Line') && in_pattern_span(full));
-			if (full.name_loc) {
-				compared++;
-				if (!deep_equal_json(recon?.name_loc, full.name_loc)) {
-					findings.push(`${file}: name_loc on ${full.type}@${full.start}`);
-				}
-			}
-			if (full.loc) {
-				compared++;
-				const has_character = 'character' in (full.loc.start ?? {});
-				if (has_character) character_locs++;
-				if (!deep_equal_json(recon?.loc, full.loc)) {
-					// documented quirk 1: Svelte's `<script>`/`<style>` tag-position override
-					const script_program = full.type === 'Program';
-					const destructure_shift =
-						binding &&
-						point_matches(recon?.loc?.start, full.loc.start) &&
-						point_matches(recon?.loc?.end, full.loc.end);
-					if (!script_program && !destructure_shift) {
-						findings.push(`${file}: loc on ${full.type}@${full.start}`);
-					}
-				}
-			}
-			for (const k of Object.keys(full)) {
-				if (k === 'loc' || k === 'name_loc') continue;
-				compare(recon?.[k], full[k], file, binding && k !== 'typeAnnotation');
-			}
-		};
-
-		for (const file of files) {
+		const findings: Array<string> = [];
+		const graded = { svelte: 0, typescript: 0, css: 0 };
+		let loc_of_checked = 0;
+		for (const [file, language] of files) {
+			// `readFileSync(…, 'utf8')` keeps a leading BOM, which each wire reads its own way
 			const source = readFileSync(file, 'utf8');
+			const goal_marker = join(dirname(file), 'goal');
+			const options =
+				language === 'typescript' &&
+				existsSync(goal_marker) &&
+				readFileSync(goal_marker, 'utf8').trim() === 'script'
+					? { sourceType: 'script' }
+					: {};
 			let full;
 			let span_only;
 			try {
-				full = node_entry.parse_svelte(source);
-				span_only = node_entry.parse_svelte(source, { locations: false });
+				full = parse(language, source, options);
+				span_only = parse(language, source, { ...options, locations: false });
 			} catch {
-				continue; // a fixture tsv rejects on purpose (input_invalid_*, tsv_rejects)
+				continue; // a source tsv rejects (input_invalid_*, tsv_rejects, a non-module `.ts`)
 			}
-			// A source whose two line classes disagree (a lone CR, U+2028, U+2029) is
-			// refused by construction: its acorn-parsed nodes carry acorn's line count and
-			// the span-only wire does not say which parse each came from. Assert the
-			// refusal rather than skipping, so the reconstruction's own precondition is
-			// under test and not merely asserted in a doc comment.
-			if (/\r(?!\n)|[\u2028\u2029]/.test(source)) {
-				refused++;
-				assert.throws(
-					() => node_entry.reconstruct_locations(span_only, source, { language: 'svelte' }),
-					/cannot reconstruct `loc`.*lone CR, U\+2028, or U\+2029/,
-					`${file.slice(repo_root.length + 1)}: expected the two-line-class refusal`
-				);
-				continue;
-			}
-			scanned++;
-			// Svelte's offsets index the BOM-less string (its `parse` strips a leading BOM)
-			const text = source.charCodeAt(0) === 0xfeff ? source.slice(1) : source;
-			if (wire_moved_an_annotation(full, text)) seeded_annotation_docs++;
+			graded[language]++;
+			const rel = file.slice(repo_root.length + 1);
 			// the per-node entry point, asked before `reconstruct` mutates the same tree
-			const locator = node_entry.create_locator(source, { ast: span_only });
+			const locator = node_entry.create_locator(source, { language });
 			const nodes = spanned(span_only);
 			const answers = nodes.map((n) => locator.loc_of(n));
-			// unguarded: a refusal the two-line-class check above did not predict fails the test
-			const recon = node_entry.reconstruct_locations(span_only, source, { language: 'svelte' });
-			const rel = file.slice(repo_root.length + 1);
-			patterns = binding_patterns(full);
-			compare(recon, full, rel);
+			const recon = node_entry.reconstruct_locations(span_only, source, { language });
+			if (!isDeepStrictEqual(recon, full)) {
+				findings.push(`${rel}: reconstruct differs from the full wire`);
+			}
 			nodes.forEach((n, i) => {
 				loc_of_checked++;
 				const { start, end } = n.loc;
@@ -1071,16 +819,13 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 			});
 		}
 
-		assert.ok(scanned > 500, `expected to parse most fixtures, parsed ${scanned}`);
-		assert.ok(refused > 0, 'expected the fixture corpus to hold a two-line-class source');
 		assert.ok(
-			seeded_annotation_docs > 0,
-			"expected the fixture corpus to hold a block binding whose `: T` Svelte's second parse moved"
+			graded.svelte > 500,
+			`expected to parse most .svelte fixtures, parsed ${graded.svelte}`
 		);
-		assert.ok(loc_of_checked > compared, `expected loc_of on every node, asked ${loc_of_checked}`);
-		assert.ok(compared > 10_000, `expected a broad comparison, made ${compared}`);
-		assert.ok(character_locs > 0, 'expected some character-bearing locs (in-tag comments)');
-		assert.deepEqual(findings.slice(0, 10), [], `${findings.length} undocumented mismatches`);
+		assert.ok(graded.typescript > 0 && graded.css > 0, `graded ${JSON.stringify(graded)}`);
+		assert.ok(loc_of_checked > 10_000, `expected a broad comparison, asked ${loc_of_checked}`);
+		assert.deepEqual(findings.slice(0, 10), [], `${findings.length} mismatches`);
 	});
 });
 
@@ -1899,7 +1644,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		assert.equal(composed.status, 0, composed.stderr);
 		assert.match(composed.stdout, /"sourceType":"script"/);
 		assert.doesNotMatch(composed.stdout, /"loc"/);
-		// svelte drops name_loc too; css accepts the flag as a no-op
+		// svelte drops name_loc too; css drops its loc
 		const sv = run_cli([
 			'parse',
 			'--no-locations',
@@ -1919,6 +1664,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			'css'
 		]);
 		assert.equal(css.status, 0, css.stderr);
+		assert.doesNotMatch(css.stdout, /"loc"/);
 	});
 
 	it('format --source-type script formats an `await` arrow param', () => {

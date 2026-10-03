@@ -15,16 +15,6 @@
 					"type": "Identifier",
 					"start": 16,
 					"end": 19,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 4
-						},
-						"end": {
-							"line": 2,
-							"column": 7
-						}
-					},
 					"name": "foo",
 					"leadingComments": [
 						{
@@ -51,30 +41,10 @@
 					"type": "CallExpression",
 					"start": 39,
 					"end": 44,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 4
-						},
-						"end": {
-							"line": 4,
-							"column": 9
-						}
-					},
 					"callee": {
 						"type": "Identifier",
 						"start": 39,
 						"end": 42,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 4
-							},
-							"end": {
-								"line": 4,
-								"column": 7
-							}
-						},
 						"name": "foo"
 					},
 					"arguments": [],
@@ -97,33 +67,13 @@
 			"type": "Block",
 			"value": " c\n ",
 			"start": 7,
-			"end": 15,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 7
-				},
-				"end": {
-					"line": 2,
-					"column": 3
-				}
-			}
+			"end": 15
 		},
 		{
 			"type": "Block",
 			"value": " c\n ",
 			"start": 30,
-			"end": 38,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 9
-				},
-				"end": {
-					"line": 4,
-					"column": 3
-				}
-			}
+			"end": 38
 		}
 	]
 }

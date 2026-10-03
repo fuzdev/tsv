@@ -16,16 +16,6 @@
 					"type": "Identifier",
 					"start": 23,
 					"end": 25,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 23
-						},
-						"end": {
-							"line": 1,
-							"column": 25
-						}
-					},
 					"name": "aa",
 					"leadingComments": [
 						{
@@ -60,16 +50,6 @@
 								"type": "Identifier",
 								"start": 63,
 								"end": 65,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 28
-									},
-									"end": {
-										"line": 3,
-										"column": 30
-									}
-								},
 								"name": "bb",
 								"leadingComments": [
 									{
@@ -112,16 +92,6 @@
 					"type": "Identifier",
 					"start": 107,
 					"end": 113,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 25
-						},
-						"end": {
-							"line": 7,
-							"column": 31
-						}
-					},
 					"name": "items1",
 					"leadingComments": [
 						{
@@ -148,19 +118,7 @@
 					"type": "Identifier",
 					"name": "item1",
 					"start": 118,
-					"end": 123,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 36,
-							"character": 118
-						},
-						"end": {
-							"line": 7,
-							"column": 41,
-							"character": 123
-						}
-					}
+					"end": 123
 				}
 			},
 			{
@@ -178,16 +136,6 @@
 					"type": "Identifier",
 					"start": 148,
 					"end": 154,
-					"loc": {
-						"start": {
-							"line": 11,
-							"column": 7
-						},
-						"end": {
-							"line": 11,
-							"column": 13
-						}
-					},
 					"name": "items2"
 				},
 				"body": {
@@ -206,34 +154,12 @@
 					"type": "Identifier",
 					"name": "item2",
 					"start": 158,
-					"end": 163,
-					"loc": {
-						"start": {
-							"line": 11,
-							"column": 17,
-							"character": 158
-						},
-						"end": {
-							"line": 11,
-							"column": 22,
-							"character": 163
-						}
-					}
+					"end": 163
 				},
 				"key": {
 					"type": "Identifier",
 					"start": 183,
 					"end": 188,
-					"loc": {
-						"start": {
-							"line": 11,
-							"column": 42
-						},
-						"end": {
-							"line": 11,
-							"column": 47
-						}
-					},
 					"name": "item2",
 					"leadingComments": [
 						{
@@ -260,16 +186,6 @@
 					"type": "Identifier",
 					"start": 234,
 					"end": 242,
-					"loc": {
-						"start": {
-							"line": 15,
-							"column": 26
-						},
-						"end": {
-							"line": 15,
-							"column": 34
-						}
-					},
 					"name": "promise1",
 					"leadingComments": [
 						{
@@ -312,16 +228,6 @@
 					"type": "Identifier",
 					"start": 288,
 					"end": 296,
-					"loc": {
-						"start": {
-							"line": 19,
-							"column": 26
-						},
-						"end": {
-							"line": 19,
-							"column": 34
-						}
-					},
 					"name": "promise2",
 					"leadingComments": [
 						{
@@ -336,19 +242,7 @@
 					"type": "Identifier",
 					"name": "value",
 					"start": 303,
-					"end": 308,
-					"loc": {
-						"start": {
-							"line": 19,
-							"column": 41,
-							"character": 303
-						},
-						"end": {
-							"line": 19,
-							"column": 46,
-							"character": 308
-						}
-					}
+					"end": 308
 				},
 				"error": null,
 				"pending": null,
@@ -381,16 +275,6 @@
 					"type": "Identifier",
 					"start": 351,
 					"end": 353,
-					"loc": {
-						"start": {
-							"line": 23,
-							"column": 24
-						},
-						"end": {
-							"line": 23,
-							"column": 26
-						}
-					},
 					"name": "cc",
 					"leadingComments": [
 						{
@@ -422,113 +306,43 @@
 			"type": "Block",
 			"value": "* @type {A} ",
 			"start": 5,
-			"end": 21,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 5
-				},
-				"end": {
-					"line": 1,
-					"column": 21
-				}
-			}
+			"end": 21
 		},
 		{
 			"type": "Block",
 			"value": "* @type {B} ",
 			"start": 45,
-			"end": 61,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 10
-				},
-				"end": {
-					"line": 3,
-					"column": 26
-				}
-			}
+			"end": 61
 		},
 		{
 			"type": "Block",
 			"value": "* @type {C} ",
 			"start": 89,
-			"end": 105,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 7
-				},
-				"end": {
-					"line": 7,
-					"column": 23
-				}
-			}
+			"end": 105
 		},
 		{
 			"type": "Block",
 			"value": "* @type {D} ",
 			"start": 165,
-			"end": 181,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 24
-				},
-				"end": {
-					"line": 11,
-					"column": 40
-				}
-			}
+			"end": 181
 		},
 		{
 			"type": "Block",
 			"value": "* @type {E} ",
 			"start": 216,
-			"end": 232,
-			"loc": {
-				"start": {
-					"line": 15,
-					"column": 8
-				},
-				"end": {
-					"line": 15,
-					"column": 24
-				}
-			}
+			"end": 232
 		},
 		{
 			"type": "Block",
 			"value": "* @type {F} ",
 			"start": 270,
-			"end": 286,
-			"loc": {
-				"start": {
-					"line": 19,
-					"column": 8
-				},
-				"end": {
-					"line": 19,
-					"column": 24
-				}
-			}
+			"end": 286
 		},
 		{
 			"type": "Block",
 			"value": "* @type {G} ",
 			"start": 333,
-			"end": 349,
-			"loc": {
-				"start": {
-					"line": 23,
-					"column": 6
-				},
-				"end": {
-					"line": 23,
-					"column": 22
-				}
-			}
+			"end": 349
 		}
 	]
 }

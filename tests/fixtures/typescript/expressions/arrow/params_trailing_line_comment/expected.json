@@ -14,33 +14,13 @@
 			"type": "Line",
 			"value": " comment",
 			"start": 26,
-			"end": 36,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 4
-				},
-				"end": {
-					"line": 3,
-					"column": 14
-				}
-			}
+			"end": 36
 		},
 		{
 			"type": "Line",
 			"value": " comment",
 			"start": 70,
-			"end": 80,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 4
-				},
-				"end": {
-					"line": 8,
-					"column": 14
-				}
-			}
+			"end": 80
 		}
 	],
 	"instance": {
@@ -52,76 +32,26 @@
 			"type": "Program",
 			"start": 8,
 			"end": 91,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 10,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 10,
 					"end": 46,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 9
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 16,
 							"end": 45,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 7
-								},
-								"end": {
-									"line": 4,
-									"column": 8
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 16,
 								"end": 17,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 7
-									},
-									"end": {
-										"line": 2,
-										"column": 8
-									}
-								},
 								"name": "f"
 							},
 							"init": {
 								"type": "ArrowFunctionExpression",
 								"start": 20,
 								"end": 45,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 11
-									},
-									"end": {
-										"line": 4,
-										"column": 8
-									}
-								},
 								"id": null,
 								"expression": false,
 								"generator": false,
@@ -131,16 +61,6 @@
 										"type": "Identifier",
 										"start": 24,
 										"end": 25,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 2
-											},
-											"end": {
-												"line": 3,
-												"column": 3
-											}
-										},
 										"name": "a",
 										"trailingComments": [
 											{
@@ -156,16 +76,6 @@
 									"type": "BlockStatement",
 									"start": 43,
 									"end": 45,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 6
-										},
-										"end": {
-											"line": 4,
-											"column": 8
-										}
-									},
 									"body": []
 								}
 							}
@@ -177,61 +87,21 @@
 					"type": "VariableDeclaration",
 					"start": 49,
 					"end": 90,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 9,
-							"column": 9
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 55,
 							"end": 89,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 7
-								},
-								"end": {
-									"line": 9,
-									"column": 8
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 55,
 								"end": 56,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 7
-									},
-									"end": {
-										"line": 6,
-										"column": 8
-									}
-								},
 								"name": "g"
 							},
 							"init": {
 								"type": "ArrowFunctionExpression",
 								"start": 59,
 								"end": 89,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 11
-									},
-									"end": {
-										"line": 9,
-										"column": 8
-									}
-								},
 								"id": null,
 								"expression": false,
 								"generator": false,
@@ -241,32 +111,12 @@
 										"type": "Identifier",
 										"start": 63,
 										"end": 64,
-										"loc": {
-											"start": {
-												"line": 7,
-												"column": 2
-											},
-											"end": {
-												"line": 7,
-												"column": 3
-											}
-										},
 										"name": "a"
 									},
 									{
 										"type": "Identifier",
 										"start": 68,
 										"end": 69,
-										"loc": {
-											"start": {
-												"line": 8,
-												"column": 2
-											},
-											"end": {
-												"line": 8,
-												"column": 3
-											}
-										},
 										"name": "b",
 										"trailingComments": [
 											{
@@ -282,16 +132,6 @@
 									"type": "BlockStatement",
 									"start": 87,
 									"end": 89,
-									"loc": {
-										"start": {
-											"line": 9,
-											"column": 6
-										},
-										"end": {
-											"line": 9,
-											"column": 8
-										}
-									},
 									"body": []
 								}
 							}

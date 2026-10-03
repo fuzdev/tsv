@@ -14,33 +14,13 @@
 			"type": "Line",
 			"value": " line comment",
 			"start": 36,
-			"end": 51,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 2
-				},
-				"end": {
-					"line": 3,
-					"column": 17
-				}
-			}
+			"end": 51
 		},
 		{
 			"type": "Block",
 			"value": " block comment ",
 			"start": 73,
-			"end": 92,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 2
-				},
-				"end": {
-					"line": 7,
-					"column": 21
-				}
-			}
+			"end": 92
 		}
 	],
 	"instance": {
@@ -52,61 +32,21 @@
 			"type": "Program",
 			"start": 18,
 			"end": 96,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 9,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "TSInterfaceDeclaration",
 					"start": 20,
 					"end": 54,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 30,
 						"end": 31,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 11
-							},
-							"end": {
-								"line": 2,
-								"column": 12
-							}
-						},
 						"name": "A"
 					},
 					"body": {
 						"type": "TSInterfaceBody",
 						"start": 32,
 						"end": 54,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 13
-							},
-							"end": {
-								"line": 4,
-								"column": 2
-							}
-						},
 						"body": []
 					}
 				},
@@ -114,46 +54,16 @@
 					"type": "TSInterfaceDeclaration",
 					"start": 57,
 					"end": 95,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 67,
 						"end": 68,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 11
-							},
-							"end": {
-								"line": 6,
-								"column": 12
-							}
-						},
 						"name": "B"
 					},
 					"body": {
 						"type": "TSInterfaceBody",
 						"start": 69,
 						"end": 95,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 13
-							},
-							"end": {
-								"line": 8,
-								"column": 2
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -182,18 +92,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

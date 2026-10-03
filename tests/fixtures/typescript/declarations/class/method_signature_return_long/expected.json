@@ -14,33 +14,13 @@
 			"type": "Line",
 			"value": " 100 chars - stays inline",
 			"start": 32,
-			"end": 59,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 2
-				},
-				"end": {
-					"line": 3,
-					"column": 29
-				}
-			}
+			"end": 59
 		},
 		{
 			"type": "Line",
 			"value": " 101 chars - params break, return type stays with )",
 			"start": 162,
-			"end": 215,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 2
-				},
-				"end": {
-					"line": 6,
-					"column": 55
-				}
-			}
+			"end": 215
 		}
 	],
 	"instance": {
@@ -52,45 +32,15 @@
 			"type": "Program",
 			"start": 18,
 			"end": 326,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 11,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ClassDeclaration",
 					"start": 20,
 					"end": 325,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 10,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 26,
 						"end": 27,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 7
-							},
-							"end": {
-								"line": 2,
-								"column": 8
-							}
-						},
 						"name": "C"
 					},
 					"superClass": null,
@@ -98,47 +48,17 @@
 						"type": "ClassBody",
 						"start": 28,
 						"end": 325,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 9
-							},
-							"end": {
-								"line": 10,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "MethodDefinition",
 								"start": 62,
 								"end": 158,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 2
-									},
-									"end": {
-										"line": 4,
-										"column": 98
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
 									"start": 68,
 									"end": 72,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 8
-										},
-										"end": {
-											"line": 4,
-											"column": 12
-										}
-									},
 									"name": "send"
 								},
 								"kind": "method",
@@ -146,16 +66,6 @@
 									"type": "FunctionExpression",
 									"start": 72,
 									"end": 158,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 12
-										},
-										"end": {
-											"line": 4,
-											"column": 98
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -165,59 +75,19 @@
 											"type": "Identifier",
 											"start": 73,
 											"end": 118,
-											"loc": {
-												"start": {
-													"line": 4,
-													"column": 13
-												},
-												"end": {
-													"line": 4,
-													"column": 58
-												}
-											},
 											"name": "messageParam",
 											"typeAnnotation": {
 												"type": "TSTypeAnnotation",
 												"start": 85,
 												"end": 118,
-												"loc": {
-													"start": {
-														"line": 4,
-														"column": 25
-													},
-													"end": {
-														"line": 4,
-														"column": 58
-													}
-												},
 												"typeAnnotation": {
 													"type": "TSTypeReference",
 													"start": 87,
 													"end": 118,
-													"loc": {
-														"start": {
-															"line": 4,
-															"column": 27
-														},
-														"end": {
-															"line": 4,
-															"column": 58
-														}
-													},
 													"typeName": {
 														"type": "Identifier",
 														"start": 87,
 														"end": 118,
-														"loc": {
-															"start": {
-																"line": 4,
-																"column": 27
-															},
-															"end": {
-																"line": 4,
-																"column": 58
-															}
-														},
 														"name": "VeryLongParameterTypeNameAAAABB"
 													}
 												}
@@ -228,121 +98,41 @@
 										"type": "TSTypeAnnotation",
 										"start": 119,
 										"end": 155,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 59
-											},
-											"end": {
-												"line": 4,
-												"column": 95
-											}
-										},
 										"typeAnnotation": {
 											"type": "TSTypeReference",
 											"start": 121,
 											"end": 155,
-											"loc": {
-												"start": {
-													"line": 4,
-													"column": 61
-												},
-												"end": {
-													"line": 4,
-													"column": 95
-												}
-											},
 											"typeName": {
 												"type": "Identifier",
 												"start": 121,
 												"end": 128,
-												"loc": {
-													"start": {
-														"line": 4,
-														"column": 61
-													},
-													"end": {
-														"line": 4,
-														"column": 68
-													}
-												},
 												"name": "Promise"
 											},
 											"typeArguments": {
 												"type": "TSTypeParameterInstantiation",
 												"start": 128,
 												"end": 155,
-												"loc": {
-													"start": {
-														"line": 4,
-														"column": 68
-													},
-													"end": {
-														"line": 4,
-														"column": 95
-													}
-												},
 												"params": [
 													{
 														"type": "TSUnionType",
 														"start": 129,
 														"end": 154,
-														"loc": {
-															"start": {
-																"line": 4,
-																"column": 69
-															},
-															"end": {
-																"line": 4,
-																"column": 94
-															}
-														},
 														"types": [
 															{
 																"type": "TSTypeReference",
 																"start": 129,
 																"end": 147,
-																"loc": {
-																	"start": {
-																		"line": 4,
-																		"column": 69
-																	},
-																	"end": {
-																		"line": 4,
-																		"column": 87
-																	}
-																},
 																"typeName": {
 																	"type": "Identifier",
 																	"start": 129,
 																	"end": 147,
-																	"loc": {
-																		"start": {
-																			"line": 4,
-																			"column": 69
-																		},
-																		"end": {
-																			"line": 4,
-																			"column": 87
-																		}
-																	},
 																	"name": "VeryLongReturnType"
 																}
 															},
 															{
 																"type": "TSNullKeyword",
 																"start": 150,
-																"end": 154,
-																"loc": {
-																	"start": {
-																		"line": 4,
-																		"column": 90
-																	},
-																	"end": {
-																		"line": 4,
-																		"column": 94
-																	}
-																}
+																"end": 154
 															}
 														]
 													}
@@ -354,16 +144,6 @@
 										"type": "BlockStatement",
 										"start": 156,
 										"end": 158,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 96
-											},
-											"end": {
-												"line": 4,
-												"column": 98
-											}
-										},
 										"body": []
 									}
 								},
@@ -380,32 +160,12 @@
 								"type": "MethodDefinition",
 								"start": 218,
 								"end": 322,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 2
-									},
-									"end": {
-										"line": 9,
-										"column": 42
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
 									"start": 224,
 									"end": 228,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 8
-										},
-										"end": {
-											"line": 7,
-											"column": 12
-										}
-									},
 									"name": "send"
 								},
 								"kind": "method",
@@ -413,16 +173,6 @@
 									"type": "FunctionExpression",
 									"start": 228,
 									"end": 322,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 12
-										},
-										"end": {
-											"line": 9,
-											"column": 42
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -432,59 +182,19 @@
 											"type": "Identifier",
 											"start": 233,
 											"end": 279,
-											"loc": {
-												"start": {
-													"line": 8,
-													"column": 3
-												},
-												"end": {
-													"line": 8,
-													"column": 49
-												}
-											},
 											"name": "messageParam",
 											"typeAnnotation": {
 												"type": "TSTypeAnnotation",
 												"start": 245,
 												"end": 279,
-												"loc": {
-													"start": {
-														"line": 8,
-														"column": 15
-													},
-													"end": {
-														"line": 8,
-														"column": 49
-													}
-												},
 												"typeAnnotation": {
 													"type": "TSTypeReference",
 													"start": 247,
 													"end": 279,
-													"loc": {
-														"start": {
-															"line": 8,
-															"column": 17
-														},
-														"end": {
-															"line": 8,
-															"column": 49
-														}
-													},
 													"typeName": {
 														"type": "Identifier",
 														"start": 247,
 														"end": 279,
-														"loc": {
-															"start": {
-																"line": 8,
-																"column": 17
-															},
-															"end": {
-																"line": 8,
-																"column": 49
-															}
-														},
 														"name": "VeryLongParameterTypeNameAAAABBB"
 													}
 												}
@@ -495,121 +205,41 @@
 										"type": "TSTypeAnnotation",
 										"start": 283,
 										"end": 319,
-										"loc": {
-											"start": {
-												"line": 9,
-												"column": 3
-											},
-											"end": {
-												"line": 9,
-												"column": 39
-											}
-										},
 										"typeAnnotation": {
 											"type": "TSTypeReference",
 											"start": 285,
 											"end": 319,
-											"loc": {
-												"start": {
-													"line": 9,
-													"column": 5
-												},
-												"end": {
-													"line": 9,
-													"column": 39
-												}
-											},
 											"typeName": {
 												"type": "Identifier",
 												"start": 285,
 												"end": 292,
-												"loc": {
-													"start": {
-														"line": 9,
-														"column": 5
-													},
-													"end": {
-														"line": 9,
-														"column": 12
-													}
-												},
 												"name": "Promise"
 											},
 											"typeArguments": {
 												"type": "TSTypeParameterInstantiation",
 												"start": 292,
 												"end": 319,
-												"loc": {
-													"start": {
-														"line": 9,
-														"column": 12
-													},
-													"end": {
-														"line": 9,
-														"column": 39
-													}
-												},
 												"params": [
 													{
 														"type": "TSUnionType",
 														"start": 293,
 														"end": 318,
-														"loc": {
-															"start": {
-																"line": 9,
-																"column": 13
-															},
-															"end": {
-																"line": 9,
-																"column": 38
-															}
-														},
 														"types": [
 															{
 																"type": "TSTypeReference",
 																"start": 293,
 																"end": 311,
-																"loc": {
-																	"start": {
-																		"line": 9,
-																		"column": 13
-																	},
-																	"end": {
-																		"line": 9,
-																		"column": 31
-																	}
-																},
 																"typeName": {
 																	"type": "Identifier",
 																	"start": 293,
 																	"end": 311,
-																	"loc": {
-																		"start": {
-																			"line": 9,
-																			"column": 13
-																		},
-																		"end": {
-																			"line": 9,
-																			"column": 31
-																		}
-																	},
 																	"name": "VeryLongReturnType"
 																}
 															},
 															{
 																"type": "TSNullKeyword",
 																"start": 314,
-																"end": 318,
-																"loc": {
-																	"start": {
-																		"line": 9,
-																		"column": 34
-																	},
-																	"end": {
-																		"line": 9,
-																		"column": 38
-																	}
-																}
+																"end": 318
 															}
 														]
 													}
@@ -621,16 +251,6 @@
 										"type": "BlockStatement",
 										"start": 320,
 										"end": 322,
-										"loc": {
-											"start": {
-												"line": 9,
-												"column": 40
-											},
-											"end": {
-												"line": 9,
-												"column": 42
-											}
-										},
 										"body": []
 									}
 								},
@@ -655,18 +275,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

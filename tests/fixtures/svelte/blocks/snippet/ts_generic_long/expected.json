@@ -35,19 +35,7 @@
 					"type": "Identifier",
 					"name": "fn1",
 					"start": 208,
-					"end": 211,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 10,
-							"character": 208
-						},
-						"end": {
-							"line": 8,
-							"column": 13,
-							"character": 211
-						}
-					}
+					"end": 211
 				},
 				"typeParams": "Taaaaaaaaa extends Aaaaaaaa, Ubbbbbbbbb extends Bbbbbbbb, Vccccccccccccccccccccccc",
 				"parameters": [],
@@ -66,18 +54,6 @@
 							"start": 300,
 							"end": 312,
 							"name": "div",
-							"name_loc": {
-								"start": {
-									"line": 9,
-									"column": 2,
-									"character": 301
-								},
-								"end": {
-									"line": 9,
-									"column": 5,
-									"character": 304
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -130,19 +106,7 @@
 					"type": "Identifier",
 					"name": "fn2",
 					"start": 416,
-					"end": 419,
-					"loc": {
-						"start": {
-							"line": 13,
-							"column": 10,
-							"character": 416
-						},
-						"end": {
-							"line": 13,
-							"column": 13,
-							"character": 419
-						}
-					}
+					"end": 419
 				},
 				"typeParams": "\n\tTaaaaaaaaaa extends Aaaaaaaa,\n\tUbbbbbbbbb extends Bbbbbbbb,\n\tVccccccccccccccccccccccc\n",
 				"parameters": [],
@@ -161,18 +125,6 @@
 							"start": 514,
 							"end": 526,
 							"name": "div",
-							"name_loc": {
-								"start": {
-									"line": 18,
-									"column": 2,
-									"character": 515
-								},
-								"end": {
-									"line": 18,
-									"column": 5,
-									"character": 518
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -225,19 +177,7 @@
 					"type": "Identifier",
 					"name": "fn3",
 					"start": 621,
-					"end": 624,
-					"loc": {
-						"start": {
-							"line": 22,
-							"column": 10,
-							"character": 621
-						},
-						"end": {
-							"line": 22,
-							"column": 13,
-							"character": 624
-						}
-					}
+					"end": 624
 				},
 				"typeParams": "\n\tTaaaaaaaaaa extends Aaaaaaaaaaaaaaaaaaaaaa,\n\tUbbbbbbbbbb extends Aaaaaaaaaaaaaaaaaaaaaa\n",
 				"parameters": [
@@ -245,59 +185,19 @@
 						"type": "Identifier",
 						"start": 717,
 						"end": 731,
-						"loc": {
-							"start": {
-								"line": 25,
-								"column": 2
-							},
-							"end": {
-								"line": 25,
-								"column": 16
-							}
-						},
 						"name": "a",
 						"typeAnnotation": {
 							"type": "TSTypeAnnotation",
 							"start": 718,
 							"end": 731,
-							"loc": {
-								"start": {
-									"line": 25,
-									"column": 3
-								},
-								"end": {
-									"line": 25,
-									"column": 16
-								}
-							},
 							"typeAnnotation": {
 								"type": "TSTypeReference",
 								"start": 720,
 								"end": 731,
-								"loc": {
-									"start": {
-										"line": 25,
-										"column": 5
-									},
-									"end": {
-										"line": 25,
-										"column": 16
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 720,
 									"end": 731,
-									"loc": {
-										"start": {
-											"line": 25,
-											"column": 5
-										},
-										"end": {
-											"line": 25,
-											"column": 16
-										}
-									},
 									"name": "Taaaaaaaaaa"
 								}
 							}
@@ -319,18 +219,6 @@
 							"start": 735,
 							"end": 747,
 							"name": "div",
-							"name_loc": {
-								"start": {
-									"line": 26,
-									"column": 2,
-									"character": 736
-								},
-								"end": {
-									"line": 26,
-									"column": 5,
-									"character": 739
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -368,153 +256,53 @@
 			"type": "Program",
 			"start": 18,
 			"end": 108,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 5,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 20,
 					"end": 43,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 24
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 25,
 						"end": 33,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 6
-							},
-							"end": {
-								"line": 2,
-								"column": 14
-							}
-						},
 						"name": "Aaaaaaaa"
 					},
 					"typeAnnotation": {
 						"type": "TSStringKeyword",
 						"start": 36,
-						"end": 42,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 17
-							},
-							"end": {
-								"line": 2,
-								"column": 23
-							}
-						}
+						"end": 42
 					}
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 45,
 					"end": 68,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 24
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 50,
 						"end": 58,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 6
-							},
-							"end": {
-								"line": 3,
-								"column": 14
-							}
-						},
 						"name": "Bbbbbbbb"
 					},
 					"typeAnnotation": {
 						"type": "TSNumberKeyword",
 						"start": 61,
-						"end": 67,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 17
-							},
-							"end": {
-								"line": 3,
-								"column": 23
-							}
-						}
+						"end": 67
 					}
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 70,
 					"end": 107,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 38
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 75,
 						"end": 97,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 6
-							},
-							"end": {
-								"line": 4,
-								"column": 28
-							}
-						},
 						"name": "Aaaaaaaaaaaaaaaaaaaaaa"
 					},
 					"typeAnnotation": {
 						"type": "TSStringKeyword",
 						"start": 100,
-						"end": 106,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 31
-							},
-							"end": {
-								"line": 4,
-								"column": 37
-							}
-						}
+						"end": 106
 					}
 				}
 			],
@@ -526,18 +314,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

@@ -28,30 +28,10 @@
 					"type": "CallExpression",
 					"start": 43,
 					"end": 133,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 9
-						},
-						"end": {
-							"line": 2,
-							"column": 99
-						}
-					},
 					"callee": {
 						"type": "Identifier",
 						"start": 43,
 						"end": 59,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 9
-							},
-							"end": {
-								"line": 2,
-								"column": 25
-							}
-						},
 						"name": "fn00000000000000"
 					},
 					"arguments": [
@@ -59,80 +39,30 @@
 							"type": "Identifier",
 							"start": 60,
 							"end": 73,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 26
-								},
-								"end": {
-									"line": 2,
-									"column": 39
-								}
-							},
 							"name": "arg0000000000"
 						},
 						{
 							"type": "Identifier",
 							"start": 75,
 							"end": 88,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 41
-								},
-								"end": {
-									"line": 2,
-									"column": 54
-								}
-							},
 							"name": "arg1111111111"
 						},
 						{
 							"type": "Identifier",
 							"start": 90,
 							"end": 103,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 56
-								},
-								"end": {
-									"line": 2,
-									"column": 69
-								}
-							},
 							"name": "arg2222222222"
 						},
 						{
 							"type": "Identifier",
 							"start": 105,
 							"end": 118,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 71
-								},
-								"end": {
-									"line": 2,
-									"column": 84
-								}
-							},
 							"name": "arg3333333333"
 						},
 						{
 							"type": "Identifier",
 							"start": 120,
 							"end": 132,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 86
-								},
-								"end": {
-									"line": 2,
-									"column": 98
-								}
-							},
 							"name": "arg444444444"
 						}
 					],
@@ -167,30 +97,10 @@
 					"type": "CallExpression",
 					"start": 182,
 					"end": 280,
-					"loc": {
-						"start": {
-							"line": 5,
-							"column": 9
-						},
-						"end": {
-							"line": 11,
-							"column": 1
-						}
-					},
 					"callee": {
 						"type": "Identifier",
 						"start": 182,
 						"end": 198,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 9
-							},
-							"end": {
-								"line": 5,
-								"column": 25
-							}
-						},
 						"name": "fn00000000000000"
 					},
 					"arguments": [
@@ -198,80 +108,30 @@
 							"type": "Identifier",
 							"start": 201,
 							"end": 214,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 1
-								},
-								"end": {
-									"line": 6,
-									"column": 14
-								}
-							},
 							"name": "arg0000000000"
 						},
 						{
 							"type": "Identifier",
 							"start": 217,
 							"end": 230,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 1
-								},
-								"end": {
-									"line": 7,
-									"column": 14
-								}
-							},
 							"name": "arg1111111111"
 						},
 						{
 							"type": "Identifier",
 							"start": 233,
 							"end": 246,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 1
-								},
-								"end": {
-									"line": 8,
-									"column": 14
-								}
-							},
 							"name": "arg2222222222"
 						},
 						{
 							"type": "Identifier",
 							"start": 249,
 							"end": 262,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 1
-								},
-								"end": {
-									"line": 9,
-									"column": 14
-								}
-							},
 							"name": "arg3333333333"
 						},
 						{
 							"type": "Identifier",
 							"start": 265,
 							"end": 278,
-							"loc": {
-								"start": {
-									"line": 10,
-									"column": 1
-								},
-								"end": {
-									"line": 10,
-									"column": 14
-								}
-							},
 							"name": "arg4444444444"
 						}
 					],
@@ -306,30 +166,10 @@
 					"type": "CallExpression",
 					"start": 329,
 					"end": 443,
-					"loc": {
-						"start": {
-							"line": 14,
-							"column": 9
-						},
-						"end": {
-							"line": 21,
-							"column": 1
-						}
-					},
 					"callee": {
 						"type": "Identifier",
 						"start": 329,
 						"end": 345,
-						"loc": {
-							"start": {
-								"line": 14,
-								"column": 9
-							},
-							"end": {
-								"line": 14,
-								"column": 25
-							}
-						},
 						"name": "fn00000000000000"
 					},
 					"arguments": [
@@ -337,96 +177,36 @@
 							"type": "Identifier",
 							"start": 348,
 							"end": 361,
-							"loc": {
-								"start": {
-									"line": 15,
-									"column": 1
-								},
-								"end": {
-									"line": 15,
-									"column": 14
-								}
-							},
 							"name": "arg0000000000"
 						},
 						{
 							"type": "Identifier",
 							"start": 364,
 							"end": 377,
-							"loc": {
-								"start": {
-									"line": 16,
-									"column": 1
-								},
-								"end": {
-									"line": 16,
-									"column": 14
-								}
-							},
 							"name": "arg1111111111"
 						},
 						{
 							"type": "Identifier",
 							"start": 380,
 							"end": 393,
-							"loc": {
-								"start": {
-									"line": 17,
-									"column": 1
-								},
-								"end": {
-									"line": 17,
-									"column": 14
-								}
-							},
 							"name": "arg2222222222"
 						},
 						{
 							"type": "Identifier",
 							"start": 396,
 							"end": 409,
-							"loc": {
-								"start": {
-									"line": 18,
-									"column": 1
-								},
-								"end": {
-									"line": 18,
-									"column": 14
-								}
-							},
 							"name": "arg3333333333"
 						},
 						{
 							"type": "Identifier",
 							"start": 412,
 							"end": 425,
-							"loc": {
-								"start": {
-									"line": 19,
-									"column": 1
-								},
-								"end": {
-									"line": 19,
-									"column": 14
-								}
-							},
 							"name": "arg4444444444"
 						},
 						{
 							"type": "Identifier",
 							"start": 428,
 							"end": 441,
-							"loc": {
-								"start": {
-									"line": 20,
-									"column": 1
-								},
-								"end": {
-									"line": 20,
-									"column": 14
-								}
-							},
 							"name": "arg5555555555"
 						}
 					],

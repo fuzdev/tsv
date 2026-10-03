@@ -14,17 +14,7 @@
 			"type": "Line",
 			"value": " line break before `as` → two statements (`as(Bar)` is a call), not `foo as Bar`",
 			"start": 20,
-			"end": 102,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 83
-				}
-			}
+			"end": 102
 		}
 	],
 	"instance": {
@@ -36,45 +26,15 @@
 			"type": "Program",
 			"start": 18,
 			"end": 119,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 5,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
 					"start": 104,
 					"end": 108,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 5
-						}
-					},
 					"expression": {
 						"type": "Identifier",
 						"start": 104,
 						"end": 107,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 1
-							},
-							"end": {
-								"line": 3,
-								"column": 4
-							}
-						},
 						"name": "foo"
 					},
 					"leadingComments": [
@@ -90,44 +50,14 @@
 					"type": "ExpressionStatement",
 					"start": 110,
 					"end": 118,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 9
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 110,
 						"end": 117,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 1
-							},
-							"end": {
-								"line": 4,
-								"column": 8
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 110,
 							"end": 112,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 1
-								},
-								"end": {
-									"line": 4,
-									"column": 3
-								}
-							},
 							"name": "as"
 						},
 						"arguments": [
@@ -135,16 +65,6 @@
 								"type": "Identifier",
 								"start": 113,
 								"end": 116,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 4
-									},
-									"end": {
-										"line": 4,
-										"column": 7
-									}
-								},
 								"name": "Bar"
 							}
 						],
@@ -160,18 +80,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

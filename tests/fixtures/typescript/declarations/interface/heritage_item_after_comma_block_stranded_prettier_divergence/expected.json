@@ -14,17 +14,7 @@
 			"type": "Block",
 			"value": " c ",
 			"start": 88,
-			"end": 95,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 38
-				},
-				"end": {
-					"line": 4,
-					"column": 45
-				}
-			}
+			"end": 95
 		}
 	],
 	"instance": {
@@ -36,45 +26,15 @@
 			"type": "Program",
 			"start": 18,
 			"end": 166,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 7,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "TSInterfaceDeclaration",
 					"start": 20,
 					"end": 165,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 33
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 30,
 						"end": 39,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 11
-							},
-							"end": {
-								"line": 2,
-								"column": 20
-							}
-						},
 						"name": "Interface"
 					},
 					"extends": [
@@ -82,30 +42,10 @@
 							"type": "TSExpressionWithTypeArguments",
 							"start": 53,
 							"end": 86,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 3
-								},
-								"end": {
-									"line": 4,
-									"column": 36
-								}
-							},
 							"expression": {
 								"type": "Identifier",
 								"start": 53,
 								"end": 86,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 3
-									},
-									"end": {
-										"line": 4,
-										"column": 36
-									}
-								},
 								"name": "SomeVeryLongBaseInterfaceNameHere"
 							},
 							"trailingComments": [
@@ -121,30 +61,10 @@
 							"type": "TSExpressionWithTypeArguments",
 							"start": 99,
 							"end": 130,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 3
-								},
-								"end": {
-									"line": 5,
-									"column": 34
-								}
-							},
 							"expression": {
 								"type": "Identifier",
 								"start": 99,
 								"end": 130,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 3
-									},
-									"end": {
-										"line": 5,
-										"column": 34
-									}
-								},
 								"name": "AnotherVeryLongInterfaceNameToo"
 							}
 						},
@@ -152,30 +72,10 @@
 							"type": "TSExpressionWithTypeArguments",
 							"start": 135,
 							"end": 162,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 3
-								},
-								"end": {
-									"line": 6,
-									"column": 30
-								}
-							},
 							"expression": {
 								"type": "Identifier",
 								"start": 135,
 								"end": 162,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 3
-									},
-									"end": {
-										"line": 6,
-										"column": 30
-									}
-								},
 								"name": "YetAnotherLongInterfaceName"
 							}
 						}
@@ -184,16 +84,6 @@
 						"type": "TSInterfaceBody",
 						"start": 163,
 						"end": 165,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 31
-							},
-							"end": {
-								"line": 6,
-								"column": 33
-							}
-						},
 						"body": []
 					}
 				}
@@ -206,18 +96,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

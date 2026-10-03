@@ -19,74 +19,24 @@
 			"type": "Program",
 			"start": 18,
 			"end": 67,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 3,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExportDefaultDeclaration",
 					"start": 20,
 					"end": 66,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 47
-						}
-					},
 					"exportKind": "value",
 					"declaration": {
 						"type": "TSSatisfiesExpression",
 						"start": 36,
 						"end": 64,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 17
-							},
-							"end": {
-								"line": 2,
-								"column": 45
-							}
-						},
 						"expression": {
 							"type": "FunctionExpression",
 							"start": 36,
 							"end": 52,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 17
-								},
-								"end": {
-									"line": 2,
-									"column": 33
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 45,
 								"end": 47,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 26
-									},
-									"end": {
-										"line": 2,
-										"column": 28
-									}
-								},
 								"name": "fn"
 							},
 							"expression": false,
@@ -97,16 +47,6 @@
 								"type": "BlockStatement",
 								"start": 50,
 								"end": 52,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 31
-									},
-									"end": {
-										"line": 2,
-										"column": 33
-									}
-								},
 								"body": []
 							}
 						},
@@ -114,30 +54,10 @@
 							"type": "TSTypeReference",
 							"start": 63,
 							"end": 64,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 44
-								},
-								"end": {
-									"line": 2,
-									"column": 45
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 63,
 								"end": 64,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 44
-									},
-									"end": {
-										"line": 2,
-										"column": 45
-									}
-								},
 								"name": "T"
 							}
 						}
@@ -152,18 +72,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

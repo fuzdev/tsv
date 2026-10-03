@@ -15,35 +15,13 @@
 					"type": "Identifier",
 					"start": 8,
 					"end": 15,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 8
-						},
-						"end": {
-							"line": 1,
-							"column": 15
-						}
-					},
 					"name": "promise"
 				},
 				"value": {
 					"type": "Identifier",
 					"name": "value",
 					"start": 21,
-					"end": 26,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 21,
-							"character": 21
-						},
-						"end": {
-							"line": 1,
-							"column": 26,
-							"character": 26
-						}
-					}
+					"end": 26
 				},
 				"error": null,
 				"pending": null,
@@ -62,18 +40,6 @@
 							"start": 29,
 							"end": 47,
 							"name": "div",
-							"name_loc": {
-								"start": {
-									"line": 2,
-									"column": 2,
-									"character": 30
-								},
-								"end": {
-									"line": 2,
-									"column": 5,
-									"character": 33
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -86,16 +52,6 @@
 											"type": "Identifier",
 											"start": 35,
 											"end": 40,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 7
-												},
-												"end": {
-													"line": 2,
-													"column": 12
-												}
-											},
 											"name": "value"
 										}
 									}

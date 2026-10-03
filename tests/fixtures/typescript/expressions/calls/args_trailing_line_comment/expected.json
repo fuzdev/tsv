@@ -14,113 +14,43 @@
 			"type": "Line",
 			"value": " Regular function call - works correctly",
 			"start": 10,
-			"end": 52,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 43
-				}
-			}
+			"end": 52
 		},
 		{
 			"type": "Line",
 			"value": " comment",
 			"start": 66,
-			"end": 76,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 8
-				},
-				"end": {
-					"line": 4,
-					"column": 18
-				}
-			}
+			"end": 76
 		},
 		{
 			"type": "Line",
 			"value": " Constructor call - bug: trailing comment is stripped",
 			"start": 90,
-			"end": 145,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 1
-				},
-				"end": {
-					"line": 8,
-					"column": 56
-				}
-			}
+			"end": 145
 		},
 		{
 			"type": "Line",
 			"value": " comment",
 			"start": 166,
-			"end": 176,
-			"loc": {
-				"start": {
-					"line": 10,
-					"column": 8
-				},
-				"end": {
-					"line": 10,
-					"column": 18
-				}
-			}
+			"end": 176
 		},
 		{
 			"type": "Line",
 			"value": " Multiple trailing comments in constructor",
 			"start": 190,
-			"end": 234,
-			"loc": {
-				"start": {
-					"line": 14,
-					"column": 1
-				},
-				"end": {
-					"line": 14,
-					"column": 45
-				}
-			}
+			"end": 234
 		},
 		{
 			"type": "Line",
 			"value": " comment 1",
 			"start": 255,
-			"end": 267,
-			"loc": {
-				"start": {
-					"line": 16,
-					"column": 8
-				},
-				"end": {
-					"line": 16,
-					"column": 20
-				}
-			}
+			"end": 267
 		},
 		{
 			"type": "Line",
 			"value": " comment 2",
 			"start": 275,
-			"end": 287,
-			"loc": {
-				"start": {
-					"line": 17,
-					"column": 7
-				},
-				"end": {
-					"line": 17,
-					"column": 19
-				}
-			}
+			"end": 287
 		}
 	],
 	"instance": {
@@ -132,59 +62,19 @@
 			"type": "Program",
 			"start": 8,
 			"end": 292,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 19,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
 					"start": 54,
 					"end": 87,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 54,
 						"end": 86,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 1
-							},
-							"end": {
-								"line": 6,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 54,
 							"end": 56,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 1
-								},
-								"end": {
-									"line": 3,
-									"column": 3
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -192,16 +82,6 @@
 								"type": "Identifier",
 								"start": 60,
 								"end": 64,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 2
-									},
-									"end": {
-										"line": 4,
-										"column": 6
-									}
-								},
 								"name": "arg1",
 								"trailingComments": [
 									{
@@ -216,16 +96,6 @@
 								"type": "Identifier",
 								"start": 79,
 								"end": 83,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 2
-									},
-									"end": {
-										"line": 5,
-										"column": 6
-									}
-								},
 								"name": "arg2"
 							}
 						],
@@ -244,44 +114,14 @@
 					"type": "ExpressionStatement",
 					"start": 147,
 					"end": 187,
-					"loc": {
-						"start": {
-							"line": 9,
-							"column": 1
-						},
-						"end": {
-							"line": 12,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "NewExpression",
 						"start": 147,
 						"end": 186,
-						"loc": {
-							"start": {
-								"line": 9,
-								"column": 1
-							},
-							"end": {
-								"line": 12,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 151,
 							"end": 156,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 5
-								},
-								"end": {
-									"line": 9,
-									"column": 10
-								}
-							},
 							"name": "Class"
 						},
 						"arguments": [
@@ -289,16 +129,6 @@
 								"type": "Identifier",
 								"start": 160,
 								"end": 164,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 2
-									},
-									"end": {
-										"line": 10,
-										"column": 6
-									}
-								},
 								"name": "arg1",
 								"trailingComments": [
 									{
@@ -313,16 +143,6 @@
 								"type": "Identifier",
 								"start": 179,
 								"end": 183,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 2
-									},
-									"end": {
-										"line": 11,
-										"column": 6
-									}
-								},
 								"name": "arg2"
 							}
 						]
@@ -340,44 +160,14 @@
 					"type": "ExpressionStatement",
 					"start": 236,
 					"end": 291,
-					"loc": {
-						"start": {
-							"line": 15,
-							"column": 1
-						},
-						"end": {
-							"line": 18,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "NewExpression",
 						"start": 236,
 						"end": 290,
-						"loc": {
-							"start": {
-								"line": 15,
-								"column": 1
-							},
-							"end": {
-								"line": 18,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 240,
 							"end": 245,
-							"loc": {
-								"start": {
-									"line": 15,
-									"column": 5
-								},
-								"end": {
-									"line": 15,
-									"column": 10
-								}
-							},
 							"name": "Class"
 						},
 						"arguments": [
@@ -385,16 +175,6 @@
 								"type": "Identifier",
 								"start": 249,
 								"end": 253,
-								"loc": {
-									"start": {
-										"line": 16,
-										"column": 2
-									},
-									"end": {
-										"line": 16,
-										"column": 6
-									}
-								},
 								"name": "arg1",
 								"trailingComments": [
 									{
@@ -409,16 +189,6 @@
 								"type": "Identifier",
 								"start": 270,
 								"end": 274,
-								"loc": {
-									"start": {
-										"line": 17,
-										"column": 2
-									},
-									"end": {
-										"line": 17,
-										"column": 6
-									}
-								},
 								"name": "arg2",
 								"trailingComments": [
 									{

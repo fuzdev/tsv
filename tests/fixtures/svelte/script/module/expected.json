@@ -87,18 +87,6 @@
 				"start": 102,
 				"end": 120,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 9,
-						"column": 1,
-						"character": 103
-					},
-					"end": {
-						"line": 9,
-						"column": 4,
-						"character": 106
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -111,16 +99,6 @@
 								"type": "Identifier",
 								"start": 108,
 								"end": 113,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 6
-									},
-									"end": {
-										"line": 9,
-										"column": 11
-									}
-								},
 								"name": "expr2"
 							}
 						}
@@ -147,76 +125,26 @@
 			"type": "Program",
 			"start": 15,
 			"end": 35,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 3,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 17,
 					"end": 34,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 18
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 23,
 							"end": 33,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 7
-								},
-								"end": {
-									"line": 2,
-									"column": 17
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 23,
 								"end": 28,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 7
-									},
-									"end": {
-										"line": 2,
-										"column": 12
-									}
-								},
 								"name": "expr1"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 31,
 								"end": 33,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 15
-									},
-									"end": {
-										"line": 2,
-										"column": 17
-									}
-								},
 								"value": "",
 								"raw": "''"
 							}
@@ -233,18 +161,6 @@
 				"start": 8,
 				"end": 14,
 				"name": "module",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 14,
-						"character": 14
-					}
-				},
 				"value": true
 			}
 		]
@@ -258,89 +174,29 @@
 			"type": "Program",
 			"start": 64,
 			"end": 91,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 0
-				},
-				"end": {
-					"line": 7,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 66,
 					"end": 90,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 25
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 72,
 							"end": 89,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 7
-								},
-								"end": {
-									"line": 6,
-									"column": 24
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 72,
 								"end": 85,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 7
-									},
-									"end": {
-										"line": 6,
-										"column": 20
-									}
-								},
 								"name": "expr2",
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
 									"start": 77,
 									"end": 85,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 12
-										},
-										"end": {
-											"line": 6,
-											"column": 20
-										}
-									},
 									"typeAnnotation": {
 										"type": "TSNumberKeyword",
 										"start": 79,
-										"end": 85,
-										"loc": {
-											"start": {
-												"line": 6,
-												"column": 14
-											},
-											"end": {
-												"line": 6,
-												"column": 20
-											}
-										}
+										"end": 85
 									}
 								}
 							},
@@ -348,16 +204,6 @@
 								"type": "Literal",
 								"start": 88,
 								"end": 89,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 23
-									},
-									"end": {
-										"line": 6,
-										"column": 24
-									}
-								},
 								"value": 5,
 								"raw": "5"
 							}
@@ -374,18 +220,6 @@
 				"start": 54,
 				"end": 63,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 8,
-						"character": 54
-					},
-					"end": {
-						"line": 5,
-						"column": 12,
-						"character": 58
-					}
-				},
 				"value": [
 					{
 						"start": 60,

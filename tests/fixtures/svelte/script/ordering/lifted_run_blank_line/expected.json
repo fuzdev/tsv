@@ -19,18 +19,6 @@
 				"start": 28,
 				"end": 36,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 1,
-						"character": 29
-					},
-					"end": {
-						"line": 5,
-						"column": 2,
-						"character": 30
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -57,18 +45,6 @@
 				"start": 38,
 				"end": 46,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 1,
-						"character": 39
-					},
-					"end": {
-						"line": 7,
-						"column": 2,
-						"character": 40
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -98,16 +74,6 @@
 					"type": "Identifier",
 					"start": 48,
 					"end": 49,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 2
-						}
-					},
 					"name": "a"
 				}
 			},
@@ -126,16 +92,6 @@
 					"type": "Identifier",
 					"start": 53,
 					"end": 54,
-					"loc": {
-						"start": {
-							"line": 10,
-							"column": 1
-						},
-						"end": {
-							"line": 10,
-							"column": 2
-						}
-					},
 					"name": "b"
 				}
 			},
@@ -151,18 +107,6 @@
 				"start": 56,
 				"end": 64,
 				"name": "b",
-				"name_loc": {
-					"start": {
-						"line": 11,
-						"column": 1,
-						"character": 57
-					},
-					"end": {
-						"line": 11,
-						"column": 2,
-						"character": 58
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -189,18 +133,6 @@
 				"start": 66,
 				"end": 74,
 				"name": "b",
-				"name_loc": {
-					"start": {
-						"line": 13,
-						"column": 1,
-						"character": 67
-					},
-					"end": {
-						"line": 13,
-						"column": 2,
-						"character": 68
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -227,18 +159,6 @@
 				"start": 75,
 				"end": 92,
 				"name": "svelte:window",
-				"name_loc": {
-					"start": {
-						"line": 14,
-						"column": 1,
-						"character": 76
-					},
-					"end": {
-						"line": 14,
-						"column": 14,
-						"character": 89
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -257,18 +177,6 @@
 				"start": 94,
 				"end": 109,
 				"name": "svelte:body",
-				"name_loc": {
-					"start": {
-						"line": 16,
-						"column": 1,
-						"character": 95
-					},
-					"end": {
-						"line": 16,
-						"column": 12,
-						"character": 106
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -287,18 +195,6 @@
 				"start": 110,
 				"end": 118,
 				"name": "A",
-				"name_loc": {
-					"start": {
-						"line": 17,
-						"column": 1,
-						"character": 111
-					},
-					"end": {
-						"line": 17,
-						"column": 2,
-						"character": 112
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -328,16 +224,6 @@
 					"type": "Identifier",
 					"start": 121,
 					"end": 122,
-					"loc": {
-						"start": {
-							"line": 19,
-							"column": 1
-						},
-						"end": {
-							"line": 19,
-							"column": 2
-						}
-					},
 					"name": "x"
 				}
 			},
@@ -346,18 +232,6 @@
 				"start": 123,
 				"end": 137,
 				"name": "span",
-				"name_loc": {
-					"start": {
-						"line": 19,
-						"column": 4,
-						"character": 124
-					},
-					"end": {
-						"line": 19,
-						"column": 8,
-						"character": 128
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -385,60 +259,20 @@
 			"type": "Program",
 			"start": 8,
 			"end": 17,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 3,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 10,
 					"end": 16,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 7
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 14,
 							"end": 15,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 5
-								},
-								"end": {
-									"line": 2,
-									"column": 6
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 14,
 								"end": 15,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 5
-									},
-									"end": {
-										"line": 2,
-										"column": 6
-									}
-								},
 								"name": "a"
 							},
 							"init": null

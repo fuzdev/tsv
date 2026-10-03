@@ -25,18 +25,6 @@
 				"start": 261,
 				"end": 417,
 				"name": "span",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 262
-					},
-					"end": {
-						"line": 2,
-						"column": 5,
-						"character": 266
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -56,30 +44,10 @@
 								"type": "CallExpression",
 								"start": 276,
 								"end": 382,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 8
-									},
-									"end": {
-										"line": 9,
-										"column": 2
-									}
-								},
 								"callee": {
 									"type": "Identifier",
 									"start": 276,
 									"end": 284,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 8
-										},
-										"end": {
-											"line": 3,
-											"column": 16
-										}
-									},
 									"name": "getItems"
 								},
 								"arguments": [
@@ -87,80 +55,30 @@
 										"type": "Identifier",
 										"start": 288,
 										"end": 303,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 2
-											},
-											"end": {
-												"line": 4,
-												"column": 17
-											}
-										},
 										"name": "aaaaaaaaaaaaaaa"
 									},
 									{
 										"type": "Identifier",
 										"start": 307,
 										"end": 322,
-										"loc": {
-											"start": {
-												"line": 5,
-												"column": 2
-											},
-											"end": {
-												"line": 5,
-												"column": 17
-											}
-										},
 										"name": "bbbbbbbbbbbbbbb"
 									},
 									{
 										"type": "Identifier",
 										"start": 326,
 										"end": 341,
-										"loc": {
-											"start": {
-												"line": 6,
-												"column": 2
-											},
-											"end": {
-												"line": 6,
-												"column": 17
-											}
-										},
 										"name": "ccccccccccccccc"
 									},
 									{
 										"type": "Identifier",
 										"start": 345,
 										"end": 360,
-										"loc": {
-											"start": {
-												"line": 7,
-												"column": 2
-											},
-											"end": {
-												"line": 7,
-												"column": 17
-											}
-										},
 										"name": "ddddddddddddddd"
 									},
 									{
 										"type": "Identifier",
 										"start": 364,
 										"end": 379,
-										"loc": {
-											"start": {
-												"line": 8,
-												"column": 2
-											},
-											"end": {
-												"line": 8,
-												"column": 17
-											}
-										},
 										"name": "eeeeeeeeeeeeeee"
 									}
 								],
@@ -184,16 +102,6 @@
 											"type": "Identifier",
 											"start": 395,
 											"end": 399,
-											"loc": {
-												"start": {
-													"line": 10,
-													"column": 3
-												},
-												"end": {
-													"line": 10,
-													"column": 7
-												}
-											},
 											"name": "item"
 										}
 									},
@@ -210,19 +118,7 @@
 								"type": "Identifier",
 								"name": "item",
 								"start": 386,
-								"end": 390,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 6,
-										"character": 386
-									},
-									"end": {
-										"line": 9,
-										"column": 10,
-										"character": 390
-									}
-								}
+								"end": 390
 							}
 						},
 						{

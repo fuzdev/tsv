@@ -14,17 +14,7 @@
 			"type": "Line",
 			"value": " comment",
 			"start": 40,
-			"end": 50,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 4
-				},
-				"end": {
-					"line": 4,
-					"column": 14
-				}
-			}
+			"end": 50
 		}
 	],
 	"instance": {
@@ -36,76 +26,26 @@
 			"type": "Program",
 			"start": 8,
 			"end": 58,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 6,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 10,
 					"end": 57,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 6
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 16,
 							"end": 56,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 7
-								},
-								"end": {
-									"line": 5,
-									"column": 5
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 16,
 								"end": 17,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 7
-									},
-									"end": {
-										"line": 2,
-										"column": 8
-									}
-								},
 								"name": "f"
 							},
 							"init": {
 								"type": "FunctionExpression",
 								"start": 20,
 								"end": 56,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 11
-									},
-									"end": {
-										"line": 5,
-										"column": 5
-									}
-								},
 								"id": null,
 								"expression": false,
 								"generator": false,
@@ -115,32 +55,12 @@
 										"type": "Identifier",
 										"start": 33,
 										"end": 34,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 2
-											},
-											"end": {
-												"line": 3,
-												"column": 3
-											}
-										},
 										"name": "a"
 									},
 									{
 										"type": "Identifier",
 										"start": 38,
 										"end": 39,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 2
-											},
-											"end": {
-												"line": 4,
-												"column": 3
-											}
-										},
 										"name": "b",
 										"trailingComments": [
 											{
@@ -156,16 +76,6 @@
 									"type": "BlockStatement",
 									"start": 54,
 									"end": 56,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 3
-										},
-										"end": {
-											"line": 5,
-											"column": 5
-										}
-									},
 									"body": []
 								}
 							}

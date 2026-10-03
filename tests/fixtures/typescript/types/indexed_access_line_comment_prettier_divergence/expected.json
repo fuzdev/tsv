@@ -14,145 +14,55 @@
 			"type": "Line",
 			"value": " Line comment in an indexed access's `[`→index gap, kept where written with",
 			"start": 20,
-			"end": 97,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 78
-				}
-			}
+			"end": 97
 		},
 		{
 			"type": "Line",
 			"value": " the index type on the next line.",
 			"start": 99,
-			"end": 134,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 36
-				}
-			}
+			"end": 134
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 149,
-			"end": 153,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 4
-				},
-				"end": {
-					"line": 5,
-					"column": 8
-				}
-			}
+			"end": 153
 		},
 		{
 			"type": "Line",
 			"value": " A run the author GLUED — a multi-line block ahead of a single-line one — and then broke",
 			"start": 162,
-			"end": 252,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 1
-				},
-				"end": {
-					"line": 8,
-					"column": 91
-				}
-			}
+			"end": 252
 		},
 		{
 			"type": "Line",
 			"value": " after. The run's break is forced by the multi-line block, so the index drops below the",
 			"start": 254,
-			"end": 343,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 1
-				},
-				"end": {
-					"line": 9,
-					"column": 90
-				}
-			}
+			"end": 343
 		},
 		{
 			"type": "Line",
 			"value": " whole run, inside the brackets that own the break — the `=` keeps its hug, as it does",
 			"start": 345,
-			"end": 433,
-			"loc": {
-				"start": {
-					"line": 10,
-					"column": 1
-				},
-				"end": {
-					"line": 10,
-					"column": 89
-				}
-			}
+			"end": 433
 		},
 		{
 			"type": "Line",
 			"value": " for every indexed access that breaks inside its own brackets.",
 			"start": 435,
-			"end": 499,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 1
-				},
-				"end": {
-					"line": 11,
-					"column": 65
-				}
-			}
+			"end": 499
 		},
 		{
 			"type": "Block",
 			"value": " a\nb ",
 			"start": 512,
-			"end": 521,
-			"loc": {
-				"start": {
-					"line": 12,
-					"column": 12
-				},
-				"end": {
-					"line": 13,
-					"column": 4
-				}
-			}
+			"end": 521
 		},
 		{
 			"type": "Block",
 			"value": " c ",
 			"start": 522,
-			"end": 529,
-			"loc": {
-				"start": {
-					"line": 13,
-					"column": 5
-				},
-				"end": {
-					"line": 13,
-					"column": 12
-				}
-			}
+			"end": 529
 		}
 	],
 	"instance": {
@@ -164,89 +74,29 @@
 			"type": "Program",
 			"start": 18,
 			"end": 535,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 15,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 136,
 					"end": 159,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 5
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 141,
 						"end": 142,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 6
-							},
-							"end": {
-								"line": 4,
-								"column": 7
-							}
-						},
 						"name": "I"
 					},
 					"typeAnnotation": {
 						"type": "TSIndexedAccessType",
 						"start": 147,
 						"end": 158,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 2
-							},
-							"end": {
-								"line": 6,
-								"column": 4
-							}
-						},
 						"objectType": {
 							"type": "TSTypeReference",
 							"start": 147,
 							"end": 148,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 2
-								},
-								"end": {
-									"line": 5,
-									"column": 3
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 147,
 								"end": 148,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 2
-									},
-									"end": {
-										"line": 5,
-										"column": 3
-									}
-								},
 								"name": "A"
 							}
 						},
@@ -254,30 +104,10 @@
 							"type": "TSTypeReference",
 							"start": 156,
 							"end": 157,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 2
-								},
-								"end": {
-									"line": 6,
-									"column": 3
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 156,
 								"end": 157,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 2
-									},
-									"end": {
-										"line": 6,
-										"column": 3
-									}
-								},
 								"name": "K"
 							},
 							"leadingComments": [
@@ -309,74 +139,24 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 501,
 					"end": 534,
-					"loc": {
-						"start": {
-							"line": 12,
-							"column": 1
-						},
-						"end": {
-							"line": 14,
-							"column": 4
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 506,
 						"end": 507,
-						"loc": {
-							"start": {
-								"line": 12,
-								"column": 6
-							},
-							"end": {
-								"line": 12,
-								"column": 7
-							}
-						},
 						"name": "J"
 					},
 					"typeAnnotation": {
 						"type": "TSIndexedAccessType",
 						"start": 510,
 						"end": 533,
-						"loc": {
-							"start": {
-								"line": 12,
-								"column": 10
-							},
-							"end": {
-								"line": 14,
-								"column": 3
-							}
-						},
 						"objectType": {
 							"type": "TSTypeReference",
 							"start": 510,
 							"end": 511,
-							"loc": {
-								"start": {
-									"line": 12,
-									"column": 10
-								},
-								"end": {
-									"line": 12,
-									"column": 11
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 510,
 								"end": 511,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 10
-									},
-									"end": {
-										"line": 12,
-										"column": 11
-									}
-								},
 								"name": "A"
 							}
 						},
@@ -384,30 +164,10 @@
 							"type": "TSTypeReference",
 							"start": 531,
 							"end": 532,
-							"loc": {
-								"start": {
-									"line": 14,
-									"column": 1
-								},
-								"end": {
-									"line": 14,
-									"column": 2
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 531,
 								"end": 532,
-								"loc": {
-									"start": {
-										"line": 14,
-										"column": 1
-									},
-									"end": {
-										"line": 14,
-										"column": 2
-									}
-								},
 								"name": "K"
 							},
 							"leadingComments": [
@@ -462,18 +222,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

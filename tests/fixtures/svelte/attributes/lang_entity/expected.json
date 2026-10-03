@@ -9,18 +9,6 @@
 				"start": 813,
 				"end": 827,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 22,
-						"column": 7,
-						"character": 813
-					},
-					"end": {
-						"line": 22,
-						"column": 11,
-						"character": 817
-					}
-				},
 				"value": [
 					{
 						"start": 819,
@@ -139,36 +127,12 @@
 				"start": 515,
 				"end": 571,
 				"name": "template",
-				"name_loc": {
-					"start": {
-						"line": 12,
-						"column": 1,
-						"character": 516
-					},
-					"end": {
-						"line": 12,
-						"column": 9,
-						"character": 524
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 525,
 						"end": 541,
 						"name": "lang",
-						"name_loc": {
-							"start": {
-								"line": 12,
-								"column": 10,
-								"character": 525
-							},
-							"end": {
-								"line": 12,
-								"column": 14,
-								"character": 529
-							}
-						},
 						"value": [
 							{
 								"start": 531,
@@ -195,18 +159,6 @@
 							"start": 544,
 							"end": 559,
 							"name": "div",
-							"name_loc": {
-								"start": {
-									"line": 13,
-									"column": 2,
-									"character": 545
-								},
-								"end": {
-									"line": 13,
-									"column": 5,
-									"character": 548
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -256,36 +208,12 @@
 				"start": 667,
 				"end": 727,
 				"name": "template",
-				"name_loc": {
-					"start": {
-						"line": 17,
-						"column": 1,
-						"character": 668
-					},
-					"end": {
-						"line": 17,
-						"column": 9,
-						"character": 676
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 677,
 						"end": 697,
 						"name": "type",
-						"name_loc": {
-							"start": {
-								"line": 17,
-								"column": 10,
-								"character": 677
-							},
-							"end": {
-								"line": 17,
-								"column": 14,
-								"character": 681
-							}
-						},
 						"value": [
 							{
 								"start": 683,
@@ -312,18 +240,6 @@
 							"start": 700,
 							"end": 715,
 							"name": "div",
-							"name_loc": {
-								"start": {
-									"line": 18,
-									"column": 2,
-									"character": 701
-								},
-								"end": {
-									"line": 18,
-									"column": 5,
-									"character": 704
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -376,49 +292,19 @@
 			"type": "Line",
 			"value": " The one reader that must NOT decode: the wire schema follows Svelte's own raw-bytes",
 			"start": 25,
-			"end": 111,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 87
-				}
-			}
+			"end": 111
 		},
 		{
 			"type": "Line",
 			"value": " `lang` regex, so this script is not TypeScript. The Svelte import shape in",
 			"start": 113,
-			"end": 190,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 78
-				}
-			}
+			"end": 190
 		},
 		{
 			"type": "Line",
 			"value": " expected.json — `attributes` present, no `importKind` — is the assertion.",
 			"start": 192,
-			"end": 268,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 1
-				},
-				"end": {
-					"line": 4,
-					"column": 77
-				}
-			}
+			"end": 268
 		}
 	],
 	"instance": {
@@ -430,60 +316,20 @@
 			"type": "Program",
 			"start": 23,
 			"end": 289,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 6,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ImportDeclaration",
 					"start": 270,
 					"end": 288,
-					"loc": {
-						"start": {
-							"line": 5,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 19
-						}
-					},
 					"specifiers": [
 						{
 							"type": "ImportDefaultSpecifier",
 							"start": 277,
 							"end": 278,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 8
-								},
-								"end": {
-									"line": 5,
-									"column": 9
-								}
-							},
 							"local": {
 								"type": "Identifier",
 								"start": 277,
 								"end": 278,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 8
-									},
-									"end": {
-										"line": 5,
-										"column": 9
-									}
-								},
 								"name": "a"
 							}
 						}
@@ -492,16 +338,6 @@
 						"type": "Literal",
 						"start": 284,
 						"end": 287,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 15
-							},
-							"end": {
-								"line": 5,
-								"column": 18
-							}
-						},
 						"value": "b",
 						"raw": "'b'"
 					},
@@ -536,18 +372,6 @@
 				"start": 8,
 				"end": 22,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

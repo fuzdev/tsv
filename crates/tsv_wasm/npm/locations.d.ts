@@ -2,38 +2,23 @@
  * Types for the line/column reconstruction helper (`locations.js`).
  *
  * Hand-written: the span-only `no-locations` wire is untyped (`any`), and these
- * functions add `loc` to that same object graph. See `locations.js` for the exact
- * TypeScript/Svelte/CSS behavior.
+ * functions add `loc` to that same object graph. See `locations.js` for the
+ * definition both the helper and the loc-bearing wire implement.
  */
 
-/** Language selector for the line-terminator rule. */
+/** The document's language, which selects its line-terminator rule. */
 export type LocationLanguage = 'typescript' | 'svelte' | 'css';
 
 /** Options shared by every entry point. */
 export interface LocationOptions {
 	/**
-	 * Which line-terminator rule to apply. `typescript` (the default) uses
-	 * ECMAScript LineTerminators; `svelte` uses LF-only; `css` makes
-	 * `reconstruct` a no-op. `reconstruct_locations` infers this from the AST
-	 * root when omitted, and `create_locator` / `loc_of` from `ast` when it is given.
-	 *
-	 * Under `svelte`, every entry point **throws** when the source holds a lone
-	 * `\r`, U+2028 or U+2029: such a document carries two line counts (acorn's on
-	 * the nodes it parsed, `locate-character`'s on the rest) and the span-only
-	 * wire does not record which acorn parse a node came from. Parse those with
-	 * locations instead. See `locations.js` for why the wire deliberately does not
-	 * carry what would make it derivable.
+	 * The document's language. `typescript` (the default for `create_locator` /
+	 * `loc_of`) counts ECMAScript LineTerminators and counts a leading BOM, as acorn
+	 * does; `svelte` and `css` count LF alone — a Svelte document's `<script>`s and
+	 * `<style>` included — and elide a leading BOM, as Svelte's `parse` and `parseCss`
+	 * do. `reconstruct_locations` infers it from the AST root when omitted.
 	 */
 	language?: LocationLanguage | undefined;
-	/**
-	 * The span-only tree the looked-up nodes come from — required by a Svelte `loc_of`
-	 * (`create_locator(...).loc_of` or the bare `loc_of`), which throws without it. A
-	 * block binding's type annotation (`{#each xs as⏎e: T}`) is read by its own acorn
-	 * parse, which can place its nodes on an earlier line than their offsets say; only
-	 * the tree says which nodes those are. `reconstruct` has the tree already and
-	 * ignores this.
-	 */
-	ast?: any;
 }
 
 /**
@@ -50,14 +35,12 @@ export interface Loc {
 
 /** A source-bound locator holding a prebuilt line-start table (`create_locator`). */
 export interface Locator {
-	/**
-	 * Line/column for one node, or `null` if it has no numeric `start`/`end`. A Svelte
-	 * locator needs `ast` in its options for this, and throws without it.
-	 */
+	/** Line/column for one node, or `null` if it has no numeric `start`/`end`. */
 	loc_of(node: any): Loc | null;
 	/**
-	 * Add `loc` to every node in `ast` — and `name_loc` to the Svelte elements,
-	 * attributes, and directives that carry one — mutating in place; returns `ast`.
+	 * Add `loc` to every object in `ast` with numeric `start`/`end` — and `name_loc` to
+	 * the Svelte elements, attributes, and directives that carry one — mutating in place;
+	 * returns `ast`.
 	 */
 	reconstruct(ast: any): any;
 }
@@ -69,10 +52,10 @@ export interface Locator {
 export declare function create_locator(source: string, opts?: LocationOptions): Locator;
 
 /**
- * Add a `loc` line/column object to every node of a span-only wire, derived from
- * `start`/`end` + `source` — plus the Svelte `name_loc`. Mutates `ast` in place
- * and returns it. Exact for TypeScript, approximate for Svelte (`name_loc` itself
- * is exact), a no-op for CSS.
+ * Add a `loc` line/column object to every object of a span-only wire that carries
+ * numeric `start`/`end`, derived from those offsets + `source` — plus the Svelte
+ * `name_loc`. Mutates `ast` in place and returns it. The result deep-equals the
+ * loc-bearing wire of the same parse, in every language.
  */
 export declare function reconstruct_locations(
 	ast: any,
@@ -82,7 +65,6 @@ export declare function reconstruct_locations(
 
 /**
  * Line/column for a single node. Rebuilds the line-start table per call — reuse a
- * `create_locator` for more than a couple of lookups against one source. A Svelte node
- * needs `opts.ast`, the span-only tree it came from.
+ * `create_locator` for more than a couple of lookups against one source.
  */
 export declare function loc_of(node: any, source: string, opts?: LocationOptions): Loc | null;

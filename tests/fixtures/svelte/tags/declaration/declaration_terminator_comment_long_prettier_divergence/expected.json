@@ -28,61 +28,21 @@
 					"type": "VariableDeclaration",
 					"start": 125,
 					"end": 223,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 99
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 131,
 							"end": 214,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 7
-								},
-								"end": {
-									"line": 3,
-									"column": 90
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 131,
 								"end": 132,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 7
-									},
-									"end": {
-										"line": 3,
-										"column": 8
-									}
-								},
 								"name": "a"
 							},
 							"init": {
 								"type": "Identifier",
 								"start": 135,
 								"end": 214,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 11
-									},
-									"end": {
-										"line": 3,
-										"column": 90
-									}
-								},
 								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 							},
 							"trailingComments": [
@@ -126,61 +86,21 @@
 					"type": "VariableDeclaration",
 					"start": 313,
 					"end": 413,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 7,
-							"column": 90
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 319,
 							"end": 404,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 7
-								},
-								"end": {
-									"line": 7,
-									"column": 81
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 319,
 								"end": 320,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 7
-									},
-									"end": {
-										"line": 6,
-										"column": 8
-									}
-								},
 								"name": "b"
 							},
 							"init": {
 								"type": "Identifier",
 								"start": 324,
 								"end": 404,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 1
-									},
-									"end": {
-										"line": 7,
-										"column": 81
-									}
-								},
 								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 							},
 							"trailingComments": [
@@ -224,61 +144,21 @@
 					"type": "VariableDeclaration",
 					"start": 489,
 					"end": 590,
-					"loc": {
-						"start": {
-							"line": 10,
-							"column": 1
-						},
-						"end": {
-							"line": 11,
-							"column": 1
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 495,
 							"end": 583,
-							"loc": {
-								"start": {
-									"line": 10,
-									"column": 7
-								},
-								"end": {
-									"line": 10,
-									"column": 95
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 495,
 								"end": 496,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 7
-									},
-									"end": {
-										"line": 10,
-										"column": 8
-									}
-								},
 								"name": "c"
 							},
 							"init": {
 								"type": "Identifier",
 								"start": 499,
 								"end": 583,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 11
-									},
-									"end": {
-										"line": 10,
-										"column": 95
-									}
-								},
 								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 							},
 							"trailingComments": [
@@ -309,61 +189,21 @@
 					"type": "VariableDeclaration",
 					"start": 593,
 					"end": 696,
-					"loc": {
-						"start": {
-							"line": 12,
-							"column": 1
-						},
-						"end": {
-							"line": 14,
-							"column": 1
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 599,
 							"end": 689,
-							"loc": {
-								"start": {
-									"line": 12,
-									"column": 7
-								},
-								"end": {
-									"line": 13,
-									"column": 86
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 599,
 								"end": 600,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 7
-									},
-									"end": {
-										"line": 12,
-										"column": 8
-									}
-								},
 								"name": "d"
 							},
 							"init": {
 								"type": "Identifier",
 								"start": 604,
 								"end": 689,
-								"loc": {
-									"start": {
-										"line": 13,
-										"column": 1
-									},
-									"end": {
-										"line": 13,
-										"column": 86
-									}
-								},
 								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 							},
 							"trailingComments": [
@@ -387,65 +227,25 @@
 			"type": "Block",
 			"value": " c ",
 			"start": 215,
-			"end": 222,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 91
-				},
-				"end": {
-					"line": 3,
-					"column": 98
-				}
-			}
+			"end": 222
 		},
 		{
 			"type": "Block",
 			"value": " c ",
 			"start": 405,
-			"end": 412,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 82
-				},
-				"end": {
-					"line": 7,
-					"column": 89
-				}
-			}
+			"end": 412
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 584,
-			"end": 588,
-			"loc": {
-				"start": {
-					"line": 10,
-					"column": 96
-				},
-				"end": {
-					"line": 10,
-					"column": 100
-				}
-			}
+			"end": 588
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 690,
-			"end": 694,
-			"loc": {
-				"start": {
-					"line": 13,
-					"column": 87
-				},
-				"end": {
-					"line": 13,
-					"column": 91
-				}
-			}
+			"end": 694
 		}
 	]
 }

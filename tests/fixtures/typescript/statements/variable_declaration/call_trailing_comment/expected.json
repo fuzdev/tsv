@@ -14,49 +14,19 @@
 			"type": "Line",
 			"value": " Expanded call with trailing comment in assignment - callee stays on same line as =",
 			"start": 10,
-			"end": 95,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 86
-				}
-			}
+			"end": 95
 		},
 		{
 			"type": "Line",
 			"value": " trailing comment",
 			"start": 121,
-			"end": 140,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 10
-				},
-				"end": {
-					"line": 4,
-					"column": 29
-				}
-			}
+			"end": 140
 		},
 		{
 			"type": "Line",
 			"value": " trailing comment",
 			"start": 173,
-			"end": 192,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 10
-				},
-				"end": {
-					"line": 8,
-					"column": 29
-				}
-			}
+			"end": 192
 		}
 	],
 	"instance": {
@@ -68,90 +38,30 @@
 			"type": "Program",
 			"start": 8,
 			"end": 197,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 10,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 97,
 					"end": 144,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 3
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 103,
 							"end": 143,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 7
-								},
-								"end": {
-									"line": 5,
-									"column": 2
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 103,
 								"end": 104,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 7
-									},
-									"end": {
-										"line": 3,
-										"column": 8
-									}
-								},
 								"name": "x"
 							},
 							"init": {
 								"type": "CallExpression",
 								"start": 107,
 								"end": 143,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 11
-									},
-									"end": {
-										"line": 5,
-										"column": 2
-									}
-								},
 								"callee": {
 									"type": "Identifier",
 									"start": 107,
 									"end": 109,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 11
-										},
-										"end": {
-											"line": 3,
-											"column": 13
-										}
-									},
 									"name": "fn"
 								},
 								"arguments": [
@@ -159,16 +69,6 @@
 										"type": "Literal",
 										"start": 113,
 										"end": 120,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 2
-											},
-											"end": {
-												"line": 4,
-												"column": 9
-											}
-										},
 										"value": "value",
 										"raw": "'value'",
 										"trailingComments": [
@@ -199,105 +99,35 @@
 					"type": "VariableDeclaration",
 					"start": 147,
 					"end": 196,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 1
-						},
-						"end": {
-							"line": 9,
-							"column": 3
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 153,
 							"end": 195,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 7
-								},
-								"end": {
-									"line": 9,
-									"column": 2
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 153,
 								"end": 154,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 7
-									},
-									"end": {
-										"line": 7,
-										"column": 8
-									}
-								},
 								"name": "y"
 							},
 							"init": {
 								"type": "CallExpression",
 								"start": 157,
 								"end": 195,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 11
-									},
-									"end": {
-										"line": 9,
-										"column": 2
-									}
-								},
 								"callee": {
 									"type": "MemberExpression",
 									"start": 157,
 									"end": 161,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 11
-										},
-										"end": {
-											"line": 7,
-											"column": 15
-										}
-									},
 									"object": {
 										"type": "Identifier",
 										"start": 157,
 										"end": 158,
-										"loc": {
-											"start": {
-												"line": 7,
-												"column": 11
-											},
-											"end": {
-												"line": 7,
-												"column": 12
-											}
-										},
 										"name": "a"
 									},
 									"property": {
 										"type": "Identifier",
 										"start": 159,
 										"end": 161,
-										"loc": {
-											"start": {
-												"line": 7,
-												"column": 13
-											},
-											"end": {
-												"line": 7,
-												"column": 15
-											}
-										},
 										"name": "fn"
 									},
 									"computed": false,
@@ -308,16 +138,6 @@
 										"type": "Literal",
 										"start": 165,
 										"end": 172,
-										"loc": {
-											"start": {
-												"line": 8,
-												"column": 2
-											},
-											"end": {
-												"line": 8,
-												"column": 9
-											}
-										},
 										"value": "value",
 										"raw": "'value'",
 										"trailingComments": [

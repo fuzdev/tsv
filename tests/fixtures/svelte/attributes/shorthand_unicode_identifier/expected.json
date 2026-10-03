@@ -25,36 +25,12 @@
 				"start": 318,
 				"end": 339,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 1,
-						"character": 319
-					},
-					"end": {
-						"line": 7,
-						"column": 4,
-						"character": 322
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 323,
 						"end": 326,
 						"name": "℘",
-						"name_loc": {
-							"start": {
-								"line": 7,
-								"column": 6,
-								"character": 324
-							},
-							"end": {
-								"line": 7,
-								"column": 7,
-								"character": 325
-							}
-						},
 						"value": {
 							"type": "ExpressionTag",
 							"start": 324,
@@ -63,19 +39,7 @@
 								"type": "Identifier",
 								"name": "℘",
 								"start": 324,
-								"end": 325,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 6,
-										"character": 324
-									},
-									"end": {
-										"line": 7,
-										"column": 7,
-										"character": 325
-									}
-								}
+								"end": 325
 							}
 						}
 					},
@@ -84,18 +48,6 @@
 						"start": 327,
 						"end": 332,
 						"name": "fn‌",
-						"name_loc": {
-							"start": {
-								"line": 7,
-								"column": 10,
-								"character": 328
-							},
-							"end": {
-								"line": 7,
-								"column": 13,
-								"character": 331
-							}
-						},
 						"value": {
 							"type": "ExpressionTag",
 							"start": 328,
@@ -104,19 +56,7 @@
 								"type": "Identifier",
 								"name": "fn‌",
 								"start": 328,
-								"end": 331,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 10,
-										"character": 328
-									},
-									"end": {
-										"line": 7,
-										"column": 13,
-										"character": 331
-									}
-								}
+								"end": 331
 							}
 						}
 					}

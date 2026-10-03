@@ -28,30 +28,10 @@
 					"type": "CallExpression",
 					"start": 78,
 					"end": 86,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 7
-						},
-						"end": {
-							"line": 2,
-							"column": 15
-						}
-					},
 					"callee": {
 						"type": "Identifier",
 						"start": 78,
 						"end": 79,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 7
-							},
-							"end": {
-								"line": 2,
-								"column": 8
-							}
-						},
 						"name": "h"
 					},
 					"arguments": [
@@ -59,16 +39,6 @@
 							"type": "Literal",
 							"start": 80,
 							"end": 85,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 9
-								},
-								"end": {
-									"line": 2,
-									"column": 14
-								}
-							},
 							"value": {},
 							"raw": "/[}]/",
 							"regex": {
@@ -95,30 +65,10 @@
 					"type": "CallExpression",
 					"start": 95,
 					"end": 107,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 7
-						},
-						"end": {
-							"line": 3,
-							"column": 19
-						}
-					},
 					"callee": {
 						"type": "Identifier",
 						"start": 95,
 						"end": 96,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 7
-							},
-							"end": {
-								"line": 3,
-								"column": 8
-							}
-						},
 						"name": "g"
 					},
 					"arguments": [
@@ -126,16 +76,6 @@
 							"type": "Identifier",
 							"start": 105,
 							"end": 106,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 17
-								},
-								"end": {
-									"line": 3,
-									"column": 18
-								}
-							},
 							"name": "x",
 							"leadingComments": [
 								{
@@ -158,17 +98,7 @@
 			"type": "Block",
 			"value": " } ",
 			"start": 97,
-			"end": 104,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 9
-				},
-				"end": {
-					"line": 3,
-					"column": 16
-				}
-			}
+			"end": 104
 		}
 	]
 }

@@ -9,18 +9,6 @@
 				"start": 189,
 				"end": 202,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 9,
-						"column": 1,
-						"character": 189
-					},
-					"end": {
-						"line": 9,
-						"column": 5,
-						"character": 193
-					}
-				},
 				"value": [
 					{
 						"start": 195,
@@ -99,16 +87,6 @@
 			"type": "Program",
 			"start": 96,
 			"end": 96,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 0
-				},
-				"end": {
-					"line": 5,
-					"column": 10
-				}
-			},
 			"body": [],
 			"sourceType": "module",
 			"leadingComments": [
@@ -124,18 +102,6 @@
 				"start": 84,
 				"end": 94,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 1,
-						"character": 84
-					},
-					"end": {
-						"line": 3,
-						"column": 5,
-						"character": 88
-					}
-				},
 				"value": [
 					{
 						"start": 90,

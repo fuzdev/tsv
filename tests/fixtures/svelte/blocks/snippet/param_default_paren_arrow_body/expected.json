@@ -15,65 +15,23 @@
 					"type": "Identifier",
 					"name": "fn1",
 					"start": 10,
-					"end": 13,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 10,
-							"character": 10
-						},
-						"end": {
-							"line": 1,
-							"column": 13,
-							"character": 13
-						}
-					}
+					"end": 13
 				},
 				"parameters": [
 					{
 						"type": "AssignmentPattern",
 						"start": 14,
 						"end": 28,
-						"loc": {
-							"start": {
-								"line": 1,
-								"column": 14
-							},
-							"end": {
-								"line": 1,
-								"column": 28
-							}
-						},
 						"left": {
 							"type": "Identifier",
 							"start": 14,
 							"end": 15,
-							"loc": {
-								"start": {
-									"line": 1,
-									"column": 14
-								},
-								"end": {
-									"line": 1,
-									"column": 15
-								}
-							},
 							"name": "a"
 						},
 						"right": {
 							"type": "ArrowFunctionExpression",
 							"start": 18,
 							"end": 28,
-							"loc": {
-								"start": {
-									"line": 1,
-									"column": 18
-								},
-								"end": {
-									"line": 1,
-									"column": 28
-								}
-							},
 							"id": null,
 							"expression": true,
 							"generator": false,
@@ -83,30 +41,10 @@
 								"type": "ParenthesizedExpression",
 								"start": 24,
 								"end": 28,
-								"loc": {
-									"start": {
-										"line": 1,
-										"column": 24
-									},
-									"end": {
-										"line": 1,
-										"column": 28
-									}
-								},
 								"expression": {
 									"type": "ObjectExpression",
 									"start": 25,
 									"end": 27,
-									"loc": {
-										"start": {
-											"line": 1,
-											"column": 25
-										},
-										"end": {
-											"line": 1,
-											"column": 27
-										}
-									},
 									"properties": []
 								}
 							}
@@ -121,18 +59,6 @@
 							"start": 30,
 							"end": 46,
 							"name": "span",
-							"name_loc": {
-								"start": {
-									"line": 1,
-									"column": 31,
-									"character": 31
-								},
-								"end": {
-									"line": 1,
-									"column": 35,
-									"character": 35
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -145,16 +71,6 @@
 											"type": "Identifier",
 											"start": 37,
 											"end": 38,
-											"loc": {
-												"start": {
-													"line": 1,
-													"column": 37
-												},
-												"end": {
-													"line": 1,
-													"column": 38
-												}
-											},
 											"name": "a"
 										}
 									}
@@ -179,65 +95,23 @@
 					"type": "Identifier",
 					"name": "fn2",
 					"start": 68,
-					"end": 71,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 10,
-							"character": 68
-						},
-						"end": {
-							"line": 3,
-							"column": 13,
-							"character": 71
-						}
-					}
+					"end": 71
 				},
 				"parameters": [
 					{
 						"type": "AssignmentPattern",
 						"start": 72,
 						"end": 88,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 14
-							},
-							"end": {
-								"line": 3,
-								"column": 30
-							}
-						},
 						"left": {
 							"type": "Identifier",
 							"start": 72,
 							"end": 73,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 14
-								},
-								"end": {
-									"line": 3,
-									"column": 15
-								}
-							},
 							"name": "a"
 						},
 						"right": {
 							"type": "ArrowFunctionExpression",
 							"start": 76,
 							"end": 88,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 18
-								},
-								"end": {
-									"line": 3,
-									"column": 30
-								}
-							},
 							"id": null,
 							"expression": true,
 							"generator": false,
@@ -247,44 +121,14 @@
 								"type": "MemberExpression",
 								"start": 82,
 								"end": 88,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 24
-									},
-									"end": {
-										"line": 3,
-										"column": 30
-									}
-								},
 								"object": {
 									"type": "ParenthesizedExpression",
 									"start": 82,
 									"end": 86,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 24
-										},
-										"end": {
-											"line": 3,
-											"column": 28
-										}
-									},
 									"expression": {
 										"type": "ObjectExpression",
 										"start": 83,
 										"end": 85,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 25
-											},
-											"end": {
-												"line": 3,
-												"column": 27
-											}
-										},
 										"properties": []
 									}
 								},
@@ -292,16 +136,6 @@
 									"type": "Identifier",
 									"start": 87,
 									"end": 88,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 29
-										},
-										"end": {
-											"line": 3,
-											"column": 30
-										}
-									},
 									"name": "x"
 								},
 								"computed": false,
@@ -318,18 +152,6 @@
 							"start": 90,
 							"end": 106,
 							"name": "span",
-							"name_loc": {
-								"start": {
-									"line": 3,
-									"column": 33,
-									"character": 91
-								},
-								"end": {
-									"line": 3,
-									"column": 37,
-									"character": 95
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -342,16 +164,6 @@
 											"type": "Identifier",
 											"start": 97,
 											"end": 98,
-											"loc": {
-												"start": {
-													"line": 3,
-													"column": 39
-												},
-												"end": {
-													"line": 3,
-													"column": 40
-												}
-											},
 											"name": "a"
 										}
 									}
@@ -376,65 +188,23 @@
 					"type": "Identifier",
 					"name": "fn3",
 					"start": 128,
-					"end": 131,
-					"loc": {
-						"start": {
-							"line": 5,
-							"column": 10,
-							"character": 128
-						},
-						"end": {
-							"line": 5,
-							"column": 13,
-							"character": 131
-						}
-					}
+					"end": 131
 				},
 				"parameters": [
 					{
 						"type": "AssignmentPattern",
 						"start": 132,
 						"end": 149,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 14
-							},
-							"end": {
-								"line": 5,
-								"column": 31
-							}
-						},
 						"left": {
 							"type": "Identifier",
 							"start": 132,
 							"end": 133,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 14
-								},
-								"end": {
-									"line": 5,
-									"column": 15
-								}
-							},
 							"name": "a"
 						},
 						"right": {
 							"type": "ArrowFunctionExpression",
 							"start": 136,
 							"end": 149,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 18
-								},
-								"end": {
-									"line": 5,
-									"column": 31
-								}
-							},
 							"id": null,
 							"expression": true,
 							"generator": false,
@@ -444,61 +214,21 @@
 								"type": "ParenthesizedExpression",
 								"start": 142,
 								"end": 149,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 24
-									},
-									"end": {
-										"line": 5,
-										"column": 31
-									}
-								},
 								"expression": {
 									"type": "AssignmentExpression",
 									"start": 143,
 									"end": 148,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 25
-										},
-										"end": {
-											"line": 5,
-											"column": 30
-										}
-									},
 									"operator": "=",
 									"left": {
 										"type": "Identifier",
 										"start": 143,
 										"end": 144,
-										"loc": {
-											"start": {
-												"line": 5,
-												"column": 25
-											},
-											"end": {
-												"line": 5,
-												"column": 26
-											}
-										},
 										"name": "x"
 									},
 									"right": {
 										"type": "Literal",
 										"start": 147,
 										"end": 148,
-										"loc": {
-											"start": {
-												"line": 5,
-												"column": 29
-											},
-											"end": {
-												"line": 5,
-												"column": 30
-											}
-										},
 										"value": 1,
 										"raw": "1"
 									}
@@ -515,18 +245,6 @@
 							"start": 151,
 							"end": 167,
 							"name": "span",
-							"name_loc": {
-								"start": {
-									"line": 5,
-									"column": 34,
-									"character": 152
-								},
-								"end": {
-									"line": 5,
-									"column": 38,
-									"character": 156
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -539,16 +257,6 @@
 											"type": "Identifier",
 											"start": 158,
 											"end": 159,
-											"loc": {
-												"start": {
-													"line": 5,
-													"column": 40
-												},
-												"end": {
-													"line": 5,
-													"column": 41
-												}
-											},
 											"name": "a"
 										}
 									}
@@ -573,65 +281,23 @@
 					"type": "Identifier",
 					"name": "fn4",
 					"start": 189,
-					"end": 192,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 10,
-							"character": 189
-						},
-						"end": {
-							"line": 7,
-							"column": 13,
-							"character": 192
-						}
-					}
+					"end": 192
 				},
 				"parameters": [
 					{
 						"type": "AssignmentPattern",
 						"start": 193,
 						"end": 214,
-						"loc": {
-							"start": {
-								"line": 7,
-								"column": 14
-							},
-							"end": {
-								"line": 7,
-								"column": 35
-							}
-						},
 						"left": {
 							"type": "Identifier",
 							"start": 193,
 							"end": 194,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 14
-								},
-								"end": {
-									"line": 7,
-									"column": 15
-								}
-							},
 							"name": "a"
 						},
 						"right": {
 							"type": "ArrowFunctionExpression",
 							"start": 197,
 							"end": 214,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 18
-								},
-								"end": {
-									"line": 7,
-									"column": 35
-								}
-							},
 							"id": null,
 							"expression": true,
 							"generator": false,
@@ -641,76 +307,26 @@
 								"type": "ParenthesizedExpression",
 								"start": 203,
 								"end": 214,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 24
-									},
-									"end": {
-										"line": 7,
-										"column": 35
-									}
-								},
 								"expression": {
 									"type": "ConditionalExpression",
 									"start": 204,
 									"end": 213,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 25
-										},
-										"end": {
-											"line": 7,
-											"column": 34
-										}
-									},
 									"test": {
 										"type": "Identifier",
 										"start": 204,
 										"end": 205,
-										"loc": {
-											"start": {
-												"line": 7,
-												"column": 25
-											},
-											"end": {
-												"line": 7,
-												"column": 26
-											}
-										},
 										"name": "x"
 									},
 									"consequent": {
 										"type": "Identifier",
 										"start": 208,
 										"end": 209,
-										"loc": {
-											"start": {
-												"line": 7,
-												"column": 29
-											},
-											"end": {
-												"line": 7,
-												"column": 30
-											}
-										},
 										"name": "y"
 									},
 									"alternate": {
 										"type": "Identifier",
 										"start": 212,
 										"end": 213,
-										"loc": {
-											"start": {
-												"line": 7,
-												"column": 33
-											},
-											"end": {
-												"line": 7,
-												"column": 34
-											}
-										},
 										"name": "z"
 									}
 								}
@@ -726,18 +342,6 @@
 							"start": 216,
 							"end": 232,
 							"name": "span",
-							"name_loc": {
-								"start": {
-									"line": 7,
-									"column": 38,
-									"character": 217
-								},
-								"end": {
-									"line": 7,
-									"column": 42,
-									"character": 221
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -750,16 +354,6 @@
 											"type": "Identifier",
 											"start": 223,
 											"end": 224,
-											"loc": {
-												"start": {
-													"line": 7,
-													"column": 44
-												},
-												"end": {
-													"line": 7,
-													"column": 45
-												}
-											},
 											"name": "a"
 										}
 									}

@@ -73,7 +73,7 @@
 use std::cell::{Cell, RefCell};
 
 use super::CommentMode;
-use tsv_lang::{AcornPrefix, Comment, JsonWriter, LocationMapper, Span};
+use tsv_lang::{AcornPrefix, Comment, JsonWriter, Span, WirePositions};
 
 /// What one island declares up front: the comments its canonical parse would have
 /// collected, plus the two facts acorn's walk reads about a **root**'s surroundings.
@@ -382,7 +382,7 @@ impl<'a> CommentAttach<'a> {
         w: &mut JsonWriter,
         node_type: &'static str,
         span: Span,
-        loc: LocationMapper<'_>,
+        positions: WirePositions<'_>,
     ) {
         let depth = self.skip_depth.get();
         if depth > 0 {
@@ -391,7 +391,7 @@ impl<'a> CommentAttach<'a> {
             self.debug_close_skipped(node_type, span);
             return;
         }
-        self.close_attached(w, node_type, span, loc);
+        self.close_attached(w, node_type, span, positions);
     }
 
     /// A node closes outside a skipped subtree: decide its trailing comments, then emit
@@ -402,7 +402,7 @@ impl<'a> CommentAttach<'a> {
         w: &mut JsonWriter,
         node_type: &'static str,
         span: Span,
-        loc: LocationMapper<'_>,
+        positions: WirePositions<'_>,
     ) {
         let st = &mut *self.state.borrow_mut();
         debug_assert!(
@@ -448,7 +448,7 @@ impl<'a> CommentAttach<'a> {
         } else {
             None
         };
-        self.emit(w, leading, trailing, html, loc);
+        self.emit(w, leading, trailing, html, positions);
         st.attached.truncate(frame.lead_start as usize);
     }
 
@@ -670,17 +670,17 @@ impl<'a> CommentAttach<'a> {
         leading: &[u32],
         trailing: &[u32],
         html: Option<&str>,
-        loc: LocationMapper<'_>,
+        positions: WirePositions<'_>,
     ) {
         if leading.is_empty() && trailing.is_empty() && html.is_none() {
             return;
         }
         if leading.is_empty() && !trailing.is_empty() {
-            self.emit_trailing(w, trailing, loc);
-            self.emit_leading(w, leading, html, loc);
+            self.emit_trailing(w, trailing, positions);
+            self.emit_leading(w, leading, html, positions);
         } else {
-            self.emit_leading(w, leading, html, loc);
-            self.emit_trailing(w, trailing, loc);
+            self.emit_leading(w, leading, html, positions);
+            self.emit_trailing(w, trailing, positions);
         }
     }
 
@@ -689,7 +689,7 @@ impl<'a> CommentAttach<'a> {
         w: &mut JsonWriter,
         leading: &[u32],
         html: Option<&str>,
-        loc: LocationMapper<'_>,
+        positions: WirePositions<'_>,
     ) {
         if leading.is_empty() && html.is_none() {
             return;
@@ -704,21 +704,22 @@ impl<'a> CommentAttach<'a> {
                 w.raw(",");
             }
         }
-        self.write_run(w, leading, loc);
+        self.write_run(w, leading, positions);
         w.raw("]");
     }
 
-    fn emit_trailing(&self, w: &mut JsonWriter, trailing: &[u32], loc: LocationMapper<'_>) {
+    fn emit_trailing(&self, w: &mut JsonWriter, trailing: &[u32], positions: WirePositions<'_>) {
         if trailing.is_empty() {
             return;
         }
         w.raw(",\"trailingComments\":[");
-        self.write_run(w, trailing, loc);
+        self.write_run(w, trailing, positions);
         w.raw("]");
     }
 
-    /// The comma-separated `{type, value, start, end}` objects of one run.
-    fn write_run(&self, w: &mut JsonWriter, run: &[u32], loc: LocationMapper<'_>) {
+    /// The comma-separated `{type, value, start, end, loc}` objects of one run (`loc`
+    /// only on a wire that carries it).
+    fn write_run(&self, w: &mut JsonWriter, run: &[u32], positions: WirePositions<'_>) {
         for (i, &idx) in run.iter().enumerate() {
             if i > 0 {
                 w.raw(",");
@@ -728,7 +729,11 @@ impl<'a> CommentAttach<'a> {
             w.raw(if comment.is_block { "Block" } else { "Line" });
             w.raw("\",\"value\":");
             w.string(&comment.wire_value(self.source, prefix));
-            w.start_end_field(loc.pos(comment.span.start), loc.pos(comment.span.end));
+            w.start_end_field(
+                positions.pos(comment.span.start),
+                positions.pos(comment.span.end),
+            );
+            w.span_loc(positions, comment.span.start, comment.span.end);
             w.raw("}");
         }
     }

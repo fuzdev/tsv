@@ -12,18 +12,6 @@
 				"start": 0,
 				"end": 44,
 				"name": "svelte:element",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 15,
-						"character": 15
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -49,18 +37,6 @@
 				"start": 45,
 				"end": 94,
 				"name": "svelte:element",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 46
-					},
-					"end": {
-						"line": 2,
-						"column": 15,
-						"character": 60
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",

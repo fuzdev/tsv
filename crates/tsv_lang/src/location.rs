@@ -107,12 +107,8 @@ impl ByteToCharMap {
         build_map(source, &mut LineScan::map_only(), LineRule::None, bom)
     }
 
-    /// The identity map: every byte offset translates to itself.
-    ///
-    /// Passing this to a `LocationMapper` selects byte-space emission — the
-    /// mode `tsv_svelte`'s island-skeleton pass requires (a comment-bearing
-    /// island's skeleton is emitted in byte space so the comment-attach spans
-    /// line up; the final fused emit uses the real map).
+    /// The identity map: every byte offset translates to itself — what `new`
+    /// returns for an all-ASCII source, where a byte offset is its UTF-16 offset.
     pub const fn identity() -> Self {
         Self {
             deltas: Deltas::Identity,
@@ -158,17 +154,7 @@ enum LineRule {
     Ecmascript,
 }
 
-/// What a line-rule scan produces: the line starts, and — under [`LineRule::Lf`]
-/// only — whether an ECMAScript-rule scan of the same source would have drawn
-/// different lines (a lone CR, U+2028, or U+2029; CRLF is one ECMAScript break
-/// holding one LF, so it never counts).
-///
-/// The two travel as **one** out-param because the flag is a fact the starts
-/// scan discovers, not an independent output: it costs no extra pass precisely
-/// because [`terminator_lanes`] already loads the `\r` positions the LF
-/// rule discards, and a caller holding the starts without it has silently
-/// dropped half of what the scan found. The `None` and `Ecmascript` rules leave
-/// it `false`.
+/// What a line-rule scan produces: the line starts.
 ///
 /// The constructors carry the leading-`0` precondition the builders rely on, so
 /// it is a type state rather than a doc comment — which is why there is no
@@ -176,7 +162,6 @@ enum LineRule {
 /// single state the builders cannot produce a correct table from.
 struct LineScan {
     starts: Vec<u32>,
-    ecmascript_differs: bool,
 }
 
 impl LineScan {
@@ -185,16 +170,12 @@ impl LineScan {
     fn lines(source_len: usize) -> Self {
         Self {
             starts: seeded_line_starts(source_len),
-            ecmascript_differs: false,
         }
     }
 
     /// A scan that collects no line data at all ([`LineRule::None`]).
     fn map_only() -> Self {
-        Self {
-            starts: Vec::new(),
-            ecmascript_differs: false,
-        }
+        Self { starts: Vec::new() }
     }
 
     /// An unseeded scan, for the unit tests that grade a single ASCII *run*
@@ -348,14 +329,13 @@ fn build_deltas<T: DeltaElem>(
                 deltas.push(T::from_delta(delta + 2));
                 delta += 2;
                 // U+2028 / U+2029 are line terminators under the ECMAScript
-                // rule only, and are the sole multibyte ones (E2 80 A8/A9) —
-                // so under the LF rule they are exactly what the probe reports.
-                if lead == 0xE2 && bytes[i + 1] == 0x80 && matches!(bytes[i + 2], 0xA8 | 0xA9) {
-                    match line_rule {
-                        LineRule::Ecmascript => lines.starts.push((i + 3) as u32),
-                        LineRule::Lf => lines.ecmascript_differs = true,
-                        LineRule::None => {}
-                    }
+                // rule only, and are the sole multibyte ones (E2 80 A8/A9).
+                if line_rule == LineRule::Ecmascript
+                    && lead == 0xE2
+                    && bytes[i + 1] == 0x80
+                    && matches!(bytes[i + 2], 0xA8 | 0xA9)
+                {
+                    lines.starts.push((i + 3) as u32);
                 }
                 i += 3;
             }
@@ -453,31 +433,19 @@ fn build_map(
 /// - with a real map (`ByteToCharMap::new(source, bom)`), `pos` and
 ///   `pos_and_position` emit final UTF-16 code-unit offsets and char-based
 ///   columns directly — no post-conversion translation walk;
-/// - with `ByteToCharMap::identity()`, both are exact byte-space passthrough —
-///   the mode `tsv_svelte`'s island-skeleton pass requires (comment-attach
-///   spans line up in byte space).
+/// - with `ByteToCharMap::identity()` (an all-ASCII source, where a byte offset
+///   and a UTF-16 offset coincide), both are exact byte-space passthrough.
 ///
-/// The fused column math is the delta-0 case of `translate_column`'s
-/// delta-preserving rule: `char_col = map(offset) − map(line_start)`. It is
-/// byte-identical to running the byte-space conversion plus the translation
-/// walk because every conversion site derives `loc` from the same span it
-/// writes into `start`/`end`.
+/// The fused column is `char_col = map(offset) − map(line_start)`: the UTF-16
+/// distance from the line's start, measured on the same emitted offsets the
+/// node's `start`/`end` carry.
 #[derive(Clone, Copy, Debug)]
 pub struct LocationMapper<'a> {
     pub tracker: &'a LocationTracker,
     pub map: &'a ByteToCharMap,
 }
 
-impl<'a> LocationMapper<'a> {
-    /// A byte-space passthrough mapper over `tracker` (identity map).
-    pub fn identity(tracker: &'a LocationTracker) -> Self {
-        static IDENTITY: ByteToCharMap = ByteToCharMap::identity();
-        Self {
-            tracker,
-            map: &IDENTITY,
-        }
-    }
-
+impl LocationMapper<'_> {
     /// Translate an emitted byte offset (UTF-16 code units with a real map,
     /// identity in byte-space mode).
     #[inline]
@@ -635,6 +603,56 @@ impl<'a> LocationMapper<'a> {
     }
 }
 
+/// What a wire writer emits positions from: the byte→UTF-16 map every `start` / `end`
+/// needs, and — only when the wire carries `loc` — the document's line table.
+///
+/// The one definition of `loc` every writer implements: an object with numeric
+/// `start` / `end` gets `loc.start` / `loc.end` at the line (1-based) and column
+/// (0-based, UTF-16 code units) of those same emitted offsets, under the document's
+/// line table — [`LocationTracker::new_ecmascript_with_map`] for a TypeScript
+/// document, [`LocationTracker::new_with_map`] for a Svelte document (every island
+/// in it included) and a CSS one. `None` lines is the span-only wire, which builds no
+/// line table at all.
+#[derive(Clone, Copy, Debug)]
+pub struct WirePositions<'a> {
+    map: &'a ByteToCharMap,
+    lines: Option<&'a LocationTracker>,
+}
+
+impl<'a> WirePositions<'a> {
+    /// Positions over `map`, with `loc` emitted iff `lines` is present — `lines` must
+    /// be the table built alongside `map`.
+    #[inline]
+    #[must_use]
+    pub const fn new(map: &'a ByteToCharMap, lines: Option<&'a LocationTracker>) -> Self {
+        Self { map, lines }
+    }
+
+    /// Byte offset → emitted (UTF-16 code unit) offset.
+    #[inline]
+    #[must_use]
+    pub fn pos(&self, byte_offset: u32) -> u32 {
+        self.map.byte_to_char(byte_offset)
+    }
+
+    /// The line/column mapper, or `None` on the span-only wire.
+    #[inline]
+    #[must_use]
+    pub fn lines(&self) -> Option<LocationMapper<'a>> {
+        self.lines.map(|tracker| LocationMapper {
+            tracker,
+            map: self.map,
+        })
+    }
+
+    /// Whether this wire carries `loc`.
+    #[inline]
+    #[must_use]
+    pub const fn emits_loc(&self) -> bool {
+        self.lines.is_some()
+    }
+}
+
 #[derive(Debug)]
 pub struct LocationTracker {
     /// Byte offset of each line's first byte, ascending, `[0]` always present.
@@ -645,7 +663,7 @@ pub struct LocationTracker {
     /// residency. The searches hold their needle in `u32` too, so nothing
     /// widens per probe.
     line_starts: Vec<u32>,
-    /// 1-entry line-range cache for `get_line_column` / `line_start_byte`.
+    /// 1-entry line-range cache for `get_line_column` and the span resolvers.
     /// Wire-JSON emission is a DFS with high line locality, so successive
     /// offset lookups usually fall in the last-resolved line's `[line_start,
     /// next_line_start)` range and skip the O(log n) binary search on
@@ -682,13 +700,10 @@ impl LocationTracker {
         }
     }
 
-    /// Line starts at LF only — Svelte's `locate-character` convention, used
-    /// for Svelte template and CSS locations.
-    ///
-    /// Production callers use the fused `new_with_map`; this survives as its
-    /// differential test oracle (the "byte-identical to `new` +
-    /// `ByteToCharMap::new`" contract).
-    pub fn new(source: &str) -> Self {
+    /// Line starts at LF only, by walking characters — the differential test
+    /// oracle for the fused [`new_with_map`](Self::new_with_map).
+    #[cfg(test)]
+    fn new(source: &str) -> Self {
         let mut line_starts = seeded_line_starts(source.len());
         for (i, ch) in source.char_indices() {
             if ch == '\n' {
@@ -699,18 +714,10 @@ impl LocationTracker {
     }
 
     /// Line starts per the ECMAScript LineTerminator set (LF, CR, CRLF,
-    /// U+2028, U+2029) — acorn's rule, applied everywhere including inside
-    /// string literals. Used for standalone TypeScript locations.
-    ///
-    /// The unfused builder, for the one caller that wants acorn's line table
-    /// and *not* a second byte→char map: a Svelte document whose two line
-    /// classes disagree already holds the map (a line rule never affects it),
-    /// so `new_ecmascript_with_map`'s second return would be discarded. It is
-    /// also `new_ecmascript_with_map`'s differential test oracle.
-    pub fn new_ecmascript(source: &str) -> Self {
-        if source.is_ascii() {
-            return Self::with_line_starts(ascii_ecmascript_line_starts(source.as_bytes()));
-        }
+    /// U+2028, U+2029), by walking characters — the differential test oracle
+    /// for the fused [`new_ecmascript_with_map`](Self::new_ecmascript_with_map).
+    #[cfg(test)]
+    fn new_ecmascript(source: &str) -> Self {
         let mut line_starts = seeded_line_starts(source.len());
         let mut chars = source.char_indices().peekable();
         while let Some((i, ch)) = chars.next() {
@@ -731,14 +738,16 @@ impl LocationTracker {
         Self::with_line_starts(line_starts)
     }
 
-    /// Build the ECMAScript-rule tracker and the byte→UTF-16 map in one
-    /// source scan.
+    /// Build the ECMAScript-rule tracker (LF, CR, CRLF, U+2028, U+2029 —
+    /// acorn's rule, applied everywhere including inside string literals) and
+    /// the byte→UTF-16 map in one source scan: the line table of a TypeScript
+    /// document.
     ///
-    /// The pair `convert_ast_json_string` needs per call — built separately
-    /// they cost two full `char_indices` passes over the source; fused they
-    /// cost one (plus the shared `is_ascii` pre-check, which selects a
-    /// byte-level line scan + identity map on the common all-ASCII path).
-    /// Byte-identical to `new_ecmascript(source)` + `ByteToCharMap::new(source, bom)`.
+    /// Built separately the pair costs two full `char_indices` passes over the
+    /// source; fused it costs one (plus the shared `is_ascii` pre-check, which
+    /// selects a byte-level line scan + identity map on the common all-ASCII
+    /// path). Byte-identical to the character-walking oracle +
+    /// `ByteToCharMap::new(source, bom)`.
     pub fn new_ecmascript_with_map(source: &str, bom: LeadingBom) -> (Self, ByteToCharMap) {
         if source.is_ascii() {
             return (
@@ -754,24 +763,11 @@ impl LocationTracker {
 
     /// Build the LF-only tracker (Svelte's `locate-character` convention — only
     /// `\n` starts a line; CR/U+2028/U+2029 do not) and the byte→UTF-16 map in
-    /// one source scan. The Svelte sibling of `new_ecmascript_with_map`, for the
-    /// wire-JSON writer's fused char-space emission over the Svelte spine.
-    /// Byte-identical to `new(source)` + `ByteToCharMap::new(source, bom)`.
-    ///
-    /// The third return is `ecmascript_lines_differ`: whether the source holds a
-    /// terminator the **ECMAScript** class counts and this one does not — a lone
-    /// CR, U+2028, or U+2029. `false` means [`new_ecmascript`](Self::new_ecmascript)
-    /// over the same source would build a byte-identical table (CRLF is one
-    /// ECMAScript break holding one LF, so it never counts), which is what lets
-    /// the Svelte writer skip acorn's second table on essentially every real
-    /// document. Detected in this same scan, so it costs no extra pass.
-    ///
-    /// ⚠️ It answers about the TABLES, not about whether every `tsv_ts::AcornSeed`
-    /// is inert: a seed can be non-identity on a source this reports `false` for
-    /// (an acorn parse entered behind where it starts lexing counts lines the
-    /// author wrote and acorn never saw). A caller gating the whole re-seeding
-    /// route on this alone has drawn the boundary too tight.
-    pub fn new_with_map(source: &str, bom: LeadingBom) -> (Self, ByteToCharMap, bool) {
+    /// one source scan: the line table of a Svelte document — every island in
+    /// it included — and of a standalone CSS document. The sibling of
+    /// `new_ecmascript_with_map`; byte-identical to the character-walking oracle
+    /// + `ByteToCharMap::new(source, bom)`.
+    pub fn new_with_map(source: &str, bom: LeadingBom) -> (Self, ByteToCharMap) {
         let mut lines = LineScan::lines(source.len());
         let map = if source.is_ascii() {
             ascii_lf_line_starts_into(source.as_bytes(), 0, &mut lines);
@@ -779,30 +775,7 @@ impl LocationTracker {
         } else {
             build_map(source, &mut lines, LineRule::Lf, bom)
         };
-        (
-            Self::with_line_starts(lines.starts),
-            map,
-            lines.ecmascript_differs,
-        )
-    }
-
-    /// A line-data-free tracker: only the byte→char `map` half of a
-    /// `LocationMapper` is populated (`ByteToCharMap`), the tracker carries no
-    /// `line_starts` scan. For the `no-locations` wire path: every line/column
-    /// field is gated off, so the writer's line-table readers
-    /// (`pos_and_position()` / `get_line_column()`, which back only `loc` /
-    /// `name_loc` / column output) are all skipped behind the same `emit_loc`
-    /// flag — leaving `LocationMapper::pos()` (byte→UTF-16 offset) as the sole
-    /// live consumer. So the O(n) line scan the fused `new_ecmascript_with_map` /
-    /// `new_with_map` do is pure dead work here. The stub `line_starts` (`[0]`)
-    /// keeps `get_line_column` non-panicking if ever reached; the `map` is
-    /// byte-identical to the fused constructors' map — line rules only affect
-    /// `line_starts`, which this skips — so `start`/`end` offsets are unchanged.
-    pub fn new_map_only(source: &str, bom: LeadingBom) -> (Self, ByteToCharMap) {
-        (
-            Self::with_line_starts(vec![0]),
-            ByteToCharMap::new(source, bom),
-        )
+        (Self::with_line_starts(lines.starts), map)
     }
 
     /// Resolve `offset` to `(line_idx, line_start)`, consulting the 1-entry
@@ -905,10 +878,10 @@ impl LocationTracker {
         (line_idx + 1, offset - line_start) // Lines are 1-indexed
     }
 
-    /// Get the byte offset of the start of the line containing the given byte offset
-    ///
-    /// Used to compute character-based columns: `char_column = byte_to_char(offset) - byte_to_char(line_start)`.
-    pub fn line_start_byte(&self, offset: usize) -> usize {
+    /// The byte offset of the start of the line containing `offset` — the
+    /// cache tests' second probe of `resolve_line`.
+    #[cfg(test)]
+    fn line_start_byte(&self, offset: usize) -> usize {
         self.resolve_line(offset).1
     }
 
@@ -1112,37 +1085,20 @@ fn push_lane_starts(starts: &mut Vec<u32>, mut lanes: u64, after: usize) {
 }
 
 /// Append the LF-only line starts of an ASCII run to `lines`, offset by the
-/// run's `base` position in the source, and set its `ecmascript_differs` if the
-/// run holds a terminator only the ECMAScript class counts (here, a lone CR).
+/// run's `base` position in the source.
 ///
 /// The multibyte builder splits the source into ASCII runs at its multibyte
 /// characters, so each run's line scan is exactly the all-ASCII one — shared
 /// with the fast path rather than re-derived. A run boundary can never split a
-/// terminator this scan reads — the LFs it collects are one ASCII byte, and the
-/// CRLF pair it probes for cannot straddle one either, since a run only ends at
-/// a non-ASCII byte and `\n` is not one. So a `\r` at the end of a run is a lone
-/// CR, exactly as this reads it.
+/// terminator this scan reads: the LFs it collects are one ASCII byte.
 ///
-/// The scan looks for `\r` alongside `\n` — both needles ride one loaded word
-/// (see [`terminator_lanes`]), so the probe costs no extra pass and no extra
-/// memory traffic. It is what lets `tsv_svelte` skip building acorn's second
-/// line table on every document that does not need one; see
-/// `tsv_ts::AcornSeed`.
-///
-/// Its starts are exact over any bytes ([`terminator_lanes`]), though its
-/// callers hand it ASCII runs; the slice is read as a whole source, so a `\r` as
-/// its last byte is a lone CR. Its `ecmascript_differs` is NOT exact over a
-/// non-ASCII slice: it sees a lone CR but not `<LS>` / `<PS>` (U+2028 / U+2029),
-/// three-byte characters the multibyte builder checks between the runs.
+/// It shares [`terminator_lanes`] with its ECMAScript sibling and reads only the
+/// `\n` lanes; its starts are exact over any bytes, though its callers hand it
+/// ASCII runs.
 fn ascii_lf_line_starts_into(bytes: &[u8], base: usize, lines: &mut LineScan) {
     let (words, tail) = bytes.as_chunks::<8>();
     let mut k = 0;
-    while let Some((at, lf, cr)) = next_terminator_word(words, &mut k) {
-        if cr != 0 {
-            // CRLF is one ECMAScript break holding one LF, so it leaves the
-            // two classes agreeing; a *lone* CR is the divergence this reports.
-            lines.ecmascript_differs |= lone_cr_lanes(lf, cr, bytes.get(at + 8)) != 0;
-        }
+    while let Some((at, lf, _)) = next_terminator_word(words, &mut k) {
         push_lane_starts(&mut lines.starts, lf, base + at + 1);
     }
     if tail.is_empty() {
@@ -1151,26 +1107,22 @@ fn ascii_lf_line_starts_into(bytes: &[u8], base: usize, lines: &mut LineScan) {
     if let Some(last) = bytes.last_chunk::<8>() {
         // The tail is the high lanes of the run's LAST word, whose low lanes the
         // loop has already read: take that word and keep only the fresh lanes.
-        let (lf, cr) = terminator_lanes(u64::from_le_bytes(*last));
+        let (lf, _) = terminator_lanes(u64::from_le_bytes(*last));
         let fresh = !0u64 << (8 * (8 - tail.len()));
-        lines.ecmascript_differs |= lone_cr_lanes(lf, cr, None) & fresh != 0;
         push_lane_starts(&mut lines.starts, lf & fresh, base + bytes.len() - 7);
     } else {
         // A run shorter than one word.
         for (k, &b) in tail.iter().enumerate() {
-            match b {
-                b'\n' => lines.starts.push((base + k + 1) as u32),
-                b'\r' => lines.ecmascript_differs |= tail.get(k + 1) != Some(&b'\n'),
-                _ => {}
+            if b == b'\n' {
+                lines.starts.push((base + k + 1) as u32);
             }
         }
     }
 }
 
 /// Append the ECMAScript-rule line starts of an ASCII run to `lines`, offset by
-/// the run's `base` position in the source. This rule counts the whole class, so
-/// it never has an `ecmascript_differs` to report — it takes the same
-/// [`LineScan`] as its LF sibling so the builder's two arms read alike.
+/// the run's `base` position in the source. It takes the same [`LineScan`] as
+/// its LF sibling so the builder's two arms read alike.
 ///
 /// A CRLF pair can never straddle a run boundary — a run only ends at a
 /// non-ASCII byte, which `\n` is not — so a `\r` at the end of a run is a lone
@@ -1265,22 +1217,12 @@ mod tests {
         let plain = ByteToCharMap::new(source, LeadingBom::Counted);
         let (ecma_tracker, ecma_map) =
             LocationTracker::new_ecmascript_with_map(source, LeadingBom::Counted);
-        let (lf_tracker, lf_map, ecmascript_lines_differ) =
-            LocationTracker::new_with_map(source, LeadingBom::Counted);
-        // The probe's meaning, stated as the identity it exists to predict: the
-        // two rules disagree on this source exactly when their tables do.
-        assert_eq!(
-            ecmascript_lines_differ,
-            ecma_tracker.line_starts != lf_tracker.line_starts,
-            "ecmascript_lines_differ must equal `the two line tables differ`"
-        );
-        let (_, map_only) = LocationTracker::new_map_only(source, LeadingBom::Counted);
+        let (lf_tracker, lf_map) = LocationTracker::new_with_map(source, LeadingBom::Counted);
 
         let maps = [
             (&plain, "new"),
             (&ecma_map, "new_ecmascript_with_map"),
             (&lf_map, "new_with_map"),
-            (&map_only, "new_map_only"),
         ];
 
         for b in 0..=(source.len() as u32 + 2) {
@@ -1360,17 +1302,14 @@ mod tests {
         for tail in ["<div>x</div>", "a\né\n中", &"é".repeat(300)] {
             let source = format!("{bom}{tail}");
             let counted = ByteToCharMap::new(&source, LeadingBom::Counted);
-            let (lf_tracker, lf_map, _) =
-                LocationTracker::new_with_map(&source, LeadingBom::Elided);
+            let (lf_tracker, lf_map) = LocationTracker::new_with_map(&source, LeadingBom::Elided);
             let (_, ecma_map) =
                 LocationTracker::new_ecmascript_with_map(&source, LeadingBom::Elided);
-            let (_, map_only) = LocationTracker::new_map_only(&source, LeadingBom::Elided);
             let plain = ByteToCharMap::new(&source, LeadingBom::Elided);
             for (map, which) in [
                 (&plain, "new"),
                 (&lf_map, "new_with_map"),
                 (&ecma_map, "new_ecmascript_with_map"),
-                (&map_only, "new_map_only"),
             ] {
                 for b in 0..3u32 {
                     assert_eq!(map.byte_to_char(b), 0, "{which}: BOM byte {b} on {tail:?}");
@@ -1577,11 +1516,6 @@ mod tests {
                         reference_ecmascript_line_starts(&bytes, 100),
                         "ecmascript {label}"
                     );
-                    assert_eq!(
-                        lf.ecmascript_differs,
-                        es.starts != lf.starts,
-                        "ecmascript-differs probe {label}"
-                    );
                 }
             }
         }
@@ -1628,11 +1562,6 @@ mod tests {
                     ascii_ecmascript_line_starts_into(&bytes, 7, &mut es);
                     let es_reference = reference_ecmascript_line_starts(&bytes, 7);
                     assert_eq!(es.starts, es_reference, "ecmascript {bytes:?}");
-                    assert_eq!(
-                        lf.ecmascript_differs,
-                        es_reference != lf_reference,
-                        "ecmascript-differs probe {bytes:?}"
-                    );
                 }
             }
         }
@@ -1678,11 +1607,6 @@ mod tests {
             ascii_ecmascript_line_starts_into(bytes, 3, &mut es);
             let es_reference = reference_ecmascript_line_starts(bytes, 3);
             assert_eq!(es.starts, es_reference, "ecmascript {bytes:x?}");
-            assert_eq!(
-                lf.ecmascript_differs,
-                es_reference != lf_reference,
-                "ecmascript-differs probe {bytes:x?}"
-            );
         }
 
         for high in 0x80..=0xffu8 {
@@ -1759,11 +1683,6 @@ mod tests {
                 es.starts,
                 reference_ecmascript_line_starts(&bytes, 0),
                 "ecmascript case {case}"
-            );
-            assert_eq!(
-                lf.ecmascript_differs,
-                es.starts != lf.starts,
-                "ecmascript-differs probe case {case}"
             );
         }
     }
@@ -1928,7 +1847,10 @@ mod tests {
         // bytes: a=0, é=1..3, \n=3, b=4, é=5..7, ' '=7, c=8
         let source = "aé\nbé c";
         let tracker = LocationTracker::new_ecmascript(source);
-        let m = LocationMapper::identity(&tracker);
+        let m = LocationMapper {
+            tracker: &tracker,
+            map: &ByteToCharMap::identity(),
+        };
         assert_eq!(m.pos(8), 8);
         let (pos, p) = m.pos_and_position(8); // 'c'
         assert_eq!(pos, 8);
@@ -2067,10 +1989,6 @@ mod tests {
             for (class, tracker) in [
                 ("lf", LocationTracker::new(source)),
                 ("ecmascript", LocationTracker::new_ecmascript(source)),
-                (
-                    "map-only",
-                    LocationTracker::new_map_only(source, LeadingBom::Counted).0,
-                ),
             ] {
                 let label = format!("{class} {source:?}");
                 // Ascending, then descending, on the same warm tracker.
@@ -2128,12 +2046,16 @@ mod tests {
         ] {
             let tracker = LocationTracker::new_ecmascript(source);
             let map = ByteToCharMap::new(source, LeadingBom::Counted);
+            let identity = ByteToCharMap::identity();
             for m in [
                 LocationMapper {
                     tracker: &tracker,
                     map: &map,
                 },
-                LocationMapper::identity(&tracker),
+                LocationMapper {
+                    tracker: &tracker,
+                    map: &identity,
+                },
             ] {
                 for start in 0..=source.len() as u32 {
                     for end in start..=source.len() as u32 {

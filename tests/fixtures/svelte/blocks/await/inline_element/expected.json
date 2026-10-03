@@ -25,18 +25,6 @@
 				"start": 77,
 				"end": 112,
 				"name": "a",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 78
-					},
-					"end": {
-						"line": 2,
-						"column": 2,
-						"character": 79
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -49,16 +37,6 @@
 								"type": "Identifier",
 								"start": 88,
 								"end": 95,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 11
-									},
-									"end": {
-										"line": 2,
-										"column": 18
-									}
-								},
 								"name": "promise"
 							},
 							"value": null,
@@ -93,18 +71,6 @@
 				"start": 113,
 				"end": 170,
 				"name": "span",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 1,
-						"character": 114
-					},
-					"end": {
-						"line": 3,
-						"column": 5,
-						"character": 118
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -117,35 +83,13 @@
 								"type": "Identifier",
 								"start": 127,
 								"end": 134,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 14
-									},
-									"end": {
-										"line": 3,
-										"column": 21
-									}
-								},
 								"name": "promise"
 							},
 							"value": {
 								"type": "Identifier",
 								"name": "val",
 								"start": 146,
-								"end": 149,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 33,
-										"character": 146
-									},
-									"end": {
-										"line": 3,
-										"column": 36,
-										"character": 149
-									}
-								}
+								"end": 149
 							},
 							"error": null,
 							"pending": {
@@ -171,16 +115,6 @@
 											"type": "Identifier",
 											"start": 151,
 											"end": 154,
-											"loc": {
-												"start": {
-													"line": 3,
-													"column": 38
-												},
-												"end": {
-													"line": 3,
-													"column": 41
-												}
-											},
 											"name": "val"
 										}
 									}

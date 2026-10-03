@@ -12,36 +12,12 @@
 				"start": 0,
 				"end": 68,
 				"name": "button",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 7,
-						"character": 7
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 8,
 						"end": 27,
 						"name": "data-attr1",
-						"name_loc": {
-							"start": {
-								"line": 1,
-								"column": 8,
-								"character": 8
-							},
-							"end": {
-								"line": 1,
-								"column": 18,
-								"character": 18
-							}
-						},
 						"value": [
 							{
 								"start": 20,
@@ -57,18 +33,6 @@
 						"start": 28,
 						"end": 47,
 						"name": "data-attr2",
-						"name_loc": {
-							"start": {
-								"line": 1,
-								"column": 28,
-								"character": 28
-							},
-							"end": {
-								"line": 1,
-								"column": 38,
-								"character": 38
-							}
-						},
 						"value": [
 							{
 								"start": 40,

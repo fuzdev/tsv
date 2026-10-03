@@ -12,18 +12,6 @@
 				"start": 0,
 				"end": 59,
 				"name": "select",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 7,
-						"character": 7
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -40,18 +28,6 @@
 							"start": 10,
 							"end": 28,
 							"name": "option",
-							"name_loc": {
-								"start": {
-									"line": 2,
-									"column": 2,
-									"character": 11
-								},
-								"end": {
-									"line": 2,
-									"column": 8,
-									"character": 17
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -78,18 +54,6 @@
 							"start": 31,
 							"end": 49,
 							"name": "option",
-							"name_loc": {
-								"start": {
-									"line": 4,
-									"column": 2,
-									"character": 32
-								},
-								"end": {
-									"line": 4,
-									"column": 8,
-									"character": 38
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",

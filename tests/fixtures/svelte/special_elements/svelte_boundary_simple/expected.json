@@ -12,36 +12,12 @@
 				"start": 0,
 				"end": 63,
 				"name": "svelte:boundary",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 16,
-						"character": 16
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 17,
 						"end": 29,
 						"name": "onerror",
-						"name_loc": {
-							"start": {
-								"line": 1,
-								"column": 17,
-								"character": 17
-							},
-							"end": {
-								"line": 1,
-								"column": 24,
-								"character": 24
-							}
-						},
 						"value": {
 							"type": "ExpressionTag",
 							"start": 25,
@@ -50,16 +26,6 @@
 								"type": "Identifier",
 								"start": 26,
 								"end": 28,
-								"loc": {
-									"start": {
-										"line": 1,
-										"column": 26
-									},
-									"end": {
-										"line": 1,
-										"column": 28
-									}
-								},
 								"name": "fn"
 							}
 						}
@@ -73,18 +39,6 @@
 							"start": 30,
 							"end": 45,
 							"name": "div",
-							"name_loc": {
-								"start": {
-									"line": 1,
-									"column": 31,
-									"character": 31
-								},
-								"end": {
-									"line": 1,
-									"column": 34,
-									"character": 34
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",

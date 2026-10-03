@@ -69,7 +69,7 @@ const INTENTIONAL_TS: &[(&str, &str)] = &[
     ),
     (
         "typescript/syntax/unicode_line_terminators",
-        "pins U+2028/U+2029 line counting on the standalone tsv_ts loc path (LocationTracker::new_ecmascript, acorn's LineTerminator set) — formatting is context-invariant but the .svelte path tracks LF-only locations (Svelte's locate-character), so embedding would pin different locs",
+        "U+2028/U+2029 in a standalone TypeScript document, whose `loc` counts them as lines (acorn's LineTerminator set) where a Svelte document counts LF alone — the fixture pins the spans, and its input is the TypeScript document tests/loc_definition.rs grades that line rule over",
     ),
     (
         "typescript/syntax/comments/format_ignore_prettier_divergence",

@@ -14,33 +14,13 @@
 			"type": "Line",
 			"value": " 100 chars: .map((file) => fits on same line, arrow body wraps",
 			"start": 42,
-			"end": 106,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 3
-				},
-				"end": {
-					"line": 4,
-					"column": 67
-				}
-			}
+			"end": 106
 		},
 		{
 			"type": "Line",
 			"value": " 101 chars: .map( breaks, first call args stay inline, callback on next line",
 			"start": 244,
-			"end": 322,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 3
-				},
-				"end": {
-					"line": 9,
-					"column": 81
-				}
-			}
+			"end": 322
 		}
 	],
 	"instance": {
@@ -52,45 +32,15 @@
 			"type": "Program",
 			"start": 8,
 			"end": 465,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 15,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "FunctionDeclaration",
 					"start": 10,
 					"end": 464,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 14,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 19,
 						"end": 20,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 10
-							},
-							"end": {
-								"line": 2,
-								"column": 11
-							}
-						},
 						"name": "a"
 					},
 					"expression": false,
@@ -101,163 +51,53 @@
 						"type": "BlockStatement",
 						"start": 23,
 						"end": 464,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 14
-							},
-							"end": {
-								"line": 14,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "IfStatement",
 								"start": 27,
 								"end": 461,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 2
-									},
-									"end": {
-										"line": 13,
-										"column": 3
-									}
-								},
 								"test": {
 									"type": "Identifier",
 									"start": 31,
 									"end": 35,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 6
-										},
-										"end": {
-											"line": 3,
-											"column": 10
-										}
-									},
 									"name": "cond"
 								},
 								"consequent": {
 									"type": "BlockStatement",
 									"start": 37,
 									"end": 461,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 12
-										},
-										"end": {
-											"line": 13,
-											"column": 3
-										}
-									},
 									"body": [
 										{
 											"type": "VariableDeclaration",
 											"start": 110,
 											"end": 239,
-											"loc": {
-												"start": {
-													"line": 5,
-													"column": 3
-												},
-												"end": {
-													"line": 7,
-													"column": 5
-												}
-											},
 											"declarations": [
 												{
 													"type": "VariableDeclarator",
 													"start": 116,
 													"end": 238,
-													"loc": {
-														"start": {
-															"line": 5,
-															"column": 9
-														},
-														"end": {
-															"line": 7,
-															"column": 4
-														}
-													},
 													"id": {
 														"type": "Identifier",
 														"start": 116,
 														"end": 121,
-														"loc": {
-															"start": {
-																"line": 5,
-																"column": 9
-															},
-															"end": {
-																"line": 5,
-																"column": 14
-															}
-														},
 														"name": "abcde"
 													},
 													"init": {
 														"type": "CallExpression",
 														"start": 124,
 														"end": 238,
-														"loc": {
-															"start": {
-																"line": 5,
-																"column": 17
-															},
-															"end": {
-																"line": 7,
-																"column": 4
-															}
-														},
 														"callee": {
 															"type": "MemberExpression",
 															"start": 124,
 															"end": 194,
-															"loc": {
-																"start": {
-																	"line": 5,
-																	"column": 17
-																},
-																"end": {
-																	"line": 5,
-																	"column": 87
-																}
-															},
 															"object": {
 																"type": "CallExpression",
 																"start": 124,
 																"end": 190,
-																"loc": {
-																	"start": {
-																		"line": 5,
-																		"column": 17
-																	},
-																	"end": {
-																		"line": 5,
-																		"column": 83
-																	}
-																},
 																"callee": {
 																	"type": "Identifier",
 																	"start": 124,
 																	"end": 133,
-																	"loc": {
-																		"start": {
-																			"line": 5,
-																			"column": 17
-																		},
-																		"end": {
-																			"line": 5,
-																			"column": 26
-																		}
-																	},
 																	"name": "fn_name__"
 																},
 																"arguments": [
@@ -265,32 +105,12 @@
 																		"type": "Identifier",
 																		"start": 134,
 																		"end": 143,
-																		"loc": {
-																			"start": {
-																				"line": 5,
-																				"column": 27
-																			},
-																			"end": {
-																				"line": 5,
-																				"column": 36
-																			}
-																		},
 																		"name": "directory"
 																	},
 																	{
 																		"type": "ArrowFunctionExpression",
 																		"start": 145,
 																		"end": 189,
-																		"loc": {
-																			"start": {
-																				"line": 5,
-																				"column": 38
-																			},
-																			"end": {
-																				"line": 5,
-																				"column": 82
-																			}
-																		},
 																		"id": null,
 																		"expression": true,
 																		"generator": false,
@@ -300,16 +120,6 @@
 																				"type": "Identifier",
 																				"start": 146,
 																				"end": 150,
-																				"loc": {
-																					"start": {
-																						"line": 5,
-																						"column": 39
-																					},
-																					"end": {
-																						"line": 5,
-																						"column": 43
-																					}
-																				},
 																				"name": "file"
 																			}
 																		],
@@ -317,60 +127,20 @@
 																			"type": "CallExpression",
 																			"start": 155,
 																			"end": 189,
-																			"loc": {
-																				"start": {
-																					"line": 5,
-																					"column": 48
-																				},
-																				"end": {
-																					"line": 5,
-																					"column": 82
-																				}
-																			},
 																			"callee": {
 																				"type": "MemberExpression",
 																				"start": 155,
 																				"end": 174,
-																				"loc": {
-																					"start": {
-																						"line": 5,
-																						"column": 48
-																					},
-																					"end": {
-																						"line": 5,
-																						"column": 67
-																					}
-																				},
 																				"object": {
 																					"type": "Identifier",
 																					"start": 155,
 																					"end": 165,
-																					"loc": {
-																						"start": {
-																							"line": 5,
-																							"column": 48
-																						},
-																						"end": {
-																							"line": 5,
-																							"column": 58
-																						}
-																					},
 																					"name": "extensions"
 																				},
 																				"property": {
 																					"type": "Identifier",
 																					"start": 166,
 																					"end": 174,
-																					"loc": {
-																						"start": {
-																							"line": 5,
-																							"column": 59
-																						},
-																						"end": {
-																							"line": 5,
-																							"column": 67
-																						}
-																					},
 																					"name": "includes"
 																				},
 																				"computed": false,
@@ -381,30 +151,10 @@
 																					"type": "CallExpression",
 																					"start": 175,
 																					"end": 188,
-																					"loc": {
-																						"start": {
-																							"line": 5,
-																							"column": 68
-																						},
-																						"end": {
-																							"line": 5,
-																							"column": 81
-																						}
-																					},
 																					"callee": {
 																						"type": "Identifier",
 																						"start": 175,
 																						"end": 182,
-																						"loc": {
-																							"start": {
-																								"line": 5,
-																								"column": 68
-																							},
-																							"end": {
-																								"line": 5,
-																								"column": 75
-																							}
-																						},
 																						"name": "extname"
 																					},
 																					"arguments": [
@@ -412,16 +162,6 @@
 																							"type": "Identifier",
 																							"start": 183,
 																							"end": 187,
-																							"loc": {
-																								"start": {
-																									"line": 5,
-																									"column": 76
-																								},
-																								"end": {
-																									"line": 5,
-																									"column": 80
-																								}
-																							},
 																							"name": "file"
 																						}
 																					],
@@ -438,16 +178,6 @@
 																"type": "Identifier",
 																"start": 191,
 																"end": 194,
-																"loc": {
-																	"start": {
-																		"line": 5,
-																		"column": 84
-																	},
-																	"end": {
-																		"line": 5,
-																		"column": 87
-																	}
-																},
 																"name": "map"
 															},
 															"computed": false,
@@ -458,16 +188,6 @@
 																"type": "ArrowFunctionExpression",
 																"start": 195,
 																"end": 233,
-																"loc": {
-																	"start": {
-																		"line": 5,
-																		"column": 88
-																	},
-																	"end": {
-																		"line": 6,
-																		"column": 28
-																	}
-																},
 																"id": null,
 																"expression": true,
 																"generator": false,
@@ -477,16 +197,6 @@
 																		"type": "Identifier",
 																		"start": 196,
 																		"end": 200,
-																		"loc": {
-																			"start": {
-																				"line": 5,
-																				"column": 89
-																			},
-																			"end": {
-																				"line": 5,
-																				"column": 93
-																			}
-																		},
 																		"name": "file"
 																	}
 																],
@@ -494,30 +204,10 @@
 																	"type": "CallExpression",
 																	"start": 209,
 																	"end": 233,
-																	"loc": {
-																		"start": {
-																			"line": 6,
-																			"column": 4
-																		},
-																		"end": {
-																			"line": 6,
-																			"column": 28
-																		}
-																	},
 																	"callee": {
 																		"type": "Identifier",
 																		"start": 209,
 																		"end": 216,
-																		"loc": {
-																			"start": {
-																				"line": 6,
-																				"column": 4
-																			},
-																			"end": {
-																				"line": 6,
-																				"column": 11
-																			}
-																		},
 																		"name": "resolve"
 																	},
 																	"arguments": [
@@ -525,32 +215,12 @@
 																			"type": "Identifier",
 																			"start": 217,
 																			"end": 226,
-																			"loc": {
-																				"start": {
-																					"line": 6,
-																					"column": 12
-																				},
-																				"end": {
-																					"line": 6,
-																					"column": 21
-																				}
-																			},
 																			"name": "directory"
 																		},
 																		{
 																			"type": "Identifier",
 																			"start": 228,
 																			"end": 232,
-																			"loc": {
-																				"start": {
-																					"line": 6,
-																					"column": 23
-																				},
-																				"end": {
-																					"line": 6,
-																					"column": 27
-																				}
-																			},
 																			"name": "file"
 																		}
 																	],
@@ -576,103 +246,33 @@
 											"type": "VariableDeclaration",
 											"start": 326,
 											"end": 457,
-											"loc": {
-												"start": {
-													"line": 10,
-													"column": 3
-												},
-												"end": {
-													"line": 12,
-													"column": 5
-												}
-											},
 											"declarations": [
 												{
 													"type": "VariableDeclarator",
 													"start": 332,
 													"end": 456,
-													"loc": {
-														"start": {
-															"line": 10,
-															"column": 9
-														},
-														"end": {
-															"line": 12,
-															"column": 4
-														}
-													},
 													"id": {
 														"type": "Identifier",
 														"start": 332,
 														"end": 338,
-														"loc": {
-															"start": {
-																"line": 10,
-																"column": 9
-															},
-															"end": {
-																"line": 10,
-																"column": 15
-															}
-														},
 														"name": "abcdef"
 													},
 													"init": {
 														"type": "CallExpression",
 														"start": 341,
 														"end": 456,
-														"loc": {
-															"start": {
-																"line": 10,
-																"column": 18
-															},
-															"end": {
-																"line": 12,
-																"column": 4
-															}
-														},
 														"callee": {
 															"type": "MemberExpression",
 															"start": 341,
 															"end": 411,
-															"loc": {
-																"start": {
-																	"line": 10,
-																	"column": 18
-																},
-																"end": {
-																	"line": 10,
-																	"column": 88
-																}
-															},
 															"object": {
 																"type": "CallExpression",
 																"start": 341,
 																"end": 407,
-																"loc": {
-																	"start": {
-																		"line": 10,
-																		"column": 18
-																	},
-																	"end": {
-																		"line": 10,
-																		"column": 84
-																	}
-																},
 																"callee": {
 																	"type": "Identifier",
 																	"start": 341,
 																	"end": 350,
-																	"loc": {
-																		"start": {
-																			"line": 10,
-																			"column": 18
-																		},
-																		"end": {
-																			"line": 10,
-																			"column": 27
-																		}
-																	},
 																	"name": "fn_name__"
 																},
 																"arguments": [
@@ -680,32 +280,12 @@
 																		"type": "Identifier",
 																		"start": 351,
 																		"end": 360,
-																		"loc": {
-																			"start": {
-																				"line": 10,
-																				"column": 28
-																			},
-																			"end": {
-																				"line": 10,
-																				"column": 37
-																			}
-																		},
 																		"name": "directory"
 																	},
 																	{
 																		"type": "ArrowFunctionExpression",
 																		"start": 362,
 																		"end": 406,
-																		"loc": {
-																			"start": {
-																				"line": 10,
-																				"column": 39
-																			},
-																			"end": {
-																				"line": 10,
-																				"column": 83
-																			}
-																		},
 																		"id": null,
 																		"expression": true,
 																		"generator": false,
@@ -715,16 +295,6 @@
 																				"type": "Identifier",
 																				"start": 363,
 																				"end": 367,
-																				"loc": {
-																					"start": {
-																						"line": 10,
-																						"column": 40
-																					},
-																					"end": {
-																						"line": 10,
-																						"column": 44
-																					}
-																				},
 																				"name": "file"
 																			}
 																		],
@@ -732,60 +302,20 @@
 																			"type": "CallExpression",
 																			"start": 372,
 																			"end": 406,
-																			"loc": {
-																				"start": {
-																					"line": 10,
-																					"column": 49
-																				},
-																				"end": {
-																					"line": 10,
-																					"column": 83
-																				}
-																			},
 																			"callee": {
 																				"type": "MemberExpression",
 																				"start": 372,
 																				"end": 391,
-																				"loc": {
-																					"start": {
-																						"line": 10,
-																						"column": 49
-																					},
-																					"end": {
-																						"line": 10,
-																						"column": 68
-																					}
-																				},
 																				"object": {
 																					"type": "Identifier",
 																					"start": 372,
 																					"end": 382,
-																					"loc": {
-																						"start": {
-																							"line": 10,
-																							"column": 49
-																						},
-																						"end": {
-																							"line": 10,
-																							"column": 59
-																						}
-																					},
 																					"name": "extensions"
 																				},
 																				"property": {
 																					"type": "Identifier",
 																					"start": 383,
 																					"end": 391,
-																					"loc": {
-																						"start": {
-																							"line": 10,
-																							"column": 60
-																						},
-																						"end": {
-																							"line": 10,
-																							"column": 68
-																						}
-																					},
 																					"name": "includes"
 																				},
 																				"computed": false,
@@ -796,30 +326,10 @@
 																					"type": "CallExpression",
 																					"start": 392,
 																					"end": 405,
-																					"loc": {
-																						"start": {
-																							"line": 10,
-																							"column": 69
-																						},
-																						"end": {
-																							"line": 10,
-																							"column": 82
-																						}
-																					},
 																					"callee": {
 																						"type": "Identifier",
 																						"start": 392,
 																						"end": 399,
-																						"loc": {
-																							"start": {
-																								"line": 10,
-																								"column": 69
-																							},
-																							"end": {
-																								"line": 10,
-																								"column": 76
-																							}
-																						},
 																						"name": "extname"
 																					},
 																					"arguments": [
@@ -827,16 +337,6 @@
 																							"type": "Identifier",
 																							"start": 400,
 																							"end": 404,
-																							"loc": {
-																								"start": {
-																									"line": 10,
-																									"column": 77
-																								},
-																								"end": {
-																									"line": 10,
-																									"column": 81
-																								}
-																							},
 																							"name": "file"
 																						}
 																					],
@@ -853,16 +353,6 @@
 																"type": "Identifier",
 																"start": 408,
 																"end": 411,
-																"loc": {
-																	"start": {
-																		"line": 10,
-																		"column": 85
-																	},
-																	"end": {
-																		"line": 10,
-																		"column": 88
-																	}
-																},
 																"name": "map"
 															},
 															"computed": false,
@@ -873,16 +363,6 @@
 																"type": "ArrowFunctionExpression",
 																"start": 417,
 																"end": 451,
-																"loc": {
-																	"start": {
-																		"line": 11,
-																		"column": 4
-																	},
-																	"end": {
-																		"line": 11,
-																		"column": 38
-																	}
-																},
 																"id": null,
 																"expression": true,
 																"generator": false,
@@ -892,16 +372,6 @@
 																		"type": "Identifier",
 																		"start": 418,
 																		"end": 422,
-																		"loc": {
-																			"start": {
-																				"line": 11,
-																				"column": 5
-																			},
-																			"end": {
-																				"line": 11,
-																				"column": 9
-																			}
-																		},
 																		"name": "file"
 																	}
 																],
@@ -909,30 +379,10 @@
 																	"type": "CallExpression",
 																	"start": 427,
 																	"end": 451,
-																	"loc": {
-																		"start": {
-																			"line": 11,
-																			"column": 14
-																		},
-																		"end": {
-																			"line": 11,
-																			"column": 38
-																		}
-																	},
 																	"callee": {
 																		"type": "Identifier",
 																		"start": 427,
 																		"end": 434,
-																		"loc": {
-																			"start": {
-																				"line": 11,
-																				"column": 14
-																			},
-																			"end": {
-																				"line": 11,
-																				"column": 21
-																			}
-																		},
 																		"name": "resolve"
 																	},
 																	"arguments": [
@@ -940,32 +390,12 @@
 																			"type": "Identifier",
 																			"start": 435,
 																			"end": 444,
-																			"loc": {
-																				"start": {
-																					"line": 11,
-																					"column": 22
-																				},
-																				"end": {
-																					"line": 11,
-																					"column": 31
-																				}
-																			},
 																			"name": "directory"
 																		},
 																		{
 																			"type": "Identifier",
 																			"start": 446,
 																			"end": 450,
-																			"loc": {
-																				"start": {
-																					"line": 11,
-																					"column": 33
-																				},
-																				"end": {
-																					"line": 11,
-																					"column": 37
-																				}
-																			},
 																			"name": "file"
 																		}
 																	],

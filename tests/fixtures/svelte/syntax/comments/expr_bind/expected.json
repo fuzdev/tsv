@@ -12,50 +12,16 @@
 				"start": 0,
 				"end": 34,
 				"name": "input",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 6,
-						"character": 6
-					}
-				},
 				"attributes": [
 					{
 						"start": 7,
 						"end": 31,
 						"type": "BindDirective",
 						"name": "value",
-						"name_loc": {
-							"start": {
-								"line": 1,
-								"column": 7,
-								"character": 7
-							},
-							"end": {
-								"line": 1,
-								"column": 17,
-								"character": 17
-							}
-						},
 						"expression": {
 							"type": "Identifier",
 							"start": 27,
 							"end": 30,
-							"loc": {
-								"start": {
-									"line": 1,
-									"column": 27
-								},
-								"end": {
-									"line": 1,
-									"column": 30
-								}
-							},
 							"name": "val",
 							"leadingComments": [
 								{
@@ -82,17 +48,7 @@
 			"type": "Block",
 			"value": " c ",
 			"start": 19,
-			"end": 26,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 19
-				},
-				"end": {
-					"line": 1,
-					"column": 26
-				}
-			}
+			"end": 26
 		}
 	]
 }

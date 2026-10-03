@@ -38,18 +38,6 @@
 				"start": 189,
 				"end": 245,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 1,
-						"character": 190
-					},
-					"end": {
-						"line": 7,
-						"column": 2,
-						"character": 191
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -66,18 +54,6 @@
 							"start": 201,
 							"end": 233,
 							"name": "script",
-							"name_loc": {
-								"start": {
-									"line": 9,
-									"column": 2,
-									"character": 202
-								},
-								"end": {
-									"line": 9,
-									"column": 8,
-									"character": 208
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -114,18 +90,6 @@
 				"start": 247,
 				"end": 315,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 15,
-						"column": 1,
-						"character": 248
-					},
-					"end": {
-						"line": 15,
-						"column": 2,
-						"character": 249
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -142,18 +106,6 @@
 							"start": 259,
 							"end": 303,
 							"name": "style",
-							"name_loc": {
-								"start": {
-									"line": 17,
-									"column": 2,
-									"character": 260
-								},
-								"end": {
-									"line": 17,
-									"column": 7,
-									"character": 265
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -203,18 +155,6 @@
 				"start": 348,
 				"end": 410,
 				"name": "span",
-				"name_loc": {
-					"start": {
-						"line": 26,
-						"column": 1,
-						"character": 349
-					},
-					"end": {
-						"line": 26,
-						"column": 5,
-						"character": 353
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -231,18 +171,6 @@
 							"start": 363,
 							"end": 395,
 							"name": "script",
-							"name_loc": {
-								"start": {
-									"line": 28,
-									"column": 2,
-									"character": 364
-								},
-								"end": {
-									"line": 28,
-									"column": 8,
-									"character": 370
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -296,16 +224,6 @@
 					"type": "Identifier",
 					"start": 437,
 					"end": 441,
-					"loc": {
-						"start": {
-							"line": 35,
-							"column": 5
-						},
-						"end": {
-							"line": 35,
-							"column": 9
-						}
-					},
 					"name": "cond"
 				},
 				"consequent": {
@@ -323,18 +241,6 @@
 							"start": 451,
 							"end": 483,
 							"name": "script",
-							"name_loc": {
-								"start": {
-									"line": 37,
-									"column": 2,
-									"character": 452
-								},
-								"end": {
-									"line": 37,
-									"column": 8,
-									"character": 458
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -385,18 +291,6 @@
 				"start": 524,
 				"end": 602,
 				"name": "Comp",
-				"name_loc": {
-					"start": {
-						"line": 44,
-						"column": 1,
-						"character": 525
-					},
-					"end": {
-						"line": 44,
-						"column": 5,
-						"character": 529
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -416,16 +310,6 @@
 								"type": "Identifier",
 								"start": 533,
 								"end": 538,
-								"loc": {
-									"start": {
-										"line": 45,
-										"column": 2
-									},
-									"end": {
-										"line": 45,
-										"column": 7
-									}
-								},
 								"name": "expr1"
 							}
 						},
@@ -441,18 +325,6 @@
 							"start": 541,
 							"end": 585,
 							"name": "style",
-							"name_loc": {
-								"start": {
-									"line": 46,
-									"column": 2,
-									"character": 542
-								},
-								"end": {
-									"line": 46,
-									"column": 7,
-									"character": 547
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -482,16 +354,6 @@
 								"type": "Identifier",
 								"start": 588,
 								"end": 593,
-								"loc": {
-									"start": {
-										"line": 51,
-										"column": 2
-									},
-									"end": {
-										"line": 51,
-										"column": 7
-									}
-								},
 								"name": "expr2"
 							}
 						},

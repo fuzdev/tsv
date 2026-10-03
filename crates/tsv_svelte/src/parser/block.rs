@@ -1408,9 +1408,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             let wrapper = format!("{WRAPPER_PREFIX}{head_slice} {{}}");
             let base = (content_offset + head_start).saturating_sub(WRAPPER_PREFIX.len());
             // Svelte's own prelude is `replace(/\S/g, ' ')` — it blanks the
-            // non-whitespace and keeps every terminator — so acorn counted the
-            // ECMAScript class over the whole prefix, exactly as for the raw
-            // template the expression islands get.
+            // non-whitespace and keeps every terminator and every tab.
             // The extent is the head slice itself — from the `<` or `(` through the
             // matching `)` — not the wrapper the parse actually runs over, whose
             // `function f` prefix sits at synthetic offsets outside the document.
@@ -1419,8 +1417,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 &content[head_start..=close_paren],
                 // `replace(/\S/g, ' ')` blanks the non-whitespace ONLY: the author's tab
                 // reaches acorn intact, and the blanked columns after it EXTEND the run the
-                // dedent measures past anything the document has — and it leaves every
-                // ECMAScript terminator standing, which is the line class it derives.
+                // dedent measures past anything the document has.
                 AcornPrefixText::WhitespaceKept,
             );
             // Two trees, one per reader. Svelte keeps acorn's `preserveParens` here (and,

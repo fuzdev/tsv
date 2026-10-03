@@ -12,36 +12,12 @@
 				"start": 0,
 				"end": 53,
 				"name": "button",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 7,
-						"character": 7
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 8,
 						"end": 40,
 						"name": "title",
-						"name_loc": {
-							"start": {
-								"line": 1,
-								"column": 8,
-								"character": 8
-							},
-							"end": {
-								"line": 1,
-								"column": 13,
-								"character": 13
-							}
-						},
 						"value": [
 							{
 								"start": 15,
@@ -58,44 +34,14 @@
 									"type": "BinaryExpression",
 									"start": 23,
 									"end": 38,
-									"loc": {
-										"start": {
-											"line": 1,
-											"column": 23
-										},
-										"end": {
-											"line": 1,
-											"column": 38
-										}
-									},
 									"left": {
 										"type": "BinaryExpression",
 										"start": 23,
 										"end": 31,
-										"loc": {
-											"start": {
-												"line": 1,
-												"column": 23
-											},
-											"end": {
-												"line": 1,
-												"column": 31
-											}
-										},
 										"left": {
 											"type": "Literal",
 											"start": 23,
 											"end": 27,
-											"loc": {
-												"start": {
-													"line": 1,
-													"column": 23
-												},
-												"end": {
-													"line": 1,
-													"column": 27
-												}
-											},
 											"value": "\"",
 											"raw": "'\\\"'"
 										},
@@ -104,16 +50,6 @@
 											"type": "Identifier",
 											"start": 30,
 											"end": 31,
-											"loc": {
-												"start": {
-													"line": 1,
-													"column": 30
-												},
-												"end": {
-													"line": 1,
-													"column": 31
-												}
-											},
 											"name": "a"
 										}
 									},
@@ -122,16 +58,6 @@
 										"type": "Literal",
 										"start": 34,
 										"end": 38,
-										"loc": {
-											"start": {
-												"line": 1,
-												"column": 34
-											},
-											"end": {
-												"line": 1,
-												"column": 38
-											}
-										},
 										"value": "\"",
 										"raw": "'\\\"'"
 									}
@@ -151,16 +77,6 @@
 								"type": "Identifier",
 								"start": 42,
 								"end": 43,
-								"loc": {
-									"start": {
-										"line": 1,
-										"column": 42
-									},
-									"end": {
-										"line": 1,
-										"column": 43
-									}
-								},
 								"name": "a"
 							}
 						}
@@ -179,36 +95,12 @@
 				"start": 54,
 				"end": 98,
 				"name": "button",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 55
-					},
-					"end": {
-						"line": 2,
-						"column": 7,
-						"character": 61
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 62,
 						"end": 85,
 						"name": "title",
-						"name_loc": {
-							"start": {
-								"line": 2,
-								"column": 8,
-								"character": 62
-							},
-							"end": {
-								"line": 2,
-								"column": 13,
-								"character": 67
-							}
-						},
 						"value": {
 							"type": "ExpressionTag",
 							"start": 68,
@@ -217,44 +109,14 @@
 								"type": "BinaryExpression",
 								"start": 69,
 								"end": 84,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 15
-									},
-									"end": {
-										"line": 2,
-										"column": 30
-									}
-								},
 								"left": {
 									"type": "BinaryExpression",
 									"start": 69,
 									"end": 77,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 15
-										},
-										"end": {
-											"line": 2,
-											"column": 23
-										}
-									},
 									"left": {
 										"type": "Literal",
 										"start": 69,
 										"end": 73,
-										"loc": {
-											"start": {
-												"line": 2,
-												"column": 15
-											},
-											"end": {
-												"line": 2,
-												"column": 19
-											}
-										},
 										"value": "\"",
 										"raw": "'\\\"'"
 									},
@@ -263,16 +125,6 @@
 										"type": "Identifier",
 										"start": 76,
 										"end": 77,
-										"loc": {
-											"start": {
-												"line": 2,
-												"column": 22
-											},
-											"end": {
-												"line": 2,
-												"column": 23
-											}
-										},
 										"name": "a"
 									}
 								},
@@ -281,16 +133,6 @@
 									"type": "Literal",
 									"start": 80,
 									"end": 84,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 26
-										},
-										"end": {
-											"line": 2,
-											"column": 30
-										}
-									},
 									"value": "\"",
 									"raw": "'\\\"'"
 								}
@@ -309,16 +151,6 @@
 								"type": "Identifier",
 								"start": 87,
 								"end": 88,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 33
-									},
-									"end": {
-										"line": 2,
-										"column": 34
-									}
-								},
 								"name": "a"
 							}
 						}
@@ -337,36 +169,12 @@
 				"start": 99,
 				"end": 151,
 				"name": "span",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 1,
-						"character": 100
-					},
-					"end": {
-						"line": 3,
-						"column": 5,
-						"character": 104
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 105,
 						"end": 139,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 3,
-								"column": 6,
-								"character": 105
-							},
-							"end": {
-								"line": 3,
-								"column": 15,
-								"character": 114
-							}
-						},
 						"value": [
 							{
 								"start": 116,
@@ -383,44 +191,14 @@
 									"type": "BinaryExpression",
 									"start": 122,
 									"end": 137,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 23
-										},
-										"end": {
-											"line": 3,
-											"column": 38
-										}
-									},
 									"left": {
 										"type": "BinaryExpression",
 										"start": 122,
 										"end": 130,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 23
-											},
-											"end": {
-												"line": 3,
-												"column": 31
-											}
-										},
 										"left": {
 											"type": "Literal",
 											"start": 122,
 											"end": 126,
-											"loc": {
-												"start": {
-													"line": 3,
-													"column": 23
-												},
-												"end": {
-													"line": 3,
-													"column": 27
-												}
-											},
 											"value": "\"",
 											"raw": "'\\\"'"
 										},
@@ -429,16 +207,6 @@
 											"type": "Identifier",
 											"start": 129,
 											"end": 130,
-											"loc": {
-												"start": {
-													"line": 3,
-													"column": 30
-												},
-												"end": {
-													"line": 3,
-													"column": 31
-												}
-											},
 											"name": "a"
 										}
 									},
@@ -447,16 +215,6 @@
 										"type": "Literal",
 										"start": 133,
 										"end": 137,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 34
-											},
-											"end": {
-												"line": 3,
-												"column": 38
-											}
-										},
 										"value": "\"",
 										"raw": "'\\\"'"
 									}

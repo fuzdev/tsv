@@ -12,12 +12,11 @@ use tsv_lang::Span;
 
 /// The header of a destructuring pattern (`ObjectPattern` / `ArrayPattern`).
 ///
-/// An annotation widens the wire `end` but **not** the `loc`
-/// ([`node_header_wide_end`]): a signature parameter's span already covers its
-/// annotation, so the widening is a no-op there, but a Svelte **block** binding
-/// pattern's span stops at the bare pattern — and the oracle's own `end` and `loc`
-/// disagree for exactly that reason (`read_pattern` patches `end` and leaves `loc`).
-/// Shared so the two pattern writers can't drift.
+/// An annotation widens the wire `end` ([`node_header_wide_end`]): a signature
+/// parameter's span already covers its annotation, so the widening is a no-op there,
+/// but a Svelte **block** binding pattern's span stops at the bare pattern, and Svelte's
+/// `read_pattern` patches `end` to the annotation's. Shared so the two pattern writers
+/// can't drift.
 pub(super) fn pattern_header(
     w: &mut JsonWriter,
     node_type: &'static str,

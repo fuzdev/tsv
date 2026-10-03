@@ -15,16 +15,6 @@
 					"type": "Identifier",
 					"start": 7,
 					"end": 12,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 7
-						},
-						"end": {
-							"line": 1,
-							"column": 12
-						}
-					},
 					"name": "items"
 				},
 				"body": {
@@ -43,31 +33,11 @@
 					"type": "ObjectPattern",
 					"start": 16,
 					"end": 47,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 16
-						},
-						"end": {
-							"line": 1,
-							"column": 47
-						}
-					},
 					"properties": [
 						{
 							"type": "Property",
 							"start": 18,
 							"end": 45,
-							"loc": {
-								"start": {
-									"line": 1,
-									"column": 18
-								},
-								"end": {
-									"line": 1,
-									"column": 45
-								}
-							},
 							"method": false,
 							"shorthand": false,
 							"computed": true,
@@ -75,16 +45,6 @@
 								"type": "Identifier",
 								"start": 37,
 								"end": 39,
-								"loc": {
-									"start": {
-										"line": 1,
-										"column": 37
-									},
-									"end": {
-										"line": 1,
-										"column": 39
-									}
-								},
 								"name": "k1",
 								"leadingComments": [
 									{
@@ -99,16 +59,6 @@
 								"type": "Identifier",
 								"start": 43,
 								"end": 45,
-								"loc": {
-									"start": {
-										"line": 1,
-										"column": 43
-									},
-									"end": {
-										"line": 1,
-										"column": 45
-									}
-								},
 								"name": "v1"
 							},
 							"kind": "init"
@@ -124,17 +74,7 @@
 			"type": "Block",
 			"value": "* @type {A} ",
 			"start": 19,
-			"end": 35,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 19
-				},
-				"end": {
-					"line": 1,
-					"column": 35
-				}
-			}
+			"end": 35
 		}
 	]
 }

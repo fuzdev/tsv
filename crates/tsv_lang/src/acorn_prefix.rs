@@ -2,25 +2,19 @@
 //!
 //! Svelte hands acorn a different string at every embedded parse, and for four of them that
 //! string is **manufactured**: the bytes ahead of the region are rewritten, and a synthetic
-//! token may stand where they end. Two answers in the wire read that preparation rather than
-//! the document:
+//! token may stand where they end. One answer in the wire reads that preparation rather than
+//! the document: the **indentation** `onComment` dedents a multi-line block comment by, which
+//! is the one the *manufactured* line opens with ([`AcornPrefix::line_indentation`], read by
+//! [`printing::strip_comment_indentation`]).
 //!
-//! - the **line class** an acorn-owned `loc` was counted under — whether the terminators ahead
-//!   of the region survived the rewrite ([`AcornPrefix::counts_ecmascript_lines`], the axis
-//!   `tsv_ts::AcornSeed` seeds a parse's first line from);
-//! - the **indentation** `onComment` dedents a multi-line block comment by, which is the one
-//!   the *manufactured* line opens with ([`AcornPrefix::line_indentation`], read by
-//!   [`printing::strip_comment_indentation`]).
-//!
-//! One value answers both, so the two cannot disagree about what a given parse was handed. It
-//! lives here rather than beside the seed in `tsv_ts` because the comment dedent —
-//! `onComment`'s mirror — already does, and a fact two crates read is this crate's.
+//! It lives here because the comment dedent — `onComment`'s mirror — already does, and a fact
+//! two crates read is this crate's.
 //!
 //! **What crosses the crate boundary is the VALUE, not the mechanics.** `tsv_svelte`'s parser
-//! states a preparation ([`AcornPrefix::manufactured`] / [`AcornPrefix::DOCUMENT`]) and
-//! `tsv_ts` reads its one bit ([`AcornPrefix::counts_ecmascript_lines`]); the walk-back and
-//! the run measurement are `pub(crate)`, because they answer in `onComment`'s coordinate
-//! space and only [`printing::strip_comment_indentation`] knows to ask them together.
+//! states a preparation ([`AcornPrefix::manufactured`] / [`AcornPrefix::DOCUMENT`]); the
+//! walk-back and the run measurement are `pub(crate)`, because they answer in `onComment`'s
+//! coordinate space and only [`printing::strip_comment_indentation`] knows to ask them
+//! together.
 //!
 //! [`printing::strip_comment_indentation`]: crate::printing::strip_comment_indentation
 
@@ -175,8 +169,7 @@ impl AcornPrefix {
     /// `_ as ` is the one that can: it stands over the five code units ending at the colon,
     /// so `{#each xs as x⏎\t: /* … */ T}` — a newline in the four units before the colon —
     /// is erased before acorn sees it, and the annotation's comment is measured from the line
-    /// the window opens on. The same five units are why that region needs a line seed at all
-    /// (`tsv_ts::AcornSeed`), so this is one fact read at a second place.
+    /// the window opens on.
     ///
     /// The blanking preparations cannot do it: `[^\n]` and `\S` both leave every `\n`
     /// standing, and `read_pattern`'s wrapper deletes a *space* and inserts a `(`.
@@ -210,21 +203,6 @@ impl AcornPrefix {
         } else {
             0..0
         }
-    }
-
-    /// Whether acorn counted the **ECMAScript** terminator class over this prefix rather than
-    /// Svelte's `\n`-only one.
-    ///
-    /// True for the raw template (acorn saw every terminator the author wrote) and for the
-    /// `{#snippet}` head, whose prelude blanks only the non-whitespace so every terminator
-    /// survived. False for the three blanked preparations, which leave `\n` standing alone.
-    #[inline]
-    #[must_use]
-    pub const fn counts_ecmascript_lines(self) -> bool {
-        matches!(
-            self.text,
-            AcornPrefixText::Document | AcornPrefixText::WhitespaceKept
-        )
     }
 
     /// The `[ \t]` run acorn saw at `line_start` — `onComment`'s
@@ -549,20 +527,5 @@ mod tests {
         let source = "\u{a0}{#snippet s(a = 1)}";
         let prefix = AcornPrefix::manufactured(AcornPrefixText::WhitespaceKept, 13);
         assert_eq!(prefix.line_indentation(source, 0), "");
-    }
-
-    #[test]
-    fn ecmascript_line_counting_follows_what_survived_the_blanking() {
-        assert!(AcornPrefix::DOCUMENT.counts_ecmascript_lines());
-        assert!(
-            AcornPrefix::manufactured(AcornPrefixText::WhitespaceKept, 1).counts_ecmascript_lines()
-        );
-        for text in [
-            AcornPrefixText::Blanked,
-            AcornPrefixText::BlankedThenParen,
-            AcornPrefixText::BlankedThenAs,
-        ] {
-            assert!(!AcornPrefix::manufactured(text, 1).counts_ecmascript_lines());
-        }
     }
 }

@@ -113,50 +113,16 @@
 				"start": 366,
 				"end": 394,
 				"name": "svelte:window",
-				"name_loc": {
-					"start": {
-						"line": 14,
-						"column": 6,
-						"character": 367
-					},
-					"end": {
-						"line": 14,
-						"column": 19,
-						"character": 380
-					}
-				},
 				"attributes": [
 					{
 						"start": 381,
 						"end": 391,
 						"type": "OnDirective",
 						"name": "x",
-						"name_loc": {
-							"start": {
-								"line": 14,
-								"column": 20,
-								"character": 381
-							},
-							"end": {
-								"line": 14,
-								"column": 24,
-								"character": 385
-							}
-						},
 						"expression": {
 							"type": "Identifier",
 							"start": 387,
 							"end": 390,
-							"loc": {
-								"start": {
-									"line": 14,
-									"column": 26
-								},
-								"end": {
-									"line": 14,
-									"column": 29
-								}
-							},
 							"name": "fn1"
 						},
 						"modifiers": []
@@ -192,50 +158,16 @@
 				"start": 443,
 				"end": 473,
 				"name": "svelte:document",
-				"name_loc": {
-					"start": {
-						"line": 17,
-						"column": 6,
-						"character": 444
-					},
-					"end": {
-						"line": 17,
-						"column": 21,
-						"character": 459
-					}
-				},
 				"attributes": [
 					{
 						"start": 460,
 						"end": 470,
 						"type": "OnDirective",
 						"name": "x",
-						"name_loc": {
-							"start": {
-								"line": 17,
-								"column": 22,
-								"character": 460
-							},
-							"end": {
-								"line": 17,
-								"column": 26,
-								"character": 464
-							}
-						},
 						"expression": {
 							"type": "Identifier",
 							"start": 466,
 							"end": 469,
-							"loc": {
-								"start": {
-									"line": 17,
-									"column": 28
-								},
-								"end": {
-									"line": 17,
-									"column": 31
-								}
-							},
 							"name": "fn2"
 						},
 						"modifiers": []
@@ -271,50 +203,16 @@
 				"start": 515,
 				"end": 541,
 				"name": "svelte:body",
-				"name_loc": {
-					"start": {
-						"line": 20,
-						"column": 6,
-						"character": 516
-					},
-					"end": {
-						"line": 20,
-						"column": 17,
-						"character": 527
-					}
-				},
 				"attributes": [
 					{
 						"start": 528,
 						"end": 538,
 						"type": "OnDirective",
 						"name": "x",
-						"name_loc": {
-							"start": {
-								"line": 20,
-								"column": 18,
-								"character": 528
-							},
-							"end": {
-								"line": 20,
-								"column": 22,
-								"character": 532
-							}
-						},
 						"expression": {
 							"type": "Identifier",
 							"start": 534,
 							"end": 537,
-							"loc": {
-								"start": {
-									"line": 20,
-									"column": 24
-								},
-								"end": {
-									"line": 20,
-									"column": 27
-								}
-							},
 							"name": "fn3"
 						},
 						"modifiers": []
@@ -343,18 +241,6 @@
 				"start": 16,
 				"end": 21,
 				"name": "runes",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 16,
-						"character": 16
-					},
-					"end": {
-						"line": 1,
-						"column": 21,
-						"character": 21
-					}
-				},
 				"value": true
 			}
 		],
@@ -370,76 +256,26 @@
 			"type": "Program",
 			"start": 34,
 			"end": 47,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 0
-				},
-				"end": {
-					"line": 5,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 36,
 					"end": 46,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 11
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 40,
 							"end": 45,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 5
-								},
-								"end": {
-									"line": 4,
-									"column": 10
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 40,
 								"end": 41,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 5
-									},
-									"end": {
-										"line": 4,
-										"column": 6
-									}
-								},
 								"name": "s"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 44,
 								"end": 45,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 9
-									},
-									"end": {
-										"line": 4,
-										"column": 10
-									}
-								},
 								"value": 1,
 								"raw": "1"
 							}

@@ -14,49 +14,19 @@
 			"type": "Line",
 			"value": " line comment",
 			"start": 26,
-			"end": 41,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 2
-				},
-				"end": {
-					"line": 4,
-					"column": 17
-				}
-			}
+			"end": 41
 		},
 		{
 			"type": "Line",
 			"value": " comment 1",
 			"start": 70,
-			"end": 82,
-			"loc": {
-				"start": {
-					"line": 10,
-					"column": 2
-				},
-				"end": {
-					"line": 10,
-					"column": 14
-				}
-			}
+			"end": 82
 		},
 		{
 			"type": "Line",
 			"value": " comment 2",
 			"start": 92,
-			"end": 104,
-			"loc": {
-				"start": {
-					"line": 12,
-					"column": 2
-				},
-				"end": {
-					"line": 12,
-					"column": 14
-				}
-			}
+			"end": 104
 		}
 	],
 	"instance": {
@@ -68,59 +38,19 @@
 			"type": "Program",
 			"start": 8,
 			"end": 115,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 15,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
 					"start": 10,
 					"end": 54,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 10,
 						"end": 53,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 1
-							},
-							"end": {
-								"line": 6,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 10,
 							"end": 12,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 1
-								},
-								"end": {
-									"line": 2,
-									"column": 3
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -128,16 +58,6 @@
 								"type": "Literal",
 								"start": 16,
 								"end": 22,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 2
-									},
-									"end": {
-										"line": 3,
-										"column": 8
-									}
-								},
 								"value": "arg1",
 								"raw": "'arg1'"
 							},
@@ -145,16 +65,6 @@
 								"type": "Literal",
 								"start": 44,
 								"end": 50,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 2
-									},
-									"end": {
-										"line": 5,
-										"column": 8
-									}
-								},
 								"value": "arg2",
 								"raw": "'arg2'",
 								"leadingComments": [
@@ -174,44 +84,14 @@
 					"type": "ExpressionStatement",
 					"start": 57,
 					"end": 114,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 1
-						},
-						"end": {
-							"line": 14,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 57,
 						"end": 113,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 1
-							},
-							"end": {
-								"line": 14,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 57,
 							"end": 59,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 1
-								},
-								"end": {
-									"line": 8,
-									"column": 3
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -219,16 +99,6 @@
 								"type": "Literal",
 								"start": 63,
 								"end": 66,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 2
-									},
-									"end": {
-										"line": 9,
-										"column": 5
-									}
-								},
 								"value": "a",
 								"raw": "'a'"
 							},
@@ -236,16 +106,6 @@
 								"type": "Literal",
 								"start": 85,
 								"end": 88,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 2
-									},
-									"end": {
-										"line": 11,
-										"column": 5
-									}
-								},
 								"value": "b",
 								"raw": "'b'",
 								"leadingComments": [
@@ -261,16 +121,6 @@
 								"type": "Literal",
 								"start": 107,
 								"end": 110,
-								"loc": {
-									"start": {
-										"line": 13,
-										"column": 2
-									},
-									"end": {
-										"line": 13,
-										"column": 5
-									}
-								},
 								"value": "c",
 								"raw": "'c'",
 								"leadingComments": [

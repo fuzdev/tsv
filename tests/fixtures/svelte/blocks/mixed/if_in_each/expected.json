@@ -15,16 +15,6 @@
 					"type": "Identifier",
 					"start": 7,
 					"end": 12,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 7
-						},
-						"end": {
-							"line": 1,
-							"column": 12
-						}
-					},
 					"name": "items"
 				},
 				"body": {
@@ -46,46 +36,16 @@
 								"type": "MemberExpression",
 								"start": 28,
 								"end": 34,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 6
-									},
-									"end": {
-										"line": 2,
-										"column": 12
-									}
-								},
 								"object": {
 									"type": "Identifier",
 									"start": 28,
 									"end": 32,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 6
-										},
-										"end": {
-											"line": 2,
-											"column": 10
-										}
-									},
 									"name": "item"
 								},
 								"property": {
 									"type": "Identifier",
 									"start": 33,
 									"end": 34,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 11
-										},
-										"end": {
-											"line": 2,
-											"column": 12
-										}
-									},
 									"name": "a"
 								},
 								"computed": false,
@@ -106,18 +66,6 @@
 										"start": 38,
 										"end": 57,
 										"name": "div",
-										"name_loc": {
-											"start": {
-												"line": 3,
-												"column": 3,
-												"character": 39
-											},
-											"end": {
-												"line": 3,
-												"column": 6,
-												"character": 42
-											}
-										},
 										"attributes": [],
 										"fragment": {
 											"type": "Fragment",
@@ -130,46 +78,16 @@
 														"type": "MemberExpression",
 														"start": 44,
 														"end": 50,
-														"loc": {
-															"start": {
-																"line": 3,
-																"column": 8
-															},
-															"end": {
-																"line": 3,
-																"column": 14
-															}
-														},
 														"object": {
 															"type": "Identifier",
 															"start": 44,
 															"end": 48,
-															"loc": {
-																"start": {
-																	"line": 3,
-																	"column": 8
-																},
-																"end": {
-																	"line": 3,
-																	"column": 12
-																}
-															},
 															"name": "item"
 														},
 														"property": {
 															"type": "Identifier",
 															"start": 49,
 															"end": 50,
-															"loc": {
-																"start": {
-																	"line": 3,
-																	"column": 13
-																},
-																"end": {
-																	"line": 3,
-																	"column": 14
-																}
-															},
 															"name": "b"
 														},
 														"computed": false,
@@ -203,19 +121,7 @@
 					"type": "Identifier",
 					"name": "item",
 					"start": 16,
-					"end": 20,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 16,
-							"character": 16
-						},
-						"end": {
-							"line": 1,
-							"column": 20,
-							"character": 20
-						}
-					}
+					"end": 20
 				}
 			}
 		]

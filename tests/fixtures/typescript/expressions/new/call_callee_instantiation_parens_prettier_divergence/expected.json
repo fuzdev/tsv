@@ -35,58 +35,18 @@
 					"type": "NewExpression",
 					"start": 108,
 					"end": 122,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 15
-						}
-					},
 					"callee": {
 						"type": "TSInstantiationExpression",
 						"start": 113,
 						"end": 119,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 6
-							},
-							"end": {
-								"line": 4,
-								"column": 12
-							}
-						},
 						"expression": {
 							"type": "CallExpression",
 							"start": 113,
 							"end": 116,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 6
-								},
-								"end": {
-									"line": 4,
-									"column": 9
-								}
-							},
 							"callee": {
 								"type": "Identifier",
 								"start": 113,
 								"end": 114,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 6
-									},
-									"end": {
-										"line": 4,
-										"column": 7
-									}
-								},
 								"name": "f"
 							},
 							"arguments": [],
@@ -96,45 +56,15 @@
 							"type": "TSTypeParameterInstantiation",
 							"start": 116,
 							"end": 119,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 9
-								},
-								"end": {
-									"line": 4,
-									"column": 12
-								}
-							},
 							"params": [
 								{
 									"type": "TSTypeReference",
 									"start": 117,
 									"end": 118,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 10
-										},
-										"end": {
-											"line": 4,
-											"column": 11
-										}
-									},
 									"typeName": {
 										"type": "Identifier",
 										"start": 117,
 										"end": 118,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 10
-											},
-											"end": {
-												"line": 4,
-												"column": 11
-											}
-										},
 										"name": "T"
 									}
 								}
@@ -159,88 +89,28 @@
 					"type": "NewExpression",
 					"start": 125,
 					"end": 141,
-					"loc": {
-						"start": {
-							"line": 5,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 17
-						}
-					},
 					"callee": {
 						"type": "TSInstantiationExpression",
 						"start": 130,
 						"end": 138,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 6
-							},
-							"end": {
-								"line": 5,
-								"column": 14
-							}
-						},
 						"expression": {
 							"type": "CallExpression",
 							"start": 130,
 							"end": 135,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 6
-								},
-								"end": {
-									"line": 5,
-									"column": 11
-								}
-							},
 							"callee": {
 								"type": "MemberExpression",
 								"start": 130,
 								"end": 133,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 6
-									},
-									"end": {
-										"line": 5,
-										"column": 9
-									}
-								},
 								"object": {
 									"type": "Identifier",
 									"start": 130,
 									"end": 131,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 6
-										},
-										"end": {
-											"line": 5,
-											"column": 7
-										}
-									},
 									"name": "a"
 								},
 								"property": {
 									"type": "Identifier",
 									"start": 132,
 									"end": 133,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 8
-										},
-										"end": {
-											"line": 5,
-											"column": 9
-										}
-									},
 									"name": "b"
 								},
 								"computed": false,
@@ -253,45 +123,15 @@
 							"type": "TSTypeParameterInstantiation",
 							"start": 135,
 							"end": 138,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 11
-								},
-								"end": {
-									"line": 5,
-									"column": 14
-								}
-							},
 							"params": [
 								{
 									"type": "TSTypeReference",
 									"start": 136,
 									"end": 137,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 12
-										},
-										"end": {
-											"line": 5,
-											"column": 13
-										}
-									},
 									"typeName": {
 										"type": "Identifier",
 										"start": 136,
 										"end": 137,
-										"loc": {
-											"start": {
-												"line": 5,
-												"column": 12
-											},
-											"end": {
-												"line": 5,
-												"column": 13
-											}
-										},
 										"name": "T"
 									}
 								}
@@ -316,72 +156,22 @@
 					"type": "NewExpression",
 					"start": 144,
 					"end": 161,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 18
-						}
-					},
 					"callee": {
 						"type": "TSInstantiationExpression",
 						"start": 149,
 						"end": 157,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 6
-							},
-							"end": {
-								"line": 6,
-								"column": 14
-							}
-						},
 						"expression": {
 							"type": "MemberExpression",
 							"start": 149,
 							"end": 154,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 6
-								},
-								"end": {
-									"line": 6,
-									"column": 11
-								}
-							},
 							"object": {
 								"type": "CallExpression",
 								"start": 149,
 								"end": 152,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 6
-									},
-									"end": {
-										"line": 6,
-										"column": 9
-									}
-								},
 								"callee": {
 									"type": "Identifier",
 									"start": 149,
 									"end": 150,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 6
-										},
-										"end": {
-											"line": 6,
-											"column": 7
-										}
-									},
 									"name": "f"
 								},
 								"arguments": [],
@@ -391,16 +181,6 @@
 								"type": "Identifier",
 								"start": 153,
 								"end": 154,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 10
-									},
-									"end": {
-										"line": 6,
-										"column": 11
-									}
-								},
 								"name": "c"
 							},
 							"computed": false,
@@ -410,45 +190,15 @@
 							"type": "TSTypeParameterInstantiation",
 							"start": 154,
 							"end": 157,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 11
-								},
-								"end": {
-									"line": 6,
-									"column": 14
-								}
-							},
 							"params": [
 								{
 									"type": "TSTypeReference",
 									"start": 155,
 									"end": 156,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 12
-										},
-										"end": {
-											"line": 6,
-											"column": 13
-										}
-									},
 									"typeName": {
 										"type": "Identifier",
 										"start": 155,
 										"end": 156,
-										"loc": {
-											"start": {
-												"line": 6,
-												"column": 12
-											},
-											"end": {
-												"line": 6,
-												"column": 13
-											}
-										},
 										"name": "T"
 									}
 								}
@@ -460,16 +210,6 @@
 							"type": "Identifier",
 							"start": 159,
 							"end": 160,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 16
-								},
-								"end": {
-									"line": 6,
-									"column": 17
-								}
-							},
 							"name": "x"
 						}
 					]
@@ -490,72 +230,22 @@
 					"type": "NewExpression",
 					"start": 164,
 					"end": 181,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 1
-						},
-						"end": {
-							"line": 7,
-							"column": 18
-						}
-					},
 					"callee": {
 						"type": "TSInstantiationExpression",
 						"start": 169,
 						"end": 178,
-						"loc": {
-							"start": {
-								"line": 7,
-								"column": 6
-							},
-							"end": {
-								"line": 7,
-								"column": 15
-							}
-						},
 						"expression": {
 							"type": "TaggedTemplateExpression",
 							"start": 169,
 							"end": 175,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 6
-								},
-								"end": {
-									"line": 7,
-									"column": 12
-								}
-							},
 							"tag": {
 								"type": "CallExpression",
 								"start": 169,
 								"end": 172,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 6
-									},
-									"end": {
-										"line": 7,
-										"column": 9
-									}
-								},
 								"callee": {
 									"type": "Identifier",
 									"start": 169,
 									"end": 170,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 6
-										},
-										"end": {
-											"line": 7,
-											"column": 7
-										}
-									},
 									"name": "f"
 								},
 								"arguments": [],
@@ -565,32 +255,12 @@
 								"type": "TemplateLiteral",
 								"start": 172,
 								"end": 175,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 9
-									},
-									"end": {
-										"line": 7,
-										"column": 12
-									}
-								},
 								"expressions": [],
 								"quasis": [
 									{
 										"type": "TemplateElement",
 										"start": 173,
 										"end": 174,
-										"loc": {
-											"start": {
-												"line": 7,
-												"column": 10
-											},
-											"end": {
-												"line": 7,
-												"column": 11
-											}
-										},
 										"value": {
 											"raw": "x",
 											"cooked": "x"
@@ -604,45 +274,15 @@
 							"type": "TSTypeParameterInstantiation",
 							"start": 175,
 							"end": 178,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 12
-								},
-								"end": {
-									"line": 7,
-									"column": 15
-								}
-							},
 							"params": [
 								{
 									"type": "TSTypeReference",
 									"start": 176,
 									"end": 177,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 13
-										},
-										"end": {
-											"line": 7,
-											"column": 14
-										}
-									},
 									"typeName": {
 										"type": "Identifier",
 										"start": 176,
 										"end": 177,
-										"loc": {
-											"start": {
-												"line": 7,
-												"column": 13
-											},
-											"end": {
-												"line": 7,
-												"column": 14
-											}
-										},
 										"name": "T"
 									}
 								}
@@ -667,72 +307,22 @@
 					"type": "NewExpression",
 					"start": 184,
 					"end": 199,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 16
-						}
-					},
 					"callee": {
 						"type": "TSInstantiationExpression",
 						"start": 189,
 						"end": 196,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 6
-							},
-							"end": {
-								"line": 8,
-								"column": 13
-							}
-						},
 						"expression": {
 							"type": "TSNonNullExpression",
 							"start": 189,
 							"end": 193,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 6
-								},
-								"end": {
-									"line": 8,
-									"column": 10
-								}
-							},
 							"expression": {
 								"type": "CallExpression",
 								"start": 189,
 								"end": 192,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 6
-									},
-									"end": {
-										"line": 8,
-										"column": 9
-									}
-								},
 								"callee": {
 									"type": "Identifier",
 									"start": 189,
 									"end": 190,
-									"loc": {
-										"start": {
-											"line": 8,
-											"column": 6
-										},
-										"end": {
-											"line": 8,
-											"column": 7
-										}
-									},
 									"name": "f"
 								},
 								"arguments": [],
@@ -743,45 +333,15 @@
 							"type": "TSTypeParameterInstantiation",
 							"start": 193,
 							"end": 196,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 10
-								},
-								"end": {
-									"line": 8,
-									"column": 13
-								}
-							},
 							"params": [
 								{
 									"type": "TSTypeReference",
 									"start": 194,
 									"end": 195,
-									"loc": {
-										"start": {
-											"line": 8,
-											"column": 11
-										},
-										"end": {
-											"line": 8,
-											"column": 12
-										}
-									},
 									"typeName": {
 										"type": "Identifier",
 										"start": 194,
 										"end": 195,
-										"loc": {
-											"start": {
-												"line": 8,
-												"column": 11
-											},
-											"end": {
-												"line": 8,
-												"column": 12
-											}
-										},
 										"name": "T"
 									}
 								}
@@ -804,16 +364,6 @@
 			"type": "Program",
 			"start": 18,
 			"end": 18,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 1,
-					"column": 27
-				}
-			},
 			"body": [],
 			"sourceType": "module"
 		},
@@ -823,18 +373,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

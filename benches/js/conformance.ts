@@ -1,9 +1,12 @@
 /**
  * The pre-release conformance aggregate in ONE process (`deno task conformance`):
  * the three parse-conformance gates (svelte-fixtures, ts-fixtures, ts-repo), then
- * `corpus:compare:parse --all` and `corpus:compare:format --all`, and finally
- * `render:audit` over the pinned checkouts (the one leg that runs as a subprocess
- * — see `run_render_audit`).
+ * `corpus:compare:parse` twice — `--all`, and over `tests/fixtures` (`--fixtures`:
+ * each fixture's parse-pinned documents, the inputs that reach the `loc` tolerance rows
+ * real code rarely does, since the fixtures pin the span-only wire and nothing else
+ * grades their `loc` against the oracle) — and `corpus:compare:format --all`, and
+ * finally `render:audit` over the pinned checkouts (the one leg that runs as a
+ * subprocess — see `run_render_audit`).
  *
  * One process means the canonical oracle modules (prettier, prettier-plugin-svelte,
  * svelte/compiler, acorn, @sveltejs/acorn-typescript — ~seconds of import each)
@@ -111,6 +114,10 @@ const legs: [string, () => Promise<void>][] = [
 	['conformance:ts-fixtures', () => run_fixtures_gate(TS_FIXTURES_GATE)],
 	['conformance:ts-repo', () => run_ts_repo_compare([])],
 	['corpus:compare:parse --all', () => run_corpus_compare_parse(['--all'])],
+	[
+		'corpus:compare:parse tests/fixtures --fixtures',
+		() => run_corpus_compare_parse(['tests/fixtures', '--fixtures'])
+	],
 	['corpus:compare:format --all', () => run_corpus_compare_format(['--all'])],
 	['render:audit (pinned checkouts)', run_render_audit]
 ];

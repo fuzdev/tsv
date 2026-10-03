@@ -12,18 +12,6 @@
 				"start": 0,
 				"end": 16,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 4,
-						"character": 4
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -50,18 +38,6 @@
 				"start": 17,
 				"end": 31,
 				"name": "h1",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 18
-					},
-					"end": {
-						"line": 2,
-						"column": 3,
-						"character": 20
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -88,18 +64,6 @@
 				"start": 32,
 				"end": 56,
 				"name": "my-elem",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 1,
-						"character": 33
-					},
-					"end": {
-						"line": 3,
-						"column": 8,
-						"character": 40
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -126,18 +90,6 @@
 				"start": 57,
 				"end": 81,
 				"name": "my-café",
-				"name_loc": {
-					"start": {
-						"line": 4,
-						"column": 1,
-						"character": 58
-					},
-					"end": {
-						"line": 4,
-						"column": 8,
-						"character": 65
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -164,18 +116,6 @@
 				"start": 82,
 				"end": 98,
 				"name": "Foo",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 1,
-						"character": 83
-					},
-					"end": {
-						"line": 5,
-						"column": 4,
-						"character": 86
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -202,18 +142,6 @@
 				"start": 99,
 				"end": 146,
 				"name": "svelte:head",
-				"name_loc": {
-					"start": {
-						"line": 6,
-						"column": 1,
-						"character": 100
-					},
-					"end": {
-						"line": 6,
-						"column": 12,
-						"character": 111
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -223,18 +151,6 @@
 							"start": 112,
 							"end": 132,
 							"name": "title",
-							"name_loc": {
-								"start": {
-									"line": 6,
-									"column": 14,
-									"character": 113
-								},
-								"end": {
-									"line": 6,
-									"column": 19,
-									"character": 118
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",

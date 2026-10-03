@@ -25,18 +25,6 @@
 				"start": 204,
 				"end": 242,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 4,
-						"column": 1,
-						"character": 205
-					},
-					"end": {
-						"line": 4,
-						"column": 4,
-						"character": 208
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -50,46 +38,16 @@
 								"type": "MemberExpression",
 								"start": 214,
 								"end": 229,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 10
-									},
-									"end": {
-										"line": 5,
-										"column": 2
-									}
-								},
 								"object": {
 									"type": "Identifier",
 									"start": 214,
 									"end": 217,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 10
-										},
-										"end": {
-											"line": 4,
-											"column": 13
-										}
-									},
 									"name": "obj"
 								},
 								"property": {
 									"type": "Identifier",
 									"start": 218,
 									"end": 221,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 14
-										},
-										"end": {
-											"line": 4,
-											"column": 17
-										}
-									},
 									"name": "key",
 									"trailingComments": [
 										{
@@ -132,18 +90,6 @@
 				"start": 244,
 				"end": 307,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 1,
-						"character": 245
-					},
-					"end": {
-						"line": 7,
-						"column": 4,
-						"character": 248
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -156,16 +102,6 @@
 								"type": "Identifier",
 								"start": 256,
 								"end": 261,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 12
-									},
-									"end": {
-										"line": 7,
-										"column": 17
-									}
-								},
 								"name": "items"
 							},
 							"body": {
@@ -179,16 +115,6 @@
 											"type": "Identifier",
 											"start": 289,
 											"end": 293,
-											"loc": {
-												"start": {
-													"line": 8,
-													"column": 5
-												},
-												"end": {
-													"line": 8,
-													"column": 9
-												}
-											},
 											"name": "item"
 										}
 									}
@@ -198,64 +124,22 @@
 								"type": "Identifier",
 								"name": "item",
 								"start": 265,
-								"end": 269,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 21,
-										"character": 265
-									},
-									"end": {
-										"line": 7,
-										"column": 25,
-										"character": 269
-									}
-								}
+								"end": 269
 							},
 							"key": {
 								"type": "MemberExpression",
 								"start": 271,
 								"end": 286,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 27
-									},
-									"end": {
-										"line": 8,
-										"column": 2
-									}
-								},
 								"object": {
 									"type": "Identifier",
 									"start": 271,
 									"end": 274,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 27
-										},
-										"end": {
-											"line": 7,
-											"column": 30
-										}
-									},
 									"name": "obj"
 								},
 								"property": {
 									"type": "Identifier",
 									"start": 275,
 									"end": 278,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 31
-										},
-										"end": {
-											"line": 7,
-											"column": 34
-										}
-									},
 									"name": "key",
 									"trailingComments": [
 										{
@@ -281,33 +165,13 @@
 			"type": "Line",
 			"value": " c",
 			"start": 222,
-			"end": 226,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 18
-				},
-				"end": {
-					"line": 4,
-					"column": 22
-				}
-			}
+			"end": 226
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 279,
-			"end": 283,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 35
-				},
-				"end": {
-					"line": 7,
-					"column": 39
-				}
-			}
+			"end": 283
 		}
 	]
 }

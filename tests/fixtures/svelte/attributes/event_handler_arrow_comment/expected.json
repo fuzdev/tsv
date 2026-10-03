@@ -25,36 +25,12 @@
 				"start": 48,
 				"end": 110,
 				"name": "button",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 49
-					},
-					"end": {
-						"line": 2,
-						"column": 7,
-						"character": 55
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 57,
 						"end": 92,
 						"name": "onclick",
-						"name_loc": {
-							"start": {
-								"line": 3,
-								"column": 1,
-								"character": 57
-							},
-							"end": {
-								"line": 3,
-								"column": 8,
-								"character": 64
-							}
-						},
 						"value": {
 							"type": "ExpressionTag",
 							"start": 65,
@@ -63,16 +39,6 @@
 								"type": "ArrowFunctionExpression",
 								"start": 66,
 								"end": 91,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 10
-									},
-									"end": {
-										"line": 5,
-										"column": 6
-									}
-								},
 								"id": null,
 								"expression": true,
 								"generator": false,
@@ -82,30 +48,10 @@
 									"type": "CallExpression",
 									"start": 87,
 									"end": 91,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 2
-										},
-										"end": {
-											"line": 5,
-											"column": 6
-										}
-									},
 									"callee": {
 										"type": "Identifier",
 										"start": 87,
 										"end": 89,
-										"loc": {
-											"start": {
-												"line": 5,
-												"column": 2
-											},
-											"end": {
-												"line": 5,
-												"column": 4
-											}
-										},
 										"name": "fn"
 									},
 									"arguments": [],
@@ -144,17 +90,7 @@
 			"type": "Line",
 			"value": " comment",
 			"start": 74,
-			"end": 84,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 2
-				},
-				"end": {
-					"line": 4,
-					"column": 12
-				}
-			}
+			"end": 84
 		}
 	]
 }

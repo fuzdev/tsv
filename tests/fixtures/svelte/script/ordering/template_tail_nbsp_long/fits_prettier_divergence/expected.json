@@ -22,17 +22,7 @@
 			"type": "Line",
 			"value": " with its last character respelled as &#xA0;, the text is exactly 100 chars: one line",
 			"start": 10,
-			"end": 97,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 88
-				}
-			}
+			"end": 97
 		}
 	],
 	"instance": {
@@ -44,60 +34,20 @@
 			"type": "Program",
 			"start": 8,
 			"end": 106,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 4,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 99,
 					"end": 105,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 7
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 103,
 							"end": 104,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 5
-								},
-								"end": {
-									"line": 3,
-									"column": 6
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 103,
 								"end": 104,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 5
-									},
-									"end": {
-										"line": 3,
-										"column": 6
-									}
-								},
 								"name": "a"
 							},
 							"init": null

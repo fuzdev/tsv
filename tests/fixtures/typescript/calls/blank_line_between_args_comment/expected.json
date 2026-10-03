@@ -14,225 +14,85 @@
 			"type": "Line",
 			"value": " Blank lines between arguments with inter-argument comments preserved",
 			"start": 10,
-			"end": 81,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 72
-				}
-			}
+			"end": 81
 		},
 		{
 			"type": "Line",
 			"value": " comment 1",
 			"start": 89,
-			"end": 101,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 2
-				},
-				"end": {
-					"line": 4,
-					"column": 14
-				}
-			}
+			"end": 101
 		},
 		{
 			"type": "Line",
 			"value": " comment 2",
 			"start": 110,
-			"end": 122,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 2
-				},
-				"end": {
-					"line": 7,
-					"column": 14
-				}
-			}
+			"end": 122
 		},
 		{
 			"type": "Line",
 			"value": " comment 3",
 			"start": 131,
-			"end": 143,
-			"loc": {
-				"start": {
-					"line": 10,
-					"column": 2
-				},
-				"end": {
-					"line": 10,
-					"column": 14
-				}
-			}
+			"end": 143
 		},
 		{
 			"type": "Line",
 			"value": " Blank lines between args with trailing line comments",
 			"start": 154,
-			"end": 209,
-			"loc": {
-				"start": {
-					"line": 14,
-					"column": 1
-				},
-				"end": {
-					"line": 14,
-					"column": 56
-				}
-			}
+			"end": 209
 		},
 		{
 			"type": "Line",
 			"value": " trailing 1",
 			"start": 220,
-			"end": 233,
-			"loc": {
-				"start": {
-					"line": 16,
-					"column": 5
-				},
-				"end": {
-					"line": 16,
-					"column": 18
-				}
-			}
+			"end": 233
 		},
 		{
 			"type": "Line",
 			"value": " trailing 2",
 			"start": 240,
-			"end": 253,
-			"loc": {
-				"start": {
-					"line": 18,
-					"column": 5
-				},
-				"end": {
-					"line": 18,
-					"column": 18
-				}
-			}
+			"end": 253
 		},
 		{
 			"type": "Line",
 			"value": " Blank lines with block comments between args",
 			"start": 265,
-			"end": 312,
-			"loc": {
-				"start": {
-					"line": 23,
-					"column": 1
-				},
-				"end": {
-					"line": 23,
-					"column": 48
-				}
-			}
+			"end": 312
 		},
 		{
 			"type": "Block",
 			"value": " comment 1 ",
 			"start": 320,
-			"end": 335,
-			"loc": {
-				"start": {
-					"line": 25,
-					"column": 2
-				},
-				"end": {
-					"line": 25,
-					"column": 17
-				}
-			}
+			"end": 335
 		},
 		{
 			"type": "Block",
 			"value": " comment 2 ",
 			"start": 344,
-			"end": 359,
-			"loc": {
-				"start": {
-					"line": 28,
-					"column": 2
-				},
-				"end": {
-					"line": 28,
-					"column": 17
-				}
-			}
+			"end": 359
 		},
 		{
 			"type": "Line",
 			"value": " Mixed: some blank lines, some not",
 			"start": 370,
-			"end": 406,
-			"loc": {
-				"start": {
-					"line": 32,
-					"column": 1
-				},
-				"end": {
-					"line": 32,
-					"column": 37
-				}
-			}
+			"end": 406
 		},
 		{
 			"type": "Line",
 			"value": " comment 1",
 			"start": 414,
-			"end": 426,
-			"loc": {
-				"start": {
-					"line": 34,
-					"column": 2
-				},
-				"end": {
-					"line": 34,
-					"column": 14
-				}
-			}
+			"end": 426
 		},
 		{
 			"type": "Line",
 			"value": " comment 2 (no blank line before)",
 			"start": 434,
-			"end": 469,
-			"loc": {
-				"start": {
-					"line": 36,
-					"column": 2
-				},
-				"end": {
-					"line": 36,
-					"column": 37
-				}
-			}
+			"end": 469
 		},
 		{
 			"type": "Line",
 			"value": " comment 3 (blank line before)",
 			"start": 478,
-			"end": 510,
-			"loc": {
-				"start": {
-					"line": 39,
-					"column": 2
-				},
-				"end": {
-					"line": 39,
-					"column": 34
-				}
-			}
+			"end": 510
 		}
 	],
 	"instance": {
@@ -244,59 +104,19 @@
 			"type": "Program",
 			"start": 8,
 			"end": 519,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 42,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
 					"start": 83,
 					"end": 151,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 12,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 83,
 						"end": 150,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 1
-							},
-							"end": {
-								"line": 12,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 83,
 							"end": 85,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 1
-								},
-								"end": {
-									"line": 3,
-									"column": 3
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -304,16 +124,6 @@
 								"type": "Identifier",
 								"start": 104,
 								"end": 105,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 2
-									},
-									"end": {
-										"line": 5,
-										"column": 3
-									}
-								},
 								"name": "a",
 								"leadingComments": [
 									{
@@ -328,16 +138,6 @@
 								"type": "Identifier",
 								"start": 125,
 								"end": 126,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 2
-									},
-									"end": {
-										"line": 8,
-										"column": 3
-									}
-								},
 								"name": "b",
 								"leadingComments": [
 									{
@@ -352,16 +152,6 @@
 								"type": "Identifier",
 								"start": 146,
 								"end": 147,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 2
-									},
-									"end": {
-										"line": 11,
-										"column": 3
-									}
-								},
 								"name": "c",
 								"leadingComments": [
 									{
@@ -388,44 +178,14 @@
 					"type": "ExpressionStatement",
 					"start": 211,
 					"end": 262,
-					"loc": {
-						"start": {
-							"line": 15,
-							"column": 1
-						},
-						"end": {
-							"line": 21,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 211,
 						"end": 261,
-						"loc": {
-							"start": {
-								"line": 15,
-								"column": 1
-							},
-							"end": {
-								"line": 21,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 211,
 							"end": 213,
-							"loc": {
-								"start": {
-									"line": 15,
-									"column": 1
-								},
-								"end": {
-									"line": 15,
-									"column": 3
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -433,16 +193,6 @@
 								"type": "Identifier",
 								"start": 217,
 								"end": 218,
-								"loc": {
-									"start": {
-										"line": 16,
-										"column": 2
-									},
-									"end": {
-										"line": 16,
-										"column": 3
-									}
-								},
 								"name": "a",
 								"trailingComments": [
 									{
@@ -457,16 +207,6 @@
 								"type": "Identifier",
 								"start": 237,
 								"end": 238,
-								"loc": {
-									"start": {
-										"line": 18,
-										"column": 2
-									},
-									"end": {
-										"line": 18,
-										"column": 3
-									}
-								},
 								"name": "b",
 								"trailingComments": [
 									{
@@ -481,16 +221,6 @@
 								"type": "Identifier",
 								"start": 257,
 								"end": 258,
-								"loc": {
-									"start": {
-										"line": 20,
-										"column": 2
-									},
-									"end": {
-										"line": 20,
-										"column": 3
-									}
-								},
 								"name": "c"
 							}
 						],
@@ -509,44 +239,14 @@
 					"type": "ExpressionStatement",
 					"start": 314,
 					"end": 367,
-					"loc": {
-						"start": {
-							"line": 24,
-							"column": 1
-						},
-						"end": {
-							"line": 30,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 314,
 						"end": 366,
-						"loc": {
-							"start": {
-								"line": 24,
-								"column": 1
-							},
-							"end": {
-								"line": 30,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 314,
 							"end": 316,
-							"loc": {
-								"start": {
-									"line": 24,
-									"column": 1
-								},
-								"end": {
-									"line": 24,
-									"column": 3
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -554,16 +254,6 @@
 								"type": "Identifier",
 								"start": 338,
 								"end": 339,
-								"loc": {
-									"start": {
-										"line": 26,
-										"column": 2
-									},
-									"end": {
-										"line": 26,
-										"column": 3
-									}
-								},
 								"name": "a",
 								"leadingComments": [
 									{
@@ -578,16 +268,6 @@
 								"type": "Identifier",
 								"start": 362,
 								"end": 363,
-								"loc": {
-									"start": {
-										"line": 29,
-										"column": 2
-									},
-									"end": {
-										"line": 29,
-										"column": 3
-									}
-								},
 								"name": "b",
 								"leadingComments": [
 									{
@@ -614,44 +294,14 @@
 					"type": "ExpressionStatement",
 					"start": 408,
 					"end": 518,
-					"loc": {
-						"start": {
-							"line": 33,
-							"column": 1
-						},
-						"end": {
-							"line": 41,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 408,
 						"end": 517,
-						"loc": {
-							"start": {
-								"line": 33,
-								"column": 1
-							},
-							"end": {
-								"line": 41,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 408,
 							"end": 410,
-							"loc": {
-								"start": {
-									"line": 33,
-									"column": 1
-								},
-								"end": {
-									"line": 33,
-									"column": 3
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -659,16 +309,6 @@
 								"type": "Identifier",
 								"start": 429,
 								"end": 430,
-								"loc": {
-									"start": {
-										"line": 35,
-										"column": 2
-									},
-									"end": {
-										"line": 35,
-										"column": 3
-									}
-								},
 								"name": "a",
 								"leadingComments": [
 									{
@@ -683,16 +323,6 @@
 								"type": "Identifier",
 								"start": 472,
 								"end": 473,
-								"loc": {
-									"start": {
-										"line": 37,
-										"column": 2
-									},
-									"end": {
-										"line": 37,
-										"column": 3
-									}
-								},
 								"name": "b",
 								"leadingComments": [
 									{
@@ -707,16 +337,6 @@
 								"type": "Identifier",
 								"start": 513,
 								"end": 514,
-								"loc": {
-									"start": {
-										"line": 40,
-										"column": 2
-									},
-									"end": {
-										"line": 40,
-										"column": 3
-									}
-								},
 								"name": "c",
 								"leadingComments": [
 									{

@@ -14,33 +14,13 @@
 			"type": "Block",
 			"value": " c ",
 			"start": 32,
-			"end": 39,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 13
-				},
-				"end": {
-					"line": 2,
-					"column": 20
-				}
-			}
+			"end": 39
 		},
 		{
 			"type": "Block",
 			"value": " inner ${ delimiter ",
 			"start": 64,
-			"end": 88,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 14
-				},
-				"end": {
-					"line": 3,
-					"column": 38
-				}
-			}
+			"end": 88
 		}
 	],
 	"instance": {
@@ -52,90 +32,30 @@
 			"type": "Program",
 			"start": 18,
 			"end": 100,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 4,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 20,
 					"end": 49,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 30
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 25,
 						"end": 26,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 6
-							},
-							"end": {
-								"line": 2,
-								"column": 7
-							}
-						},
 						"name": "A"
 					},
 					"typeAnnotation": {
 						"type": "TSLiteralType",
 						"start": 29,
 						"end": 48,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 10
-							},
-							"end": {
-								"line": 2,
-								"column": 29
-							}
-						},
 						"literal": {
 							"type": "TemplateLiteral",
 							"start": 29,
 							"end": 48,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 10
-								},
-								"end": {
-									"line": 2,
-									"column": 29
-								}
-							},
 							"expressions": [
 								{
 									"type": "TSStringKeyword",
 									"start": 40,
 									"end": 46,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 21
-										},
-										"end": {
-											"line": 2,
-											"column": 27
-										}
-									},
 									"leadingComments": [
 										{
 											"type": "Block",
@@ -151,16 +71,6 @@
 									"type": "TemplateElement",
 									"start": 30,
 									"end": 30,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 11
-										},
-										"end": {
-											"line": 2,
-											"column": 11
-										}
-									},
 									"value": {
 										"raw": "",
 										"cooked": ""
@@ -171,16 +81,6 @@
 									"type": "TemplateElement",
 									"start": 47,
 									"end": 47,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 28
-										},
-										"end": {
-											"line": 2,
-											"column": 28
-										}
-									},
 									"value": {
 										"raw": "",
 										"cooked": ""
@@ -195,75 +95,25 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 51,
 					"end": 99,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 49
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 56,
 						"end": 57,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 6
-							},
-							"end": {
-								"line": 3,
-								"column": 7
-							}
-						},
 						"name": "B"
 					},
 					"typeAnnotation": {
 						"type": "TSLiteralType",
 						"start": 60,
 						"end": 98,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 10
-							},
-							"end": {
-								"line": 3,
-								"column": 48
-							}
-						},
 						"literal": {
 							"type": "TemplateLiteral",
 							"start": 60,
 							"end": 98,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 10
-								},
-								"end": {
-									"line": 3,
-									"column": 48
-								}
-							},
 							"expressions": [
 								{
 									"type": "TSStringKeyword",
 									"start": 89,
 									"end": 95,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 39
-										},
-										"end": {
-											"line": 3,
-											"column": 45
-										}
-									},
 									"leadingComments": [
 										{
 											"type": "Block",
@@ -279,16 +129,6 @@
 									"type": "TemplateElement",
 									"start": 61,
 									"end": 62,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 11
-										},
-										"end": {
-											"line": 3,
-											"column": 12
-										}
-									},
 									"value": {
 										"raw": "a",
 										"cooked": "a"
@@ -299,16 +139,6 @@
 									"type": "TemplateElement",
 									"start": 96,
 									"end": 97,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 46
-										},
-										"end": {
-											"line": 3,
-											"column": 47
-										}
-									},
 									"value": {
 										"raw": "c",
 										"cooked": "c"
@@ -328,18 +158,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

@@ -25,18 +25,6 @@
 				"start": 83,
 				"end": 113,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 84
-					},
-					"end": {
-						"line": 2,
-						"column": 4,
-						"character": 87
-					}
-				},
 				"attributes": [
 					{
 						"type": "AttachTag",
@@ -46,30 +34,10 @@
 							"type": "CallExpression",
 							"start": 97,
 							"end": 105,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 14
-								},
-								"end": {
-									"line": 2,
-									"column": 22
-								}
-							},
 							"callee": {
 								"type": "Identifier",
 								"start": 97,
 								"end": 98,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 14
-									},
-									"end": {
-										"line": 2,
-										"column": 15
-									}
-								},
 								"name": "a"
 							},
 							"arguments": [
@@ -77,16 +45,6 @@
 									"type": "Literal",
 									"start": 99,
 									"end": 104,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 16
-										},
-										"end": {
-											"line": 2,
-											"column": 21
-										}
-									},
 									"value": {},
 									"raw": "/[}]/",
 									"regex": {
@@ -116,18 +74,6 @@
 				"start": 114,
 				"end": 142,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 1,
-						"character": 115
-					},
-					"end": {
-						"line": 3,
-						"column": 4,
-						"character": 118
-					}
-				},
 				"attributes": [
 					{
 						"type": "AttachTag",
@@ -137,30 +83,10 @@
 							"type": "CallExpression",
 							"start": 128,
 							"end": 134,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 14
-								},
-								"end": {
-									"line": 3,
-									"column": 20
-								}
-							},
 							"callee": {
 								"type": "Identifier",
 								"start": 128,
 								"end": 129,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 14
-									},
-									"end": {
-										"line": 3,
-										"column": 15
-									}
-								},
 								"name": "b"
 							},
 							"arguments": [
@@ -168,16 +94,6 @@
 									"type": "Literal",
 									"start": 130,
 									"end": 133,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 16
-										},
-										"end": {
-											"line": 3,
-											"column": 19
-										}
-									},
 									"value": "}",
 									"raw": "'}'"
 								}
@@ -203,18 +119,6 @@
 				"start": 143,
 				"end": 177,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 4,
-						"column": 1,
-						"character": 144
-					},
-					"end": {
-						"line": 4,
-						"column": 4,
-						"character": 147
-					}
-				},
 				"attributes": [
 					{
 						"type": "AttachTag",
@@ -224,30 +128,10 @@
 							"type": "CallExpression",
 							"start": 157,
 							"end": 169,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 14
-								},
-								"end": {
-									"line": 4,
-									"column": 26
-								}
-							},
 							"callee": {
 								"type": "Identifier",
 								"start": 157,
 								"end": 158,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 14
-									},
-									"end": {
-										"line": 4,
-										"column": 15
-									}
-								},
 								"name": "c"
 							},
 							"arguments": [
@@ -255,16 +139,6 @@
 									"type": "Identifier",
 									"start": 167,
 									"end": 168,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 24
-										},
-										"end": {
-											"line": 4,
-											"column": 25
-										}
-									},
 									"name": "d",
 									"leadingComments": [
 										{
@@ -293,17 +167,7 @@
 			"type": "Block",
 			"value": " } ",
 			"start": 159,
-			"end": 166,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 16
-				},
-				"end": {
-					"line": 4,
-					"column": 23
-				}
-			}
+			"end": 166
 		}
 	]
 }

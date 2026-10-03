@@ -14,33 +14,13 @@
 			"type": "Block",
 			"value": ", b",
 			"start": 21,
-			"end": 28,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 12
-				},
-				"end": {
-					"line": 2,
-					"column": 19
-				}
-			}
+			"end": 28
 		},
 		{
 			"type": "Block",
 			"value": ", d",
 			"start": 44,
-			"end": 51,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 12
-				},
-				"end": {
-					"line": 3,
-					"column": 19
-				}
-			}
+			"end": 51
 		}
 	],
 	"instance": {
@@ -52,77 +32,27 @@
 			"type": "Program",
 			"start": 8,
 			"end": 64,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 4,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExportNamedDeclaration",
 					"start": 10,
 					"end": 31,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 22
-						}
-					},
 					"declaration": null,
 					"specifiers": [
 						{
 							"type": "ExportSpecifier",
 							"start": 19,
 							"end": 20,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 10
-								},
-								"end": {
-									"line": 2,
-									"column": 11
-								}
-							},
 							"local": {
 								"type": "Identifier",
 								"start": 19,
 								"end": 20,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 10
-									},
-									"end": {
-										"line": 2,
-										"column": 11
-									}
-								},
 								"name": "a"
 							},
 							"exported": {
 								"type": "Identifier",
 								"start": 19,
 								"end": 20,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 10
-									},
-									"end": {
-										"line": 2,
-										"column": 11
-									}
-								},
 								"name": "a"
 							},
 							"trailingComments": [
@@ -142,62 +72,22 @@
 					"type": "ExportNamedDeclaration",
 					"start": 33,
 					"end": 63,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 31
-						}
-					},
 					"declaration": null,
 					"specifiers": [
 						{
 							"type": "ExportSpecifier",
 							"start": 42,
 							"end": 43,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 10
-								},
-								"end": {
-									"line": 3,
-									"column": 11
-								}
-							},
 							"local": {
 								"type": "Identifier",
 								"start": 42,
 								"end": 43,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 10
-									},
-									"end": {
-										"line": 3,
-										"column": 11
-									}
-								},
 								"name": "c"
 							},
 							"exported": {
 								"type": "Identifier",
 								"start": 42,
 								"end": 43,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 10
-									},
-									"end": {
-										"line": 3,
-										"column": 11
-									}
-								},
 								"name": "c"
 							},
 							"trailingComments": [
@@ -214,16 +104,6 @@
 						"type": "Literal",
 						"start": 59,
 						"end": 62,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 27
-							},
-							"end": {
-								"line": 3,
-								"column": 30
-							}
-						},
 						"value": "x",
 						"raw": "'x'"
 					},

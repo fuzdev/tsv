@@ -14,17 +14,7 @@
 			"type": "Block",
 			"value": " before ",
 			"start": 30,
-			"end": 42,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 2
-				},
-				"end": {
-					"line": 3,
-					"column": 14
-				}
-			}
+			"end": 42
 		}
 	],
 	"instance": {
@@ -36,59 +26,19 @@
 			"type": "Program",
 			"start": 18,
 			"end": 70,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 7,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
 					"start": 20,
 					"end": 69,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "NewExpression",
 						"start": 20,
 						"end": 68,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 1
-							},
-							"end": {
-								"line": 6,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 24,
 							"end": 26,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 5
-								},
-								"end": {
-									"line": 2,
-									"column": 7
-								}
-							},
 							"name": "Fn"
 						},
 						"arguments": [
@@ -96,31 +46,11 @@
 								"type": "ObjectExpression",
 								"start": 43,
 								"end": 65,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 15
-									},
-									"end": {
-										"line": 5,
-										"column": 3
-									}
-								},
 								"properties": [
 									{
 										"type": "Property",
 										"start": 48,
 										"end": 61,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 3
-											},
-											"end": {
-												"line": 4,
-												"column": 16
-											}
-										},
 										"method": false,
 										"shorthand": false,
 										"computed": false,
@@ -128,32 +58,12 @@
 											"type": "Identifier",
 											"start": 48,
 											"end": 52,
-											"loc": {
-												"start": {
-													"line": 4,
-													"column": 3
-												},
-												"end": {
-													"line": 4,
-													"column": 7
-												}
-											},
 											"name": "prop"
 										},
 										"value": {
 											"type": "Literal",
 											"start": 54,
 											"end": 61,
-											"loc": {
-												"start": {
-													"line": 4,
-													"column": 9
-												},
-												"end": {
-													"line": 4,
-													"column": 16
-												}
-											},
 											"value": "value",
 											"raw": "'value'"
 										},
@@ -181,18 +91,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

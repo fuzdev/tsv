@@ -14,33 +14,13 @@
 			"type": "Block",
 			"value": " c1 ",
 			"start": 25,
-			"end": 33,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 9
-				}
-			}
+			"end": 33
 		},
 		{
 			"type": "Block",
 			"value": " c2 ",
 			"start": 34,
-			"end": 42,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 10
-				},
-				"end": {
-					"line": 3,
-					"column": 18
-				}
-			}
+			"end": 42
 		}
 	],
 	"instance": {
@@ -52,60 +32,20 @@
 			"type": "Program",
 			"start": 18,
 			"end": 55,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 5,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ClassDeclaration",
 					"start": 20,
 					"end": 54,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 11
-						}
-					},
 					"decorators": [
 						{
 							"type": "Decorator",
 							"start": 20,
 							"end": 23,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 1
-								},
-								"end": {
-									"line": 2,
-									"column": 4
-								}
-							},
 							"expression": {
 								"type": "Identifier",
 								"start": 21,
 								"end": 23,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 2
-									},
-									"end": {
-										"line": 2,
-										"column": 4
-									}
-								},
 								"name": "fn"
 							}
 						}
@@ -114,16 +54,6 @@
 						"type": "Identifier",
 						"start": 50,
 						"end": 51,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 7
-							},
-							"end": {
-								"line": 4,
-								"column": 8
-							}
-						},
 						"name": "A",
 						"leadingComments": [
 							{
@@ -145,16 +75,6 @@
 						"type": "ClassBody",
 						"start": 52,
 						"end": 54,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 9
-							},
-							"end": {
-								"line": 4,
-								"column": 11
-							}
-						},
 						"body": []
 					}
 				}
@@ -167,18 +87,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

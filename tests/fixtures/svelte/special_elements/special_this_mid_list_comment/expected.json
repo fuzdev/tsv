@@ -38,36 +38,12 @@
 				"start": 190,
 				"end": 244,
 				"name": "svelte:element",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 1,
-						"character": 191
-					},
-					"end": {
-						"line": 3,
-						"column": 15,
-						"character": 205
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 215,
 						"end": 232,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 3,
-								"column": 25,
-								"character": 215
-							},
-							"end": {
-								"line": 3,
-								"column": 34,
-								"character": 224
-							}
-						},
 						"value": [
 							{
 								"start": 226,
@@ -87,16 +63,6 @@
 					"type": "Identifier",
 					"start": 212,
 					"end": 213,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 22
-						},
-						"end": {
-							"line": 3,
-							"column": 23
-						}
-					},
 					"name": "x"
 				}
 			},
@@ -125,36 +91,12 @@
 				"start": 278,
 				"end": 354,
 				"name": "svelte:element",
-				"name_loc": {
-					"start": {
-						"line": 6,
-						"column": 1,
-						"character": 279
-					},
-					"end": {
-						"line": 6,
-						"column": 15,
-						"character": 293
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 303,
 						"end": 322,
 						"name": "data-attr1",
-						"name_loc": {
-							"start": {
-								"line": 6,
-								"column": 25,
-								"character": 303
-							},
-							"end": {
-								"line": 6,
-								"column": 35,
-								"character": 313
-							}
-						},
 						"value": [
 							{
 								"start": 315,
@@ -170,18 +112,6 @@
 						"start": 332,
 						"end": 351,
 						"name": "data-attr2",
-						"name_loc": {
-							"start": {
-								"line": 6,
-								"column": 54,
-								"character": 332
-							},
-							"end": {
-								"line": 6,
-								"column": 64,
-								"character": 342
-							}
-						},
 						"value": [
 							{
 								"start": 344,
@@ -201,16 +131,6 @@
 					"type": "Identifier",
 					"start": 300,
 					"end": 301,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 22
-						},
-						"end": {
-							"line": 6,
-							"column": 23
-						}
-					},
 					"name": "x"
 				}
 			},
@@ -239,36 +159,12 @@
 				"start": 396,
 				"end": 453,
 				"name": "svelte:element",
-				"name_loc": {
-					"start": {
-						"line": 9,
-						"column": 1,
-						"character": 397
-					},
-					"end": {
-						"line": 9,
-						"column": 15,
-						"character": 411
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 433,
 						"end": 450,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 12,
-								"column": 1,
-								"character": 433
-							},
-							"end": {
-								"line": 12,
-								"column": 10,
-								"character": 442
-							}
-						},
 						"value": [
 							{
 								"start": 444,
@@ -288,16 +184,6 @@
 					"type": "Identifier",
 					"start": 419,
 					"end": 420,
-					"loc": {
-						"start": {
-							"line": 10,
-							"column": 7
-						},
-						"end": {
-							"line": 10,
-							"column": 8
-						}
-					},
 					"name": "x"
 				}
 			}
@@ -309,55 +195,19 @@
 			"type": "Block",
 			"start": 233,
 			"end": 241,
-			"value": " c1 ",
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 43,
-					"character": 233
-				},
-				"end": {
-					"line": 3,
-					"column": 51,
-					"character": 241
-				}
-			}
+			"value": " c1 "
 		},
 		{
 			"type": "Block",
 			"start": 323,
 			"end": 331,
-			"value": " c2 ",
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 45,
-					"character": 323
-				},
-				"end": {
-					"line": 6,
-					"column": 53,
-					"character": 331
-				}
-			}
+			"value": " c2 "
 		},
 		{
 			"type": "Block",
 			"start": 423,
 			"end": 431,
-			"value": " c3 ",
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 1,
-					"character": 423
-				},
-				"end": {
-					"line": 11,
-					"column": 9,
-					"character": 431
-				}
-			}
+			"value": " c3 "
 		}
 	]
 }

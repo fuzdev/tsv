@@ -16,16 +16,6 @@
 					"type": "Identifier",
 					"start": 13,
 					"end": 17,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 13
-						},
-						"end": {
-							"line": 1,
-							"column": 17
-						}
-					},
 					"name": "cond",
 					"leadingComments": [
 						{
@@ -66,16 +56,6 @@
 					"type": "Identifier",
 					"start": 32,
 					"end": 33,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 5
-						},
-						"end": {
-							"line": 2,
-							"column": 6
-						}
-					},
 					"name": "a"
 				},
 				"consequent": {
@@ -102,16 +82,6 @@
 								"type": "Identifier",
 								"start": 53,
 								"end": 54,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 26
-									},
-									"end": {
-										"line": 2,
-										"column": 27
-									}
-								},
 								"name": "b",
 								"leadingComments": [
 									{
@@ -155,16 +125,6 @@
 					"type": "Identifier",
 					"start": 67,
 					"end": 68,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 5
-						},
-						"end": {
-							"line": 3,
-							"column": 6
-						}
-					},
 					"name": "a"
 				},
 				"consequent": {
@@ -191,16 +151,6 @@
 								"type": "Identifier",
 								"start": 90,
 								"end": 91,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 28
-									},
-									"end": {
-										"line": 3,
-										"column": 29
-									}
-								},
 								"name": "b",
 								"leadingComments": [
 									{
@@ -236,49 +186,19 @@
 			"type": "Block",
 			"value": " c ",
 			"start": 5,
-			"end": 12,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 5
-				},
-				"end": {
-					"line": 1,
-					"column": 12
-				}
-			}
+			"end": 12
 		},
 		{
 			"type": "Block",
 			"value": " c ",
 			"start": 45,
-			"end": 52,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 18
-				},
-				"end": {
-					"line": 2,
-					"column": 25
-				}
-			}
+			"end": 52
 		},
 		{
 			"type": "Block",
 			"value": " c ",
 			"start": 82,
-			"end": 89,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 20
-				},
-				"end": {
-					"line": 3,
-					"column": 27
-				}
-			}
+			"end": 89
 		}
 	]
 }

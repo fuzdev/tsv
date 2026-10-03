@@ -31,7 +31,7 @@
 import { probe_goals } from './reject_probe.ts';
 import type { Language, ParseGoal } from './types.ts';
 
-/** The languages with a no-locations row — CSS has none (`parseCss` emits no `loc`). */
+/** The languages with a benched no-locations row — none for CSS (`implementations.ts`). */
 export type LocationsLanguage = Exclude<Language, 'css'>;
 
 /**

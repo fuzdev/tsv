@@ -14,97 +14,37 @@
 			"type": "Line",
 			"value": " comment authored trailing the previous member (stays trailing in both formatters);",
 			"start": 20,
-			"end": 105,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 86
-				}
-			}
+			"end": 105
 		},
 		{
 			"type": "Line",
 			"value": " the parenthesized inner union is kept, fits inline, no break",
 			"start": 107,
-			"end": 170,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 64
-				}
-			}
+			"end": 170
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 189,
-			"end": 193,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 6
-				},
-				"end": {
-					"line": 5,
-					"column": 10
-				}
-			}
+			"end": 193
 		},
 		{
 			"type": "Line",
 			"value": " inner union breaks one member per line - content indents one level past the `| (`",
 			"start": 209,
-			"end": 293,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 1
-				},
-				"end": {
-					"line": 8,
-					"column": 85
-				}
-			}
+			"end": 293
 		},
 		{
 			"type": "Line",
 			"value": " member offset, closing `)` sits at the offset (tabs-only: prettier uses spaces)",
 			"start": 295,
-			"end": 377,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 1
-				},
-				"end": {
-					"line": 9,
-					"column": 83
-				}
-			}
+			"end": 377
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 396,
-			"end": 400,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 6
-				},
-				"end": {
-					"line": 11,
-					"column": 10
-				}
-			}
+			"end": 400
 		}
 	],
 	"instance": {
@@ -116,90 +56,30 @@
 			"type": "Program",
 			"start": 18,
 			"end": 528,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 16,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 172,
 					"end": 206,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 12
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 177,
 						"end": 180,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 6
-							},
-							"end": {
-								"line": 4,
-								"column": 9
-							}
-						},
 						"name": "Fit"
 					},
 					"typeAnnotation": {
 						"type": "TSUnionType",
 						"start": 185,
 						"end": 205,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 2
-							},
-							"end": {
-								"line": 6,
-								"column": 11
-							}
-						},
 						"types": [
 							{
 								"type": "TSTypeReference",
 								"start": 187,
 								"end": 188,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 4
-									},
-									"end": {
-										"line": 5,
-										"column": 5
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 187,
 									"end": 188,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 4
-										},
-										"end": {
-											"line": 5,
-											"column": 5
-										}
-									},
 									"name": "Z"
 								},
 								"trailingComments": [
@@ -215,59 +95,19 @@
 								"type": "TSParenthesizedType",
 								"start": 198,
 								"end": 205,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 4
-									},
-									"end": {
-										"line": 6,
-										"column": 11
-									}
-								},
 								"typeAnnotation": {
 									"type": "TSUnionType",
 									"start": 199,
 									"end": 204,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 5
-										},
-										"end": {
-											"line": 6,
-											"column": 10
-										}
-									},
 									"types": [
 										{
 											"type": "TSTypeReference",
 											"start": 199,
 											"end": 200,
-											"loc": {
-												"start": {
-													"line": 6,
-													"column": 5
-												},
-												"end": {
-													"line": 6,
-													"column": 6
-												}
-											},
 											"typeName": {
 												"type": "Identifier",
 												"start": 199,
 												"end": 200,
-												"loc": {
-													"start": {
-														"line": 6,
-														"column": 5
-													},
-													"end": {
-														"line": 6,
-														"column": 6
-													}
-												},
 												"name": "D"
 											}
 										},
@@ -275,30 +115,10 @@
 											"type": "TSTypeReference",
 											"start": 203,
 											"end": 204,
-											"loc": {
-												"start": {
-													"line": 6,
-													"column": 9
-												},
-												"end": {
-													"line": 6,
-													"column": 10
-												}
-											},
 											"typeName": {
 												"type": "Identifier",
 												"start": 203,
 												"end": 204,
-												"loc": {
-													"start": {
-														"line": 6,
-														"column": 9
-													},
-													"end": {
-														"line": 6,
-														"column": 10
-													}
-												},
 												"name": "E"
 											}
 										}
@@ -326,75 +146,25 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 379,
 					"end": 527,
-					"loc": {
-						"start": {
-							"line": 10,
-							"column": 1
-						},
-						"end": {
-							"line": 15,
-							"column": 6
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 384,
 						"end": 387,
-						"loc": {
-							"start": {
-								"line": 10,
-								"column": 6
-							},
-							"end": {
-								"line": 10,
-								"column": 9
-							}
-						},
 						"name": "Brk"
 					},
 					"typeAnnotation": {
 						"type": "TSUnionType",
 						"start": 392,
 						"end": 526,
-						"loc": {
-							"start": {
-								"line": 11,
-								"column": 2
-							},
-							"end": {
-								"line": 15,
-								"column": 5
-							}
-						},
 						"types": [
 							{
 								"type": "TSTypeReference",
 								"start": 394,
 								"end": 395,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 4
-									},
-									"end": {
-										"line": 11,
-										"column": 5
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 394,
 									"end": 395,
-									"loc": {
-										"start": {
-											"line": 11,
-											"column": 4
-										},
-										"end": {
-											"line": 11,
-											"column": 5
-										}
-									},
 									"name": "Z"
 								},
 								"trailingComments": [
@@ -410,59 +180,19 @@
 								"type": "TSParenthesizedType",
 								"start": 405,
 								"end": 526,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 4
-									},
-									"end": {
-										"line": 15,
-										"column": 5
-									}
-								},
 								"typeAnnotation": {
 									"type": "TSUnionType",
 									"start": 411,
 									"end": 520,
-									"loc": {
-										"start": {
-											"line": 13,
-											"column": 4
-										},
-										"end": {
-											"line": 14,
-											"column": 56
-										}
-									},
 									"types": [
 										{
 											"type": "TSTypeReference",
 											"start": 413,
 											"end": 463,
-											"loc": {
-												"start": {
-													"line": 13,
-													"column": 6
-												},
-												"end": {
-													"line": 13,
-													"column": 56
-												}
-											},
 											"typeName": {
 												"type": "Identifier",
 												"start": 413,
 												"end": 463,
-												"loc": {
-													"start": {
-														"line": 13,
-														"column": 6
-													},
-													"end": {
-														"line": 13,
-														"column": 56
-													}
-												},
 												"name": "Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 											}
 										},
@@ -470,30 +200,10 @@
 											"type": "TSTypeReference",
 											"start": 470,
 											"end": 520,
-											"loc": {
-												"start": {
-													"line": 14,
-													"column": 6
-												},
-												"end": {
-													"line": 14,
-													"column": 56
-												}
-											},
 											"typeName": {
 												"type": "Identifier",
 												"start": 470,
 												"end": 520,
-												"loc": {
-													"start": {
-														"line": 14,
-														"column": 6
-													},
-													"end": {
-														"line": 14,
-														"column": 56
-													}
-												},
 												"name": "Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 											}
 										}
@@ -526,18 +236,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

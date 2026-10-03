@@ -14,17 +14,7 @@
 			"type": "Block",
 			"value": " c ",
 			"start": 28,
-			"end": 35,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 9
-				},
-				"end": {
-					"line": 2,
-					"column": 16
-				}
-			}
+			"end": 35
 		}
 	],
 	"instance": {
@@ -36,104 +26,34 @@
 			"type": "Program",
 			"start": 18,
 			"end": 48,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 4,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ClassDeclaration",
 					"start": 20,
 					"end": 47,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 11
-						}
-					},
 					"decorators": [
 						{
 							"type": "Decorator",
 							"start": 20,
 							"end": 27,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 1
-								},
-								"end": {
-									"line": 2,
-									"column": 8
-								}
-							},
 							"expression": {
 								"type": "ChainExpression",
 								"start": 22,
 								"end": 26,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 3
-									},
-									"end": {
-										"line": 2,
-										"column": 7
-									}
-								},
 								"expression": {
 									"type": "MemberExpression",
 									"start": 22,
 									"end": 26,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 3
-										},
-										"end": {
-											"line": 2,
-											"column": 7
-										}
-									},
 									"object": {
 										"type": "Identifier",
 										"start": 22,
 										"end": 23,
-										"loc": {
-											"start": {
-												"line": 2,
-												"column": 3
-											},
-											"end": {
-												"line": 2,
-												"column": 4
-											}
-										},
 										"name": "a"
 									},
 									"property": {
 										"type": "Identifier",
 										"start": 25,
 										"end": 26,
-										"loc": {
-											"start": {
-												"line": 2,
-												"column": 6
-											},
-											"end": {
-												"line": 2,
-												"column": 7
-											}
-										},
 										"name": "b"
 									},
 									"computed": false,
@@ -154,16 +74,6 @@
 						"type": "Identifier",
 						"start": 43,
 						"end": 44,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 7
-							},
-							"end": {
-								"line": 3,
-								"column": 8
-							}
-						},
 						"name": "A"
 					},
 					"superClass": null,
@@ -171,16 +81,6 @@
 						"type": "ClassBody",
 						"start": 45,
 						"end": 47,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 9
-							},
-							"end": {
-								"line": 3,
-								"column": 11
-							}
-						},
 						"body": []
 					}
 				}
@@ -193,18 +93,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

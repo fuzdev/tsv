@@ -25,18 +25,6 @@
 				"start": 249,
 				"end": 322,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 1,
-						"character": 250
-					},
-					"end": {
-						"line": 7,
-						"column": 4,
-						"character": 253
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -53,18 +41,6 @@
 							"start": 255,
 							"end": 315,
 							"name": "svelte:element",
-							"name_loc": {
-								"start": {
-									"line": 7,
-									"column": 7,
-									"character": 256
-								},
-								"end": {
-									"line": 7,
-									"column": 21,
-									"character": 270
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -108,18 +84,6 @@
 				"start": 324,
 				"end": 403,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 12,
-						"column": 1,
-						"character": 325
-					},
-					"end": {
-						"line": 12,
-						"column": 4,
-						"character": 328
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -136,18 +100,6 @@
 							"start": 330,
 							"end": 396,
 							"name": "svelte:component",
-							"name_loc": {
-								"start": {
-									"line": 12,
-									"column": 7,
-									"character": 331
-								},
-								"end": {
-									"line": 12,
-									"column": 23,
-									"character": 347
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -165,16 +117,6 @@
 								"type": "Identifier",
 								"start": 354,
 								"end": 358,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 30
-									},
-									"end": {
-										"line": 12,
-										"column": 34
-									}
-								},
 								"name": "Comp"
 							}
 						},
@@ -200,18 +142,6 @@
 				"start": 405,
 				"end": 478,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 17,
-						"column": 1,
-						"character": 406
-					},
-					"end": {
-						"line": 17,
-						"column": 4,
-						"character": 409
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -225,16 +155,6 @@
 								"type": "Identifier",
 								"start": 415,
 								"end": 419,
-								"loc": {
-									"start": {
-										"line": 17,
-										"column": 10
-									},
-									"end": {
-										"line": 17,
-										"column": 14
-									}
-								},
 								"name": "cond"
 							},
 							"consequent": {
@@ -252,18 +172,6 @@
 										"start": 421,
 										"end": 466,
 										"name": "svelte:self",
-										"name_loc": {
-											"start": {
-												"line": 17,
-												"column": 17,
-												"character": 422
-											},
-											"end": {
-												"line": 17,
-												"column": 28,
-												"character": 433
-											}
-										},
 										"attributes": [],
 										"fragment": {
 											"type": "Fragment",
@@ -304,18 +212,6 @@
 				"start": 480,
 				"end": 524,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 22,
-						"column": 1,
-						"character": 481
-					},
-					"end": {
-						"line": 22,
-						"column": 4,
-						"character": 484
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -332,18 +228,6 @@
 							"start": 486,
 							"end": 517,
 							"name": "slot",
-							"name_loc": {
-								"start": {
-									"line": 22,
-									"column": 7,
-									"character": 487
-								},
-								"end": {
-									"line": 22,
-									"column": 11,
-									"character": 491
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -356,16 +240,6 @@
 											"type": "Identifier",
 											"start": 496,
 											"end": 500,
-											"loc": {
-												"start": {
-													"line": 23,
-													"column": 4
-												},
-												"end": {
-													"line": 23,
-													"column": 8
-												}
-											},
 											"name": "expr"
 										}
 									},

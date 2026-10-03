@@ -25,18 +25,6 @@
 				"start": 88,
 				"end": 179,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 89
-					},
-					"end": {
-						"line": 2,
-						"column": 4,
-						"character": 92
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -53,18 +41,6 @@
 							"start": 95,
 							"end": 172,
 							"name": "div",
-							"name_loc": {
-								"start": {
-									"line": 3,
-									"column": 2,
-									"character": 96
-								},
-								"end": {
-									"line": 3,
-									"column": 5,
-									"character": 99
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -81,36 +57,12 @@
 										"start": 103,
 										"end": 164,
 										"name": "div",
-										"name_loc": {
-											"start": {
-												"line": 4,
-												"column": 3,
-												"character": 104
-											},
-											"end": {
-												"line": 4,
-												"column": 6,
-												"character": 107
-											}
-										},
 										"attributes": [
 											{
 												"start": 111,
 												"end": 154,
 												"type": "StyleDirective",
 												"name": "transform-origin",
-												"name_loc": {
-													"start": {
-														"line": 5,
-														"column": 3,
-														"character": 111
-													},
-													"end": {
-														"line": 5,
-														"column": 25,
-														"character": 133
-													}
-												},
 												"modifiers": [],
 												"value": [
 													{
@@ -121,16 +73,6 @@
 															"type": "Identifier",
 															"start": 136,
 															"end": 141,
-															"loc": {
-																"start": {
-																	"line": 5,
-																	"column": 28
-																},
-																"end": {
-																	"line": 5,
-																	"column": 33
-																}
-															},
 															"name": "expr1"
 														}
 													},
@@ -149,16 +91,6 @@
 															"type": "Identifier",
 															"start": 147,
 															"end": 152,
-															"loc": {
-																"start": {
-																	"line": 6,
-																	"column": 4
-																},
-																"end": {
-																	"line": 6,
-																	"column": 9
-																}
-															},
 															"name": "expr2"
 														}
 													}
@@ -215,36 +147,12 @@
 				"start": 240,
 				"end": 296,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 12,
-						"column": 1,
-						"character": 241
-					},
-					"end": {
-						"line": 12,
-						"column": 4,
-						"character": 244
-					}
-				},
 				"attributes": [
 					{
 						"start": 246,
 						"end": 288,
 						"type": "StyleDirective",
 						"name": "transform-origin",
-						"name_loc": {
-							"start": {
-								"line": 13,
-								"column": 1,
-								"character": 246
-							},
-							"end": {
-								"line": 13,
-								"column": 23,
-								"character": 268
-							}
-						},
 						"modifiers": [],
 						"value": [
 							{
@@ -255,16 +163,6 @@
 									"type": "Identifier",
 									"start": 271,
 									"end": 276,
-									"loc": {
-										"start": {
-											"line": 13,
-											"column": 26
-										},
-										"end": {
-											"line": 13,
-											"column": 31
-										}
-									},
 									"name": "expr1"
 								}
 							},
@@ -283,16 +181,6 @@
 									"type": "Identifier",
 									"start": 281,
 									"end": 286,
-									"loc": {
-										"start": {
-											"line": 15,
-											"column": 2
-										},
-										"end": {
-											"line": 15,
-											"column": 7
-										}
-									},
 									"name": "expr2"
 								}
 							}
@@ -329,36 +217,12 @@
 				"start": 343,
 				"end": 391,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 19,
-						"column": 1,
-						"character": 344
-					},
-					"end": {
-						"line": 19,
-						"column": 4,
-						"character": 347
-					}
-				},
 				"attributes": [
 					{
 						"start": 349,
 						"end": 383,
 						"type": "StyleDirective",
 						"name": "transform-origin",
-						"name_loc": {
-							"start": {
-								"line": 20,
-								"column": 1,
-								"character": 349
-							},
-							"end": {
-								"line": 20,
-								"column": 23,
-								"character": 371
-							}
-						},
 						"modifiers": [],
 						"value": [
 							{
@@ -376,16 +240,6 @@
 									"type": "Identifier",
 									"start": 376,
 									"end": 381,
-									"loc": {
-										"start": {
-											"line": 21,
-											"column": 2
-										},
-										"end": {
-											"line": 21,
-											"column": 7
-										}
-									},
 									"name": "expr1"
 								}
 							}
@@ -422,36 +276,12 @@
 				"start": 439,
 				"end": 487,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 25,
-						"column": 1,
-						"character": 440
-					},
-					"end": {
-						"line": 25,
-						"column": 4,
-						"character": 443
-					}
-				},
 				"attributes": [
 					{
 						"start": 445,
 						"end": 479,
 						"type": "StyleDirective",
 						"name": "transform-origin",
-						"name_loc": {
-							"start": {
-								"line": 26,
-								"column": 1,
-								"character": 445
-							},
-							"end": {
-								"line": 26,
-								"column": 23,
-								"character": 467
-							}
-						},
 						"modifiers": [],
 						"value": [
 							{
@@ -462,16 +292,6 @@
 									"type": "Identifier",
 									"start": 470,
 									"end": 475,
-									"loc": {
-										"start": {
-											"line": 26,
-											"column": 26
-										},
-										"end": {
-											"line": 26,
-											"column": 31
-										}
-									},
 									"name": "expr1"
 								}
 							},
@@ -515,36 +335,12 @@
 				"start": 589,
 				"end": 636,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 31,
-						"column": 1,
-						"character": 590
-					},
-					"end": {
-						"line": 31,
-						"column": 4,
-						"character": 593
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 595,
 						"end": 628,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 32,
-								"column": 1,
-								"character": 595
-							},
-							"end": {
-								"line": 32,
-								"column": 10,
-								"character": 604
-							}
-						},
 						"value": [
 							{
 								"type": "ExpressionTag",
@@ -554,16 +350,6 @@
 									"type": "Identifier",
 									"start": 607,
 									"end": 612,
-									"loc": {
-										"start": {
-											"line": 32,
-											"column": 13
-										},
-										"end": {
-											"line": 32,
-											"column": 18
-										}
-									},
 									"name": "expr1"
 								}
 							},
@@ -582,16 +368,6 @@
 									"type": "Identifier",
 									"start": 621,
 									"end": 626,
-									"loc": {
-										"start": {
-											"line": 33,
-											"column": 7
-										},
-										"end": {
-											"line": 33,
-											"column": 12
-										}
-									},
 									"name": "expr2"
 								}
 							}

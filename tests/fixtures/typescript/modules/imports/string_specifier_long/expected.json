@@ -14,33 +14,13 @@
 			"type": "Line",
 			"value": " Fits at exactly 100 — the string-specifier list stays inline.",
 			"start": 10,
-			"end": 74,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 65
-				}
-			}
+			"end": 74
 		},
 		{
 			"type": "Line",
 			"value": " At 101 — the string-specifier list breaks one per line.",
 			"start": 176,
-			"end": 234,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 1
-				},
-				"end": {
-					"line": 4,
-					"column": 59
-				}
-			}
+			"end": 234
 		}
 	],
 	"instance": {
@@ -52,60 +32,20 @@
 			"type": "Program",
 			"start": 8,
 			"end": 341,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 9,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ImportDeclaration",
 					"start": 76,
 					"end": 174,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 99
-						}
-					},
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
 							"start": 85,
 							"end": 111,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 10
-								},
-								"end": {
-									"line": 3,
-									"column": 36
-								}
-							},
 							"imported": {
 								"type": "Literal",
 								"start": 85,
 								"end": 97,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 10
-									},
-									"end": {
-										"line": 3,
-										"column": 22
-									}
-								},
 								"value": "aaaaaaaaaa",
 								"raw": "'aaaaaaaaaa'"
 							},
@@ -113,16 +53,6 @@
 								"type": "Identifier",
 								"start": 101,
 								"end": 111,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 26
-									},
-									"end": {
-										"line": 3,
-										"column": 36
-									}
-								},
 								"name": "bbbbbbbb01"
 							}
 						},
@@ -130,30 +60,10 @@
 							"type": "ImportSpecifier",
 							"start": 113,
 							"end": 139,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 38
-								},
-								"end": {
-									"line": 3,
-									"column": 64
-								}
-							},
 							"imported": {
 								"type": "Literal",
 								"start": 113,
 								"end": 125,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 38
-									},
-									"end": {
-										"line": 3,
-										"column": 50
-									}
-								},
 								"value": "cccccccccc",
 								"raw": "'cccccccccc'"
 							},
@@ -161,16 +71,6 @@
 								"type": "Identifier",
 								"start": 129,
 								"end": 139,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 54
-									},
-									"end": {
-										"line": 3,
-										"column": 64
-									}
-								},
 								"name": "dddddddd01"
 							}
 						}
@@ -179,16 +79,6 @@
 						"type": "Literal",
 						"start": 147,
 						"end": 173,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 72
-							},
-							"end": {
-								"line": 3,
-								"column": 98
-							}
-						},
 						"value": "./eeeeeeeeeeeeeeeeeeeeee",
 						"raw": "'./eeeeeeeeeeeeeeeeeeeeee'"
 					},
@@ -206,45 +96,15 @@
 					"type": "ImportDeclaration",
 					"start": 236,
 					"end": 340,
-					"loc": {
-						"start": {
-							"line": 5,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 36
-						}
-					},
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
 							"start": 247,
 							"end": 273,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 2
-								},
-								"end": {
-									"line": 6,
-									"column": 28
-								}
-							},
 							"imported": {
 								"type": "Literal",
 								"start": 247,
 								"end": 259,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 2
-									},
-									"end": {
-										"line": 6,
-										"column": 14
-									}
-								},
 								"value": "aaaaaaaaaa",
 								"raw": "'aaaaaaaaaa'"
 							},
@@ -252,16 +112,6 @@
 								"type": "Identifier",
 								"start": 263,
 								"end": 273,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 18
-									},
-									"end": {
-										"line": 6,
-										"column": 28
-									}
-								},
 								"name": "bbbbbbbb02"
 							}
 						},
@@ -269,30 +119,10 @@
 							"type": "ImportSpecifier",
 							"start": 277,
 							"end": 303,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 2
-								},
-								"end": {
-									"line": 7,
-									"column": 28
-								}
-							},
 							"imported": {
 								"type": "Literal",
 								"start": 277,
 								"end": 289,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 2
-									},
-									"end": {
-										"line": 7,
-										"column": 14
-									}
-								},
 								"value": "cccccccccc",
 								"raw": "'cccccccccc'"
 							},
@@ -300,16 +130,6 @@
 								"type": "Identifier",
 								"start": 293,
 								"end": 303,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 18
-									},
-									"end": {
-										"line": 7,
-										"column": 28
-									}
-								},
 								"name": "dddddddd02"
 							}
 						}
@@ -318,16 +138,6 @@
 						"type": "Literal",
 						"start": 312,
 						"end": 339,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 8
-							},
-							"end": {
-								"line": 8,
-								"column": 35
-							}
-						},
 						"value": "./eeeeeeeeeeeeeeeeeeeeeee",
 						"raw": "'./eeeeeeeeeeeeeeeeeeeeeee'"
 					},

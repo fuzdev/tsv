@@ -12,50 +12,16 @@
 				"start": 0,
 				"end": 43,
 				"name": "button",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 7,
-						"character": 7
-					}
-				},
 				"attributes": [
 					{
 						"start": 8,
 						"end": 29,
 						"type": "OnDirective",
 						"name": "click",
-						"name_loc": {
-							"start": {
-								"line": 1,
-								"column": 8,
-								"character": 8
-							},
-							"end": {
-								"line": 1,
-								"column": 16,
-								"character": 16
-							}
-						},
 						"expression": {
 							"type": "Identifier",
 							"start": 26,
 							"end": 28,
-							"loc": {
-								"start": {
-									"line": 1,
-									"column": 26
-								},
-								"end": {
-									"line": 1,
-									"column": 28
-								}
-							},
 							"name": "fn",
 							"leadingComments": [
 								{
@@ -90,17 +56,7 @@
 			"type": "Block",
 			"value": " c ",
 			"start": 18,
-			"end": 25,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 18
-				},
-				"end": {
-					"line": 1,
-					"column": 25
-				}
-			}
+			"end": 25
 		}
 	]
 }

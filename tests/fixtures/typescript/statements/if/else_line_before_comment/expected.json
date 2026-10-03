@@ -14,65 +14,25 @@
 			"type": "Line",
 			"value": " Line comment before else - no blank line above",
 			"start": 10,
-			"end": 59,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 50
-				}
-			}
+			"end": 59
 		},
 		{
 			"type": "Line",
 			"value": " comment (no blank above)",
 			"start": 87,
-			"end": 114,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 1
-				},
-				"end": {
-					"line": 6,
-					"column": 28
-				}
-			}
+			"end": 114
 		},
 		{
 			"type": "Line",
 			"value": " Trailing comment before else - stays attached (existing behavior)",
 			"start": 148,
-			"end": 216,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 1
-				},
-				"end": {
-					"line": 11,
-					"column": 69
-				}
-			}
+			"end": 216
 		},
 		{
 			"type": "Line",
 			"value": " trailing comment",
 			"start": 243,
-			"end": 262,
-			"loc": {
-				"start": {
-					"line": 14,
-					"column": 3
-				},
-				"end": {
-					"line": 14,
-					"column": 22
-				}
-			}
+			"end": 262
 		}
 	],
 	"instance": {
@@ -84,104 +44,34 @@
 			"type": "Program",
 			"start": 8,
 			"end": 283,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 18,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "IfStatement",
 					"start": 61,
 					"end": 145,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 9,
-							"column": 2
-						}
-					},
 					"test": {
 						"type": "Identifier",
 						"start": 65,
 						"end": 70,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 5
-							},
-							"end": {
-								"line": 3,
-								"column": 10
-							}
-						},
 						"name": "cond1"
 					},
 					"consequent": {
 						"type": "BlockStatement",
 						"start": 72,
 						"end": 85,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 12
-							},
-							"end": {
-								"line": 5,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "ExpressionStatement",
 								"start": 76,
 								"end": 82,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 2
-									},
-									"end": {
-										"line": 4,
-										"column": 8
-									}
-								},
 								"expression": {
 									"type": "CallExpression",
 									"start": 76,
 									"end": 81,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 2
-										},
-										"end": {
-											"line": 4,
-											"column": 7
-										}
-									},
 									"callee": {
 										"type": "Identifier",
 										"start": 76,
 										"end": 79,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 2
-											},
-											"end": {
-												"line": 4,
-												"column": 5
-											}
-										},
 										"name": "fn1"
 									},
 									"arguments": [],
@@ -194,89 +84,29 @@
 						"type": "IfStatement",
 						"start": 121,
 						"end": 145,
-						"loc": {
-							"start": {
-								"line": 7,
-								"column": 6
-							},
-							"end": {
-								"line": 9,
-								"column": 2
-							}
-						},
 						"test": {
 							"type": "Identifier",
 							"start": 125,
 							"end": 130,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 10
-								},
-								"end": {
-									"line": 7,
-									"column": 15
-								}
-							},
 							"name": "cond2"
 						},
 						"consequent": {
 							"type": "BlockStatement",
 							"start": 132,
 							"end": 145,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 17
-								},
-								"end": {
-									"line": 9,
-									"column": 2
-								}
-							},
 							"body": [
 								{
 									"type": "ExpressionStatement",
 									"start": 136,
 									"end": 142,
-									"loc": {
-										"start": {
-											"line": 8,
-											"column": 2
-										},
-										"end": {
-											"line": 8,
-											"column": 8
-										}
-									},
 									"expression": {
 										"type": "CallExpression",
 										"start": 136,
 										"end": 141,
-										"loc": {
-											"start": {
-												"line": 8,
-												"column": 2
-											},
-											"end": {
-												"line": 8,
-												"column": 7
-											}
-										},
 										"callee": {
 											"type": "Identifier",
 											"start": 136,
 											"end": 139,
-											"loc": {
-												"start": {
-													"line": 8,
-													"column": 2
-												},
-												"end": {
-													"line": 8,
-													"column": 5
-												}
-											},
 											"name": "fn2"
 										},
 										"arguments": [],
@@ -308,89 +138,29 @@
 					"type": "IfStatement",
 					"start": 218,
 					"end": 282,
-					"loc": {
-						"start": {
-							"line": 12,
-							"column": 1
-						},
-						"end": {
-							"line": 17,
-							"column": 2
-						}
-					},
 					"test": {
 						"type": "Identifier",
 						"start": 222,
 						"end": 227,
-						"loc": {
-							"start": {
-								"line": 12,
-								"column": 5
-							},
-							"end": {
-								"line": 12,
-								"column": 10
-							}
-						},
 						"name": "cond1"
 					},
 					"consequent": {
 						"type": "BlockStatement",
 						"start": 229,
 						"end": 242,
-						"loc": {
-							"start": {
-								"line": 12,
-								"column": 12
-							},
-							"end": {
-								"line": 14,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "ExpressionStatement",
 								"start": 233,
 								"end": 239,
-								"loc": {
-									"start": {
-										"line": 13,
-										"column": 2
-									},
-									"end": {
-										"line": 13,
-										"column": 8
-									}
-								},
 								"expression": {
 									"type": "CallExpression",
 									"start": 233,
 									"end": 238,
-									"loc": {
-										"start": {
-											"line": 13,
-											"column": 2
-										},
-										"end": {
-											"line": 13,
-											"column": 7
-										}
-									},
 									"callee": {
 										"type": "Identifier",
 										"start": 233,
 										"end": 236,
-										"loc": {
-											"start": {
-												"line": 13,
-												"column": 2
-											},
-											"end": {
-												"line": 13,
-												"column": 5
-											}
-										},
 										"name": "fn1"
 									},
 									"arguments": [],
@@ -411,59 +181,19 @@
 						"type": "BlockStatement",
 						"start": 269,
 						"end": 282,
-						"loc": {
-							"start": {
-								"line": 15,
-								"column": 6
-							},
-							"end": {
-								"line": 17,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "ExpressionStatement",
 								"start": 273,
 								"end": 279,
-								"loc": {
-									"start": {
-										"line": 16,
-										"column": 2
-									},
-									"end": {
-										"line": 16,
-										"column": 8
-									}
-								},
 								"expression": {
 									"type": "CallExpression",
 									"start": 273,
 									"end": 278,
-									"loc": {
-										"start": {
-											"line": 16,
-											"column": 2
-										},
-										"end": {
-											"line": 16,
-											"column": 7
-										}
-									},
 									"callee": {
 										"type": "Identifier",
 										"start": 273,
 										"end": 276,
-										"loc": {
-											"start": {
-												"line": 16,
-												"column": 2
-											},
-											"end": {
-												"line": 16,
-												"column": 5
-											}
-										},
 										"name": "fn2"
 									},
 									"arguments": [],

@@ -29,32 +29,12 @@
 						"type": "Identifier",
 						"start": 115,
 						"end": 118,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 1
-							},
-							"end": {
-								"line": 4,
-								"column": 4
-							}
-						},
 						"name": "aaa"
 					},
 					{
 						"type": "Identifier",
 						"start": 122,
 						"end": 125,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 8
-							},
-							"end": {
-								"line": 4,
-								"column": 11
-							}
-						},
 						"name": "bbb"
 					}
 				]
@@ -88,32 +68,12 @@
 						"type": "Identifier",
 						"start": 203,
 						"end": 206,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 8
-							},
-							"end": {
-								"line": 8,
-								"column": 11
-							}
-						},
 						"name": "ccc"
 					},
 					{
 						"type": "Identifier",
 						"start": 208,
 						"end": 211,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 13
-							},
-							"end": {
-								"line": 8,
-								"column": 16
-							}
-						},
 						"name": "ddd"
 					}
 				]
@@ -126,17 +86,7 @@
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 95,
-			"end": 113,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 19
-				}
-			}
+			"end": 113
 		}
 	]
 }

@@ -14,49 +14,19 @@
 			"type": "Block",
 			"value": " c ",
 			"start": 32,
-			"end": 39,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 9
-				},
-				"end": {
-					"line": 3,
-					"column": 16
-				}
-			}
+			"end": 39
 		},
 		{
 			"type": "Block",
 			"value": " c1 ",
 			"start": 60,
-			"end": 68,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 9
-				},
-				"end": {
-					"line": 5,
-					"column": 17
-				}
-			}
+			"end": 68
 		},
 		{
 			"type": "Block",
 			"value": " c2 ",
 			"start": 69,
-			"end": 77,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 18
-				},
-				"end": {
-					"line": 5,
-					"column": 26
-				}
-			}
+			"end": 77
 		}
 	],
 	"instance": {
@@ -68,45 +38,15 @@
 			"type": "Program",
 			"start": 8,
 			"end": 92,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 8,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "SwitchStatement",
 					"start": 10,
 					"end": 91,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 7,
-							"column": 2
-						}
-					},
 					"discriminant": {
 						"type": "Identifier",
 						"start": 18,
 						"end": 19,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 9
-							},
-							"end": {
-								"line": 2,
-								"column": 10
-							}
-						},
 						"name": "a"
 					},
 					"cases": [
@@ -114,31 +54,11 @@
 							"type": "SwitchCase",
 							"start": 25,
 							"end": 50,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 2
-								},
-								"end": {
-									"line": 4,
-									"column": 9
-								}
-							},
 							"consequent": [
 								{
 									"type": "BreakStatement",
 									"start": 44,
 									"end": 50,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 3
-										},
-										"end": {
-											"line": 4,
-											"column": 9
-										}
-									},
 									"label": null,
 									"leadingComments": [
 										{
@@ -154,16 +74,6 @@
 								"type": "Literal",
 								"start": 30,
 								"end": 31,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 7
-									},
-									"end": {
-										"line": 3,
-										"column": 8
-									}
-								},
 								"value": 1,
 								"raw": "1"
 							}
@@ -172,31 +82,11 @@
 							"type": "SwitchCase",
 							"start": 53,
 							"end": 88,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 2
-								},
-								"end": {
-									"line": 6,
-									"column": 9
-								}
-							},
 							"consequent": [
 								{
 									"type": "BreakStatement",
 									"start": 82,
 									"end": 88,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 3
-										},
-										"end": {
-											"line": 6,
-											"column": 9
-										}
-									},
 									"label": null,
 									"leadingComments": [
 										{
@@ -218,16 +108,6 @@
 								"type": "Literal",
 								"start": 58,
 								"end": 59,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 7
-									},
-									"end": {
-										"line": 5,
-										"column": 8
-									}
-								},
 								"value": 2,
 								"raw": "2"
 							}

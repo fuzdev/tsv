@@ -25,36 +25,12 @@
 				"start": 82,
 				"end": 124,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 83
-					},
-					"end": {
-						"line": 2,
-						"column": 4,
-						"character": 86
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 87,
 						"end": 100,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 2,
-								"column": 5,
-								"character": 87
-							},
-							"end": {
-								"line": 2,
-								"column": 14,
-								"character": 96
-							}
-						},
 						"value": [
 							{
 								"start": 98,
@@ -81,18 +57,6 @@
 							"start": 103,
 							"end": 117,
 							"name": "pre",
-							"name_loc": {
-								"start": {
-									"line": 3,
-									"column": 2,
-									"character": 104
-								},
-								"end": {
-									"line": 3,
-									"column": 5,
-									"character": 107
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -129,36 +93,12 @@
 				"start": 126,
 				"end": 183,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 1,
-						"character": 127
-					},
-					"end": {
-						"line": 7,
-						"column": 4,
-						"character": 130
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 131,
 						"end": 144,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 7,
-								"column": 5,
-								"character": 131
-							},
-							"end": {
-								"line": 7,
-								"column": 14,
-								"character": 140
-							}
-						},
 						"value": [
 							{
 								"start": 142,
@@ -185,18 +125,6 @@
 							"start": 147,
 							"end": 176,
 							"name": "textarea",
-							"name_loc": {
-								"start": {
-									"line": 8,
-									"column": 2,
-									"character": 148
-								},
-								"end": {
-									"line": 8,
-									"column": 10,
-									"character": 156
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -246,36 +174,12 @@
 				"start": 223,
 				"end": 260,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 15,
-						"column": 1,
-						"character": 224
-					},
-					"end": {
-						"line": 15,
-						"column": 4,
-						"character": 227
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 228,
 						"end": 241,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 15,
-								"column": 5,
-								"character": 228
-							},
-							"end": {
-								"line": 15,
-								"column": 14,
-								"character": 237
-							}
-						},
 						"value": [
 							{
 								"start": 239,
@@ -295,18 +199,6 @@
 							"start": 242,
 							"end": 254,
 							"name": "pre",
-							"name_loc": {
-								"start": {
-									"line": 15,
-									"column": 20,
-									"character": 243
-								},
-								"end": {
-									"line": 15,
-									"column": 23,
-									"character": 246
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",

@@ -14,33 +14,13 @@
 			"type": "Line",
 			"value": " comment",
 			"start": 27,
-			"end": 37,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 5
-				},
-				"end": {
-					"line": 3,
-					"column": 15
-				}
-			}
+			"end": 37
 		},
 		{
 			"type": "Line",
 			"value": " comment",
 			"start": 57,
-			"end": 67,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 5
-				},
-				"end": {
-					"line": 8,
-					"column": 15
-				}
-			}
+			"end": 67
 		}
 	],
 	"instance": {
@@ -52,105 +32,35 @@
 			"type": "Program",
 			"start": 8,
 			"end": 76,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 11,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 10,
 					"end": 45,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 3
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 16,
 							"end": 44,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 7
-								},
-								"end": {
-									"line": 5,
-									"column": 2
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 16,
 								"end": 17,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 7
-									},
-									"end": {
-										"line": 2,
-										"column": 8
-									}
-								},
 								"name": "a"
 							},
 							"init": {
 								"type": "ArrayExpression",
 								"start": 20,
 								"end": 44,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 11
-									},
-									"end": {
-										"line": 5,
-										"column": 2
-									}
-								},
 								"elements": [
 									{
 										"type": "SpreadElement",
 										"start": 24,
 										"end": 41,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 2
-											},
-											"end": {
-												"line": 4,
-												"column": 3
-											}
-										},
 										"argument": {
 											"type": "Identifier",
 											"start": 40,
 											"end": 41,
-											"loc": {
-												"start": {
-													"line": 4,
-													"column": 2
-												},
-												"end": {
-													"line": 4,
-													"column": 3
-												}
-											},
 											"name": "b",
 											"leadingComments": [
 												{
@@ -172,44 +82,14 @@
 					"type": "ExpressionStatement",
 					"start": 48,
 					"end": 75,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 1
-						},
-						"end": {
-							"line": 10,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 48,
 						"end": 74,
-						"loc": {
-							"start": {
-								"line": 7,
-								"column": 1
-							},
-							"end": {
-								"line": 10,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 48,
 							"end": 50,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 1
-								},
-								"end": {
-									"line": 7,
-									"column": 3
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -217,30 +97,10 @@
 								"type": "SpreadElement",
 								"start": 54,
 								"end": 71,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 2
-									},
-									"end": {
-										"line": 9,
-										"column": 3
-									}
-								},
 								"argument": {
 									"type": "Identifier",
 									"start": 70,
 									"end": 71,
-									"loc": {
-										"start": {
-											"line": 9,
-											"column": 2
-										},
-										"end": {
-											"line": 9,
-											"column": 3
-										}
-									},
 									"name": "b",
 									"leadingComments": [
 										{

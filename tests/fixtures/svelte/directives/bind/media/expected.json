@@ -12,36 +12,12 @@
 				"start": 0,
 				"end": 81,
 				"name": "audio",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 6,
-						"character": 6
-					}
-				},
 				"attributes": [
 					{
 						"start": 7,
 						"end": 23,
 						"type": "BindDirective",
 						"name": "currentTime",
-						"name_loc": {
-							"start": {
-								"line": 1,
-								"column": 7,
-								"character": 7
-							},
-							"end": {
-								"line": 1,
-								"column": 23,
-								"character": 23
-							}
-						},
 						"expression": {
 							"start": 12,
 							"end": 23,
@@ -55,18 +31,6 @@
 						"end": 35,
 						"type": "BindDirective",
 						"name": "paused",
-						"name_loc": {
-							"start": {
-								"line": 1,
-								"column": 24,
-								"character": 24
-							},
-							"end": {
-								"line": 1,
-								"column": 35,
-								"character": 35
-							}
-						},
 						"expression": {
 							"start": 29,
 							"end": 35,
@@ -80,18 +44,6 @@
 						"end": 47,
 						"type": "BindDirective",
 						"name": "volume",
-						"name_loc": {
-							"start": {
-								"line": 1,
-								"column": 36,
-								"character": 36
-							},
-							"end": {
-								"line": 1,
-								"column": 47,
-								"character": 47
-							}
-						},
 						"expression": {
 							"start": 41,
 							"end": 47,
@@ -105,18 +57,6 @@
 						"end": 58,
 						"type": "BindDirective",
 						"name": "muted",
-						"name_loc": {
-							"start": {
-								"line": 1,
-								"column": 48,
-								"character": 48
-							},
-							"end": {
-								"line": 1,
-								"column": 58,
-								"character": 58
-							}
-						},
 						"expression": {
 							"start": 53,
 							"end": 58,
@@ -130,18 +70,6 @@
 						"end": 72,
 						"type": "BindDirective",
 						"name": "duration",
-						"name_loc": {
-							"start": {
-								"line": 1,
-								"column": 59,
-								"character": 59
-							},
-							"end": {
-								"line": 1,
-								"column": 72,
-								"character": 72
-							}
-						},
 						"expression": {
 							"start": 64,
 							"end": 72,
@@ -168,36 +96,12 @@
 				"start": 83,
 				"end": 160,
 				"name": "video",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 1,
-						"character": 84
-					},
-					"end": {
-						"line": 3,
-						"column": 6,
-						"character": 89
-					}
-				},
 				"attributes": [
 					{
 						"start": 90,
 						"end": 106,
 						"type": "BindDirective",
 						"name": "currentTime",
-						"name_loc": {
-							"start": {
-								"line": 3,
-								"column": 7,
-								"character": 90
-							},
-							"end": {
-								"line": 3,
-								"column": 23,
-								"character": 106
-							}
-						},
 						"expression": {
 							"start": 95,
 							"end": 106,
@@ -211,18 +115,6 @@
 						"end": 118,
 						"type": "BindDirective",
 						"name": "paused",
-						"name_loc": {
-							"start": {
-								"line": 3,
-								"column": 24,
-								"character": 107
-							},
-							"end": {
-								"line": 3,
-								"column": 35,
-								"character": 118
-							}
-						},
 						"expression": {
 							"start": 112,
 							"end": 118,
@@ -236,18 +128,6 @@
 						"end": 134,
 						"type": "BindDirective",
 						"name": "videoWidth",
-						"name_loc": {
-							"start": {
-								"line": 3,
-								"column": 36,
-								"character": 119
-							},
-							"end": {
-								"line": 3,
-								"column": 51,
-								"character": 134
-							}
-						},
 						"expression": {
 							"start": 124,
 							"end": 134,
@@ -261,18 +141,6 @@
 						"end": 151,
 						"type": "BindDirective",
 						"name": "videoHeight",
-						"name_loc": {
-							"start": {
-								"line": 3,
-								"column": 52,
-								"character": 135
-							},
-							"end": {
-								"line": 3,
-								"column": 68,
-								"character": 151
-							}
-						},
 						"expression": {
 							"start": 140,
 							"end": 151,

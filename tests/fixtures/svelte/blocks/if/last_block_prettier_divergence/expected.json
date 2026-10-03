@@ -16,16 +16,6 @@
 					"type": "Identifier",
 					"start": 5,
 					"end": 6,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 5
-						},
-						"end": {
-							"line": 1,
-							"column": 6
-						}
-					},
 					"name": "a"
 				},
 				"consequent": {
@@ -52,16 +42,6 @@
 								"type": "Identifier",
 								"start": 19,
 								"end": 20,
-								"loc": {
-									"start": {
-										"line": 1,
-										"column": 19
-									},
-									"end": {
-										"line": 1,
-										"column": 20
-									}
-								},
 								"name": "b"
 							},
 							"consequent": {
@@ -97,16 +77,6 @@
 					"type": "Identifier",
 					"start": 35,
 					"end": 36,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 5
-						},
-						"end": {
-							"line": 3,
-							"column": 6
-						}
-					},
 					"name": "a"
 				},
 				"consequent": {
@@ -133,16 +103,6 @@
 								"type": "Identifier",
 								"start": 49,
 								"end": 50,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 19
-									},
-									"end": {
-										"line": 3,
-										"column": 20
-									}
-								},
 								"name": "b"
 							},
 							"consequent": {

@@ -25,36 +25,12 @@
 				"start": 97,
 				"end": 152,
 				"name": "svelte:element",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 98
-					},
-					"end": {
-						"line": 2,
-						"column": 15,
-						"character": 112
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 122,
 						"end": 130,
 						"name": "this",
-						"name_loc": {
-							"start": {
-								"line": 2,
-								"column": 25,
-								"character": 122
-							},
-							"end": {
-								"line": 2,
-								"column": 29,
-								"character": 126
-							}
-						},
 						"value": {
 							"type": "ExpressionTag",
 							"start": 127,
@@ -63,16 +39,6 @@
 								"type": "Identifier",
 								"start": 128,
 								"end": 129,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 31
-									},
-									"end": {
-										"line": 2,
-										"column": 32
-									}
-								},
 								"name": "b"
 							}
 						}
@@ -94,16 +60,6 @@
 					"type": "Identifier",
 					"start": 119,
 					"end": 120,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 22
-						},
-						"end": {
-							"line": 2,
-							"column": 23
-						}
-					},
 					"name": "a"
 				}
 			},
@@ -132,36 +88,12 @@
 				"start": 179,
 				"end": 239,
 				"name": "svelte:element",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 1,
-						"character": 180
-					},
-					"end": {
-						"line": 5,
-						"column": 15,
-						"character": 194
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 206,
 						"end": 217,
 						"name": "this",
-						"name_loc": {
-							"start": {
-								"line": 5,
-								"column": 27,
-								"character": 206
-							},
-							"end": {
-								"line": 5,
-								"column": 31,
-								"character": 210
-							}
-						},
 						"value": [
 							{
 								"start": 212,
@@ -218,36 +150,12 @@
 				"start": 316,
 				"end": 367,
 				"name": "svelte:element",
-				"name_loc": {
-					"start": {
-						"line": 8,
-						"column": 1,
-						"character": 317
-					},
-					"end": {
-						"line": 8,
-						"column": 15,
-						"character": 331
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 341,
 						"end": 345,
 						"name": "this",
-						"name_loc": {
-							"start": {
-								"line": 8,
-								"column": 25,
-								"character": 341
-							},
-							"end": {
-								"line": 8,
-								"column": 29,
-								"character": 345
-							}
-						},
 						"value": true
 					}
 				],
@@ -267,16 +175,6 @@
 					"type": "Identifier",
 					"start": 338,
 					"end": 339,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 22
-						},
-						"end": {
-							"line": 8,
-							"column": 23
-						}
-					},
 					"name": "a"
 				}
 			},
@@ -292,36 +190,12 @@
 				"start": 368,
 				"end": 426,
 				"name": "svelte:element",
-				"name_loc": {
-					"start": {
-						"line": 9,
-						"column": 1,
-						"character": 369
-					},
-					"end": {
-						"line": 9,
-						"column": 15,
-						"character": 383
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 393,
 						"end": 404,
 						"name": "this",
-						"name_loc": {
-							"start": {
-								"line": 9,
-								"column": 25,
-								"character": 393
-							},
-							"end": {
-								"line": 9,
-								"column": 29,
-								"character": 397
-							}
-						},
 						"value": [
 							{
 								"start": 399,
@@ -338,16 +212,6 @@
 									"type": "Identifier",
 									"start": 401,
 									"end": 402,
-									"loc": {
-										"start": {
-											"line": 9,
-											"column": 33
-										},
-										"end": {
-											"line": 9,
-											"column": 34
-										}
-									},
 									"name": "b"
 								}
 							}
@@ -370,16 +234,6 @@
 					"type": "Identifier",
 					"start": 390,
 					"end": 391,
-					"loc": {
-						"start": {
-							"line": 9,
-							"column": 22
-						},
-						"end": {
-							"line": 9,
-							"column": 23
-						}
-					},
 					"name": "a"
 				}
 			},
@@ -408,36 +262,12 @@
 				"start": 490,
 				"end": 585,
 				"name": "svelte:element",
-				"name_loc": {
-					"start": {
-						"line": 12,
-						"column": 1,
-						"character": 491
-					},
-					"end": {
-						"line": 12,
-						"column": 15,
-						"character": 505
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 515,
 						"end": 534,
 						"name": "data-attr1",
-						"name_loc": {
-							"start": {
-								"line": 12,
-								"column": 25,
-								"character": 515
-							},
-							"end": {
-								"line": 12,
-								"column": 35,
-								"character": 525
-							}
-						},
 						"value": [
 							{
 								"start": 527,
@@ -453,18 +283,6 @@
 						"start": 535,
 						"end": 554,
 						"name": "data-attr2",
-						"name_loc": {
-							"start": {
-								"line": 12,
-								"column": 45,
-								"character": 535
-							},
-							"end": {
-								"line": 12,
-								"column": 55,
-								"character": 545
-							}
-						},
 						"value": [
 							{
 								"start": 547,
@@ -480,18 +298,6 @@
 						"start": 555,
 						"end": 563,
 						"name": "this",
-						"name_loc": {
-							"start": {
-								"line": 12,
-								"column": 65,
-								"character": 555
-							},
-							"end": {
-								"line": 12,
-								"column": 69,
-								"character": 559
-							}
-						},
 						"value": {
 							"type": "ExpressionTag",
 							"start": 560,
@@ -500,16 +306,6 @@
 								"type": "Identifier",
 								"start": 561,
 								"end": 562,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 71
-									},
-									"end": {
-										"line": 12,
-										"column": 72
-									}
-								},
 								"name": "b"
 							}
 						}
@@ -531,16 +327,6 @@
 					"type": "Identifier",
 					"start": 512,
 					"end": 513,
-					"loc": {
-						"start": {
-							"line": 12,
-							"column": 22
-						},
-						"end": {
-							"line": 12,
-							"column": 23
-						}
-					},
 					"name": "a"
 				}
 			},
@@ -569,36 +355,12 @@
 				"start": 682,
 				"end": 727,
 				"name": "svelte:component",
-				"name_loc": {
-					"start": {
-						"line": 15,
-						"column": 1,
-						"character": 683
-					},
-					"end": {
-						"line": 15,
-						"column": 17,
-						"character": 699
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 712,
 						"end": 724,
 						"name": "this",
-						"name_loc": {
-							"start": {
-								"line": 15,
-								"column": 30,
-								"character": 712
-							},
-							"end": {
-								"line": 15,
-								"column": 34,
-								"character": 716
-							}
-						},
 						"value": [
 							{
 								"start": 718,
@@ -618,16 +380,6 @@
 					"type": "Identifier",
 					"start": 706,
 					"end": 710,
-					"loc": {
-						"start": {
-							"line": 15,
-							"column": 24
-						},
-						"end": {
-							"line": 15,
-							"column": 28
-						}
-					},
 					"name": "Comp"
 				}
 			},
@@ -643,36 +395,12 @@
 				"start": 728,
 				"end": 769,
 				"name": "svelte:component",
-				"name_loc": {
-					"start": {
-						"line": 16,
-						"column": 1,
-						"character": 729
-					},
-					"end": {
-						"line": 16,
-						"column": 17,
-						"character": 745
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 758,
 						"end": 766,
 						"name": "this",
-						"name_loc": {
-							"start": {
-								"line": 16,
-								"column": 30,
-								"character": 758
-							},
-							"end": {
-								"line": 16,
-								"column": 34,
-								"character": 762
-							}
-						},
 						"value": {
 							"type": "ExpressionTag",
 							"start": 763,
@@ -681,16 +409,6 @@
 								"type": "Identifier",
 								"start": 764,
 								"end": 765,
-								"loc": {
-									"start": {
-										"line": 16,
-										"column": 36
-									},
-									"end": {
-										"line": 16,
-										"column": 37
-									}
-								},
 								"name": "b"
 							}
 						}
@@ -704,16 +422,6 @@
 					"type": "Identifier",
 					"start": 752,
 					"end": 756,
-					"loc": {
-						"start": {
-							"line": 16,
-							"column": 24
-						},
-						"end": {
-							"line": 16,
-							"column": 28
-						}
-					},
 					"name": "Comp"
 				}
 			}

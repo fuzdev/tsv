@@ -525,7 +525,7 @@ pub(super) fn write_type_parameter_declaration(
     write_array(w, params.params, |w, p| write_type_parameter(w, p, ctx));
     if let Some(pos) = params.trailing_comma {
         w.raw(",\"extra\":{\"trailingComma\":");
-        w.u32(ctx.loc.pos(pos));
+        w.u32(ctx.pos(pos));
         w.raw("}");
     }
     close_node(w, "TSTypeParameterDeclaration", params.span, ctx);

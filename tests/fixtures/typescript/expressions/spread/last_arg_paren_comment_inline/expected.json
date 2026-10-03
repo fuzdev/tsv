@@ -14,193 +14,73 @@
 			"type": "Line",
 			"value": " same-line comment left behind by a spread's stripped parens: it rides the argument's",
 			"start": 10,
-			"end": 97,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 88
-				}
-			}
+			"end": 97
 		},
 		{
 			"type": "Line",
 			"value": " line, and the line comment after the stripped `)` trails it",
 			"start": 99,
-			"end": 161,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 63
-				}
-			}
+			"end": 161
 		},
 		{
 			"type": "Block",
 			"value": " i ",
 			"start": 179,
-			"end": 186,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 7
-				},
-				"end": {
-					"line": 6,
-					"column": 14
-				}
-			}
+			"end": 186
 		},
 		{
 			"type": "Line",
 			"value": " t",
 			"start": 187,
-			"end": 191,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 15
-				},
-				"end": {
-					"line": 6,
-					"column": 19
-				}
-			}
+			"end": 191
 		},
 		{
 			"type": "Block",
 			"value": " i ",
 			"start": 217,
-			"end": 224,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 7
-				},
-				"end": {
-					"line": 11,
-					"column": 14
-				}
-			}
+			"end": 224
 		},
 		{
 			"type": "Line",
 			"value": " t",
 			"start": 225,
-			"end": 229,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 15
-				},
-				"end": {
-					"line": 11,
-					"column": 19
-				}
-			}
+			"end": 229
 		},
 		{
 			"type": "Block",
 			"value": " i ",
 			"start": 260,
-			"end": 267,
-			"loc": {
-				"start": {
-					"line": 16,
-					"column": 7
-				},
-				"end": {
-					"line": 16,
-					"column": 14
-				}
-			}
+			"end": 267
 		},
 		{
 			"type": "Line",
 			"value": " t",
 			"start": 268,
-			"end": 272,
-			"loc": {
-				"start": {
-					"line": 16,
-					"column": 15
-				},
-				"end": {
-					"line": 16,
-					"column": 19
-				}
-			}
+			"end": 272
 		},
 		{
 			"type": "Line",
 			"value": " a line comment inside the stripped parens runs to end of line, so the argument list",
 			"start": 279,
-			"end": 365,
-			"loc": {
-				"start": {
-					"line": 19,
-					"column": 1
-				},
-				"end": {
-					"line": 19,
-					"column": 87
-				}
-			}
+			"end": 365
 		},
 		{
 			"type": "Line",
 			"value": " breaks around it — flushed inline, it would escape past the `)` and the `;`",
 			"start": 367,
-			"end": 445,
-			"loc": {
-				"start": {
-					"line": 20,
-					"column": 1
-				},
-				"end": {
-					"line": 20,
-					"column": 79
-				}
-			}
+			"end": 445
 		},
 		{
 			"type": "Line",
 			"value": " i",
 			"start": 463,
-			"end": 467,
-			"loc": {
-				"start": {
-					"line": 23,
-					"column": 7
-				},
-				"end": {
-					"line": 23,
-					"column": 11
-				}
-			}
+			"end": 467
 		},
 		{
 			"type": "Line",
 			"value": " i",
 			"start": 488,
-			"end": 492,
-			"loc": {
-				"start": {
-					"line": 27,
-					"column": 7
-				},
-				"end": {
-					"line": 27,
-					"column": 11
-				}
-			}
+			"end": 492
 		}
 	],
 	"instance": {
@@ -212,59 +92,19 @@
 			"type": "Program",
 			"start": 8,
 			"end": 497,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 29,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
 					"start": 163,
 					"end": 195,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 7,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 163,
 						"end": 194,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 1
-							},
-							"end": {
-								"line": 7,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 163,
 							"end": 165,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 1
-								},
-								"end": {
-									"line": 4,
-									"column": 3
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -272,46 +112,16 @@
 								"type": "Identifier",
 								"start": 169,
 								"end": 170,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 2
-									},
-									"end": {
-										"line": 5,
-										"column": 3
-									}
-								},
 								"name": "a"
 							},
 							{
 								"type": "SpreadElement",
 								"start": 174,
 								"end": 178,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 2
-									},
-									"end": {
-										"line": 6,
-										"column": 6
-									}
-								},
 								"argument": {
 									"type": "Identifier",
 									"start": 177,
 									"end": 178,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 5
-										},
-										"end": {
-											"line": 6,
-											"column": 6
-										}
-									},
 									"name": "b"
 								},
 								"trailingComments": [
@@ -345,44 +155,14 @@
 					"type": "ExpressionStatement",
 					"start": 198,
 					"end": 233,
-					"loc": {
-						"start": {
-							"line": 9,
-							"column": 1
-						},
-						"end": {
-							"line": 12,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "NewExpression",
 						"start": 198,
 						"end": 232,
-						"loc": {
-							"start": {
-								"line": 9,
-								"column": 1
-							},
-							"end": {
-								"line": 12,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 202,
 							"end": 203,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 5
-								},
-								"end": {
-									"line": 9,
-									"column": 6
-								}
-							},
 							"name": "A"
 						},
 						"arguments": [
@@ -390,46 +170,16 @@
 								"type": "Identifier",
 								"start": 207,
 								"end": 208,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 2
-									},
-									"end": {
-										"line": 10,
-										"column": 3
-									}
-								},
 								"name": "a"
 							},
 							{
 								"type": "SpreadElement",
 								"start": 212,
 								"end": 216,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 2
-									},
-									"end": {
-										"line": 11,
-										"column": 6
-									}
-								},
 								"argument": {
 									"type": "Identifier",
 									"start": 215,
 									"end": 216,
-									"loc": {
-										"start": {
-											"line": 11,
-											"column": 5
-										},
-										"end": {
-											"line": 11,
-											"column": 6
-										}
-									},
 									"name": "b"
 								},
 								"trailingComments": [
@@ -456,74 +206,24 @@
 					"type": "ExpressionStatement",
 					"start": 236,
 					"end": 276,
-					"loc": {
-						"start": {
-							"line": 14,
-							"column": 1
-						},
-						"end": {
-							"line": 17,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 236,
 						"end": 275,
-						"loc": {
-							"start": {
-								"line": 14,
-								"column": 1
-							},
-							"end": {
-								"line": 17,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "MemberExpression",
 							"start": 236,
 							"end": 246,
-							"loc": {
-								"start": {
-									"line": 14,
-									"column": 1
-								},
-								"end": {
-									"line": 14,
-									"column": 11
-								}
-							},
 							"object": {
 								"type": "Identifier",
 								"start": 236,
 								"end": 239,
-								"loc": {
-									"start": {
-										"line": 14,
-										"column": 1
-									},
-									"end": {
-										"line": 14,
-										"column": 4
-									}
-								},
 								"name": "obj"
 							},
 							"property": {
 								"type": "Identifier",
 								"start": 240,
 								"end": 246,
-								"loc": {
-									"start": {
-										"line": 14,
-										"column": 5
-									},
-									"end": {
-										"line": 14,
-										"column": 11
-									}
-								},
 								"name": "method"
 							},
 							"computed": false,
@@ -534,46 +234,16 @@
 								"type": "Identifier",
 								"start": 250,
 								"end": 251,
-								"loc": {
-									"start": {
-										"line": 15,
-										"column": 2
-									},
-									"end": {
-										"line": 15,
-										"column": 3
-									}
-								},
 								"name": "a"
 							},
 							{
 								"type": "SpreadElement",
 								"start": 255,
 								"end": 259,
-								"loc": {
-									"start": {
-										"line": 16,
-										"column": 2
-									},
-									"end": {
-										"line": 16,
-										"column": 6
-									}
-								},
 								"argument": {
 									"type": "Identifier",
 									"start": 258,
 									"end": 259,
-									"loc": {
-										"start": {
-											"line": 16,
-											"column": 5
-										},
-										"end": {
-											"line": 16,
-											"column": 6
-										}
-									},
 									"name": "b"
 								},
 								"trailingComments": [
@@ -601,44 +271,14 @@
 					"type": "ExpressionStatement",
 					"start": 447,
 					"end": 471,
-					"loc": {
-						"start": {
-							"line": 21,
-							"column": 1
-						},
-						"end": {
-							"line": 24,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 447,
 						"end": 470,
-						"loc": {
-							"start": {
-								"line": 21,
-								"column": 1
-							},
-							"end": {
-								"line": 24,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 447,
 							"end": 449,
-							"loc": {
-								"start": {
-									"line": 21,
-									"column": 1
-								},
-								"end": {
-									"line": 21,
-									"column": 3
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -646,46 +286,16 @@
 								"type": "Identifier",
 								"start": 453,
 								"end": 454,
-								"loc": {
-									"start": {
-										"line": 22,
-										"column": 2
-									},
-									"end": {
-										"line": 22,
-										"column": 3
-									}
-								},
 								"name": "a"
 							},
 							{
 								"type": "SpreadElement",
 								"start": 458,
 								"end": 462,
-								"loc": {
-									"start": {
-										"line": 23,
-										"column": 2
-									},
-									"end": {
-										"line": 23,
-										"column": 6
-									}
-								},
 								"argument": {
 									"type": "Identifier",
 									"start": 461,
 									"end": 462,
-									"loc": {
-										"start": {
-											"line": 23,
-											"column": 5
-										},
-										"end": {
-											"line": 23,
-											"column": 6
-										}
-									},
 									"name": "b"
 								},
 								"trailingComments": [
@@ -725,44 +335,14 @@
 					"type": "ExpressionStatement",
 					"start": 474,
 					"end": 496,
-					"loc": {
-						"start": {
-							"line": 26,
-							"column": 1
-						},
-						"end": {
-							"line": 28,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "NewExpression",
 						"start": 474,
 						"end": 495,
-						"loc": {
-							"start": {
-								"line": 26,
-								"column": 1
-							},
-							"end": {
-								"line": 28,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 478,
 							"end": 479,
-							"loc": {
-								"start": {
-									"line": 26,
-									"column": 5
-								},
-								"end": {
-									"line": 26,
-									"column": 6
-								}
-							},
 							"name": "A"
 						},
 						"arguments": [
@@ -770,30 +350,10 @@
 								"type": "SpreadElement",
 								"start": 483,
 								"end": 487,
-								"loc": {
-									"start": {
-										"line": 27,
-										"column": 2
-									},
-									"end": {
-										"line": 27,
-										"column": 6
-									}
-								},
 								"argument": {
 									"type": "Identifier",
 									"start": 486,
 									"end": 487,
-									"loc": {
-										"start": {
-											"line": 27,
-											"column": 5
-										},
-										"end": {
-											"line": 27,
-											"column": 6
-										}
-									},
 									"name": "b"
 								},
 								"trailingComments": [

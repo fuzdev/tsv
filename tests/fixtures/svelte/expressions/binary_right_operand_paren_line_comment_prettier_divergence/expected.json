@@ -12,18 +12,6 @@
 				"start": 0,
 				"end": 38,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 2,
-						"character": 2
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -43,30 +31,10 @@
 								"type": "BinaryExpression",
 								"start": 6,
 								"end": 32,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 2
-									},
-									"end": {
-										"line": 5,
-										"column": 3
-									}
-								},
 								"left": {
 									"type": "Identifier",
 									"start": 6,
 									"end": 7,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 2
-										},
-										"end": {
-											"line": 2,
-											"column": 3
-										}
-									},
 									"name": "x"
 								},
 								"operator": "-",
@@ -74,30 +42,10 @@
 									"type": "BinaryExpression",
 									"start": 17,
 									"end": 22,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 3
-										},
-										"end": {
-											"line": 4,
-											"column": 8
-										}
-									},
 									"left": {
 										"type": "Identifier",
 										"start": 17,
 										"end": 18,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 3
-											},
-											"end": {
-												"line": 4,
-												"column": 4
-											}
-										},
 										"name": "y"
 									},
 									"operator": "-",
@@ -105,16 +53,6 @@
 										"type": "Identifier",
 										"start": 21,
 										"end": 22,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 7
-											},
-											"end": {
-												"line": 4,
-												"column": 8
-											}
-										},
 										"name": "z"
 									},
 									"trailingComments": [
@@ -150,36 +88,12 @@
 				"start": 40,
 				"end": 92,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 8,
-						"column": 1,
-						"character": 41
-					},
-					"end": {
-						"line": 8,
-						"column": 4,
-						"character": 44
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 46,
 						"end": 84,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 9,
-								"column": 1,
-								"character": 46
-							},
-							"end": {
-								"line": 9,
-								"column": 10,
-								"character": 55
-							}
-						},
 						"value": {
 							"type": "ExpressionTag",
 							"start": 56,
@@ -188,30 +102,10 @@
 								"type": "BinaryExpression",
 								"start": 57,
 								"end": 83,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 12
-									},
-									"end": {
-										"line": 12,
-										"column": 3
-									}
-								},
 								"left": {
 									"type": "Identifier",
 									"start": 57,
 									"end": 58,
-									"loc": {
-										"start": {
-											"line": 9,
-											"column": 12
-										},
-										"end": {
-											"line": 9,
-											"column": 13
-										}
-									},
 									"name": "x"
 								},
 								"operator": "-",
@@ -219,30 +113,10 @@
 									"type": "BinaryExpression",
 									"start": 68,
 									"end": 73,
-									"loc": {
-										"start": {
-											"line": 11,
-											"column": 3
-										},
-										"end": {
-											"line": 11,
-											"column": 8
-										}
-									},
 									"left": {
 										"type": "Identifier",
 										"start": 68,
 										"end": 69,
-										"loc": {
-											"start": {
-												"line": 11,
-												"column": 3
-											},
-											"end": {
-												"line": 11,
-												"column": 4
-											}
-										},
 										"name": "y"
 									},
 									"operator": "-",
@@ -250,16 +124,6 @@
 										"type": "Identifier",
 										"start": 72,
 										"end": 73,
-										"loc": {
-											"start": {
-												"line": 11,
-												"column": 7
-											},
-											"end": {
-												"line": 11,
-												"column": 8
-											}
-										},
 										"name": "z"
 									},
 									"trailingComments": [
@@ -296,30 +160,10 @@
 					"type": "BinaryExpression",
 					"start": 99,
 					"end": 122,
-					"loc": {
-						"start": {
-							"line": 15,
-							"column": 5
-						},
-						"end": {
-							"line": 18,
-							"column": 2
-						}
-					},
 					"left": {
 						"type": "Identifier",
 						"start": 99,
 						"end": 100,
-						"loc": {
-							"start": {
-								"line": 15,
-								"column": 5
-							},
-							"end": {
-								"line": 15,
-								"column": 6
-							}
-						},
 						"name": "x"
 					},
 					"operator": "-",
@@ -327,30 +171,10 @@
 						"type": "BinaryExpression",
 						"start": 108,
 						"end": 113,
-						"loc": {
-							"start": {
-								"line": 17,
-								"column": 2
-							},
-							"end": {
-								"line": 17,
-								"column": 7
-							}
-						},
 						"left": {
 							"type": "Identifier",
 							"start": 108,
 							"end": 109,
-							"loc": {
-								"start": {
-									"line": 17,
-									"column": 2
-								},
-								"end": {
-									"line": 17,
-									"column": 3
-								}
-							},
 							"name": "y"
 						},
 						"operator": "-",
@@ -358,16 +182,6 @@
 							"type": "Identifier",
 							"start": 112,
 							"end": 113,
-							"loc": {
-								"start": {
-									"line": 17,
-									"column": 6
-								},
-								"end": {
-									"line": 17,
-									"column": 7
-								}
-							},
 							"name": "z"
 						},
 						"trailingComments": [
@@ -395,18 +209,6 @@
 							"start": 126,
 							"end": 137,
 							"name": "p",
-							"name_loc": {
-								"start": {
-									"line": 20,
-									"column": 2,
-									"character": 127
-								},
-								"end": {
-									"line": 20,
-									"column": 3,
-									"character": 128
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -440,49 +242,19 @@
 			"type": "Line",
 			"value": " c1",
 			"start": 23,
-			"end": 28,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 9
-				},
-				"end": {
-					"line": 4,
-					"column": 14
-				}
-			}
+			"end": 28
 		},
 		{
 			"type": "Line",
 			"value": " c2",
 			"start": 74,
-			"end": 79,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 9
-				},
-				"end": {
-					"line": 11,
-					"column": 14
-				}
-			}
+			"end": 79
 		},
 		{
 			"type": "Line",
 			"value": " c3",
 			"start": 114,
-			"end": 119,
-			"loc": {
-				"start": {
-					"line": 17,
-					"column": 8
-				},
-				"end": {
-					"line": 17,
-					"column": 13
-				}
-			}
+			"end": 119
 		}
 	]
 }

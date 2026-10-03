@@ -293,7 +293,7 @@ Options:
   --stdin           read from stdin (requires --parser)
   --parser <p>      parser type: svelte | typescript | css
   --source-type <t> TypeScript parse goal: script | module (default: module; an error with svelte/css)
-  --no-locations    omit per-node loc (span-only wire; svelte also omits name_loc; no-op for css)
+  --no-locations    omit per-node loc (span-only wire; svelte also omits name_loc)
 `;
 
 /**
@@ -1458,8 +1458,8 @@ function run_parse({ values, positionals }) {
 		}
 	}
 
-	// --no-locations drops per-node `loc` (span-only wire; svelte also `name_loc`,
-	// a no-op for css); orthogonal to --source-type (the source type drives the TS
+	// --no-locations drops per-node `loc` (span-only wire; svelte also `name_loc`)
+	// in every language; orthogonal to --source-type (the source type drives the TS
 	// parser, no-locations the writer), so they compose. `locations` is a parse-only
 	// option — format emits no wire and rejects the key.
 	const no_locations = values.no_locations === true;

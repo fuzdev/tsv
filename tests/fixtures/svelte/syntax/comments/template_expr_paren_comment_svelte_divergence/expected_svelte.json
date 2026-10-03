@@ -15,44 +15,14 @@
 					"type": "LogicalExpression",
 					"start": 1,
 					"end": 31,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 1
-						},
-						"end": {
-							"line": 1,
-							"column": 31
-						}
-					},
 					"left": {
 						"type": "LogicalExpression",
 						"start": 2,
 						"end": 8,
-						"loc": {
-							"start": {
-								"line": 1,
-								"column": 2
-							},
-							"end": {
-								"line": 1,
-								"column": 8
-							}
-						},
 						"left": {
 							"type": "Identifier",
 							"start": 2,
 							"end": 3,
-							"loc": {
-								"start": {
-									"line": 1,
-									"column": 2
-								},
-								"end": {
-									"line": 1,
-									"column": 3
-								}
-							},
 							"name": "a"
 						},
 						"operator": "||",
@@ -60,16 +30,6 @@
 							"type": "Identifier",
 							"start": 7,
 							"end": 8,
-							"loc": {
-								"start": {
-									"line": 1,
-									"column": 7
-								},
-								"end": {
-									"line": 1,
-									"column": 8
-								}
-							},
 							"name": "b"
 						}
 					},
@@ -78,30 +38,10 @@
 						"type": "LogicalExpression",
 						"start": 22,
 						"end": 30,
-						"loc": {
-							"start": {
-								"line": 1,
-								"column": 22
-							},
-							"end": {
-								"line": 1,
-								"column": 30
-							}
-						},
 						"left": {
 							"type": "Identifier",
 							"start": 22,
 							"end": 24,
-							"loc": {
-								"start": {
-									"line": 1,
-									"column": 22
-								},
-								"end": {
-									"line": 1,
-									"column": 24
-								}
-							},
 							"name": "cc"
 						},
 						"operator": "||",
@@ -109,16 +49,6 @@
 							"type": "Identifier",
 							"start": 28,
 							"end": 30,
-							"loc": {
-								"start": {
-									"line": 1,
-									"column": 28
-								},
-								"end": {
-									"line": 1,
-									"column": 30
-								}
-							},
 							"name": "dd"
 						}
 					}
@@ -132,17 +62,7 @@
 			"type": "Block",
 			"value": " c ",
 			"start": 13,
-			"end": 20,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 13
-				},
-				"end": {
-					"line": 1,
-					"column": 20
-				}
-			}
+			"end": 20
 		}
 	]
 }

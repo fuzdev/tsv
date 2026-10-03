@@ -14,49 +14,19 @@
 			"type": "Line",
 			"value": " a plain constructor is neither async nor a generator",
 			"start": 32,
-			"end": 87,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 2
-				},
-				"end": {
-					"line": 3,
-					"column": 57
-				}
-			}
+			"end": 87
 		},
 		{
 			"type": "Line",
 			"value": " an async method (not the constructor) is fine",
 			"start": 109,
-			"end": 157,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 2
-				},
-				"end": {
-					"line": 5,
-					"column": 50
-				}
-			}
+			"end": 157
 		},
 		{
 			"type": "Line",
 			"value": " a generator method (not the constructor) is fine",
 			"start": 175,
-			"end": 226,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 2
-				},
-				"end": {
-					"line": 7,
-					"column": 53
-				}
-			}
+			"end": 226
 		}
 	],
 	"instance": {
@@ -68,45 +38,15 @@
 			"type": "Program",
 			"start": 18,
 			"end": 240,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 10,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ClassDeclaration",
 					"start": 20,
 					"end": 239,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 9,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 26,
 						"end": 27,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 7
-							},
-							"end": {
-								"line": 2,
-								"column": 8
-							}
-						},
 						"name": "C"
 					},
 					"superClass": null,
@@ -114,47 +54,17 @@
 						"type": "ClassBody",
 						"start": 28,
 						"end": 239,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 9
-							},
-							"end": {
-								"line": 9,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "MethodDefinition",
 								"start": 90,
 								"end": 106,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 2
-									},
-									"end": {
-										"line": 4,
-										"column": 18
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
 									"start": 90,
 									"end": 101,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 2
-										},
-										"end": {
-											"line": 4,
-											"column": 13
-										}
-									},
 									"name": "constructor"
 								},
 								"kind": "constructor",
@@ -162,16 +72,6 @@
 									"type": "FunctionExpression",
 									"start": 101,
 									"end": 106,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 13
-										},
-										"end": {
-											"line": 4,
-											"column": 18
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -181,16 +81,6 @@
 										"type": "BlockStatement",
 										"start": 104,
 										"end": 106,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 16
-											},
-											"end": {
-												"line": 4,
-												"column": 18
-											}
-										},
 										"body": []
 									}
 								},
@@ -207,32 +97,12 @@
 								"type": "MethodDefinition",
 								"start": 160,
 								"end": 172,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 2
-									},
-									"end": {
-										"line": 6,
-										"column": 14
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
 									"start": 166,
 									"end": 167,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 8
-										},
-										"end": {
-											"line": 6,
-											"column": 9
-										}
-									},
 									"name": "m"
 								},
 								"kind": "method",
@@ -240,16 +110,6 @@
 									"type": "FunctionExpression",
 									"start": 167,
 									"end": 172,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 9
-										},
-										"end": {
-											"line": 6,
-											"column": 14
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -259,16 +119,6 @@
 										"type": "BlockStatement",
 										"start": 170,
 										"end": 172,
-										"loc": {
-											"start": {
-												"line": 6,
-												"column": 12
-											},
-											"end": {
-												"line": 6,
-												"column": 14
-											}
-										},
 										"body": []
 									}
 								},
@@ -285,32 +135,12 @@
 								"type": "MethodDefinition",
 								"start": 229,
 								"end": 236,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 2
-									},
-									"end": {
-										"line": 8,
-										"column": 9
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
 									"start": 230,
 									"end": 231,
-									"loc": {
-										"start": {
-											"line": 8,
-											"column": 3
-										},
-										"end": {
-											"line": 8,
-											"column": 4
-										}
-									},
 									"name": "g"
 								},
 								"kind": "method",
@@ -318,16 +148,6 @@
 									"type": "FunctionExpression",
 									"start": 231,
 									"end": 236,
-									"loc": {
-										"start": {
-											"line": 8,
-											"column": 4
-										},
-										"end": {
-											"line": 8,
-											"column": 9
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": true,
@@ -337,16 +157,6 @@
 										"type": "BlockStatement",
 										"start": 234,
 										"end": 236,
-										"loc": {
-											"start": {
-												"line": 8,
-												"column": 7
-											},
-											"end": {
-												"line": 8,
-												"column": 9
-											}
-										},
 										"body": []
 									}
 								},
@@ -371,18 +181,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

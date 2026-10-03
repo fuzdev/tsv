@@ -19,16 +19,6 @@
 			"type": "Program",
 			"start": 46,
 			"end": 47,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 2,
-					"column": 9
-				}
-			},
 			"body": [],
 			"sourceType": "module"
 		},
@@ -38,18 +28,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,
@@ -65,18 +43,6 @@
 				"start": 18,
 				"end": 45,
 				"name": "generics",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 18,
-						"character": 18
-					},
-					"end": {
-						"line": 1,
-						"column": 26,
-						"character": 26
-					}
-				},
 				"value": [
 					{
 						"start": 28,

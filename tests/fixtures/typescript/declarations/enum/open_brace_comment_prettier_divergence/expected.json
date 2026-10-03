@@ -14,241 +14,91 @@
 			"type": "Line",
 			"value": " line comment trailing an enum body `{`",
 			"start": 20,
-			"end": 61,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 42
-				}
-			}
+			"end": 61
 		},
 		{
 			"type": "Line",
 			"value": " c1",
 			"start": 72,
-			"end": 77,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 10
-				},
-				"end": {
-					"line": 3,
-					"column": 15
-				}
-			}
+			"end": 77
 		},
 		{
 			"type": "Line",
 			"value": " block comment trailing the body `{`, then own-line leading comment",
 			"start": 87,
-			"end": 156,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 1
-				},
-				"end": {
-					"line": 7,
-					"column": 70
-				}
-			}
+			"end": 156
 		},
 		{
 			"type": "Block",
 			"value": " brace ",
 			"start": 167,
-			"end": 178,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 10
-				},
-				"end": {
-					"line": 8,
-					"column": 21
-				}
-			}
+			"end": 178
 		},
 		{
 			"type": "Line",
 			"value": " lead",
 			"start": 181,
-			"end": 188,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 2
-				},
-				"end": {
-					"line": 9,
-					"column": 9
-				}
-			}
+			"end": 188
 		},
 		{
 			"type": "Line",
 			"value": " an author blank BELOW the pulled comment survives — the blank is authorship, not",
 			"start": 198,
-			"end": 281,
-			"loc": {
-				"start": {
-					"line": 13,
-					"column": 1
-				},
-				"end": {
-					"line": 13,
-					"column": 84
-				}
-			}
+			"end": 281
 		},
 		{
 			"type": "Line",
 			"value": " the container's leading gap",
 			"start": 283,
-			"end": 313,
-			"loc": {
-				"start": {
-					"line": 14,
-					"column": 1
-				},
-				"end": {
-					"line": 14,
-					"column": 31
-				}
-			}
+			"end": 313
 		},
 		{
 			"type": "Line",
 			"value": " c2",
 			"start": 324,
-			"end": 329,
-			"loc": {
-				"start": {
-					"line": 15,
-					"column": 10
-				},
-				"end": {
-					"line": 15,
-					"column": 15
-				}
-			}
+			"end": 329
 		},
 		{
 			"type": "Line",
 			"value": " the same, with the block spelling (an own-line comment is what pulls a block onto",
 			"start": 340,
-			"end": 424,
-			"loc": {
-				"start": {
-					"line": 20,
-					"column": 1
-				},
-				"end": {
-					"line": 20,
-					"column": 85
-				}
-			}
+			"end": 424
 		},
 		{
 			"type": "Line",
 			"value": " the `{` line)",
 			"start": 426,
-			"end": 442,
-			"loc": {
-				"start": {
-					"line": 21,
-					"column": 1
-				},
-				"end": {
-					"line": 21,
-					"column": 17
-				}
-			}
+			"end": 442
 		},
 		{
 			"type": "Block",
 			"value": " brace2 ",
 			"start": 453,
-			"end": 465,
-			"loc": {
-				"start": {
-					"line": 22,
-					"column": 10
-				},
-				"end": {
-					"line": 22,
-					"column": 22
-				}
-			}
+			"end": 465
 		},
 		{
 			"type": "Line",
 			"value": " lead",
 			"start": 469,
-			"end": 476,
-			"loc": {
-				"start": {
-					"line": 24,
-					"column": 2
-				},
-				"end": {
-					"line": 24,
-					"column": 9
-				}
-			}
+			"end": 476
 		},
 		{
 			"type": "Line",
 			"value": " the blank ABOVE the comment is a different question and stays erased — it sits",
 			"start": 486,
-			"end": 567,
-			"loc": {
-				"start": {
-					"line": 28,
-					"column": 1
-				},
-				"end": {
-					"line": 28,
-					"column": 82
-				}
-			}
+			"end": 567
 		},
 		{
 			"type": "Line",
 			"value": " against the delimiter, where both formatters drop it at every bracket",
 			"start": 569,
-			"end": 641,
-			"loc": {
-				"start": {
-					"line": 29,
-					"column": 1
-				},
-				"end": {
-					"line": 29,
-					"column": 73
-				}
-			}
+			"end": 641
 		},
 		{
 			"type": "Line",
 			"value": " c3",
 			"start": 654,
-			"end": 659,
-			"loc": {
-				"start": {
-					"line": 31,
-					"column": 2
-				},
-				"end": {
-					"line": 31,
-					"column": 7
-				}
-			}
+			"end": 659
 		}
 	],
 	"instance": {
@@ -260,45 +110,15 @@
 			"type": "Program",
 			"start": 18,
 			"end": 667,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 34,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "TSEnumDeclaration",
 					"start": 63,
 					"end": 84,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 68,
 						"end": 69,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 6
-							},
-							"end": {
-								"line": 3,
-								"column": 7
-							}
-						},
 						"name": "E"
 					},
 					"members": [
@@ -306,30 +126,10 @@
 							"type": "TSEnumMember",
 							"start": 80,
 							"end": 81,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 2
-								},
-								"end": {
-									"line": 4,
-									"column": 3
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 80,
 								"end": 81,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 2
-									},
-									"end": {
-										"line": 4,
-										"column": 3
-									}
-								},
 								"name": "A"
 							},
 							"leadingComments": [
@@ -355,30 +155,10 @@
 					"type": "TSEnumDeclaration",
 					"start": 158,
 					"end": 195,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 1
-						},
-						"end": {
-							"line": 11,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 163,
 						"end": 164,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 6
-							},
-							"end": {
-								"line": 8,
-								"column": 7
-							}
-						},
 						"name": "F"
 					},
 					"members": [
@@ -386,30 +166,10 @@
 							"type": "TSEnumMember",
 							"start": 191,
 							"end": 192,
-							"loc": {
-								"start": {
-									"line": 10,
-									"column": 2
-								},
-								"end": {
-									"line": 10,
-									"column": 3
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 191,
 								"end": 192,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 2
-									},
-									"end": {
-										"line": 10,
-										"column": 3
-									}
-								},
 								"name": "B"
 							},
 							"leadingComments": [
@@ -441,30 +201,10 @@
 					"type": "TSEnumDeclaration",
 					"start": 315,
 					"end": 337,
-					"loc": {
-						"start": {
-							"line": 15,
-							"column": 1
-						},
-						"end": {
-							"line": 18,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 320,
 						"end": 321,
-						"loc": {
-							"start": {
-								"line": 15,
-								"column": 6
-							},
-							"end": {
-								"line": 15,
-								"column": 7
-							}
-						},
 						"name": "G"
 					},
 					"members": [
@@ -472,30 +212,10 @@
 							"type": "TSEnumMember",
 							"start": 333,
 							"end": 334,
-							"loc": {
-								"start": {
-									"line": 17,
-									"column": 2
-								},
-								"end": {
-									"line": 17,
-									"column": 3
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 333,
 								"end": 334,
-								"loc": {
-									"start": {
-										"line": 17,
-										"column": 2
-									},
-									"end": {
-										"line": 17,
-										"column": 3
-									}
-								},
 								"name": "C"
 							},
 							"leadingComments": [
@@ -527,30 +247,10 @@
 					"type": "TSEnumDeclaration",
 					"start": 444,
 					"end": 483,
-					"loc": {
-						"start": {
-							"line": 22,
-							"column": 1
-						},
-						"end": {
-							"line": 26,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 449,
 						"end": 450,
-						"loc": {
-							"start": {
-								"line": 22,
-								"column": 6
-							},
-							"end": {
-								"line": 22,
-								"column": 7
-							}
-						},
 						"name": "H"
 					},
 					"members": [
@@ -558,30 +258,10 @@
 							"type": "TSEnumMember",
 							"start": 479,
 							"end": 480,
-							"loc": {
-								"start": {
-									"line": 25,
-									"column": 2
-								},
-								"end": {
-									"line": 25,
-									"column": 3
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 479,
 								"end": 480,
-								"loc": {
-									"start": {
-										"line": 25,
-										"column": 2
-									},
-									"end": {
-										"line": 25,
-										"column": 3
-									}
-								},
 								"name": "D"
 							},
 							"leadingComments": [
@@ -619,30 +299,10 @@
 					"type": "TSEnumDeclaration",
 					"start": 643,
 					"end": 666,
-					"loc": {
-						"start": {
-							"line": 30,
-							"column": 1
-						},
-						"end": {
-							"line": 33,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 648,
 						"end": 649,
-						"loc": {
-							"start": {
-								"line": 30,
-								"column": 6
-							},
-							"end": {
-								"line": 30,
-								"column": 7
-							}
-						},
 						"name": "I"
 					},
 					"members": [
@@ -650,30 +310,10 @@
 							"type": "TSEnumMember",
 							"start": 662,
 							"end": 663,
-							"loc": {
-								"start": {
-									"line": 32,
-									"column": 2
-								},
-								"end": {
-									"line": 32,
-									"column": 3
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 662,
 								"end": 663,
-								"loc": {
-									"start": {
-										"line": 32,
-										"column": 2
-									},
-									"end": {
-										"line": 32,
-										"column": 3
-									}
-								},
 								"name": "E"
 							},
 							"leadingComments": [
@@ -710,18 +350,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

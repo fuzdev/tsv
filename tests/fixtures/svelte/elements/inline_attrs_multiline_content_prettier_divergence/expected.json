@@ -25,18 +25,6 @@
 				"start": 184,
 				"end": 346,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 1,
-						"character": 185
-					},
-					"end": {
-						"line": 3,
-						"column": 4,
-						"character": 188
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -53,36 +41,12 @@
 							"start": 191,
 							"end": 339,
 							"name": "label",
-							"name_loc": {
-								"start": {
-									"line": 4,
-									"column": 2,
-									"character": 192
-								},
-								"end": {
-									"line": 4,
-									"column": 7,
-									"character": 197
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 198,
 									"end": 206,
 									"name": "for",
-									"name_loc": {
-										"start": {
-											"line": 4,
-											"column": 8,
-											"character": 198
-										},
-										"end": {
-											"line": 4,
-											"column": 11,
-											"character": 201
-										}
-									},
 									"value": [
 										{
 											"start": 203,
@@ -98,18 +62,6 @@
 									"start": 207,
 									"end": 270,
 									"name": "class",
-									"name_loc": {
-										"start": {
-											"line": 4,
-											"column": 17,
-											"character": 207
-										},
-										"end": {
-											"line": 4,
-											"column": 22,
-											"character": 212
-										}
-									},
 									"value": [
 										{
 											"start": 214,
@@ -125,18 +77,6 @@
 									"start": 271,
 									"end": 288,
 									"name": "data-attr",
-									"name_loc": {
-										"start": {
-											"line": 4,
-											"column": 81,
-											"character": 271
-										},
-										"end": {
-											"line": 4,
-											"column": 90,
-											"character": 280
-										}
-									},
 									"value": [
 										{
 											"start": 282,
@@ -163,36 +103,12 @@
 										"start": 292,
 										"end": 317,
 										"name": "input",
-										"name_loc": {
-											"start": {
-												"line": 5,
-												"column": 3,
-												"character": 293
-											},
-											"end": {
-												"line": 5,
-												"column": 8,
-												"character": 298
-											}
-										},
 										"attributes": [
 											{
 												"type": "Attribute",
 												"start": 299,
 												"end": 314,
 												"name": "type",
-												"name_loc": {
-													"start": {
-														"line": 5,
-														"column": 9,
-														"character": 299
-													},
-													"end": {
-														"line": 5,
-														"column": 13,
-														"character": 303
-													}
-												},
 												"value": [
 													{
 														"start": 305,

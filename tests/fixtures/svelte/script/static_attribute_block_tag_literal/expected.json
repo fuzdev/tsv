@@ -9,18 +9,6 @@
 				"start": 437,
 				"end": 450,
 				"name": "baz",
-				"name_loc": {
-					"start": {
-						"line": 11,
-						"column": 7,
-						"character": 437
-					},
-					"end": {
-						"line": 11,
-						"column": 10,
-						"character": 440
-					}
-				},
 				"value": [
 					{
 						"start": 442,
@@ -36,18 +24,6 @@
 				"start": 451,
 				"end": 464,
 				"name": "qux",
-				"name_loc": {
-					"start": {
-						"line": 11,
-						"column": 21,
-						"character": 451
-					},
-					"end": {
-						"line": 11,
-						"column": 24,
-						"character": 454
-					}
-				},
 				"value": [
 					{
 						"start": 456,
@@ -113,16 +89,6 @@
 			"type": "Program",
 			"start": 44,
 			"end": 44,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 1,
-					"column": 53
-				}
-			},
 			"body": [],
 			"sourceType": "module"
 		},
@@ -132,18 +98,6 @@
 				"start": 8,
 				"end": 27,
 				"name": "foo",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 11,
-						"character": 11
-					}
-				},
 				"value": [
 					{
 						"start": 13,
@@ -159,18 +113,6 @@
 				"start": 28,
 				"end": 43,
 				"name": "bar",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 28,
-						"character": 28
-					},
-					"end": {
-						"line": 1,
-						"column": 31,
-						"character": 31
-					}
-				},
 				"value": [
 					{
 						"start": 33,

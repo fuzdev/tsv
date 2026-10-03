@@ -14,161 +14,61 @@
 			"type": "Line",
 			"value": " an own-line comment left behind by a spread's stripped parens, on an argument the",
 			"start": 10,
-			"end": 94,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 85
-				}
-			}
+			"end": 94
 		},
 		{
 			"type": "Line",
 			"value": " list continues past: it becomes a sibling line ahead of the next argument",
 			"start": 96,
-			"end": 172,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 77
-				}
-			}
+			"end": 172
 		},
 		{
 			"type": "Block",
 			"value": " i ",
 			"start": 188,
-			"end": 195,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 2
-				},
-				"end": {
-					"line": 6,
-					"column": 9
-				}
-			}
+			"end": 195
 		},
 		{
 			"type": "Block",
 			"value": " i ",
 			"start": 223,
-			"end": 230,
-			"loc": {
-				"start": {
-					"line": 12,
-					"column": 2
-				},
-				"end": {
-					"line": 12,
-					"column": 9
-				}
-			}
+			"end": 230
 		},
 		{
 			"type": "Block",
 			"value": " i ",
 			"start": 263,
-			"end": 270,
-			"loc": {
-				"start": {
-					"line": 18,
-					"column": 2
-				},
-				"end": {
-					"line": 18,
-					"column": 9
-				}
-			}
+			"end": 270
 		},
 		{
 			"type": "Line",
 			"value": " the same on an argument in the middle of the list",
 			"start": 281,
-			"end": 333,
-			"loc": {
-				"start": {
-					"line": 22,
-					"column": 1
-				},
-				"end": {
-					"line": 22,
-					"column": 53
-				}
-			}
+			"end": 333
 		},
 		{
 			"type": "Block",
 			"value": " i ",
 			"start": 354,
-			"end": 361,
-			"loc": {
-				"start": {
-					"line": 26,
-					"column": 2
-				},
-				"end": {
-					"line": 26,
-					"column": 9
-				}
-			}
+			"end": 361
 		},
 		{
 			"type": "Line",
 			"value": " a line comment written on its own line after the `)` keeps its own line too",
 			"start": 372,
-			"end": 450,
-			"loc": {
-				"start": {
-					"line": 30,
-					"column": 1
-				},
-				"end": {
-					"line": 30,
-					"column": 79
-				}
-			}
+			"end": 450
 		},
 		{
 			"type": "Block",
 			"value": " i ",
 			"start": 466,
-			"end": 473,
-			"loc": {
-				"start": {
-					"line": 33,
-					"column": 2
-				},
-				"end": {
-					"line": 33,
-					"column": 9
-				}
-			}
+			"end": 473
 		},
 		{
 			"type": "Line",
 			"value": " t",
 			"start": 476,
-			"end": 480,
-			"loc": {
-				"start": {
-					"line": 34,
-					"column": 2
-				},
-				"end": {
-					"line": 34,
-					"column": 6
-				}
-			}
+			"end": 480
 		}
 	],
 	"instance": {
@@ -180,59 +80,19 @@
 			"type": "Program",
 			"start": 8,
 			"end": 489,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 37,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
 					"start": 174,
 					"end": 203,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 174,
 						"end": 202,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 1
-							},
-							"end": {
-								"line": 8,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 174,
 							"end": 176,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 1
-								},
-								"end": {
-									"line": 4,
-									"column": 3
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -240,30 +100,10 @@
 								"type": "SpreadElement",
 								"start": 180,
 								"end": 184,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 2
-									},
-									"end": {
-										"line": 5,
-										"column": 6
-									}
-								},
 								"argument": {
 									"type": "Identifier",
 									"start": 183,
 									"end": 184,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 5
-										},
-										"end": {
-											"line": 5,
-											"column": 6
-										}
-									},
 									"name": "b"
 								}
 							},
@@ -271,16 +111,6 @@
 								"type": "Identifier",
 								"start": 198,
 								"end": 199,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 2
-									},
-									"end": {
-										"line": 7,
-										"column": 3
-									}
-								},
 								"name": "c",
 								"leadingComments": [
 									{
@@ -313,44 +143,14 @@
 					"type": "ExpressionStatement",
 					"start": 206,
 					"end": 238,
-					"loc": {
-						"start": {
-							"line": 10,
-							"column": 1
-						},
-						"end": {
-							"line": 14,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "NewExpression",
 						"start": 206,
 						"end": 237,
-						"loc": {
-							"start": {
-								"line": 10,
-								"column": 1
-							},
-							"end": {
-								"line": 14,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 210,
 							"end": 211,
-							"loc": {
-								"start": {
-									"line": 10,
-									"column": 5
-								},
-								"end": {
-									"line": 10,
-									"column": 6
-								}
-							},
 							"name": "A"
 						},
 						"arguments": [
@@ -358,30 +158,10 @@
 								"type": "SpreadElement",
 								"start": 215,
 								"end": 219,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 2
-									},
-									"end": {
-										"line": 11,
-										"column": 6
-									}
-								},
 								"argument": {
 									"type": "Identifier",
 									"start": 218,
 									"end": 219,
-									"loc": {
-										"start": {
-											"line": 11,
-											"column": 5
-										},
-										"end": {
-											"line": 11,
-											"column": 6
-										}
-									},
 									"name": "b"
 								}
 							},
@@ -389,16 +169,6 @@
 								"type": "Identifier",
 								"start": 233,
 								"end": 234,
-								"loc": {
-									"start": {
-										"line": 13,
-										"column": 2
-									},
-									"end": {
-										"line": 13,
-										"column": 3
-									}
-								},
 								"name": "c",
 								"leadingComments": [
 									{
@@ -416,74 +186,24 @@
 					"type": "ExpressionStatement",
 					"start": 241,
 					"end": 278,
-					"loc": {
-						"start": {
-							"line": 16,
-							"column": 1
-						},
-						"end": {
-							"line": 20,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 241,
 						"end": 277,
-						"loc": {
-							"start": {
-								"line": 16,
-								"column": 1
-							},
-							"end": {
-								"line": 20,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "MemberExpression",
 							"start": 241,
 							"end": 251,
-							"loc": {
-								"start": {
-									"line": 16,
-									"column": 1
-								},
-								"end": {
-									"line": 16,
-									"column": 11
-								}
-							},
 							"object": {
 								"type": "Identifier",
 								"start": 241,
 								"end": 244,
-								"loc": {
-									"start": {
-										"line": 16,
-										"column": 1
-									},
-									"end": {
-										"line": 16,
-										"column": 4
-									}
-								},
 								"name": "obj"
 							},
 							"property": {
 								"type": "Identifier",
 								"start": 245,
 								"end": 251,
-								"loc": {
-									"start": {
-										"line": 16,
-										"column": 5
-									},
-									"end": {
-										"line": 16,
-										"column": 11
-									}
-								},
 								"name": "method"
 							},
 							"computed": false,
@@ -494,30 +214,10 @@
 								"type": "SpreadElement",
 								"start": 255,
 								"end": 259,
-								"loc": {
-									"start": {
-										"line": 17,
-										"column": 2
-									},
-									"end": {
-										"line": 17,
-										"column": 6
-									}
-								},
 								"argument": {
 									"type": "Identifier",
 									"start": 258,
 									"end": 259,
-									"loc": {
-										"start": {
-											"line": 17,
-											"column": 5
-										},
-										"end": {
-											"line": 17,
-											"column": 6
-										}
-									},
 									"name": "b"
 								}
 							},
@@ -525,16 +225,6 @@
 								"type": "Identifier",
 								"start": 273,
 								"end": 274,
-								"loc": {
-									"start": {
-										"line": 19,
-										"column": 2
-									},
-									"end": {
-										"line": 19,
-										"column": 3
-									}
-								},
 								"name": "c",
 								"leadingComments": [
 									{
@@ -553,44 +243,14 @@
 					"type": "ExpressionStatement",
 					"start": 335,
 					"end": 369,
-					"loc": {
-						"start": {
-							"line": 23,
-							"column": 1
-						},
-						"end": {
-							"line": 28,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 335,
 						"end": 368,
-						"loc": {
-							"start": {
-								"line": 23,
-								"column": 1
-							},
-							"end": {
-								"line": 28,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 335,
 							"end": 337,
-							"loc": {
-								"start": {
-									"line": 23,
-									"column": 1
-								},
-								"end": {
-									"line": 23,
-									"column": 3
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -598,46 +258,16 @@
 								"type": "Identifier",
 								"start": 341,
 								"end": 342,
-								"loc": {
-									"start": {
-										"line": 24,
-										"column": 2
-									},
-									"end": {
-										"line": 24,
-										"column": 3
-									}
-								},
 								"name": "a"
 							},
 							{
 								"type": "SpreadElement",
 								"start": 346,
 								"end": 350,
-								"loc": {
-									"start": {
-										"line": 25,
-										"column": 2
-									},
-									"end": {
-										"line": 25,
-										"column": 6
-									}
-								},
 								"argument": {
 									"type": "Identifier",
 									"start": 349,
 									"end": 350,
-									"loc": {
-										"start": {
-											"line": 25,
-											"column": 5
-										},
-										"end": {
-											"line": 25,
-											"column": 6
-										}
-									},
 									"name": "b"
 								}
 							},
@@ -645,16 +275,6 @@
 								"type": "Identifier",
 								"start": 364,
 								"end": 365,
-								"loc": {
-									"start": {
-										"line": 27,
-										"column": 2
-									},
-									"end": {
-										"line": 27,
-										"column": 3
-									}
-								},
 								"name": "c",
 								"leadingComments": [
 									{
@@ -681,44 +301,14 @@
 					"type": "ExpressionStatement",
 					"start": 452,
 					"end": 488,
-					"loc": {
-						"start": {
-							"line": 31,
-							"column": 1
-						},
-						"end": {
-							"line": 36,
-							"column": 3
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 452,
 						"end": 487,
-						"loc": {
-							"start": {
-								"line": 31,
-								"column": 1
-							},
-							"end": {
-								"line": 36,
-								"column": 2
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 452,
 							"end": 454,
-							"loc": {
-								"start": {
-									"line": 31,
-									"column": 1
-								},
-								"end": {
-									"line": 31,
-									"column": 3
-								}
-							},
 							"name": "fn"
 						},
 						"arguments": [
@@ -726,30 +316,10 @@
 								"type": "SpreadElement",
 								"start": 458,
 								"end": 462,
-								"loc": {
-									"start": {
-										"line": 32,
-										"column": 2
-									},
-									"end": {
-										"line": 32,
-										"column": 6
-									}
-								},
 								"argument": {
 									"type": "Identifier",
 									"start": 461,
 									"end": 462,
-									"loc": {
-										"start": {
-											"line": 32,
-											"column": 5
-										},
-										"end": {
-											"line": 32,
-											"column": 6
-										}
-									},
 									"name": "b"
 								}
 							},
@@ -757,16 +327,6 @@
 								"type": "Identifier",
 								"start": 483,
 								"end": 484,
-								"loc": {
-									"start": {
-										"line": 35,
-										"column": 2
-									},
-									"end": {
-										"line": 35,
-										"column": 3
-									}
-								},
 								"name": "c",
 								"leadingComments": [
 									{

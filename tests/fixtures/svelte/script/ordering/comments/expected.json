@@ -131,18 +131,6 @@
 				"start": 132,
 				"end": 145,
 				"name": "h1",
-				"name_loc": {
-					"start": {
-						"line": 10,
-						"column": 1,
-						"character": 133
-					},
-					"end": {
-						"line": 10,
-						"column": 3,
-						"character": 135
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -194,76 +182,26 @@
 			"type": "Program",
 			"start": 77,
 			"end": 95,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 0
-				},
-				"end": {
-					"line": 7,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 79,
 					"end": 94,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 16
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 85,
 							"end": 93,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 7
-								},
-								"end": {
-									"line": 6,
-									"column": 15
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 85,
 								"end": 86,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 7
-									},
-									"end": {
-										"line": 6,
-										"column": 8
-									}
-								},
 								"name": "a"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 89,
 								"end": 93,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 11
-									},
-									"end": {
-										"line": 6,
-										"column": 15
-									}
-								},
 								"value": true,
 								"raw": "true"
 							}

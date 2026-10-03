@@ -19,103 +19,33 @@
 			"type": "Program",
 			"start": 44,
 			"end": 67,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 4,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 46,
 					"end": 55,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 10
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 50,
 							"end": 54,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 5
-								},
-								"end": {
-									"line": 2,
-									"column": 9
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 50,
 								"end": 54,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 5
-									},
-									"end": {
-										"line": 2,
-										"column": 9
-									}
-								},
 								"name": "a",
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
 									"start": 51,
 									"end": 54,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 6
-										},
-										"end": {
-											"line": 2,
-											"column": 9
-										}
-									},
 									"typeAnnotation": {
 										"type": "TSTypeReference",
 										"start": 53,
 										"end": 54,
-										"loc": {
-											"start": {
-												"line": 2,
-												"column": 8
-											},
-											"end": {
-												"line": 2,
-												"column": 9
-											}
-										},
 										"typeName": {
 											"type": "Identifier",
 											"start": 53,
 											"end": 54,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 8
-												},
-												"end": {
-													"line": 2,
-													"column": 9
-												}
-											},
 											"name": "T"
 										}
 									}
@@ -130,88 +60,28 @@
 					"type": "VariableDeclaration",
 					"start": 57,
 					"end": 66,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 10
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 61,
 							"end": 65,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 5
-								},
-								"end": {
-									"line": 3,
-									"column": 9
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 61,
 								"end": 65,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 5
-									},
-									"end": {
-										"line": 3,
-										"column": 9
-									}
-								},
 								"name": "b",
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
 									"start": 62,
 									"end": 65,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 6
-										},
-										"end": {
-											"line": 3,
-											"column": 9
-										}
-									},
 									"typeAnnotation": {
 										"type": "TSTypeReference",
 										"start": 64,
 										"end": 65,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 8
-											},
-											"end": {
-												"line": 3,
-												"column": 9
-											}
-										},
 										"typeName": {
 											"type": "Identifier",
 											"start": 64,
 											"end": 65,
-											"loc": {
-												"start": {
-													"line": 3,
-													"column": 8
-												},
-												"end": {
-													"line": 3,
-													"column": 9
-												}
-											},
 											"name": "U"
 										}
 									}
@@ -231,18 +101,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,
@@ -258,18 +116,6 @@
 				"start": 18,
 				"end": 43,
 				"name": "generics",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 18,
-						"character": 18
-					},
-					"end": {
-						"line": 1,
-						"column": 26,
-						"character": 26
-					}
-				},
 				"value": [
 					{
 						"start": 28,

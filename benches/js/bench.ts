@@ -671,7 +671,7 @@ const SURFACE_DISCLOSURES: ReadonlyArray<SurfaceDisclosure> = [
 	},
 	// The two `+reconstruct` rows, one entry each because the claim is checked per row:
 	// consumer-cost rows whose parse IS the no-locations row's, so on a coverage surface
-	// they would add only the reconstruct helper's refusal, published as a tsv parse gap.
+	// they would add nothing but a duplicate of that row's coverage.
 	{
 		row: 'tsv-json-no-locations+reconstruct',
 		direction: 'excluded',

@@ -21,13 +21,12 @@ neither shape alone is the case. `c1` and `d1` are the strip arm.
 `e1` is the null control: an `<LS>` whose two readings agree, which is what makes
 the other four a claim about the *class* rather than about the character.
 
-Because a `.svelte` fixture pins the whole wire, this also pins the `loc` half of
-the same class — every position after one of these terminators is acorn's line
-count, not `locate-character`'s. The region-by-region claims about that live in
-[line_terminators_acorn_regions](../line_terminators_acorn_regions/).
+The `<CR>` spelling belongs to the same claim and cannot be a fixture input: every
+parse-then-format entry point folds it to `<LF>` before parsing, so such a document
+is not the fixed point F1 requires. It is pinned by
+[`tests/comment_dedent_line_terminators.rs`](../../../../../comment_dedent_line_terminators.rs).
 
-The `<CR>` spelling belongs to both claims and can be a fixture input for neither:
-every parse-then-format entry point folds it to `<LF>` before parsing, so such a
-document is not the fixed point F1 requires. It is pinned by
-[`tests/comment_dedent_line_terminators.rs`](../../../../../comment_dedent_line_terminators.rs)
-and [`tests/acorn_loc_line_terminators.rs`](../../../../../acorn_loc_line_terminators.rs).
+The `loc` half of these terminators is not a claim here: a Svelte document counts
+LF alone for every `loc` in it, which
+[`tests/loc_definition.rs`](../../../../../loc_definition.rs) grades over this input
+and the sibling [line_terminators_acorn_regions](../line_terminators_acorn_regions/).

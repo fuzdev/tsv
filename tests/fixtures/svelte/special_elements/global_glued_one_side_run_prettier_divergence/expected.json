@@ -25,50 +25,16 @@
 				"start": 210,
 				"end": 238,
 				"name": "svelte:window",
-				"name_loc": {
-					"start": {
-						"line": 6,
-						"column": 1,
-						"character": 211
-					},
-					"end": {
-						"line": 6,
-						"column": 14,
-						"character": 224
-					}
-				},
 				"attributes": [
 					{
 						"start": 225,
 						"end": 235,
 						"type": "OnDirective",
 						"name": "x",
-						"name_loc": {
-							"start": {
-								"line": 6,
-								"column": 15,
-								"character": 225
-							},
-							"end": {
-								"line": 6,
-								"column": 19,
-								"character": 229
-							}
-						},
 						"expression": {
 							"type": "Identifier",
 							"start": 231,
 							"end": 234,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 21
-								},
-								"end": {
-									"line": 6,
-									"column": 24
-								}
-							},
 							"name": "fn1"
 						},
 						"modifiers": []
@@ -91,50 +57,16 @@
 				"start": 239,
 				"end": 265,
 				"name": "svelte:body",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 1,
-						"character": 240
-					},
-					"end": {
-						"line": 7,
-						"column": 12,
-						"character": 251
-					}
-				},
 				"attributes": [
 					{
 						"start": 252,
 						"end": 262,
 						"type": "OnDirective",
 						"name": "x",
-						"name_loc": {
-							"start": {
-								"line": 7,
-								"column": 13,
-								"character": 252
-							},
-							"end": {
-								"line": 7,
-								"column": 17,
-								"character": 256
-							}
-						},
 						"expression": {
 							"type": "Identifier",
 							"start": 258,
 							"end": 261,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 19
-								},
-								"end": {
-									"line": 7,
-									"column": 22
-								}
-							},
 							"name": "fn2"
 						},
 						"modifiers": []
@@ -157,18 +89,6 @@
 				"start": 272,
 				"end": 319,
 				"name": "svelte:head",
-				"name_loc": {
-					"start": {
-						"line": 9,
-						"column": 1,
-						"character": 273
-					},
-					"end": {
-						"line": 9,
-						"column": 12,
-						"character": 284
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -178,18 +98,6 @@
 							"start": 285,
 							"end": 305,
 							"name": "title",
-							"name_loc": {
-								"start": {
-									"line": 9,
-									"column": 14,
-									"character": 286
-								},
-								"end": {
-									"line": 9,
-									"column": 19,
-									"character": 291
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",

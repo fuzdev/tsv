@@ -14,65 +14,25 @@
 			"type": "Line",
 			"value": " Empty object with block comment",
 			"start": 20,
-			"end": 54,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 35
-				}
-			}
+			"end": 54
 		},
 		{
 			"type": "Block",
 			"value": " empty ",
 			"start": 71,
-			"end": 82,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 16
-				},
-				"end": {
-					"line": 3,
-					"column": 27
-				}
-			}
+			"end": 82
 		},
 		{
 			"type": "Line",
 			"value": " Empty object with line comment",
 			"start": 91,
-			"end": 124,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 1
-				},
-				"end": {
-					"line": 5,
-					"column": 34
-				}
-			}
+			"end": 124
 		},
 		{
 			"type": "Line",
 			"value": " empty",
 			"start": 143,
-			"end": 151,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 2
-				},
-				"end": {
-					"line": 7,
-					"column": 10
-				}
-			}
+			"end": 151
 		}
 	],
 	"instance": {
@@ -84,90 +44,30 @@
 			"type": "Program",
 			"start": 18,
 			"end": 159,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 9,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 56,
 					"end": 88,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 33
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 62,
 							"end": 87,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 7
-								},
-								"end": {
-									"line": 3,
-									"column": 32
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 62,
 								"end": 63,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 7
-									},
-									"end": {
-										"line": 3,
-										"column": 8
-									}
-								},
 								"name": "a"
 							},
 							"init": {
 								"type": "CallExpression",
 								"start": 66,
 								"end": 87,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 11
-									},
-									"end": {
-										"line": 3,
-										"column": 32
-									}
-								},
 								"callee": {
 									"type": "Identifier",
 									"start": 66,
 									"end": 68,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 11
-										},
-										"end": {
-											"line": 3,
-											"column": 13
-										}
-									},
 									"name": "fn"
 								},
 								"arguments": [],
@@ -175,31 +75,11 @@
 									"type": "TSTypeParameterInstantiation",
 									"start": 68,
 									"end": 85,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 13
-										},
-										"end": {
-											"line": 3,
-											"column": 30
-										}
-									},
 									"params": [
 										{
 											"type": "TSTypeLiteral",
 											"start": 69,
 											"end": 84,
-											"loc": {
-												"start": {
-													"line": 3,
-													"column": 14
-												},
-												"end": {
-													"line": 3,
-													"column": 29
-												}
-											},
 											"members": []
 										}
 									]
@@ -221,75 +101,25 @@
 					"type": "VariableDeclaration",
 					"start": 126,
 					"end": 158,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 6
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 132,
 							"end": 157,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 7
-								},
-								"end": {
-									"line": 8,
-									"column": 5
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 132,
 								"end": 133,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 7
-									},
-									"end": {
-										"line": 6,
-										"column": 8
-									}
-								},
 								"name": "b"
 							},
 							"init": {
 								"type": "CallExpression",
 								"start": 136,
 								"end": 157,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 11
-									},
-									"end": {
-										"line": 8,
-										"column": 5
-									}
-								},
 								"callee": {
 									"type": "Identifier",
 									"start": 136,
 									"end": 138,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 11
-										},
-										"end": {
-											"line": 6,
-											"column": 13
-										}
-									},
 									"name": "fn"
 								},
 								"arguments": [],
@@ -297,31 +127,11 @@
 									"type": "TSTypeParameterInstantiation",
 									"start": 138,
 									"end": 155,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 13
-										},
-										"end": {
-											"line": 8,
-											"column": 3
-										}
-									},
 									"params": [
 										{
 											"type": "TSTypeLiteral",
 											"start": 139,
 											"end": 154,
-											"loc": {
-												"start": {
-													"line": 6,
-													"column": 14
-												},
-												"end": {
-													"line": 8,
-													"column": 2
-												}
-											},
 											"members": []
 										}
 									]
@@ -362,18 +172,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

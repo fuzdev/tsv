@@ -14,17 +14,7 @@
 			"type": "Block",
 			"value": " c ",
 			"start": 27,
-			"end": 34,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 8
-				},
-				"end": {
-					"line": 2,
-					"column": 15
-				}
-			}
+			"end": 34
 		}
 	],
 	"instance": {
@@ -36,134 +26,44 @@
 			"type": "Program",
 			"start": 18,
 			"end": 56,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 3,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 20,
 					"end": 55,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 36
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 24,
 							"end": 54,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 5
-								},
-								"end": {
-									"line": 2,
-									"column": 35
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 24,
 								"end": 50,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 5
-									},
-									"end": {
-										"line": 2,
-										"column": 31
-									}
-								},
 								"name": "x",
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
 									"start": 25,
 									"end": 50,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 6
-										},
-										"end": {
-											"line": 2,
-											"column": 31
-										}
-									},
 									"typeAnnotation": {
 										"type": "TSTypeReference",
 										"start": 35,
 										"end": 50,
-										"loc": {
-											"start": {
-												"line": 2,
-												"column": 16
-											},
-											"end": {
-												"line": 2,
-												"column": 31
-											}
-										},
 										"typeName": {
 											"type": "Identifier",
 											"start": 35,
 											"end": 42,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 16
-												},
-												"end": {
-													"line": 2,
-													"column": 23
-												}
-											},
 											"name": "Promise"
 										},
 										"typeArguments": {
 											"type": "TSTypeParameterInstantiation",
 											"start": 42,
 											"end": 50,
-											"loc": {
-												"start": {
-													"line": 2,
-													"column": 23
-												},
-												"end": {
-													"line": 2,
-													"column": 31
-												}
-											},
 											"params": [
 												{
 													"type": "TSStringKeyword",
 													"start": 43,
-													"end": 49,
-													"loc": {
-														"start": {
-															"line": 2,
-															"column": 24
-														},
-														"end": {
-															"line": 2,
-															"column": 30
-														}
-													}
+													"end": 49
 												}
 											]
 										},
@@ -182,16 +82,6 @@
 								"type": "Identifier",
 								"start": 53,
 								"end": 54,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 34
-									},
-									"end": {
-										"line": 2,
-										"column": 35
-									}
-								},
 								"name": "y"
 							}
 						}
@@ -207,18 +97,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

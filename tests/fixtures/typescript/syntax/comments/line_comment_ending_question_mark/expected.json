@@ -14,17 +14,7 @@
 			"type": "Line",
 			"value": " comment ending with question mark?",
 			"start": 32,
-			"end": 69,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 13
-				},
-				"end": {
-					"line": 2,
-					"column": 50
-				}
-			}
+			"end": 69
 		}
 	],
 	"instance": {
@@ -36,90 +26,30 @@
 			"type": "Program",
 			"start": 18,
 			"end": 106,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 5,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 20,
 					"end": 105,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 9
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 26,
 							"end": 104,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 7
-								},
-								"end": {
-									"line": 4,
-									"column": 8
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 26,
 								"end": 27,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 7
-									},
-									"end": {
-										"line": 2,
-										"column": 8
-									}
-								},
 								"name": "a"
 							},
 							"init": {
 								"type": "ConditionalExpression",
 								"start": 30,
 								"end": 104,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 11
-									},
-									"end": {
-										"line": 4,
-										"column": 8
-									}
-								},
 								"test": {
 									"type": "Identifier",
 									"start": 30,
 									"end": 31,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 11
-										},
-										"end": {
-											"line": 2,
-											"column": 12
-										}
-									},
 									"name": "b",
 									"trailingComments": [
 										{
@@ -134,44 +64,14 @@
 									"type": "AwaitExpression",
 									"start": 74,
 									"end": 95,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 4
-										},
-										"end": {
-											"line": 3,
-											"column": 25
-										}
-									},
 									"argument": {
 										"type": "CallExpression",
 										"start": 80,
 										"end": 95,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 10
-											},
-											"end": {
-												"line": 3,
-												"column": 25
-											}
-										},
 										"callee": {
 											"type": "Identifier",
 											"start": 80,
 											"end": 82,
-											"loc": {
-												"start": {
-													"line": 3,
-													"column": 10
-												},
-												"end": {
-													"line": 3,
-													"column": 12
-												}
-											},
 											"name": "fn"
 										},
 										"arguments": [
@@ -179,63 +79,23 @@
 												"type": "Identifier",
 												"start": 83,
 												"end": 84,
-												"loc": {
-													"start": {
-														"line": 3,
-														"column": 13
-													},
-													"end": {
-														"line": 3,
-														"column": 14
-													}
-												},
 												"name": "c"
 											},
 											{
 												"type": "Identifier",
 												"start": 86,
 												"end": 87,
-												"loc": {
-													"start": {
-														"line": 3,
-														"column": 16
-													},
-													"end": {
-														"line": 3,
-														"column": 17
-													}
-												},
 												"name": "b"
 											},
 											{
 												"type": "ObjectExpression",
 												"start": 89,
 												"end": 94,
-												"loc": {
-													"start": {
-														"line": 3,
-														"column": 19
-													},
-													"end": {
-														"line": 3,
-														"column": 24
-													}
-												},
 												"properties": [
 													{
 														"type": "Property",
 														"start": 91,
 														"end": 92,
-														"loc": {
-															"start": {
-																"line": 3,
-																"column": 21
-															},
-															"end": {
-																"line": 3,
-																"column": 22
-															}
-														},
 														"method": false,
 														"shorthand": true,
 														"computed": false,
@@ -243,32 +103,12 @@
 															"type": "Identifier",
 															"start": 91,
 															"end": 92,
-															"loc": {
-																"start": {
-																	"line": 3,
-																	"column": 21
-																},
-																"end": {
-																	"line": 3,
-																	"column": 22
-																}
-															},
 															"name": "d"
 														},
 														"value": {
 															"type": "Identifier",
 															"start": 91,
 															"end": 92,
-															"loc": {
-																"start": {
-																	"line": 3,
-																	"column": 21
-																},
-																"end": {
-																	"line": 3,
-																	"column": 22
-																}
-															},
 															"name": "d"
 														},
 														"kind": "init"
@@ -283,16 +123,6 @@
 									"type": "Literal",
 									"start": 100,
 									"end": 104,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 4
-										},
-										"end": {
-											"line": 4,
-											"column": 8
-										}
-									},
 									"value": null,
 									"raw": "null"
 								}
@@ -310,18 +140,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

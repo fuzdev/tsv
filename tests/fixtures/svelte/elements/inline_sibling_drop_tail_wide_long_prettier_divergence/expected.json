@@ -12,18 +12,6 @@
 				"start": 0,
 				"end": 346,
 				"name": "ul",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 3,
-						"character": 3
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -40,18 +28,6 @@
 							"start": 6,
 							"end": 169,
 							"name": "li",
-							"name_loc": {
-								"start": {
-									"line": 2,
-									"column": 2,
-									"character": 7
-								},
-								"end": {
-									"line": 2,
-									"column": 4,
-									"character": 9
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -81,36 +57,12 @@
 										"start": 26,
 										"end": 122,
 										"name": "a",
-										"name_loc": {
-											"start": {
-												"line": 4,
-												"column": 3,
-												"character": 27
-											},
-											"end": {
-												"line": 4,
-												"column": 4,
-												"character": 28
-											}
-										},
 										"attributes": [
 											{
 												"type": "Attribute",
 												"start": 29,
 												"end": 39,
 												"name": "href",
-												"name_loc": {
-													"start": {
-														"line": 4,
-														"column": 5,
-														"character": 29
-													},
-													"end": {
-														"line": 4,
-														"column": 9,
-														"character": 33
-													}
-												},
 												"value": [
 													{
 														"start": 35,
@@ -126,18 +78,6 @@
 												"start": 40,
 												"end": 53,
 												"name": "class",
-												"name_loc": {
-													"start": {
-														"line": 4,
-														"column": 16,
-														"character": 40
-													},
-													"end": {
-														"line": 4,
-														"column": 21,
-														"character": 45
-													}
-												},
 												"value": [
 													{
 														"start": 47,
@@ -153,18 +93,6 @@
 												"start": 54,
 												"end": 73,
 												"name": "data-attr1",
-												"name_loc": {
-													"start": {
-														"line": 4,
-														"column": 30,
-														"character": 54
-													},
-													"end": {
-														"line": 4,
-														"column": 40,
-														"character": 64
-													}
-												},
 												"value": [
 													{
 														"start": 66,
@@ -180,18 +108,6 @@
 												"start": 74,
 												"end": 93,
 												"name": "data-attr2",
-												"name_loc": {
-													"start": {
-														"line": 4,
-														"column": 50,
-														"character": 74
-													},
-													"end": {
-														"line": 4,
-														"column": 60,
-														"character": 84
-													}
-												},
 												"value": [
 													{
 														"start": 86,
@@ -232,16 +148,6 @@
 											"type": "Identifier",
 											"start": 147,
 											"end": 151,
-											"loc": {
-												"start": {
-													"line": 5,
-													"column": 24
-												},
-												"end": {
-													"line": 5,
-													"column": 28
-												}
-											},
 											"name": "cond"
 										},
 										"consequent": {
@@ -280,18 +186,6 @@
 							"start": 171,
 							"end": 340,
 							"name": "li",
-							"name_loc": {
-								"start": {
-									"line": 7,
-									"column": 2,
-									"character": 172
-								},
-								"end": {
-									"line": 7,
-									"column": 4,
-									"character": 174
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -321,36 +215,12 @@
 										"start": 191,
 										"end": 295,
 										"name": "a",
-										"name_loc": {
-											"start": {
-												"line": 9,
-												"column": 3,
-												"character": 192
-											},
-											"end": {
-												"line": 9,
-												"column": 4,
-												"character": 193
-											}
-										},
 										"attributes": [
 											{
 												"type": "Attribute",
 												"start": 194,
 												"end": 204,
 												"name": "href",
-												"name_loc": {
-													"start": {
-														"line": 9,
-														"column": 5,
-														"character": 194
-													},
-													"end": {
-														"line": 9,
-														"column": 9,
-														"character": 198
-													}
-												},
 												"value": [
 													{
 														"start": 200,
@@ -366,18 +236,6 @@
 												"start": 205,
 												"end": 218,
 												"name": "class",
-												"name_loc": {
-													"start": {
-														"line": 9,
-														"column": 16,
-														"character": 205
-													},
-													"end": {
-														"line": 9,
-														"column": 21,
-														"character": 210
-													}
-												},
 												"value": [
 													{
 														"start": 212,
@@ -393,18 +251,6 @@
 												"start": 219,
 												"end": 238,
 												"name": "data-attr1",
-												"name_loc": {
-													"start": {
-														"line": 9,
-														"column": 30,
-														"character": 219
-													},
-													"end": {
-														"line": 9,
-														"column": 40,
-														"character": 229
-													}
-												},
 												"value": [
 													{
 														"start": 231,
@@ -420,18 +266,6 @@
 												"start": 239,
 												"end": 258,
 												"name": "data-attr2",
-												"name_loc": {
-													"start": {
-														"line": 9,
-														"column": 50,
-														"character": 239
-													},
-													"end": {
-														"line": 9,
-														"column": 60,
-														"character": 249
-													}
-												},
 												"value": [
 													{
 														"start": 251,
@@ -472,16 +306,6 @@
 											"type": "Identifier",
 											"start": 318,
 											"end": 322,
-											"loc": {
-												"start": {
-													"line": 11,
-													"column": 29
-												},
-												"end": {
-													"line": 11,
-													"column": 33
-												}
-											},
 											"name": "cond"
 										},
 										"consequent": {

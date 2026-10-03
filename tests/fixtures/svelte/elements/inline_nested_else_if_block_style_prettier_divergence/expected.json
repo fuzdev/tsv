@@ -12,18 +12,6 @@
 				"start": 0,
 				"end": 62,
 				"name": "span",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 5,
-						"character": 5
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -40,18 +28,6 @@
 							"start": 8,
 							"end": 54,
 							"name": "span",
-							"name_loc": {
-								"start": {
-									"line": 2,
-									"column": 2,
-									"character": 9
-								},
-								"end": {
-									"line": 2,
-									"column": 6,
-									"character": 13
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -72,16 +48,6 @@
 											"type": "Identifier",
 											"start": 22,
 											"end": 23,
-											"loc": {
-												"start": {
-													"line": 3,
-													"column": 7
-												},
-												"end": {
-													"line": 3,
-													"column": 8
-												}
-											},
 											"name": "a"
 										},
 										"consequent": {
@@ -108,16 +74,6 @@
 														"type": "Identifier",
 														"start": 36,
 														"end": 37,
-														"loc": {
-															"start": {
-																"line": 3,
-																"column": 21
-															},
-															"end": {
-																"line": 3,
-																"column": 22
-															}
-														},
 														"name": "b"
 													},
 													"consequent": {

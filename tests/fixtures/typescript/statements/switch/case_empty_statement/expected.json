@@ -14,17 +14,7 @@
 			"type": "Line",
 			"value": " keep me",
 			"start": 121,
-			"end": 131,
-			"loc": {
-				"start": {
-					"line": 15,
-					"column": 3
-				},
-				"end": {
-					"line": 15,
-					"column": 13
-				}
-			}
+			"end": 131
 		}
 	],
 	"instance": {
@@ -36,45 +26,15 @@
 			"type": "Program",
 			"start": 8,
 			"end": 153,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 19,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "SwitchStatement",
 					"start": 10,
 					"end": 46,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 2
-						}
-					},
 					"discriminant": {
 						"type": "Identifier",
 						"start": 18,
 						"end": 19,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 9
-							},
-							"end": {
-								"line": 2,
-								"column": 10
-							}
-						},
 						"name": "x"
 					},
 					"cases": [
@@ -82,31 +42,11 @@
 							"type": "SwitchCase",
 							"start": 25,
 							"end": 32,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 2
-								},
-								"end": {
-									"line": 3,
-									"column": 9
-								}
-							},
 							"consequent": [],
 							"test": {
 								"type": "Literal",
 								"start": 30,
 								"end": 31,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 7
-									},
-									"end": {
-										"line": 3,
-										"column": 8
-									}
-								},
 								"value": 1,
 								"raw": "1"
 							}
@@ -115,16 +55,6 @@
 							"type": "SwitchCase",
 							"start": 35,
 							"end": 43,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 2
-								},
-								"end": {
-									"line": 4,
-									"column": 10
-								}
-							},
 							"consequent": [],
 							"test": null
 						}
@@ -134,30 +64,10 @@
 					"type": "SwitchStatement",
 					"start": 49,
 					"end": 84,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 1
-						},
-						"end": {
-							"line": 10,
-							"column": 2
-						}
-					},
 					"discriminant": {
 						"type": "Identifier",
 						"start": 57,
 						"end": 58,
-						"loc": {
-							"start": {
-								"line": 7,
-								"column": 9
-							},
-							"end": {
-								"line": 7,
-								"column": 10
-							}
-						},
 						"name": "x"
 					},
 					"cases": [
@@ -165,31 +75,11 @@
 							"type": "SwitchCase",
 							"start": 64,
 							"end": 71,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 2
-								},
-								"end": {
-									"line": 8,
-									"column": 9
-								}
-							},
 							"consequent": [],
 							"test": {
 								"type": "Literal",
 								"start": 69,
 								"end": 70,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 7
-									},
-									"end": {
-										"line": 8,
-										"column": 8
-									}
-								},
 								"value": 1,
 								"raw": "1"
 							}
@@ -198,31 +88,11 @@
 							"type": "SwitchCase",
 							"start": 74,
 							"end": 81,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 2
-								},
-								"end": {
-									"line": 9,
-									"column": 9
-								}
-							},
 							"consequent": [],
 							"test": {
 								"type": "Literal",
 								"start": 79,
 								"end": 80,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 7
-									},
-									"end": {
-										"line": 9,
-										"column": 8
-									}
-								},
 								"value": 2,
 								"raw": "2"
 							}
@@ -233,30 +103,10 @@
 					"type": "SwitchStatement",
 					"start": 87,
 					"end": 152,
-					"loc": {
-						"start": {
-							"line": 12,
-							"column": 1
-						},
-						"end": {
-							"line": 18,
-							"column": 2
-						}
-					},
 					"discriminant": {
 						"type": "Identifier",
 						"start": 95,
 						"end": 96,
-						"loc": {
-							"start": {
-								"line": 12,
-								"column": 9
-							},
-							"end": {
-								"line": 12,
-								"column": 10
-							}
-						},
 						"name": "x"
 					},
 					"cases": [
@@ -264,59 +114,19 @@
 							"type": "SwitchCase",
 							"start": 102,
 							"end": 149,
-							"loc": {
-								"start": {
-									"line": 13,
-									"column": 2
-								},
-								"end": {
-									"line": 17,
-									"column": 9
-								}
-							},
 							"consequent": [
 								{
 									"type": "ExpressionStatement",
 									"start": 113,
 									"end": 117,
-									"loc": {
-										"start": {
-											"line": 14,
-											"column": 3
-										},
-										"end": {
-											"line": 14,
-											"column": 7
-										}
-									},
 									"expression": {
 										"type": "CallExpression",
 										"start": 113,
 										"end": 116,
-										"loc": {
-											"start": {
-												"line": 14,
-												"column": 3
-											},
-											"end": {
-												"line": 14,
-												"column": 6
-											}
-										},
 										"callee": {
 											"type": "Identifier",
 											"start": 113,
 											"end": 114,
-											"loc": {
-												"start": {
-													"line": 14,
-													"column": 3
-												},
-												"end": {
-													"line": 14,
-													"column": 4
-												}
-											},
 											"name": "a"
 										},
 										"arguments": [],
@@ -327,44 +137,14 @@
 									"type": "ExpressionStatement",
 									"start": 135,
 									"end": 139,
-									"loc": {
-										"start": {
-											"line": 16,
-											"column": 3
-										},
-										"end": {
-											"line": 16,
-											"column": 7
-										}
-									},
 									"expression": {
 										"type": "CallExpression",
 										"start": 135,
 										"end": 138,
-										"loc": {
-											"start": {
-												"line": 16,
-												"column": 3
-											},
-											"end": {
-												"line": 16,
-												"column": 6
-											}
-										},
 										"callee": {
 											"type": "Identifier",
 											"start": 135,
 											"end": 136,
-											"loc": {
-												"start": {
-													"line": 16,
-													"column": 3
-												},
-												"end": {
-													"line": 16,
-													"column": 4
-												}
-											},
 											"name": "b"
 										},
 										"arguments": [],
@@ -383,16 +163,6 @@
 									"type": "BreakStatement",
 									"start": 143,
 									"end": 149,
-									"loc": {
-										"start": {
-											"line": 17,
-											"column": 3
-										},
-										"end": {
-											"line": 17,
-											"column": 9
-										}
-									},
 									"label": null
 								}
 							],
@@ -400,16 +170,6 @@
 								"type": "Literal",
 								"start": 107,
 								"end": 108,
-								"loc": {
-									"start": {
-										"line": 13,
-										"column": 7
-									},
-									"end": {
-										"line": 13,
-										"column": 8
-									}
-								},
 								"value": 1,
 								"raw": "1"
 							}

@@ -47,9 +47,10 @@ export interface NapiAddon {
 	parse_css: (source: string, goal?: string) => string;
 	parse_internal_css: (source: string, goal?: string) => void;
 	format_css: (source: string, goal?: string) => string;
-	// span-only wire — svelte + typescript only (CSS emits no `loc`)
+	// the span-only wire
 	parse_svelte_no_locations: (source: string, goal?: string) => string;
 	parse_typescript_no_locations: (source: string, goal?: string) => string;
+	parse_css_no_locations: (source: string, goal?: string) => string;
 	// test-only panic-contract probe — present only when built with the
 	// `panic_probe` cargo feature (`deno task test:napi`); absent in published
 	// builds, so `test_napi.ts` skips its contract test when undefined
@@ -73,8 +74,8 @@ export function get_napi_library_path(): string {
 interface NapiTables {
 	parse: Record<Language, (source: string, goal?: string) => string>;
 	parse_internal: Record<Language, (source: string, goal?: string) => void>;
-	/** Span-only wire — svelte + typescript only (CSS emits no `loc`). */
-	parse_no_locations: Partial<Record<Language, (source: string, goal?: string) => string>>;
+	/** The span-only wire. */
+	parse_no_locations: Record<Language, (source: string, goal?: string) => string>;
 	format: Record<Language, (source: string, goal?: string) => string>;
 }
 
@@ -125,7 +126,8 @@ export class NapiImplementation extends BaseImplementation {
 			},
 			parse_no_locations: {
 				svelte: addon.parse_svelte_no_locations,
-				typescript: addon.parse_typescript_no_locations
+				typescript: addon.parse_typescript_no_locations,
+				css: addon.parse_css_no_locations
 			},
 			format: {
 				svelte: addon.format_svelte,
@@ -160,7 +162,6 @@ export class NapiImplementation extends BaseImplementation {
 
 	parse_no_locations(source: string, language: Language, goal?: ParseGoal): unknown {
 		const fn = this.tables.parse_no_locations[language];
-		if (!fn) throw new Error(`no-locations parse unsupported for ${language}`);
 		return JSON.parse(fn(source, goal_for(language, goal)));
 	}
 

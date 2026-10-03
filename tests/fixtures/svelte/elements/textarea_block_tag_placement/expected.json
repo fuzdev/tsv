@@ -25,18 +25,6 @@
 				"start": 91,
 				"end": 118,
 				"name": "textarea",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 92
-					},
-					"end": {
-						"line": 2,
-						"column": 9,
-						"character": 100
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -49,16 +37,6 @@
 								"type": "Identifier",
 								"start": 102,
 								"end": 106,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 11
-									},
-									"end": {
-										"line": 2,
-										"column": 15
-									}
-								},
 								"name": "expr"
 							}
 						}
@@ -77,18 +55,6 @@
 				"start": 119,
 				"end": 145,
 				"name": "textarea",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 1,
-						"character": 120
-					},
-					"end": {
-						"line": 3,
-						"column": 9,
-						"character": 128
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -101,16 +67,6 @@
 								"type": "Literal",
 								"start": 130,
 								"end": 133,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 11
-									},
-									"end": {
-										"line": 3,
-										"column": 14
-									}
-								},
 								"value": {},
 								"raw": "/a/",
 								"regex": {

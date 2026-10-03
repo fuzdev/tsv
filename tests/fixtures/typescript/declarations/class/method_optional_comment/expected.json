@@ -14,33 +14,13 @@
 			"type": "Line",
 			"value": " Comment between method name and ? is preserved",
 			"start": 20,
-			"end": 69,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 50
-				}
-			}
+			"end": 69
 		},
 		{
 			"type": "Block",
 			"value": " c1 ",
 			"start": 85,
-			"end": 93,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 4
-				},
-				"end": {
-					"line": 4,
-					"column": 12
-				}
-			}
+			"end": 93
 		}
 	],
 	"instance": {
@@ -52,45 +32,15 @@
 			"type": "Program",
 			"start": 18,
 			"end": 113,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 7,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ClassDeclaration",
 					"start": 71,
 					"end": 112,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 77,
 						"end": 78,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 7
-							},
-							"end": {
-								"line": 3,
-								"column": 8
-							}
-						},
 						"name": "A"
 					},
 					"superClass": null,
@@ -98,47 +48,17 @@
 						"type": "ClassBody",
 						"start": 79,
 						"end": 112,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 9
-							},
-							"end": {
-								"line": 6,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "MethodDefinition",
 								"start": 83,
 								"end": 99,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 2
-									},
-									"end": {
-										"line": 4,
-										"column": 18
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
 									"start": 83,
 									"end": 84,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 2
-										},
-										"end": {
-											"line": 4,
-											"column": 3
-										}
-									},
 									"name": "m",
 									"trailingComments": [
 										{
@@ -155,16 +75,6 @@
 									"type": "FunctionExpression",
 									"start": 94,
 									"end": 99,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 13
-										},
-										"end": {
-											"line": 4,
-											"column": 18
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -174,16 +84,6 @@
 										"type": "BlockStatement",
 										"start": 97,
 										"end": 99,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 16
-											},
-											"end": {
-												"line": 4,
-												"column": 18
-											}
-										},
 										"body": []
 									}
 								}
@@ -192,32 +92,12 @@
 								"type": "MethodDefinition",
 								"start": 102,
 								"end": 109,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 2
-									},
-									"end": {
-										"line": 5,
-										"column": 9
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
 									"start": 102,
 									"end": 103,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 2
-										},
-										"end": {
-											"line": 5,
-											"column": 3
-										}
-									},
 									"name": "n"
 								},
 								"optional": true,
@@ -226,16 +106,6 @@
 									"type": "FunctionExpression",
 									"start": 104,
 									"end": 109,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 4
-										},
-										"end": {
-											"line": 5,
-											"column": 9
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -245,16 +115,6 @@
 										"type": "BlockStatement",
 										"start": 107,
 										"end": 109,
-										"loc": {
-											"start": {
-												"line": 5,
-												"column": 7
-											},
-											"end": {
-												"line": 5,
-												"column": 9
-											}
-										},
 										"body": []
 									}
 								}
@@ -279,18 +139,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

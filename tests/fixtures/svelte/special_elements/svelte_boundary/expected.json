@@ -12,36 +12,12 @@
 				"start": 0,
 				"end": 242,
 				"name": "svelte:boundary",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 16,
-						"character": 16
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 17,
 						"end": 29,
 						"name": "onerror",
-						"name_loc": {
-							"start": {
-								"line": 1,
-								"column": 17,
-								"character": 17
-							},
-							"end": {
-								"line": 1,
-								"column": 24,
-								"character": 24
-							}
-						},
 						"value": {
 							"type": "ExpressionTag",
 							"start": 25,
@@ -50,16 +26,6 @@
 								"type": "Identifier",
 								"start": 26,
 								"end": 28,
-								"loc": {
-									"start": {
-										"line": 1,
-										"column": 26
-									},
-									"end": {
-										"line": 1,
-										"column": 28
-									}
-								},
 								"name": "fn"
 							}
 						}
@@ -80,18 +46,6 @@
 							"start": 32,
 							"end": 47,
 							"name": "div",
-							"name_loc": {
-								"start": {
-									"line": 2,
-									"column": 2,
-									"character": 33
-								},
-								"end": {
-									"line": 2,
-									"column": 5,
-									"character": 36
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -121,19 +75,7 @@
 								"type": "Identifier",
 								"name": "pending",
 								"start": 60,
-								"end": 67,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 11,
-										"character": 60
-									},
-									"end": {
-										"line": 4,
-										"column": 18,
-										"character": 67
-									}
-								}
+								"end": 67
 							},
 							"parameters": [],
 							"body": {
@@ -151,18 +93,6 @@
 										"start": 73,
 										"end": 93,
 										"name": "span",
-										"name_loc": {
-											"start": {
-												"line": 5,
-												"column": 3,
-												"character": 74
-											},
-											"end": {
-												"line": 5,
-												"column": 7,
-												"character": 78
-											}
-										},
 										"attributes": [],
 										"fragment": {
 											"type": "Fragment",
@@ -202,51 +132,19 @@
 								"type": "Identifier",
 								"name": "failed",
 								"start": 118,
-								"end": 124,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 11,
-										"character": 118
-									},
-									"end": {
-										"line": 8,
-										"column": 17,
-										"character": 124
-									}
-								}
+								"end": 124
 							},
 							"parameters": [
 								{
 									"type": "Identifier",
 									"start": 125,
 									"end": 130,
-									"loc": {
-										"start": {
-											"line": 8,
-											"column": 18
-										},
-										"end": {
-											"line": 8,
-											"column": 23
-										}
-									},
 									"name": "error"
 								},
 								{
 									"type": "Identifier",
 									"start": 132,
 									"end": 137,
-									"loc": {
-										"start": {
-											"line": 8,
-											"column": 25
-										},
-										"end": {
-											"line": 8,
-											"column": 30
-										}
-									},
 									"name": "reset"
 								}
 							],
@@ -265,18 +163,6 @@
 										"start": 142,
 										"end": 170,
 										"name": "span",
-										"name_loc": {
-											"start": {
-												"line": 9,
-												"column": 3,
-												"character": 143
-											},
-											"end": {
-												"line": 9,
-												"column": 7,
-												"character": 147
-											}
-										},
 										"attributes": [],
 										"fragment": {
 											"type": "Fragment",
@@ -289,46 +175,16 @@
 														"type": "MemberExpression",
 														"start": 149,
 														"end": 162,
-														"loc": {
-															"start": {
-																"line": 9,
-																"column": 9
-															},
-															"end": {
-																"line": 9,
-																"column": 22
-															}
-														},
 														"object": {
 															"type": "Identifier",
 															"start": 149,
 															"end": 154,
-															"loc": {
-																"start": {
-																	"line": 9,
-																	"column": 9
-																},
-																"end": {
-																	"line": 9,
-																	"column": 14
-																}
-															},
 															"name": "error"
 														},
 														"property": {
 															"type": "Identifier",
 															"start": 155,
 															"end": 162,
-															"loc": {
-																"start": {
-																	"line": 9,
-																	"column": 15
-																},
-																"end": {
-																	"line": 9,
-																	"column": 22
-																}
-															},
 															"name": "message"
 														},
 														"computed": false,
@@ -350,36 +206,12 @@
 										"start": 173,
 										"end": 211,
 										"name": "button",
-										"name_loc": {
-											"start": {
-												"line": 10,
-												"column": 3,
-												"character": 174
-											},
-											"end": {
-												"line": 10,
-												"column": 9,
-												"character": 180
-											}
-										},
 										"attributes": [
 											{
 												"type": "Attribute",
 												"start": 181,
 												"end": 196,
 												"name": "onclick",
-												"name_loc": {
-													"start": {
-														"line": 10,
-														"column": 10,
-														"character": 181
-													},
-													"end": {
-														"line": 10,
-														"column": 17,
-														"character": 188
-													}
-												},
 												"value": {
 													"type": "ExpressionTag",
 													"start": 189,
@@ -388,16 +220,6 @@
 														"type": "Identifier",
 														"start": 190,
 														"end": 195,
-														"loc": {
-															"start": {
-																"line": 10,
-																"column": 19
-															},
-															"end": {
-																"line": 10,
-																"column": 24
-															}
-														},
 														"name": "reset"
 													}
 												}

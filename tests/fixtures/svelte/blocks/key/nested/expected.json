@@ -15,16 +15,6 @@
 					"type": "Identifier",
 					"start": 6,
 					"end": 7,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 6
-						},
-						"end": {
-							"line": 1,
-							"column": 7
-						}
-					},
 					"name": "a"
 				},
 				"fragment": {
@@ -45,16 +35,6 @@
 								"type": "Identifier",
 								"start": 16,
 								"end": 17,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 7
-									},
-									"end": {
-										"line": 2,
-										"column": 8
-									}
-								},
 								"name": "b"
 							},
 							"fragment": {
@@ -72,18 +52,6 @@
 										"start": 21,
 										"end": 36,
 										"name": "div",
-										"name_loc": {
-											"start": {
-												"line": 3,
-												"column": 3,
-												"character": 22
-											},
-											"end": {
-												"line": 3,
-												"column": 6,
-												"character": 25
-											}
-										},
 										"attributes": [],
 										"fragment": {
 											"type": "Fragment",

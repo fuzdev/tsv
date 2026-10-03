@@ -86,18 +86,6 @@
 				"start": 62,
 				"end": 75,
 				"name": "b",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 31,
-						"character": 63
-					},
-					"end": {
-						"line": 5,
-						"column": 32,
-						"character": 64
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -136,18 +124,6 @@
 				"start": 140,
 				"end": 153,
 				"name": "b",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 31,
-						"character": 141
-					},
-					"end": {
-						"line": 7,
-						"column": 32,
-						"character": 142
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -188,76 +164,26 @@
 			"type": "Program",
 			"start": 8,
 			"end": 21,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 3,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 10,
 					"end": 20,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 11
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 14,
 							"end": 19,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 5
-								},
-								"end": {
-									"line": 2,
-									"column": 10
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 14,
 								"end": 15,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 5
-									},
-									"end": {
-										"line": 2,
-										"column": 6
-									}
-								},
 								"name": "a"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 18,
 								"end": 19,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 9
-									},
-									"end": {
-										"line": 2,
-										"column": 10
-									}
-								},
 								"value": 1,
 								"raw": "1"
 							}

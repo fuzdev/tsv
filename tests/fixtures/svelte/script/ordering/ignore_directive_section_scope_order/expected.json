@@ -100,18 +100,6 @@
 				"start": 91,
 				"end": 99,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 10,
-						"column": 1,
-						"character": 92
-					},
-					"end": {
-						"line": 10,
-						"column": 2,
-						"character": 93
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -146,60 +134,20 @@
 			"type": "Program",
 			"start": 15,
 			"end": 24,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 3,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 17,
 					"end": 23,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 7
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 21,
 							"end": 22,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 5
-								},
-								"end": {
-									"line": 2,
-									"column": 6
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 21,
 								"end": 22,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 5
-									},
-									"end": {
-										"line": 2,
-										"column": 6
-									}
-								},
 								"name": "m"
 							},
 							"init": null
@@ -216,18 +164,6 @@
 				"start": 8,
 				"end": 14,
 				"name": "module",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 14,
-						"character": 14
-					}
-				},
 				"value": true
 			}
 		]
@@ -241,60 +177,20 @@
 			"type": "Program",
 			"start": 68,
 			"end": 80,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 0
-				},
-				"end": {
-					"line": 8,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 71,
 					"end": 79,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 2
-						},
-						"end": {
-							"line": 7,
-							"column": 10
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 77,
 							"end": 78,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 8
-								},
-								"end": {
-									"line": 7,
-									"column": 9
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 77,
 								"end": 78,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 8
-									},
-									"end": {
-										"line": 7,
-										"column": 9
-									}
-								},
 								"name": "a"
 							},
 							"init": null

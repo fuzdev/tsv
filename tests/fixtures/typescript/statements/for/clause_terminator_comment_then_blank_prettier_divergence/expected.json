@@ -14,129 +14,49 @@
 			"type": "Line",
 			"value": " the hoisted comment stays with its statement; the author blank follows it",
 			"start": 10,
-			"end": 86,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 77
-				}
-			}
+			"end": 86
 		},
 		{
 			"type": "Line",
 			"value": " c1",
 			"start": 108,
-			"end": 113,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 1
-				},
-				"end": {
-					"line": 4,
-					"column": 6
-				}
-			}
+			"end": 113
 		},
 		{
 			"type": "Line",
 			"value": " the block spelling of the same gap",
 			"start": 124,
-			"end": 161,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 1
-				},
-				"end": {
-					"line": 7,
-					"column": 38
-				}
-			}
+			"end": 161
 		},
 		{
 			"type": "Block",
 			"value": " c2 ",
 			"start": 180,
-			"end": 188,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 1
-				},
-				"end": {
-					"line": 9,
-					"column": 9
-				}
-			}
+			"end": 188
 		},
 		{
 			"type": "Line",
 			"value": " the rule is the SEAM's, not the clause's: a plain statement's own terminator gap",
 			"start": 199,
-			"end": 282,
-			"loc": {
-				"start": {
-					"line": 12,
-					"column": 1
-				},
-				"end": {
-					"line": 12,
-					"column": 84
-				}
-			}
+			"end": 282
 		},
 		{
 			"type": "Line",
 			"value": " answers identically",
 			"start": 284,
-			"end": 306,
-			"loc": {
-				"start": {
-					"line": 13,
-					"column": 1
-				},
-				"end": {
-					"line": 13,
-					"column": 23
-				}
-			}
+			"end": 306
 		},
 		{
 			"type": "Line",
 			"value": " c3",
 			"start": 316,
-			"end": 321,
-			"loc": {
-				"start": {
-					"line": 15,
-					"column": 1
-				},
-				"end": {
-					"line": 15,
-					"column": 6
-				}
-			}
+			"end": 321
 		},
 		{
 			"type": "Block",
 			"value": " c4 ",
 			"start": 340,
-			"end": 348,
-			"loc": {
-				"start": {
-					"line": 19,
-					"column": 1
-				},
-				"end": {
-					"line": 19,
-					"column": 9
-				}
-			}
+			"end": 348
 		}
 	],
 	"instance": {
@@ -148,31 +68,11 @@
 			"type": "Program",
 			"start": 8,
 			"end": 358,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 22,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ForStatement",
 					"start": 88,
 					"end": 106,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 19
-						}
-					},
 					"init": null,
 					"test": null,
 					"update": null,
@@ -180,16 +80,6 @@
 						"type": "ContinueStatement",
 						"start": 97,
 						"end": 106,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 10
-							},
-							"end": {
-								"line": 3,
-								"column": 19
-							}
-						},
 						"label": null
 					},
 					"leadingComments": [
@@ -205,44 +95,14 @@
 					"type": "ExpressionStatement",
 					"start": 116,
 					"end": 122,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 7
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 116,
 						"end": 121,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 1
-							},
-							"end": {
-								"line": 6,
-								"column": 6
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 116,
 							"end": 119,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 1
-								},
-								"end": {
-									"line": 6,
-									"column": 4
-								}
-							},
 							"name": "fn1"
 						},
 						"arguments": [],
@@ -261,16 +121,6 @@
 					"type": "ForStatement",
 					"start": 163,
 					"end": 178,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 16
-						}
-					},
 					"init": null,
 					"test": null,
 					"update": null,
@@ -278,16 +128,6 @@
 						"type": "BreakStatement",
 						"start": 172,
 						"end": 178,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 10
-							},
-							"end": {
-								"line": 8,
-								"column": 16
-							}
-						},
 						"label": null
 					},
 					"leadingComments": [
@@ -303,44 +143,14 @@
 					"type": "ExpressionStatement",
 					"start": 191,
 					"end": 197,
-					"loc": {
-						"start": {
-							"line": 11,
-							"column": 1
-						},
-						"end": {
-							"line": 11,
-							"column": 7
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 191,
 						"end": 196,
-						"loc": {
-							"start": {
-								"line": 11,
-								"column": 1
-							},
-							"end": {
-								"line": 11,
-								"column": 6
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 191,
 							"end": 194,
-							"loc": {
-								"start": {
-									"line": 11,
-									"column": 1
-								},
-								"end": {
-									"line": 11,
-									"column": 4
-								}
-							},
 							"name": "fn2"
 						},
 						"arguments": [],
@@ -359,44 +169,14 @@
 					"type": "ExpressionStatement",
 					"start": 308,
 					"end": 314,
-					"loc": {
-						"start": {
-							"line": 14,
-							"column": 1
-						},
-						"end": {
-							"line": 14,
-							"column": 7
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 308,
 						"end": 313,
-						"loc": {
-							"start": {
-								"line": 14,
-								"column": 1
-							},
-							"end": {
-								"line": 14,
-								"column": 6
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 308,
 							"end": 311,
-							"loc": {
-								"start": {
-									"line": 14,
-									"column": 1
-								},
-								"end": {
-									"line": 14,
-									"column": 4
-								}
-							},
 							"name": "fn3"
 						},
 						"arguments": [],
@@ -421,44 +201,14 @@
 					"type": "ExpressionStatement",
 					"start": 324,
 					"end": 330,
-					"loc": {
-						"start": {
-							"line": 17,
-							"column": 1
-						},
-						"end": {
-							"line": 17,
-							"column": 7
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 324,
 						"end": 329,
-						"loc": {
-							"start": {
-								"line": 17,
-								"column": 1
-							},
-							"end": {
-								"line": 17,
-								"column": 6
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 324,
 							"end": 327,
-							"loc": {
-								"start": {
-									"line": 17,
-									"column": 1
-								},
-								"end": {
-									"line": 17,
-									"column": 4
-								}
-							},
 							"name": "fn4"
 						},
 						"arguments": [],
@@ -477,44 +227,14 @@
 					"type": "ExpressionStatement",
 					"start": 332,
 					"end": 338,
-					"loc": {
-						"start": {
-							"line": 18,
-							"column": 1
-						},
-						"end": {
-							"line": 18,
-							"column": 7
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 332,
 						"end": 337,
-						"loc": {
-							"start": {
-								"line": 18,
-								"column": 1
-							},
-							"end": {
-								"line": 18,
-								"column": 6
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 332,
 							"end": 335,
-							"loc": {
-								"start": {
-									"line": 18,
-									"column": 1
-								},
-								"end": {
-									"line": 18,
-									"column": 4
-								}
-							},
 							"name": "fn5"
 						},
 						"arguments": [],
@@ -525,44 +245,14 @@
 					"type": "ExpressionStatement",
 					"start": 351,
 					"end": 357,
-					"loc": {
-						"start": {
-							"line": 21,
-							"column": 1
-						},
-						"end": {
-							"line": 21,
-							"column": 7
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 351,
 						"end": 356,
-						"loc": {
-							"start": {
-								"line": 21,
-								"column": 1
-							},
-							"end": {
-								"line": 21,
-								"column": 6
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 351,
 							"end": 354,
-							"loc": {
-								"start": {
-									"line": 21,
-									"column": 1
-								},
-								"end": {
-									"line": 21,
-									"column": 4
-								}
-							},
 							"name": "fn6"
 						},
 						"arguments": [],

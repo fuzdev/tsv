@@ -14,65 +14,25 @@
 			"type": "Line",
 			"value": " block comment before = with type params stays before =",
 			"start": 20,
-			"end": 77,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 58
-				}
-			}
+			"end": 77
 		},
 		{
 			"type": "Block",
 			"value": " c ",
 			"start": 89,
-			"end": 96,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 11
-				},
-				"end": {
-					"line": 3,
-					"column": 18
-				}
-			}
+			"end": 96
 		},
 		{
 			"type": "Line",
 			"value": " block comment before = without type params stays before =",
 			"start": 108,
-			"end": 168,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 1
-				},
-				"end": {
-					"line": 5,
-					"column": 61
-				}
-			}
+			"end": 168
 		},
 		{
 			"type": "Block",
 			"value": " c ",
 			"start": 177,
-			"end": 184,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 8
-				},
-				"end": {
-					"line": 6,
-					"column": 15
-				}
-			}
+			"end": 184
 		}
 	],
 	"instance": {
@@ -84,76 +44,26 @@
 			"type": "Program",
 			"start": 18,
 			"end": 194,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 7,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 79,
 					"end": 105,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 27
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 84,
 						"end": 85,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 6
-							},
-							"end": {
-								"line": 3,
-								"column": 7
-							}
-						},
 						"name": "A"
 					},
 					"typeParameters": {
 						"type": "TSTypeParameterDeclaration",
 						"start": 85,
 						"end": 88,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 7
-							},
-							"end": {
-								"line": 3,
-								"column": 10
-							}
-						},
 						"params": [
 							{
 								"type": "TSTypeParameter",
 								"start": 86,
 								"end": 87,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 8
-									},
-									"end": {
-										"line": 3,
-										"column": 9
-									}
-								},
 								"name": "X"
 							}
 						],
@@ -170,45 +80,15 @@
 						"type": "TSUnionType",
 						"start": 99,
 						"end": 104,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 21
-							},
-							"end": {
-								"line": 3,
-								"column": 26
-							}
-						},
 						"types": [
 							{
 								"type": "TSTypeReference",
 								"start": 99,
 								"end": 100,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 21
-									},
-									"end": {
-										"line": 3,
-										"column": 22
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 99,
 									"end": 100,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 21
-										},
-										"end": {
-											"line": 3,
-											"column": 22
-										}
-									},
 									"name": "B"
 								}
 							},
@@ -216,30 +96,10 @@
 								"type": "TSTypeReference",
 								"start": 103,
 								"end": 104,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 25
-									},
-									"end": {
-										"line": 3,
-										"column": 26
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 103,
 									"end": 104,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 25
-										},
-										"end": {
-											"line": 3,
-											"column": 26
-										}
-									},
 									"name": "C"
 								}
 							}
@@ -258,30 +118,10 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 170,
 					"end": 193,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 24
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 175,
 						"end": 176,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 6
-							},
-							"end": {
-								"line": 6,
-								"column": 7
-							}
-						},
 						"name": "D",
 						"trailingComments": [
 							{
@@ -296,45 +136,15 @@
 						"type": "TSUnionType",
 						"start": 187,
 						"end": 192,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 18
-							},
-							"end": {
-								"line": 6,
-								"column": 23
-							}
-						},
 						"types": [
 							{
 								"type": "TSTypeReference",
 								"start": 187,
 								"end": 188,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 18
-									},
-									"end": {
-										"line": 6,
-										"column": 19
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 187,
 									"end": 188,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 18
-										},
-										"end": {
-											"line": 6,
-											"column": 19
-										}
-									},
 									"name": "E"
 								}
 							},
@@ -342,30 +152,10 @@
 								"type": "TSTypeReference",
 								"start": 191,
 								"end": 192,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 22
-									},
-									"end": {
-										"line": 6,
-										"column": 23
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 191,
 									"end": 192,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 22
-										},
-										"end": {
-											"line": 6,
-											"column": 23
-										}
-									},
 									"name": "F"
 								}
 							}
@@ -389,18 +179,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

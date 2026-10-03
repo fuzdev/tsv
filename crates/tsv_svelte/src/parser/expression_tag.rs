@@ -149,7 +149,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Parse expression using TypeScript parser — the shared helper, which
         // collects the comments into `Root.comments` and records the acorn
-        // region the wire writer seeds this island's `loc` from.
+        // region the wire writer dedents this island's comments by.
         let expression = self.parse_ts_expression(expr_content, expr_start)?;
 
         // The span end is right after the closing brace

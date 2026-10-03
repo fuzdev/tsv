@@ -19,9 +19,11 @@
 //! `mod.rs` (`strip_css_comments_collecting`, `split_declaration_svelte_compat`,
 //! `raw_selector_name`, …) so the Svelte scan semantics are defined once.
 //!
-//! CSS public nodes carry only `start`/`end` (no `loc`/columns), so there is no
-//! `LocationTracker`: each position is translated independently via a
-//! `ByteToCharMap` (identity on ASCII). Dynamic strings are escaped by
+//! `parseCss` emits only `start`/`end`; tsv adds `loc` (LF-only lines, UTF-16
+//! columns) to every object that carries them, on the wire that asks for it — the
+//! one `loc` definition all three writers share (`tsv_lang::WirePositions`). Each
+//! position is translated via the `ByteToCharMap` (identity on ASCII). Dynamic
+//! strings are escaped by
 //! [`write_string`] (byte-identical to `serde_json`, and to `JsonWriter::string`:
 //! one shared copy of `JsonWriter::string_led_words` with an empty lead, whose short clean
 //! path is a single window append, which pays on this writer's many short strings); static
@@ -78,6 +80,10 @@
 //! constant straight into the output buffer: no scratch round trip and no runtime-length flush, so
 //! fewer instructions than the staged form. **Grade any change to this on `cycles`/wall as well as
 //! instructions** — the two channels have ranked this file's scopes in opposite orders.
+//!
+//! The windows are the span-only wire's shape. On the wire that carries `loc`, which sits
+//! between `end` and the closing constant, [`Ctx::head`] / [`Ctx::tail`] write the same burst
+//! piecewise with the `loc` field in place.
 
 use super::super::internal;
 use super::{
@@ -85,7 +91,10 @@ use super::{
     split_declaration_svelte_compat, strip_css_comments_collecting, trim_wire_end, trim_wire_start,
 };
 use std::borrow::Cow;
-use tsv_lang::{ByteToCharMap, JsonWriter, LeadingBom, Span, write_array, write_or_null};
+use tsv_lang::{
+    ByteToCharMap, JsonWriter, LeadingBom, LocationTracker, Span, WirePositions, write_array,
+    write_or_null,
+};
 
 /// Declares one `parseCss()` metadata payload twice from a single literal: bare
 /// (`$bare`), and as the constant burst that closes its node (`$closing` — `$lead`,
@@ -141,7 +150,7 @@ fn write_array_open<T, const N: usize>(
 #[derive(Clone, Copy)]
 struct Ctx<'a> {
     source: &'a str,
-    map: &'a ByteToCharMap,
+    positions: WirePositions<'a>,
     /// Whether to attach `parseCss()` `metadata` (standalone `.css`) or omit it
     /// (embedded `<style>`). Precomputed once — the two shapes are otherwise the
     /// same walk — so the per-node metadata sites are a bare bool test.
@@ -152,25 +161,92 @@ impl Ctx<'_> {
     /// Byte offset → emitted (UTF-16 code unit) offset; identity on ASCII.
     #[inline]
     fn pos(&self, byte: u32) -> u32 {
-        self.map.byte_to_char(byte)
+        self.positions.pos(byte)
+    }
+
+    /// N `,"end":` M and, on a wire that carries it, `,"loc":…` — for a caller whose
+    /// literal ends in `"start":`. `start` / `end` are byte offsets.
+    #[inline]
+    fn start_end(&self, w: &mut JsonWriter, start: u32, end: u32) {
+        w.start_end(self.pos(start), self.pos(end));
+        w.span_loc(self.positions, start, end);
+    }
+
+    /// `,"start":` N `,"end":` M and, on a wire that carries it, `,"loc":…`.
+    #[inline]
+    fn start_end_field(&self, w: &mut JsonWriter, start: u32, end: u32) {
+        w.start_end_field(self.pos(start), self.pos(end));
+        w.span_loc(self.positions, start, end);
+    }
+
+    /// A node's closing burst (`lead`, `"start":` N `,"end":` M, `close`) as
+    /// [`JsonWriter::start_end_tail`]'s one window — or, on a wire that carries `loc`,
+    /// the same bytes with `loc` after `end`, written piecewise.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    fn tail<const L: usize, const C: usize>(
+        &self,
+        w: &mut JsonWriter,
+        lead: &[u8; L],
+        start: u32,
+        end: u32,
+        close: &[u8; C],
+    ) {
+        if self.positions.emits_loc() {
+            w.raw_fixed(lead);
+            w.raw("\"start\":");
+            self.start_end(w, start, end);
+            w.raw_fixed(close);
+        } else {
+            w.start_end_tail(lead, self.pos(start), self.pos(end), close);
+        }
+    }
+
+    /// A node's opening burst (`lead` ending in `"start":`, N `,"end":` M, `close`) as
+    /// [`JsonWriter::start_end_head`]'s one window — or, on a wire that carries `loc`,
+    /// the same bytes with `loc` after `end`, written piecewise.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    fn head<const L: usize, const C: usize>(
+        &self,
+        w: &mut JsonWriter,
+        lead: &[u8; L],
+        start: u32,
+        end: u32,
+        close: &[u8; C],
+    ) {
+        if self.positions.emits_loc() {
+            w.raw_fixed(lead);
+            self.start_end(w, start, end);
+            w.raw_fixed(close);
+        } else {
+            w.start_end_head(lead, self.pos(start), self.pos(end), close);
+        }
     }
 }
 
 /// Convert the internal CSS nodes straight to standalone-`StyleSheetFile` wire
-/// bytes — one AST walk, with byte→char offset translation fused in.
+/// bytes — one AST walk, with byte→char offset translation fused in, and every
+/// node's `loc` (LF-only lines, UTF-16 columns) when `locations` is set.
 ///
 /// A leading BOM is ELIDED: `parseCss` strips it (`remove_bom`) before parsing, so every
 /// canonical offset indexes the BOM-less string — one UTF-16 unit below the author's
 /// file. The lexer's spans stay file-true; only the emitted position moves. (An embedded
-/// `<style>` takes the Svelte writer's map, built the same way.)
+/// `<style>` takes the Svelte writer's positions, built the same way.)
 pub(crate) fn write_stylesheet_file_bytes(
     stylesheet: &internal::CssStyleSheet<'_>,
     source: &str,
+    locations: bool,
 ) -> Vec<u8> {
-    let map = ByteToCharMap::new(source, LeadingBom::Elided);
+    let (tracker, map) = if locations {
+        let (tracker, map) = LocationTracker::new_with_map(source, LeadingBom::Elided);
+        (Some(tracker), map)
+    } else {
+        (None, ByteToCharMap::new(source, LeadingBom::Elided))
+    };
     let ctx = Ctx {
         source,
-        map: &map,
+        positions: WirePositions::new(&map, tracker.as_ref()),
         has_metadata: true,
     };
     let mut w = JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(source.len()));
@@ -181,17 +257,18 @@ pub(crate) fn write_stylesheet_file_bytes(
 /// Emit an embedded-`<style>` stylesheet's `children` array (no `metadata`) into
 /// a caller-owned writer, handing back the `comments` run the same walk gathered
 /// — the composition entry the Svelte writer uses for a `<style>` element, whose
-/// wire puts those two arrays side by side. `map` must be built from the host
-/// document (spans are in host-file coordinates).
+/// wire puts those two arrays side by side. `positions` must be the host
+/// document's (spans are in host-file coordinates, and the line table is the
+/// Svelte document's).
 pub fn write_css_children(
     w: &mut JsonWriter,
     stylesheet: &internal::CssStyleSheet<'_>,
     source: &str,
-    map: &ByteToCharMap,
+    positions: WirePositions<'_>,
 ) -> CssComments {
     let ctx = Ctx {
         source,
-        map,
+        positions,
         has_metadata: false,
     };
     write_children(w, stylesheet, &ctx)
@@ -203,11 +280,11 @@ pub fn write_css_comments(
     w: &mut JsonWriter,
     comments: &CssComments,
     source: &str,
-    map: &ByteToCharMap,
+    positions: WirePositions<'_>,
 ) {
     let ctx = Ctx {
         source,
-        map,
+        positions,
         has_metadata: false,
     };
     write_comments(w, comments, &ctx);
@@ -238,7 +315,7 @@ fn write_stylesheet_file(
     ctx: &Ctx<'_>,
 ) {
     w.raw("{\"type\":\"StyleSheetFile\",\"start\":");
-    w.start_end(ctx.pos(0), ctx.pos(ctx.source.len() as u32));
+    ctx.start_end(w, 0, ctx.source.len() as u32);
     w.raw(",\"children\":");
     let comments = write_children(w, stylesheet, ctx);
     w.raw(",\"comments\":");
@@ -300,7 +377,7 @@ fn write_comments(w: &mut JsonWriter, comments: &CssComments, ctx: &Ctx<'_>) {
         let interior = Span::new(c.span.start + 2, c.span.end - 2);
         w.raw("{\"type\":\"CSSComment\",\"value\":");
         write_string(w, interior.extract(ctx.source));
-        w.start_end_field(ctx.pos(c.span.start), ctx.pos(c.span.end));
+        ctx.start_end_field(w, c.span.start, c.span.end);
         if let Some(position) = c.position {
             w.raw(",\"position\":");
             w.u32(position);
@@ -338,7 +415,7 @@ fn write_rule(
     write_selector_list(w, &rule.selector, ctx);
     w.raw(",\"block\":");
     write_block(w, rule.block_span, rule.declarations, ctx, comments);
-    w.start_end_tail(b",", ctx.pos(rule.span.start), ctx.pos(rule.span.end), b"");
+    ctx.tail(w, b",", rule.span.start, rule.span.end, b"");
     if ctx.has_metadata {
         w.raw(RULE_META_CLOSE);
     } else {
@@ -356,7 +433,7 @@ fn write_atrule(
     comments: &mut Vec<WireComment>,
 ) {
     w.raw("{\"type\":\"Atrule\",\"start\":");
-    w.start_end(ctx.pos(atrule.span.start), ctx.pos(atrule.span.end));
+    ctx.start_end(w, atrule.span.start, atrule.span.end);
     w.raw(",\"name\":");
     // Half-decoded from source, like a selector name: parseCss reads both with
     // `read_identifier`, so an identity escape keeps its backslash (`@a\?b` → `a\?b`)
@@ -423,10 +500,11 @@ fn write_block(
         }),
         _ => None,
     }));
-    w.start_end_head(
+    ctx.head(
+        w,
         b"{\"type\":\"Block\",\"start\":",
-        ctx.pos(block_span.start),
-        ctx.pos(block_span.end),
+        block_span.start,
+        block_span.end,
         b",\"children\":[",
     );
     write_array_open(
@@ -528,10 +606,11 @@ fn write_declaration(
         Cow::Borrowed(trim_wire_end(split.value))
     };
 
-    w.start_end_head(
+    ctx.head(
+        w,
         b"{\"type\":\"Declaration\",\"start\":",
-        ctx.pos(decl.span.start),
-        ctx.pos(split.end),
+        decl.span.start,
+        split.end,
         b"",
     );
     write_keyed_string(w, b",\"property\":", trim_wire_end(split.property));
@@ -561,10 +640,11 @@ fn write_selector_list_inner(
     ctx: &Ctx<'_>,
     filter_invalid: bool,
 ) {
-    w.start_end_head(
+    ctx.head(
+        w,
         b"{\"type\":\"SelectorList\",\"start\":",
-        ctx.pos(sl.span.start),
-        ctx.pos(sl.span.end),
+        sl.span.start,
+        sl.span.end,
         b",\"children\":[",
     );
     write_array_open(
@@ -580,10 +660,11 @@ fn write_selector_list_inner(
 
 /// Emits a `ComplexSelector` node.
 fn write_complex_selector(w: &mut JsonWriter, c: &internal::ComplexSelector<'_>, ctx: &Ctx<'_>) {
-    w.start_end_head(
+    ctx.head(
+        w,
         b"{\"type\":\"ComplexSelector\",\"start\":",
-        ctx.pos(c.span.start),
-        ctx.pos(c.span.end),
+        c.span.start,
+        c.span.end,
         b",\"children\":[",
     );
     write_array_open(w, b"", c.children, |w, r| {
@@ -614,7 +695,7 @@ fn write_relative_selector(w: &mut JsonWriter, r: &internal::RelativeSelector<'_
         _ => w.raw("{\"type\":\"RelativeSelector\",\"combinator\":null,\"selectors\":["),
     }
     write_array_open(w, b"", r.selectors, |w, s| write_simple_selector(w, s, ctx));
-    w.start_end_tail(b"],", ctx.pos(r.span.start), ctx.pos(r.span.end), b"");
+    ctx.tail(w, b"],", r.span.start, r.span.end, b"");
     if ctx.has_metadata {
         w.raw(RELATIVE_META_CLOSE);
     } else {
@@ -625,7 +706,7 @@ fn write_relative_selector(w: &mut JsonWriter, r: &internal::RelativeSelector<'_
 fn write_combinator(w: &mut JsonWriter, name: &'static str, span: Span, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"Combinator\",\"name\":");
     w.token(name); // ` ` / `>` / `+` / `~` / `||` — escape-free
-    w.start_end_field(ctx.pos(span.start), ctx.pos(span.end));
+    ctx.start_end_field(w, span.start, span.end);
     w.raw("}");
 }
 
@@ -691,7 +772,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             // `*` and the empty prefix fall out of the same slice.
             let namespace = namespace_span.map(|ns| raw_selector_name(ctx.source, ns, 0));
             w.raw("{\"type\":\"AttributeSelector\",\"start\":");
-            w.start_end(ctx.pos(span.start), ctx.pos(span.end));
+            ctx.start_end(w, span.start, span.end);
             w.raw(",\"name\":");
             write_string(w, &name);
             w.raw(",\"matcher\":");
@@ -722,7 +803,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             write_string(w, &name);
             w.raw(",\"args\":");
             write_or_null(w, args.as_ref(), |w, a| write_pseudo_args(w, a, ctx));
-            w.start_end_field(ctx.pos(span.start), ctx.pos(span.end));
+            ctx.start_end_field(w, span.start, span.end);
             w.raw("}");
         }
         internal::SimpleSelector::PseudoElement {
@@ -743,7 +824,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             );
             w.raw("{\"type\":\"PseudoElementSelector\",\"name\":");
             write_string(w, &name);
-            w.start_end_field(ctx.pos(span.start), ctx.pos(span.end));
+            ctx.start_end_field(w, span.start, span.end);
             // `args` is emitted only when present — Svelte spreads the key in
             // conditionally (`...(args && { args })`), so an argument-less
             // `::before` carries no `args` at all, unlike a pseudo-CLASS (which
@@ -762,7 +843,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             };
             w.raw("{\"type\":\"Percentage\",\"value\":");
             write_string(w, &value_str);
-            w.start_end_field(ctx.pos(span.start), ctx.pos(span.end));
+            ctx.start_end_field(w, span.start, span.end);
             w.raw("}");
         }
         internal::SimpleSelector::Nth { span } => {
@@ -775,7 +856,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             // `Nth.selector`).
             w.raw("{\"type\":\"Nth\",\"value\":");
             write_string(w, span.extract(ctx.source));
-            w.start_end_field(ctx.pos(span.start), ctx.pos(span.end));
+            ctx.start_end_field(w, span.start, span.end);
             w.raw("}");
         }
         // Forgiving-list `Invalid`s are filtered before convert (see
@@ -822,7 +903,7 @@ fn write_type_selector(
     write_string(w, name);
     w.raw(",\"namespace\":");
     write_string(w, &raw_selector_name(ctx.source, prefix, 0));
-    w.start_end_tail(b",", ctx.pos(span.start), ctx.pos(span.end), b"}");
+    ctx.tail(w, b",", span.start, span.end, b"}");
 }
 
 /// The shared `{type, name, start, end}` shape (Class/Id/Nesting, and a `TypeSelector`
@@ -836,7 +917,7 @@ fn write_type_selector(
 /// it.
 fn write_named_selector(w: &mut JsonWriter, name: &str, span: Span, ctx: &Ctx<'_>) {
     write_string(w, name);
-    w.start_end_tail(b",", ctx.pos(span.start), ctx.pos(span.end), b"}");
+    ctx.tail(w, b",", span.start, span.end, b"}");
 }
 
 /// Emit a functional pseudo-class's or pseudo-element's args (an `Nth` node, a
@@ -869,7 +950,7 @@ fn write_pseudo_args(w: &mut JsonWriter, args: &internal::PseudoClassArgs<'_>, c
             write_wrap_single_selector(w, public_span, ctx, |w, ctx| {
                 w.raw("{\"type\":\"Nth\",\"value\":");
                 write_string(w, value);
-                w.start_end_field(ctx.pos(public_span.start), ctx.pos(public_span.end));
+                ctx.start_end_field(w, public_span.start, public_span.end);
                 if let Some(sel) = of_selector {
                     w.raw(",\"selector\":");
                     write_selector_list_filtered(w, sel, ctx);
@@ -956,12 +1037,10 @@ fn write_synth_selector_list(
     ctx: &Ctx<'_>,
     emit_relatives: impl FnOnce(&mut JsonWriter, &Ctx<'_>),
 ) {
-    let s = ctx.pos(span.start);
-    let e = ctx.pos(span.end);
     w.raw("{\"type\":\"SelectorList\",\"start\":");
-    w.start_end(s, e);
+    ctx.start_end(w, span.start, span.end);
     w.raw(",\"children\":[{\"type\":\"ComplexSelector\",\"start\":");
-    w.start_end(s, e);
+    ctx.start_end(w, span.start, span.end);
     w.raw(",\"children\":");
     emit_relatives(w, ctx);
     if ctx.has_metadata {
@@ -991,7 +1070,7 @@ fn write_synth_relative_selector(
     w.raw(",\"selectors\":[");
     emit_simple(w, ctx);
     w.raw("],\"start\":");
-    w.start_end(ctx.pos(span.start), ctx.pos(span.end));
+    ctx.start_end(w, span.start, span.end);
     if ctx.has_metadata {
         w.raw(RELATIVE_META);
     }

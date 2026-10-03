@@ -383,7 +383,7 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		assert.deepEqual(JSON.parse(json), ast);
 	});
 
-	it('locations: false selects the span-only wire (inert for CSS)', () => {
+	it('locations: false selects the span-only wire', () => {
 		const ast = api.parse_typescript('const x = 1;', { locations: false });
 		assert.equal(ast.type, 'Program');
 		assert.equal(ast.body[0].loc, undefined, 'span-only wire omits loc');
@@ -391,27 +391,47 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 			api.parse_svelte('<div>x</div>', { locations: false }).fragment.nodes[0].loc,
 			undefined
 		);
+		assert.ok(api.parse_css('a { color: red }').children[0].loc, 'CSS default wire carries loc');
 		assert.equal(
-			api.parse_css_json('a { color: red }', { locations: false }),
-			api.parse_css_json('a { color: red }'),
-			'CSS wire has no loc, so the option is inert'
+			api.parse_css('a { color: red }', { locations: false }).children[0].loc,
+			undefined,
+			'CSS span-only wire omits loc'
 		);
 	});
 
 	// The span-only wire and the helper that makes it usable ship together —
 	// the pure-JS `locations.js` is copied in from the wasm packages, so this
-	// asserts the copy landed AND that its output matches the loc-bearing wire
-	// this same package emits by default.
+	// asserts the copy landed AND that its output EQUALS the loc-bearing wire this
+	// same package emits by default, in all three languages: the native writer and
+	// the helper implement one `loc` definition.
 	it('the locations helpers ship alongside the span-only wire', () => {
 		const source = 'const x = 1;\nconst y = 2;\n';
 		const spans = api.parse_typescript(source, { locations: false });
 		assert.equal(spans.body[1].loc, undefined, 'span-only wire starts without loc');
 		assert.equal(api.reconstruct_locations(spans, source), spans, 'mutates and returns the ast');
-		assert.deepEqual(spans.body[1].loc, api.parse_typescript(source).body[1].loc);
+		assert.deepEqual(spans, api.parse_typescript(source));
 		// The amortized entry point over the same source.
 		const locator = api.create_locator(source);
 		assert.deepEqual(locator.loc_of(spans.body[1]), spans.body[1].loc);
 		assert.deepEqual(api.loc_of(spans.body[1], source), spans.body[1].loc);
+		// Svelte (LF-only for the whole document, `name_loc` and `character` restored) and
+		// CSS reconstruct exactly too.
+		const sv =
+			'<script>\nlet a = 1;\u2028let b = 2;\n</script>\n<div /* c */ {x}>\n{#each xs as { a }}{a}{/each}\n</div>\n<style>\np { }\n</style>\n';
+		assert.deepEqual(
+			api.reconstruct_locations(api.parse_svelte(sv, { locations: false }), sv),
+			api.parse_svelte(sv)
+		);
+		const css = '/* c */\na {\n\tcolor: red;\n}\r\nb { }';
+		assert.deepEqual(
+			api.reconstruct_locations(api.parse_css(css, { locations: false }), css),
+			api.parse_css(css)
+		);
+		// The `_json` siblings route the bag the same way.
+		assert.equal(
+			api.parse_css_json(css, { locations: false }),
+			JSON.stringify(api.parse_css(css, { locations: false }))
+		);
 	});
 
 	it('the TypeScript sourceType axis reaches parse AND format', () => {

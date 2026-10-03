@@ -22,19 +22,7 @@
 					"type": "Identifier",
 					"name": "menu",
 					"start": 60,
-					"end": 64,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 10,
-							"character": 60
-						},
-						"end": {
-							"line": 6,
-							"column": 14,
-							"character": 64
-						}
-					}
+					"end": 64
 				},
 				"parameters": [],
 				"body": {
@@ -65,30 +53,10 @@
 					"type": "CallExpression",
 					"start": 95,
 					"end": 101,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 9
-						},
-						"end": {
-							"line": 8,
-							"column": 15
-						}
-					},
 					"callee": {
 						"type": "Identifier",
 						"start": 95,
 						"end": 99,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 9
-							},
-							"end": {
-								"line": 8,
-								"column": 13
-							}
-						},
 						"name": "menu"
 					},
 					"arguments": [],
@@ -104,30 +72,10 @@
 					"type": "LogicalExpression",
 					"start": 107,
 					"end": 113,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 21
-						},
-						"end": {
-							"line": 8,
-							"column": 27
-						}
-					},
 					"left": {
 						"type": "Identifier",
 						"start": 107,
 						"end": 108,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 21
-							},
-							"end": {
-								"line": 8,
-								"column": 22
-							}
-						},
 						"name": "a"
 					},
 					"operator": "&&",
@@ -135,16 +83,6 @@
 						"type": "Identifier",
 						"start": 112,
 						"end": 113,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 26
-							},
-							"end": {
-								"line": 8,
-								"column": 27
-							}
-						},
 						"name": "b"
 					}
 				},
@@ -175,76 +113,26 @@
 			"type": "Program",
 			"start": 8,
 			"end": 39,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 4,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 10,
 					"end": 23,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 14
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 14,
 							"end": 22,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 5
-								},
-								"end": {
-									"line": 2,
-									"column": 13
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 14,
 								"end": 15,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 5
-									},
-									"end": {
-										"line": 2,
-										"column": 6
-									}
-								},
 								"name": "a"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 18,
 								"end": 22,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 9
-									},
-									"end": {
-										"line": 2,
-										"column": 13
-									}
-								},
 								"value": true,
 								"raw": "true"
 							}
@@ -256,61 +144,21 @@
 					"type": "VariableDeclaration",
 					"start": 25,
 					"end": 38,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 14
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 29,
 							"end": 37,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 5
-								},
-								"end": {
-									"line": 3,
-									"column": 13
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 29,
 								"end": 30,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 5
-									},
-									"end": {
-										"line": 3,
-										"column": 6
-									}
-								},
 								"name": "b"
 							},
 							"init": {
 								"type": "Literal",
 								"start": 33,
 								"end": 37,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 9
-									},
-									"end": {
-										"line": 3,
-										"column": 13
-									}
-								},
 								"value": true,
 								"raw": "true"
 							}

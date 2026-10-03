@@ -14,17 +14,7 @@
 			"type": "Line",
 			"value": " comment",
 			"start": 43,
-			"end": 53,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 5
-				},
-				"end": {
-					"line": 5,
-					"column": 15
-				}
-			}
+			"end": 53
 		}
 	],
 	"instance": {
@@ -36,45 +26,15 @@
 			"type": "Program",
 			"start": 8,
 			"end": 64,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 8,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ClassDeclaration",
 					"start": 10,
 					"end": 63,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 7,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 16,
 						"end": 19,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 7
-							},
-							"end": {
-								"line": 2,
-								"column": 10
-							}
-						},
 						"name": "Foo"
 					},
 					"superClass": null,
@@ -82,47 +42,17 @@
 						"type": "ClassBody",
 						"start": 20,
 						"end": 63,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 11
-							},
-							"end": {
-								"line": 7,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "MethodDefinition",
 								"start": 24,
 								"end": 60,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 2
-									},
-									"end": {
-										"line": 6,
-										"column": 6
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
 									"start": 24,
 									"end": 30,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 2
-										},
-										"end": {
-											"line": 3,
-											"column": 8
-										}
-									},
 									"name": "method"
 								},
 								"kind": "method",
@@ -130,16 +60,6 @@
 									"type": "FunctionExpression",
 									"start": 30,
 									"end": 60,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 8
-										},
-										"end": {
-											"line": 6,
-											"column": 6
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -149,32 +69,12 @@
 											"type": "Identifier",
 											"start": 35,
 											"end": 36,
-											"loc": {
-												"start": {
-													"line": 4,
-													"column": 3
-												},
-												"end": {
-													"line": 4,
-													"column": 4
-												}
-											},
 											"name": "a"
 										},
 										{
 											"type": "Identifier",
 											"start": 41,
 											"end": 42,
-											"loc": {
-												"start": {
-													"line": 5,
-													"column": 3
-												},
-												"end": {
-													"line": 5,
-													"column": 4
-												}
-											},
 											"name": "b",
 											"trailingComments": [
 												{
@@ -190,16 +90,6 @@
 										"type": "BlockStatement",
 										"start": 58,
 										"end": 60,
-										"loc": {
-											"start": {
-												"line": 6,
-												"column": 4
-											},
-											"end": {
-												"line": 6,
-												"column": 6
-											}
-										},
 										"body": []
 									}
 								}

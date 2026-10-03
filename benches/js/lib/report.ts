@@ -168,11 +168,11 @@ export function rows_missing_from_display_order(names: Iterable<string>): string
  * - `drop_in` — the canonical parser's own AST shape (loc-bearing for TS and Svelte;
  *   `parseCss` emits no `loc`). The oracle rows, tsv's `-json` wires, and
  *   `rsvelte-parse`, measured within ~1.5% of tsv's bytes. The `+reconstruct` rows too:
- *   the span-only wire with `loc` rebuilt in JS — acorn-exact on TypeScript. On Svelte
- *   it is a superset of the drop-in `loc` (every template node gains one), which errs
- *   against that row, and approximate on two Svelte parser quirks it does not replicate:
- *   the `<script>` tag-position `Program.loc` and the destructure `+1` column
- *   (`crates/tsv_wasm/npm/locations.js`'s module doc).
+ *   the span-only wire with `loc` rebuilt in JS, which is the tree tsv's own loc-bearing
+ *   wire carries — one `loc` definition, implemented by the Rust writer and by
+ *   `crates/tsv_wasm/npm/locations.js` — so acorn-exact on TypeScript, and on Svelte the
+ *   same superset of Svelte's own `loc` that `tsv-json` is (every positioned object gains
+ *   one, where Svelte gives one only to acorn-parsed nodes).
  * - `span_only` — `start`/`end` and no per-node `loc`: tsv's `no-locations` wires,
  *   and oxc's and yuku's default ASTs.
  * - `own_shape` — a product that is neither: its own AST dialect (swc, postcss,
@@ -193,10 +193,8 @@ const PARSE_PAYLOAD_TIERS: Readonly<Record<string, PayloadTier>> = {
 	'rsvelte-parse': 'drop_in',
 	'tsv-json-no-locations': 'span_only',
 	'tsv-wasm-json-no-locations': 'span_only',
-	// `loc` rebuilt in JS on every node: acorn-exact on TypeScript, so the drop-in tier; on
-	// Svelte a superset of the drop-in `loc` (template nodes gain one too), which only
-	// makes a ratio against `tsv-json` conservative for this row, and approximate on the
-	// two parser quirks `locations.js` declines (tag-position `Program.loc`, destructure +1)
+	// `loc` rebuilt in JS on every node — the tree `tsv-json` itself carries (one `loc`
+	// definition, two implementations), so the drop-in tier wherever `tsv-json` is
 	'tsv-json-no-locations+reconstruct': 'drop_in',
 	'tsv-wasm-json-no-locations+reconstruct': 'drop_in',
 	'oxc-parser': 'span_only',
@@ -1646,12 +1644,11 @@ const RECONSTRUCT_ROWS: ReadonlyArray<
  * any is left out, and the note is omitted when nothing is left — a filtered or
  * coverage-only run carries no stale claim.
  *
- * ⚠ The Svelte reconstruct is a superset of the drop-in `loc`: it adds `loc` to every
- * node, where the Svelte wire carries it only on the acorn-parsed nodes (plus
- * `name_loc`), so on Svelte the `+reconstruct` row builds the larger tree and its
- * ratio is conservative. It is also approximate on two Svelte parser quirks it does not
- * replicate — the `<script>` tag-position `Program.loc` and the destructure `+1` column
- * (`crates/tsv_wasm/npm/locations.js`'s module doc) — which move values, not size.
+ * The `+reconstruct` row builds exactly the tree its loc-bearing row materializes: the
+ * Rust writer and `crates/tsv_wasm/npm/locations.js` implement one `loc` definition, and
+ * `deno task check:loc` holds them equal over the fixture tree. So the ratio is
+ * payload-matched in every language — on Svelte both products are the same superset of
+ * Svelte's own `loc` (every positioned object carries one).
  */
 export function generate_reconstruct_note(all_group_results: GroupResults[]): string | null {
 	const parts: string[] = [];
@@ -1673,7 +1670,7 @@ export function generate_reconstruct_note(all_group_results: GroupResults[]): st
 		if (cells.length > 0) parts.push(`${language}: ${cells.join('; ')}`);
 	}
 	if (parts.length === 0) return null;
-	return `**Span-only + reconstruct vs the loc-bearing wire** (the binding's loc-bearing row — \`tsv-json\` / \`tsv-wasm-json\` — mean / row mean, speedup form; \`+reconstruct\` = the span-only wire plus \`loc\` on every node rebuilt in JS by the shipped \`reconstruct_locations\`, line table included — on Svelte a superset of the drop-in \`loc\`, so that ratio is conservative, and approximate on two parser quirks, the \`<script>\` tag-position \`Program.loc\` and the destructure +1 column): ${parts.join(' | ')}`;
+	return `**Span-only + reconstruct vs the loc-bearing wire** (the binding's loc-bearing row — \`tsv-json\` / \`tsv-wasm-json\` — mean / row mean, speedup form; \`+reconstruct\` = the span-only wire plus \`loc\` on every node rebuilt in JS by the shipped \`reconstruct_locations\`, line table included — the same tree the loc-bearing row carries, so the two are payload-matched): ${parts.join(' | ')}`;
 }
 
 /**

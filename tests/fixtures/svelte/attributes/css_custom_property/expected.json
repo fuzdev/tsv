@@ -12,36 +12,12 @@
 				"start": 0,
 				"end": 21,
 				"name": "Comp",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 5,
-						"character": 5
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 6,
 						"end": 18,
 						"name": "--margin",
-						"name_loc": {
-							"start": {
-								"line": 1,
-								"column": 6,
-								"character": 6
-							},
-							"end": {
-								"line": 1,
-								"column": 14,
-								"character": 14
-							}
-						},
 						"value": [
 							{
 								"start": 16,
@@ -70,36 +46,12 @@
 				"start": 22,
 				"end": 54,
 				"name": "Comp",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 23
-					},
-					"end": {
-						"line": 2,
-						"column": 5,
-						"character": 27
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 28,
 						"end": 51,
 						"name": "--my-custom-var",
-						"name_loc": {
-							"start": {
-								"line": 2,
-								"column": 6,
-								"character": 28
-							},
-							"end": {
-								"line": 2,
-								"column": 21,
-								"character": 43
-							}
-						},
 						"value": [
 							{
 								"start": 45,
@@ -128,36 +80,12 @@
 				"start": 55,
 				"end": 78,
 				"name": "Comp",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 1,
-						"character": 56
-					},
-					"end": {
-						"line": 3,
-						"column": 5,
-						"character": 60
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 61,
 						"end": 75,
 						"name": "--color",
-						"name_loc": {
-							"start": {
-								"line": 3,
-								"column": 6,
-								"character": 61
-							},
-							"end": {
-								"line": 3,
-								"column": 13,
-								"character": 68
-							}
-						},
 						"value": {
 							"type": "ExpressionTag",
 							"start": 69,
@@ -166,16 +94,6 @@
 								"type": "Identifier",
 								"start": 70,
 								"end": 74,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 15
-									},
-									"end": {
-										"line": 3,
-										"column": 19
-									}
-								},
 								"name": "expr"
 							}
 						}
@@ -198,36 +116,12 @@
 				"start": 79,
 				"end": 135,
 				"name": "Comp",
-				"name_loc": {
-					"start": {
-						"line": 4,
-						"column": 1,
-						"character": 80
-					},
-					"end": {
-						"line": 4,
-						"column": 5,
-						"character": 84
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 85,
 						"end": 99,
 						"name": "prop1",
-						"name_loc": {
-							"start": {
-								"line": 4,
-								"column": 6,
-								"character": 85
-							},
-							"end": {
-								"line": 4,
-								"column": 11,
-								"character": 90
-							}
-						},
 						"value": [
 							{
 								"start": 92,
@@ -243,18 +137,6 @@
 						"start": 100,
 						"end": 117,
 						"name": "--custom",
-						"name_loc": {
-							"start": {
-								"line": 4,
-								"column": 21,
-								"character": 100
-							},
-							"end": {
-								"line": 4,
-								"column": 29,
-								"character": 108
-							}
-						},
 						"value": [
 							{
 								"start": 110,
@@ -270,18 +152,6 @@
 						"start": 118,
 						"end": 132,
 						"name": "prop2",
-						"name_loc": {
-							"start": {
-								"line": 4,
-								"column": 39,
-								"character": 118
-							},
-							"end": {
-								"line": 4,
-								"column": 44,
-								"character": 123
-							}
-						},
 						"value": [
 							{
 								"start": 125,
@@ -310,36 +180,12 @@
 				"start": 136,
 				"end": 167,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 1,
-						"character": 137
-					},
-					"end": {
-						"line": 5,
-						"column": 4,
-						"character": 140
-					}
-				},
 				"attributes": [
 					{
 						"start": 141,
 						"end": 160,
 						"type": "StyleDirective",
 						"name": "--color",
-						"name_loc": {
-							"start": {
-								"line": 5,
-								"column": 5,
-								"character": 141
-							},
-							"end": {
-								"line": 5,
-								"column": 18,
-								"character": 154
-							}
-						},
 						"modifiers": [],
 						"value": [
 							{

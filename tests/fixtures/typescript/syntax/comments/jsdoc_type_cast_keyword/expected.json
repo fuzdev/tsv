@@ -14,65 +14,25 @@
 			"type": "Line",
 			"value": " await with JSDoc cast",
 			"start": 10,
-			"end": 34,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 25
-				}
-			}
+			"end": 34
 		},
 		{
 			"type": "Block",
 			"value": "* @type {Promise<A>} ",
 			"start": 77,
-			"end": 102,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 18
-				},
-				"end": {
-					"line": 4,
-					"column": 43
-				}
-			}
+			"end": 102
 		},
 		{
 			"type": "Line",
 			"value": " yield with JSDoc cast",
 			"start": 116,
-			"end": 140,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 1
-				},
-				"end": {
-					"line": 7,
-					"column": 25
-				}
-			}
+			"end": 140
 		},
 		{
 			"type": "Block",
 			"value": "* @type {A} ",
 			"start": 178,
-			"end": 194,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 18
-				},
-				"end": {
-					"line": 9,
-					"column": 34
-				}
-			}
+			"end": 194
 		}
 	],
 	"instance": {
@@ -84,45 +44,15 @@
 			"type": "Program",
 			"start": 8,
 			"end": 206,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 11,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "FunctionDeclaration",
 					"start": 36,
 					"end": 113,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 51,
 						"end": 54,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 16
-							},
-							"end": {
-								"line": 3,
-								"column": 19
-							}
-						},
 						"name": "fn1"
 					},
 					"expression": false,
@@ -133,90 +63,30 @@
 						"type": "BlockStatement",
 						"start": 57,
 						"end": 113,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 22
-							},
-							"end": {
-								"line": 5,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "VariableDeclaration",
 								"start": 61,
 								"end": 110,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 2
-									},
-									"end": {
-										"line": 4,
-										"column": 51
-									}
-								},
 								"declarations": [
 									{
 										"type": "VariableDeclarator",
 										"start": 67,
 										"end": 109,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 8
-											},
-											"end": {
-												"line": 4,
-												"column": 50
-											}
-										},
 										"id": {
 											"type": "Identifier",
 											"start": 67,
 											"end": 68,
-											"loc": {
-												"start": {
-													"line": 4,
-													"column": 8
-												},
-												"end": {
-													"line": 4,
-													"column": 9
-												}
-											},
 											"name": "a"
 										},
 										"init": {
 											"type": "AwaitExpression",
 											"start": 71,
 											"end": 109,
-											"loc": {
-												"start": {
-													"line": 4,
-													"column": 12
-												},
-												"end": {
-													"line": 4,
-													"column": 50
-												}
-											},
 											"argument": {
 												"type": "Identifier",
 												"start": 104,
 												"end": 108,
-												"loc": {
-													"start": {
-														"line": 4,
-														"column": 45
-													},
-													"end": {
-														"line": 4,
-														"column": 49
-													}
-												},
 												"name": "expr",
 												"leadingComments": [
 													{
@@ -247,30 +117,10 @@
 					"type": "FunctionDeclaration",
 					"start": 142,
 					"end": 205,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 1
-						},
-						"end": {
-							"line": 10,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 152,
 						"end": 155,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 11
-							},
-							"end": {
-								"line": 8,
-								"column": 14
-							}
-						},
 						"name": "fn2"
 					},
 					"expression": false,
@@ -281,91 +131,31 @@
 						"type": "BlockStatement",
 						"start": 158,
 						"end": 205,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 17
-							},
-							"end": {
-								"line": 10,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "VariableDeclaration",
 								"start": 162,
 								"end": 202,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 2
-									},
-									"end": {
-										"line": 9,
-										"column": 42
-									}
-								},
 								"declarations": [
 									{
 										"type": "VariableDeclarator",
 										"start": 168,
 										"end": 201,
-										"loc": {
-											"start": {
-												"line": 9,
-												"column": 8
-											},
-											"end": {
-												"line": 9,
-												"column": 41
-											}
-										},
 										"id": {
 											"type": "Identifier",
 											"start": 168,
 											"end": 169,
-											"loc": {
-												"start": {
-													"line": 9,
-													"column": 8
-												},
-												"end": {
-													"line": 9,
-													"column": 9
-												}
-											},
 											"name": "b"
 										},
 										"init": {
 											"type": "YieldExpression",
 											"start": 172,
 											"end": 201,
-											"loc": {
-												"start": {
-													"line": 9,
-													"column": 12
-												},
-												"end": {
-													"line": 9,
-													"column": 41
-												}
-											},
 											"delegate": false,
 											"argument": {
 												"type": "Identifier",
 												"start": 196,
 												"end": 200,
-												"loc": {
-													"start": {
-														"line": 9,
-														"column": 36
-													},
-													"end": {
-														"line": 9,
-														"column": 40
-													}
-												},
 												"name": "expr",
 												"leadingComments": [
 													{

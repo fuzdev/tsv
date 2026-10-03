@@ -25,18 +25,6 @@
 				"start": 169,
 				"end": 284,
 				"name": "li",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 1,
-						"character": 170
-					},
-					"end": {
-						"line": 5,
-						"column": 3,
-						"character": 172
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -56,16 +44,6 @@
 								"type": "Identifier",
 								"start": 260,
 								"end": 270,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 86
-									},
-									"end": {
-										"line": 6,
-										"column": 96
-									}
-								},
 								"name": "xxxxxxxxxx"
 							}
 						},

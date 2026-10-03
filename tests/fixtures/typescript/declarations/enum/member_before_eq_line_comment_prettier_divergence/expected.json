@@ -14,81 +14,31 @@
 			"type": "Line",
 			"value": " A line comment before `=` stays after the name; `= value` indents one level.",
 			"start": 31,
-			"end": 110,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 2
-				},
-				"end": {
-					"line": 3,
-					"column": 81
-				}
-			}
+			"end": 110
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 115,
-			"end": 119,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 4
-				},
-				"end": {
-					"line": 4,
-					"column": 8
-				}
-			}
+			"end": 119
 		},
 		{
 			"type": "Line",
 			"value": " Two comments around the member stay distinct (prettier merges them — loss).",
 			"start": 130,
-			"end": 208,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 2
-				},
-				"end": {
-					"line": 6,
-					"column": 80
-				}
-			}
+			"end": 208
 		},
 		{
 			"type": "Line",
 			"value": " c1",
 			"start": 213,
-			"end": 218,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 4
-				},
-				"end": {
-					"line": 7,
-					"column": 9
-				}
-			}
+			"end": 218
 		},
 		{
 			"type": "Line",
 			"value": " c2",
 			"start": 226,
-			"end": 231,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 7
-				},
-				"end": {
-					"line": 8,
-					"column": 12
-				}
-			}
+			"end": 231
 		}
 	],
 	"instance": {
@@ -100,45 +50,15 @@
 			"type": "Program",
 			"start": 18,
 			"end": 235,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 10,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "TSEnumDeclaration",
 					"start": 20,
 					"end": 234,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 9,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 25,
 						"end": 26,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 6
-							},
-							"end": {
-								"line": 2,
-								"column": 7
-							}
-						},
 						"name": "E"
 					},
 					"members": [
@@ -146,30 +66,10 @@
 							"type": "TSEnumMember",
 							"start": 113,
 							"end": 126,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 2
-								},
-								"end": {
-									"line": 5,
-									"column": 6
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 113,
 								"end": 114,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 2
-									},
-									"end": {
-										"line": 4,
-										"column": 3
-									}
-								},
 								"name": "A",
 								"trailingComments": [
 									{
@@ -184,16 +84,6 @@
 								"type": "Literal",
 								"start": 125,
 								"end": 126,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 5
-									},
-									"end": {
-										"line": 5,
-										"column": 6
-									}
-								},
 								"value": 1,
 								"raw": "1"
 							},
@@ -210,30 +100,10 @@
 							"type": "TSEnumMember",
 							"start": 211,
 							"end": 225,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 2
-								},
-								"end": {
-									"line": 8,
-									"column": 6
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 211,
 								"end": 212,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 2
-									},
-									"end": {
-										"line": 7,
-										"column": 3
-									}
-								},
 								"name": "B",
 								"trailingComments": [
 									{
@@ -248,16 +118,6 @@
 								"type": "Literal",
 								"start": 224,
 								"end": 225,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 5
-									},
-									"end": {
-										"line": 8,
-										"column": 6
-									}
-								},
 								"value": 2,
 								"raw": "2"
 							},
@@ -289,18 +149,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

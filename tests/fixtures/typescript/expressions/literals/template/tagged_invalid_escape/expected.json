@@ -14,49 +14,19 @@
 			"type": "Line",
 			"value": " Tagged templates tolerate otherwise-invalid escape sequences (ES2018 template",
 			"start": 20,
-			"end": 100,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 81
-				}
-			}
+			"end": 100
 		},
 		{
 			"type": "Line",
 			"value": " literals revision): the cooked value is null but the raw text is preserved.",
 			"start": 102,
-			"end": 180,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 79
-				}
-			}
+			"end": 180
 		},
 		{
 			"type": "Line",
 			"value": " Valid escapes in a tagged template still cook normally.",
 			"start": 390,
-			"end": 448,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 1
-				},
-				"end": {
-					"line": 11,
-					"column": 59
-				}
-			}
+			"end": 448
 		}
 	],
 	"instance": {
@@ -68,122 +38,42 @@
 			"type": "Program",
 			"start": 18,
 			"end": 475,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 13,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 182,
 					"end": 211,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 30
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 188,
 							"end": 210,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 7
-								},
-								"end": {
-									"line": 4,
-									"column": 29
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 188,
 								"end": 195,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 7
-									},
-									"end": {
-										"line": 4,
-										"column": 14
-									}
-								},
 								"name": "unicode"
 							},
 							"init": {
 								"type": "TaggedTemplateExpression",
 								"start": 198,
 								"end": 210,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 17
-									},
-									"end": {
-										"line": 4,
-										"column": 29
-									}
-								},
 								"tag": {
 									"type": "Identifier",
 									"start": 198,
 									"end": 201,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 17
-										},
-										"end": {
-											"line": 4,
-											"column": 20
-										}
-									},
 									"name": "tag"
 								},
 								"quasi": {
 									"type": "TemplateLiteral",
 									"start": 201,
 									"end": 210,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 20
-										},
-										"end": {
-											"line": 4,
-											"column": 29
-										}
-									},
 									"expressions": [],
 									"quasis": [
 										{
 											"type": "TemplateElement",
 											"start": 202,
 											"end": 209,
-											"loc": {
-												"start": {
-													"line": 4,
-													"column": 21
-												},
-												"end": {
-													"line": 4,
-													"column": 28
-												}
-											},
 											"value": {
 												"raw": "\\u{zzz}",
 												"cooked": null
@@ -215,107 +105,37 @@
 					"type": "VariableDeclaration",
 					"start": 213,
 					"end": 248,
-					"loc": {
-						"start": {
-							"line": 5,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 36
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 219,
 							"end": 247,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 7
-								},
-								"end": {
-									"line": 5,
-									"column": 35
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 219,
 								"end": 231,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 7
-									},
-									"end": {
-										"line": 5,
-										"column": 19
-									}
-								},
 								"name": "unicodeShort"
 							},
 							"init": {
 								"type": "TaggedTemplateExpression",
 								"start": 234,
 								"end": 247,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 22
-									},
-									"end": {
-										"line": 5,
-										"column": 35
-									}
-								},
 								"tag": {
 									"type": "Identifier",
 									"start": 234,
 									"end": 237,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 22
-										},
-										"end": {
-											"line": 5,
-											"column": 25
-										}
-									},
 									"name": "tag"
 								},
 								"quasi": {
 									"type": "TemplateLiteral",
 									"start": 237,
 									"end": 247,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 25
-										},
-										"end": {
-											"line": 5,
-											"column": 35
-										}
-									},
 									"expressions": [],
 									"quasis": [
 										{
 											"type": "TemplateElement",
 											"start": 238,
 											"end": 246,
-											"loc": {
-												"start": {
-													"line": 5,
-													"column": 26
-												},
-												"end": {
-													"line": 5,
-													"column": 34
-												}
-											},
 											"value": {
 												"raw": "\\unicode",
 												"cooked": null
@@ -333,107 +153,37 @@
 					"type": "VariableDeclaration",
 					"start": 250,
 					"end": 282,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 33
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 256,
 							"end": 281,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 7
-								},
-								"end": {
-									"line": 6,
-									"column": 32
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 256,
 								"end": 268,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 7
-									},
-									"end": {
-										"line": 6,
-										"column": 19
-									}
-								},
 								"name": "unterminated"
 							},
 							"init": {
 								"type": "TaggedTemplateExpression",
 								"start": 271,
 								"end": 281,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 22
-									},
-									"end": {
-										"line": 6,
-										"column": 32
-									}
-								},
 								"tag": {
 									"type": "Identifier",
 									"start": 271,
 									"end": 274,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 22
-										},
-										"end": {
-											"line": 6,
-											"column": 25
-										}
-									},
 									"name": "tag"
 								},
 								"quasi": {
 									"type": "TemplateLiteral",
 									"start": 274,
 									"end": 281,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 25
-										},
-										"end": {
-											"line": 6,
-											"column": 32
-										}
-									},
 									"expressions": [],
 									"quasis": [
 										{
 											"type": "TemplateElement",
 											"start": 275,
 											"end": 280,
-											"loc": {
-												"start": {
-													"line": 6,
-													"column": 26
-												},
-												"end": {
-													"line": 6,
-													"column": 31
-												}
-											},
 											"value": {
 												"raw": "\\u{41",
 												"cooked": null
@@ -451,107 +201,37 @@
 					"type": "VariableDeclaration",
 					"start": 284,
 					"end": 306,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 1
-						},
-						"end": {
-							"line": 7,
-							"column": 23
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 290,
 							"end": 305,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 7
-								},
-								"end": {
-									"line": 7,
-									"column": 22
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 290,
 								"end": 293,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 7
-									},
-									"end": {
-										"line": 7,
-										"column": 10
-									}
-								},
 								"name": "hex"
 							},
 							"init": {
 								"type": "TaggedTemplateExpression",
 								"start": 296,
 								"end": 305,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 13
-									},
-									"end": {
-										"line": 7,
-										"column": 22
-									}
-								},
 								"tag": {
 									"type": "Identifier",
 									"start": 296,
 									"end": 299,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 13
-										},
-										"end": {
-											"line": 7,
-											"column": 16
-										}
-									},
 									"name": "tag"
 								},
 								"quasi": {
 									"type": "TemplateLiteral",
 									"start": 299,
 									"end": 305,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 16
-										},
-										"end": {
-											"line": 7,
-											"column": 22
-										}
-									},
 									"expressions": [],
 									"quasis": [
 										{
 											"type": "TemplateElement",
 											"start": 300,
 											"end": 304,
-											"loc": {
-												"start": {
-													"line": 7,
-													"column": 17
-												},
-												"end": {
-													"line": 7,
-													"column": 21
-												}
-											},
 											"value": {
 												"raw": "\\xZZ",
 												"cooked": null
@@ -569,106 +249,36 @@
 					"type": "VariableDeclaration",
 					"start": 308,
 					"end": 350,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 43
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 314,
 							"end": 349,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 7
-								},
-								"end": {
-									"line": 8,
-									"column": 42
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 314,
 								"end": 326,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 7
-									},
-									"end": {
-										"line": 8,
-										"column": 19
-									}
-								},
 								"name": "interpolated"
 							},
 							"init": {
 								"type": "TaggedTemplateExpression",
 								"start": 329,
 								"end": 349,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 22
-									},
-									"end": {
-										"line": 8,
-										"column": 42
-									}
-								},
 								"tag": {
 									"type": "Identifier",
 									"start": 329,
 									"end": 332,
-									"loc": {
-										"start": {
-											"line": 8,
-											"column": 22
-										},
-										"end": {
-											"line": 8,
-											"column": 25
-										}
-									},
 									"name": "tag"
 								},
 								"quasi": {
 									"type": "TemplateLiteral",
 									"start": 332,
 									"end": 349,
-									"loc": {
-										"start": {
-											"line": 8,
-											"column": 25
-										},
-										"end": {
-											"line": 8,
-											"column": 42
-										}
-									},
 									"expressions": [
 										{
 											"type": "Identifier",
 											"start": 342,
 											"end": 346,
-											"loc": {
-												"start": {
-													"line": 8,
-													"column": 35
-												},
-												"end": {
-													"line": 8,
-													"column": 39
-												}
-											},
 											"name": "expr"
 										}
 									],
@@ -677,16 +287,6 @@
 											"type": "TemplateElement",
 											"start": 333,
 											"end": 340,
-											"loc": {
-												"start": {
-													"line": 8,
-													"column": 26
-												},
-												"end": {
-													"line": 8,
-													"column": 33
-												}
-											},
 											"value": {
 												"raw": "a\\u{zz}",
 												"cooked": null
@@ -697,16 +297,6 @@
 											"type": "TemplateElement",
 											"start": 347,
 											"end": 348,
-											"loc": {
-												"start": {
-													"line": 8,
-													"column": 40
-												},
-												"end": {
-													"line": 8,
-													"column": 41
-												}
-											},
 											"value": {
 												"raw": "c",
 												"cooked": "c"
@@ -724,105 +314,35 @@
 					"type": "VariableDeclaration",
 					"start": 352,
 					"end": 387,
-					"loc": {
-						"start": {
-							"line": 9,
-							"column": 1
-						},
-						"end": {
-							"line": 9,
-							"column": 36
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 358,
 							"end": 386,
-							"loc": {
-								"start": {
-									"line": 9,
-									"column": 7
-								},
-								"end": {
-									"line": 9,
-									"column": 35
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 358,
 								"end": 364,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 7
-									},
-									"end": {
-										"line": 9,
-										"column": 13
-									}
-								},
 								"name": "member"
 							},
 							"init": {
 								"type": "TaggedTemplateExpression",
 								"start": 367,
 								"end": 386,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 16
-									},
-									"end": {
-										"line": 9,
-										"column": 35
-									}
-								},
 								"tag": {
 									"type": "MemberExpression",
 									"start": 367,
 									"end": 377,
-									"loc": {
-										"start": {
-											"line": 9,
-											"column": 16
-										},
-										"end": {
-											"line": 9,
-											"column": 26
-										}
-									},
 									"object": {
 										"type": "Identifier",
 										"start": 367,
 										"end": 373,
-										"loc": {
-											"start": {
-												"line": 9,
-												"column": 16
-											},
-											"end": {
-												"line": 9,
-												"column": 22
-											}
-										},
 										"name": "String"
 									},
 									"property": {
 										"type": "Identifier",
 										"start": 374,
 										"end": 377,
-										"loc": {
-											"start": {
-												"line": 9,
-												"column": 23
-											},
-											"end": {
-												"line": 9,
-												"column": 26
-											}
-										},
 										"name": "raw"
 									},
 									"computed": false,
@@ -832,32 +352,12 @@
 									"type": "TemplateLiteral",
 									"start": 377,
 									"end": 386,
-									"loc": {
-										"start": {
-											"line": 9,
-											"column": 26
-										},
-										"end": {
-											"line": 9,
-											"column": 35
-										}
-									},
 									"expressions": [],
 									"quasis": [
 										{
 											"type": "TemplateElement",
 											"start": 378,
 											"end": 385,
-											"loc": {
-												"start": {
-													"line": 9,
-													"column": 27
-												},
-												"end": {
-													"line": 9,
-													"column": 34
-												}
-											},
 											"value": {
 												"raw": "\\u{zzz}",
 												"cooked": null
@@ -875,107 +375,37 @@
 					"type": "VariableDeclaration",
 					"start": 450,
 					"end": 474,
-					"loc": {
-						"start": {
-							"line": 12,
-							"column": 1
-						},
-						"end": {
-							"line": 12,
-							"column": 25
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 456,
 							"end": 473,
-							"loc": {
-								"start": {
-									"line": 12,
-									"column": 7
-								},
-								"end": {
-									"line": 12,
-									"column": 24
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 456,
 								"end": 461,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 7
-									},
-									"end": {
-										"line": 12,
-										"column": 12
-									}
-								},
 								"name": "valid"
 							},
 							"init": {
 								"type": "TaggedTemplateExpression",
 								"start": 464,
 								"end": 473,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 15
-									},
-									"end": {
-										"line": 12,
-										"column": 24
-									}
-								},
 								"tag": {
 									"type": "Identifier",
 									"start": 464,
 									"end": 467,
-									"loc": {
-										"start": {
-											"line": 12,
-											"column": 15
-										},
-										"end": {
-											"line": 12,
-											"column": 18
-										}
-									},
 									"name": "tag"
 								},
 								"quasi": {
 									"type": "TemplateLiteral",
 									"start": 467,
 									"end": 473,
-									"loc": {
-										"start": {
-											"line": 12,
-											"column": 18
-										},
-										"end": {
-											"line": 12,
-											"column": 24
-										}
-									},
 									"expressions": [],
 									"quasis": [
 										{
 											"type": "TemplateElement",
 											"start": 468,
 											"end": 472,
-											"loc": {
-												"start": {
-													"line": 12,
-													"column": 19
-												},
-												"end": {
-													"line": 12,
-													"column": 23
-												}
-											},
 											"value": {
 												"raw": "\\n\\t",
 												"cooked": "\n\t"
@@ -1006,18 +436,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

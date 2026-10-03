@@ -25,18 +25,6 @@
 				"start": 174,
 				"end": 214,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 1,
-						"character": 175
-					},
-					"end": {
-						"line": 3,
-						"column": 2,
-						"character": 176
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -53,18 +41,6 @@
 							"start": 191,
 							"end": 209,
 							"name": "span",
-							"name_loc": {
-								"start": {
-									"line": 4,
-									"column": 14,
-									"character": 192
-								},
-								"end": {
-									"line": 4,
-									"column": 18,
-									"character": 196
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",

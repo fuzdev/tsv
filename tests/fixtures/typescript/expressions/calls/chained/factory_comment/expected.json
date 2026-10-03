@@ -14,33 +14,13 @@
 			"type": "Line",
 			"value": " Factory pattern with comment (expands)",
 			"start": 10,
-			"end": 51,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 42
-				}
-			}
+			"end": 51
 		},
 		{
 			"type": "Block",
 			"value": " comment ",
 			"start": 60,
-			"end": 73,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 8
-				},
-				"end": {
-					"line": 3,
-					"column": 21
-				}
-			}
+			"end": 73
 		}
 	],
 	"instance": {
@@ -52,101 +32,31 @@
 			"type": "Program",
 			"start": 8,
 			"end": 104,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 5,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
 					"start": 53,
 					"end": 103,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 17
-						}
-					},
 					"expression": {
 						"type": "CallExpression",
 						"start": 53,
 						"end": 102,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 1
-							},
-							"end": {
-								"line": 4,
-								"column": 16
-							}
-						},
 						"callee": {
 							"type": "MemberExpression",
 							"start": 53,
 							"end": 92,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 1
-								},
-								"end": {
-									"line": 4,
-									"column": 6
-								}
-							},
 							"object": {
 								"type": "CallExpression",
 								"start": 53,
 								"end": 85,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 1
-									},
-									"end": {
-										"line": 3,
-										"column": 33
-									}
-								},
 								"callee": {
 									"type": "MemberExpression",
 									"start": 53,
 									"end": 78,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 1
-										},
-										"end": {
-											"line": 3,
-											"column": 26
-										}
-									},
 									"object": {
 										"type": "Identifier",
 										"start": 53,
 										"end": 59,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 1
-											},
-											"end": {
-												"line": 3,
-												"column": 7
-											}
-										},
 										"name": "Object",
 										"trailingComments": [
 											{
@@ -161,16 +71,6 @@
 										"type": "Identifier",
 										"start": 74,
 										"end": 78,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 22
-											},
-											"end": {
-												"line": 3,
-												"column": 26
-											}
-										},
 										"name": "keys"
 									},
 									"computed": false,
@@ -181,16 +81,6 @@
 										"type": "Identifier",
 										"start": 79,
 										"end": 84,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 27
-											},
-											"end": {
-												"line": 3,
-												"column": 32
-											}
-										},
 										"name": "items"
 									}
 								],
@@ -200,16 +90,6 @@
 								"type": "Identifier",
 								"start": 89,
 								"end": 92,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 3
-									},
-									"end": {
-										"line": 4,
-										"column": 6
-									}
-								},
 								"name": "map"
 							},
 							"computed": false,
@@ -220,16 +100,6 @@
 								"type": "ArrowFunctionExpression",
 								"start": 93,
 								"end": 101,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 7
-									},
-									"end": {
-										"line": 4,
-										"column": 15
-									}
-								},
 								"id": null,
 								"expression": true,
 								"generator": false,
@@ -239,16 +109,6 @@
 										"type": "Identifier",
 										"start": 94,
 										"end": 95,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 8
-											},
-											"end": {
-												"line": 4,
-												"column": 9
-											}
-										},
 										"name": "k"
 									}
 								],
@@ -256,16 +116,6 @@
 									"type": "Identifier",
 									"start": 100,
 									"end": 101,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 14
-										},
-										"end": {
-											"line": 4,
-											"column": 15
-										}
-									},
 									"name": "k"
 								}
 							}

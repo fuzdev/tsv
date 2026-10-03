@@ -19,18 +19,6 @@
 				"start": 28,
 				"end": 36,
 				"name": "b",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 1,
-						"character": 29
-					},
-					"end": {
-						"line": 5,
-						"column": 2,
-						"character": 30
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -57,18 +45,6 @@
 				"start": 37,
 				"end": 45,
 				"name": "b",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 10,
-						"character": 38
-					},
-					"end": {
-						"line": 5,
-						"column": 11,
-						"character": 39
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -95,18 +71,6 @@
 				"start": 46,
 				"end": 54,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 6,
-						"column": 1,
-						"character": 47
-					},
-					"end": {
-						"line": 6,
-						"column": 2,
-						"character": 48
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -133,18 +97,6 @@
 				"start": 55,
 				"end": 63,
 				"name": "b",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 1,
-						"character": 56
-					},
-					"end": {
-						"line": 7,
-						"column": 2,
-						"character": 57
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -179,60 +131,20 @@
 			"type": "Program",
 			"start": 8,
 			"end": 17,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 3,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 10,
 					"end": 16,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 7
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 14,
 							"end": 15,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 5
-								},
-								"end": {
-									"line": 2,
-									"column": 6
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 14,
 								"end": 15,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 5
-									},
-									"end": {
-										"line": 2,
-										"column": 6
-									}
-								},
 								"name": "a"
 							},
 							"init": null

@@ -21,8 +21,9 @@ CSS and TypeScript BOM fixtures reference this README.
 (P4) — the input itself cannot carry this BOM, which has nothing load-bearing behind it, since
 tsv's format strips it and the input must be its own fixed point (F1). It holds Svelte's own
 AST of that variant: Svelte's `parse` strips the BOM before parsing, so every offset indexes
-the BOM-less string — the `<script>` on line 1, its
-`Program` loc, the template `name_loc`, the `<style>` sheet, and the `{a}` island all sit one
-UTF-16 unit below their file positions, and the line-1 columns one lower. The CSS sibling pins
+the BOM-less string — the `<script>` on line 1, the template elements, the `<style>` sheet,
+and the `{a}` island all sit one UTF-16 unit below their file positions. The CSS sibling pins
 `parseCss`'s identical reading; the TypeScript sibling pins acorn's opposite one (the BOM counts
-as whitespace, so file coordinates are kept).
+as whitespace, so file coordinates are kept). The pins are span-only, like every expected file;
+the same reading's `loc` side — a line-1 column one lower — is graded per language by
+[`tests/loc_definition.rs`](../../../../../loc_definition.rs).

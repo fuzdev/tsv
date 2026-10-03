@@ -14,65 +14,25 @@
 			"type": "Line",
 			"value": " An own-line comment in the value→`;` gap drops to its own line below the `;`",
 			"start": 20,
-			"end": 99,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 80
-				}
-			}
+			"end": 99
 		},
 		{
 			"type": "Block",
 			"value": " a ",
 			"start": 114,
-			"end": 121,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 1
-				},
-				"end": {
-					"line": 4,
-					"column": 8
-				}
-			}
+			"end": 121
 		},
 		{
 			"type": "Line",
 			"value": " An author blank above such a comment survives the terminator",
 			"start": 124,
-			"end": 187,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 1
-				},
-				"end": {
-					"line": 6,
-					"column": 64
-				}
-			}
+			"end": 187
 		},
 		{
 			"type": "Block",
 			"value": " c ",
 			"start": 203,
-			"end": 210,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 1
-				},
-				"end": {
-					"line": 9,
-					"column": 8
-				}
-			}
+			"end": 210
 		}
 	],
 	"instance": {
@@ -84,75 +44,25 @@
 			"type": "Program",
 			"start": 18,
 			"end": 211,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 10,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 101,
 					"end": 112,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 12
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 106,
 						"end": 107,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 6
-							},
-							"end": {
-								"line": 3,
-								"column": 7
-							}
-						},
 						"name": "A"
 					},
 					"typeAnnotation": {
 						"type": "TSTypeReference",
 						"start": 110,
 						"end": 111,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 10
-							},
-							"end": {
-								"line": 3,
-								"column": 11
-							}
-						},
 						"typeName": {
 							"type": "Identifier",
 							"start": 110,
 							"end": 111,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 10
-								},
-								"end": {
-									"line": 3,
-									"column": 11
-								}
-							},
 							"name": "B"
 						}
 					},
@@ -169,60 +79,20 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 189,
 					"end": 200,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 1
-						},
-						"end": {
-							"line": 7,
-							"column": 12
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 194,
 						"end": 195,
-						"loc": {
-							"start": {
-								"line": 7,
-								"column": 6
-							},
-							"end": {
-								"line": 7,
-								"column": 7
-							}
-						},
 						"name": "C"
 					},
 					"typeAnnotation": {
 						"type": "TSTypeReference",
 						"start": 198,
 						"end": 199,
-						"loc": {
-							"start": {
-								"line": 7,
-								"column": 10
-							},
-							"end": {
-								"line": 7,
-								"column": 11
-							}
-						},
 						"typeName": {
 							"type": "Identifier",
 							"start": 198,
 							"end": 199,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 10
-								},
-								"end": {
-									"line": 7,
-									"column": 11
-								}
-							},
 							"name": "D"
 						}
 					},
@@ -258,18 +128,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

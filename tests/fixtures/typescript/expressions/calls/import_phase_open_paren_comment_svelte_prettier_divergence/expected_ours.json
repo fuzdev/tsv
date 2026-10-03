@@ -14,113 +14,43 @@
 			"type": "Line",
 			"value": " a `source`-phased import answers its own `(` like every other call shape",
 			"start": 20,
-			"end": 95,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 76
-				}
-			}
+			"end": 95
 		},
 		{
 			"type": "Line",
 			"value": " c1",
 			"start": 122,
-			"end": 127,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 26
-				},
-				"end": {
-					"line": 3,
-					"column": 31
-				}
-			}
+			"end": 127
 		},
 		{
 			"type": "Line",
 			"value": " a `defer`-phased one likewise — the phase only changes the head, not the gap",
 			"start": 142,
-			"end": 221,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 1
-				},
-				"end": {
-					"line": 7,
-					"column": 80
-				}
-			}
+			"end": 221
 		},
 		{
 			"type": "Line",
 			"value": " c2",
 			"start": 247,
-			"end": 252,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 25
-				},
-				"end": {
-					"line": 8,
-					"column": 30
-				}
-			}
+			"end": 252
 		},
 		{
 			"type": "Line",
 			"value": " an author blank BELOW the pulled comment survives — the blank is authorship, not",
 			"start": 267,
-			"end": 350,
-			"loc": {
-				"start": {
-					"line": 12,
-					"column": 1
-				},
-				"end": {
-					"line": 12,
-					"column": 84
-				}
-			}
+			"end": 350
 		},
 		{
 			"type": "Line",
 			"value": " the container's leading gap (the blank ABOVE one stays erased, against the delimiter)",
 			"start": 352,
-			"end": 440,
-			"loc": {
-				"start": {
-					"line": 13,
-					"column": 1
-				},
-				"end": {
-					"line": 13,
-					"column": 89
-				}
-			}
+			"end": 440
 		},
 		{
 			"type": "Line",
 			"value": " c3",
 			"start": 467,
-			"end": 472,
-			"loc": {
-				"start": {
-					"line": 14,
-					"column": 26
-				},
-				"end": {
-					"line": 14,
-					"column": 31
-				}
-			}
+			"end": 472
 		}
 	],
 	"instance": {
@@ -132,90 +62,30 @@
 			"type": "Program",
 			"start": 18,
 			"end": 486,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 18,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 97,
 					"end": 139,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 3
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 103,
 							"end": 138,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 7
-								},
-								"end": {
-									"line": 5,
-									"column": 2
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 103,
 								"end": 104,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 7
-									},
-									"end": {
-										"line": 3,
-										"column": 8
-									}
-								},
 								"name": "a"
 							},
 							"init": {
 								"type": "ImportExpression",
 								"start": 107,
 								"end": 138,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 11
-									},
-									"end": {
-										"line": 5,
-										"column": 2
-									}
-								},
 								"source": {
 									"type": "Literal",
 									"start": 130,
 									"end": 135,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 2
-										},
-										"end": {
-											"line": 4,
-											"column": 7
-										}
-									},
 									"value": "./a",
 									"raw": "'./a'",
 									"leadingComments": [
@@ -245,75 +115,25 @@
 					"type": "VariableDeclaration",
 					"start": 223,
 					"end": 264,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 1
-						},
-						"end": {
-							"line": 10,
-							"column": 3
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 229,
 							"end": 263,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 7
-								},
-								"end": {
-									"line": 10,
-									"column": 2
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 229,
 								"end": 230,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 7
-									},
-									"end": {
-										"line": 8,
-										"column": 8
-									}
-								},
 								"name": "b"
 							},
 							"init": {
 								"type": "ImportExpression",
 								"start": 233,
 								"end": 263,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 11
-									},
-									"end": {
-										"line": 10,
-										"column": 2
-									}
-								},
 								"source": {
 									"type": "Literal",
 									"start": 255,
 									"end": 260,
-									"loc": {
-										"start": {
-											"line": 9,
-											"column": 2
-										},
-										"end": {
-											"line": 9,
-											"column": 7
-										}
-									},
 									"value": "./b",
 									"raw": "'./b'",
 									"leadingComments": [
@@ -343,75 +163,25 @@
 					"type": "VariableDeclaration",
 					"start": 442,
 					"end": 485,
-					"loc": {
-						"start": {
-							"line": 14,
-							"column": 1
-						},
-						"end": {
-							"line": 17,
-							"column": 3
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 448,
 							"end": 484,
-							"loc": {
-								"start": {
-									"line": 14,
-									"column": 7
-								},
-								"end": {
-									"line": 17,
-									"column": 2
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 448,
 								"end": 449,
-								"loc": {
-									"start": {
-										"line": 14,
-										"column": 7
-									},
-									"end": {
-										"line": 14,
-										"column": 8
-									}
-								},
 								"name": "c"
 							},
 							"init": {
 								"type": "ImportExpression",
 								"start": 452,
 								"end": 484,
-								"loc": {
-									"start": {
-										"line": 14,
-										"column": 11
-									},
-									"end": {
-										"line": 17,
-										"column": 2
-									}
-								},
 								"source": {
 									"type": "Literal",
 									"start": 476,
 									"end": 481,
-									"loc": {
-										"start": {
-											"line": 16,
-											"column": 2
-										},
-										"end": {
-											"line": 16,
-											"column": 7
-										}
-									},
 									"value": "./c",
 									"raw": "'./c'",
 									"leadingComments": [
@@ -452,18 +222,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

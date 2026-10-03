@@ -14,129 +14,49 @@
 			"type": "Line",
 			"value": " class keyword to name — block comment stays inline (both formatters)",
 			"start": 20,
-			"end": 91,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 72
-				}
-			}
+			"end": 91
 		},
 		{
 			"type": "Block",
 			"value": " c2 ",
 			"start": 99,
-			"end": 107,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 7
-				},
-				"end": {
-					"line": 3,
-					"column": 15
-				}
-			}
+			"end": 107
 		},
 		{
 			"type": "Line",
 			"value": " function expression keyword to name — an expression (not a declaration",
 			"start": 115,
-			"end": 188,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 1
-				},
-				"end": {
-					"line": 5,
-					"column": 74
-				}
-			}
+			"end": 188
 		},
 		{
 			"type": "Line",
 			"value": " header), so a line comment stays flat in both formatters",
 			"start": 190,
-			"end": 249,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 1
-				},
-				"end": {
-					"line": 6,
-					"column": 60
-				}
-			}
+			"end": 249
 		},
 		{
 			"type": "Line",
 			"value": " c3",
 			"start": 270,
-			"end": 275,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 20
-				},
-				"end": {
-					"line": 7,
-					"column": 25
-				}
-			}
+			"end": 275
 		},
 		{
 			"type": "Block",
 			"value": " c4 ",
 			"start": 307,
-			"end": 315,
-			"loc": {
-				"start": {
-					"line": 10,
-					"column": 20
-				},
-				"end": {
-					"line": 10,
-					"column": 28
-				}
-			}
+			"end": 315
 		},
 		{
 			"type": "Line",
 			"value": " declare function keyword to name — block comment stays inline (both formatters)",
 			"start": 327,
-			"end": 409,
-			"loc": {
-				"start": {
-					"line": 12,
-					"column": 1
-				},
-				"end": {
-					"line": 12,
-					"column": 83
-				}
-			}
+			"end": 409
 		},
 		{
 			"type": "Block",
 			"value": " c6 ",
 			"start": 428,
-			"end": 436,
-			"loc": {
-				"start": {
-					"line": 13,
-					"column": 18
-				},
-				"end": {
-					"line": 13,
-					"column": 26
-				}
-			}
+			"end": 436
 		}
 	],
 	"instance": {
@@ -148,45 +68,15 @@
 			"type": "Program",
 			"start": 18,
 			"end": 449,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 14,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ClassDeclaration",
 					"start": 93,
 					"end": 112,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 20
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 108,
 						"end": 109,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 16
-							},
-							"end": {
-								"line": 3,
-								"column": 17
-							}
-						},
 						"name": "B",
 						"leadingComments": [
 							{
@@ -202,16 +92,6 @@
 						"type": "ClassBody",
 						"start": 110,
 						"end": 112,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 18
-							},
-							"end": {
-								"line": 3,
-								"column": 20
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -227,75 +107,25 @@
 					"type": "VariableDeclaration",
 					"start": 251,
 					"end": 285,
-					"loc": {
-						"start": {
-							"line": 7,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 9
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 257,
 							"end": 284,
-							"loc": {
-								"start": {
-									"line": 7,
-									"column": 7
-								},
-								"end": {
-									"line": 8,
-									"column": 8
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 257,
 								"end": 258,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 7
-									},
-									"end": {
-										"line": 7,
-										"column": 8
-									}
-								},
 								"name": "a"
 							},
 							"init": {
 								"type": "FunctionExpression",
 								"start": 261,
 								"end": 284,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 11
-									},
-									"end": {
-										"line": 8,
-										"column": 8
-									}
-								},
 								"id": {
 									"type": "Identifier",
 									"start": 277,
 									"end": 279,
-									"loc": {
-										"start": {
-											"line": 8,
-											"column": 1
-										},
-										"end": {
-											"line": 8,
-											"column": 3
-										}
-									},
 									"name": "f1",
 									"leadingComments": [
 										{
@@ -314,16 +144,6 @@
 									"type": "BlockStatement",
 									"start": 282,
 									"end": 284,
-									"loc": {
-										"start": {
-											"line": 8,
-											"column": 6
-										},
-										"end": {
-											"line": 8,
-											"column": 8
-										}
-									},
 									"body": []
 								}
 							}
@@ -349,75 +169,25 @@
 					"type": "VariableDeclaration",
 					"start": 288,
 					"end": 324,
-					"loc": {
-						"start": {
-							"line": 10,
-							"column": 1
-						},
-						"end": {
-							"line": 10,
-							"column": 37
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 294,
 							"end": 323,
-							"loc": {
-								"start": {
-									"line": 10,
-									"column": 7
-								},
-								"end": {
-									"line": 10,
-									"column": 36
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 294,
 								"end": 295,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 7
-									},
-									"end": {
-										"line": 10,
-										"column": 8
-									}
-								},
 								"name": "b"
 							},
 							"init": {
 								"type": "FunctionExpression",
 								"start": 298,
 								"end": 323,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 11
-									},
-									"end": {
-										"line": 10,
-										"column": 36
-									}
-								},
 								"id": {
 									"type": "Identifier",
 									"start": 316,
 									"end": 318,
-									"loc": {
-										"start": {
-											"line": 10,
-											"column": 29
-										},
-										"end": {
-											"line": 10,
-											"column": 31
-										}
-									},
 									"name": "f2",
 									"leadingComments": [
 										{
@@ -436,16 +206,6 @@
 									"type": "BlockStatement",
 									"start": 321,
 									"end": 323,
-									"loc": {
-										"start": {
-											"line": 10,
-											"column": 34
-										},
-										"end": {
-											"line": 10,
-											"column": 36
-										}
-									},
 									"body": []
 								}
 							}
@@ -457,31 +217,11 @@
 					"type": "TSDeclareFunction",
 					"start": 411,
 					"end": 448,
-					"loc": {
-						"start": {
-							"line": 13,
-							"column": 1
-						},
-						"end": {
-							"line": 13,
-							"column": 38
-						}
-					},
 					"declare": true,
 					"id": {
 						"type": "Identifier",
 						"start": 437,
 						"end": 439,
-						"loc": {
-							"start": {
-								"line": 13,
-								"column": 27
-							},
-							"end": {
-								"line": 13,
-								"column": 29
-							}
-						},
 						"name": "f4",
 						"leadingComments": [
 							{
@@ -500,30 +240,10 @@
 						"type": "TSTypeAnnotation",
 						"start": 441,
 						"end": 447,
-						"loc": {
-							"start": {
-								"line": 13,
-								"column": 31
-							},
-							"end": {
-								"line": 13,
-								"column": 37
-							}
-						},
 						"typeAnnotation": {
 							"type": "TSVoidKeyword",
 							"start": 443,
-							"end": 447,
-							"loc": {
-								"start": {
-									"line": 13,
-									"column": 33
-								},
-								"end": {
-									"line": 13,
-									"column": 37
-								}
-							}
+							"end": 447
 						}
 					},
 					"leadingComments": [
@@ -544,18 +264,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

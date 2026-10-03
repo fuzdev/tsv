@@ -14,81 +14,31 @@
 			"type": "Line",
 			"value": " An own-line block comment collapses to trail the binding.",
 			"start": 10,
-			"end": 70,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 61
-				}
-			}
+			"end": 70
 		},
 		{
 			"type": "Block",
 			"value": " c ",
 			"start": 83,
-			"end": 90,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 12
-				},
-				"end": {
-					"line": 3,
-					"column": 19
-				}
-			}
+			"end": 90
 		},
 		{
 			"type": "Line",
 			"value": " A run collapses in order, each comment distinct.",
 			"start": 114,
-			"end": 165,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 1
-				},
-				"end": {
-					"line": 5,
-					"column": 52
-				}
-			}
+			"end": 165
 		},
 		{
 			"type": "Block",
 			"value": " c1 ",
 			"start": 178,
-			"end": 186,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 12
-				},
-				"end": {
-					"line": 6,
-					"column": 20
-				}
-			}
+			"end": 186
 		},
 		{
 			"type": "Block",
 			"value": " c2 ",
 			"start": 187,
-			"end": 195,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 21
-				},
-				"end": {
-					"line": 6,
-					"column": 29
-				}
-			}
+			"end": 195
 		}
 	],
 	"instance": {
@@ -100,74 +50,24 @@
 			"type": "Program",
 			"start": 8,
 			"end": 217,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 7,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ForStatement",
 					"start": 72,
 					"end": 111,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 40
-						}
-					},
 					"init": {
 						"type": "VariableDeclaration",
 						"start": 77,
 						"end": 94,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 6
-							},
-							"end": {
-								"line": 3,
-								"column": 23
-							}
-						},
 						"declarations": [
 							{
 								"type": "VariableDeclarator",
 								"start": 81,
 								"end": 94,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 10
-									},
-									"end": {
-										"line": 3,
-										"column": 23
-									}
-								},
 								"id": {
 									"type": "Identifier",
 									"start": 81,
 									"end": 82,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 10
-										},
-										"end": {
-											"line": 3,
-											"column": 11
-										}
-									},
 									"name": "g",
 									"trailingComments": [
 										{
@@ -182,16 +82,6 @@
 									"type": "Literal",
 									"start": 93,
 									"end": 94,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 22
-										},
-										"end": {
-											"line": 3,
-											"column": 23
-										}
-									},
 									"value": 0,
 									"raw": "0"
 								}
@@ -203,30 +93,10 @@
 						"type": "BinaryExpression",
 						"start": 96,
 						"end": 102,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 25
-							},
-							"end": {
-								"line": 3,
-								"column": 31
-							}
-						},
 						"left": {
 							"type": "Identifier",
 							"start": 96,
 							"end": 97,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 25
-								},
-								"end": {
-									"line": 3,
-									"column": 26
-								}
-							},
 							"name": "g"
 						},
 						"operator": "<",
@@ -234,16 +104,6 @@
 							"type": "Literal",
 							"start": 100,
 							"end": 102,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 29
-								},
-								"end": {
-									"line": 3,
-									"column": 31
-								}
-							},
 							"value": 10,
 							"raw": "10"
 						}
@@ -252,32 +112,12 @@
 						"type": "UpdateExpression",
 						"start": 104,
 						"end": 107,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 33
-							},
-							"end": {
-								"line": 3,
-								"column": 36
-							}
-						},
 						"operator": "++",
 						"prefix": false,
 						"argument": {
 							"type": "Identifier",
 							"start": 104,
 							"end": 105,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 33
-								},
-								"end": {
-									"line": 3,
-									"column": 34
-								}
-							},
 							"name": "g"
 						}
 					},
@@ -285,16 +125,6 @@
 						"type": "BlockStatement",
 						"start": 109,
 						"end": 111,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 38
-							},
-							"end": {
-								"line": 3,
-								"column": 40
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [
@@ -310,59 +140,19 @@
 					"type": "ForStatement",
 					"start": 167,
 					"end": 216,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 50
-						}
-					},
 					"init": {
 						"type": "VariableDeclaration",
 						"start": 172,
 						"end": 199,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 6
-							},
-							"end": {
-								"line": 6,
-								"column": 33
-							}
-						},
 						"declarations": [
 							{
 								"type": "VariableDeclarator",
 								"start": 176,
 								"end": 199,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 10
-									},
-									"end": {
-										"line": 6,
-										"column": 33
-									}
-								},
 								"id": {
 									"type": "Identifier",
 									"start": 176,
 									"end": 177,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 10
-										},
-										"end": {
-											"line": 6,
-											"column": 11
-										}
-									},
 									"name": "h",
 									"trailingComments": [
 										{
@@ -377,16 +167,6 @@
 									"type": "Literal",
 									"start": 198,
 									"end": 199,
-									"loc": {
-										"start": {
-											"line": 6,
-											"column": 32
-										},
-										"end": {
-											"line": 6,
-											"column": 33
-										}
-									},
 									"value": 0,
 									"raw": "0",
 									"leadingComments": [
@@ -406,30 +186,10 @@
 						"type": "BinaryExpression",
 						"start": 201,
 						"end": 207,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 35
-							},
-							"end": {
-								"line": 6,
-								"column": 41
-							}
-						},
 						"left": {
 							"type": "Identifier",
 							"start": 201,
 							"end": 202,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 35
-								},
-								"end": {
-									"line": 6,
-									"column": 36
-								}
-							},
 							"name": "h"
 						},
 						"operator": "<",
@@ -437,16 +197,6 @@
 							"type": "Literal",
 							"start": 205,
 							"end": 207,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 39
-								},
-								"end": {
-									"line": 6,
-									"column": 41
-								}
-							},
 							"value": 10,
 							"raw": "10"
 						}
@@ -455,32 +205,12 @@
 						"type": "UpdateExpression",
 						"start": 209,
 						"end": 212,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 43
-							},
-							"end": {
-								"line": 6,
-								"column": 46
-							}
-						},
 						"operator": "++",
 						"prefix": false,
 						"argument": {
 							"type": "Identifier",
 							"start": 209,
 							"end": 210,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 43
-								},
-								"end": {
-									"line": 6,
-									"column": 44
-								}
-							},
 							"name": "h"
 						}
 					},
@@ -488,16 +218,6 @@
 						"type": "BlockStatement",
 						"start": 214,
 						"end": 216,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 48
-							},
-							"end": {
-								"line": 6,
-								"column": 50
-							}
-						},
 						"body": []
 					},
 					"leadingComments": [

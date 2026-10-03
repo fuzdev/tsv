@@ -25,18 +25,6 @@
 				"start": 841,
 				"end": 949,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 13,
-						"column": 1,
-						"character": 842
-					},
-					"end": {
-						"line": 13,
-						"column": 2,
-						"character": 843
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -56,44 +44,14 @@
 								"type": "ConditionalExpression",
 								"start": 912,
 								"end": 943,
-								"loc": {
-									"start": {
-										"line": 14,
-										"column": 67
-									},
-									"end": {
-										"line": 14,
-										"column": 98
-									}
-								},
 								"test": {
 									"type": "BinaryExpression",
 									"start": 912,
 									"end": 927,
-									"loc": {
-										"start": {
-											"line": 14,
-											"column": 67
-										},
-										"end": {
-											"line": 14,
-											"column": 82
-										}
-									},
 									"left": {
 										"type": "Identifier",
 										"start": 912,
 										"end": 917,
-										"loc": {
-											"start": {
-												"line": 14,
-												"column": 67
-											},
-											"end": {
-												"line": 14,
-												"column": 72
-											}
-										},
 										"name": "cond1"
 									},
 									"operator": "===",
@@ -101,16 +59,6 @@
 										"type": "Identifier",
 										"start": 922,
 										"end": 927,
-										"loc": {
-											"start": {
-												"line": 14,
-												"column": 77
-											},
-											"end": {
-												"line": 14,
-												"column": 82
-											}
-										},
 										"name": "cond2"
 									}
 								},
@@ -118,16 +66,6 @@
 									"type": "Literal",
 									"start": 930,
 									"end": 935,
-									"loc": {
-										"start": {
-											"line": 14,
-											"column": 85
-										},
-										"end": {
-											"line": 14,
-											"column": 90
-										}
-									},
 									"value": "aaa",
 									"raw": "'aaa'"
 								},
@@ -135,16 +73,6 @@
 									"type": "Literal",
 									"start": 938,
 									"end": 943,
-									"loc": {
-										"start": {
-											"line": 14,
-											"column": 93
-										},
-										"end": {
-											"line": 14,
-											"column": 98
-										}
-									},
 									"value": "bbb",
 									"raw": "'bbb'"
 								}
@@ -172,18 +100,6 @@
 				"start": 950,
 				"end": 1060,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 16,
-						"column": 1,
-						"character": 951
-					},
-					"end": {
-						"line": 16,
-						"column": 2,
-						"character": 952
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -203,44 +119,14 @@
 								"type": "ConditionalExpression",
 								"start": 1023,
 								"end": 1054,
-								"loc": {
-									"start": {
-										"line": 18,
-										"column": 2
-									},
-									"end": {
-										"line": 18,
-										"column": 33
-									}
-								},
 								"test": {
 									"type": "BinaryExpression",
 									"start": 1023,
 									"end": 1038,
-									"loc": {
-										"start": {
-											"line": 18,
-											"column": 2
-										},
-										"end": {
-											"line": 18,
-											"column": 17
-										}
-									},
 									"left": {
 										"type": "Identifier",
 										"start": 1023,
 										"end": 1028,
-										"loc": {
-											"start": {
-												"line": 18,
-												"column": 2
-											},
-											"end": {
-												"line": 18,
-												"column": 7
-											}
-										},
 										"name": "cond1"
 									},
 									"operator": "===",
@@ -248,16 +134,6 @@
 										"type": "Identifier",
 										"start": 1033,
 										"end": 1038,
-										"loc": {
-											"start": {
-												"line": 18,
-												"column": 12
-											},
-											"end": {
-												"line": 18,
-												"column": 17
-											}
-										},
 										"name": "cond2"
 									}
 								},
@@ -265,16 +141,6 @@
 									"type": "Literal",
 									"start": 1041,
 									"end": 1046,
-									"loc": {
-										"start": {
-											"line": 18,
-											"column": 20
-										},
-										"end": {
-											"line": 18,
-											"column": 25
-										}
-									},
 									"value": "aaa",
 									"raw": "'aaa'"
 								},
@@ -282,16 +148,6 @@
 									"type": "Literal",
 									"start": 1049,
 									"end": 1054,
-									"loc": {
-										"start": {
-											"line": 18,
-											"column": 28
-										},
-										"end": {
-											"line": 18,
-											"column": 33
-										}
-									},
 									"value": "bbb",
 									"raw": "'bbb'"
 								}
@@ -319,18 +175,6 @@
 				"start": 1061,
 				"end": 1237,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 20,
-						"column": 1,
-						"character": 1062
-					},
-					"end": {
-						"line": 20,
-						"column": 2,
-						"character": 1063
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -350,44 +194,14 @@
 								"type": "ConditionalExpression",
 								"start": 1136,
 								"end": 1231,
-								"loc": {
-									"start": {
-										"line": 22,
-										"column": 2
-									},
-									"end": {
-										"line": 22,
-										"column": 97
-									}
-								},
 								"test": {
 									"type": "BinaryExpression",
 									"start": 1136,
 									"end": 1151,
-									"loc": {
-										"start": {
-											"line": 22,
-											"column": 2
-										},
-										"end": {
-											"line": 22,
-											"column": 17
-										}
-									},
 									"left": {
 										"type": "Identifier",
 										"start": 1136,
 										"end": 1141,
-										"loc": {
-											"start": {
-												"line": 22,
-												"column": 2
-											},
-											"end": {
-												"line": 22,
-												"column": 7
-											}
-										},
 										"name": "cond1"
 									},
 									"operator": "===",
@@ -395,16 +209,6 @@
 										"type": "Identifier",
 										"start": 1146,
 										"end": 1151,
-										"loc": {
-											"start": {
-												"line": 22,
-												"column": 12
-											},
-											"end": {
-												"line": 22,
-												"column": 17
-											}
-										},
 										"name": "cond2"
 									}
 								},
@@ -412,16 +216,6 @@
 									"type": "Literal",
 									"start": 1154,
 									"end": 1191,
-									"loc": {
-										"start": {
-											"line": 22,
-											"column": 20
-										},
-										"end": {
-											"line": 22,
-											"column": 57
-										}
-									},
 									"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 									"raw": "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'"
 								},
@@ -429,16 +223,6 @@
 									"type": "Literal",
 									"start": 1194,
 									"end": 1231,
-									"loc": {
-										"start": {
-											"line": 22,
-											"column": 60
-										},
-										"end": {
-											"line": 22,
-											"column": 97
-										}
-									},
 									"value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 									"raw": "'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
 								}
@@ -466,18 +250,6 @@
 				"start": 1238,
 				"end": 1454,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 24,
-						"column": 1,
-						"character": 1239
-					},
-					"end": {
-						"line": 24,
-						"column": 2,
-						"character": 1240
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -497,44 +269,14 @@
 								"type": "ConditionalExpression",
 								"start": 1313,
 								"end": 1448,
-								"loc": {
-									"start": {
-										"line": 26,
-										"column": 2
-									},
-									"end": {
-										"line": 28,
-										"column": 59
-									}
-								},
 								"test": {
 									"type": "BinaryExpression",
 									"start": 1313,
 									"end": 1328,
-									"loc": {
-										"start": {
-											"line": 26,
-											"column": 2
-										},
-										"end": {
-											"line": 26,
-											"column": 17
-										}
-									},
 									"left": {
 										"type": "Identifier",
 										"start": 1313,
 										"end": 1318,
-										"loc": {
-											"start": {
-												"line": 26,
-												"column": 2
-											},
-											"end": {
-												"line": 26,
-												"column": 7
-											}
-										},
 										"name": "cond1"
 									},
 									"operator": "===",
@@ -542,16 +284,6 @@
 										"type": "Identifier",
 										"start": 1323,
 										"end": 1328,
-										"loc": {
-											"start": {
-												"line": 26,
-												"column": 12
-											},
-											"end": {
-												"line": 26,
-												"column": 17
-											}
-										},
 										"name": "cond2"
 									}
 								},
@@ -559,16 +291,6 @@
 									"type": "Literal",
 									"start": 1333,
 									"end": 1388,
-									"loc": {
-										"start": {
-											"line": 27,
-											"column": 4
-										},
-										"end": {
-											"line": 27,
-											"column": 59
-										}
-									},
 									"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 									"raw": "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'"
 								},
@@ -576,16 +298,6 @@
 									"type": "Literal",
 									"start": 1393,
 									"end": 1448,
-									"loc": {
-										"start": {
-											"line": 28,
-											"column": 4
-										},
-										"end": {
-											"line": 28,
-											"column": 59
-										}
-									},
 									"value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 									"raw": "'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
 								}

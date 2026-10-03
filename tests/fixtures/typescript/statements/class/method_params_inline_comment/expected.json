@@ -14,65 +14,25 @@
 			"type": "Block",
 			"value": " c ",
 			"start": 31,
-			"end": 38,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 9
-				},
-				"end": {
-					"line": 3,
-					"column": 16
-				}
-			}
+			"end": 38
 		},
 		{
 			"type": "Block",
 			"value": " c ",
 			"start": 44,
-			"end": 51,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 22
-				},
-				"end": {
-					"line": 3,
-					"column": 29
-				}
-			}
+			"end": 51
 		},
 		{
 			"type": "Block",
 			"value": " c ",
 			"start": 62,
-			"end": 69,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 6
-				},
-				"end": {
-					"line": 4,
-					"column": 13
-				}
-			}
+			"end": 69
 		},
 		{
 			"type": "Block",
 			"value": " c ",
 			"start": 72,
-			"end": 79,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 16
-				},
-				"end": {
-					"line": 4,
-					"column": 23
-				}
-			}
+			"end": 79
 		}
 	],
 	"instance": {
@@ -84,45 +44,15 @@
 			"type": "Program",
 			"start": 8,
 			"end": 87,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 6,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ClassDeclaration",
 					"start": 10,
 					"end": 86,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 16,
 						"end": 19,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 7
-							},
-							"end": {
-								"line": 2,
-								"column": 10
-							}
-						},
 						"name": "Foo"
 					},
 					"superClass": null,
@@ -130,47 +60,17 @@
 						"type": "ClassBody",
 						"start": 20,
 						"end": 86,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 11
-							},
-							"end": {
-								"line": 5,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "MethodDefinition",
 								"start": 24,
 								"end": 55,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 2
-									},
-									"end": {
-										"line": 3,
-										"column": 33
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
 									"start": 24,
 									"end": 30,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 2
-										},
-										"end": {
-											"line": 3,
-											"column": 8
-										}
-									},
 									"name": "method"
 								},
 								"kind": "method",
@@ -178,16 +78,6 @@
 									"type": "FunctionExpression",
 									"start": 30,
 									"end": 55,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 8
-										},
-										"end": {
-											"line": 3,
-											"column": 33
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -197,16 +87,6 @@
 											"type": "Identifier",
 											"start": 39,
 											"end": 40,
-											"loc": {
-												"start": {
-													"line": 3,
-													"column": 17
-												},
-												"end": {
-													"line": 3,
-													"column": 18
-												}
-											},
 											"name": "a",
 											"leadingComments": [
 												{
@@ -221,16 +101,6 @@
 											"type": "Identifier",
 											"start": 42,
 											"end": 43,
-											"loc": {
-												"start": {
-													"line": 3,
-													"column": 20
-												},
-												"end": {
-													"line": 3,
-													"column": 21
-												}
-											},
 											"name": "b",
 											"trailingComments": [
 												{
@@ -246,16 +116,6 @@
 										"type": "BlockStatement",
 										"start": 53,
 										"end": 55,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 31
-											},
-											"end": {
-												"line": 3,
-												"column": 33
-											}
-										},
 										"body": []
 									}
 								}
@@ -264,32 +124,12 @@
 								"type": "MethodDefinition",
 								"start": 58,
 								"end": 83,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 2
-									},
-									"end": {
-										"line": 4,
-										"column": 27
-									}
-								},
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
 									"start": 58,
 									"end": 61,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 2
-										},
-										"end": {
-											"line": 4,
-											"column": 5
-										}
-									},
 									"name": "bar"
 								},
 								"kind": "method",
@@ -297,16 +137,6 @@
 									"type": "FunctionExpression",
 									"start": 61,
 									"end": 83,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 5
-										},
-										"end": {
-											"line": 4,
-											"column": 27
-										}
-									},
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -316,16 +146,6 @@
 											"type": "Identifier",
 											"start": 70,
 											"end": 71,
-											"loc": {
-												"start": {
-													"line": 4,
-													"column": 14
-												},
-												"end": {
-													"line": 4,
-													"column": 15
-												}
-											},
 											"name": "x",
 											"leadingComments": [
 												{
@@ -349,16 +169,6 @@
 										"type": "BlockStatement",
 										"start": 81,
 										"end": 83,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 25
-											},
-											"end": {
-												"line": 4,
-												"column": 27
-											}
-										},
 										"body": []
 									}
 								}

@@ -38,18 +38,6 @@
 				"start": 255,
 				"end": 391,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 1,
-						"character": 256
-					},
-					"end": {
-						"line": 7,
-						"column": 2,
-						"character": 257
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -66,18 +54,6 @@
 							"start": 265,
 							"end": 297,
 							"name": "script",
-							"name_loc": {
-								"start": {
-									"line": 8,
-									"column": 7,
-									"character": 266
-								},
-								"end": {
-									"line": 8,
-									"column": 13,
-									"character": 272
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -127,18 +103,6 @@
 				"start": 449,
 				"end": 587,
 				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 14,
-						"column": 1,
-						"character": 450
-					},
-					"end": {
-						"line": 14,
-						"column": 2,
-						"character": 451
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -155,18 +119,6 @@
 							"start": 459,
 							"end": 491,
 							"name": "script",
-							"name_loc": {
-								"start": {
-									"line": 15,
-									"column": 7,
-									"character": 460
-								},
-								"end": {
-									"line": 15,
-									"column": 13,
-									"character": 466
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",

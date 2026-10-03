@@ -14,81 +14,31 @@
 			"type": "Line",
 			"value": " An empty object type as a union member keeps its braces tight (`{}`, no",
 			"start": 20,
-			"end": 94,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 75
-				}
-			}
+			"end": 94
 		},
 		{
 			"type": "Line",
 			"value": " bracketSpacing) — an empty object has no content to space around, so both",
 			"start": 96,
-			"end": 172,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 77
-				}
-			}
+			"end": 172
 		},
 		{
 			"type": "Line",
 			"value": " formatters agree.",
 			"start": 174,
-			"end": 194,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 1
-				},
-				"end": {
-					"line": 4,
-					"column": 21
-				}
-			}
+			"end": 194
 		},
 		{
 			"type": "Line",
 			"value": " Leading empty union member behaves the same.",
 			"start": 218,
-			"end": 265,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 1
-				},
-				"end": {
-					"line": 7,
-					"column": 48
-				}
-			}
+			"end": 265
 		},
 		{
 			"type": "Line",
 			"value": " Empty object inside a parenthesized intersection union member.",
 			"start": 292,
-			"end": 357,
-			"loc": {
-				"start": {
-					"line": 10,
-					"column": 1
-				},
-				"end": {
-					"line": 10,
-					"column": 66
-				}
-			}
+			"end": 357
 		}
 	],
 	"instance": {
@@ -100,90 +50,30 @@
 			"type": "Program",
 			"start": 18,
 			"end": 386,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 12,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 196,
 					"end": 215,
-					"loc": {
-						"start": {
-							"line": 5,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 20
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 201,
 						"end": 205,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 6
-							},
-							"end": {
-								"line": 5,
-								"column": 10
-							}
-						},
 						"name": "Bare"
 					},
 					"typeAnnotation": {
 						"type": "TSUnionType",
 						"start": 208,
 						"end": 214,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 13
-							},
-							"end": {
-								"line": 5,
-								"column": 19
-							}
-						},
 						"types": [
 							{
 								"type": "TSTypeReference",
 								"start": 208,
 								"end": 209,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 13
-									},
-									"end": {
-										"line": 5,
-										"column": 14
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 208,
 									"end": 209,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 13
-										},
-										"end": {
-											"line": 5,
-											"column": 14
-										}
-									},
 									"name": "A"
 								}
 							},
@@ -191,16 +81,6 @@
 								"type": "TSTypeLiteral",
 								"start": 212,
 								"end": 214,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 17
-									},
-									"end": {
-										"line": 5,
-										"column": 19
-									}
-								},
 								"members": []
 							}
 						]
@@ -230,91 +110,31 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 267,
 					"end": 289,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 23
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 272,
 						"end": 279,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 6
-							},
-							"end": {
-								"line": 8,
-								"column": 13
-							}
-						},
 						"name": "Leading"
 					},
 					"typeAnnotation": {
 						"type": "TSUnionType",
 						"start": 282,
 						"end": 288,
-						"loc": {
-							"start": {
-								"line": 8,
-								"column": 16
-							},
-							"end": {
-								"line": 8,
-								"column": 22
-							}
-						},
 						"types": [
 							{
 								"type": "TSTypeLiteral",
 								"start": 282,
 								"end": 284,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 16
-									},
-									"end": {
-										"line": 8,
-										"column": 18
-									}
-								},
 								"members": []
 							},
 							{
 								"type": "TSTypeReference",
 								"start": 287,
 								"end": 288,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 21
-									},
-									"end": {
-										"line": 8,
-										"column": 22
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 287,
 									"end": 288,
-									"loc": {
-										"start": {
-											"line": 8,
-											"column": 21
-										},
-										"end": {
-											"line": 8,
-											"column": 22
-										}
-									},
 									"name": "A"
 								}
 							}
@@ -333,75 +153,25 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 359,
 					"end": 385,
-					"loc": {
-						"start": {
-							"line": 11,
-							"column": 1
-						},
-						"end": {
-							"line": 11,
-							"column": 27
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 364,
 						"end": 369,
-						"loc": {
-							"start": {
-								"line": 11,
-								"column": 6
-							},
-							"end": {
-								"line": 11,
-								"column": 11
-							}
-						},
 						"name": "Paren"
 					},
 					"typeAnnotation": {
 						"type": "TSUnionType",
 						"start": 372,
 						"end": 384,
-						"loc": {
-							"start": {
-								"line": 11,
-								"column": 14
-							},
-							"end": {
-								"line": 11,
-								"column": 26
-							}
-						},
 						"types": [
 							{
 								"type": "TSTypeReference",
 								"start": 372,
 								"end": 373,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 14
-									},
-									"end": {
-										"line": 11,
-										"column": 15
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 372,
 									"end": 373,
-									"loc": {
-										"start": {
-											"line": 11,
-											"column": 14
-										},
-										"end": {
-											"line": 11,
-											"column": 15
-										}
-									},
 									"name": "A"
 								}
 							},
@@ -409,59 +179,19 @@
 								"type": "TSParenthesizedType",
 								"start": 376,
 								"end": 384,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 18
-									},
-									"end": {
-										"line": 11,
-										"column": 26
-									}
-								},
 								"typeAnnotation": {
 									"type": "TSIntersectionType",
 									"start": 377,
 									"end": 383,
-									"loc": {
-										"start": {
-											"line": 11,
-											"column": 19
-										},
-										"end": {
-											"line": 11,
-											"column": 25
-										}
-									},
 									"types": [
 										{
 											"type": "TSTypeReference",
 											"start": 377,
 											"end": 378,
-											"loc": {
-												"start": {
-													"line": 11,
-													"column": 19
-												},
-												"end": {
-													"line": 11,
-													"column": 20
-												}
-											},
 											"typeName": {
 												"type": "Identifier",
 												"start": 377,
 												"end": 378,
-												"loc": {
-													"start": {
-														"line": 11,
-														"column": 19
-													},
-													"end": {
-														"line": 11,
-														"column": 20
-													}
-												},
 												"name": "B"
 											}
 										},
@@ -469,16 +199,6 @@
 											"type": "TSTypeLiteral",
 											"start": 381,
 											"end": 383,
-											"loc": {
-												"start": {
-													"line": 11,
-													"column": 23
-												},
-												"end": {
-													"line": 11,
-													"column": 25
-												}
-											},
 											"members": []
 										}
 									]
@@ -504,18 +224,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

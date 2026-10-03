@@ -44,36 +44,12 @@
 				"start": 215,
 				"end": 259,
 				"name": "span",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 30,
-						"character": 216
-					},
-					"end": {
-						"line": 7,
-						"column": 34,
-						"character": 220
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 224,
 						"end": 241,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 7,
-								"column": 38,
-								"character": 224
-							},
-							"end": {
-								"line": 7,
-								"column": 47,
-								"character": 233
-							}
-						},
 						"value": [
 							{
 								"start": 235,
@@ -129,36 +105,12 @@
 				"start": 317,
 				"end": 343,
 				"name": "Comp",
-				"name_loc": {
-					"start": {
-						"line": 10,
-						"column": 30,
-						"character": 318
-					},
-					"end": {
-						"line": 10,
-						"column": 34,
-						"character": 322
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 326,
 						"end": 338,
 						"name": "prop",
-						"name_loc": {
-							"start": {
-								"line": 10,
-								"column": 38,
-								"character": 326
-							},
-							"end": {
-								"line": 10,
-								"column": 42,
-								"character": 330
-							}
-						},
 						"value": [
 							{
 								"start": 332,
@@ -209,16 +161,6 @@
 					"type": "Identifier",
 					"start": 411,
 					"end": 415,
-					"loc": {
-						"start": {
-							"line": 13,
-							"column": 33
-						},
-						"end": {
-							"line": 13,
-							"column": 37
-						}
-					},
 					"name": "expr"
 				}
 			},
@@ -257,16 +199,6 @@
 					"type": "Identifier",
 					"start": 493,
 					"end": 497,
-					"loc": {
-						"start": {
-							"line": 16,
-							"column": 36
-						},
-						"end": {
-							"line": 16,
-							"column": 40
-						}
-					},
 					"name": "cond"
 				},
 				"consequent": {
@@ -314,18 +246,6 @@
 				"start": 572,
 				"end": 624,
 				"name": "svelte:element",
-				"name_loc": {
-					"start": {
-						"line": 19,
-						"column": 31,
-						"character": 573
-					},
-					"end": {
-						"line": 19,
-						"column": 45,
-						"character": 587
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -343,16 +263,6 @@
 					"type": "Identifier",
 					"start": 595,
 					"end": 598,
-					"loc": {
-						"start": {
-							"line": 19,
-							"column": 53
-						},
-						"end": {
-							"line": 19,
-							"column": 56
-						}
-					},
 					"name": "tag"
 				}
 			},
@@ -387,50 +297,16 @@
 				"start": 756,
 				"end": 789,
 				"name": "svelte:window",
-				"name_loc": {
-					"start": {
-						"line": 22,
-						"column": 31,
-						"character": 757
-					},
-					"end": {
-						"line": 22,
-						"column": 44,
-						"character": 770
-					}
-				},
 				"attributes": [
 					{
 						"start": 774,
 						"end": 784,
 						"type": "OnDirective",
 						"name": "x",
-						"name_loc": {
-							"start": {
-								"line": 22,
-								"column": 48,
-								"character": 774
-							},
-							"end": {
-								"line": 22,
-								"column": 52,
-								"character": 778
-							}
-						},
 						"expression": {
 							"type": "Identifier",
 							"start": 780,
 							"end": 783,
-							"loc": {
-								"start": {
-									"line": 22,
-									"column": 54
-								},
-								"end": {
-									"line": 22,
-									"column": 57
-								}
-							},
 							"name": "fn1"
 						},
 						"modifiers": []

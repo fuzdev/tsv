@@ -12,36 +12,12 @@
 				"start": 0,
 				"end": 49,
 				"name": "template",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 9,
-						"character": 9
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 10,
 						"end": 20,
 						"name": "lang",
-						"name_loc": {
-							"start": {
-								"line": 1,
-								"column": 10,
-								"character": 10
-							},
-							"end": {
-								"line": 1,
-								"column": 14,
-								"character": 14
-							}
-						},
 						"value": [
 							{
 								"start": 16,
@@ -68,18 +44,6 @@
 							"start": 22,
 							"end": 37,
 							"name": "div",
-							"name_loc": {
-								"start": {
-									"line": 2,
-									"column": 1,
-									"character": 23
-								},
-								"end": {
-									"line": 2,
-									"column": 4,
-									"character": 26
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",

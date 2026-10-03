@@ -385,8 +385,10 @@ inputs, so the corpus AST differential is the regression oracle.
   patching the expression's `end` _offset_ back to `contents ?? []` but leaving
   `loc.end` at the as-expression's end (the column after `section`). tsv's
   `loc` agrees with the corrected offset. The matcher is scoped to EachBlock
-  `expression.loc.end` entries; offsets and `loc.start` are never absorbed, so
-  a real loc bug still surfaces as undocumented.
+  `expression.loc.end` entries whose oracle point names the end of the swallowed
+  `as` type — past the `as` keyword, at or before the binding's end, on a token
+  boundary; offsets and `loc.start` are never absorbed, so a real loc bug still
+  surfaces as undocumented.
 
 - **each-`as` unwound `end` inside a closing paren** — the same unwind's *offset* half,
   pinned by a fixture rather than the corpus (no real code in it holds the shape). When the
@@ -399,27 +401,52 @@ inputs, so the corpus AST differential is the regression oracle.
   Pinned by
   [each/ts_head_paren_tail](../tests/fixtures/svelte/blocks/each/ts_head_paren_tail_svelte_prettier_divergence/).
 
-- **Typed block-pattern `end`/`loc` split** — reproduced, not corrected. Svelte's
+- **Typed block-pattern `end`** — reproduced; its `loc.end` is not. Svelte's
   `read_pattern` (`1-parse/read/context.js`) handles a typed block binding two
-  different ways, and tsv matches both. For a plain identifier
-  (`{#each xs as item: T}`) it returns the identifier with `start`/`end`/`loc`
+  different ways, and tsv matches both spans. For a plain identifier
+  (`{#each xs as item: T}`) it returns the identifier with `start`/`end`
   untouched and the annotation as a sibling field — so the binding's span covers
   only the name, unlike an ordinary TS binding identifier, whose span is
   tail-anchored over its `: T`. For a **destructuring** pattern
   (`{#each xs as { a }: T}`, `{:then { a }: T}`, `{:catch { a }: T}`) it patches
-  `expression.end = typeAnnotation.end` but **never touches `expression.loc`** —
-  so `end` and `loc.end` genuinely disagree. tsv keeps the internal span on the
-  bare pattern (which `loc` derives from) and widens only the emitted `end`, via a
-  `max` in the wire writer, so a plain signature parameter — whose span already
-  covers its annotation — is unaffected. Same context-reparse-loc family as the
-  each-`as` correction above, but here the quirk is *matched* rather than fixed: it
-  is a shape in the wire AST, not a slip in a position tsv can independently derive.
-  The binding-pattern interior-comment positions are the family's other matched
-  member — attachment and positions both reproduce, so the wire there is a full
-  match (see [conformance_prettier_svelte.md §Svelte: destructuring binding-pattern
+  `expression.end = typeAnnotation.end` and leaves `expression.loc` at the
+  bracket. tsv keeps the internal span on the bare pattern and widens the emitted
+  `end`, via a `max` in the wire writer, so a plain signature parameter — whose
+  span already covers its annotation — is unaffected; its `loc.end` follows the
+  widened `end`, as every `loc` follows its own offsets (the `loc` row below).
+  The binding-pattern interior-comment attachment is the family's other matched
+  member (see [conformance_prettier_svelte.md §Svelte: destructuring binding-pattern
   comments](./conformance_prettier_svelte.md#svelte-destructuring-binding-pattern-comments)). Pinned by
   [each/typed_context_destructured](../tests/fixtures/svelte/blocks/each/typed_context_destructured/)
   and [await/typed_value_destructured](../tests/fixtures/svelte/blocks/await/typed_value_destructured/).
+
+- **`loc` follows one definition, and Svelte's `loc` quirks are not reproduced.**
+  tsv's `loc` is the line and column of each object's own `start`/`end`, on one
+  `\n`-only line table for the whole document
+  ([architecture.md §`loc` lines](./architecture.md#loc-lines-one-rule-per-document)).
+  Svelte's wire departs from that in the places below — none reproduced, each graded
+  as a named tolerance in the corpus `loc` comparison rather than matched (the
+  each-`as` stale `loc.end` above is the sixth):
+  - **the destructure column shift** — a destructured block binding off line 1 reads
+    one column right on its opening line, its nodes and the comments in it alike
+    (`read_pattern` parses `(pattern = 1)` and drops one blank to compensate, which
+    lands only on line 1);
+  - **the `_ as ` line swallow** — a newline in the four UTF-16 units before a block
+    binding's `:` is overwritten by `read_type_annotation`'s synthetic `_ as `, so the
+    annotation's nodes sit that many lines higher;
+  - **two line classes** — acorn-parsed nodes count ECMAScript's terminators (a lone
+    `<CR>`, `<LS>`, `<PS>`), seeded per parse from the prefix Svelte prepared, where
+    the rest counts `\n` alone (graded exactly inside a `<script>`, whose prefix is the
+    document's LF lines, and within a band in a template island);
+  - **`Program.loc` at the tag** — `read_script` stamps a `<script>`'s `Program.loc`
+    at the tag (for its sourcemaps) while `start`/`end` are the content's;
+  - **the typed destructure's `loc.end`** at the bracket, above.
+
+  The other direction is a superset: Svelte gives `loc` to acorn-parsed nodes only,
+  and tsv gives one to every positioned object (template nodes, `Root`, `<style>`
+  and its `content`, `<svelte:options>`, attached comments, every CSS node), where
+  there is no oracle to grade it against. The definition itself is graded by
+  `tests/loc_definition.rs`.
 
 ### Entity Decoding Corrections
 
@@ -1445,7 +1472,7 @@ because regex bodies are opaque, so it does not meet this section's bar and will
 
 - **`{@const}` with a type annotation duplicates every comment from the `:` to the tag close.** Svelte's `read_type_annotation` tricks acorn into parsing the annotation by building `_ as <annotation> = <init>`; that parse is an `AssignmentExpression`, so the reader's own "gets mangled — fix it" branch **re-parses** the slice up to the `=`. The first parse is discarded, but its `onComment` has already pushed everything it scanned into the shared `root.comments`, and the two real parses then push their own copies — order [pass 1: all, pass 2: annotation region, pass 3: init region]. `add_comments` re-filters the *whole accumulated* array rather than its own parse's pushes, so the duplicates are attached as well. The trigger is the annotation's **presence**, not a comment's position: an *init* comment is doubled too when the binding carries an annotation, and listed once when it does not. tsv parses the annotation as part of the binding, once, so each comment exists once and attaches once; the formatter matches prettier on every shape.
   - **The two copies need not land on the same NODE, so the duplication can be an attachment tsv has nowhere.** `add_comments` walks with the whole accumulated array as its queue, so at a **union seam** the copies split rather than stacking: `{@const a: A /* c */ | B = expr}` gives `A` a `trailingComments` (the gap to the comment is acorn's own `/^[,) \t]*$/`) and then `B` a `leadingComments`, where a comment leading the whole type gives one node `[c, c]`. The seam is not what produces it — the same comment at the same seam in a plain `<script>` (`let a: A /* c */ | B;`), which Svelte reads once, is attached to `A` alone by **both** parsers, which is tsv's answer inside the tag too.
-  - **The two copies of a multi-line block comment can also carry two different `value`s.** acorn's `onComment` dedents such a comment by the `[ \t]` run opening its line **in the string acorn was handed**, and the discarded parse was handed a different one from the surviving parse (the discarded pass reads the `_ as ` manufactured source; the surviving init parse reads the raw template). So the duplication is not always a duplicate: `[pass 1: all]` can list an *init* comment dedented against the annotation's synthetic source and `[pass 3: init region]` the same comment dedented against the init's own. tsv emits one value, equal to the copy the surviving parse made. Distinct from the dedent model itself, which tsv reproduces exactly — see [architecture.md §`loc` lines](./architecture.md#loc-lines-two-classes-one-per-acorn-parse) for the sibling question these synthetic sources also decide.
+  - **The two copies of a multi-line block comment can also carry two different `value`s.** acorn's `onComment` dedents such a comment by the `[ \t]` run opening its line **in the string acorn was handed**, and the discarded parse was handed a different one from the surviving parse (the discarded pass reads the `_ as ` manufactured source; the surviving init parse reads the raw template). So the duplication is not always a duplicate: `[pass 1: all]` can list an *init* comment dedented against the annotation's synthetic source and `[pass 3: init region]` the same comment dedented against the init's own. tsv emits one value, equal to the copy the surviving parse made. Distinct from the dedent model itself, which tsv reproduces exactly — see [architecture.md §`loc` lines](./architecture.md#loc-lines-one-rule-per-document).
   - [const_annotation_comment_svelte_divergence](../tests/fixtures/svelte/tags/const/const_annotation_comment_svelte_divergence/)
 
 - **Leading HTML comment duplicated onto every later lifted root.** A leading fragment HTML comment (`<!-- @component … -->`) before a `<script module>` + instance `<script>` pair is attached to *both* the module Program and the instance Program. tsv attaches it once, to the nearest (module) script Program; the comment is also a `Comment` node in the fragment in both parsers, so nothing is lost. The mechanism is that a lifted `<script>` / `<style>` is never appended to the fragment, so canonical's backwards walk (`1-parse/state/element.js`) steps over one as if it were absent — which means a **`<style>` is a second root too**, in both directions: `<!-- c --><script/><style/>` gives canonical the comment on the instance *and* on the stylesheet, and `<!-- c --><style/><script/>` likewise. tsv stops the walk at the hole the lifted tag leaves between two fragment nodes, so the nearest root keeps it in every arrangement. (With a single lifted root there is nothing to copy onto and tsv matches Svelte.) The three arrangements are pinned as controls in [svelte_preceding_comment.rs](../tests/svelte_preceding_comment.rs), which also pins the gap-class rule this stance shares a reader with.
@@ -1514,29 +1541,16 @@ Backslash doubling and unicode-escape duplication are inherited "for free" by ex
   u128 cast. Pinned by
   [literals/numeric/edge_cases](../tests/fixtures/typescript/expressions/literals/numeric/edge_cases/)
   (`hexBeyondSafe`/`octBeyondSafe`).
-- Two `loc` line classes in the Svelte wire, routed per node origin —
-  Svelte's model is mixed, so tsv's is. What Svelte's own parser positions via
-  `locate-character` counts only `\n` as a line start, and tsv's
-  `LocationTracker::new_with_map` does too for those positions: the template
-  spine, `name_loc`, CSS locations, a `<script>`'s own `Program` `loc`, and the
-  `character`-bearing identifiers. Everything **acorn** parses — `<script>`
-  bodies, expression islands, and the root `comments` array — carries acorn's
-  `loc`, and acorn's line class is the ECMAScript one (LF, CR, CRLF, U+2028,
-  U+2029, applied even inside string literals), seeded once per embedded parse
-  over whatever prefix Svelte prepared for that island (`tsv_ts::AcornSeed` +
-  `Root::acorn_regions`). Standalone TypeScript is all-acorn
-  (`LocationTracker::new_ecmascript`). The same file content can therefore
-  carry different `loc` values by context — and, inside a `.svelte` file, by
-  node origin. Model + the per-island seeding table:
-  [architecture.md §`loc` lines](architecture.md#loc-lines-two-classes-one-per-acorn-parse).
-  Pinned by
+- One `loc` line rule per document: ECMAScript's terminators for a TypeScript
+  document (acorn's, applied even inside string literals) and `\n` alone for a
+  Svelte document — every island in it included — so the same script content
+  reports different lines as a `.ts` file and inside `<script>` when it holds a
+  lone `<CR>` / `<LS>` / `<PS>`. Svelte's own wire mixes the two classes inside one
+  document; tsv's does not (see §Svelte Template Corrections). Pinned by
   [syntax/unicode_line_terminators](../tests/fixtures/typescript/syntax/unicode_line_terminators/)
-  (`.ts` deliberately; see `INTENTIONAL_TS` in `ts_fixture_audit`) for the
-  standalone class, and for the mixed wire by
-  [svelte/syntax/whitespace/line_terminators_comment_dedent](../tests/fixtures/svelte/syntax/whitespace/line_terminators_comment_dedent/)
-  and
-  [svelte/syntax/whitespace/line_terminators_acorn_regions](../tests/fixtures/svelte/syntax/whitespace/line_terminators_acorn_regions/)
-  (`tests/acorn_loc_line_terminators.rs` covers the `<CR>` half).
+  (`.ts` deliberately; see `INTENTIONAL_TS` in `ts_fixture_audit`), whose input
+  `tests/loc_definition.rs` grades along with every other fixture input and the
+  lone-`<CR>` cases no fixture can hold.
 
 Compat behaviors live in the **conversion layer** wherever possible: the
 internal AST stays clean and semantic, and quirks apply only when generating

@@ -18,90 +18,40 @@
  *   for heavy sparse use; the bare `loc_of(node, source)` convenience rebuilds the
  *   O(source) table per call.
  *
- * Offsets are UTF-16 and JS strings are UTF-16-indexed, so a line-start table
- * scanned off the source string is directly comparable — no byte handling.
- * Column is 0-based UTF-16 code units; line is 1-based.
+ * **The definition.** Every object in the tree that carries numeric `start` and `end` —
+ * in all three languages, objects without a `type` included (Svelte's `StyleSheet.content`
+ * and `options`, comments) — gets `loc: {start: {line, column}, end: {line, column}}`: the
+ * line (1-based) and column (0-based, UTF-16 code units) of that object's own `start` and
+ * `end`. One line-terminator rule per **document**: ECMAScript's (LF, CR, CRLF as one,
+ * U+2028, U+2029) for a TypeScript document, LF alone for a Svelte document — its
+ * `<script>`s, template expressions and `<style>` included — and for a CSS document. That
+ * is the same definition tsv's loc-bearing wire is written to, so the two agree on every
+ * object: the reconstruction of the span-only wire deep-equals the loc wire of the same
+ * parse. (Only key order differs — this module appends `loc` last on each object, where
+ * the wire places it after `end` — so a deep-equal sees identical data, and a
+ * re-serialized tree won't byte-match the wire.)
  *
- * **TypeScript is exact.** For a `.ts`/`.js` (`Program`) tree, each node's
- * reconstructed `loc` *value* equals the acorn `loc` the loc-bearing wire would
- * have emitted, exactly. (The key is *appended last* on each node rather than
- * placed after `start`/`end`, so an object consumer — or `deepEqual` — sees
- * identical data, but a re-serialized tree won't byte-match the wire's key order.)
+ * The TypeScript count is acorn's. A Svelte document's is not Svelte's everywhere: Svelte's
+ * own wire carries `loc` only on the nodes acorn parsed (this adds it to template, style and
+ * option objects too), counts ECMAScript terminators on those nodes, puts a `<script>`
+ * program's `loc` at the tag rather than at the content its `start`/`end` name, and reads a
+ * block binding's pattern or type annotation a column or line off in a few spellings. Every
+ * one of those is a fact about how Svelte's parser is assembled, not about the source, and
+ * none is reproduced here.
  *
- * **Svelte needs one line class, and refuses when the source has two.** A Svelte
- * document's `loc`s are LF-only (Svelte's `locate-character`) *except* on the nodes
- * acorn parsed, which carry acorn's ECMAScript line count — seeded once per embedded
- * parse, over whatever prefix Svelte prepared for it. The two classes agree unless the
- * source holds a lone `\r`, U+2028 or U+2029 (a `\r\n` is one ECMAScript break holding
- * one LF, so it never counts), and where they disagree the span-only wire does not carry
- * what would be needed to tell the classes apart: which acorn parse a node came from is
- * not a function of its offsets. So `create_locator` — and every entry point through it —
- * **throws** on such a source rather than returning lines that are quietly wrong for
- * every acorn-owned node. Parse with `loc` (the default) for those documents. Everything
- * else reconstructs as described below.
- *
- * **A block binding's type annotation is placed by the tree, not the offsets.** Svelte reads
- * a block binding's `: T` (`{#each xs as e: T}`, `{:then v: T}`, `{:catch e: T}`,
- * `{@const a: T = …}`) with its own acorn parse over a rewritten template: the five code
- * units ending at the colon are overwritten with a synthetic `_ as `. A newline in the four
- * units before the colon is therefore never counted, and the annotation's nodes sit that many
- * lines higher (`{#each xs as⏎e: T}` puts `T` on the `as` line); a destructure binding's
- * `loc.end` also stops at its closing bracket though its `end` runs over the annotation.
- * Both are exact functions of the binding, so the reconstruction applies them — but they need
- * the *tree* to find the binding, which is why a Svelte `loc_of` takes the span-only `ast`
- * (see `create_locator`) and throws without it, rather than give one node a line or column
- * different from `reconstruct`.
- *
- * **Why refuse rather than carry what is missing.** The span-only wire could ship the
- * per-parse origins that make the two-line-class case derivable — a few dozen bytes per
- * document against a `loc` on every node. It deliberately does not. Reconstructing them here
- * would mean a second implementation, in JS, of a model that exists only to mirror upstream
- * defects: acorn seeds `lineStart` with `lastIndexOf("\n", …)` while counting `curLine` over
- * the full terminator class, and Svelte prepares acorn's input three different ways across
- * five readers. That model moves when either upstream moves, nothing in `deno task check`
- * would grade the JS copy against the Rust one, and the documents it buys back hold a lone CR,
- * U+2028 or U+2029. Parsing those with `loc` is the better answer. The block-binding
- * annotation above is the one model carried here anyway, and it is a different kind of model:
- * a fixed five-unit window that follows from the binding alone, not a per-parse origin — and
- * the canonical rows of `scripts/test_npm.ts` grade it against Svelte's own wire.
- *
- * **Svelte is otherwise approximate** — reconstruct where you have the source, but be
- * aware of two deliberate divergences from Svelte's own wire (this module does NOT
- * replicate these two parser quirks):
- * - The `<script>`/`<style>` `Program` `loc` is Svelte's *tag-position* override
- *   (`read_script`), not the content offset the node's `start`/`end` carry, so the
- *   reconstructed `Program` `loc` is the content position, not Svelte's.
- * - Destructure patterns in `{#each … as …}` / `{:then}` / `{:catch}` / `{@const}`
- *   carry a `+1` column in Svelte's wire (parsed under a synthetic `(`) on every endpoint
- *   that sits on the line the pattern opens on, unless that is line 1 — the pattern's own
- *   `loc.end` included, when it closes there; the reconstruction is the true offset, so it
- *   reads one column earlier.
- *
- * Additionally, Svelte's own wire carries `loc` *only* on embedded ECMAScript
- * nodes (script + template expressions); this walk adds `loc` to the template
- * nodes (elements, text, blocks) too, so the result is a superset. Everything
- * outside the two cases above reconstructs exactly.
- *
- * **Svelte `name_loc` is exact.** The name span is a function of the node's own
- * `start`/`end` + type — a tag name is the run after `<`, an attribute name starts
- * at the node (a shorthand `{x}` names the identifier inside the braces, so `{ x }`
- * excludes the padding), and a directive names its whole head token
- * (`on:click|preventDefault`) — so the walk
- * restores `name_loc` (`{line, column, character}` endpoints) on every element,
- * attribute, and directive that carries one, matching Svelte's wire.
- *
- * That same name shape reaches a few identifiers: Svelte reports `{line, column,
- * character}` on the ones its own reader creates — a shorthand attribute's
- * expansion (`{x}`), a snippet name, and a simple-identifier block pattern
- * (`{#each … as x}`, `{:then x}`, `{:catch x}`, `{@const x = …}`) — so the walk
- * gives those the `character` field too. The last `character`-bearing shape is the
- * **in-tag comment** — one written between an element's attributes, which Svelte's
- * template reader collects rather than acorn. Nothing on the comment node marks it,
- * so it's recovered structurally (see `stamp_in_tag_comment_locs`) and gets the
- * `character` field like Svelte's.
- *
- * **CSS is a no-op** — `parse_css` emits no `loc` (nothing to reconstruct), so
- * `reconstruct_locations` returns a CSS tree unchanged.
+ * **Svelte `name_loc` and `character`.** Svelte's wire carries a `name_loc` on every
+ * element, attribute and directive, and a `character` field (the offset itself) in the
+ * position objects of the few nodes its own template reader creates. Both are exact
+ * functions of a node's span and type, so the walk restores them:
+ * - `name_loc` (`{line, column, character}` endpoints): a tag name is the run after `<`, an
+ *   attribute name starts at the node (a shorthand `{x}` names the identifier inside the
+ *   braces, so `{ x }` excludes the padding), and a directive names its whole head token
+ *   (`on:click|preventDefault`).
+ * - `character` in `loc`: a shorthand attribute's expansion (`{x}`), a snippet name, a
+ *   simple-identifier block pattern (`{#each … as x}`, `{:then x}`, `{:catch x}`,
+ *   `{@const x = …}`), and an **in-tag** comment — one written between an element's
+ *   attributes, which Svelte's template reader collects rather than acorn. Nothing on the
+ *   comment node marks it, so it's recovered structurally (see `stamp_in_tag_comment_locs`).
  *
  * **A leading byte-order mark is read the way each wire reads it.** Svelte's `parse` and
  * `parseCss` strip a U+FEFF at index 0 before parsing, so the Svelte and CSS wires index
@@ -138,43 +88,16 @@ function indexed_text(source, language) {
 }
 
 /**
- * The line-terminator rule for a language. TypeScript/JS follow ECMAScript
- * LineTerminators (`\n`, `\r`, `\r\n` as one, U+2028, U+2029); Svelte uses
- * LF-only, matching the Svelte parser's locate-character convention.
- *
- * One rule per document is only enough for Svelte because `create_locator` has
- * already refused any source whose acorn-owned nodes would need the other one —
- * see `ECMASCRIPT_ONLY_TERMINATOR` and the module doc — and places a block binding's
- * annotation itself (`push_binding_annotations`).
- * @param {string} language
- * @returns {'ecmascript' | 'lf'}
- */
-function rule_for(language) {
-	return language === 'svelte' ? 'lf' : 'ecmascript';
-}
-
-/**
- * A terminator the ECMAScript class counts and the LF class does not — a lone `\r`,
- * U+2028, or U+2029. `\r\n` is one ECMAScript break holding one LF, so the two classes
- * agree over it and the negative lookahead is what keeps it out.
- *
- * The JS twin of the Rust probe `LocationTracker::new_with_map` returns (which is what
- * decides, on the emitting side, whether a second line table is built at all), and it must
- * keep answering the same question: a source this says `false` about is one where every
- * acorn seed is the identity and a single LF table reproduces the whole Svelte wire.
- */
-const ECMASCRIPT_ONLY_TERMINATOR = /\r(?!\n)|[\u2028\u2029]/;
-
-/**
  * Line-start offsets (UTF-16 units); the rightmost start `<=` an offset gives its
- * line. Built once per source and reused for every `loc_at` lookup.
+ * line. Built once per source and reused for every `loc_at` lookup. A TypeScript
+ * document counts the ECMAScript LineTerminators (`\n`, `\r`, `\r\n` as one, U+2028,
+ * U+2029); a Svelte or CSS document counts LF alone.
  * @param {string} source
- * @param {'ecmascript' | 'lf'} rule
+ * @param {boolean} ecmascript
  * @returns {number[]}
  */
-function build_line_starts(source, rule) {
+function build_line_starts(source, ecmascript) {
 	const starts = [0];
-	const ecmascript = rule === 'ecmascript';
 	for (let i = 0; i < source.length; i++) {
 		const c = source.charCodeAt(i);
 		if (c === LF) {
@@ -350,8 +273,9 @@ function shorthand_identifier_of(node) {
 }
 
 /**
- * A `name_loc` endpoint — line/column plus the offset itself, the extra
- * `character` field Svelte's `name_loc` carries and `loc` does not.
+ * A position carrying `character` — line/column plus the offset itself, the extra
+ * field Svelte's `name_loc` (and the `loc` of the few nodes its own reader creates)
+ * carries and a plain `loc` does not.
  * @param {number} offset
  * @param {number[]} starts
  * @returns {{line: number, column: number, character: number}}
@@ -362,7 +286,7 @@ function name_loc_at(offset, starts) {
 }
 
 /**
- * Overwrite `node`'s plain `loc` with the name-shaped one, if it's an identifier.
+ * Overwrite `node`'s plain `loc` with the `character`-bearing one, if it's an identifier.
  * @param {any} node
  * @param {number[]} starts
  * @mutates node
@@ -374,12 +298,11 @@ function stamp_name_shaped_loc(node, starts) {
 }
 
 /**
- * Give the identifiers under `node` the name-shaped `loc` — the `{line, column,
- * character}` endpoints Svelte reports on the ones its own reader creates, rather
- * than the plain `{line, column}` an acorn-parsed node carries. Those are a
- * shorthand attribute's expansion (`{x}`), a snippet name, and a block pattern
+ * Give the identifiers under `node` the `character`-bearing `loc` Svelte reports on the
+ * ones its own reader creates, rather than the plain `{line, column}` an acorn-parsed node
+ * carries: a shorthand attribute's expansion (`{x}`), a snippet name, and a block pattern
  * that is a simple identifier (`{#each … as x}`, `{:then x}`, `{:catch x}`,
- * `{@const x = …}` — a destructure pattern takes the `+1`-column quirk instead).
+ * `{@const x = …}`).
  * @param {any} node
  * @param {number[]} starts
  * @param {string} source
@@ -395,28 +318,15 @@ function stamp_character_locs(node, starts, source) {
 		case 'SnippetBlock':
 			stamp_name_shaped_loc(node.expression, starts);
 			return;
-	}
-	for (const pattern of block_binding_patterns(node)) stamp_name_shaped_loc(pattern, starts);
-}
-
-/**
- * The binding patterns a Svelte node declares in a block-binding slot — the patterns Svelte
- * reads with its own `read_pattern` (and a trailing `: T` with `read_type_annotation`):
- * `{#each … as p}`, `{:then p}` / `{:catch p}`, `{@const p = …}`. Empty for any other node;
- * an absent slot yields `undefined`, which every consumer skips.
- * @param {any} node
- * @returns {any[]}
- */
-function block_binding_patterns(node) {
-	switch (node.type) {
 		case 'EachBlock':
-			return [node.context];
+			stamp_name_shaped_loc(node.context, starts);
+			return;
 		case 'AwaitBlock':
-			return [node.value, node.error];
+			stamp_name_shaped_loc(node.value, starts);
+			stamp_name_shaped_loc(node.error, starts);
+			return;
 		case 'ConstTag':
-			return (node.declaration?.declarations ?? []).map((d) => d?.id);
-		default:
-			return [];
+			for (const d of node.declaration?.declarations ?? []) stamp_name_shaped_loc(d?.id, starts);
 	}
 }
 
@@ -508,176 +418,21 @@ function stamp_in_tag_comment_locs(comments, elements, starts, source) {
 }
 
 /**
- * Svelte's template whitespace class — what `allow_whitespace` skips between a block
- * binding and its `:` — which is exactly JavaScript's `\s`.
- */
-const TEMPLATE_WHITESPACE = /\s/;
-
-/**
- * The synthetic text `read_type_annotation` writes over the code units ending at a block
- * binding's colon (the Rust side's `AcornPrefixText::AS_INSERT`).
- */
-const AS_INSERT = '_ as ';
-
-/**
- * @typedef {object} BindingAnnotation
- * @property {any} pattern - the binding pattern the annotation hangs off.
- * @property {number} close - the destructure pattern's real end (its annotation's
- *   `start`), or `-1` for an identifier binding, whose `end` was never stretched.
- * @property {number} colon - the annotation's `:`.
- * @property {number} annotation_end
- * @property {number} erased - newlines the synthetic `_ as ` overwrote.
- * @property {number} colon_line - line index of the colon.
- * @property {number} base_line - line index where the rewrite began (four units before the colon).
- * @property {number} base - that line's start offset: the column origin acorn kept.
- */
-
-/**
- * The positions a Svelte **block binding's** type annotation shifts, one entry per
- * annotated binding that needs one.
- *
- * A block binding (`{#each … as P: T}`, `{:then P: T}`, `{:catch P: T}`,
- * `{@const P: T = …}`) is read by Svelte's own `read_pattern`, and its `: T` by
- * `read_type_annotation`, which runs a **second** acorn parse over a rewritten template:
- * the five code units ending at the colon become a synthetic `_ as `, and everything ahead
- * of them is blanked with the newlines kept. Two facts of the wire follow, and neither is a
- * function of a node's own offsets:
- *
- * - **Erased newlines.** A newline in the four code units before the colon is overwritten,
- *   so acorn never counts it: every node inside the annotation sits that many lines higher,
- *   and one on the colon's own line takes its column from the line the rewrite began on
- *   (`{#each xs as⏎e: T}` puts `T` on the `as` line). A newline further back survives the
- *   blanking, so `{#each xs as e⏎        : T}` reads plainly.
- * - **The pattern's own end.** A destructure pattern's `end` is stretched over the
- *   annotation after acorn has placed it, so its `loc.end` still names the closing bracket
- *   — the annotation's `start`.
- *
- * These annotations are the only ones Svelte builds by hand (they carry no `loc` of their
- * own), and they are found by the slot they sit in, never by their shape: an acorn-built
- * annotation (a parameter's, a variable's) can look identical in the span-only wire.
- *
- * @param {any} node - a Svelte node; only `EachBlock`, `AwaitBlock` and `ConstTag` yield entries.
- * @param {number[]} starts
- * @param {string} source
- * @param {BindingAnnotation[]} out
- * @mutates out - one entry appended per annotated binding that needs one.
- */
-function push_binding_annotations(node, starts, source, out) {
-	for (const pattern of block_binding_patterns(node)) {
-		push_binding_annotation(pattern, starts, source, out);
-	}
-}
-
-/**
- * The entry for one block binding, if its annotation needs one — see
- * `push_binding_annotations`.
- * @param {any} pattern - the binding pattern (an `Identifier`, `ObjectPattern` or `ArrayPattern`).
- * @param {number[]} starts
- * @param {string} source
- * @param {BindingAnnotation[]} out
- * @mutates out
- */
-function push_binding_annotation(pattern, starts, source, out) {
-	const annotation = pattern?.typeAnnotation;
-	if (annotation?.type !== 'TSTypeAnnotation' || typeof annotation.start !== 'number') return;
-	// the colon is where Svelte's `allow_whitespace` stops, as its reader found it
-	let colon = annotation.start;
-	while (colon < source.length && TEMPLATE_WHITESPACE.test(source[colon])) colon++;
-	if (source[colon] !== ':') return;
-	// the rewrite's first unit: `_ as ` overwrites the units ending at the colon
-	const window_start = Math.max(0, colon + 1 - AS_INSERT.length);
-	let erased = 0;
-	for (let i = window_start; i < colon; i++) if (source.charCodeAt(i) === LF) erased++;
-	const destructure = pattern.type === 'ObjectPattern' || pattern.type === 'ArrayPattern';
-	if (erased === 0 && !destructure) return;
-	const base_line = line_index_at(window_start, starts);
-	out.push({
-		pattern,
-		close: destructure ? annotation.start : -1,
-		colon,
-		annotation_end: annotation.end,
-		erased,
-		colon_line: line_index_at(colon, starts),
-		base_line,
-		base: starts[base_line]
-	});
-}
-
-/**
- * One offset inside a block binding's annotation, as the annotation's own acorn parse
- * counted it: `erased` lines higher, and on the colon's line measured from where the
- * rewrite began.
- * @param {number} offset
- * @param {BindingAnnotation} b
- * @param {number[]} starts
- * @returns {{line: number, column: number}}
- */
-function annotation_loc_at(offset, b, starts) {
-	const i = line_index_at(offset, starts);
-	if (i === b.colon_line) return { line: b.base_line + 1, column: offset - b.base };
-	return { line: i + 1 - b.erased, column: offset - starts[i] };
-}
-
-/**
- * A node's `loc`: the plain line table's answer, unless a block binding in `bindings`
- * places it — a node inside an annotation whose newlines were erased, or the destructure
- * pattern whose `end` the annotation stretched. `bindings` is empty for every
- * non-Svelte tree and for nearly every Svelte one, which is the fast path.
- * @param {any} node - a node with numeric `start`/`end`.
- * @param {number[]} starts
- * @param {BindingAnnotation[]} bindings
- * @returns {{start: {line: number, column: number}, end: {line: number, column: number}}}
- */
-function node_loc(node, starts, bindings) {
-	for (let k = 0; k < bindings.length; k++) {
-		const b = bindings[k];
-		if (b.erased > 0 && node.start > b.colon && node.end <= b.annotation_end) {
-			return {
-				start: annotation_loc_at(node.start, b, starts),
-				end: annotation_loc_at(node.end, b, starts)
-			};
-		}
-		if (
-			b.close >= 0 &&
-			node.start === b.pattern.start &&
-			node.end === b.pattern.end &&
-			node.type === b.pattern.type
-		) {
-			return { start: loc_at(node.start, starts), end: loc_at(b.close, starts) };
-		}
-	}
-	return { start: loc_at(node.start, starts), end: loc_at(node.end, starts) };
-}
-
-/**
- * Walk `value`, adding a `loc` object to every node with numeric `start`/`end` —
+ * Walk `value`, adding a `loc` object to every object with numeric `start`/`end` —
  * and, for a Svelte tree, a `name_loc` to every element, attribute, and directive
  * that carries one. Mutates in place. Skips the keys it writes so it never
  * re-walks its own output.
  * @param {any} value
- * @param {{starts: number[], source: string, is_svelte: boolean, elements: any[] | null, bindings: BindingAnnotation[], collected: BindingAnnotation[]}} ctx
+ * @param {{starts: number[], source: string, is_svelte: boolean, elements: any[] | null}} ctx
  *   `elements` collects element nodes for the in-tag comment pass, or is `null`
- *   when the document has no comments to classify. `bindings` holds the block-binding
- *   annotations of the blocks the walk is inside — pushed on the way in, dropped on the
- *   way out, so it never grows past the nesting depth — and `collected` every one it has
- *   met, for the root `comments` list (`reconstruct_in`).
+ *   when the document has no comments to classify.
  */
 function walk_add_loc(value, ctx) {
 	if (Array.isArray(value)) {
 		for (const v of value) walk_add_loc(v, ctx);
 	} else if (value && typeof value === 'object') {
-		const depth = ctx.bindings.length;
-		if (ctx.is_svelte) {
-			push_binding_annotations(value, ctx.starts, ctx.source, ctx.bindings);
-			// kept for the root `comments` list, which the walk reaches outside every block
-			for (let i = depth; i < ctx.bindings.length; i++) ctx.collected.push(ctx.bindings[i]);
-		}
 		if (typeof value.start === 'number' && typeof value.end === 'number') {
-			// the empty-`bindings` fast path: every TypeScript tree, and nearly every Svelte one
-			value.loc =
-				ctx.bindings.length === 0
-					? { start: loc_at(value.start, ctx.starts), end: loc_at(value.end, ctx.starts) }
-					: node_loc(value, ctx.starts, ctx.bindings);
+			value.loc = { start: loc_at(value.start, ctx.starts), end: loc_at(value.end, ctx.starts) };
 			if (ctx.is_svelte) {
 				const span = name_span_of(value, ctx.source);
 				if (span) {
@@ -695,53 +450,10 @@ function walk_add_loc(value, ctx) {
 			if (key === 'loc' || key === 'name_loc') continue;
 			walk_add_loc(value[key], ctx);
 		}
-		if (ctx.bindings.length !== depth) ctx.bindings.length = depth;
-		// Re-stamp the identifiers Svelte gives the name-shaped `loc`, after the walk
-		// above wrote them the plain shape.
+		// Re-stamp the identifiers Svelte gives the `character`-bearing `loc`, after the
+		// walk above wrote them the plain shape.
 		if (ctx.is_svelte) stamp_character_locs(value, ctx.starts, ctx.source);
 	}
-}
-
-/**
- * The keys that lead from one Svelte **template** node to the next: a fragment's `nodes`,
- * an element's or `{#key}`'s `fragment`, and each block's branches. Block bindings live only
- * in the template, so the per-node `loc_of` collects them along these alone and never walks
- * the `<script>` programs, the stylesheet, or an expression subtree — which is most of a
- * component's tree. Every one of them holds a `Fragment` (or `null`) on every node that
- * carries it, so the walk cannot step off the template.
- */
-const TEMPLATE_CHILD_KEYS = [
-	'fragment',
-	'nodes',
-	'body',
-	'fallback',
-	'consequent',
-	'alternate',
-	'pending',
-	'then',
-	'catch'
-];
-
-/**
- * Every block-binding annotation entry in a Svelte tree, for the per-node `loc_of`, which
- * has no walk to collect them on the way down — gathered through the template alone
- * (`TEMPLATE_CHILD_KEYS`).
- * @param {any} value
- * @param {number[]} starts
- * @param {string} source
- * @param {BindingAnnotation[]} out
- * @returns {BindingAnnotation[]}
- */
-function collect_binding_annotations(value, starts, source, out) {
-	if (Array.isArray(value)) {
-		for (const v of value) collect_binding_annotations(v, starts, source, out);
-	} else if (value && typeof value === 'object') {
-		push_binding_annotations(value, starts, source, out);
-		for (const key of TEMPLATE_CHILD_KEYS) {
-			if (value[key]) collect_binding_annotations(value[key], starts, source, out);
-		}
-	}
-	return out;
 }
 
 /**
@@ -751,29 +463,13 @@ function collect_binding_annotations(value, starts, source, out) {
  * @param {any} ast
  * @param {number[]} starts
  * @param {string} source
- * @param {'typescript' | 'svelte' | 'css'} language
+ * @param {boolean} is_svelte
  * @returns {any} the same `ast`, mutated.
  */
-function reconstruct_in(ast, starts, source, language) {
-	// CSS has no `loc` in the wire — nothing to reconstruct.
-	if (language === 'css') return ast;
-	const is_svelte = language === 'svelte';
+function reconstruct_in(ast, starts, source, is_svelte) {
 	const comments = is_svelte && Array.isArray(ast?.comments) ? ast.comments : null;
 	const elements = comments !== null && comments.length > 0 ? [] : null;
-	/** @type {BindingAnnotation[]} */
-	const collected = [];
-	walk_add_loc(ast, { starts, source, is_svelte, elements, bindings: [], collected });
-	// A comment inside a block binding's annotation is listed twice: attached under the
-	// annotation, where the walk placed it with its binding in scope, and in the root
-	// `comments` list, which the walk reached outside every block. Re-place the root copies
-	// against every binding the template holds — once, and only when there is one.
-	if (comments !== null && collected.length > 0) {
-		for (const c of comments) {
-			if (typeof c?.start === 'number' && typeof c.end === 'number') {
-				c.loc = node_loc(c, starts, collected);
-			}
-		}
-	}
+	walk_add_loc(ast, { starts, source, is_svelte, elements });
 	if (elements !== null) {
 		// `<svelte:options>` is the one attribute-bearing tag head whose wire node
 		// carries no `type` (Svelte's `root.options`), so the type-keyed walk can't
@@ -790,79 +486,46 @@ function reconstruct_in(ast, starts, source, language) {
  * don't rebuild it. Prefer this over the bare `loc_of`/`reconstruct_locations`
  * helpers for heavy sparse use — those rebuild the O(source) table per call.
  *
- * A Svelte locator's `loc_of` needs `opts.ast`, the span-only tree the nodes come from:
- * where a node inside a block binding's type annotation sits depends on that binding, which
- * the node alone does not say. The locator reads the tree's template once, up front (the
- * bindings live nowhere else — `TEMPLATE_CHILD_KEYS`); `loc_of` without it throws rather
- * than answer differently from `reconstruct`.
- *
  * @param {string} source - the exact source the span-only wire was parsed from.
- * @param {{language?: 'typescript' | 'svelte' | 'css', ast?: any}} [opts] - `language`
- *   selects the line rule: `typescript` (ECMAScript line terminators) by default, or
- *   inferred from `ast` when given; `svelte` for a `.svelte` document (LF-only), `css` for
- *   a no-op reconstruct. `ast` is the span-only tree, required by a Svelte `loc_of`.
+ * @param {{language?: 'typescript' | 'svelte' | 'css'}} [opts] - `language` selects the
+ *   document's line rule and coordinates: `typescript` (the default — ECMAScript line
+ *   terminators, a leading BOM counted), `svelte` or `css` (LF alone, a leading BOM elided).
  * @returns {{loc_of: (node: any) => ({start: {line: number, column: number}, end: {line: number, column: number}} | null), reconstruct: (ast: any) => any}}
  */
 export function create_locator(source, opts) {
-	const tree = opts?.ast;
-	const language = opts?.language ?? (tree === undefined ? 'typescript' : infer_language(tree));
+	const language = opts?.language ?? 'typescript';
 	// Everything below reads the string the wire's offsets index (see `indexed_text`),
-	// never the caller's `source` directly — a Svelte BOM is not in the wire's coordinates.
+	// never the caller's `source` directly — a Svelte or CSS BOM is not in the wire's
+	// coordinates.
 	const text = indexed_text(source, language);
-	if (language === 'svelte' && ECMASCRIPT_ONLY_TERMINATOR.test(text)) {
-		// "cannot reconstruct `loc`" is the stable marker a caller (or a test) matches on
-		throw new Error(
-			'tsv: cannot reconstruct `loc` for this Svelte document because the source contains ' +
-				'a lone CR, U+2028, or U+2029, so its acorn-parsed nodes carry a different line ' +
-				'count from the rest of the document, and the span-only wire does not record ' +
-				'which acorn parse a node came from. Parse this document with locations (the ' +
-				'default) instead.'
-		);
-	}
-	const starts = build_line_starts(text, rule_for(language));
+	const starts = build_line_starts(text, language === 'typescript');
 	const is_svelte = language === 'svelte';
-	/** @type {BindingAnnotation[] | null} */
-	const bindings = !is_svelte
-		? []
-		: tree === undefined
-			? null
-			: collect_binding_annotations(tree, starts, text, []);
 	return {
 		loc_of(node) {
-			if (bindings === null) {
-				throw new Error(
-					'tsv: `loc_of` on a Svelte node needs the span-only tree it came from — pass ' +
-						'`{ast}` to `create_locator`/`loc_of` — because a block binding places the ' +
-						'nodes of its type annotation, and the node alone does not say which binding it is under.'
-				);
-			}
 			if (!node || typeof node.start !== 'number' || typeof node.end !== 'number') {
 				return null;
 			}
-			return node_loc(node, starts, bindings);
+			return { start: loc_at(node.start, starts), end: loc_at(node.end, starts) };
 		},
 		reconstruct(ast) {
-			return reconstruct_in(ast, starts, text, language);
+			return reconstruct_in(ast, starts, text, is_svelte);
 		}
 	};
 }
 
 /**
- * Add a `loc: {start, end}` line/column object to every node of a span-only wire,
- * derived from each node's `start`/`end` offsets + `source` — and, for a Svelte
- * tree, the `name_loc` its elements, attributes, and directives carry. Builds the
- * line-start table once, **mutates `ast` in place**, and returns it.
+ * Add a `loc: {start, end}` line/column object to every object of a span-only wire
+ * that carries numeric `start`/`end`, derived from those offsets + `source` — and, for
+ * a Svelte tree, the `name_loc` its elements, attributes, and directives carry. Builds
+ * the line-start table once, **mutates `ast` in place**, and returns it.
  * `structuredClone(ast)` first if you need the input untouched.
  *
- * Exact for TypeScript; approximate for Svelte; a no-op for CSS — see the module
- * doc for the specifics.
+ * The result deep-equals the loc-bearing wire of the same parse — see the module doc.
  *
- * @param {any} ast - the span-only AST from a `{locations: false}` parse (untyped: the
- *   no-locations wire has no `.d.ts`).
+ * @param {any} ast - the span-only AST from a `{locations: false}` parse.
  * @param {string} source - the exact source `ast` was parsed from.
- * @param {{language?: 'typescript' | 'svelte' | 'css'}} [opts] - line rule
- *   selector; inferred from the root node (`Root`/`Program`/`StyleSheetFile`) when
- *   omitted.
+ * @param {{language?: 'typescript' | 'svelte' | 'css'}} [opts] - the document's language;
+ *   inferred from the root node (`Root`/`Program`/`StyleSheetFile`) when omitted.
  * @returns {any} the same `ast`, now with `loc` on every node (plus `name_loc` on
  *   the Svelte nodes that carry one).
  */
@@ -873,17 +536,16 @@ export function reconstruct_locations(ast, source, opts) {
 
 /**
  * Line/column for a single node, derived from its `start`/`end` + `source`.
- * Returns `null` if the node has no numeric `start`/`end`.
+ * Returns `null` if the node has no numeric `start`/`end`. The plain `{line, column}`
+ * shape always — the `character` field `reconstruct` puts on a few Svelte positions
+ * is the offset itself, which the caller already holds.
  *
- * Convenience form: it rebuilds the O(source) line-start table on every call (and, for
- * Svelte, re-walks the template of `opts.ast` — no larger than the source, and never cached,
- * since a tree the caller edits between calls would be served stale), so for more than a
- * couple of lookups against one source reuse a `create_locator`.
+ * Convenience form: it rebuilds the O(source) line-start table on every call, so for
+ * more than a couple of lookups against one source reuse a `create_locator`.
  *
  * @param {any} node - a node from a span-only wire (must carry numeric `start`/`end`).
  * @param {string} source - the exact source the node was parsed from.
- * @param {{language?: 'typescript' | 'svelte' | 'css', ast?: any}} [opts] - as for
- *   `create_locator`: `ast` is required for a Svelte node.
+ * @param {{language?: 'typescript' | 'svelte' | 'css'}} [opts] - as for `create_locator`.
  * @returns {{start: {line: number, column: number}, end: {line: number, column: number}} | null}
  */
 export function loc_of(node, source, opts) {

@@ -28,16 +28,6 @@
 					"type": "Identifier",
 					"start": 85,
 					"end": 90,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 7
-						},
-						"end": {
-							"line": 2,
-							"column": 12
-						}
-					},
 					"name": "items"
 				},
 				"body": {
@@ -48,18 +38,6 @@
 							"start": 97,
 							"end": 109,
 							"name": "div",
-							"name_loc": {
-								"start": {
-									"line": 2,
-									"column": 20,
-									"character": 98
-								},
-								"end": {
-									"line": 2,
-									"column": 23,
-									"character": 101
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -80,16 +58,6 @@
 					"type": "ObjectPattern",
 					"start": 94,
 					"end": 96,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 17
-						},
-						"end": {
-							"line": 2,
-							"column": 19
-						}
-					},
 					"properties": []
 				}
 			}

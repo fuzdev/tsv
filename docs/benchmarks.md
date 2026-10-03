@@ -434,13 +434,12 @@ Things the published numbers measure that aren't quite what they look like.
   a Svelte source by the TypeScript line rule and skips the Svelte stamping), and they
   are perf-only: their parse is the `no-locations` row's, so a coverage table would
   learn nothing from them. Read them against `tsv-json` / `tsv-wasm-json`: the report's
-  span-only + reconstruct note computes that ratio from the run's own rows. On
-  TypeScript the reconstructed tree is the drop-in AST exactly. On Svelte it is a
-  superset of the drop-in `loc` (every template node gains `loc`, where Svelte's wire
-  carries it only on acorn-parsed nodes), so the Svelte ratio errs against the
-  reconstruct row — and approximate on two Svelte parser quirks the helper does not
-  replicate, the `<script>` tag-position `Program.loc` and the destructure `+1` column
-  (`locations.js`'s module doc states both).
+  span-only + reconstruct note computes that ratio from the run's own rows. The
+  reconstructed tree is the tree the loc-bearing row materializes, in every language:
+  tsv's writer and `locations.js` implement one `loc` definition, held equal over the
+  fixture tree by `deno task check:loc`. On TypeScript that is the drop-in AST exactly;
+  on Svelte both are the same superset of Svelte's own `loc` (every positioned object
+  carries one, where Svelte's wire gives `loc` only to acorn-parsed nodes).
 - **The `yuku-parser` rows need two corrections to be honest, and both are
   load-bearing.** yuku is payload-matched to oxc (span-only AST, same padding
   fields), so read it against `oxc-parser` / `tsv-json-no-locations` rather than

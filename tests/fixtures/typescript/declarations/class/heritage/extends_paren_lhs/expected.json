@@ -19,75 +19,25 @@
 			"type": "Program",
 			"start": 18,
 			"end": 143,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 6,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ClassDeclaration",
 					"start": 20,
 					"end": 51,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 32
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 26,
 						"end": 27,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 7
-							},
-							"end": {
-								"line": 2,
-								"column": 8
-							}
-						},
 						"name": "A"
 					},
 					"superClass": {
 						"type": "NewExpression",
 						"start": 37,
 						"end": 47,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 18
-							},
-							"end": {
-								"line": 2,
-								"column": 28
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 41,
 							"end": 45,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 22
-								},
-								"end": {
-									"line": 2,
-									"column": 26
-								}
-							},
 							"name": "Base"
 						},
 						"arguments": []
@@ -96,16 +46,6 @@
 						"type": "ClassBody",
 						"start": 49,
 						"end": 51,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 30
-							},
-							"end": {
-								"line": 2,
-								"column": 32
-							}
-						},
 						"body": []
 					}
 				},
@@ -113,105 +53,35 @@
 					"type": "ClassDeclaration",
 					"start": 53,
 					"end": 87,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 35
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 59,
 						"end": 60,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 7
-							},
-							"end": {
-								"line": 3,
-								"column": 8
-							}
-						},
 						"name": "B"
 					},
 					"superClass": {
 						"type": "NewExpression",
 						"start": 70,
 						"end": 83,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 18
-							},
-							"end": {
-								"line": 3,
-								"column": 31
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 74,
 							"end": 78,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 22
-								},
-								"end": {
-									"line": 3,
-									"column": 26
-								}
-							},
 							"name": "Base"
 						},
 						"typeArguments": {
 							"type": "TSTypeParameterInstantiation",
 							"start": 78,
 							"end": 81,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 26
-								},
-								"end": {
-									"line": 3,
-									"column": 29
-								}
-							},
 							"params": [
 								{
 									"type": "TSTypeReference",
 									"start": 79,
 									"end": 80,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 27
-										},
-										"end": {
-											"line": 3,
-											"column": 28
-										}
-									},
 									"typeName": {
 										"type": "Identifier",
 										"start": 79,
 										"end": 80,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 27
-											},
-											"end": {
-												"line": 3,
-												"column": 28
-											}
-										},
 										"name": "T"
 									}
 								}
@@ -223,16 +93,6 @@
 						"type": "ClassBody",
 						"start": 85,
 						"end": 87,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 33
-							},
-							"end": {
-								"line": 3,
-								"column": 35
-							}
-						},
 						"body": []
 					}
 				},
@@ -240,92 +100,32 @@
 					"type": "ClassDeclaration",
 					"start": 89,
 					"end": 116,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 28
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 95,
 						"end": 96,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 7
-							},
-							"end": {
-								"line": 4,
-								"column": 8
-							}
-						},
 						"name": "C"
 					},
 					"superClass": {
 						"type": "TaggedTemplateExpression",
 						"start": 106,
 						"end": 112,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 18
-							},
-							"end": {
-								"line": 4,
-								"column": 24
-							}
-						},
 						"tag": {
 							"type": "Identifier",
 							"start": 106,
 							"end": 109,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 18
-								},
-								"end": {
-									"line": 4,
-									"column": 21
-								}
-							},
 							"name": "tag"
 						},
 						"quasi": {
 							"type": "TemplateLiteral",
 							"start": 109,
 							"end": 112,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 21
-								},
-								"end": {
-									"line": 4,
-									"column": 24
-								}
-							},
 							"expressions": [],
 							"quasis": [
 								{
 									"type": "TemplateElement",
 									"start": 110,
 									"end": 111,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 22
-										},
-										"end": {
-											"line": 4,
-											"column": 23
-										}
-									},
 									"value": {
 										"raw": "t",
 										"cooked": "t"
@@ -339,16 +139,6 @@
 						"type": "ClassBody",
 						"start": 114,
 						"end": 116,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 26
-							},
-							"end": {
-								"line": 4,
-								"column": 28
-							}
-						},
 						"body": []
 					}
 				},
@@ -356,60 +146,20 @@
 					"type": "ClassDeclaration",
 					"start": 118,
 					"end": 142,
-					"loc": {
-						"start": {
-							"line": 5,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 25
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 124,
 						"end": 125,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 7
-							},
-							"end": {
-								"line": 5,
-								"column": 8
-							}
-						},
 						"name": "D"
 					},
 					"superClass": {
 						"type": "TSNonNullExpression",
 						"start": 134,
 						"end": 139,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 17
-							},
-							"end": {
-								"line": 5,
-								"column": 22
-							}
-						},
 						"expression": {
 							"type": "Identifier",
 							"start": 134,
 							"end": 138,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 17
-								},
-								"end": {
-									"line": 5,
-									"column": 21
-								}
-							},
 							"name": "Base"
 						}
 					},
@@ -417,16 +167,6 @@
 						"type": "ClassBody",
 						"start": 140,
 						"end": 142,
-						"loc": {
-							"start": {
-								"line": 5,
-								"column": 23
-							},
-							"end": {
-								"line": 5,
-								"column": 25
-							}
-						},
 						"body": []
 					}
 				}
@@ -439,18 +179,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

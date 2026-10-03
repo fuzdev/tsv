@@ -14,113 +14,43 @@
 			"type": "Line",
 			"value": " before condition",
 			"start": 20,
-			"end": 39,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 2
-				},
-				"end": {
-					"line": 3,
-					"column": 21
-				}
-			}
+			"end": 39
 		},
 		{
 			"type": "Line",
 			"value": " inline with condition",
 			"start": 44,
-			"end": 68,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 4
-				},
-				"end": {
-					"line": 4,
-					"column": 28
-				}
-			}
+			"end": 68
 		},
 		{
 			"type": "Line",
 			"value": " trailing after condition",
 			"start": 71,
-			"end": 98,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 2
-				},
-				"end": {
-					"line": 5,
-					"column": 29
-				}
-			}
+			"end": 98
 		},
 		{
 			"type": "Line",
 			"value": " Block comment variant",
 			"start": 116,
-			"end": 140,
-			"loc": {
-				"start": {
-					"line": 10,
-					"column": 1
-				},
-				"end": {
-					"line": 10,
-					"column": 25
-				}
-			}
+			"end": 140
 		},
 		{
 			"type": "Block",
 			"value": " before ",
 			"start": 152,
-			"end": 164,
-			"loc": {
-				"start": {
-					"line": 12,
-					"column": 2
-				},
-				"end": {
-					"line": 12,
-					"column": 14
-				}
-			}
+			"end": 164
 		},
 		{
 			"type": "Block",
 			"value": " inline ",
 			"start": 167,
-			"end": 179,
-			"loc": {
-				"start": {
-					"line": 12,
-					"column": 17
-				},
-				"end": {
-					"line": 12,
-					"column": 29
-				}
-			}
+			"end": 179
 		},
 		{
 			"type": "Block",
 			"value": " trailing ",
 			"start": 182,
-			"end": 196,
-			"loc": {
-				"start": {
-					"line": 13,
-					"column": 2
-				},
-				"end": {
-					"line": 13,
-					"column": 16
-				}
-			}
+			"end": 196
 		}
 	],
 	"instance": {
@@ -132,45 +62,15 @@
 			"type": "Program",
 			"start": 8,
 			"end": 212,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 17,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "WhileStatement",
 					"start": 10,
 					"end": 113,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 8,
-							"column": 2
-						}
-					},
 					"test": {
 						"type": "Identifier",
 						"start": 42,
 						"end": 43,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 2
-							},
-							"end": {
-								"line": 4,
-								"column": 3
-							}
-						},
 						"name": "x",
 						"leadingComments": [
 							{
@@ -193,59 +93,19 @@
 						"type": "BlockStatement",
 						"start": 102,
 						"end": 113,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 3
-							},
-							"end": {
-								"line": 8,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "ExpressionStatement",
 								"start": 106,
 								"end": 110,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 2
-									},
-									"end": {
-										"line": 7,
-										"column": 6
-									}
-								},
 								"expression": {
 									"type": "CallExpression",
 									"start": 106,
 									"end": 109,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 2
-										},
-										"end": {
-											"line": 7,
-											"column": 5
-										}
-									},
 									"callee": {
 										"type": "Identifier",
 										"start": 106,
 										"end": 107,
-										"loc": {
-											"start": {
-												"line": 7,
-												"column": 2
-											},
-											"end": {
-												"line": 7,
-												"column": 3
-											}
-										},
 										"name": "a"
 									},
 									"arguments": [],
@@ -267,30 +127,10 @@
 					"type": "WhileStatement",
 					"start": 142,
 					"end": 211,
-					"loc": {
-						"start": {
-							"line": 11,
-							"column": 1
-						},
-						"end": {
-							"line": 16,
-							"column": 2
-						}
-					},
 					"test": {
 						"type": "Identifier",
 						"start": 165,
 						"end": 166,
-						"loc": {
-							"start": {
-								"line": 12,
-								"column": 15
-							},
-							"end": {
-								"line": 12,
-								"column": 16
-							}
-						},
 						"name": "x",
 						"leadingComments": [
 							{
@@ -313,59 +153,19 @@
 						"type": "BlockStatement",
 						"start": 200,
 						"end": 211,
-						"loc": {
-							"start": {
-								"line": 14,
-								"column": 3
-							},
-							"end": {
-								"line": 16,
-								"column": 2
-							}
-						},
 						"body": [
 							{
 								"type": "ExpressionStatement",
 								"start": 204,
 								"end": 208,
-								"loc": {
-									"start": {
-										"line": 15,
-										"column": 2
-									},
-									"end": {
-										"line": 15,
-										"column": 6
-									}
-								},
 								"expression": {
 									"type": "CallExpression",
 									"start": 204,
 									"end": 207,
-									"loc": {
-										"start": {
-											"line": 15,
-											"column": 2
-										},
-										"end": {
-											"line": 15,
-											"column": 5
-										}
-									},
 									"callee": {
 										"type": "Identifier",
 										"start": 204,
 										"end": 205,
-										"loc": {
-											"start": {
-												"line": 15,
-												"column": 2
-											},
-											"end": {
-												"line": 15,
-												"column": 3
-											}
-										},
 										"name": "b"
 									},
 									"arguments": [],

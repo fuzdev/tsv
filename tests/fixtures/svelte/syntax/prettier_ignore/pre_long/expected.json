@@ -38,18 +38,6 @@
 				"start": 225,
 				"end": 325,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 1,
-						"character": 226
-					},
-					"end": {
-						"line": 7,
-						"column": 4,
-						"character": 229
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -72,36 +60,12 @@
 							"start": 255,
 							"end": 279,
 							"name": "b",
-							"name_loc": {
-								"start": {
-									"line": 7,
-									"column": 31,
-									"character": 256
-								},
-								"end": {
-									"line": 7,
-									"column": 32,
-									"character": 257
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 260,
 									"end": 272,
 									"name": "data-a",
-									"name_loc": {
-										"start": {
-											"line": 7,
-											"column": 35,
-											"character": 260
-										},
-										"end": {
-											"line": 7,
-											"column": 41,
-											"character": 266
-										}
-									},
 									"value": [
 										{
 											"start": 270,
@@ -131,36 +95,12 @@
 							"start": 279,
 							"end": 318,
 							"name": "b",
-							"name_loc": {
-								"start": {
-									"line": 7,
-									"column": 55,
-									"character": 280
-								},
-								"end": {
-									"line": 7,
-									"column": 56,
-									"character": 281
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 282,
 									"end": 312,
 									"name": "data-a",
-									"name_loc": {
-										"start": {
-											"line": 7,
-											"column": 57,
-											"character": 282
-										},
-										"end": {
-											"line": 7,
-											"column": 63,
-											"character": 288
-										}
-									},
 									"value": [
 										{
 											"start": 290,
@@ -220,18 +160,6 @@
 				"start": 394,
 				"end": 497,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 10,
-						"column": 1,
-						"character": 395
-					},
-					"end": {
-						"line": 10,
-						"column": 4,
-						"character": 398
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -254,36 +182,12 @@
 							"start": 424,
 							"end": 448,
 							"name": "b",
-							"name_loc": {
-								"start": {
-									"line": 10,
-									"column": 31,
-									"character": 425
-								},
-								"end": {
-									"line": 10,
-									"column": 32,
-									"character": 426
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 429,
 									"end": 441,
 									"name": "data-a",
-									"name_loc": {
-										"start": {
-											"line": 10,
-											"column": 35,
-											"character": 429
-										},
-										"end": {
-											"line": 10,
-											"column": 41,
-											"character": 435
-										}
-									},
 									"value": [
 										{
 											"start": 439,
@@ -313,36 +217,12 @@
 							"start": 448,
 							"end": 490,
 							"name": "b",
-							"name_loc": {
-								"start": {
-									"line": 10,
-									"column": 55,
-									"character": 449
-								},
-								"end": {
-									"line": 10,
-									"column": 56,
-									"character": 450
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 451,
 									"end": 482,
 									"name": "data-a",
-									"name_loc": {
-										"start": {
-											"line": 10,
-											"column": 57,
-											"character": 451
-										},
-										"end": {
-											"line": 10,
-											"column": 63,
-											"character": 457
-										}
-									},
 									"value": [
 										{
 											"start": 459,
@@ -402,18 +282,6 @@
 				"start": 595,
 				"end": 739,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 14,
-						"column": 1,
-						"character": 596
-					},
-					"end": {
-						"line": 14,
-						"column": 4,
-						"character": 599
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -436,36 +304,12 @@
 							"start": 625,
 							"end": 732,
 							"name": "b",
-							"name_loc": {
-								"start": {
-									"line": 14,
-									"column": 31,
-									"character": 626
-								},
-								"end": {
-									"line": 14,
-									"column": 32,
-									"character": 627
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 630,
 									"end": 691,
 									"name": "data-a",
-									"name_loc": {
-										"start": {
-											"line": 14,
-											"column": 35,
-											"character": 630
-										},
-										"end": {
-											"line": 14,
-											"column": 41,
-											"character": 636
-										}
-									},
 									"value": [
 										{
 											"start": 640,
@@ -481,18 +325,6 @@
 									"start": 694,
 									"end": 725,
 									"name": "data-b",
-									"name_loc": {
-										"start": {
-											"line": 14,
-											"column": 99,
-											"character": 694
-										},
-										"end": {
-											"line": 14,
-											"column": 105,
-											"character": 700
-										}
-									},
 									"value": [
 										{
 											"start": 704,
@@ -539,18 +371,6 @@
 				"start": 741,
 				"end": 857,
 				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 16,
-						"column": 1,
-						"character": 742
-					},
-					"end": {
-						"line": 16,
-						"column": 4,
-						"character": 745
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -567,36 +387,12 @@
 							"start": 747,
 							"end": 850,
 							"name": "b",
-							"name_loc": {
-								"start": {
-									"line": 16,
-									"column": 7,
-									"character": 748
-								},
-								"end": {
-									"line": 16,
-									"column": 8,
-									"character": 749
-								}
-							},
 							"attributes": [
 								{
 									"type": "Attribute",
 									"start": 750,
 									"end": 809,
 									"name": "data-a",
-									"name_loc": {
-										"start": {
-											"line": 16,
-											"column": 9,
-											"character": 750
-										},
-										"end": {
-											"line": 16,
-											"column": 15,
-											"character": 756
-										}
-									},
 									"value": [
 										{
 											"start": 758,
@@ -612,18 +408,6 @@
 									"start": 810,
 									"end": 839,
 									"name": "data-b",
-									"name_loc": {
-										"start": {
-											"line": 16,
-											"column": 69,
-											"character": 810
-										},
-										"end": {
-											"line": 16,
-											"column": 75,
-											"character": 816
-										}
-									},
 									"value": [
 										{
 											"start": 818,

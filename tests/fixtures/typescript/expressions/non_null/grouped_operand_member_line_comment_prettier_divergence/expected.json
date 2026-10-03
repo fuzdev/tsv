@@ -14,65 +14,25 @@
 			"type": "Line",
 			"value": " line comment in a non-null grouped operand forces the multiline paren layout",
 			"start": 20,
-			"end": 99,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 80
-				}
-			}
+			"end": 99
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 121,
-			"end": 125,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 8
-				},
-				"end": {
-					"line": 4,
-					"column": 12
-				}
-			}
+			"end": 125
 		},
 		{
 			"type": "Line",
 			"value": " ternary operand",
 			"start": 137,
-			"end": 155,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 1
-				},
-				"end": {
-					"line": 7,
-					"column": 19
-				}
-			}
+			"end": 155
 		},
 		{
 			"type": "Line",
 			"value": " c",
 			"start": 181,
-			"end": 185,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 12
-				},
-				"end": {
-					"line": 9,
-					"column": 16
-				}
-			}
+			"end": 185
 		}
 	],
 	"instance": {
@@ -84,118 +44,38 @@
 			"type": "Program",
 			"start": 18,
 			"end": 195,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 11,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 101,
 					"end": 134,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
-							"column": 8
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 107,
 							"end": 133,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 7
-								},
-								"end": {
-									"line": 5,
-									"column": 7
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 107,
 								"end": 108,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 7
-									},
-									"end": {
-										"line": 3,
-										"column": 8
-									}
-								},
 								"name": "a"
 							},
 							"init": {
 								"type": "MemberExpression",
 								"start": 111,
 								"end": 133,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 11
-									},
-									"end": {
-										"line": 5,
-										"column": 7
-									}
-								},
 								"object": {
 									"type": "TSNonNullExpression",
 									"start": 111,
 									"end": 129,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 11
-										},
-										"end": {
-											"line": 5,
-											"column": 3
-										}
-									},
 									"expression": {
 										"type": "BinaryExpression",
 										"start": 115,
 										"end": 120,
-										"loc": {
-											"start": {
-												"line": 4,
-												"column": 2
-											},
-											"end": {
-												"line": 4,
-												"column": 7
-											}
-										},
 										"left": {
 											"type": "Identifier",
 											"start": 115,
 											"end": 116,
-											"loc": {
-												"start": {
-													"line": 4,
-													"column": 2
-												},
-												"end": {
-													"line": 4,
-													"column": 3
-												}
-											},
 											"name": "x"
 										},
 										"operator": "+",
@@ -203,16 +83,6 @@
 											"type": "Identifier",
 											"start": 119,
 											"end": 120,
-											"loc": {
-												"start": {
-													"line": 4,
-													"column": 6
-												},
-												"end": {
-													"line": 4,
-													"column": 7
-												}
-											},
 											"name": "y"
 										},
 										"trailingComments": [
@@ -229,16 +99,6 @@
 									"type": "Identifier",
 									"start": 130,
 									"end": 133,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 4
-										},
-										"end": {
-											"line": 5,
-											"column": 7
-										}
-									},
 									"name": "foo"
 								},
 								"computed": false,
@@ -260,135 +120,45 @@
 					"type": "VariableDeclaration",
 					"start": 157,
 					"end": 194,
-					"loc": {
-						"start": {
-							"line": 8,
-							"column": 1
-						},
-						"end": {
-							"line": 10,
-							"column": 8
-						}
-					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 163,
 							"end": 193,
-							"loc": {
-								"start": {
-									"line": 8,
-									"column": 7
-								},
-								"end": {
-									"line": 10,
-									"column": 7
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 163,
 								"end": 164,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 7
-									},
-									"end": {
-										"line": 8,
-										"column": 8
-									}
-								},
 								"name": "b"
 							},
 							"init": {
 								"type": "MemberExpression",
 								"start": 167,
 								"end": 193,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 11
-									},
-									"end": {
-										"line": 10,
-										"column": 7
-									}
-								},
 								"object": {
 									"type": "TSNonNullExpression",
 									"start": 167,
 									"end": 189,
-									"loc": {
-										"start": {
-											"line": 8,
-											"column": 11
-										},
-										"end": {
-											"line": 10,
-											"column": 3
-										}
-									},
 									"expression": {
 										"type": "ConditionalExpression",
 										"start": 171,
 										"end": 180,
-										"loc": {
-											"start": {
-												"line": 9,
-												"column": 2
-											},
-											"end": {
-												"line": 9,
-												"column": 11
-											}
-										},
 										"test": {
 											"type": "Identifier",
 											"start": 171,
 											"end": 172,
-											"loc": {
-												"start": {
-													"line": 9,
-													"column": 2
-												},
-												"end": {
-													"line": 9,
-													"column": 3
-												}
-											},
 											"name": "p"
 										},
 										"consequent": {
 											"type": "Identifier",
 											"start": 175,
 											"end": 176,
-											"loc": {
-												"start": {
-													"line": 9,
-													"column": 6
-												},
-												"end": {
-													"line": 9,
-													"column": 7
-												}
-											},
 											"name": "q"
 										},
 										"alternate": {
 											"type": "Identifier",
 											"start": 179,
 											"end": 180,
-											"loc": {
-												"start": {
-													"line": 9,
-													"column": 10
-												},
-												"end": {
-													"line": 9,
-													"column": 11
-												}
-											},
 											"name": "r"
 										},
 										"trailingComments": [
@@ -405,16 +175,6 @@
 									"type": "Identifier",
 									"start": 190,
 									"end": 193,
-									"loc": {
-										"start": {
-											"line": 10,
-											"column": 4
-										},
-										"end": {
-											"line": 10,
-											"column": 7
-										}
-									},
 									"name": "foo"
 								},
 								"computed": false,
@@ -441,18 +201,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

@@ -14,17 +14,7 @@
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 29,
-			"end": 47,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 2
-				},
-				"end": {
-					"line": 3,
-					"column": 20
-				}
-			}
+			"end": 47
 		}
 	],
 	"instance": {
@@ -36,91 +26,31 @@
 			"type": "Program",
 			"start": 18,
 			"end": 77,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 7,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExportNamedDeclaration",
 					"start": 20,
 					"end": 64,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 16
-						}
-					},
 					"exportKind": "value",
 					"declaration": {
 						"type": "VariableDeclaration",
 						"start": 50,
 						"end": 64,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 2
-							},
-							"end": {
-								"line": 4,
-								"column": 16
-							}
-						},
 						"declarations": [
 							{
 								"type": "VariableDeclarator",
 								"start": 56,
 								"end": 63,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 8
-									},
-									"end": {
-										"line": 4,
-										"column": 15
-									}
-								},
 								"id": {
 									"type": "Identifier",
 									"start": 56,
 									"end": 57,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 8
-										},
-										"end": {
-											"line": 4,
-											"column": 9
-										}
-									},
 									"name": "a"
 								},
 								"init": {
 									"type": "Identifier",
 									"start": 62,
 									"end": 63,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 14
-										},
-										"end": {
-											"line": 4,
-											"column": 15
-										}
-									},
 									"name": "x"
 								}
 							}
@@ -142,30 +72,10 @@
 					"type": "ExpressionStatement",
 					"start": 67,
 					"end": 76,
-					"loc": {
-						"start": {
-							"line": 6,
-							"column": 1
-						},
-						"end": {
-							"line": 6,
-							"column": 10
-						}
-					},
 					"expression": {
 						"type": "ArrowFunctionExpression",
 						"start": 67,
 						"end": 75,
-						"loc": {
-							"start": {
-								"line": 6,
-								"column": 1
-							},
-							"end": {
-								"line": 6,
-								"column": 9
-							}
-						},
 						"id": null,
 						"expression": true,
 						"generator": false,
@@ -175,16 +85,6 @@
 								"type": "Identifier",
 								"start": 68,
 								"end": 69,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 2
-									},
-									"end": {
-										"line": 6,
-										"column": 3
-									}
-								},
 								"name": "y"
 							}
 						],
@@ -192,16 +92,6 @@
 							"type": "Literal",
 							"start": 74,
 							"end": 75,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 8
-								},
-								"end": {
-									"line": 6,
-									"column": 9
-								}
-							},
 							"value": 1,
 							"raw": "1"
 						}
@@ -216,18 +106,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

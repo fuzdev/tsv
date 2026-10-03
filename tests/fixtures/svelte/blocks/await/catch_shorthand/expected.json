@@ -15,16 +15,6 @@
 					"type": "Identifier",
 					"start": 8,
 					"end": 15,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 8
-						},
-						"end": {
-							"line": 1,
-							"column": 15
-						}
-					},
 					"name": "promise"
 				},
 				"value": null,
@@ -32,19 +22,7 @@
 					"type": "Identifier",
 					"name": "error",
 					"start": 22,
-					"end": 27,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 22,
-							"character": 22
-						},
-						"end": {
-							"line": 1,
-							"column": 27,
-							"character": 27
-						}
-					}
+					"end": 27
 				},
 				"pending": null,
 				"then": null,
@@ -59,16 +37,6 @@
 								"type": "Identifier",
 								"start": 29,
 								"end": 34,
-								"loc": {
-									"start": {
-										"line": 1,
-										"column": 29
-									},
-									"end": {
-										"line": 1,
-										"column": 34
-									}
-								},
 								"name": "error"
 							}
 						}

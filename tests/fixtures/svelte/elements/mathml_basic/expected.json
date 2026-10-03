@@ -12,18 +12,6 @@
 				"start": 0,
 				"end": 70,
 				"name": "math",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 5,
-						"character": 5
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -40,18 +28,6 @@
 							"start": 8,
 							"end": 62,
 							"name": "mrow",
-							"name_loc": {
-								"start": {
-									"line": 2,
-									"column": 2,
-									"character": 9
-								},
-								"end": {
-									"line": 2,
-									"column": 6,
-									"character": 13
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -68,18 +44,6 @@
 										"start": 17,
 										"end": 27,
 										"name": "mi",
-										"name_loc": {
-											"start": {
-												"line": 3,
-												"column": 3,
-												"character": 18
-											},
-											"end": {
-												"line": 3,
-												"column": 5,
-												"character": 20
-											}
-										},
 										"attributes": [],
 										"fragment": {
 											"type": "Fragment",
@@ -106,18 +70,6 @@
 										"start": 30,
 										"end": 40,
 										"name": "mo",
-										"name_loc": {
-											"start": {
-												"line": 4,
-												"column": 3,
-												"character": 31
-											},
-											"end": {
-												"line": 4,
-												"column": 5,
-												"character": 33
-											}
-										},
 										"attributes": [],
 										"fragment": {
 											"type": "Fragment",
@@ -144,18 +96,6 @@
 										"start": 43,
 										"end": 53,
 										"name": "mi",
-										"name_loc": {
-											"start": {
-												"line": 5,
-												"column": 3,
-												"character": 44
-											},
-											"end": {
-												"line": 5,
-												"column": 5,
-												"character": 46
-											}
-										},
 										"attributes": [],
 										"fragment": {
 											"type": "Fragment",

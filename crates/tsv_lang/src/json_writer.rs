@@ -22,6 +22,7 @@
 //! unique decimal form and are hand-formatted (two-digit-pair, the hot path
 //! emitting several ints per node).
 
+use crate::location::{Position, WirePositions};
 use crate::swar::{lanes_less_than, splat, zero_lanes};
 
 /// `00`,`01`,…,`99` — the two-digit-pair table behind every integer emitter,
@@ -2101,6 +2102,40 @@ impl JsonWriter {
         self.buf.push(lead);
         self.raw(START_KEY);
         self.start_end_wide(start, end);
+    }
+
+    /// `,"loc":{"start":{"line":L,"column":C},"end":{"line":L,"column":C}}` — the
+    /// `loc` field, which every wire writer places immediately after `end` (acorn's
+    /// key order). One staged run: four integers between five static fragments, and
+    /// the end's line is the start's digits again when the two share a line.
+    #[inline(never)]
+    pub fn loc_field(&mut self, start: Position, end: Position) {
+        let mut run = self.stage_run();
+        run.raw(",\"loc\":{\"start\":{\"line\":");
+        let start_line = run.usize_kept(start.line);
+        run.raw(",\"column\":");
+        run.usize(start.column);
+        run.raw("},\"end\":{\"line\":");
+        if end.line == start.line {
+            run.repeat(start_line, end.line);
+        } else {
+            run.usize(end.line);
+        }
+        run.raw(",\"column\":");
+        run.usize(end.column);
+        run.raw("}}");
+        run.flush();
+    }
+
+    /// The `loc` field of the byte span `[start, end)` under `positions`' line table
+    /// ([`JsonWriter::loc_field`]) — nothing at all on the span-only wire, which has
+    /// none.
+    #[inline]
+    pub fn span_loc(&mut self, positions: WirePositions<'_>, start: u32, end: u32) {
+        if let Some(lines) = positions.lines() {
+            let ((_, start), (_, end)) = lines.span_positions(start, end);
+            self.loc_field(start, end);
+        }
     }
 
     /// A `u64` value. **Every integer the writers actually emit — offsets,

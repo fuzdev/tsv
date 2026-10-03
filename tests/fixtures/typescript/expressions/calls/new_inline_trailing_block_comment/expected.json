@@ -14,17 +14,7 @@
 			"type": "Block",
 			"value": " block comment ",
 			"start": 31,
-			"end": 50,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 12
-				},
-				"end": {
-					"line": 2,
-					"column": 31
-				}
-			}
+			"end": 50
 		}
 	],
 	"instance": {
@@ -36,59 +26,19 @@
 			"type": "Program",
 			"start": 18,
 			"end": 53,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 3,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
 					"start": 20,
 					"end": 52,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 33
-						}
-					},
 					"expression": {
 						"type": "NewExpression",
 						"start": 20,
 						"end": 51,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 1
-							},
-							"end": {
-								"line": 2,
-								"column": 32
-							}
-						},
 						"callee": {
 							"type": "Identifier",
 							"start": 24,
 							"end": 25,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 5
-								},
-								"end": {
-									"line": 2,
-									"column": 6
-								}
-							},
 							"name": "A"
 						},
 						"arguments": [
@@ -96,32 +46,12 @@
 								"type": "Identifier",
 								"start": 26,
 								"end": 27,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 7
-									},
-									"end": {
-										"line": 2,
-										"column": 8
-									}
-								},
 								"name": "a"
 							},
 							{
 								"type": "Identifier",
 								"start": 29,
 								"end": 30,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 10
-									},
-									"end": {
-										"line": 2,
-										"column": 11
-									}
-								},
 								"name": "b",
 								"trailingComments": [
 									{
@@ -144,18 +74,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

@@ -45,18 +45,6 @@
 				"start": 62,
 				"end": 77,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 1,
-						"character": 63
-					},
-					"end": {
-						"line": 5,
-						"column": 4,
-						"character": 66
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -82,18 +70,6 @@
 				"start": 52,
 				"end": 57,
 				"name": "runes",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 16,
-						"character": 52
-					},
-					"end": {
-						"line": 3,
-						"column": 21,
-						"character": 57
-					}
-				},
 				"value": true
 			}
 		],

@@ -16,16 +16,6 @@
 					"type": "Identifier",
 					"start": 5,
 					"end": 9,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 5
-						},
-						"end": {
-							"line": 1,
-							"column": 9
-						}
-					},
 					"name": "cond"
 				},
 				"consequent": {
@@ -65,48 +55,16 @@
 											"type": "Identifier",
 											"name": "aaa",
 											"start": 108,
-											"end": 111,
-											"loc": {
-												"start": {
-													"line": 3,
-													"column": 9,
-													"character": 108
-												},
-												"end": {
-													"line": 3,
-													"column": 12,
-													"character": 111
-												}
-											}
+											"end": 111
 										},
 										"init": {
 											"type": "BinaryExpression",
 											"start": 137,
 											"end": 148,
-											"loc": {
-												"start": {
-													"line": 5,
-													"column": 2
-												},
-												"end": {
-													"line": 5,
-													"column": 13
-												}
-											},
 											"left": {
 												"type": "Identifier",
 												"start": 137,
 												"end": 140,
-												"loc": {
-													"start": {
-														"line": 5,
-														"column": 2
-													},
-													"end": {
-														"line": 5,
-														"column": 5
-													}
-												},
 												"name": "bbb"
 											},
 											"operator": "+",
@@ -114,16 +72,6 @@
 												"type": "Identifier",
 												"start": 145,
 												"end": 148,
-												"loc": {
-													"start": {
-														"line": 5,
-														"column": 10
-													},
-													"end": {
-														"line": 5,
-														"column": 13
-													}
-												},
 												"name": "ccc"
 											},
 											"leadingComments": [
@@ -177,48 +125,16 @@
 											"type": "Identifier",
 											"name": "ddd",
 											"start": 216,
-											"end": 219,
-											"loc": {
-												"start": {
-													"line": 8,
-													"column": 9,
-													"character": 216
-												},
-												"end": {
-													"line": 8,
-													"column": 12,
-													"character": 219
-												}
-											}
+											"end": 219
 										},
 										"init": {
 											"type": "BinaryExpression",
 											"start": 248,
 											"end": 259,
-											"loc": {
-												"start": {
-													"line": 10,
-													"column": 2
-												},
-												"end": {
-													"line": 10,
-													"column": 13
-												}
-											},
 											"left": {
 												"type": "Identifier",
 												"start": 248,
 												"end": 251,
-												"loc": {
-													"start": {
-														"line": 10,
-														"column": 2
-													},
-													"end": {
-														"line": 10,
-														"column": 5
-													}
-												},
 												"name": "eee"
 											},
 											"operator": "+",
@@ -226,16 +142,6 @@
 												"type": "Identifier",
 												"start": 256,
 												"end": 259,
-												"loc": {
-													"start": {
-														"line": 10,
-														"column": 10
-													},
-													"end": {
-														"line": 10,
-														"column": 13
-													}
-												},
 												"name": "fff"
 											},
 											"leadingComments": [
@@ -289,31 +195,11 @@
 											"type": "ObjectPattern",
 											"start": 326,
 											"end": 333,
-											"loc": {
-												"start": {
-													"line": 13,
-													"column": 10
-												},
-												"end": {
-													"line": 13,
-													"column": 17
-												}
-											},
 											"properties": [
 												{
 													"type": "Property",
 													"start": 328,
 													"end": 331,
-													"loc": {
-														"start": {
-															"line": 13,
-															"column": 12
-														},
-														"end": {
-															"line": 13,
-															"column": 15
-														}
-													},
 													"method": false,
 													"shorthand": true,
 													"computed": false,
@@ -321,32 +207,12 @@
 														"type": "Identifier",
 														"start": 328,
 														"end": 331,
-														"loc": {
-															"start": {
-																"line": 13,
-																"column": 12
-															},
-															"end": {
-																"line": 13,
-																"column": 15
-															}
-														},
 														"name": "ggg"
 													},
 													"value": {
 														"type": "Identifier",
 														"start": 328,
 														"end": 331,
-														"loc": {
-															"start": {
-																"line": 13,
-																"column": 12
-															},
-															"end": {
-																"line": 13,
-																"column": 15
-															}
-														},
 														"name": "ggg"
 													},
 													"kind": "init"
@@ -357,30 +223,10 @@
 											"type": "LogicalExpression",
 											"start": 359,
 											"end": 371,
-											"loc": {
-												"start": {
-													"line": 15,
-													"column": 2
-												},
-												"end": {
-													"line": 15,
-													"column": 14
-												}
-											},
 											"left": {
 												"type": "Identifier",
 												"start": 359,
 												"end": 362,
-												"loc": {
-													"start": {
-														"line": 15,
-														"column": 2
-													},
-													"end": {
-														"line": 15,
-														"column": 5
-													}
-												},
 												"name": "hhh"
 											},
 											"operator": "||",
@@ -388,16 +234,6 @@
 												"type": "Identifier",
 												"start": 368,
 												"end": 371,
-												"loc": {
-													"start": {
-														"line": 15,
-														"column": 11
-													},
-													"end": {
-														"line": 15,
-														"column": 14
-													}
-												},
 												"name": "iii"
 											},
 											"leadingComments": [
@@ -451,49 +287,17 @@
 											"type": "Identifier",
 											"name": "jjj",
 											"start": 489,
-											"end": 492,
-											"loc": {
-												"start": {
-													"line": 19,
-													"column": 9,
-													"character": 489
-												},
-												"end": {
-													"line": 19,
-													"column": 12,
-													"character": 492
-												}
-											}
+											"end": 492
 										},
 										"init": {
 											"type": "ObjectExpression",
 											"start": 518,
 											"end": 536,
-											"loc": {
-												"start": {
-													"line": 21,
-													"column": 2
-												},
-												"end": {
-													"line": 23,
-													"column": 3
-												}
-											},
 											"properties": [
 												{
 													"type": "Property",
 													"start": 524,
 													"end": 532,
-													"loc": {
-														"start": {
-															"line": 22,
-															"column": 4
-														},
-														"end": {
-															"line": 22,
-															"column": 12
-														}
-													},
 													"method": false,
 													"shorthand": false,
 													"computed": false,
@@ -501,32 +305,12 @@
 														"type": "Identifier",
 														"start": 524,
 														"end": 527,
-														"loc": {
-															"start": {
-																"line": 22,
-																"column": 4
-															},
-															"end": {
-																"line": 22,
-																"column": 7
-															}
-														},
 														"name": "kkk"
 													},
 													"value": {
 														"type": "Literal",
 														"start": 531,
 														"end": 532,
-														"loc": {
-															"start": {
-																"line": 22,
-																"column": 11
-															},
-															"end": {
-																"line": 22,
-																"column": 12
-															}
-														},
 														"value": 1,
 														"raw": "1"
 													},
@@ -569,65 +353,25 @@
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 116,
-			"end": 134,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 2
-				},
-				"end": {
-					"line": 4,
-					"column": 20
-				}
-			}
+			"end": 134
 		},
 		{
 			"type": "Block",
 			"value": " prettier-ignore ",
 			"start": 224,
-			"end": 245,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 2
-				},
-				"end": {
-					"line": 9,
-					"column": 23
-				}
-			}
+			"end": 245
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 338,
-			"end": 356,
-			"loc": {
-				"start": {
-					"line": 14,
-					"column": 2
-				},
-				"end": {
-					"line": 14,
-					"column": 20
-				}
-			}
+			"end": 356
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 497,
-			"end": 515,
-			"loc": {
-				"start": {
-					"line": 20,
-					"column": 2
-				},
-				"end": {
-					"line": 20,
-					"column": 20
-				}
-			}
+			"end": 515
 		}
 	]
 }

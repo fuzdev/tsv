@@ -14,353 +14,133 @@
 			"type": "Line",
 			"value": " a run at the end of an indexed access's brackets stays inside them, distinct,",
 			"start": 20,
-			"end": 100,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 81
-				}
-			}
+			"end": 100
 		},
 		{
 			"type": "Line",
 			"value": " one comment per line (unformatted_ours_flat carries the flat authoring)",
 			"start": 102,
-			"end": 176,
-			"loc": {
-				"start": {
-					"line": 3,
-					"column": 1
-				},
-				"end": {
-					"line": 3,
-					"column": 75
-				}
-			}
+			"end": 176
 		},
 		{
 			"type": "Line",
 			"value": " c1",
 			"start": 195,
-			"end": 200,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 4
-				},
-				"end": {
-					"line": 5,
-					"column": 9
-				}
-			}
+			"end": 200
 		},
 		{
 			"type": "Line",
 			"value": " c2",
 			"start": 203,
-			"end": 208,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 2
-				},
-				"end": {
-					"line": 6,
-					"column": 7
-				}
-			}
+			"end": 208
 		},
 		{
 			"type": "Line",
 			"value": " the same gap holding a single comment",
 			"start": 215,
-			"end": 255,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 1
-				},
-				"end": {
-					"line": 9,
-					"column": 41
-				}
-			}
+			"end": 255
 		},
 		{
 			"type": "Line",
 			"value": " c3",
 			"start": 274,
-			"end": 279,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 4
-				},
-				"end": {
-					"line": 11,
-					"column": 9
-				}
-			}
+			"end": 279
 		},
 		{
 			"type": "Line",
 			"value": " a retained paren shell's trailing gap behaves the same way - and an extra redundant",
 			"start": 286,
-			"end": 372,
-			"loc": {
-				"start": {
-					"line": 14,
-					"column": 1
-				},
-				"end": {
-					"line": 14,
-					"column": 87
-				}
-			}
+			"end": 372
 		},
 		{
 			"type": "Line",
 			"value": " LAYER changes nothing, the layers stripping as a unit so the retain question is the",
 			"start": 374,
-			"end": 460,
-			"loc": {
-				"start": {
-					"line": 15,
-					"column": 1
-				},
-				"end": {
-					"line": 15,
-					"column": 87
-				}
-			}
+			"end": 460
 		},
 		{
 			"type": "Line",
 			"value": " whole nest's (unformatted_ours_paren_layer carries that authoring)",
 			"start": 462,
-			"end": 531,
-			"loc": {
-				"start": {
-					"line": 16,
-					"column": 1
-				},
-				"end": {
-					"line": 16,
-					"column": 70
-				}
-			}
+			"end": 531
 		},
 		{
 			"type": "Line",
 			"value": " c4",
 			"start": 549,
-			"end": 554,
-			"loc": {
-				"start": {
-					"line": 18,
-					"column": 4
-				},
-				"end": {
-					"line": 18,
-					"column": 9
-				}
-			}
+			"end": 554
 		},
 		{
 			"type": "Line",
 			"value": " c5",
 			"start": 557,
-			"end": 562,
-			"loc": {
-				"start": {
-					"line": 19,
-					"column": 2
-				},
-				"end": {
-					"line": 19,
-					"column": 7
-				}
-			}
+			"end": 562
 		},
 		{
 			"type": "Line",
 			"value": " c6",
 			"start": 587,
-			"end": 592,
-			"loc": {
-				"start": {
-					"line": 23,
-					"column": 4
-				},
-				"end": {
-					"line": 23,
-					"column": 9
-				}
-			}
+			"end": 592
 		},
 		{
 			"type": "Line",
 			"value": " a LEADING run in the same nest: the retain rule is asked of the whole nest, so the",
 			"start": 601,
-			"end": 686,
-			"loc": {
-				"start": {
-					"line": 26,
-					"column": 1
-				},
-				"end": {
-					"line": 26,
-					"column": 86
-				}
-			}
+			"end": 686
 		},
 		{
 			"type": "Line",
 			"value": " pair survives and the enclosing gap must not claim the leading run out of it",
 			"start": 688,
-			"end": 767,
-			"loc": {
-				"start": {
-					"line": 27,
-					"column": 1
-				},
-				"end": {
-					"line": 27,
-					"column": 80
-				}
-			}
+			"end": 767
 		},
 		{
 			"type": "Line",
 			"value": " c7",
 			"start": 781,
-			"end": 786,
-			"loc": {
-				"start": {
-					"line": 28,
-					"column": 13
-				},
-				"end": {
-					"line": 28,
-					"column": 18
-				}
-			}
+			"end": 786
 		},
 		{
 			"type": "Line",
 			"value": " c8",
 			"start": 791,
-			"end": 796,
-			"loc": {
-				"start": {
-					"line": 29,
-					"column": 4
-				},
-				"end": {
-					"line": 29,
-					"column": 9
-				}
-			}
+			"end": 796
 		},
 		{
 			"type": "Line",
 			"value": " an author BLANK inside the run survives: the run never leaves the region it was",
 			"start": 805,
-			"end": 887,
-			"loc": {
-				"start": {
-					"line": 32,
-					"column": 1
-				},
-				"end": {
-					"line": 32,
-					"column": 83
-				}
-			}
+			"end": 887
 		},
 		{
 			"type": "Line",
 			"value": " written in, so `isPreviousLineEmpty` still has the line above the comment to read",
 			"start": 889,
-			"end": 973,
-			"loc": {
-				"start": {
-					"line": 33,
-					"column": 1
-				},
-				"end": {
-					"line": 33,
-					"column": 85
-				}
-			}
+			"end": 973
 		},
 		{
 			"type": "Line",
 			"value": " c9",
 			"start": 992,
-			"end": 997,
-			"loc": {
-				"start": {
-					"line": 35,
-					"column": 4
-				},
-				"end": {
-					"line": 35,
-					"column": 9
-				}
-			}
+			"end": 997
 		},
 		{
 			"type": "Line",
 			"value": " c10",
 			"start": 1001,
-			"end": 1007,
-			"loc": {
-				"start": {
-					"line": 37,
-					"column": 2
-				},
-				"end": {
-					"line": 37,
-					"column": 8
-				}
-			}
+			"end": 1007
 		},
 		{
 			"type": "Line",
 			"value": " c11",
 			"start": 1030,
-			"end": 1036,
-			"loc": {
-				"start": {
-					"line": 41,
-					"column": 4
-				},
-				"end": {
-					"line": 41,
-					"column": 10
-				}
-			}
+			"end": 1036
 		},
 		{
 			"type": "Line",
 			"value": " c12",
 			"start": 1040,
-			"end": 1046,
-			"loc": {
-				"start": {
-					"line": 43,
-					"column": 2
-				},
-				"end": {
-					"line": 43,
-					"column": 8
-				}
-			}
+			"end": 1046
 		}
 	],
 	"instance": {
@@ -372,89 +152,29 @@
 			"type": "Program",
 			"start": 18,
 			"end": 1053,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 45,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 178,
 					"end": 212,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 7,
-							"column": 3
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 183,
 						"end": 185,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 6
-							},
-							"end": {
-								"line": 4,
-								"column": 8
-							}
-						},
 						"name": "A1"
 					},
 					"typeAnnotation": {
 						"type": "TSIndexedAccessType",
 						"start": 188,
 						"end": 211,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 11
-							},
-							"end": {
-								"line": 7,
-								"column": 2
-							}
-						},
 						"objectType": {
 							"type": "TSTypeReference",
 							"start": 188,
 							"end": 189,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 11
-								},
-								"end": {
-									"line": 4,
-									"column": 12
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 188,
 								"end": 189,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 11
-									},
-									"end": {
-										"line": 4,
-										"column": 12
-									}
-								},
 								"name": "T"
 							}
 						},
@@ -462,30 +182,10 @@
 							"type": "TSTypeReference",
 							"start": 193,
 							"end": 194,
-							"loc": {
-								"start": {
-									"line": 5,
-									"column": 2
-								},
-								"end": {
-									"line": 5,
-									"column": 3
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 193,
 								"end": 194,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 2
-									},
-									"end": {
-										"line": 5,
-										"column": 3
-									}
-								},
 								"name": "K"
 							},
 							"trailingComments": [
@@ -517,74 +217,24 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 257,
 					"end": 283,
-					"loc": {
-						"start": {
-							"line": 10,
-							"column": 1
-						},
-						"end": {
-							"line": 12,
-							"column": 3
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 262,
 						"end": 264,
-						"loc": {
-							"start": {
-								"line": 10,
-								"column": 6
-							},
-							"end": {
-								"line": 10,
-								"column": 8
-							}
-						},
 						"name": "A2"
 					},
 					"typeAnnotation": {
 						"type": "TSIndexedAccessType",
 						"start": 267,
 						"end": 282,
-						"loc": {
-							"start": {
-								"line": 10,
-								"column": 11
-							},
-							"end": {
-								"line": 12,
-								"column": 2
-							}
-						},
 						"objectType": {
 							"type": "TSTypeReference",
 							"start": 267,
 							"end": 268,
-							"loc": {
-								"start": {
-									"line": 10,
-									"column": 11
-								},
-								"end": {
-									"line": 10,
-									"column": 12
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 267,
 								"end": 268,
-								"loc": {
-									"start": {
-										"line": 10,
-										"column": 11
-									},
-									"end": {
-										"line": 10,
-										"column": 12
-									}
-								},
 								"name": "T"
 							}
 						},
@@ -592,30 +242,10 @@
 							"type": "TSTypeReference",
 							"start": 272,
 							"end": 273,
-							"loc": {
-								"start": {
-									"line": 11,
-									"column": 2
-								},
-								"end": {
-									"line": 11,
-									"column": 3
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 272,
 								"end": 273,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 2
-									},
-									"end": {
-										"line": 11,
-										"column": 3
-									}
-								},
 								"name": "K"
 							},
 							"trailingComments": [
@@ -647,88 +277,28 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 533,
 					"end": 568,
-					"loc": {
-						"start": {
-							"line": 17,
-							"column": 1
-						},
-						"end": {
-							"line": 20,
-							"column": 5
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 538,
 						"end": 540,
-						"loc": {
-							"start": {
-								"line": 17,
-								"column": 6
-							},
-							"end": {
-								"line": 17,
-								"column": 8
-							}
-						},
 						"name": "B1"
 					},
 					"typeAnnotation": {
 						"type": "TSArrayType",
 						"start": 543,
 						"end": 567,
-						"loc": {
-							"start": {
-								"line": 17,
-								"column": 11
-							},
-							"end": {
-								"line": 20,
-								"column": 4
-							}
-						},
 						"elementType": {
 							"type": "TSParenthesizedType",
 							"start": 543,
 							"end": 565,
-							"loc": {
-								"start": {
-									"line": 17,
-									"column": 11
-								},
-								"end": {
-									"line": 20,
-									"column": 2
-								}
-							},
 							"typeAnnotation": {
 								"type": "TSTypeReference",
 								"start": 547,
 								"end": 548,
-								"loc": {
-									"start": {
-										"line": 18,
-										"column": 2
-									},
-									"end": {
-										"line": 18,
-										"column": 3
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 547,
 									"end": 548,
-									"loc": {
-										"start": {
-											"line": 18,
-											"column": 2
-										},
-										"end": {
-											"line": 18,
-											"column": 3
-										}
-									},
 									"name": "U"
 								},
 								"trailingComments": [
@@ -767,88 +337,28 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 571,
 					"end": 598,
-					"loc": {
-						"start": {
-							"line": 22,
-							"column": 1
-						},
-						"end": {
-							"line": 24,
-							"column": 5
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 576,
 						"end": 578,
-						"loc": {
-							"start": {
-								"line": 22,
-								"column": 6
-							},
-							"end": {
-								"line": 22,
-								"column": 8
-							}
-						},
 						"name": "B2"
 					},
 					"typeAnnotation": {
 						"type": "TSArrayType",
 						"start": 581,
 						"end": 597,
-						"loc": {
-							"start": {
-								"line": 22,
-								"column": 11
-							},
-							"end": {
-								"line": 24,
-								"column": 4
-							}
-						},
 						"elementType": {
 							"type": "TSParenthesizedType",
 							"start": 581,
 							"end": 595,
-							"loc": {
-								"start": {
-									"line": 22,
-									"column": 11
-								},
-								"end": {
-									"line": 24,
-									"column": 2
-								}
-							},
 							"typeAnnotation": {
 								"type": "TSTypeReference",
 								"start": 585,
 								"end": 586,
-								"loc": {
-									"start": {
-										"line": 23,
-										"column": 2
-									},
-									"end": {
-										"line": 23,
-										"column": 3
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 585,
 									"end": 586,
-									"loc": {
-										"start": {
-											"line": 23,
-											"column": 2
-										},
-										"end": {
-											"line": 23,
-											"column": 3
-										}
-									},
 									"name": "U"
 								},
 								"trailingComments": [
@@ -875,88 +385,28 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 769,
 					"end": 802,
-					"loc": {
-						"start": {
-							"line": 28,
-							"column": 1
-						},
-						"end": {
-							"line": 30,
-							"column": 5
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 774,
 						"end": 776,
-						"loc": {
-							"start": {
-								"line": 28,
-								"column": 6
-							},
-							"end": {
-								"line": 28,
-								"column": 8
-							}
-						},
 						"name": "B3"
 					},
 					"typeAnnotation": {
 						"type": "TSArrayType",
 						"start": 779,
 						"end": 801,
-						"loc": {
-							"start": {
-								"line": 28,
-								"column": 11
-							},
-							"end": {
-								"line": 30,
-								"column": 4
-							}
-						},
 						"elementType": {
 							"type": "TSParenthesizedType",
 							"start": 779,
 							"end": 799,
-							"loc": {
-								"start": {
-									"line": 28,
-									"column": 11
-								},
-								"end": {
-									"line": 30,
-									"column": 2
-								}
-							},
 							"typeAnnotation": {
 								"type": "TSTypeReference",
 								"start": 789,
 								"end": 790,
-								"loc": {
-									"start": {
-										"line": 29,
-										"column": 2
-									},
-									"end": {
-										"line": 29,
-										"column": 3
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 789,
 									"end": 790,
-									"loc": {
-										"start": {
-											"line": 29,
-											"column": 2
-										},
-										"end": {
-											"line": 29,
-											"column": 3
-										}
-									},
 									"name": "U"
 								},
 								"leadingComments": [
@@ -997,74 +447,24 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 975,
 					"end": 1011,
-					"loc": {
-						"start": {
-							"line": 34,
-							"column": 1
-						},
-						"end": {
-							"line": 38,
-							"column": 3
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 980,
 						"end": 982,
-						"loc": {
-							"start": {
-								"line": 34,
-								"column": 6
-							},
-							"end": {
-								"line": 34,
-								"column": 8
-							}
-						},
 						"name": "A3"
 					},
 					"typeAnnotation": {
 						"type": "TSIndexedAccessType",
 						"start": 985,
 						"end": 1010,
-						"loc": {
-							"start": {
-								"line": 34,
-								"column": 11
-							},
-							"end": {
-								"line": 38,
-								"column": 2
-							}
-						},
 						"objectType": {
 							"type": "TSTypeReference",
 							"start": 985,
 							"end": 986,
-							"loc": {
-								"start": {
-									"line": 34,
-									"column": 11
-								},
-								"end": {
-									"line": 34,
-									"column": 12
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 985,
 								"end": 986,
-								"loc": {
-									"start": {
-										"line": 34,
-										"column": 11
-									},
-									"end": {
-										"line": 34,
-										"column": 12
-									}
-								},
 								"name": "T"
 							}
 						},
@@ -1072,30 +472,10 @@
 							"type": "TSTypeReference",
 							"start": 990,
 							"end": 991,
-							"loc": {
-								"start": {
-									"line": 35,
-									"column": 2
-								},
-								"end": {
-									"line": 35,
-									"column": 3
-								}
-							},
 							"typeName": {
 								"type": "Identifier",
 								"start": 990,
 								"end": 991,
-								"loc": {
-									"start": {
-										"line": 35,
-										"column": 2
-									},
-									"end": {
-										"line": 35,
-										"column": 3
-									}
-								},
 								"name": "K"
 							},
 							"trailingComments": [
@@ -1127,88 +507,28 @@
 					"type": "TSTypeAliasDeclaration",
 					"start": 1014,
 					"end": 1052,
-					"loc": {
-						"start": {
-							"line": 40,
-							"column": 1
-						},
-						"end": {
-							"line": 44,
-							"column": 5
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 1019,
 						"end": 1021,
-						"loc": {
-							"start": {
-								"line": 40,
-								"column": 6
-							},
-							"end": {
-								"line": 40,
-								"column": 8
-							}
-						},
 						"name": "B4"
 					},
 					"typeAnnotation": {
 						"type": "TSArrayType",
 						"start": 1024,
 						"end": 1051,
-						"loc": {
-							"start": {
-								"line": 40,
-								"column": 11
-							},
-							"end": {
-								"line": 44,
-								"column": 4
-							}
-						},
 						"elementType": {
 							"type": "TSParenthesizedType",
 							"start": 1024,
 							"end": 1049,
-							"loc": {
-								"start": {
-									"line": 40,
-									"column": 11
-								},
-								"end": {
-									"line": 44,
-									"column": 2
-								}
-							},
 							"typeAnnotation": {
 								"type": "TSTypeReference",
 								"start": 1028,
 								"end": 1029,
-								"loc": {
-									"start": {
-										"line": 41,
-										"column": 2
-									},
-									"end": {
-										"line": 41,
-										"column": 3
-									}
-								},
 								"typeName": {
 									"type": "Identifier",
 									"start": 1028,
 									"end": 1029,
-									"loc": {
-										"start": {
-											"line": 41,
-											"column": 2
-										},
-										"end": {
-											"line": 41,
-											"column": 3
-										}
-									},
 									"name": "U"
 								},
 								"trailingComments": [
@@ -1248,18 +568,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,

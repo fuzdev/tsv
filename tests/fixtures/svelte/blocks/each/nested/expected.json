@@ -15,16 +15,6 @@
 					"type": "Identifier",
 					"start": 7,
 					"end": 12,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 7
-						},
-						"end": {
-							"line": 1,
-							"column": 12
-						}
-					},
 					"name": "outer"
 				},
 				"body": {
@@ -45,16 +35,6 @@
 								"type": "Identifier",
 								"start": 27,
 								"end": 32,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 8
-									},
-									"end": {
-										"line": 2,
-										"column": 13
-									}
-								},
 								"name": "inner"
 							},
 							"body": {
@@ -72,18 +52,6 @@
 										"start": 41,
 										"end": 59,
 										"name": "div",
-										"name_loc": {
-											"start": {
-												"line": 3,
-												"column": 3,
-												"character": 42
-											},
-											"end": {
-												"line": 3,
-												"column": 6,
-												"character": 45
-											}
-										},
 										"attributes": [],
 										"fragment": {
 											"type": "Fragment",
@@ -96,16 +64,6 @@
 														"type": "Identifier",
 														"start": 47,
 														"end": 48,
-														"loc": {
-															"start": {
-																"line": 3,
-																"column": 8
-															},
-															"end": {
-																"line": 3,
-																"column": 9
-															}
-														},
 														"name": "a"
 													}
 												},
@@ -124,16 +82,6 @@
 														"type": "Identifier",
 														"start": 51,
 														"end": 52,
-														"loc": {
-															"start": {
-																"line": 3,
-																"column": 12
-															},
-															"end": {
-																"line": 3,
-																"column": 13
-															}
-														},
 														"name": "b"
 													}
 												}
@@ -153,19 +101,7 @@
 								"type": "Identifier",
 								"name": "b",
 								"start": 36,
-								"end": 37,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 17,
-										"character": 36
-									},
-									"end": {
-										"line": 2,
-										"column": 18,
-										"character": 37
-									}
-								}
+								"end": 37
 							}
 						},
 						{
@@ -181,19 +117,7 @@
 					"type": "Identifier",
 					"name": "a",
 					"start": 16,
-					"end": 17,
-					"loc": {
-						"start": {
-							"line": 1,
-							"column": 16,
-							"character": 16
-						},
-						"end": {
-							"line": 1,
-							"column": 17,
-							"character": 17
-						}
-					}
+					"end": 17
 				}
 			}
 		]

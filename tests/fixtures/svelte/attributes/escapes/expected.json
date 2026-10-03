@@ -12,36 +12,12 @@
 				"start": 0,
 				"end": 51,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 4,
-						"character": 4
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 5,
 						"end": 30,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 1,
-								"column": 5,
-								"character": 5
-							},
-							"end": {
-								"line": 1,
-								"column": 14,
-								"character": 14
-							}
-						},
 						"value": {
 							"type": "ExpressionTag",
 							"start": 15,
@@ -50,16 +26,6 @@
 								"type": "Literal",
 								"start": 16,
 								"end": 29,
-								"loc": {
-									"start": {
-										"line": 1,
-										"column": 16
-									},
-									"end": {
-										"line": 1,
-										"column": 29
-									}
-								},
 								"value": "line\nbreak",
 								"raw": "'line\\nbreak'"
 							}
@@ -91,36 +57,12 @@
 				"start": 53,
 				"end": 98,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 1,
-						"character": 54
-					},
-					"end": {
-						"line": 3,
-						"column": 4,
-						"character": 57
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 58,
 						"end": 81,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 3,
-								"column": 5,
-								"character": 58
-							},
-							"end": {
-								"line": 3,
-								"column": 14,
-								"character": 67
-							}
-						},
 						"value": {
 							"type": "ExpressionTag",
 							"start": 68,
@@ -129,16 +71,6 @@
 								"type": "Literal",
 								"start": 69,
 								"end": 80,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 16
-									},
-									"end": {
-										"line": 3,
-										"column": 27
-									}
-								},
 								"value": "tab\there",
 								"raw": "'tab\\there'"
 							}
@@ -170,36 +102,12 @@
 				"start": 100,
 				"end": 155,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 1,
-						"character": 101
-					},
-					"end": {
-						"line": 5,
-						"column": 4,
-						"character": 104
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 105,
 						"end": 135,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 5,
-								"column": 5,
-								"character": 105
-							},
-							"end": {
-								"line": 5,
-								"column": 14,
-								"character": 114
-							}
-						},
 						"value": {
 							"type": "ExpressionTag",
 							"start": 115,
@@ -208,16 +116,6 @@
 								"type": "Literal",
 								"start": 116,
 								"end": 134,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 16
-									},
-									"end": {
-										"line": 5,
-										"column": 34
-									}
-								},
 								"value": "{\"key\": \"value\"}",
 								"raw": "'{\"key\": \"value\"}'"
 							}
@@ -249,36 +147,12 @@
 				"start": 157,
 				"end": 216,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 1,
-						"character": 158
-					},
-					"end": {
-						"line": 7,
-						"column": 4,
-						"character": 161
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 162,
 						"end": 194,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 7,
-								"column": 5,
-								"character": 162
-							},
-							"end": {
-								"line": 7,
-								"column": 14,
-								"character": 171
-							}
-						},
 						"value": {
 							"type": "ExpressionTag",
 							"start": 172,
@@ -287,16 +161,6 @@
 								"type": "Literal",
 								"start": 173,
 								"end": 193,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 16
-									},
-									"end": {
-										"line": 7,
-										"column": 36
-									}
-								},
 								"value": "ABC",
 								"raw": "'\\u0041\\u0042\\u0043'"
 							}
@@ -328,36 +192,12 @@
 				"start": 218,
 				"end": 267,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 9,
-						"column": 1,
-						"character": 219
-					},
-					"end": {
-						"line": 9,
-						"column": 4,
-						"character": 222
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 223,
 						"end": 249,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 9,
-								"column": 5,
-								"character": 223
-							},
-							"end": {
-								"line": 9,
-								"column": 14,
-								"character": 232
-							}
-						},
 						"value": {
 							"type": "ExpressionTag",
 							"start": 233,
@@ -366,16 +206,6 @@
 								"type": "Literal",
 								"start": 234,
 								"end": 248,
-								"loc": {
-									"start": {
-										"line": 9,
-										"column": 16
-									},
-									"end": {
-										"line": 9,
-										"column": 30
-									}
-								},
 								"value": "ABC",
 								"raw": "'\\x41\\x42\\x43'"
 							}
@@ -407,36 +237,12 @@
 				"start": 269,
 				"end": 322,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 11,
-						"column": 1,
-						"character": 270
-					},
-					"end": {
-						"line": 11,
-						"column": 4,
-						"character": 273
-					}
-				},
 				"attributes": [
 					{
 						"type": "Attribute",
 						"start": 274,
 						"end": 302,
 						"name": "data-attr",
-						"name_loc": {
-							"start": {
-								"line": 11,
-								"column": 5,
-								"character": 274
-							},
-							"end": {
-								"line": 11,
-								"column": 14,
-								"character": 283
-							}
-						},
 						"value": {
 							"type": "ExpressionTag",
 							"start": 284,
@@ -445,16 +251,6 @@
 								"type": "Literal",
 								"start": 285,
 								"end": 301,
-								"loc": {
-									"start": {
-										"line": 11,
-										"column": 16
-									},
-									"end": {
-										"line": 11,
-										"column": 32
-									}
-								},
 								"value": "text1\ntext2\t",
 								"raw": "'text1\\ntext2\\t'"
 							}

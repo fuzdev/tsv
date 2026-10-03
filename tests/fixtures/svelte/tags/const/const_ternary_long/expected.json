@@ -28,16 +28,6 @@
 					"type": "Identifier",
 					"start": 62,
 					"end": 67,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 7
-						},
-						"end": {
-							"line": 2,
-							"column": 12
-						}
-					},
 					"name": "items"
 				},
 				"body": {
@@ -64,64 +54,22 @@
 											"type": "Identifier",
 											"name": "a",
 											"start": 86,
-											"end": 87,
-											"loc": {
-												"start": {
-													"line": 3,
-													"column": 9,
-													"character": 86
-												},
-												"end": {
-													"line": 3,
-													"column": 10,
-													"character": 87
-												}
-											}
+											"end": 87
 										},
 										"init": {
 											"type": "ConditionalExpression",
 											"start": 90,
 											"end": 218,
-											"loc": {
-												"start": {
-													"line": 3,
-													"column": 13
-												},
-												"end": {
-													"line": 7,
-													"column": 25
-												}
-											},
 											"test": {
 												"type": "Identifier",
 												"start": 90,
 												"end": 94,
-												"loc": {
-													"start": {
-														"line": 3,
-														"column": 13
-													},
-													"end": {
-														"line": 3,
-														"column": 17
-													}
-												},
 												"name": "cond"
 											},
 											"consequent": {
 												"type": "Literal",
 												"start": 99,
 												"end": 144,
-												"loc": {
-													"start": {
-														"line": 4,
-														"column": 4
-													},
-													"end": {
-														"line": 4,
-														"column": 49
-													}
-												},
 												"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 												"raw": "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'"
 											},
@@ -129,46 +77,16 @@
 												"type": "ConditionalExpression",
 												"start": 149,
 												"end": 218,
-												"loc": {
-													"start": {
-														"line": 5,
-														"column": 4
-													},
-													"end": {
-														"line": 7,
-														"column": 25
-													}
-												},
 												"test": {
 													"type": "Identifier",
 													"start": 149,
 													"end": 153,
-													"loc": {
-														"start": {
-															"line": 5,
-															"column": 4
-														},
-														"end": {
-															"line": 5,
-															"column": 8
-														}
-													},
 													"name": "cond"
 												},
 												"consequent": {
 													"type": "Literal",
 													"start": 159,
 													"end": 192,
-													"loc": {
-														"start": {
-															"line": 6,
-															"column": 5
-														},
-														"end": {
-															"line": 6,
-															"column": 38
-														}
-													},
 													"value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 													"raw": "'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
 												},
@@ -176,16 +94,6 @@
 													"type": "Literal",
 													"start": 198,
 													"end": 218,
-													"loc": {
-														"start": {
-															"line": 7,
-															"column": 5
-														},
-														"end": {
-															"line": 7,
-															"column": 25
-														}
-													},
 													"value": "cccccccccccccccccc",
 													"raw": "'cccccccccccccccccc'"
 												}
@@ -214,16 +122,6 @@
 								"type": "Identifier",
 								"start": 222,
 								"end": 223,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 2
-									},
-									"end": {
-										"line": 8,
-										"column": 3
-									}
-								},
 								"name": "a"
 							}
 						},
@@ -240,19 +138,7 @@
 					"type": "Identifier",
 					"name": "item",
 					"start": 71,
-					"end": 75,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 16,
-							"character": 71
-						},
-						"end": {
-							"line": 2,
-							"column": 20,
-							"character": 75
-						}
-					}
+					"end": 75
 				}
 			}
 		]

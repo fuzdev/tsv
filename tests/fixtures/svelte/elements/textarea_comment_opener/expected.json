@@ -25,18 +25,6 @@
 				"start": 91,
 				"end": 122,
 				"name": "textarea",
-				"name_loc": {
-					"start": {
-						"line": 2,
-						"column": 1,
-						"character": 92
-					},
-					"end": {
-						"line": 2,
-						"column": 9,
-						"character": 100
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -76,18 +64,6 @@
 				"start": 154,
 				"end": 196,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 1,
-						"character": 155
-					},
-					"end": {
-						"line": 5,
-						"column": 4,
-						"character": 158
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -97,18 +73,6 @@
 							"start": 159,
 							"end": 190,
 							"name": "textarea",
-							"name_loc": {
-								"start": {
-									"line": 5,
-									"column": 6,
-									"character": 160
-								},
-								"end": {
-									"line": 5,
-									"column": 14,
-									"character": 168
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -151,18 +115,6 @@
 				"start": 233,
 				"end": 265,
 				"name": "textarea",
-				"name_loc": {
-					"start": {
-						"line": 8,
-						"column": 1,
-						"character": 234
-					},
-					"end": {
-						"line": 8,
-						"column": 9,
-						"character": 242
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -202,18 +154,6 @@
 				"start": 313,
 				"end": 348,
 				"name": "textarea",
-				"name_loc": {
-					"start": {
-						"line": 11,
-						"column": 1,
-						"character": 314
-					},
-					"end": {
-						"line": 11,
-						"column": 9,
-						"character": 322
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -253,18 +193,6 @@
 				"start": 391,
 				"end": 416,
 				"name": "textarea",
-				"name_loc": {
-					"start": {
-						"line": 14,
-						"column": 1,
-						"character": 392
-					},
-					"end": {
-						"line": 14,
-						"column": 9,
-						"character": 400
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",

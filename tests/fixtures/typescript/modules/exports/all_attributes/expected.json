@@ -19,46 +19,16 @@
 			"type": "Program",
 			"start": 8,
 			"end": 163,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 5,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "ExportAllDeclaration",
 					"start": 10,
 					"end": 50,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 41
-						}
-					},
 					"exported": null,
 					"source": {
 						"type": "Literal",
 						"start": 24,
 						"end": 27,
-						"loc": {
-							"start": {
-								"line": 2,
-								"column": 15
-							},
-							"end": {
-								"line": 2,
-								"column": 18
-							}
-						},
 						"value": "a",
 						"raw": "'a'"
 					},
@@ -67,46 +37,16 @@
 							"type": "ImportAttribute",
 							"start": 35,
 							"end": 47,
-							"loc": {
-								"start": {
-									"line": 2,
-									"column": 26
-								},
-								"end": {
-									"line": 2,
-									"column": 38
-								}
-							},
 							"key": {
 								"type": "Identifier",
 								"start": 35,
 								"end": 39,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 26
-									},
-									"end": {
-										"line": 2,
-										"column": 30
-									}
-								},
 								"name": "type"
 							},
 							"value": {
 								"type": "Literal",
 								"start": 41,
 								"end": 47,
-								"loc": {
-									"start": {
-										"line": 2,
-										"column": 32
-									},
-									"end": {
-										"line": 2,
-										"column": 38
-									}
-								},
 								"value": "json",
 								"raw": "'json'"
 							}
@@ -117,46 +57,16 @@
 					"type": "ExportAllDeclaration",
 					"start": 52,
 					"end": 98,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 47
-						}
-					},
 					"exported": {
 						"type": "Identifier",
 						"start": 64,
 						"end": 66,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 13
-							},
-							"end": {
-								"line": 3,
-								"column": 15
-							}
-						},
 						"name": "ns"
 					},
 					"source": {
 						"type": "Literal",
 						"start": 72,
 						"end": 75,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 21
-							},
-							"end": {
-								"line": 3,
-								"column": 24
-							}
-						},
 						"value": "b",
 						"raw": "'b'"
 					},
@@ -165,46 +75,16 @@
 							"type": "ImportAttribute",
 							"start": 83,
 							"end": 95,
-							"loc": {
-								"start": {
-									"line": 3,
-									"column": 32
-								},
-								"end": {
-									"line": 3,
-									"column": 44
-								}
-							},
 							"key": {
 								"type": "Identifier",
 								"start": 83,
 								"end": 87,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 32
-									},
-									"end": {
-										"line": 3,
-										"column": 36
-									}
-								},
 								"name": "type"
 							},
 							"value": {
 								"type": "Literal",
 								"start": 89,
 								"end": 95,
-								"loc": {
-									"start": {
-										"line": 3,
-										"column": 38
-									},
-									"end": {
-										"line": 3,
-										"column": 44
-									}
-								},
 								"value": "json",
 								"raw": "'json'"
 							}
@@ -215,46 +95,16 @@
 					"type": "ExportAllDeclaration",
 					"start": 100,
 					"end": 162,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 63
-						}
-					},
 					"exported": {
 						"type": "Identifier",
 						"start": 112,
 						"end": 115,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 13
-							},
-							"end": {
-								"line": 4,
-								"column": 16
-							}
-						},
 						"name": "ns2"
 					},
 					"source": {
 						"type": "Literal",
 						"start": 121,
 						"end": 124,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 22
-							},
-							"end": {
-								"line": 4,
-								"column": 25
-							}
-						},
 						"value": "c",
 						"raw": "'c'"
 					},
@@ -263,46 +113,16 @@
 							"type": "ImportAttribute",
 							"start": 132,
 							"end": 144,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 33
-								},
-								"end": {
-									"line": 4,
-									"column": 45
-								}
-							},
 							"key": {
 								"type": "Identifier",
 								"start": 132,
 								"end": 136,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 33
-									},
-									"end": {
-										"line": 4,
-										"column": 37
-									}
-								},
 								"name": "type"
 							},
 							"value": {
 								"type": "Literal",
 								"start": 138,
 								"end": 144,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 39
-									},
-									"end": {
-										"line": 4,
-										"column": 45
-									}
-								},
 								"value": "json",
 								"raw": "'json'"
 							}
@@ -311,46 +131,16 @@
 							"type": "ImportAttribute",
 							"start": 146,
 							"end": 159,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 47
-								},
-								"end": {
-									"line": 4,
-									"column": 60
-								}
-							},
 							"key": {
 								"type": "Identifier",
 								"start": 146,
 								"end": 150,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 47
-									},
-									"end": {
-										"line": 4,
-										"column": 51
-									}
-								},
 								"name": "attr"
 							},
 							"value": {
 								"type": "Literal",
 								"start": 152,
 								"end": 159,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 53
-									},
-									"end": {
-										"line": 4,
-										"column": 60
-									}
-								},
 								"value": "value",
 								"raw": "'value'"
 							}

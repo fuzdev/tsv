@@ -2,10 +2,8 @@
 //
 // The writer (`write/`) emits the compact wire JSON directly from the internal
 // AST in one walk, fusing byte→UTF-16 offset translation into the walk (final
-// char-space positions emitted directly via `LocationMapper`). It is the sole
+// char-space positions emitted directly via `WirePositions`). It is the sole
 // emission path; `convert_ast_json_bytes`/`_string` in `lib.rs` call it.
-
-use tsv_lang::{ByteToCharMap, LocationTracker};
 
 /// Schema choice for public-AST serialization.
 ///
@@ -35,33 +33,10 @@ impl Schema {
 mod write;
 
 pub use write::{
-    CommentAttach, CommentMode, EmbedWriter, IslandComments, ProgramLoc, ProgramWriter,
+    CommentAttach, CommentMode, EmbedWriter, IslandComments, ProgramWriter,
     write_expression_embedded, write_identifier_expression_with_character, write_pattern_embedded,
     write_program_embedded, write_program_json, write_variable_declaration_embedded,
 };
-
-/// Translate a column from byte-based to char-based, preserving any prior adjustment (e.g., +1)
-///
-/// Computes the expected byte-based column from the byte offset, then the char-based column,
-/// and preserves the delta between the existing column value and the expected byte column.
-/// This ensures adjustments like Svelte's read-pattern `+1` survive translation.
-///
-/// `pub` so the `tsv_svelte` writer reuses it for the `<script>` `Program`'s
-/// tag-line column positions (which it emits in char space directly).
-#[expect(clippy::cast_sign_loss)]
-pub fn translate_column(
-    byte_offset: u32,
-    existing_column: u64,
-    map: &ByteToCharMap,
-    tracker: &LocationTracker,
-) -> u64 {
-    let line_start = tracker.line_start_byte(byte_offset as usize);
-    let expected_byte_col = (byte_offset as usize).saturating_sub(line_start);
-    let char_col = map.byte_to_char(byte_offset) - map.byte_to_char(line_start as u32);
-    // Preserve any delta (e.g., +1 from Svelte's read-pattern column shift)
-    let delta = (existing_column as i64) - (expected_byte_col as i64);
-    ((char_col as i64) + delta) as u64
-}
 
 /// Convert non-decimal BigInt values to decimal string (matching acorn behavior).
 /// Strips numeric separators (`_`) and converts radix prefixes:

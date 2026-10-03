@@ -12,18 +12,6 @@
 				"start": 0,
 				"end": 340,
 				"name": "div",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 1,
-						"character": 1
-					},
-					"end": {
-						"line": 1,
-						"column": 4,
-						"character": 4
-					}
-				},
 				"attributes": [],
 				"fragment": {
 					"type": "Fragment",
@@ -40,18 +28,6 @@
 							"start": 7,
 							"end": 333,
 							"name": "div",
-							"name_loc": {
-								"start": {
-									"line": 2,
-									"column": 2,
-									"character": 8
-								},
-								"end": {
-									"line": 2,
-									"column": 5,
-									"character": 11
-								}
-							},
 							"attributes": [],
 							"fragment": {
 								"type": "Fragment",
@@ -68,18 +44,6 @@
 										"start": 15,
 										"end": 325,
 										"name": "a",
-										"name_loc": {
-											"start": {
-												"line": 3,
-												"column": 3,
-												"character": 16
-											},
-											"end": {
-												"line": 3,
-												"column": 4,
-												"character": 17
-											}
-										},
 										"attributes": [],
 										"fragment": {
 											"type": "Fragment",
@@ -109,36 +73,12 @@
 													"start": 59,
 													"end": 153,
 													"name": "Comp",
-													"name_loc": {
-														"start": {
-															"line": 5,
-															"column": 4,
-															"character": 60
-														},
-														"end": {
-															"line": 5,
-															"column": 8,
-															"character": 64
-														}
-													},
 													"attributes": [
 														{
 															"type": "Attribute",
 															"start": 65,
 															"end": 79,
 															"name": "prop1",
-															"name_loc": {
-																"start": {
-																	"line": 5,
-																	"column": 9,
-																	"character": 65
-																},
-																"end": {
-																	"line": 5,
-																	"column": 14,
-																	"character": 70
-																}
-															},
 															"value": [
 																{
 																	"start": 72,
@@ -154,18 +94,6 @@
 															"start": 80,
 															"end": 94,
 															"name": "prop2",
-															"name_loc": {
-																"start": {
-																	"line": 5,
-																	"column": 24,
-																	"character": 80
-																},
-																"end": {
-																	"line": 5,
-																	"column": 29,
-																	"character": 85
-																}
-															},
 															"value": [
 																{
 																	"start": 87,
@@ -181,18 +109,6 @@
 															"start": 95,
 															"end": 145,
 															"name": "prop3",
-															"name_loc": {
-																"start": {
-																	"line": 5,
-																	"column": 39,
-																	"character": 95
-																},
-																"end": {
-																	"line": 5,
-																	"column": 44,
-																	"character": 100
-																}
-															},
 															"value": [
 																{
 																	"start": 102,
@@ -234,36 +150,12 @@
 													"start": 219,
 													"end": 318,
 													"name": "Comp",
-													"name_loc": {
-														"start": {
-															"line": 7,
-															"column": 4,
-															"character": 220
-														},
-														"end": {
-															"line": 7,
-															"column": 8,
-															"character": 224
-														}
-													},
 													"attributes": [
 														{
 															"type": "Attribute",
 															"start": 225,
 															"end": 239,
 															"name": "prop1",
-															"name_loc": {
-																"start": {
-																	"line": 7,
-																	"column": 9,
-																	"character": 225
-																},
-																"end": {
-																	"line": 7,
-																	"column": 14,
-																	"character": 230
-																}
-															},
 															"value": [
 																{
 																	"start": 232,
@@ -279,18 +171,6 @@
 															"start": 240,
 															"end": 254,
 															"name": "prop2",
-															"name_loc": {
-																"start": {
-																	"line": 7,
-																	"column": 24,
-																	"character": 240
-																},
-																"end": {
-																	"line": 7,
-																	"column": 29,
-																	"character": 245
-																}
-															},
 															"value": [
 																{
 																	"start": 247,
@@ -306,18 +186,6 @@
 															"start": 255,
 															"end": 306,
 															"name": "prop3",
-															"name_loc": {
-																"start": {
-																	"line": 7,
-																	"column": 39,
-																	"character": 255
-																},
-																"end": {
-																	"line": 7,
-																	"column": 44,
-																	"character": 260
-																}
-															},
 															"value": [
 																{
 																	"start": 262,

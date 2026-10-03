@@ -9,18 +9,6 @@
 				"start": 50,
 				"end": 57,
 				"name": "h",
-				"name_loc": {
-					"start": {
-						"line": 3,
-						"column": 7,
-						"character": 50
-					},
-					"end": {
-						"line": 3,
-						"column": 8,
-						"character": 51
-					}
-				},
 				"value": [
 					{
 						"start": 52,
@@ -68,16 +56,6 @@
 			"type": "Program",
 			"start": 32,
 			"end": 32,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 1,
-					"column": 41
-				}
-			},
 			"body": [],
 			"sourceType": "module"
 		},
@@ -87,18 +65,6 @@
 				"start": 8,
 				"end": 15,
 				"name": "a",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 9,
-						"character": 9
-					}
-				},
 				"value": [
 					{
 						"start": 10,
@@ -114,18 +80,6 @@
 				"start": 16,
 				"end": 23,
 				"name": "b",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 16,
-						"character": 16
-					},
-					"end": {
-						"line": 1,
-						"column": 17,
-						"character": 17
-					}
-				},
 				"value": [
 					{
 						"start": 19,
@@ -141,18 +95,6 @@
 				"start": 24,
 				"end": 31,
 				"name": "e",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 24,
-						"character": 24
-					},
-					"end": {
-						"line": 1,
-						"column": 25,
-						"character": 25
-					}
-				},
 				"value": [
 					{
 						"start": 27,

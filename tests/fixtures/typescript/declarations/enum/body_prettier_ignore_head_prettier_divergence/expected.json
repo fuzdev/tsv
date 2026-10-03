@@ -14,97 +14,37 @@
 			"type": "Line",
 			"value": " an own-line directive in the header→`{` gap freezes the whole enum body",
 			"start": 20,
-			"end": 94,
-			"loc": {
-				"start": {
-					"line": 2,
-					"column": 1
-				},
-				"end": {
-					"line": 2,
-					"column": 75
-				}
-			}
+			"end": 94
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 106,
-			"end": 124,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 1
-				},
-				"end": {
-					"line": 4,
-					"column": 19
-				}
-			}
+			"end": 124
 		},
 		{
 			"type": "Line",
 			"value": " a `const enum` shares the head, so it shares the freeze",
 			"start": 154,
-			"end": 212,
-			"loc": {
-				"start": {
-					"line": 9,
-					"column": 1
-				},
-				"end": {
-					"line": 9,
-					"column": 59
-				}
-			}
+			"end": 212
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
 			"start": 230,
-			"end": 248,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 1
-				},
-				"end": {
-					"line": 11,
-					"column": 19
-				}
-			}
+			"end": 248
 		},
 		{
 			"type": "Line",
 			"value": " an own-line block comment behaves identically — placement keys the freeze",
 			"start": 271,
-			"end": 347,
-			"loc": {
-				"start": {
-					"line": 16,
-					"column": 1
-				},
-				"end": {
-					"line": 16,
-					"column": 77
-				}
-			}
+			"end": 347
 		},
 		{
 			"type": "Block",
 			"value": " prettier-ignore ",
 			"start": 359,
-			"end": 380,
-			"loc": {
-				"start": {
-					"line": 18,
-					"column": 1
-				},
-				"end": {
-					"line": 18,
-					"column": 22
-				}
-			}
+			"end": 380
 		}
 	],
 	"instance": {
@@ -116,45 +56,15 @@
 			"type": "Program",
 			"start": 18,
 			"end": 401,
-			"loc": {
-				"start": {
-					"line": 1,
-					"column": 0
-				},
-				"end": {
-					"line": 22,
-					"column": 9
-				}
-			},
 			"body": [
 				{
 					"type": "TSEnumDeclaration",
 					"start": 96,
 					"end": 151,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 7,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 101,
 						"end": 104,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 6
-							},
-							"end": {
-								"line": 3,
-								"column": 9
-							}
-						},
 						"name": "Aaa"
 					},
 					"members": [
@@ -162,46 +72,16 @@
 							"type": "TSEnumMember",
 							"start": 130,
 							"end": 141,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 2
-								},
-								"end": {
-									"line": 6,
-									"column": 13
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 130,
 								"end": 133,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 2
-									},
-									"end": {
-										"line": 6,
-										"column": 5
-									}
-								},
 								"name": "mmm"
 							},
 							"initializer": {
 								"type": "Literal",
 								"start": 140,
 								"end": 141,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 12
-									},
-									"end": {
-										"line": 6,
-										"column": 13
-									}
-								},
 								"value": 1,
 								"raw": "1"
 							},
@@ -218,30 +98,10 @@
 							"type": "TSEnumMember",
 							"start": 145,
 							"end": 148,
-							"loc": {
-								"start": {
-									"line": 6,
-									"column": 17
-								},
-								"end": {
-									"line": 6,
-									"column": 20
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 145,
 								"end": 148,
-								"loc": {
-									"start": {
-										"line": 6,
-										"column": 17
-									},
-									"end": {
-										"line": 6,
-										"column": 20
-									}
-								},
 								"name": "nnn"
 							}
 						}
@@ -259,31 +119,11 @@
 					"type": "TSEnumDeclaration",
 					"start": 214,
 					"end": 268,
-					"loc": {
-						"start": {
-							"line": 10,
-							"column": 1
-						},
-						"end": {
-							"line": 14,
-							"column": 2
-						}
-					},
 					"const": true,
 					"id": {
 						"type": "Identifier",
 						"start": 225,
 						"end": 228,
-						"loc": {
-							"start": {
-								"line": 10,
-								"column": 12
-							},
-							"end": {
-								"line": 10,
-								"column": 15
-							}
-						},
 						"name": "Bbb"
 					},
 					"members": [
@@ -291,46 +131,16 @@
 							"type": "TSEnumMember",
 							"start": 254,
 							"end": 265,
-							"loc": {
-								"start": {
-									"line": 13,
-									"column": 2
-								},
-								"end": {
-									"line": 13,
-									"column": 13
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 254,
 								"end": 257,
-								"loc": {
-									"start": {
-										"line": 13,
-										"column": 2
-									},
-									"end": {
-										"line": 13,
-										"column": 5
-									}
-								},
 								"name": "ooo"
 							},
 							"initializer": {
 								"type": "Literal",
 								"start": 264,
 								"end": 265,
-								"loc": {
-									"start": {
-										"line": 13,
-										"column": 12
-									},
-									"end": {
-										"line": 13,
-										"column": 13
-									}
-								},
 								"value": 2,
 								"raw": "2"
 							},
@@ -357,30 +167,10 @@
 					"type": "TSEnumDeclaration",
 					"start": 349,
 					"end": 400,
-					"loc": {
-						"start": {
-							"line": 17,
-							"column": 1
-						},
-						"end": {
-							"line": 21,
-							"column": 2
-						}
-					},
 					"id": {
 						"type": "Identifier",
 						"start": 354,
 						"end": 357,
-						"loc": {
-							"start": {
-								"line": 17,
-								"column": 6
-							},
-							"end": {
-								"line": 17,
-								"column": 9
-							}
-						},
 						"name": "Ccc"
 					},
 					"members": [
@@ -388,46 +178,16 @@
 							"type": "TSEnumMember",
 							"start": 386,
 							"end": 397,
-							"loc": {
-								"start": {
-									"line": 20,
-									"column": 2
-								},
-								"end": {
-									"line": 20,
-									"column": 13
-								}
-							},
 							"id": {
 								"type": "Identifier",
 								"start": 386,
 								"end": 389,
-								"loc": {
-									"start": {
-										"line": 20,
-										"column": 2
-									},
-									"end": {
-										"line": 20,
-										"column": 5
-									}
-								},
 								"name": "ppp"
 							},
 							"initializer": {
 								"type": "Literal",
 								"start": 396,
 								"end": 397,
-								"loc": {
-									"start": {
-										"line": 20,
-										"column": 12
-									},
-									"end": {
-										"line": 20,
-										"column": 13
-									}
-								},
 								"value": 3,
 								"raw": "3"
 							},
@@ -459,18 +219,6 @@
 				"start": 8,
 				"end": 17,
 				"name": "lang",
-				"name_loc": {
-					"start": {
-						"line": 1,
-						"column": 8,
-						"character": 8
-					},
-					"end": {
-						"line": 1,
-						"column": 12,
-						"character": 12
-					}
-				},
 				"value": [
 					{
 						"start": 14,
