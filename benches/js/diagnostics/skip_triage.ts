@@ -34,6 +34,7 @@
  */
 
 import { CorpusLoader, DirectoryLoader, group_by_language } from '../lib/corpus.ts';
+import { first_line } from '../lib/error_text.ts';
 import { init_implementations } from '../lib/implementations.ts';
 import {
 	type KnownGap,
@@ -220,12 +221,12 @@ for (const lang of langs) {
 			// JSON.parse) — same $lang::parse + error surface in tsv_ffi
 			impls.native.parse_internal(f.content, lang);
 		} catch (e) {
-			tsv_err = String(e instanceof Error ? e.message : e).split('\n')[0];
+			tsv_err = first_line(e);
 		}
 		try {
 			impls.canonical.parse(f.content, lang);
 		} catch (e) {
-			canon_err = String(e instanceof Error ? e.message : e).split('\n')[0];
+			canon_err = first_line(e);
 		}
 		if (tsv_err && !canon_err) {
 			const reason = sanction_for(SANCTIONED, f.path);

@@ -113,8 +113,8 @@ fn grade(source: &str) -> Option<Vec<String>> {
     root_names(&root, source, &mut names);
     graded_names(root.fragment.nodes, source, &mut names);
     for bytes in [
+        tsv_svelte::convert_ast_json_bytes_with_locations(&root, source),
         tsv_svelte::convert_ast_json_bytes(&root, source),
-        tsv_svelte::convert_ast_json_bytes_no_locations(&root, source),
     ] {
         let text = String::from_utf8(bytes)
             .unwrap_or_else(|e| panic!("wire is not UTF-8 for {source:?}: {e}"));

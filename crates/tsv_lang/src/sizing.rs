@@ -1,27 +1,37 @@
 // Sizing heuristics for allocation pre-sizing — the wire-JSON output buffer,
 // the parse-time bump arena, and the wire writer's line-start table.
 
-/// Estimated compact-JSON bytes per source byte for the wire-JSON output.
+/// Estimated compact-JSON bytes per source byte for the span-only wire — the one
+/// every binding emits.
 ///
-/// Per-file means measured across corpora cluster tightly: TypeScript ~18.5x
-/// (zzz, 90 files), Svelte ~17.6x (zzz, 123 files), CSS ~19.8x (prettier css
-/// tests, 205 files) — node objects with `start`/`end`/`loc` dominate the
-/// wire size regardless of language. 20 slightly over-allocates the typical
-/// file so serialization finishes without reallocating; high-ratio outliers
-/// (TS max ~30x) pay one doubling.
-const JSON_BYTES_PER_SOURCE_BYTE: usize = 20;
+/// Per-file ratios across the `../corpora` snapshot cluster by wire, not by
+/// language: span-only, TypeScript and Svelte both have a median near 9x and a p90
+/// near 12x (CSS lower by bytes, noisier on tiny files). 12 sizes ~90% of files to
+/// finish without reallocating, where the loc wire's constant would reserve over
+/// twice what the median file writes — memory a WASM instance's linear memory keeps
+/// as its high-water mark. The outliers pay one doubling.
+const SPAN_JSON_BYTES_PER_SOURCE_BYTE: usize = 12;
 
-/// Pre-size estimate for a document's compact wire-JSON output.
+/// Estimated compact-JSON bytes per source byte for the loc-bearing wire
+/// (`tsv parse --locations`): the per-node `loc` object roughly doubles the wire
+/// (median ~17x TypeScript, ~19x Svelte over the same snapshot), so 20 covers the
+/// typical file and the high-ratio outliers pay one doubling.
+const LOC_JSON_BYTES_PER_SOURCE_BYTE: usize = 20;
+
+/// Pre-size estimate for a document's compact wire-JSON output, `locations`
+/// naming the wire (whether it carries `loc`).
 ///
-/// Used by each language's wire-JSON writer (`convert_ast_json_bytes`) to
-/// allocate the `JsonWriter` buffer up front instead of growing it through
-/// `Vec`'s default doubling (the JSON wire form runs ~20x the source length,
-/// so default growth pays many large reallocs). The floor covers tiny sources
-/// whose output is mostly fixed envelope.
-pub fn estimated_json_capacity(source_len: usize) -> usize {
-    source_len
-        .saturating_mul(JSON_BYTES_PER_SOURCE_BYTE)
-        .max(128)
+/// Used by each language's wire-JSON writer to allocate the `JsonWriter` buffer
+/// up front instead of growing it through `Vec`'s default doubling (the wire runs
+/// several times the source length, so default growth pays many large reallocs).
+/// The floor covers tiny sources whose output is mostly fixed envelope.
+pub fn estimated_json_capacity(source_len: usize, locations: bool) -> usize {
+    let per_byte = if locations {
+        LOC_JSON_BYTES_PER_SOURCE_BYTE
+    } else {
+        SPAN_JSON_BYTES_PER_SOURCE_BYTE
+    };
+    source_len.saturating_mul(per_byte).max(128)
 }
 
 /// Bump-arena pre-size floor, in bytes per source byte, for the internal AST.

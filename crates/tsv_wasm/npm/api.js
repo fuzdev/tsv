@@ -23,6 +23,9 @@
  * take no `locations`: the JSON string is the wire, and `loc` is a view over objects; a
  * format emits no wire at all.
  *
+ * A `source` that is not a string is refused before the engine sees it
+ * (`read_source`), since the engines would each answer it differently.
+ *
  * An unset source type stays unset all the way to the engine, which answers it per
  * family: a parse reads it as `module` (its wire's `Program.sourceType` is a claim one
  * settled grammar has to produce), a format as none named — the module grammar, retried
@@ -37,9 +40,6 @@
  * `parse_internal_*` (bench-only) never passes through here.
  */
 
-/** The languages with a parse goal — `tsv_arena`'s `goal_allowed!`, restated for the bag. */
-const GOAL_LANGUAGES = new Set(['typescript']);
-
 /**
  * Read an options bag against one export's key set, returning
  * `{locations, source_type}` (`locations` default `false`, `source_type` default
@@ -52,10 +52,10 @@ const GOAL_LANGUAGES = new Set(['typescript']);
  * all defaults. A key's getter runs once, and one that throws surfaces as
  * `failed to read <noun> option '<name>'` with the getter's error as its `cause`.
  *
- * @param {unknown} options - the caller's bag.
- * @param {'parse' | 'format'} noun - the export family, as every error names it.
- * @param {boolean} takes_locations - whether this export takes `locations`.
- * @param {boolean} takes_source_type - whether this export's language has a parse goal.
+ * @param {unknown} options - the caller's bag
+ * @param {'parse' | 'format'} noun - the export family, as every error names it
+ * @param {boolean} takes_locations - whether this export takes `locations`
+ * @param {boolean} takes_source_type - whether this export's language has a parse goal
  * @returns {{locations: boolean, source_type: 'script' | 'module' | undefined}}
  */
 export function read_options(options, noun, takes_locations, takes_source_type) {
@@ -107,9 +107,9 @@ export function read_options(options, noun, takes_locations, takes_source_type) 
  * caller's own error rides along as the `cause`. An unknown key is refused before it
  * is read, so its getter never runs.
  *
- * @param {object} options - the caller's bag.
- * @param {string} name - a key this export takes.
- * @param {'parse' | 'format'} noun - the export family, as every error names it.
+ * @param {object} options - the caller's bag
+ * @param {string} name - a key this export takes
+ * @param {'parse' | 'format'} noun - the export family, as every error names it
  * @returns {unknown}
  */
 function read_option(options, name, noun) {
@@ -121,13 +121,35 @@ function read_option(options, name, noun) {
 }
 
 /**
- * Whether `language` has a parse goal, i.e. takes a `sourceType`.
+ * Refuse a `source` that is not a string, with one message on every engine. Without
+ * it the engines disagree: wasm-bindgen's string glue hands the value to
+ * `TextEncoder.encodeInto`, which stringifies it on Deno, Bun and browsers (so `42`
+ * parses as the empty document) and throws a Node-specific `TypeError` on Node, while
+ * the N-API addon throws its own conversion error.
+ *
+ * @param {unknown} source - the caller's source
+ * @param {'parse' | 'format'} noun - the export family, as every error names it
+ * @returns {string} the same `source`
+ * @throws {TypeError} when `source` is not a string
+ */
+export function read_source(source, noun) {
+	if (typeof source !== 'string') {
+		throw new TypeError(
+			`${noun} source must be a string (got ${source === null ? 'null' : typeof source})`
+		);
+	}
+	return source;
+}
+
+/**
+ * Whether `language` has a parse goal, i.e. takes a `sourceType` — TypeScript alone
+ * (`tsv_arena`'s `goal_allowed!`, restated for the bag; the refusal text names it).
  *
  * @param {string} language
  * @returns {boolean}
  */
 export function has_source_type(language) {
-	return GOAL_LANGUAGES.has(language);
+	return language === 'typescript';
 }
 
 /**
@@ -135,7 +157,7 @@ export function has_source_type(language) {
  * functions, keyed by language.
  *
  * @param {Record<string, (source: string, source_type?: string) => string>} format
- * @returns {Record<string, (source: string, options?: unknown) => string>} `format_<lang>`.
+ * @returns {Record<string, (source: string, options?: unknown) => string>} `format_<lang>`
  */
 export function create_format_api(format) {
 	/** @type {Record<string, (source: string, options?: unknown) => string>} */
@@ -143,7 +165,10 @@ export function create_format_api(format) {
 	for (const [language, format_language] of Object.entries(format)) {
 		const goal = has_source_type(language);
 		api[`format_${language}`] = (source, options) =>
-			format_language(source, read_options(options, 'format', false, goal).source_type);
+			format_language(
+				read_source(source, 'format'),
+				read_options(options, 'format', false, goal).source_type
+			);
 	}
 	return api;
 }

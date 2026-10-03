@@ -9,6 +9,9 @@ default = ["convert"]
 # The wire-JSON conversion layer (`ast/convert/write.rs`). Forwards to
 # tsv_ts/tsv_css because the writer composes their embedded emitters.
 convert = ["tsv_lang/json", "tsv_ts/convert", "tsv_css/convert"]
+# The loc-bearing wire (`convert_ast_json_bytes_with_locations`) — see `tsv_lang`'s
+# `locations` feature. Off in every binding.
+locations = ["convert", "tsv_lang/locations", "tsv_ts/locations", "tsv_css/locations"]
 # Opt-in print-once comment ledger (`tsv_lang::comment_ledger`): the format entry points
 # register `Root.comments`, the four JS-comment doc builders record each emit, and the
 # format-ignore seams (raw `<script>`/`<style>`, the template node + range forms) record

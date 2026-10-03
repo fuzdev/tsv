@@ -155,9 +155,9 @@ export class WasmImplementation extends BaseImplementation {
 		// The guard above asks what a SUCCESS returns; this asks what a REFUSAL does.
 		assert_binding_reports_rejection('tsv (WASM)', this);
 
-		// The parse wire is span-only — prove this bundle emits it, so one built before
-		// the bindings went span-only (whose `parse_<lang>` took an options bag and
-		// returned the loc-bearing wire) can't be timed under the span rows' label. The
+		// The parse wire is span-only — prove this bundle emits it, so a stale one whose
+		// `parse_<lang>` still returns the loc-bearing wire can't be timed under the span
+		// rows' label. The
 		// freshness guard refuses such a bundle unless `BENCH_STALE_OK=1`; this is what
 		// still stands then — see `lib/locations_probe.ts`.
 		assert_binding_emits_span_only(

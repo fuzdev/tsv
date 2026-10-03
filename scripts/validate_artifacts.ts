@@ -39,6 +39,7 @@ import {
 	type WasmVariant
 } from '../benches/js/lib/tsv_artifacts.ts';
 import { assert_staged_fresh, type StagedCheck } from './check_staged_freshness.ts';
+import { facade_sources } from './npm_facade.ts';
 import { format_size } from './size.ts';
 
 let passed = 0;
@@ -131,7 +132,7 @@ for (const target of TARGETS) {
 				label: `${variant}/npm package entries`,
 				staged: repo_rel(`${wasm_bundle_dir(variant, 'npm')}/index.js`),
 				crates: [],
-				files: ['scripts/patch_npm_package.ts', 'scripts/npm_metadata.ts'],
+				files: ['scripts/patch_npm_package.ts', 'scripts/npm_facade.ts', 'scripts/npm_metadata.ts'],
 				rebuild
 			});
 			// The facade every entry imports is COPIED in, so its sources are the
@@ -140,18 +141,7 @@ for (const target of TARGETS) {
 				label: `${variant}/npm facade`,
 				staged: repo_rel(`${wasm_bundle_dir(variant, 'npm')}/api.js`),
 				crates: [],
-				files: [
-					'crates/tsv_wasm/npm/api.js',
-					'crates/tsv_wasm/npm/api.d.ts',
-					...(variant === 'format'
-						? []
-						: [
-								'crates/tsv_wasm/npm/api_parse.js',
-								'crates/tsv_wasm/npm/api_parse.d.ts',
-								'crates/tsv_wasm/npm/locations.js',
-								'crates/tsv_wasm/npm/locations.d.ts'
-							])
-				],
+				files: [...facade_sources(variant !== 'format'), 'scripts/npm_facade.ts'],
 				rebuild
 			});
 		}

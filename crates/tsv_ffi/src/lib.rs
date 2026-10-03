@@ -354,7 +354,7 @@ macro_rules! lang_bindings {
     ) => {
         /// Parse source code and return the span-only JSON AST — `start`/`end` offsets,
         /// no per-node `loc` (Svelte also no `name_loc`): the language crate's
-        /// `convert_ast_json_bytes_no_locations`, the one wire every binding emits.
+        /// `convert_ast_json_bytes`, the one wire every binding emits.
         ///
         /// # Safety
         /// See the module-level safety contract.
@@ -375,13 +375,7 @@ macro_rules! lang_bindings {
                     // names the default the decoder already applied.
                     let goal = ffi_source_type(source_type, goal_allowed!($goalness), false)?
                         .unwrap_or(tsv_ts::Goal::Module);
-                    parse_convert!(
-                        $goalness,
-                        $lang,
-                        convert_ast_json_bytes_no_locations,
-                        source,
-                        goal
-                    )
+                    parse_convert!($goalness, $lang, convert_ast_json_bytes, source, goal)
                 })
             }
         }

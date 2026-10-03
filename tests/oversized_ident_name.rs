@@ -56,10 +56,13 @@ fn assert_name_survives(name: &str) {
         // A name of ASCII letters or `é` is written to the wire as its own bytes.
         let field = format!("\"name\":\"{name}\"");
         for (variant, bytes) in [
-            ("default", tsv_ts::convert_ast_json_bytes(&program, &source)),
             (
-                "no-locations",
-                tsv_ts::convert_ast_json_bytes_no_locations(&program, &source),
+                "loc",
+                tsv_ts::convert_ast_json_bytes_with_locations(&program, &source),
+            ),
+            (
+                "span-only",
+                tsv_ts::convert_ast_json_bytes(&program, &source),
             ),
         ] {
             let wire = String::from_utf8(bytes).expect("the wire is UTF-8");

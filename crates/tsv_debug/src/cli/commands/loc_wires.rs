@@ -47,7 +47,7 @@
 //! axis, as every binding refuses it), answered by exactly one line on stdout, flushed
 //! before the next request is read:
 //!
-//! - `{"loc": <wire>}` — the language crate's `convert_ast_json_bytes`, verbatim;
+//! - `{"loc": <wire>}` — the language crate's `convert_ast_json_bytes_with_locations`, verbatim;
 //! - `{"error": "<message>"}` — tsv rejected the source, the parse error's message
 //!   exactly as `tsv_ffi` renders it;
 //! - `{"panic": "<payload>"}` — tsv panicked. Each request runs under `catch_unwind`
@@ -197,18 +197,18 @@ fn record(path: &Path, input_type: InputType, goal: tsv_ts::Goal) -> Result<Vec<
     let (language, loc, span) = match &parsed {
         ParsedInput::Svelte(ast) => (
             "svelte",
+            tsv_svelte::convert_ast_json_bytes_with_locations(ast, &source),
             tsv_svelte::convert_ast_json_bytes(ast, &source),
-            tsv_svelte::convert_ast_json_bytes_no_locations(ast, &source),
         ),
         ParsedInput::Ts(ast) => (
             "typescript",
+            tsv_ts::convert_ast_json_bytes_with_locations(ast, &source),
             tsv_ts::convert_ast_json_bytes(ast, &source),
-            tsv_ts::convert_ast_json_bytes_no_locations(ast, &source),
         ),
         ParsedInput::Css(ast) => (
             "css",
+            tsv_css::convert_ast_json_bytes_with_locations(ast, &source),
             tsv_css::convert_ast_json_bytes(ast, &source),
-            tsv_css::convert_ast_json_bytes_no_locations(ast, &source),
         ),
     };
     let mut line = Vec::with_capacity(loc.len() + span.len() + source.len() + 64);
@@ -234,10 +234,31 @@ fn json_string(s: &str) -> String {
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct WireRequest {
-    language: String,
+    language: WireLanguage,
     #[serde(default)]
     goal: Option<String>,
     source: String,
+}
+
+/// A request's language, as the corpus tools name it — an unknown one is a malformed
+/// request.
+#[derive(serde::Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "lowercase")]
+enum WireLanguage {
+    Svelte,
+    Typescript,
+    Css,
+}
+
+impl WireLanguage {
+    /// The language as a request spells it.
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Svelte => "svelte",
+            Self::Typescript => "typescript",
+            Self::Css => "css",
+        }
+    }
 }
 
 /// Answer loc-wire requests until stdin closes (module doc §`--stdin`).
@@ -280,46 +301,39 @@ fn serve_requests() -> Result<(), CliError> {
 }
 
 /// The reply line for one request — `Err` only for a request no binding would accept
-/// (an unknown language or goal, a goal on a goalless language).
+/// (an unknown goal, a goal on a goalless language).
 fn answer(request: &WireRequest, arena: &mut bumpalo::Bump) -> Result<Vec<u8>, String> {
-    // the language first: a goal on an unknown one is a bad language, not a goalless one
-    if !matches!(request.language.as_str(), "svelte" | "typescript" | "css") {
-        return Err(format!(
-            "unknown language {:?} in a loc_wires request",
-            request.language
-        ));
-    }
+    let language = request.language;
     let goal = match request.goal.as_deref() {
         None => tsv_ts::Goal::Module,
-        Some(goal) if request.language == "typescript" => tsv_ts::Goal::from_source_type(goal)
+        Some(goal) if language == WireLanguage::Typescript => tsv_ts::Goal::from_source_type(goal)
             .ok_or_else(|| format!("unknown goal {goal:?} in a loc_wires request"))?,
         Some(goal) => {
             return Err(format!(
                 "goal {goal:?} on {:?}, which has no goal axis",
-                request.language
+                language.name()
             ));
         }
     };
     arena.reset();
     let source = request.source.as_str();
-    let language = request.language.as_str();
     let parsed = {
         let arena: &bumpalo::Bump = arena;
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(
             || -> Result<Vec<u8>, String> {
                 Ok(match language {
-                    "svelte" => {
+                    WireLanguage::Svelte => {
                         let ast = tsv_svelte::parse(source, arena).map_err(|e| e.to_string())?;
-                        tsv_svelte::convert_ast_json_bytes(&ast, source)
+                        tsv_svelte::convert_ast_json_bytes_with_locations(&ast, source)
                     }
-                    "typescript" => {
+                    WireLanguage::Typescript => {
                         let ast = tsv_ts::parse_with_goal(source, goal, arena)
                             .map_err(|e| e.to_string())?;
-                        tsv_ts::convert_ast_json_bytes(&ast, source)
+                        tsv_ts::convert_ast_json_bytes_with_locations(&ast, source)
                     }
-                    _ => {
+                    WireLanguage::Css => {
                         let ast = tsv_css::parse(source, arena).map_err(|e| e.to_string())?;
-                        tsv_css::convert_ast_json_bytes(&ast, source)
+                        tsv_css::convert_ast_json_bytes_with_locations(&ast, source)
                     }
                 })
             },
@@ -337,12 +351,8 @@ fn answer(request: &WireRequest, arena: &mut bumpalo::Bump) -> Result<Vec<u8>, S
         Err(payload) => {
             // a panicked parse may leave the arena mid-allocation; start the next one fresh
             *arena = bumpalo::Bump::new();
-            let message = payload
-                .downcast_ref::<&str>()
-                .map(|s| (*s).to_owned())
-                .or_else(|| payload.downcast_ref::<String>().cloned())
-                .unwrap_or_else(|| "<unknown>".to_owned());
-            format!("{{\"panic\":{}}}", json_string(&message)).into_bytes()
+            let message = crate::audit::panic_hook::panic_message(payload.as_ref());
+            format!("{{\"panic\":{}}}", json_string(message)).into_bytes()
         }
     })
 }

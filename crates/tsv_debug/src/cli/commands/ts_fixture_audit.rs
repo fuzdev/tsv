@@ -65,7 +65,7 @@ const INTENTIONAL_TS: &[(&str, &str)] = &[
     ),
     (
         "typescript/syntax/unicode_offsets",
-        "pins byte→UTF-16 offset translation on the standalone tsv_ts JSON path (convert_ast_json_string's multibyte branch) — embedding in .svelte would route through tsv_svelte's convert instead",
+        "pins byte→UTF-16 offset translation on the standalone tsv_ts JSON path (convert_ast_json_bytes's multibyte branch) — embedding in .svelte would route through tsv_svelte's convert instead",
     ),
     (
         "typescript/syntax/unicode_line_terminators",

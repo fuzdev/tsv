@@ -102,6 +102,7 @@ import {
 import {
 	get_alternative_versions,
 	get_benchmark_tasks,
+	get_defined_cells,
 	get_defined_rows,
 	init_implementations,
 	type UnavailableImpl,
@@ -301,7 +302,7 @@ const BENCH_WARMUP = env_int('BENCH_WARMUP') ?? 3;
  * fast-row drift −1.9% → −0.7…−1.0%) while bun's json and yuku rows still read
  * −6…−9% — a synthetic JSON.parse loop shows none of it, so it is the per-file
  * JS paths tiering, not the heap — and at 5 s the same rows read −0.2…+0.7%
- * (`parse/css/tsv-json` −9.0% → −0.2%). One floor on every runtime, since a
+ * (a CSS parse row: −9.0% → −0.2%). One floor on every runtime, since a
  * per-runtime warmup would be a second protocol on the rows this bench compares
  * across runtimes; the price is ~2.5 min of wall per runtime on the rows whose
  * three sweeps fall short of it, and the multi-second rows are unchanged.
@@ -831,12 +832,7 @@ if (uncompared_rows.length > 0) {
 // only as "unknown" — and an `Nx` it renders from that row then carries no word on
 // whether the two products match.
 const untiered_rows = rows_missing_from_payload_tiers(
-	LANGUAGES.flatMap((language) =>
-		get_benchmark_tasks(impls.complete, 'parse', language, TASK_OPTIONS).map((task) => ({
-			name: task.name,
-			language
-		}))
-	)
+	get_defined_cells(impls, 'parse', TASK_OPTIONS)
 );
 if (untiered_rows.length > 0) {
 	log(

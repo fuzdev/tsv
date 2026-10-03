@@ -206,9 +206,9 @@ edition.workspace = true
 
 [dependencies]
 tsv_lang.workspace = true
-tsv_ts = { workspace = true, features = ["convert"] }
-tsv_css = { workspace = true, features = ["convert"] }
-tsv_svelte = { workspace = true, features = ["convert"] }
+tsv_ts = { workspace = true, features = ["convert", "locations"] }
+tsv_css = { workspace = true, features = ["convert", "locations"] }
+tsv_svelte = { workspace = true, features = ["convert", "locations"] }
 serde_json.workspace = true
 
 [dev-dependencies]

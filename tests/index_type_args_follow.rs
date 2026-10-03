@@ -56,11 +56,7 @@ fn expression_kinds(source: &str) -> Vec<String> {
                     }
                     out.push(kind.to_owned());
                 }
-                for (key, child) in map {
-                    if key != "loc" {
-                        walk(child, out);
-                    }
-                }
+                map.values().for_each(|child| walk(child, out));
             }
             Value::Array(items) => items.iter().for_each(|item| walk(item, out)),
             _ => {}

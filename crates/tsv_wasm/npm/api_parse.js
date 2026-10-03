@@ -14,7 +14,7 @@
  * `locations.js`, never loads one.
  */
 
-import { has_source_type, read_options } from './api.js';
+import { has_source_type, read_options, read_source } from './api.js';
 import { reconstruct_locations } from './locations.js';
 
 /**
@@ -42,12 +42,16 @@ export function create_parse_api(engine) {
 			engine.parse?.[language] ??
 			((source, source_type) => JSON.parse(parse_json(source, source_type)));
 		api[`parse_${language}`] = (source, options) => {
+			const text = read_source(source, 'parse');
 			const opts = read_options(options, 'parse', true, goal);
-			const ast = parse(source, opts.source_type);
-			return opts.locations ? reconstruct_locations(ast, source, { language }) : ast;
+			const ast = parse(text, opts.source_type);
+			return opts.locations ? reconstruct_locations(ast, text, { language }) : ast;
 		};
 		api[`parse_${language}_json`] = (source, options) =>
-			parse_json(source, read_options(options, 'parse', false, goal).source_type);
+			parse_json(
+				read_source(source, 'parse'),
+				read_options(options, 'parse', false, goal).source_type
+			);
 	}
 	return api;
 }

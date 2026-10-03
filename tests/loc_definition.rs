@@ -20,6 +20,9 @@
 //! (`on:click|once`), which Svelte's reader stops at whitespace or one of `=` `/` `>` `"`
 //! `'`.
 //!
+//! And the span-only wire — the one every binding ships — is the loc wire with every
+//! `loc` / `name_loc` removed and nothing else, byte for byte (`span_wire_difference`).
+//!
 //! The reference here is the test's own — its own line-start scan over the document's
 //! UTF-16 units — so it shares nothing with `tsv_lang`'s line table. It walks every fixture
 //! input in the tree, then the inputs no fixture can hold: a line terminator other than LF
@@ -296,42 +299,104 @@ fn check_name_loc(
     }
 }
 
-/// The loc wire of `source` parsed as `input_type`, with its reference.
-fn wire_and_reference(
+/// Both wires of `source` parsed as `input_type` — the loc wire as a tree, the span-only
+/// wire as its bytes — with the loc wire's reference.
+fn wires_and_reference(
     source: &str,
     input_type: InputType,
     goal: tsv_ts::Goal,
-) -> (Value, Reference) {
+) -> (Value, Vec<u8>, Reference) {
     let arena = bumpalo::Bump::new();
-    match input_type {
+    let (loc, span, rule, elide_bom) = match input_type {
         InputType::Svelte => {
             let ast = tsv_svelte::parse(source, &arena).expect("Svelte input parses");
             (
-                tsv_debug::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&ast, source)),
-                Reference::new(source, LineRule::Lf, true),
+                tsv_svelte::convert_ast_json_bytes_with_locations(&ast, source),
+                tsv_svelte::convert_ast_json_bytes(&ast, source),
+                LineRule::Lf,
+                true,
             )
         }
         InputType::TypeScript | InputType::SvelteTs => {
             let ast = tsv_ts::parse_with_goal(source, goal, &arena).expect("TS input parses");
             (
-                tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&ast, source)),
-                Reference::new(source, LineRule::Ecmascript, false),
+                tsv_ts::convert_ast_json_bytes_with_locations(&ast, source),
+                tsv_ts::convert_ast_json_bytes(&ast, source),
+                LineRule::Ecmascript,
+                false,
             )
         }
         InputType::Css => {
             let ast = tsv_css::parse(source, &arena).expect("CSS input parses");
             (
-                tsv_debug::json::wire_value(&tsv_css::convert_ast_json_bytes(&ast, source)),
-                Reference::new(source, LineRule::Lf, true),
+                tsv_css::convert_ast_json_bytes_with_locations(&ast, source),
+                tsv_css::convert_ast_json_bytes(&ast, source),
+                LineRule::Lf,
+                true,
             )
         }
+    };
+    (
+        tsv_debug::json::wire_value(&loc),
+        span,
+        Reference::new(source, rule, elide_bom),
+    )
+}
+
+/// Remove every `loc` and `name_loc` key — the exact set the span-only wire omits
+/// (`character` lives inside both). `shift_remove`, not `remove`: under `preserve_order`
+/// the latter is a `swap_remove`, which moves the object's last key into the hole.
+fn strip_locations(value: &mut Value) {
+    match value {
+        Value::Object(map) => {
+            map.shift_remove("loc");
+            map.shift_remove("name_loc");
+            for child in map.values_mut() {
+                strip_locations(child);
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                strip_locations(item);
+            }
+        }
+        _ => {}
     }
+}
+
+/// The span-only wire must be the loc wire with every `loc` / `name_loc` removed and
+/// nothing else, byte for byte: so the two wires agree on every `type` / `start` / `end`
+/// and payload, in the same key order, and the fixtures' grade of the span-only wire
+/// against the canonical parsers carries over to the loc wire. Bytes, not `Value`s —
+/// `serde_json`'s `Map` equality ignores key order even under `preserve_order` — and the
+/// re-serialization is exact (`preserve_order` keeps the writer's key order,
+/// `arbitrary_precision` each number token, and the writer's string escaper is graded
+/// byte-for-byte against `serde_json`'s). Strips `loc_wire` in place; returns where the
+/// two first differ.
+fn span_wire_difference(loc_wire: &mut Value, span: &[u8]) -> Option<String> {
+    strip_locations(loc_wire);
+    let stripped = serde_json::to_string(loc_wire).expect("a parsed wire re-serializes");
+    let at = stripped
+        .bytes()
+        .zip(span)
+        .position(|(a, &b)| a != b)
+        .or_else(|| (stripped.len() != span.len()).then(|| stripped.len().min(span.len())))?;
+    let context = |text: &[u8]| {
+        String::from_utf8_lossy(&text[at.saturating_sub(40)..(at + 40).min(text.len())])
+            .into_owned()
+    };
+    Some(format!(
+        "span-only wire != the loc wire stripped, at byte {at}:\n    stripped  …{}…\n    span-only …{}…",
+        context(stripped.as_bytes()),
+        context(span)
+    ))
 }
 
 /// Grade one document, panicking with the first violations.
 fn assert_definition(source: &str, input_type: InputType) -> Value {
-    let (wire, reference) = wire_and_reference(source, input_type, tsv_ts::Goal::Module);
-    let found = violations(&wire, &reference);
+    let (wire, span, reference) = wires_and_reference(source, input_type, tsv_ts::Goal::Module);
+    let mut found = violations(&wire, &reference);
+    found.extend(span_wire_difference(&mut wire.clone(), &span));
     assert!(
         found.is_empty(),
         "{input_type:?} {source:?} breaks the loc definition:\n{}",
@@ -394,8 +459,9 @@ fn every_fixture_input_follows_the_definition() {
         }
         let input_type = fixture.input_type();
         let source = fixtures::read_file(&fixture.input_path()).expect("read the input");
-        let (wire, reference) = wire_and_reference(&source, input_type, fixture.goal());
-        let found = violations(&wire, &reference);
+        let (mut wire, span, reference) = wires_and_reference(&source, input_type, fixture.goal());
+        let mut found = violations(&wire, &reference);
+        found.extend(span_wire_difference(&mut wire, &span));
         if !found.is_empty() {
             failures.push(format!(
                 "{}:\n  {}",

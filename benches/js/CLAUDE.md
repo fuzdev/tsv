@@ -319,7 +319,7 @@ deno task corpus:compare:format:run --all --json 2>/dev/null > report.json
 Deep-diff tsv's parse output against the canonical parsers
 (acorn-typescript / `svelte.parse` / `parseCss`) — the parser-side sibling of the
 formatting comparison. The shipped span-only wire comes from the native FFI by design:
-the WASM artifact rides the same Rust wire (`convert_ast_json_string_no_locations`),
+the WASM artifact rides the same Rust wire (`convert_ast_json_string`),
 differing only at the boundary, and is already exercised per-file by the bench
 preflight and `deno task smoke`. The `loc`-bearing wire ships through no binding, so
 the loc arm asks one `target/corpus/tsv_debug loc_wires --stdin` process for it
@@ -349,11 +349,11 @@ deno task corpus:compare:parse tests/fixtures --fixtures # each fixture's parse-
 # row (the other rows fire there too, on the base file's own shapes) and the family grades
 # the SPAN arm (plus the definition check) on inputs no fixture and no real repo can reach.
 # They differ in COVERAGE because they differ in site density: ws is a CENSUS
-# (--inject-limit 0, ~11k sites, ~17 s); terminators is a 5.9% strided SAMPLE of ~629k sites
-# (a census there is ~9 min). Only a census is gradeable — a sample's stride divisor is the
-# file's own site count, so a fixture edit redraws it (measured: one unrelated one-line edit
-# retired 12 of terminators' 194 finding signatures with every bug intact).
-# ⚠️ RED BY DESIGN, a discovery tool like compile:fuzz.
+# (--inject-limit 0, every head site); terminators, document-wide, is a strided SAMPLE. Only a
+# census is gradeable — a sample's stride divisor is the file's own site count, so a fixture
+# edit redraws it (measured: one unrelated one-line edit retired 12 of terminators' 194
+# finding signatures with every bug intact). ws is green; terminators is ⚠️ RED BY DESIGN, a
+# discovery tool like compile:fuzz.
 # Full reference: ../../docs/audits.md §Wire-Injection
 deno task wire:audit
 deno task wire:audit:terminators
@@ -388,21 +388,22 @@ tables.
   oracle that drops `loc` from a node it used to carry fails rather than reading as
   superset; the pin is a "may only contain" set, since no single run meets every kind. A
   superset `loc` is a difference for TypeScript. And a differing line or column is a
-  finding unless one of the **six tolerance rows** claims it (`lib/loc_tolerance.ts`,
+  finding unless one of the **tolerance rows** claims it (`lib/loc_tolerance.ts`,
   Svelte only — TypeScript `loc` is exact against acorn). The rows are Svelte's own `loc`
   departures from the definition, each cataloged in `docs/conformance_svelte.md` and each
   recognized by structure — a block-binding slot, the `_ as ` window before its colon, a
   lone terminator ahead of the position, the `<script>` program, the typed destructure's
-  `end`, the `{#each}` expression — and by a value Svelte's model gives: exactly for rows
-  1, 2, 4 and 5; for row 6 the end of the `as` type its acorn read swallowed; for row 3 the
-  exact count inside a `<script>` and a band in a template island (a line one off inside
-  the band is the deliberate residual). Every row also requires tsv's own value to be the
+  `end`, the `{#each}` expression — and by a value Svelte's model gives: exactly for
+  `destructure_column`, `annotation_swallow`, `program_at_tag` and `typed_destructure_end`;
+  for `each_as_stale_loc` the end of the `as` type its acorn read swallowed; for
+  `two_line_classes` the exact count inside a `<script>` and a band in a template island (a
+  line one off inside the band is the deliberate residual). Every row also requires tsv's own value to be the
   definition's, and each is mutation-tested in `lib/loc_tolerance_test.ts` (a `test:deno`
   leg). A tolerated row neither fills the per-file diff cap nor stores an entry: it is
   counted, per row (files and sites), in the summary and in `--json` as `loc_arm.rows`,
   beside `loc_arm.superset` / `loc_arm.superset_kinds`, `loc_arm.span_skipped` (halves) and
   the definition check's `checked` / `violations`. An unclassified `loc` difference is an
-  undocumented group and fails the run — a seventh row is a bug.
+  undocumented group and fails the run — a bug until a named row claims it.
 
   ⚠️ **`--fixtures`' `fixture_declared_divergence` reaches the whole document.** A
   `_svelte_divergence` fixture's input whose two parses still equal its committed
@@ -412,7 +413,7 @@ tables.
   as it does to `fixtures:validate`, which compares tsv against that same pin.
 - **The span-only arm** grades tsv's shipped span-only wire (the FFI's parse export) in
   every language: per file, it is deep-diffed against the oracle's output with every `loc`
-  and `name_loc` key removed — the definition `tests/no_locations.rs` encodes, and the whole
+  and `name_loc` key removed — the definition `tests/loc_definition.rs` encodes, and the whole
   of what that wire drops (the `character` field Svelte writes lives inside one of those).
   It reuses the diff engine and `DOCUMENTED_MATCHERS` unchanged, so a span difference the
   loc arm excuses is excused identically; an undocumented span-only group fails the run,
@@ -438,10 +439,11 @@ input whose two parses still equal its committed `expected_ours.json` /
 file's, and the moment either parse drifts from its pin every difference grades. Takes
 neither `--all` nor `--inject*`.
 
-The documented-divergence matchers live in `corpus_compare_parse.ts`
-(`DOCUMENTED_MATCHERS`) and cover only the AST-content divergences that parse on
-both sides (comment-attachment duplication, async-generic-arrow params); the
-parser-feature corrections (`using`, v-flag regex, CSS namespaces) make the
+The documented-divergence matchers live in `lib/parse_divergences.ts`
+(`DOCUMENTED_MATCHERS`, each naming its `docs/conformance_svelte.md` section — a
+`test:deno` leg, `parse_divergences_test.ts`, checks every named section exists) and cover
+only the AST-content divergences that parse on both sides; the parser-feature
+corrections (`using`, v-flag regex, CSS namespaces) make the
 canonical parser throw, so they land in the error buckets. When triage confirms a
 new group is intentional, add a matcher AND catalog it in
 `docs/conformance_svelte.md`.
@@ -450,8 +452,9 @@ new group is intentional, add a matcher AND catalog it in
 
 Three gates run tsv's parsers against an upstream suite. All three share one shape —
 **verdict parity** (enforced) plus **AST-shape** deep-diff (report-only, via the
-SHARED `corpus_compare_parse.ts` engine: `diff_asts` + `DOCUMENTED_MATCHERS`, which
-is `import.meta.main`-guarded so importing it doesn't run the CLI). The shape half grades
+SHARED engine `corpus_compare_parse.ts` grades with: `lib/parse_diff.ts`'s `diff_asts` +
+`lib/parse_divergences.ts`'s `DOCUMENTED_MATCHERS`, both node-modules-free and unit-tested
+in `test:deno`). The shape half grades
 tsv's shipped span-only wire against the oracle with its `loc` / `name_loc` stripped
 (`lib/span_only.ts`), as `corpus:compare:parse`'s span-only arm does; `loc` is that
 tool's loc arm's to grade. All accept `-v`,
@@ -665,7 +668,8 @@ deno task test:deno:canonical
 # walks transitive imports, so `typecheck:scripts` already covers the loader/guard core
 # through scripts/'s own graph (check_artifact_freshness, ffi, napi, tsv_artifacts,
 # runtime, types, reject_probe, locations_probe) and `test:deno` covers gate_counts. `typecheck:bench-core`
-# names the orphans nothing else reaches — `lib/wasm.ts`, `lib/harvest_stamp.ts` and
+# names the orphans nothing else reaches — `lib/wasm.ts`, `lib/harvest_stamp.ts`,
+# `lib/loc_wire_client.ts`, `lib/fixture_documents.ts`, `lib/error_text.ts` and
 # `compose_reports.ts`. It is deliberately NOT the maximal checkable set: the impl
 # wrappers also check on a bare checkout, but only because their npm imports are
 # dynamic, and gating them would impose that import style on modules whose job is
@@ -760,8 +764,8 @@ BENCH_ALLOW_MISSING=1   # tolerate a partial corpus
 
 `deno task bench` regenerates EVERY committed artifact the site consumes, reusing
 the node artifacts the perf half just built for the coverage run. It FAILS FAST if
-node or bun isn't installed — `bench:runtimes` preflights `bench:perf`, ahead of the
-~8 minutes it would otherwise take to discover the miss (by which point two of the
+node or bun isn't installed — `bench:runtimes` preflights `bench:perf`, rather than
+discovering the miss only after the legs ahead of it have run (by which point two of the
 three siblings have been regenerated and `bench:compose` skipped, leaving the
 committed combined report stale against fresh siblings). ⚠️ Its node arm asks what
 the binary IS, not whether the name resolves: `deno task` prepends its node-compat
@@ -1147,8 +1151,8 @@ stale or missing. The build-first tasks rebuild first, so they pass for free.
 stays fatal); see the module doc for why stale is a hard error by default.
 
 **Behind the override: the span-only wire is probed at init.** An mtime can only
-say an artifact is old, not what it does, and a binding built before the bindings went
-span-only still returns the loc-bearing wire from `parse_<lang>` — under
+say an artifact is old, not what it does, and a stale binding whose `parse_<lang>` still
+returns the loc-bearing wire would pass it — under
 `BENCH_STALE_OK=1` the span rows would time it under the span-only label, and the
 `+reconstruct` rows would rebuild `loc` over a tree that already had it. So each tsv
 binding's `init()` parses a fixed source per language through the row's own call and
@@ -1507,8 +1511,13 @@ benches/js/
     │                      # collection, git-detected for any other checkout — so the report's
     │                      # source links pin to the measured code
     ├── diff.ts            # Line-based diff utilities (LCS algorithm)
+    ├── diff_path.ts       # `get_at_path`: a diff's concrete path back to the canonical node it
+    │                      # names (the parse matchers and the loc tolerance rows both read it)
     ├── dprint.ts          # dprint WASM wrapper (TypeScript/JS only; the engine `deno fmt` runs)
+    ├── error_text.ts      # `first_line`: a thrown value's message, first line only (node-modules-free)
     ├── ffi.ts             # Deno.dlopen bindings (NativeImplementation — Deno native)
+    ├── fixture_documents.ts # The parse claims a fixture tree commits — what `corpus:compare:parse
+    │                      # --fixtures` grades (node-modules-free)
     ├── fixtures_gate.ts   # Shared per-language parse-conformance gate engine
     ├── format_config_probe.ts # Behavioral "did the pinned layout config LAND" check —
     │                      # one probe source + grading arm PER LANGUAGE, shared by prettier
@@ -1520,8 +1529,8 @@ benches/js/
     ├── loc_cross_grade.ts # The `loc` cross-grade: tsv's loc wire vs the shipped `locations.js`
     │                      # reconstruction of its span-only wire (node-modules-free; shared by
     │                      # `scripts/check_loc.ts` and corpus_compare_parse's definition check)
-    ├── loc_tolerance.ts   # The loc arm's six tolerance rows — Svelte's own `loc` departures from
-    │                      # the definition, recognized by structure (a seventh fails the run) —
+    ├── loc_tolerance.ts   # The loc arm's tolerance rows — Svelte's own `loc` departures from
+    │                      # the definition, recognized by structure (any other fails the run) —
     │                      # and its pinned superset kinds; mutation-tested by loc_tolerance_test.ts
     ├── loc_wire_client.ts # The loc arm's loc-bearing wire, asked of one `tsv_debug loc_wires
     │                      # --stdin` process (NDJSON, per-request panic catching) — the wire no
@@ -1534,6 +1543,12 @@ benches/js/
     ├── napi.ts            # process.dlopen bindings (NapiImplementation — Node/Bun native)
     ├── oxc.ts             # OXC native wrappers (oxc-parser + oxfmt)
     ├── oxc_wasm.ts        # OXC WASM wrapper (oxc-parser via wasm32-wasi; per-runtime entry)
+    ├── parse_diff.ts      # The parse-comparison diff engine (`diff_asts`): raw deep diff, then
+    │                      # classification at the reporting layer (shared by corpus_compare_parse
+    │                      # and fixtures_gate; node-modules-free, unit-tested by parse_diff_test.ts)
+    ├── parse_divergences.ts # The documented parse divergences (`DOCUMENTED_MATCHERS`, each naming
+    │                      # its docs/conformance_svelte.md section); unit-tested by
+    │                      # parse_divergences_test.ts
     ├── parse_sanctions.ts # Shared parse-parity vocabulary: Sanction (keep) + KnownGap (fix)
     ├── perf_omit.ts       # PERF_OMITS — the only excused per-file failures on the perf view, each
     │                      # typed by WHY the tool fails (`category`) — plus the per-group
@@ -1661,7 +1676,7 @@ internal state), the coverage report and skip counts make it visible without
 - **Parse benchmark overhead**: JSON materialization, not parsing, dominates the
   `-json` rows (see `results/report.<runtime>.md` for current ratios). Use
   `tsv-internal` for raw parse speed. Both the native and WASM rows go through
-  `convert_ast_json_string_no_locations` — the span-only wire-JSON writer emitting directly from the
+  `convert_ast_json_string` — the span-only wire-JSON writer emitting directly from the
   internal AST in one walk, no intermediate `serde_json::Value` or typed public tree
   ([../../docs/architecture.md §Closed Scope, Open
   Convention](../../docs/architecture.md#closed-scope-open-convention)). They differ

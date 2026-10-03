@@ -58,6 +58,7 @@ import { pathToFileURL } from 'node:url';
 
 import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/tsv_artifacts.ts';
 import { assert_staged_fresh, staged_staleness } from './check_staged_freshness.ts';
+import { FACADE_SOURCE_DIR, facade_files, facade_sources } from './npm_facade.ts';
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
 
 const pkg_root = 'crates/tsv_napi/pkg';
@@ -134,14 +135,10 @@ await assert_staged_fresh([
 			'crates/tsv_napi/npm/index.d.ts',
 			'crates/tsv_napi/npm/platform.js',
 			'crates/tsv_napi/npm/bin.js',
-			'crates/tsv_wasm/npm/api.js',
-			'crates/tsv_wasm/npm/api.d.ts',
-			'crates/tsv_wasm/npm/api_parse.js',
-			'crates/tsv_wasm/npm/api_parse.d.ts',
-			'crates/tsv_wasm/npm/locations.js',
-			'crates/tsv_wasm/npm/locations.d.ts',
+			...facade_sources(true),
 			'crates/tsv_wasm/types/tsv_ast.d.ts',
 			'scripts/build_napi_packages.ts',
+			'scripts/npm_facade.ts',
 			'scripts/npm_metadata.ts'
 		],
 		rebuild: 'deno task build:napi:packages'
@@ -167,7 +164,12 @@ const wasm_parity_staleness = await staged_staleness({
 	label: 'the @fuzdev/tsv-wasm package',
 	staged: wasm_package_index,
 	crates: [...CORE_CRATES, ...WASM_CRATES],
-	files: ['scripts/patch_npm_package.ts', 'scripts/npm_metadata.ts', 'deno.json'],
+	files: [
+		'scripts/patch_npm_package.ts',
+		'scripts/npm_facade.ts',
+		'scripts/npm_metadata.ts',
+		'deno.json'
+	],
 	rebuild: 'deno task build:npm:all'
 });
 const wasm_parity_skip: string | false = wasm_parity_staleness
@@ -463,56 +465,36 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		);
 	});
 
-	it('option bags carry the wasm package error semantics, string for string', () => {
-		// Unknown keys error whatever their value — undefined included.
+	// The bag's full refusal set is graded word for word over a fake engine
+	// (`scripts/npm_api_test.ts`, gated in `check`); the loader ships that facade verbatim
+	// (next test). What is left to prove here is that the loader routes through it: one
+	// refusal per export family, the forwarding idiom over the real engine, and the
+	// non-string refusal the engines would otherwise each spell their own way.
+	it('the loader routes through the shared facade', () => {
 		throws_with(
 			() => api.parse_typescript('const x = 1;', { locatons: false }),
 			"unknown parse option 'locatons' (expected 'locations' or 'sourceType')"
 		);
 		throws_with(
-			() => api.parse_typescript('const x = 1;', { locatons: undefined }),
-			"unknown parse option 'locatons'"
+			() => api.parse_css_json('a{}', { locations: false }),
+			"unknown parse option 'locations' (this export takes no options)"
 		);
-		// The TS-only sourceType on other languages: a SET value throws, undefined forwards.
-		throws_with(
-			() => api.parse_svelte('<div>x</div>', { sourceType: 'script' }),
-			"parse option 'sourceType' is only supported for TypeScript"
-		);
-		assert.equal(api.parse_svelte('<div>x</div>', { sourceType: undefined }).type, 'Root');
 		throws_with(
 			() => api.format_css('a{}', { sourceType: 'script' }),
 			"format option 'sourceType' is only supported for TypeScript"
 		);
-		// `locations` shapes a parse wire; format emits none — unknown key there.
-		throws_with(
-			() => api.format_typescript('const x = 1;', { locations: false }),
-			"unknown format option 'locations' (expected 'sourceType')"
-		);
-		throws_with(
-			() => api.format_css('a{}', { locations: false }),
-			"unknown format option 'locations' (this export takes no options)"
-		);
-		// Non-object bags error, arrays included (`sources.map(format_typescript)`).
-		throws_with(
-			() => api.format_typescript('const x = 1;', ['script']),
-			'format options must be an object'
-		);
-		throws_with(() => api.parse_typescript('const x = 1;', 7), 'parse options must be an object');
-		// A boolean-typed key rejects non-booleans.
-		throws_with(
-			() => api.parse_typescript('const x = 1;', { locations: 'no' }),
-			"parse option 'locations' must be a boolean"
-		);
-		// The `_json` siblings return the wire string itself, so they take no `locations`
-		// — `loc` is a view over objects.
-		throws_with(
-			() => api.parse_typescript_json('const x = 1;', { locations: false }),
-			"unknown parse option 'locations' (expected 'sourceType')"
-		);
-		throws_with(
-			() => api.parse_css_json('a{}', { locations: false }),
-			"unknown parse option 'locations' (this export takes no options)"
-		);
+		assert.equal(api.parse_svelte('<div>x</div>', { sourceType: undefined }).type, 'Root');
+		throws_with(() => api.format_css(42), 'format source must be a string (got number)');
+	});
+
+	it('the loader ships the shared facade verbatim', () => {
+		for (const file of facade_files(true)) {
+			assert.equal(
+				readFileSync(join(pkg_root, 'napi', file), 'utf8'),
+				readFileSync(join(FACADE_SOURCE_DIR, file), 'utf8'),
+				file
+			);
+		}
 	});
 
 	// The discovery matcher rides the package as a class. The `undefined`

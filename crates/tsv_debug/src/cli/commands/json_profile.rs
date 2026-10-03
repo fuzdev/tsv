@@ -1,12 +1,12 @@
 //! Profile the parse→JSON emission path (the bindings' parse path).
 //!
 //! Every binding's `parse_<lang>` (`tsv_ffi`'s `tsv_parse_<lang>` among them) runs
-//! `parse` + `convert_ast_json_bytes_no_locations` — the span-only wire. This command
+//! `parse` + `convert_ast_json_bytes` — the span-only wire. This command
 //! times those two phases per file across a corpus; `--locations` times the Rust `loc`
-//! emitter instead (`convert_ast_json_bytes`, what `tsv parse --locations` writes). Either
-//! writer walks the internal AST once and emits the final char-space wire JSON directly,
-//! so there are no sub-steps to decompose: just `parse` and `write`. `--json` names the
-//! writer it timed in its `wire` field (`span` / `loc`).
+//! emitter instead (`convert_ast_json_bytes_with_locations`, what `tsv parse --locations`
+//! writes). Either writer walks the internal AST once and emits the final char-space wire
+//! JSON directly, so there are no sub-steps to decompose: just `parse` and `write`.
+//! `--json` names the writer it timed in its `wire` field (`span` / `loc`).
 //!
 //! Run with `--release`; debug-build numbers aren't meaningful.
 
@@ -40,8 +40,8 @@ pub struct JsonProfileCommand {
     #[argh(switch)]
     json: bool,
 
-    /// time the `loc` emitter (`convert_ast_json_bytes`, what `tsv parse --locations`
-    /// writes) instead of the bindings' span-only wire
+    /// time the `loc` emitter (`convert_ast_json_bytes_with_locations`, what
+    /// `tsv parse --locations` writes) instead of the bindings' span-only wire
     #[argh(switch)]
     locations: bool,
 
@@ -150,7 +150,7 @@ fn profile_file(path: &Path, iterations: usize, locations: bool) -> Result<FileR
 }
 
 /// One iteration of the parse path: `parse`, then the span-only writer
-/// (`convert_ast_json_bytes_no_locations`) — or the `loc` emitter (`convert_ast_json_bytes`)
+/// (`convert_ast_json_bytes`) — or the `loc` emitter (`convert_ast_json_bytes_with_locations`)
 /// under `locations`.
 fn profile_once(
     source: &str,
@@ -169,9 +169,9 @@ fn profile_once(
             steps.parse.push(t.elapsed());
             let t = Instant::now();
             let wire = if locations {
-                tsv_ts::convert_ast_json_bytes(&ast, source)
+                tsv_ts::convert_ast_json_bytes_with_locations(&ast, source)
             } else {
-                tsv_ts::convert_ast_json_bytes_no_locations(&ast, source)
+                tsv_ts::convert_ast_json_bytes(&ast, source)
             };
             steps.write.push(t.elapsed());
             wire
@@ -182,9 +182,9 @@ fn profile_once(
             steps.parse.push(t.elapsed());
             let t = Instant::now();
             let wire = if locations {
-                tsv_svelte::convert_ast_json_bytes(&ast, source)
+                tsv_svelte::convert_ast_json_bytes_with_locations(&ast, source)
             } else {
-                tsv_svelte::convert_ast_json_bytes_no_locations(&ast, source)
+                tsv_svelte::convert_ast_json_bytes(&ast, source)
             };
             steps.write.push(t.elapsed());
             wire
@@ -195,9 +195,9 @@ fn profile_once(
             steps.parse.push(t.elapsed());
             let t = Instant::now();
             let wire = if locations {
-                tsv_css::convert_ast_json_bytes(&ast, source)
+                tsv_css::convert_ast_json_bytes_with_locations(&ast, source)
             } else {
-                tsv_css::convert_ast_json_bytes_no_locations(&ast, source)
+                tsv_css::convert_ast_json_bytes(&ast, source)
             };
             steps.write.push(t.elapsed());
             wire
@@ -257,9 +257,9 @@ fn print_report(
     locations: bool,
 ) {
     let writer = if locations {
-        "convert_ast_json_bytes, the loc writer"
+        "convert_ast_json_bytes_with_locations, the loc writer"
     } else {
-        "convert_ast_json_bytes_no_locations, the span-only writer"
+        "convert_ast_json_bytes, the span-only writer"
     };
     for (parser_type, a) in aggregates {
         eprintln!(

@@ -60,8 +60,8 @@ pub fn from_str<T: DeserializeOwned>(s: &str) -> serde_json::Result<T> {
     from_slice(s.as_bytes())
 }
 
-/// The `Value` tree of a wire tsv's own writer emitted (`convert_ast_json_bytes`
-/// and its siblings).
+/// The `Value` tree of a wire tsv's own writer emitted (`convert_ast_json_bytes` and
+/// its siblings).
 ///
 /// This is the one read that may `expect`: with the recursion limit off, the
 /// only way the parse of those bytes fails is malformed JSON, and the writer
@@ -170,8 +170,8 @@ mod tests {
                             continue;
                         };
                         vec![
+                            tsv_ts::convert_ast_json_bytes_with_locations(&ast, &source),
                             tsv_ts::convert_ast_json_bytes(&ast, &source),
-                            tsv_ts::convert_ast_json_bytes_no_locations(&ast, &source),
                         ]
                     }
                     ParserType::Svelte => {
@@ -179,8 +179,8 @@ mod tests {
                             continue;
                         };
                         vec![
+                            tsv_svelte::convert_ast_json_bytes_with_locations(&ast, &source),
                             tsv_svelte::convert_ast_json_bytes(&ast, &source),
-                            tsv_svelte::convert_ast_json_bytes_no_locations(&ast, &source),
                         ]
                     }
                     ParserType::Css => {
@@ -188,8 +188,8 @@ mod tests {
                             continue;
                         };
                         vec![
+                            tsv_css::convert_ast_json_bytes_with_locations(&ast, &source),
                             tsv_css::convert_ast_json_bytes(&ast, &source),
-                            tsv_css::convert_ast_json_bytes_no_locations(&ast, &source),
                         ]
                     }
                 };

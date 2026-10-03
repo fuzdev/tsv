@@ -167,9 +167,9 @@ the `--json` output as `*_us_per_kb` / `*_us_per_file` fields.
 ### 2. `tsv_debug json_profile` — parse→JSON emission timing
 
 Times the two phases of the bindings' parse path (`parse` +
-`convert_ast_json_bytes_no_locations`, the span-only wire every binding ships) per file
-across a corpus; `--locations` times the Rust `loc` emitter (`convert_ast_json_bytes`,
-what `tsv parse --locations` writes) instead. Either writer walks the internal AST once
+`convert_ast_json_bytes`, the span-only wire every binding ships) per file across a
+corpus; `--locations` times the Rust `loc` emitter
+(`convert_ast_json_bytes_with_locations`, what `tsv parse --locations` writes) instead. Either writer walks the internal AST once
 and emits the final char-space wire JSON directly, so there are no sub-steps to decompose
 (per-language pipeline shapes:
 [architecture.md §Closed Scope, Open Convention](./architecture.md#closed-scope-open-convention)).

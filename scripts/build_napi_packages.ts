@@ -32,6 +32,7 @@
 import { parseArgs } from 'node:util';
 
 import { cli_binary_name, host_triple } from './napi_host.ts';
+import { FACADE_SOURCE_DIR, facade_files } from './npm_facade.ts';
 import { NPM_SHARED_METADATA } from './npm_metadata.ts';
 import { format_size } from './size.ts';
 
@@ -112,12 +113,7 @@ for (const [from, to] of [
 	['crates/tsv_wasm/types/tsv_ast.d.ts', 'tsv_ast.d.ts'],
 	// the shared facade every tsv package exports through — one options reader and
 	// one set of error texts with the wasm packages; `index.js` imports both halves
-	['crates/tsv_wasm/npm/api.js', 'api.js'],
-	['crates/tsv_wasm/npm/api.d.ts', 'api.d.ts'],
-	['crates/tsv_wasm/npm/api_parse.js', 'api_parse.js'],
-	['crates/tsv_wasm/npm/api_parse.d.ts', 'api_parse.d.ts'],
-	['crates/tsv_wasm/npm/locations.js', 'locations.js'],
-	['crates/tsv_wasm/npm/locations.d.ts', 'locations.d.ts'],
+	...facade_files(true).map((file) => [`${FACADE_SOURCE_DIR}/${file}`, file]),
 	// the JS CLI — imports its engine from `./index.js`, so the same source
 	// binds to the native loader here and to the wasm engine in
 	// @fuzdev/tsv-wasm (where it IS the bin); here it is bin.js's fallback
@@ -127,32 +123,6 @@ for (const [from, to] of [
 	Deno.copyFileSync(from, `${loader_dir}/${to}`);
 }
 
-// The reconstruction helpers are pure JS over the span-only wire — no wasm, no
-// addon — so the wasm packages' copy ships here verbatim,
-// which is what the ESM loader bought. The re-export is APPENDED to the staged
-// entry rather than written into `npm/index.js`: the source tree has no
-// sibling `locations.js`, and an import that resolves only after staging is a
-// wart an editor would flag. Names are extracted from the helper rather than
-// listed here, so a fourth entry point can't reach one package and miss the
-// other (`scripts/patch_npm_package.ts` holds the wasm side's copy).
-const locations_source = Deno.readTextFileSync(`${loader_dir}/locations.js`);
-const locations_exports = [...locations_source.matchAll(/^export function (\w+)/gm)].map(
-	(m) => m[1]
-);
-if (!locations_exports.length) {
-	console.error('FAIL: no exports found in locations.js — did the helper change shape?');
-	Deno.exit(1);
-}
-Deno.writeTextFileSync(
-	`${loader_dir}/index.js`,
-	`\nexport { ${locations_exports.join(', ')} } from './locations.js';\n`,
-	{ append: true }
-);
-// `export *`, not `export type *` — the helper's functions AND its types flow
-// through, matching the wasm packages' index.d.ts.
-Deno.writeTextFileSync(`${loader_dir}/index.d.ts`, `\nexport * from './locations.js';\n`, {
-	append: true
-});
 write_pkg(loader_dir, {
 	name: '@fuzdev/tsv',
 	version,
@@ -179,12 +149,7 @@ write_pkg(loader_dir, {
 		'index.d.ts',
 		'platform.js',
 		'bin.js',
-		'api.js',
-		'api.d.ts',
-		'api_parse.js',
-		'api_parse.d.ts',
-		'locations.js',
-		'locations.d.ts',
+		...facade_files(true),
 		'tsv_ast.d.ts',
 		'cli.js',
 		'README.md',

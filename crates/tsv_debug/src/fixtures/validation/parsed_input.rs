@@ -43,7 +43,7 @@ pub(crate) fn parse_input<'arena>(
 
 /// The parser phases' view of one input: the writer's span-only wire and its tabbed form.
 pub(crate) struct InputAstPaths {
-    /// The compact span-only wire `convert_ast_json_bytes_no_locations` emitted
+    /// The compact span-only wire `convert_ast_json_bytes` emitted
     /// (fixtures pin spans; the `loc` gates grade `loc`, not this). Read back into
     /// a `Value` only on a byte mismatch, to classify it as field-order-only vs
     /// semantic ([`Self::wire_value`]) — so the happy path deserializes nothing,
@@ -72,9 +72,9 @@ impl InputAstPaths {
 /// freshness checks — is the oracle these phases compare against.
 pub(crate) fn input_ast_paths(parsed: &ParsedInput<'_>, content: &str) -> InputAstPaths {
     let wire = match parsed {
-        ParsedInput::Svelte(ast) => tsv_svelte::convert_ast_json_bytes_no_locations(ast, content),
-        ParsedInput::Ts(ast) => tsv_ts::convert_ast_json_bytes_no_locations(ast, content),
-        ParsedInput::Css(ast) => tsv_css::convert_ast_json_bytes_no_locations(ast, content),
+        ParsedInput::Svelte(ast) => tsv_svelte::convert_ast_json_bytes(ast, content),
+        ParsedInput::Ts(ast) => tsv_ts::convert_ast_json_bytes(ast, content),
+        ParsedInput::Css(ast) => tsv_css::convert_ast_json_bytes(ast, content),
     };
     let mut tabs = indent_json_with_tabs(&wire);
     // Trailing newline matches the expected*.json format

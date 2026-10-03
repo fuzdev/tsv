@@ -426,7 +426,7 @@ inputs, so the corpus AST differential is the regression oracle.
   ([architecture.md §`loc` lines](./architecture.md#loc-lines-one-rule-per-document)).
   Svelte's wire departs from that in the places below — none reproduced, each graded
   as a named tolerance in the corpus `loc` comparison rather than matched (the
-  each-`as` stale `loc.end` above is the sixth):
+  each-`as` stale `loc.end` above is one more):
   - **the destructure column shift** — a destructured block binding off line 1 reads
     one column right on its opening line, its nodes and the comments in it alike
     (`read_pattern` parses `(pattern = 1)` and drops one blank to compensate, which

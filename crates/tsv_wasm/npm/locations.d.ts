@@ -16,8 +16,9 @@ export interface LocationOptions {
 	 * a leading BOM, as acorn does; `svelte` and `css` count LF alone — a Svelte
 	 * document's `<script>`s and `<style>` included — and elide a leading BOM, as
 	 * Svelte's `parse` and `parseCss` do. Omitted, it is read off the root (`Root`,
-	 * `Program`, `StyleSheetFile`); any other node — a subtree such as a Svelte
-	 * `Fragment` names no document — throws, so name the language to reconstruct one.
+	 * `StyleSheetFile`, or a `Program` spanning the whole source); any other node — a
+	 * subtree such as a Svelte `Fragment`, or a `<script>`'s `Program`, names no
+	 * document — throws, so name the language to reconstruct one.
 	 */
 	language?: LocationLanguage | undefined;
 }
@@ -50,9 +51,10 @@ export interface Locator {
 	/**
 	 * Add `loc` to every object in `ast` with numeric `start`/`end` — and `name_loc` to
 	 * the Svelte elements, attributes, and directives that carry one — mutating in place;
-	 * returns `ast`.
+	 * returns `ast`. A Svelte subtree reconstructs without the in-tag comments'
+	 * `character` stamp, which reads the root's `comments` list.
 	 */
-	reconstruct(ast: any): any;
+	reconstruct<T>(ast: T): T;
 }
 
 /**
@@ -69,13 +71,10 @@ export declare function create_locator(source: string, opts: LocatorOptions): Lo
  * language — and is what a parse with `{locations: true}` returns.
  *
  * @throws when `opts.language` is omitted and `ast` is not a parse's root (`Root`,
- *   `Program`, `StyleSheetFile`), or names a language that is not one of the three.
+ *   `StyleSheetFile`, or a `Program` spanning the whole source), or names a language
+ *   that is not one of the three.
  */
-export declare function reconstruct_locations(
-	ast: any,
-	source: string,
-	opts?: LocationOptions
-): any;
+export declare function reconstruct_locations<T>(ast: T, source: string, opts?: LocationOptions): T;
 
 /**
  * Line/column for a single node. Rebuilds the line-start table per call — reuse a

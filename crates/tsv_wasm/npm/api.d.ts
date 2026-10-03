@@ -3,9 +3,8 @@
  * whole facade shares the conventions of (`api.js`; the parse half is `api_parse.d.ts`).
  *
  * These declare the PUBLISHED functions — what each package entry re-exports by name
- * from `create_format_api`'s result — not `api.js`'s own module exports
- * (`read_options`, `create_format_api`, `has_source_type`), which are the entries'
- * plumbing and reachable through no package `exports` path. Hand-written, staged into
+ * from `create_format_api`'s result — not `api.js`'s own module exports, which are
+ * the entries' plumbing and reachable through no package `exports` path. Hand-written, staged into
  * every package beside `api.js`.
  *
  * Every option key spells `| undefined` on top of `?`. That is not redundant: under a

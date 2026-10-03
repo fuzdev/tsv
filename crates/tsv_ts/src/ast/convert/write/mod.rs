@@ -2,9 +2,11 @@
 //!
 //! This is the **sole emission path** for the TS wire JSON: it walks the
 //! *internal* AST once and writes the final JSON bytes as it goes, never
-//! materializing a typed public tree — the hot path behind
-//! `convert_ast_json_bytes`/`_string` (FFI/WASM/N-API parse bindings, the CLI's
-//! compact and `--pretty` output — the latter a re-indent of these same bytes).
+//! materializing a typed public tree. It writes both wires: the span-only one
+//! behind `convert_ast_json_bytes` / `convert_ast_json_string` (every FFI/WASM/N-API
+//! parse binding, the CLI's default output) and the loc-bearing one behind
+//! `convert_ast_json_bytes_with_locations` (`tsv parse --locations`) — `--pretty` is a
+//! re-indent of either's bytes.
 //!
 //! **Byte-identity**: the wire JSON is a faithful emission of the acorn quirk
 //! catalog — each node's field order, `skip_serializing_if` behavior, `null`s
@@ -56,10 +58,11 @@ use types::{write_type_annotation, write_type_parameter_instantiation};
 ///
 /// Returns `Vec<u8>` rather than `String`: every emitted byte comes from `&str`
 /// slices and ASCII fragments, so the output is valid UTF-8 by construction,
-/// but proving that to a `String` costs an O(output) validation scan (~15×
-/// source bytes). Byte-oriented boundaries (FFI, the CLI's stdout) take the
-/// bytes as-is; `&str` boundaries (`convert_ast_json_string` → WASM/N-API)
-/// pay the one validation at the edge.
+/// but proving that to a `String` costs an O(output) validation scan, and the
+/// output is several times the source (`tsv_lang::estimated_json_capacity`).
+/// Byte-oriented boundaries (FFI, the CLI's stdout) take the bytes as-is; `&str`
+/// boundaries (`convert_ast_json_string` → WASM/N-API) pay the one validation at
+/// the edge.
 pub fn write_program_json(
     program: &internal::Program<'_>,
     source: &str,
@@ -67,7 +70,10 @@ pub fn write_program_json(
     schema: Schema,
 ) -> Vec<u8> {
     let ctx = Ctx::new(source, positions, schema, CommentMode::Off);
-    let mut w = JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(source.len()));
+    let mut w = JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(
+        source.len(),
+        positions.emits_loc(),
+    ));
     write_program(&mut w, program, &ctx);
     w.into_bytes()
 }
@@ -399,7 +405,8 @@ pub(super) fn write_bare_node(
 /// opens and knows nothing about line/column, so a node skipped here on one wire re-binds
 /// its comments to whatever opens next on that wire alone, and the two wires then attach
 /// comments differently. The fixture gate pins the span-only wire's attachment, `check:loc`
-/// holds the loc wire's to it, and `tests/no_locations.rs`'s comment-attach cases pin both.
+/// holds the loc wire's to it, and `tests/loc_definition.rs` holds the span-only wire to
+/// the loc wire stripped, byte for byte, over every fixture input.
 #[inline]
 pub(super) fn attach_open(node_type: &'static str, span: Span, ctx: &Ctx<'_>) {
     if let CommentMode::Attach(attach) = ctx.comments {
@@ -1113,19 +1120,26 @@ pub(super) fn write_identifier_with_optional(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tsv_lang::{LeadingBom, LocationTracker};
+    use tsv_lang::{LeadingBom, WireTables};
+
+    /// The wire variants a test runs: both, unless the build lacks the loc-bearing one
+    /// (`tsv_lang`'s `locations` feature, off in a bare `cargo test -p tsv_ts`).
+    const WIRES: &[bool] = if cfg!(feature = "locations") {
+        &[true, false]
+    } else {
+        &[false]
+    };
 
     /// Run `emit` under a standalone-TypeScript context over `source`, for one
     /// wire variant and one comment role.
     fn emitted(
         source: &str,
-        emit_loc: bool,
+        locations: bool,
         comments: CommentMode<'_>,
         emit: impl FnOnce(&mut JsonWriter, &Ctx<'_>),
     ) -> String {
-        let (tracker, map) = LocationTracker::new_ecmascript_with_map(source, LeadingBom::Counted);
-        let positions = WirePositions::new(&map, emit_loc.then_some(&tracker));
-        let ctx = Ctx::new(source, positions, Schema::Acorn, comments);
+        let tables = WireTables::ecmascript(source, LeadingBom::Counted, locations);
+        let ctx = Ctx::new(source, tables.positions(), Schema::Acorn, comments);
         let mut w = JsonWriter::with_capacity(0);
         emit(&mut w, &ctx);
         String::from_utf8(w.into_bytes()).expect("the wire is UTF-8")
@@ -1158,15 +1172,15 @@ mod tests {
         let span = Span::new(start, source.len() as u32 - 2);
         for len in [1, 31, 32, 33, TYPE.len()] {
             let node_type: &'static str = &TYPE[..len];
-            for emit_loc in [true, false] {
-                let staged = emitted(source, emit_loc, CommentMode::Off, |w, ctx| {
+            for &locations in WIRES {
+                let staged = emitted(source, locations, CommentMode::Off, |w, ctx| {
                     node_header(w, node_type, span, ctx);
                 });
-                let direct = emitted(source, emit_loc, CommentMode::Off, |w, ctx| {
+                let direct = emitted(source, locations, CommentMode::Off, |w, ctx| {
                     node_header_wide_end(w, node_type, span, span.end, ctx);
                 });
-                assert_eq!(staged, direct, "type length {len}, loc {emit_loc}");
-                if emit_loc {
+                assert_eq!(staged, direct, "type length {len}, loc {locations}");
+                if locations {
                     assert_eq!(
                         staged,
                         format!(
@@ -1222,15 +1236,15 @@ mod tests {
             let id = sole_identifier(&program);
             let end = 3 + written.encode_utf16().count();
             let column = end - 1;
-            for emit_loc in [true, false] {
-                let plain = emitted(&source, emit_loc, CommentMode::Off, |w, ctx| {
+            for &locations in WIRES {
+                let plain = emitted(&source, locations, CommentMode::Off, |w, ctx| {
                     write_identifier_plain(w, id, ctx);
                 });
-                let general = emitted(&source, emit_loc, CommentMode::Off, |w, ctx| {
+                let general = emitted(&source, locations, CommentMode::Off, |w, ctx| {
                     write_identifier_parts(w, id.span, id.ident_name(), false, None, None, ctx);
                 });
-                assert_eq!(plain, general, "{written:?}, loc {emit_loc}");
-                let loc = if emit_loc {
+                assert_eq!(plain, general, "{written:?}, loc {locations}");
+                let loc = if locations {
                     format!(
                         ",\"loc\":{{\"start\":{{\"line\":2,\"column\":2}},\"end\":\
                          {{\"line\":2,\"column\":{column}}}}}"
@@ -1244,7 +1258,7 @@ mod tests {
                         "{{\"type\":\"Identifier\",\"start\":3,\"end\":{end}{loc},\
                          \"name\":\"{name}\"}}"
                     ),
-                    "{written:?}, loc {emit_loc}"
+                    "{written:?}, loc {locations}"
                 );
             }
         }
@@ -1273,16 +1287,16 @@ mod tests {
                 },
             )
         };
-        for emit_loc in [true, false] {
+        for &locations in WIRES {
             let island = attach();
-            let plain = emitted(source, emit_loc, island.mode(), |w, ctx| {
+            let plain = emitted(source, locations, island.mode(), |w, ctx| {
                 write_identifier_plain(w, id, ctx);
             });
             let island = attach();
-            let general = emitted(source, emit_loc, island.mode(), |w, ctx| {
+            let general = emitted(source, locations, island.mode(), |w, ctx| {
                 write_identifier_parts(w, id.span, id.ident_name(), false, None, None, ctx);
             });
-            assert_eq!(plain, general, "loc {emit_loc}");
+            assert_eq!(plain, general, "loc {locations}");
             assert!(
                 plain.contains(",\"name\":\"name\",\"leadingComments\":[{\"type\":\"Block\""),
                 "the leading comment is emitted: {plain}"

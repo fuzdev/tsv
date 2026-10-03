@@ -11,8 +11,8 @@
  * cadence a minute of process startup, push every source through argv or a pipe per file, and
  * report a panic as an exit code rather than as a panic.
  *
- * The verdict semantics are the FFI's, which the loc arm read before the bindings lost the
- * loc wire: a parse error throws its message exactly as `tsv_ffi` renders it, and a caught
+ * The verdict semantics are the FFI's, so the two arms read one verdict: a parse error
+ * throws its message exactly as `tsv_ffi` renders it, and a caught
  * panic throws `panic: <payload>` — the shape `is_native_panic_error` recognizes, so a panic
  * on this wire still fails `gate_on_panics` rather than counting as one more rejection. The
  * `corpus` profile is what makes a panic catchable here, as it is for the FFI library.
@@ -94,9 +94,15 @@ export class LocWireClient {
 		throw new Error(reply.error);
 	}
 
-	/** Close stdin and wait for the server to exit. */
+	/**
+	 * Close stdin and wait for the server to exit — a non-zero exit after every reply
+	 * arrived is still a failure, never a quiet end of run.
+	 */
 	async close(): Promise<void> {
 		await this.writer.close();
-		await this.child.status;
+		const status = await this.child.status;
+		if (!status.success) {
+			throw new Error(`${TSV_DEBUG_CORPUS} loc_wires --stdin exited ${status.code} on close`);
+		}
 	}
 }

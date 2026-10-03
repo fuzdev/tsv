@@ -103,29 +103,27 @@ pub fn format_folded_in(
 
 /// Convert internal AST to compact JSON wire bytes with character-based positions
 ///
+/// The span-only wire every binding ships, and `tsv parse`'s default: the Svelte parser's
+/// JSON shape with every line/column object dropped — every `loc` and the `name_loc` on
+/// elements/attributes/directives — keeping only `start`/`end` offsets. All are derivable
+/// from those offsets plus the source, so a consumer that has the source loses nothing (a
+/// name's exact span is reconstructed from its node's offsets plus the source); nothing
+/// queries the line table. Mirrors acorn's `locations: false`.
+///
 /// The **sole emission path** for its wire: emits the wire JSON directly during a
 /// single walk of the *internal* Svelte AST — no typed public tree, no intermediate
 /// `Value` for the output. A **writer-mode conversion** (`ast/convert/write.rs`) fuses
 /// byte→UTF-16 offset translation into the walk: the whole document — the
-/// Svelte spine (elements, blocks, tags, directives, attributes, `name_loc`),
-/// embedded template expressions and `<script>` content via `tsv_ts`'s
-/// embedded writers, `<style>` children via `tsv_css`'s `write_css_children` —
-/// emits final char-space positions directly. Comment-bearing islands
-/// (template expressions with comments, comment-carrying `<script>`s) run
-/// acorn's attach **online** off this same emit's node opens and closes
-/// (`ast/convert/comment_attachment.rs` declares each island's window), so each node emits
-/// its own `leadingComments` / `trailingComments` at its close — no second
-/// pass and no per-node map. This is `tsv parse --locations`'s writer (and
-/// `tsv_debug`'s); the bindings and the CLI's default emit
-/// `convert_ast_json_bytes_no_locations`. The bytes are valid UTF-8 by
+/// Svelte spine (elements, blocks, tags, directives, attributes), embedded template
+/// expressions and `<script>` content via `tsv_ts`'s embedded writers, `<style>`
+/// children via `tsv_css`'s `write_css_children` — emits final char-space positions
+/// directly (`start`, `end`). Comment-bearing islands (template expressions
+/// with comments, comment-carrying `<script>`s) run acorn's attach **online** off this
+/// same emit's node opens and closes (`ast/convert/comment_attachment.rs` declares each
+/// island's window), so each node emits its own `leadingComments` / `trailingComments` at
+/// its close — no second pass and no per-node map. The bytes are valid UTF-8 by
 /// construction (every emitted byte is a source slice or ASCII fragment), and
 /// byte-oriented consumers skip the O(output) validation a `String` requires.
-///
-/// The output is the Svelte parser's JSON shape plus a `loc` on every object
-/// carrying `start`/`end` (a superset of Svelte's, which gives `loc` to
-/// acorn-parsed nodes only), with every byte-based position
-/// (`start`, `end`, `loc.*.column`, `character`) already translated to a Unicode
-/// character offset by the writer.
 ///
 /// # Example
 ///
@@ -137,44 +135,26 @@ pub fn format_folded_in(
 /// ```
 #[cfg(feature = "convert")]
 pub fn convert_ast_json_bytes(root: &Root<'_>, source: &str) -> Vec<u8> {
-    ast::convert::write_root_bytes(root, source)
+    ast::convert::write_root_bytes(root, source, false)
 }
 
-/// Convert internal AST to compact JSON wire bytes **without** line/column data.
-///
-/// The span-only variant of `convert_ast_json_bytes` — the wire every binding emits:
-/// drops every
-/// line/column object from the Svelte wire — every `loc` and the `name_loc` on
-/// elements/attributes/directives — keeping only `start`/`end` offsets. All are
-/// derivable from those offsets plus source, so a consumer that has the source
-/// loses nothing; a name's exact span reconstructs as `node.start + a fixed
-/// per-node-type prefix`. Because this removes *all* line/column emission,
-/// nothing queries the line table. Mirrors acorn's `locations: false`; the
-/// loc-bearing `convert_ast_json_bytes` is what `tsv parse --locations` writes.
-#[cfg(feature = "convert")]
-pub fn convert_ast_json_bytes_no_locations(root: &Root<'_>, source: &str) -> Vec<u8> {
-    ast::convert::write_root_bytes_no_locations(root, source)
+/// The `convert_ast_json_bytes` wire plus a `loc` on every object carrying `start`/`end`
+/// (a superset of Svelte's, which gives `loc` to acorn-parsed nodes only) and the
+/// `name_loc` on elements/attributes/directives — line (1-based) and column (0-based,
+/// UTF-16 code units) under `\n` alone, the one line rule for a Svelte document and
+/// everything embedded in it. `tsv parse --locations` writes it.
+#[cfg(feature = "locations")]
+pub fn convert_ast_json_bytes_with_locations(root: &Root<'_>, source: &str) -> Vec<u8> {
+    ast::convert::write_root_bytes(root, source, true)
 }
 
-/// Convert internal AST to a compact JSON string with character-based positions
-///
-/// The `String` form of `convert_ast_json_bytes` for `&str` boundaries (the
-/// bindings use the `_no_locations` twin): same wire bytes plus one UTF-8
-/// validation of the output. Byte-oriented consumers should prefer the
-/// bytes variant.
+/// The `String` form of `convert_ast_json_bytes` for `&str` boundaries (the WASM
+/// binding's `JSON.parse`, N-API strings): same wire bytes plus one UTF-8 validation of
+/// the output. Byte-oriented consumers should prefer the bytes variant.
 #[cfg(feature = "convert")]
 #[expect(clippy::expect_used)]
 pub fn convert_ast_json_string(root: &Root<'_>, source: &str) -> String {
     String::from_utf8(convert_ast_json_bytes(root, source))
-        .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
-}
-
-/// The `String` form of `convert_ast_json_bytes_no_locations` for `&str`
-/// boundaries (the WASM binding's `JSON.parse`, N-API strings).
-#[cfg(feature = "convert")]
-#[expect(clippy::expect_used)]
-pub fn convert_ast_json_string_no_locations(root: &Root<'_>, source: &str) -> String {
-    String::from_utf8(convert_ast_json_bytes_no_locations(root, source))
         .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
 }
 

@@ -100,7 +100,7 @@ impl ByteToCharMap {
     /// Build a byte-to-UTF-16-code-unit offset map from source text
     ///
     /// For ASCII-only sources, returns an empty map (fast path).
-    pub fn new(source: &str, bom: LeadingBom) -> Self {
+    pub(crate) fn new(source: &str, bom: LeadingBom) -> Self {
         if source.is_ascii() {
             return Self::identity();
         }
@@ -109,7 +109,7 @@ impl ByteToCharMap {
 
     /// The identity map: every byte offset translates to itself — what `new`
     /// returns for an all-ASCII source, where a byte offset is its UTF-16 offset.
-    pub const fn identity() -> Self {
+    pub(crate) const fn identity() -> Self {
         Self {
             deltas: Deltas::Identity,
         }
@@ -121,7 +121,7 @@ impl ByteToCharMap {
     /// past the end of the source also translate to themselves (a missing
     /// entry is a zero delta).
     #[inline]
-    pub fn byte_to_char(&self, byte_offset: u32) -> u32 {
+    pub(crate) fn byte_to_char(&self, byte_offset: u32) -> u32 {
         match &self.deltas {
             Deltas::Identity => byte_offset,
             Deltas::Narrow(deltas) => {
@@ -135,7 +135,7 @@ impl ByteToCharMap {
 
     /// Whether the source contains multibyte UTF-8 characters
     #[inline]
-    pub fn has_multibyte(&self) -> bool {
+    pub(crate) fn has_multibyte(&self) -> bool {
         !matches!(self.deltas, Deltas::Identity)
     }
 }
@@ -430,8 +430,8 @@ fn build_map(
 /// The wire-JSON writers thread this instead of a bare tracker so position
 /// emission and byte→UTF-16 translation fuse into one pass:
 ///
-/// - with a real map (`ByteToCharMap::new(source, bom)`), `pos` and
-///   `pos_and_position` emit final UTF-16 code-unit offsets and char-based
+/// - with a real map (`ByteToCharMap::new(source, bom)`), `pos_and_position`
+///   and the span forms emit final UTF-16 code-unit offsets and char-based
 ///   columns directly — no post-conversion translation walk;
 /// - with `ByteToCharMap::identity()` (an all-ASCII source, where a byte offset
 ///   and a UTF-16 offset coincide), both are exact byte-space passthrough.
@@ -446,17 +446,10 @@ pub struct LocationMapper<'a> {
 }
 
 impl LocationMapper<'_> {
-    /// Translate an emitted byte offset (UTF-16 code units with a real map,
-    /// identity in byte-space mode).
-    #[inline]
-    pub fn pos(&self, byte_offset: u32) -> u32 {
-        self.map.byte_to_char(byte_offset)
-    }
-
-    /// The emitted offset (`pos`) plus its `Position`, in one translation —
-    /// the per-endpoint form direct wire emitters use (calling `pos` and
-    /// deriving the `Position` separately would translate `byte_offset`
-    /// through the map twice on the multibyte path).
+    /// The emitted offset (UTF-16 code units) plus its `Position`, in one translation —
+    /// the per-endpoint form direct wire emitters use (translating the offset with
+    /// `WirePositions::pos` and deriving the `Position` separately would put
+    /// `byte_offset` through the map twice on the multibyte path).
     #[inline]
     pub fn pos_and_position(&self, byte_offset: u32) -> (u32, Position) {
         let (line, byte_column) = self.tracker.get_line_column(byte_offset as usize);
@@ -604,30 +597,29 @@ impl LocationMapper<'_> {
 }
 
 /// What a wire writer emits positions from: the byte→UTF-16 map every `start` / `end`
-/// needs, and — only when the wire carries `loc` — the document's line table.
+/// needs, and — only when the wire carries `loc` — the document's line table. Built by
+/// [`WireTables::positions`], never directly, so the line table is always the one built
+/// alongside the map.
 ///
 /// The one definition of `loc` every writer implements: an object with numeric
 /// `start` / `end` gets `loc.start` / `loc.end` at the line (1-based) and column
 /// (0-based, UTF-16 code units) of those same emitted offsets, under the document's
 /// line table — [`LocationTracker::new_ecmascript_with_map`] for a TypeScript
 /// document, [`LocationTracker::new_with_map`] for a Svelte document (every island
-/// in it included) and a CSS one. `None` lines is the span-only wire, which builds no
-/// line table at all.
+/// in it included) and a CSS one. No line table is the span-only wire.
+///
+/// The line table exists only under the `locations` feature. Without it [`Self::lines`]
+/// is a constant `None`, so every `loc` emitter in the writers is dead code the
+/// optimizer removes — what keeps the bindings, which ship the span-only wire alone,
+/// from carrying the loc writer they never run.
 #[derive(Clone, Copy, Debug)]
 pub struct WirePositions<'a> {
     map: &'a ByteToCharMap,
+    #[cfg(feature = "locations")]
     lines: Option<&'a LocationTracker>,
 }
 
 impl<'a> WirePositions<'a> {
-    /// Positions over `map`, with `loc` emitted iff `lines` is present — `lines` must
-    /// be the table built alongside `map`.
-    #[inline]
-    #[must_use]
-    pub const fn new(map: &'a ByteToCharMap, lines: Option<&'a LocationTracker>) -> Self {
-        Self { map, lines }
-    }
-
     /// Byte offset → emitted (UTF-16 code unit) offset.
     #[inline]
     #[must_use]
@@ -639,17 +631,101 @@ impl<'a> WirePositions<'a> {
     #[inline]
     #[must_use]
     pub fn lines(&self) -> Option<LocationMapper<'a>> {
-        self.lines.map(|tracker| LocationMapper {
-            tracker,
-            map: self.map,
-        })
+        #[cfg(feature = "locations")]
+        {
+            self.lines.map(|tracker| LocationMapper {
+                tracker,
+                map: self.map,
+            })
+        }
+        #[cfg(not(feature = "locations"))]
+        {
+            None
+        }
     }
 
     /// Whether this wire carries `loc`.
     #[inline]
     #[must_use]
     pub const fn emits_loc(&self) -> bool {
-        self.lines.is_some()
+        #[cfg(feature = "locations")]
+        {
+            self.lines.is_some()
+        }
+        #[cfg(not(feature = "locations"))]
+        {
+            false
+        }
+    }
+}
+
+/// The tables one document's wire is written from, owned: the byte→UTF-16 map every
+/// wire needs and — only for the loc-bearing wire — the line table built alongside it
+/// in the same source scan. [`Self::positions`] lends both to a writer.
+#[derive(Debug)]
+pub struct WireTables {
+    map: ByteToCharMap,
+    #[cfg(feature = "locations")]
+    lines: Option<LocationTracker>,
+}
+
+impl WireTables {
+    /// A TypeScript document's tables: ECMAScript's line terminators
+    /// ([`LocationTracker::new_ecmascript_with_map`]) when `locations` is set, the map
+    /// alone otherwise.
+    #[must_use]
+    pub fn ecmascript(source: &str, bom: LeadingBom, locations: bool) -> Self {
+        #[cfg(feature = "locations")]
+        if locations {
+            let (lines, map) = LocationTracker::new_ecmascript_with_map(source, bom);
+            return Self {
+                map,
+                lines: Some(lines),
+            };
+        }
+        Self::span_only(source, bom, locations)
+    }
+
+    /// A Svelte or CSS document's tables: `\n` alone starts a line
+    /// ([`LocationTracker::new_with_map`]) when `locations` is set, the map alone
+    /// otherwise.
+    #[must_use]
+    pub fn lf(source: &str, bom: LeadingBom, locations: bool) -> Self {
+        #[cfg(feature = "locations")]
+        if locations {
+            let (lines, map) = LocationTracker::new_with_map(source, bom);
+            return Self {
+                map,
+                lines: Some(lines),
+            };
+        }
+        Self::span_only(source, bom, locations)
+    }
+
+    /// The map alone. Without the `locations` feature a set `locations` cannot reach
+    /// here — each language crate's loc-bearing entry point is gated on the same feature
+    /// — so the request is asserted rather than silently dropped.
+    fn span_only(source: &str, bom: LeadingBom, locations: bool) -> Self {
+        debug_assert!(
+            cfg!(feature = "locations") || !locations,
+            "the loc-bearing wire needs tsv_lang's `locations` feature"
+        );
+        Self {
+            map: ByteToCharMap::new(source, bom),
+            #[cfg(feature = "locations")]
+            lines: None,
+        }
+    }
+
+    /// The positions a writer emits from, borrowing both tables.
+    #[inline]
+    #[must_use]
+    pub fn positions(&self) -> WirePositions<'_> {
+        WirePositions {
+            map: &self.map,
+            #[cfg(feature = "locations")]
+            lines: self.lines.as_ref(),
+        }
     }
 }
 
@@ -873,7 +949,7 @@ impl LocationTracker {
         lo + starts[lo + 1..hi].partition_point(|&s| s <= needle)
     }
 
-    pub fn get_line_column(&self, offset: usize) -> (usize, usize) {
+    pub(crate) fn get_line_column(&self, offset: usize) -> (usize, usize) {
         let (line_idx, line_start) = self.resolve_line(offset);
         (line_idx + 1, offset - line_start) // Lines are 1-indexed
     }
@@ -975,9 +1051,9 @@ fn ascii_ecmascript_line_starts(bytes: &[u8]) -> Vec<u32> {
 /// search per line re-enters its loop, reloads the word it just read, and pays
 /// its entry and exit once a line, where a stride over the source pays them
 /// once a run. Both needles ride the same loaded word, so the source is read
-/// **once**, which is also why the LF-only scan asks for `\r` at all: it wants
-/// the positions, to report whether the ECMAScript rule would draw different
-/// lines.
+/// **once**. The LF-only scan shares the hop and drops the `\r` lanes: a word
+/// whose only terminator is a lone `\r` costs it one empty stop, and a CRLF
+/// pair almost always shares its word with the LF the scan wanted anyway.
 ///
 /// The kernel beneath, [`ascii_zero_lanes`], is exact only over an ASCII word —
 /// a non-ASCII lane (post-XOR at or above `0x81`, every high byte but the
@@ -1851,7 +1927,7 @@ mod tests {
             tracker: &tracker,
             map: &ByteToCharMap::identity(),
         };
-        assert_eq!(m.pos(8), 8);
+        assert_eq!(m.pos_and_position(8).0, 8);
         let (pos, p) = m.pos_and_position(8); // 'c'
         assert_eq!(pos, 8);
         assert_eq!((p.line, p.column), (2, 4)); // byte column
@@ -1866,7 +1942,7 @@ mod tests {
             tracker: &tracker,
             map: &map,
         };
-        assert_eq!(m.pos(8), 6); // 'c' in UTF-16 code units
+        assert_eq!(m.pos_and_position(8).0, 6); // 'c' in UTF-16 code units
         let (_, start) = m.pos_and_position(4); // "bé c" minus 'c'
         let (_, end) = m.pos_and_position(8);
         assert_eq!((start.line, start.column), (2, 0));

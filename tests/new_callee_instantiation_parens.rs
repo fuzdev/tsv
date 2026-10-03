@@ -48,7 +48,7 @@ fn expression_json(source: &str) -> Value {
 fn strip_positions(value: &mut Value) {
     match value {
         Value::Object(map) => {
-            for key in ["start", "end", "loc"] {
+            for key in ["start", "end"] {
                 map.remove(key);
             }
             map.values_mut().for_each(strip_positions);

@@ -15,7 +15,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Swallow](#line-comment-swallow-audit-swallowaudit) | `swallow:audit` | `//` line comment followed by content on one output line (silent content loss) | `deno task check`; `audit:corpus` (real code) |
 | [Comment ledger](#comment-ledger-audit-commentsaudit) | `comments:audit` | a parsed comment DROPPED or DOUBLE-PRINTED (print-once) | `deno task check`; `audit:corpus` (real code) |
 | [Gap injection](#gap-injection-audit-gapsaudit) | `gaps:audit` | comment drops — and `//` swallows — in gaps no fixture covers | `deno task check` (ratchet) |
-| [Wire injection](#wire-injection-audit-wireaudit) | `wire:audit` | a WIRE divergence from the canonical parser that only a spelling no corpus contains reveals — the parse-side sibling of gap injection | on demand (⚠️ red by design) |
+| [Wire injection](#wire-injection-audit-wireaudit) | `wire:audit` | a WIRE divergence from the canonical parser that only a spelling no corpus contains reveals — the parse-side sibling of gap injection | on demand (`ws` green; `terminators` ⚠️ red by design) |
 | [Blank injection](#blank-line-injection-audit-blanksaudit) | `blanks:audit` | blank-line handling: panic / idempotency / reparse (incl. node loss) / ledger / blank-run — plus the blank-DROP absorb pin (a new kind of silently-eaten blank) | `deno task check` (ratchet) |
 | [Blank fabrication](#blank-fabrication-audit-fabricationaudit) | `fabrication:audit` | a blank line the formatter INVENTS on a pristine seed (the author never wrote it) | `deno task check` (ratchet); `audit:corpus` (real code) |
 | [Comment census](#comment-census-audit-censusaudit) | `census:audit` | a comment interior lost, gained, or rewritten between raw input and raw output — parse-time drops included, which the ledger can't see | `deno task check` (ratchet); `audit:corpus` (real code) |
@@ -217,7 +217,7 @@ whitespace is injected into a Svelte tag or block head — `{#…}`, `{:…}`, `
 manufactured input is graded against the real external oracle (`svelte.parse`), through
 the same deep-diff and documented-divergence classifier `corpus:compare:parse` uses, on
 both of its arms: the **loc arm** (tsv's `loc` first checked against the definition — the
-reconstruction of its own span-only wire — then the oracle's `loc` under the six named
+reconstruction of its own span-only wire — then the oracle's `loc` under the named
 tolerance rows of `benches/js/lib/loc_tolerance.ts`, which the injections reach far more
 often than real code does: a newline before a binding's `:`, a destructure pattern pushed
 off line 1) and the **span arm** (the span-only wire against the oracle with `loc` /
@@ -268,7 +268,7 @@ both the instant such an input exists; this audit makes them exist.
   while Svelte counts ECMAScript's on the nodes acorn parsed — so under this family the
   oracle `loc` differences a terminator adds fall in the `two_line_classes` tolerance row
   (the other rows fire too, on the shapes the base fixture already holds), and **as a `loc`
-  audit it grades little new** — though it is what exercises row 3's model: exact inside a
+  audit it grades little new** — though it is what exercises `two_line_classes`' model: exact inside a
   `<script>`, a band in a template island. What it grades is the **span arm** — whether a terminator in a
   head, an island or the template moves an offset — and the loc arm's **definition check**
   on inputs nothing else holds: no fixture can carry a raw `<CR>` (every parse-then-format
@@ -288,11 +288,10 @@ both the instant such an input exists; this audit makes them exist.
   family injects a CR and the two line separators.) Point it at any new reader, and pair a
   finding with U+0085 NEL — Rust-whitespace but not JS `\s` — as the null control.
 
-**Coverage differs per family, and that is the whole design.** `ws` is head-scoped —
-~11,049 sites over `tests/fixtures` — so it runs as a **CENSUS** (`--inject-limit 0`,
-every site, ~17 s for 22,098 variants). `terminators` is document-wide — ~628,852 sites
-— so a census would cost ~9 minutes and it stays a strided **SAMPLE** (the default
-`--inject-limit 12`, which reaches 5.9% of its sites in 111,669 variants, ~33 s). Where a
+**Coverage differs per family, and that is the whole design.** `ws` is head-scoped, so it
+runs as a **CENSUS** (`--inject-limit 0`, every site). `terminators` is document-wide —
+dense enough that a census costs minutes — so it stays a strided **SAMPLE** (the default
+`--inject-limit 12`, a small share of its sites). Where a
 run is sampled, sites are taken by even stride rather than as a prefix, so the per-file
 cap spreads across the document instead of piling into its first few lines.
 
@@ -357,9 +356,9 @@ files are controls and are dropped; only the delta is reported. Subtraction is b
   comments, so a head containing `'}'` ends early. That costs sites; it cannot
   manufacture a wrong finding.
 
-⚠️ **Currently RED by design**, like `compile:fuzz` — a discovery tool with an open work
-list, not a regression gate, which is why it is not in `deno task check` (it also needs
-the canonical parser, so it is conformance-tier at best). Standing findings:
+⚠️ **`terminators` is RED by design**, like `compile:fuzz` — a discovery tool with an open
+work list, not a regression gate; **`ws` is green** (below). Neither is in `deno task check`:
+both need the canonical parser, so they are conformance-tier at best. Standing findings:
 
 - **`ws`** (census: **0 files**) — the family is CLEAN, and both of its findings asked a
   sub-parse the same question: **which SOURCE did that parse actually see?**
@@ -1099,7 +1098,7 @@ the span-only wire of the same parse deep-equal each other (key order ignored �
 places `loc` after `end`, the reconstruction appends it) on every document of the fixture
 tree, in all three languages. The definition — every object with numeric `start`/`end` gets
 the line and UTF-16 column of those offsets, one line-terminator rule per document — is
-stated in `locations.js`'s module doc and in [conformance_svelte.md](./conformance_svelte.md#svelte-template-corrections-corpus-enforced).
+stated in [architecture.md §`loc` lines](./architecture.md#loc-lines-one-rule-per-document) and in `locations.js`'s module doc; Svelte's departures from it are cataloged in [conformance_svelte.md](./conformance_svelte.md#svelte-template-corrections-corpus-enforced).
 
 **Why it exists.** The fixtures pin the **span-only** wire (`expected*.json` is the
 canonical output with `loc` and `name_loc` stripped), so `fixtures_tests` grades no `loc` at
@@ -1139,7 +1138,7 @@ all, each by a declaration: `input_invalid_*` (it must fail both parsers) and a
   plus the inputs no fixture can hold (a lone `<CR>` / `<LS>` / `<PS>`, a BOM, an astral
   character). The outside reference is the canonical parsers' own `loc`, graded at
   conformance cadence by `corpus:compare:parse`'s loc arm — exactly against acorn for
-  TypeScript, and against Svelte through its six cataloged tolerance rows
+  TypeScript, and against Svelte through its cataloged tolerance rows
   (`benches/js/lib/loc_tolerance.ts`), over the `gates` corpus and, with `--fixtures`, over
   each fixture's parse-pinned documents (the input and its `expected_<stem>.json` variants,
   the ones an oracle verdict is committed for). That arm runs this cross-grade first, so a

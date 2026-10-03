@@ -49,6 +49,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { Worker } from 'node:worker_threads';
 
 import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/tsv_artifacts.ts';
+import { FACADE_SOURCE_DIR, facade_files, facade_sources } from './npm_facade.ts';
 import { assert_staged_fresh } from './check_staged_freshness.ts';
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
 
@@ -103,14 +104,16 @@ await assert_staged_fresh([
 		label: `staged package entries (${variant})`,
 		staged: `${pkg_dir}/index.js`,
 		crates: [],
-		files: ['scripts/patch_npm_package.ts', 'scripts/npm_metadata.ts'],
+		files: ['scripts/patch_npm_package.ts', 'scripts/npm_facade.ts', 'scripts/npm_metadata.ts'],
 		rebuild: `deno task build:npm:${variant}`
 	},
 	{
+		// every facade file the variant ships is copied in the same staging step, so the
+		// first one's age speaks for the rest
 		label: `staged facade (${variant})`,
 		staged: `${pkg_dir}/api.js`,
 		crates: [],
-		files: ['crates/tsv_wasm/npm/api.js', 'crates/tsv_wasm/npm/api.d.ts'],
+		files: [...facade_sources(variant !== 'format'), 'scripts/npm_facade.ts'],
 		rebuild: `deno task build:npm:${variant}`
 	},
 	...(variant === 'all'
@@ -126,20 +129,6 @@ await assert_staged_fresh([
 		: []),
 	...(variant !== 'format'
 		? [
-				{
-					label: `staged parse facade (${variant})`,
-					staged: `${pkg_dir}/api_parse.js`,
-					crates: [],
-					files: ['crates/tsv_wasm/npm/api_parse.js', 'crates/tsv_wasm/npm/api_parse.d.ts'],
-					rebuild: `deno task build:npm:${variant}`
-				},
-				{
-					label: `staged locations helper (${variant})`,
-					staged: `${pkg_dir}/locations.js`,
-					crates: [],
-					files: ['crates/tsv_wasm/npm/locations.js', 'crates/tsv_wasm/npm/locations.d.ts'],
-					rebuild: `deno task build:npm:${variant}`
-				},
 				{
 					label: `staged AST types (${variant})`,
 					staged: `${pkg_dir}/tsv_ast.d.ts`,
@@ -252,12 +241,12 @@ describe(`package metadata: ${pkg_dir}`, () => {
 	// The facade's two halves: the shared one (the options reader + the format family)
 	// in every variant, the parse one only where parsing ships — so the format-only
 	// package carries neither `api_parse.js` nor the `locations.js` it imports.
-	it('every variant ships the shared facade, verbatim', () => {
-		for (const file of ['api.js', 'api.d.ts']) {
+	it('every variant ships its half of the facade, verbatim', () => {
+		for (const file of facade_files(has_parse)) {
 			assert.ok(pkg.files.includes(file), file);
 			assert.equal(
 				readFileSync(new URL(`../${pkg_dir}/${file}`, import.meta.url), 'utf8'),
-				readFileSync(new URL(`../crates/tsv_wasm/npm/${file}`, import.meta.url), 'utf8'),
+				readFileSync(new URL(`../${FACADE_SOURCE_DIR}/${file}`, import.meta.url), 'utf8'),
 				`${file} is the shared source`
 			);
 		}
@@ -465,84 +454,28 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 			() => node_entry.format_typescript("import x from 'y';\nwith (a) {\n\tb;\n}\n"),
 			/The 'with' statement is not allowed in strict mode/
 		);
-		assert.throws(
-			() => node_entry.format_typescript('x;', { sourceType: 'bogus' }),
-			/invalid sourceType/
-		);
-		assert.throws(
-			() => node_entry.format_typescript('x;', { sourceType: 42 }),
-			/'sourceType' must be 'script' or 'module'/
-		);
 	});
 
-	it(
-		'format options: unknown keys and a misapplied sourceType error',
-		{ skip: !has_format },
-		() => {
-			assert.throws(
-				() => node_entry.format_typescript('x;', { sourceTpye: 'script' }),
-				/unknown format option 'sourceTpye'/
-			);
-			// `locations` shapes the parse WIRE and format emits none, so it is an
-			// unknown key here rather than an accepted-and-inert one — an inert
-			// spelling would let a caller believe they had asked a formatter for the
-			// narrower product
-			assert.throws(
-				() => node_entry.format_typescript('x;', { locations: false }),
-				/unknown format option 'locations'/
-			);
-			// svelte/css formatting is non-configurable and the source type is
-			// TypeScript's alone, so their bags carry no key at all
-			// both goalless languages, and even `'module'` — the value they would have
-			// used — since the rejection is of the axis; the whole sentence, noun
-			// included, because `@fuzdev/tsv`'s loader restates it by hand
-			for (const [format, source] of [
-				[node_entry.format_svelte, '<div>x</div>'],
-				[node_entry.format_css, 'a { color: red }']
-			] as const) {
-				for (const sourceType of ['script', 'module']) {
-					assert.throws(() => format(source, { sourceType }), {
-						message: "format option 'sourceType' is only supported for TypeScript"
-					});
-				}
-			}
-			assert.throws(
-				() => node_entry.format_svelte('<div>x</div>', { locations: false }),
-				/takes no options/
-			);
-			// a supported key explicitly set to `undefined` means that key's default
-			// (omitted-key convention) — including the TS-only key on a language that
-			// REJECTS it, which is what lets `npm/cli.js` hand one bag to whichever
-			// formatter instead of branching the call
-			assert.equal(
-				node_entry.format_typescript('const   x=1', { sourceType: undefined }),
-				'const x = 1;\n'
-			);
-			assert.equal(
-				node_entry.format_svelte('<div   >x</div   >', { sourceType: undefined }),
-				'<div>x</div>\n'
-			);
-			assert.equal(
-				node_entry.format_css('a{color:red}', { sourceType: undefined }),
-				'a {\n\tcolor: red;\n}\n'
-			);
-			// an UNKNOWN key throws even at `undefined` — the typo guard has no
-			// undefined-valued hole
-			assert.throws(
-				() => node_entry.format_typescript('x;', { sourceTpye: undefined }),
-				/unknown format option 'sourceTpye'/
-			);
-			// a non-object options argument is an error, arrays included
-			assert.throws(() => node_entry.format_typescript('x;', 'script'), /must be an object/);
-			assert.throws(() => node_entry.format_typescript('x;', ['script']), /must be an object/);
-			// `null` and `undefined` both mean all-defaults — `null` is the arm that
-			// would otherwise fall through to the non-object error, since it is
-			// `typeof 'object'` — and so does `{}`, the zero-key object path
-			assert.equal(node_entry.format_typescript('const   x=1', null), 'const x = 1;\n');
-			assert.equal(node_entry.format_typescript('const   x=1', undefined), 'const x = 1;\n');
-			assert.equal(node_entry.format_typescript('const   x=1', {}), 'const x = 1;\n');
-		}
-	);
+	// The bag's full refusal set is graded word for word over a fake engine
+	// (`scripts/npm_api_test.ts`, gated in `check`), and every variant ships that facade
+	// verbatim (asserted above). What is left to prove here is that the entries route
+	// through it: one refusal per export family, and the forwarding idiom over the real
+	// engine.
+	it('format options: the entries route through the shared facade', { skip: !has_format }, () => {
+		assert.throws(() => node_entry.format_typescript('x;', { sourceTpye: 'script' }), {
+			message: "unknown format option 'sourceTpye' (expected 'sourceType')"
+		});
+		assert.throws(() => node_entry.format_svelte('<div>x</div>', { sourceType: 'module' }), {
+			message: "format option 'sourceType' is only supported for TypeScript"
+		});
+		// a supported key at `undefined` is its default, on a language that refuses a set
+		// one too — what lets `npm/cli.js` hand one bag to whichever formatter
+		assert.equal(
+			node_entry.format_svelte('<div   >x</div   >', { sourceType: undefined }),
+			'<div>x</div>\n'
+		);
+		assert.equal(node_entry.format_css('a{color:red}', null), 'a {\n\tcolor: red;\n}\n');
+	});
 
 	it('format_* absent from the parse-only build', { skip: has_format }, () => {
 		assert.equal(node_entry.format_typescript, undefined);
@@ -613,10 +546,6 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		// module goal (default and explicit) reserves `await`
 		assert.throws(() => node_entry.parse_typescript('var await = 1;'));
 		assert.throws(() => node_entry.parse_typescript('var await = 1;', { sourceType: 'module' }));
-		assert.throws(
-			() => node_entry.parse_typescript('x;', { sourceType: 'bogus' }),
-			/invalid sourceType/
-		);
 		// sourceType composes with locations (it drives the parser, locations the view)
 		const composed = node_entry.parse_typescript('var await = 1;', {
 			sourceType: 'script',
@@ -632,68 +561,27 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		);
 	});
 
-	it('parse options: unknown keys and a misapplied sourceType error', { skip: !has_parse }, () => {
+	it('parse options: the entries route through the shared facade', { skip: !has_parse }, () => {
 		assert.throws(() => node_entry.parse_typescript('x;', { locatons: true }), {
 			message: "unknown parse option 'locatons' (expected 'locations' or 'sourceType')"
 		});
-		assert.throws(() => node_entry.parse_svelte('x', { x: 1 }), {
-			message: "unknown parse option 'x' (expected 'locations')"
-		});
-		for (const [parse, source] of [
-			[node_entry.parse_svelte, '<div>x</div>'],
-			[node_entry.parse_css, 'a { color: red }'],
-			[node_entry.parse_svelte_json, '<div>x</div>'],
-			[node_entry.parse_css_json, 'a { color: red }']
-		] as const) {
-			for (const sourceType of ['script', 'module']) {
-				assert.throws(() => parse(source, { sourceType }), {
-					message: "parse option 'sourceType' is only supported for TypeScript"
-				});
-			}
-		}
-		assert.throws(() => node_entry.parse_typescript('x;', { locations: 'yes' }), {
-			message: "parse option 'locations' must be a boolean"
-		});
-		// the `_json` exports return the wire string itself, so they take no
-		// `locations` — `loc` is a view over objects
-		assert.throws(() => node_entry.parse_typescript_json('x;', { locations: false }), {
-			message: "unknown parse option 'locations' (expected 'sourceType')"
-		});
+		// the `_json` exports return the wire string itself, so they take no `locations`
 		assert.throws(() => node_entry.parse_css_json('a{}', { locations: false }), {
 			message: "unknown parse option 'locations' (this export takes no options)"
 		});
-		// a supported key explicitly set to undefined means that key's default
-		// (omitted-key convention)
-		assert.equal(
-			'loc' in node_entry.parse_typescript('x;', { locations: undefined, sourceType: undefined }),
-			false
-		);
-		// ...including the TS-only key on a language that REJECTS it. Load-bearing:
-		// `npm/cli.js` forwards one options bag to whichever parser and spells the
-		// inapplicable source type as `undefined` rather than branching the call. The
-		// `sourceType` arm must read `undefined` before its language rejection, or
-		// this breaks with `check` still green. `ParseOptions` declares
-		// `sourceType?: undefined` so the same bag type-checks; see `api_parse.d.ts`.
-		assert.ok(node_entry.parse_svelte('<div>x</div>', { sourceType: undefined }));
-		assert.ok(node_entry.parse_css('a { color: red }', { sourceType: undefined }));
-		assert.ok(node_entry.parse_css_json('a { color: red }', { sourceType: undefined }));
-		// an UNKNOWN key throws even at `undefined` — the typo guard has no
-		// undefined-valued hole; only supported keys read `undefined` as absent
-		assert.throws(
-			() => node_entry.parse_typescript('x;', { locatons: undefined }),
-			/unknown parse option 'locatons'/
-		);
-		// a non-object options argument is an error, arrays included
-		assert.throws(() => node_entry.parse_typescript('x;', 'locations'), {
-			message: 'parse options must be an object'
+		assert.throws(() => node_entry.parse_svelte('<div>x</div>', { sourceType: 'module' }), {
+			message: "parse option 'sourceType' is only supported for TypeScript"
 		});
-		assert.throws(() => node_entry.parse_typescript('x;', []), /must be an object/);
-		// `null` and `undefined` both mean all-defaults — `null` is the arm that
-		// would otherwise fall through to the non-object error, since it is
-		// `typeof 'object'` — and so does `{}`, the zero-key object path
-		for (const options of [null, undefined, {}]) {
-			assert.equal(node_entry.parse_typescript('x;', options).type, 'Program');
-		}
+		// the forwarding idiom over the real engine (`npm/cli.js` hands one bag to whichever
+		// parser)
+		assert.ok(node_entry.parse_svelte('<div>x</div>', { sourceType: undefined }));
+		assert.equal(node_entry.parse_typescript('x;', null).type, 'Program');
+		// a non-string source is the facade's refusal, not the glue's (which would read
+		// `42` as the empty document off Node)
+		assert.throws(() => node_entry.parse_typescript(42), {
+			name: 'TypeError',
+			message: 'parse source must be a string (got number)'
+		});
 	});
 });
 

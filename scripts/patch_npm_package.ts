@@ -59,6 +59,7 @@
  *   all    → crates/tsv_wasm/pkg/all/npm/    → @fuzdev/tsv-wasm
  */
 
+import { FACADE_SOURCE_DIR, facade_files } from './npm_facade.ts';
 import { NPM_SHARED_METADATA } from './npm_metadata.ts';
 import { format_size, gzip_size } from './size.ts';
 
@@ -116,22 +117,9 @@ const api_parse_dts = 'api_parse.d.ts';
 // an already-parsed AST).
 const locations_file = 'locations.js';
 const locations_dts = 'locations.d.ts';
-// Extracted from the helper, not listed here: `scripts/build_napi_packages.ts`
-// re-exports the same file from `@fuzdev/tsv`, and a hand-kept list in each
-// script is how a fourth entry point reaches one package and misses the other.
-const locations_exports = [
-	...Deno.readTextFileSync(`crates/tsv_wasm/npm/${locations_file}`).matchAll(
-		/^export function (\w+)/gm
-	)
-].map((m) => m[1]);
-if (!locations_exports.length) {
-	console.error(`FAIL: no exports found in ${locations_file} — did the helper change shape?`);
-	Deno.exit(1);
-}
-// A plain re-export line (no init guard — pure JS), shared by index.js + browser.js.
-const locations_reexport = has_parse_exports
-	? `export { ${locations_exports.join(', ')} } from './${locations_file}';\n`
-	: '';
+// A whole-module re-export (no init guard — pure JS), shared by index.js + browser.js,
+// so a new helper export reaches every entry, and `@fuzdev/tsv`'s, with no list to keep.
+const locations_reexport = has_parse_exports ? `export * from './${locations_file}';\n` : '';
 
 // 1. Extract the public function exports from the generated JS.
 
@@ -693,27 +681,17 @@ console.log(`Copied ${readme_src} → ${pkg_root}/README.md`);
 Deno.copyFileSync('LICENSE', `${pkg_root}/LICENSE`);
 console.log(`Copied LICENSE → ${pkg_root}/LICENSE`);
 
-// The facade's shared half, in every variant (the entries import it).
-for (const file of [api_file, api_dts]) {
-	Deno.copyFileSync(`crates/tsv_wasm/npm/${file}`, `${pkg_root}/${file}`);
-	console.log(`Copied crates/tsv_wasm/npm/${file} → ${pkg_root}/${file}`);
+// The facade the entries import — its parse half (with the reconstruction helper
+// index.js/browser.js/index.d.ts re-export) in the parse-capable variants only.
+for (const file of facade_files(has_parse_exports)) {
+	Deno.copyFileSync(`${FACADE_SOURCE_DIR}/${file}`, `${pkg_root}/${file}`);
+	console.log(`Copied ${FACADE_SOURCE_DIR}/${file} → ${pkg_root}/${file}`);
 }
 
 if (has_parse_exports) {
-	// The facade's parse half, which imports the reconstruction helper below.
-	for (const file of [api_parse_file, api_parse_dts]) {
-		Deno.copyFileSync(`crates/tsv_wasm/npm/${file}`, `${pkg_root}/${file}`);
-		console.log(`Copied crates/tsv_wasm/npm/${file} → ${pkg_root}/${file}`);
-	}
 	// Bundle the hand-maintained AST types alongside the generated `tsv_wasm.d.ts`.
 	Deno.copyFileSync('crates/tsv_wasm/types/tsv_ast.d.ts', `${pkg_root}/tsv_ast.d.ts`);
 	console.log(`Copied crates/tsv_wasm/types/tsv_ast.d.ts → ${pkg_root}/tsv_ast.d.ts`);
-	// Bundle the pure-JS line/column reconstruction helper + its hand-written types
-	// (re-exported from index.js/browser.js/index.d.ts above, and run by the facade).
-	Deno.copyFileSync(`crates/tsv_wasm/npm/${locations_file}`, `${pkg_root}/${locations_file}`);
-	console.log(`Copied crates/tsv_wasm/npm/${locations_file} → ${pkg_root}/${locations_file}`);
-	Deno.copyFileSync(`crates/tsv_wasm/npm/${locations_dts}`, `${pkg_root}/${locations_dts}`);
-	console.log(`Copied crates/tsv_wasm/npm/${locations_dts} → ${pkg_root}/${locations_dts}`);
 }
 
 if (variant === 'all') {
@@ -773,11 +751,8 @@ pkg.files = [
 	main_js,
 	dts_file,
 	wasm_file,
-	api_file,
-	api_dts,
-	...(has_parse_exports
-		? [api_parse_file, api_parse_dts, 'tsv_ast.d.ts', locations_file, locations_dts]
-		: []),
+	...facade_files(has_parse_exports),
+	...(has_parse_exports ? ['tsv_ast.d.ts'] : []),
 	...(variant === 'all' ? [cli_file] : []),
 	'README.md',
 	'LICENSE'

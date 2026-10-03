@@ -141,7 +141,7 @@ dispatch), so it doesn't bear on the closed-scope/open-convention stance below.
 
 **Compile-Time Isolation** — Cargo prevents circular dependencies. CSS changes don't trigger TypeScript recompilation.
 
-**Clean API Boundaries** — Each language exports `parse()`, `format()`, and `convert_ast_json_bytes()` / `convert_ast_json_string()` (plus their span-only `_no_locations` twins; no shipped crate reads the wire back — `tsv_debug::json` is the one reader). tsv_ts and tsv_css also provide embedding APIs (`parse_embedded`, expression formatting, `build_*_doc`) used by tsv_svelte for nested language support.
+**Clean API Boundaries** — Each language exports `parse()`, `format()`, and `convert_ast_json_bytes()` / `convert_ast_json_string()` (the span-only wire every binding ships; `convert_ast_json_bytes_with_locations` adds `loc`; no shipped crate reads the wire back — `tsv_debug::json` is the one reader). tsv_ts and tsv_css also provide embedding APIs (`parse_embedded`, expression formatting, `build_*_doc`) used by tsv_svelte for nested language support.
 
 **Scalability** — Easy to add new crates (`tsv_ffi`, `tsv_wasm`, `tsv_napi`, `tsv_arena`, `tsv_ignore` + `tsv_discover`, and the experimental `tsv_check` / `tsv_svelte_compile` — which may never ship — are all crate additions; `tsv_linter`/`tsv_lsp`/`tsv_md` planned).
 
@@ -157,9 +157,11 @@ pub fn parse<'a>(source: &str, arena: &'a Bump) -> Result<InternalAst<'a>, Parse
 pub fn format(ast: &InternalAst, source: &str) -> String;
 pub fn convert_ast_json_bytes(ast: &InternalAst, source: &str) -> Vec<u8>;
 pub fn convert_ast_json_string(ast: &InternalAst, source: &str) -> String;
+pub fn convert_ast_json_bytes_with_locations(ast: &InternalAst, source: &str) -> Vec<u8>;
 ```
 
-`convert_ast_json_bytes` and its span-only twin are the **sole emission
+`convert_ast_json_bytes` (the span-only wire) and
+`convert_ast_json_bytes_with_locations` (the same wire plus `loc`) are the **sole emission
 paths** — every JSON form derives from one of them, the CLI's `--pretty`
 included (a linear re-indent of their bytes, never a read). In every language
 each is a **writer-mode conversion**
@@ -169,19 +171,18 @@ with byte→UTF-16 offset translation fused into the walk via `WirePositions`
 (final char-space positions emitted directly; ASCII sources are byte-space
 passthrough). The output is valid UTF-8 by construction, and returning bytes
 lets byte-oriented boundaries skip the O(output) UTF-8 validation a `String`
-requires (the wire is ~20× the source); `convert_ast_json_string` is the
-same bytes plus that one validation, for `&str` boundaries (the WASM
-binding's `JSON.parse`, N-API strings). No language crate reads the wire
+requires (the wire is several times the source); `convert_ast_json_string`
+is the span-only bytes plus that one validation, for `&str` boundaries (what the
+WASM binding's `JSON.parse` and the N-API strings take). No language crate reads the wire
 back: the one `Value` consumer is `tsv_debug` (the fixture gate, the audits),
 whose `json` module reads these bytes with serde_json's recursion limit off —
 the default of 128 levels refused ~60 nested arrays or ~40 nested objects the
-writer emits without trouble. Each of the two has a `_no_locations` sibling
-(`convert_ast_json_bytes_no_locations` / `_string_no_locations`) emitting the
-same wire minus every line/column object — the per-node `loc`, plus Svelte's
-`name_loc` — so only `start`/`end` offsets remain. That span-only wire is the one every
-binding ships (`tsv_ffi`, `tsv_napi`, `tsv_wasm`) and `tsv parse`'s default; the
-`loc`-bearing form ships through no binding — it is `tsv parse --locations`'s,
-`tsv_debug`'s, and the oracle comparison's. Line/column is a pure function of an offset
+writer emits without trouble. The span-only wire is the `_with_locations` one
+minus every line/column object — the per-node `loc`, plus Svelte's `name_loc` — so
+only `start`/`end` offsets remain. It is the one every binding ships (`tsv_ffi`,
+`tsv_napi`, `tsv_wasm`) and `tsv parse`'s default; the `loc`-bearing form ships
+through no binding — it is `tsv parse --locations`'s, `tsv_debug`'s, and the oracle
+comparison's. Line/column is a pure function of an offset
 plus source, so the packages derive it consumer-side rather than shipping it: every
 package that parses carries the derivation as a pure-JS `reconstruct_locations` helper,
 which its `parse_*(source, {locations: true})` runs. Each writer is a faithful emission of the acorn /
@@ -261,9 +262,13 @@ artifacts for user ergonomics independent of the Rust workspace shape.
 #### Cargo feature surface
 
 `tsv_ts`, `tsv_css`, and `tsv_svelte` each expose a default-on `convert`
-feature that gates `pub mod convert` (the writer) and the
-`convert_ast_json_bytes` / `convert_ast_json_string` free functions (and
-their `_no_locations` twins). The format-only WASM
+feature that gates `pub mod convert` (the writer) and the span-only
+`convert_ast_json_bytes` / `convert_ast_json_string` free functions, and an
+opt-in `locations` feature (implying `convert`) that adds the loc-bearing
+`convert_ast_json_bytes_with_locations` — the line table it needs exists only
+under `tsv_lang`'s `locations`, so a build without it carries no `loc` writer
+at all. `tsv_cli` (`tsv parse --locations`) and `tsv_debug` enable it; no
+binding does. The format-only WASM
 build (`@fuzdev/tsv-format-wasm`) declares its language deps with
 `default-features = false` so the convert layer is excluded at link
 time; the parse-capable builds (`@fuzdev/tsv-parse-wasm` and the full
@@ -281,8 +286,11 @@ Rust consumers that only need parse/format can follow the same pattern:
 # Minimal: parse + format only (source-level consumption — tsv is not on crates.io)
 tsv_ts = { git = "https://github.com/fuzdev/tsv", default-features = false }
 
-# Full: also build the wire-JSON parse output (`convert_ast_json*`)
+# Also build the span-only wire-JSON parse output (`convert_ast_json*`)
 tsv_ts = { git = "https://github.com/fuzdev/tsv", features = ["convert"] }
+
+# Full: plus the loc-bearing wire (`convert_ast_json_bytes_with_locations`)
+tsv_ts = { git = "https://github.com/fuzdev/tsv", features = ["locations"] }
 ```
 
 ## Foundation Crate (tsv_lang)
@@ -671,7 +679,9 @@ tolerance.
 The writers take the line table as `Option<&LocationTracker>` inside
 `tsv_lang::WirePositions`, built at **write** time, once per document and only when `loc` is
 requested — the span-only wire builds the byte→UTF-16 map alone, and no parse path builds a
-line table at all. The fixtures pin the span-only wire; the definition itself is graded by
+line table at all. The table exists only under `tsv_lang`'s `locations` cargo feature, which
+no binding enables, so the bindings — which ship the span-only wire alone — carry no `loc`
+writer: without it every `loc` emitter is dead code the optimizer removes. The fixtures pin the span-only wire; the definition itself is graded by
 `tests/loc_definition.rs`, an independent reference over every fixture input plus the
 terminator, BOM and astral inputs no fixture can hold. The shipped JS reconstruction
 (`crates/tsv_wasm/npm/locations.js`) implements the same definition over the span-only wire,
@@ -759,7 +769,7 @@ pub struct Comment {
     pub is_block: bool,              // true for /* */ or <!-- -->, false for //
     pub multiline: bool,             // content contains '\n' (precomputed; block-only in practice)
     pub span: Span,                  // full comment span, delimiters included
-    pub emit_character_field: bool,  // Serializer hint: include `character` in JSON loc
+    pub from_template_reader: bool,  // collected by Svelte's template reader (in-tag), not acorn
     pub owned_by_node: bool,         // bound to the token after it; printed by that node,
                                      // not the enclosing gap (see docs/comments.md)
 }

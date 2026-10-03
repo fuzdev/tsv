@@ -31,6 +31,12 @@ audits = ["swallow_check", "comment_check"]
 # each language crate's `convert` feature. Off in the format-only
 # @fuzdev/tsv-format-wasm build, so `serde_json` never enters that graph.
 json = ["dep:serde_json"]
+# The loc-bearing wire: the line table `WireTables` builds beside its map, which is the
+# only thing that makes `WirePositions::lines` non-`None`. Off in every binding (they
+# ship the span-only wire alone), so the writers' `loc` emitters compile to dead code
+# and drop out of those artifacts; `tsv_cli` (`tsv parse --locations`) and `tsv_debug`
+# turn it on through each language crate's own `locations` feature.
+locations = ["json"]
 
 [dependencies]
 smallvec.workspace = true

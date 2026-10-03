@@ -3,8 +3,10 @@
 //!
 //! The CSS sibling of `tsv_ts`'s `ast/convert/write/` — the **sole emission
 //! path** for the CSS wire JSON. It walks the *internal* AST once and writes the
-//! final JSON bytes as it goes, never materializing a typed public tree — the
-//! hot path behind `convert_ast_json_bytes` (FFI/CLI compact output) and the
+//! final JSON bytes as it goes, never materializing a typed public tree. It
+//! writes both wires — the span-only one behind `convert_ast_json_bytes`
+//! (every parse binding, the CLI's default output) and the loc-bearing one behind
+//! `convert_ast_json_bytes_with_locations` (`tsv parse --locations`) — and is the
 //! entry the Svelte writer composes for embedded `<style>` blocks.
 //!
 //! **Byte-identity**: the wire JSON is a faithful emission of the `parseCss()`
@@ -92,8 +94,7 @@ use super::{
 };
 use std::borrow::Cow;
 use tsv_lang::{
-    ByteToCharMap, JsonWriter, LeadingBom, LocationTracker, Span, WirePositions, write_array,
-    write_or_null,
+    JsonWriter, LeadingBom, Span, WirePositions, WireTables, write_array, write_or_null,
 };
 
 /// Declares one `parseCss()` metadata payload twice from a single literal: bare
@@ -238,18 +239,14 @@ pub(crate) fn write_stylesheet_file_bytes(
     source: &str,
     locations: bool,
 ) -> Vec<u8> {
-    let (tracker, map) = if locations {
-        let (tracker, map) = LocationTracker::new_with_map(source, LeadingBom::Elided);
-        (Some(tracker), map)
-    } else {
-        (None, ByteToCharMap::new(source, LeadingBom::Elided))
-    };
+    let tables = WireTables::lf(source, LeadingBom::Elided, locations);
     let ctx = Ctx {
         source,
-        positions: WirePositions::new(&map, tracker.as_ref()),
+        positions: tables.positions(),
         has_metadata: true,
     };
-    let mut w = JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(source.len()));
+    let mut w =
+        JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(source.len(), locations));
     write_stylesheet_file(&mut w, stylesheet, &ctx);
     w.into_bytes()
 }

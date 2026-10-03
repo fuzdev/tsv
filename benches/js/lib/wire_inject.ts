@@ -17,7 +17,7 @@
  *
  * **Two families, because there are two kinds of claim to break.** Both run through the
  * comparison's two arms — the loc arm (the definition check, then the oracle's `loc` under the
- * six tolerance rows of `lib/loc_tolerance.ts`) and the span arm — each variant graded against
+ * tolerance rows of `lib/loc_tolerance.ts`) and the span arm — each variant graded against
  * its own base.
  *
  * - `ws` — whitespace inside a Svelte tag or block head (`{#…}`, `{:…}`, `{@…}`). Heads

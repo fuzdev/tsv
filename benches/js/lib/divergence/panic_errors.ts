@@ -31,8 +31,9 @@
  * must never be able to fabricate a panic verdict.
  *
  * Three shapes, one producible today:
- *  - `panic: …` — `tsv_ffi`'s `format_panic` under `catch_unwind`; the only
- *    shape either corpus tool can currently see (both drive the FFI binding).
+ *  - `panic: …` — `tsv_ffi`'s `format_panic` under `catch_unwind`, which
+ *    `tsv_debug loc_wires --stdin` (the parse tool's loc arm) spells the same; the
+ *    only shape either corpus tool can currently see.
  *  - `… panicked at …` — Rust's own panic-hook text, for a boundary that
  *    forwards the hook's line rather than the payload (the N-API binding, once
  *    its panic contract lands — 0.4).

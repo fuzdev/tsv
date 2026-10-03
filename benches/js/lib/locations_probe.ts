@@ -7,8 +7,8 @@
  * time what `{locations: true}` adds over it — and nothing in a timed sweep can tell
  * that wire from a loc-bearing one: both are a successful parse returning an AST, so an
  * artifact still emitting `loc` is timed as usual and published under the span label,
- * with a reconstruction running over a tree that already had `loc`. A binding built
- * before the bindings went span-only does exactly this.
+ * with a reconstruction running over a tree that already had `loc`. A stale binding
+ * whose parse still emits `loc` does exactly this.
  *
  * The artifact-freshness guard refuses such a build by default
  * (`lib/check_artifact_freshness.ts`), and this does not replace it: it is what stands
@@ -25,6 +25,7 @@
  */
 
 import { probe_goals } from './reject_probe.ts';
+import { LOCATION_KEYS } from './span_only.ts';
 import { type Language, LANGUAGES, type ParseGoal } from './types.ts';
 
 /**
@@ -37,9 +38,6 @@ export const LOCATIONS_PROBE_SOURCES: Readonly<Record<Language, string>> = {
 	typescript: 'const x = 1;',
 	css: 'a { color: red; }'
 };
-
-/** The keys only a loc-bearing wire carries. */
-const LOCATION_KEYS: ReadonlySet<string> = new Set(['loc', 'name_loc']);
 
 /**
  * Count the `loc` and `name_loc` keys anywhere in `ast`.

@@ -3,7 +3,8 @@
 // The writer (`write/`) emits the compact wire JSON directly from the internal
 // AST in one walk, fusing byte→UTF-16 offset translation into the walk (final
 // char-space positions emitted directly via `WirePositions`). It is the sole
-// emission path; `convert_ast_json_bytes`/`_string` in `lib.rs` call it.
+// emission path; `convert_ast_json_bytes` / `convert_ast_json_string` and
+// `convert_ast_json_bytes_with_locations` in `lib.rs` call it.
 
 /// Schema choice for public-AST serialization.
 ///

@@ -20,12 +20,12 @@
 import { strictEqual } from 'node:assert';
 import {
 	classify_loc_difference,
-	get_at_path,
-	type LocLanguage,
 	type LocRow,
 	superset_key,
 	superset_kinds_of
 } from './loc_tolerance.ts';
+import { get_at_path } from './diff_path.ts';
+import type { Language } from './types.ts';
 
 type Node = Record<string, any>;
 type Point = { line: number; column: number; character?: number };
@@ -68,7 +68,7 @@ function classify(
 	root: Node,
 	leaf: string,
 	oracle: Partial<Point>,
-	options: { ours?: number; language?: LocLanguage } = {}
+	options: { ours?: number; language?: Language } = {}
 ): LocRow | null {
 	const m = /^(?:(.*)\.)?loc\.(start|end)\.(line|column)$/.exec(leaf);
 	if (!m) throw Error(`not a loc leaf: ${leaf}`);
@@ -407,10 +407,15 @@ Deno.test('typed_destructure_end: mutants do not classify', () => {
 
 // --- 6. each_as_stale_loc ----------------------------------------------------------
 
-/** `{#each contents ?? [] as section}{section}{/each}`, the expression unwound to `[]`. */
-function each_as(source = '{#each contents ?? [] as section}{section}{/each}'): [string, Node] {
+/**
+ * `{#each contents ?? [] as section}{section}{/each}` under `lang="ts"` — the expression
+ * unwound to `[]`.
+ */
+const EACH_AS_TS = '<script lang="ts"></script>{#each contents ?? [] as section}{section}{/each}';
+
+function each_as(source = EACH_AS_TS): [string, Node] {
 	const s = at(source, 'section');
-	const each = node(source, 'EachBlock', 0, source.length, {
+	const each = node(source, 'EachBlock', at(source, '{#each'), source.length, {
 		expression: node(source, 'LogicalExpression', at(source, 'contents'), at(source, '[]') + 2),
 		context: node(source, 'Identifier', s, s + 7)
 	});
@@ -438,7 +443,7 @@ Deno.test('each_as_stale_loc: mutants do not classify', () => {
 	// past the context
 	strictEqual(classify(source, root, EACH_EXPRESSION_END, lf_point(source, s + 8)), null);
 	// past the context on a token boundary, the `as` test passing: the context bound alone
-	const [spaced, spaced_root] = each_as('{#each contents ?? [] as section }{section}{/each}');
+	const [spaced, spaced_root] = each_as(EACH_AS_TS.replace('as section}', 'as section }'));
 	const past = at(spaced, 'section') + 8;
 	strictEqual(classify(spaced, spaced_root, EACH_EXPRESSION_END, lf_point(spaced, past)), null);
 	// inside the context on a token boundary, but no `as <type>` read: the `as` test alone
@@ -458,6 +463,13 @@ Deno.test('each_as_stale_loc: mutants do not classify', () => {
 		classify(source, root, 'fragment.nodes[0].expression.loc.start.column', { column: 1 }),
 		null
 	);
+	// not `lang="ts"`: Svelte never unwinds the `as`, so its `loc.end` is not stale — no
+	// script, a plain one, or a `lang="ts"` only an HTML comment holds
+	for (const prefix of ['', '<script></script>', '<!-- <script lang="ts"> --><script></script>']) {
+		const [plain, plain_root] = each_as(EACH_AS_TS.replace('<script lang="ts"></script>', prefix));
+		const end = at(plain, 'section') + 7;
+		strictEqual(classify(plain, plain_root, EACH_EXPRESSION_END, lf_point(plain, end)), null);
+	}
 	// an expression that is no `{#each}`'s
 	strictEqual(
 		classify(source, root, 'fragment.nodes[1].expression.loc.end.column', { column: s + 18 }),

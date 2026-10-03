@@ -460,38 +460,34 @@ fn format_program_in(
 
 /// Convert internal AST to compact JSON wire bytes with character-based positions
 ///
-/// The **sole emission path** for its wire: emits the wire JSON directly during a
-/// single walk of the internal AST (the writer in `ast/convert/write/`), never
-/// materializing a typed public tree or an intermediate `Value`, and
-/// fuses the byte→UTF-16 offset translation into that walk: the writer receives
-/// the `ByteToCharMap` via `WirePositions` and emits final char-space
-/// positions directly, so no post-conversion translation walk runs. For ASCII
-/// sources the map is empty and emission is byte-space passthrough. This is
-/// `tsv parse --locations`'s writer (and `tsv_debug`'s); the bindings and the
-/// CLI's default emit `convert_ast_json_bytes_no_locations`. Returning bytes lets
-/// a consumer that never needs `&str` skip the O(output) UTF-8 validation
-/// `convert_ast_json_string` pays (the output is ~15× the source).
+/// The span-only wire every binding ships, and `tsv parse`'s default: each node carries
+/// `start` / `end` as UTF-16 offsets and no `loc`. Line/column is a pure function of those
+/// offsets plus the source, so a consumer holding the source loses nothing — it derives
+/// `loc` on demand (the npm packages' `{locations: true}`), and emission skips the line
+/// table entirely, mirroring acorn's own `locations: false`.
 ///
-/// Every node carries `loc` — the line (1-based) and column (0-based, UTF-16
-/// code units) of its own `start` / `end` under ECMAScript's line terminators
-/// (CR, LF, CRLF, LS, PS), which is acorn's.
+/// The **sole emission path** for its wire: emits the wire JSON directly during a single
+/// walk of the internal AST (the writer in `ast/convert/write/`), never materializing a
+/// typed public tree or an intermediate `Value`, and fuses the byte→UTF-16 offset
+/// translation into that walk: the writer receives the `ByteToCharMap` via
+/// `WirePositions` and emits final char-space positions directly, so no post-conversion
+/// translation walk runs. For ASCII sources the map is empty and emission is byte-space
+/// passthrough. Returning bytes lets a consumer that never needs `&str` skip the
+/// O(output) UTF-8 validation `convert_ast_json_string` pays (the output is several times
+/// the source).
 #[cfg(feature = "convert")]
 pub fn convert_ast_json_bytes(program: &Program<'_>, source: &str) -> Vec<u8> {
-    convert_ast_json_bytes_variant(program, source, true)
+    convert_ast_json_bytes_variant(program, source, false)
 }
 
-/// Convert internal AST to compact JSON wire bytes **without** per-node `loc`.
+/// Convert internal AST to compact JSON wire bytes **with** per-node `loc`.
 ///
-/// The span-only twin of `convert_ast_json_bytes`: emits `start`/`end` offsets
-/// but drops the per-node `loc` object (line/column). `loc` is a pure function
-/// of a node's `start`/`end` (UTF-16 offsets) plus the source, so a consumer that
-/// has the source loses nothing — line/column is derived lazily. Dropping it
-/// removes ~46% of the wire and ~61% of the downstream `JSON.parse` cost (three
-/// nested objects per node), and lets emission skip the line table entirely —
-/// mirroring acorn's own `locations: false`. The wire every binding emits.
-#[cfg(feature = "convert")]
-pub fn convert_ast_json_bytes_no_locations(program: &Program<'_>, source: &str) -> Vec<u8> {
-    convert_ast_json_bytes_variant(program, source, false)
+/// The `convert_ast_json_bytes` wire plus a `loc` on every node — the line (1-based) and
+/// column (0-based, UTF-16 code units) of its own `start` / `end` under ECMAScript's line
+/// terminators (CR, LF, CRLF, LS, PS), which is acorn's. `tsv parse --locations` writes it.
+#[cfg(feature = "locations")]
+pub fn convert_ast_json_bytes_with_locations(program: &Program<'_>, source: &str) -> Vec<u8> {
+    convert_ast_json_bytes_variant(program, source, true)
 }
 
 #[cfg(feature = "convert")]
@@ -499,40 +495,22 @@ fn convert_ast_json_bytes_variant(program: &Program<'_>, source: &str, locations
     // The line table is built only when `loc` is written — one fused source scan
     // builds it with the map; ASCII sources take a byte-level line scan and get
     // the identity map. The span-only wire builds the map alone.
-    let bom = tsv_lang::LeadingBom::Counted;
-    let (tracker, map) = if locations {
-        let (tracker, map) = tsv_lang::LocationTracker::new_ecmascript_with_map(source, bom);
-        (Some(tracker), map)
-    } else {
-        (None, tsv_lang::ByteToCharMap::new(source, bom))
-    };
+    let tables = tsv_lang::WireTables::ecmascript(source, tsv_lang::LeadingBom::Counted, locations);
     ast::convert::write_program_json(
         program,
         source,
-        tsv_lang::WirePositions::new(&map, tracker.as_ref()),
+        tables.positions(),
         ast::convert::Schema::Acorn,
     )
 }
 
-/// Convert internal AST to a compact JSON string with character-based positions
-///
-/// The `String` form of `convert_ast_json_bytes` for `&str` boundaries (the
-/// bindings use the `_no_locations` twin): same wire bytes plus one UTF-8
-/// validation of the output. Byte-oriented consumers should prefer the
-/// bytes variant.
+/// The `String` form of `convert_ast_json_bytes` for `&str` boundaries (the WASM
+/// binding's `JSON.parse`, N-API strings): same wire bytes plus one UTF-8 validation of
+/// the output. Byte-oriented consumers should prefer the bytes variant.
 #[cfg(feature = "convert")]
 #[expect(clippy::expect_used)]
 pub fn convert_ast_json_string(program: &Program<'_>, source: &str) -> String {
     String::from_utf8(convert_ast_json_bytes(program, source))
-        .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
-}
-
-/// The `String` form of `convert_ast_json_bytes_no_locations` for `&str`
-/// boundaries (the WASM binding's `JSON.parse`, N-API strings).
-#[cfg(feature = "convert")]
-#[expect(clippy::expect_used)]
-pub fn convert_ast_json_string_no_locations(program: &Program<'_>, source: &str) -> String {
-    String::from_utf8(convert_ast_json_bytes_no_locations(program, source))
         .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
 }
 

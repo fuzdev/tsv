@@ -1,10 +1,10 @@
 /**
- * The `loc` arm's tolerance list: the six named ways Svelte's own `loc` departs from tsv's
- * definition, recognized by STRUCTURE so a seventh fails.
+ * The `loc` arm's tolerance list: the named ways Svelte's own `loc` departs from tsv's
+ * definition, recognized by STRUCTURE so any other departure fails.
  *
  * tsv's `loc` follows one definition — the line and UTF-16 column of each object's own
  * `start`/`end`, LF-only for a whole Svelte document (`crates/tsv_wasm/npm/locations.js`'s
- * module doc). Svelte's wire departs from it in six places, none reproduced and each
+ * module doc). Svelte's wire departs from it in the places below, none reproduced and each
  * cataloged in docs/conformance_svelte.md §Svelte Template Corrections:
  *
  * 1. `destructure_column` — a destructured block binding (`{#each … as {…}}`, `{:then}`,
@@ -59,7 +59,10 @@
  * @module
  */
 
-/** One of the six tolerance rows. */
+import { get_at_path } from './diff_path.ts';
+import type { Language } from './types.ts';
+
+/** One tolerance row. */
 export type LocRow =
 	| 'destructure_column'
 	| 'annotation_swallow'
@@ -283,7 +286,7 @@ const LOC_SUPERSET_KEYS: Record<'svelte' | 'css', ReadonlySet<string>> = {
 };
 
 /** The language's pinned superset kinds, or `null` for TypeScript, which has none. */
-export function superset_kinds_of(language: LocLanguage): ReadonlySet<string> | null {
+export function superset_kinds_of(language: Language): ReadonlySet<string> | null {
 	return language === 'typescript' ? null : LOC_SUPERSET_KEYS[language];
 }
 
@@ -293,23 +296,6 @@ const LOC_LEAF = /^(?:(.*)\.)?loc\.(start|end)\.(line|column)$/;
 /** Whether `path` names a `loc` line or column — the leaves only the rows may classify. */
 export function is_loc_leaf(path: string): boolean {
 	return LOC_LEAF.test(path);
-}
-
-/** Resolve a node by concrete diff path (`fragment.nodes[3].expression`); `''` is the root. */
-export function get_at_path(root: unknown, path: string): unknown {
-	if (path === '') return root;
-	let node = root;
-	for (const seg of path.split('.')) {
-		if (node == null) return null;
-		const m = seg.match(/^([^[]+)((?:\[\d+\])*)$/);
-		if (!m) return null;
-		node = (node as Record<string, unknown>)[m[1]];
-		for (const idx of m[2].matchAll(/\[(\d+)\]/g)) {
-			if (!Array.isArray(node)) return null;
-			node = node[Number(idx[1])];
-		}
-	}
-	return node;
 }
 
 type Node = Record<string, any>;
@@ -333,17 +319,16 @@ interface Document {
 	ecmascript_only: number[];
 	/** Every block-binding slot in the canonical tree, for the root `comments` list. */
 	slots: Slot[] | null;
+	/** Whether Svelte parses the document as `lang="ts"` (`svelte_reads_typescript`). */
+	typescript: boolean;
 }
-
-/** A document's language, as the comparator names it. */
-export type LocLanguage = 'svelte' | 'typescript' | 'css';
 
 /** What the rows read about one file — the comparator's own match context. */
 export interface LocRowContext {
 	source: string;
 	canonical_root: unknown;
 	/** Only a Svelte document's differences can fall in a row. */
-	language: LocLanguage;
+	language: Language;
 }
 
 const documents = new WeakMap<LocRowContext, Document>();
@@ -356,10 +341,26 @@ function document_of(ctx: LocRowContext): Document {
 		for (let i = 0; i < text.length; i++) if (text.charCodeAt(i) === 0x0a) starts.push(i + 1);
 		const ecmascript_only: number[] = [];
 		for (const m of text.matchAll(/\r(?!\n)|[\u2028\u2029]/g)) ecmascript_only.push(m.index);
-		doc = { text, starts, ecmascript_only, slots: null };
+		doc = { text, starts, ecmascript_only, slots: null, typescript: svelte_reads_typescript(text) };
 		documents.set(ctx, doc);
 	}
 	return doc;
+}
+
+/**
+ * Svelte's own `lang="ts"` test, restated: the first `<script` tag the parser's
+ * `regex_lang_attribute` finds outside an HTML comment, read for `lang=ts`
+ * (`phases/1-parse/index.js`) — a source regex, not the AST, so it is restated here
+ * rather than read off the canonical tree.
+ */
+const SVELTE_LANG_ATTRIBUTE =
+	/<!--[^]*?-->|<script\s+(?:[^>]*|(?:[^=>'"/]+=(?:"[^"]*"|'[^']*'|[^>\s]+)\s+)*)lang=(["'])?([^"' >]+)\1[^>]*>/g;
+
+function svelte_reads_typescript(text: string): boolean {
+	for (const m of text.matchAll(SVELTE_LANG_ATTRIBUTE)) {
+		if (m[0][1] === 's') return m[2] === 'ts';
+	}
+	return false;
 }
 
 /** 0-based line index of `offset` in an LF table. */
@@ -668,14 +669,15 @@ export function classify_loc_difference(
 		}
 	}
 
-	// 6. each_as_stale_loc — the `{#each}` expression's `loc.end`, which Svelte leaves at
-	// the end of the `as` type its acorn read swallowed: the oracle's point must sit past
+	// 6. each_as_stale_loc — the `{#each}` expression's `loc.end`, which Svelte (under
+	// `lang="ts"` alone) leaves at the end of the `as` type its acorn read swallowed: the
+	// oracle's point must sit past
 	// the `as` keyword, at or before the context's end, on a token boundary (the `as` test
 	// is what bounds it below — a point at or before `offset` reads an empty slice)
 	const oracle = oracle_point(owner!, side, field, canonical);
 	const each_block = side === 'end' ? each_block_of(owner_path, ctx.canonical_root) : null;
 	const context_end = each_block?.context?.end;
-	if (oracle !== null && typeof context_end === 'number') {
+	if (oracle !== null && typeof context_end === 'number' && doc.typescript) {
 		const at = offset_at(oracle, doc.starts);
 		if (
 			at !== null &&

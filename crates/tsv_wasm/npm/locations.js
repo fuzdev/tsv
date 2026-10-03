@@ -12,8 +12,9 @@
  * - `reconstruct_locations(ast, source, opts?)` — one-shot: build the line table once,
  *   walk the tree, add `loc` to every node (and `name_loc` back to the Svelte nodes that
  *   carry one), return the (mutated) ast. The language is inferred from the root when
- *   `opts.language` is omitted — a whole parse's root (`Root`, `Program`,
- *   `StyleSheetFile`); any other node names no document, so it throws rather than guess.
+ *   `opts.language` is omitted — a whole parse's root (`Root`, `StyleSheetFile`, or a
+ *   `Program` spanning the whole source); any other node names no document, a Svelte
+ *   `<script>`'s `Program` included, so it throws rather than guess.
  * - `create_locator(source, {language})` — amortized: hold the prebuilt line table and
  *   expose `loc_of(node)` (single node) and `reconstruct(ast)` (whole tree). Prefer this
  *   for heavy sparse use.
@@ -56,8 +57,8 @@
  * - `character` in `loc`: a shorthand attribute's expansion (`{x}`), a snippet name, a
  *   simple-identifier block pattern (`{#each … as x}`, `{:then x}`, `{:catch x}`,
  *   `{@const x = …}`), and an **in-tag** comment — one written between an element's
- *   attributes, which Svelte's template reader collects rather than acorn. Nothing on the
- *   comment node marks it, so it's recovered structurally (see `stamp_in_tag_comment_locs`).
+ *   attributes, which Svelte's template reader collects rather than acorn — told apart by
+ *   the key order each collector writes (see `stamp_in_tag_comment_locs`).
  *
  * **A leading byte-order mark is read the way each wire reads it.** Svelte's `parse` and
  * `parseCss` strip a U+FEFF at index 0 before parsing, so the Svelte and CSS wires index
@@ -156,16 +157,22 @@ function loc_at(offset, starts) {
  * `Root` → svelte, `Program` → typescript, `StyleSheetFile` → css. `undefined` for
  * anything else — a subtree (a Svelte `Fragment`, a statement) names no document, and
  * guessing would silently apply the wrong line rule and skip Svelte's `name_loc`.
+ *
+ * A `Program` is a TypeScript root only when it spans the whole source, as a parse's
+ * root always does: a Svelte `<script>`'s program (`instance.content`) is a `Program`
+ * too, keyed identically, but it starts after its tag — read as a TypeScript root it
+ * would count ECMAScript terminators and a BOM the Svelte document doesn't.
  * @param {any} ast
+ * @param {string} source
  * @returns {'typescript' | 'svelte' | 'css' | undefined}
  */
-function infer_language(ast) {
+function infer_language(ast, source) {
 	if (ast && typeof ast === 'object') {
 		switch (ast.type) {
 			case 'Root':
 				return 'svelte';
 			case 'Program':
-				return 'typescript';
+				return ast.start === 0 && ast.end === source.length ? 'typescript' : undefined;
 			case 'StyleSheetFile':
 				return 'css';
 		}
@@ -239,11 +246,12 @@ function is_shorthand_attribute(node, source) {
  * The `[start, end]` UTF-16 offsets a Svelte node's `name_loc` covers, or `null`
  * for a node type that carries none.
  * @param {any} node
+ * @param {'element' | 'directive' | 'attribute' | undefined} kind - `NAME_LOC_KINDS`' entry
+ *   for the node's type, which the walk has already looked up
  * @param {string} source
  * @returns {[number, number] | null}
  */
-function name_span_of(node, source) {
-	const kind = NAME_LOC_KINDS.get(node.type);
+function name_span_of(node, kind, source) {
 	if (kind === undefined || typeof node.name !== 'string') return null;
 	if (kind === 'element') {
 		const start = node.start + 1; // the tag name follows `<`
@@ -267,7 +275,7 @@ function name_span_of(node, source) {
 
 /**
  * The `Identifier` a shorthand attribute expands to (`{x}` → `x`), or `null`.
- * @param {any} node - a shorthand `Attribute`.
+ * @param {any} node - a shorthand `Attribute`
  * @returns {any | null}
  */
 function shorthand_identifier_of(node) {
@@ -304,6 +312,9 @@ function stamp_name_shaped_loc(node, starts) {
 	node.loc = { start: name_loc_at(node.start, starts), end: name_loc_at(node.end, starts) };
 }
 
+/** The node types `stamp_character_locs` acts on — its switch's cases. */
+const STAMP_HOSTS = new Set(['Attribute', 'SnippetBlock', 'EachBlock', 'AwaitBlock', 'ConstTag']);
+
 /**
  * Give the identifiers under `node` the `character`-bearing `loc` Svelte reports on the
  * ones its own reader creates, rather than the plain `{line, column}` an acorn-parsed node
@@ -338,128 +349,78 @@ function stamp_character_locs(node, starts, source) {
 }
 
 /**
- * Whether `comment` sits *between* `element`'s attributes — the position Svelte's
- * own template reader collects from.
- *
- * Scans `element`'s opening tag tracking brace depth and quoting, and reports
- * whether the comment begins at depth 0 outside any quoted value. Everything
- * brace-wrapped is an expression acorn parses (an attribute value, a directive, a
- * spread, an `{@attach}`, a `svelte:element` `this={…}` binding), so one depth test
- * covers them all — no field-name knowledge, and no reliance on a `tag`/`expression`
- * span the wire may not carry. Comment bytes are stepped over whole, so a `>`, `{`,
- * or quote written inside a comment is never read as structure.
- * @param {any} element
- * @param {{start: number}} comment
- * @param {string} source
- * @param {Map<number, any>} comments_by_start - the root comment list, keyed by
- * `start` — one lookup per scanned character, where a `find` over the list made
- * the scan O(characters × comments) per comment.
- * @returns {boolean}
- */
-function is_between_attributes(element, comment, source, comments_by_start) {
-	let i = element.start + 1; // past `<`
-	let depth = 0;
-	let quote = '';
-	while (i < source.length) {
-		if (quote === '') {
-			const here = comments_by_start.get(i);
-			if (here) {
-				if (i === comment.start) return depth === 0;
-				i = here.end;
-				continue;
-			}
-		}
-		const ch = source[i];
-		if (quote !== '') {
-			if (ch === quote) quote = '';
-		} else if (ch === '"' || ch === "'") {
-			quote = ch;
-		} else if (ch === '{') {
-			depth++;
-		} else if (ch === '}') {
-			if (depth > 0) depth--;
-		} else if (ch === '>' && depth === 0) {
-			return false; // opening tag closed before reaching the comment
-		}
-		i++;
-	}
-	return false;
-}
-
-/**
  * Give each **in-tag** comment the `character`-bearing `loc` Svelte reports on it.
  *
  * Svelte's template reader collects the comments written *between* an element's
  * attributes (`<div /* c *\/ class="x">`) and stamps `character` into their `loc`;
- * every other comment is collected by acorn and gets the plain shape. Nothing on
- * the comment node itself tells the two apart, so the class is recovered
- * structurally — a comment is in-tag when it sits between the attributes of the
- * innermost element containing it. The "between" half is load-bearing: a comment
- * inside an attribute's *expression* (`{@attach /* c *\/ foo}`, `onclick={() =>
- * /* c *\/ x}`, `<svelte:element this={/* c *\/ 'p'}>`) is inside the opening tag
- * too, but acorn parses it, so it keeps the plain shape.
+ * every other comment is collected by acorn and gets the plain shape. The wire itself
+ * records which collector built each one, in its key order — the template reader's
+ * literal is `{type, start, end, value}`, acorn's `onComment` wrapper's
+ * `{type, value, start, end}` — so that order is read here, not re-derived from the
+ * tree. It holds for any tree a parse returned (`JSON.parse` and `structuredClone` keep
+ * key order); a tree rebuilt with its comments' keys reordered loses the stamp.
  * @param {any[]} comments
- * @param {any[]} elements - every element node the walk passed, in visit order.
  * @param {number[]} starts
- * @param {string} source
  * @mutates comments
  */
-function stamp_in_tag_comment_locs(comments, elements, starts, source) {
-	const comments_by_start = new Map();
-	for (const c of comments) {
-		if (typeof c?.start === 'number') comments_by_start.set(c.start, c);
-	}
+function stamp_in_tag_comment_locs(comments, starts) {
 	for (const c of comments) {
 		if (typeof c?.start !== 'number' || typeof c.end !== 'number') continue;
-		// innermost = the containing element with the greatest start; an outer
-		// element's opening tag closes before the comment, so only this one can hold it
-		let host = null;
-		for (const e of elements) {
-			if (e.start < c.start && c.end <= e.end && (host === null || e.start > host.start)) {
-				host = e;
-			}
-		}
-		if (host === null || !is_between_attributes(host, c, source, comments_by_start)) continue;
+		if (Object.keys(c)[1] !== 'start') continue;
 		c.loc = { start: name_loc_at(c.start, starts), end: name_loc_at(c.end, starts) };
 	}
 }
 
 /**
- * Walk `value`, adding a `loc` object to every object with numeric `start`/`end` —
+ * Walk `root`, adding a `loc` object to every object with numeric `start`/`end` —
  * and, for a Svelte tree, a `name_loc` to every element, attribute, and directive
  * that carries one. Mutates in place. Skips the keys it writes so it never
  * re-walks its own output.
- * @param {any} value
- * @param {{starts: number[], source: string, is_svelte: boolean, elements: any[] | null}} ctx
- *   `elements` collects element nodes for the in-tag comment pass, or is `null`
- *   when the document has no comments to classify.
+ *
+ * An explicit stack, not recursion: a recursive walk spends a JS frame per nesting
+ * level and meets the host's JS stack (a `RangeError`) well before the parser's own
+ * depth ceiling — on the N-API addon, whose parse runs on the host's native stack, a
+ * few thousand nested elements in. Depth here costs only the stack array.
+ *
+ * The `character`-bearing identifiers Svelte stamps are re-stamped after the walk
+ * (`stamp_character_locs`, per collected `STAMP_HOSTS` node), once the plain shape the
+ * walk writes every object has landed on them. Nothing reads the visit order.
+ * @param {any} root
+ * @param {{starts: number[], source: string, is_svelte: boolean}} ctx
  */
-function walk_add_loc(value, ctx) {
-	if (Array.isArray(value)) {
-		for (const v of value) walk_add_loc(v, ctx);
-	} else if (value && typeof value === 'object') {
+function walk_add_loc(root, ctx) {
+	const { starts, source, is_svelte } = ctx;
+	if (root === null || typeof root !== 'object') return;
+	const stack = [root];
+	const stamp_hosts = is_svelte ? [] : null;
+	while (stack.length > 0) {
+		const value = stack.pop();
+		if (Array.isArray(value)) {
+			for (const v of value) if (v !== null && typeof v === 'object') stack.push(v);
+			continue;
+		}
 		if (typeof value.start === 'number' && typeof value.end === 'number') {
-			value.loc = { start: loc_at(value.start, ctx.starts), end: loc_at(value.end, ctx.starts) };
-			if (ctx.is_svelte) {
-				const span = name_span_of(value, ctx.source);
+			value.loc = { start: loc_at(value.start, starts), end: loc_at(value.end, starts) };
+			if (is_svelte) {
+				const kind = NAME_LOC_KINDS.get(value.type);
+				const span = name_span_of(value, kind, source);
 				if (span) {
 					value.name_loc = {
-						start: name_loc_at(span[0], ctx.starts),
-						end: name_loc_at(span[1], ctx.starts)
+						start: name_loc_at(span[0], starts),
+						end: name_loc_at(span[1], starts)
 					};
-				}
-				if (ctx.elements !== null && NAME_LOC_KINDS.get(value.type) === 'element') {
-					ctx.elements.push(value);
 				}
 			}
 		}
-		for (const key of Object.keys(value)) {
+		for (const key in value) {
 			if (key === 'loc' || key === 'name_loc') continue;
-			walk_add_loc(value[key], ctx);
+			const v = value[key];
+			if (v !== null && typeof v === 'object') stack.push(v);
 		}
-		// Re-stamp the identifiers Svelte gives the `character`-bearing `loc`, after the
-		// walk above wrote them the plain shape.
-		if (ctx.is_svelte) stamp_character_locs(value, ctx.starts, ctx.source);
+		if (stamp_hosts !== null && STAMP_HOSTS.has(value.type)) stamp_hosts.push(value);
+	}
+	if (stamp_hosts !== null) {
+		for (const host of stamp_hosts) stamp_character_locs(host, starts, source);
 	}
 }
 
@@ -471,20 +432,11 @@ function walk_add_loc(value, ctx) {
  * @param {number[]} starts
  * @param {string} source
  * @param {boolean} is_svelte
- * @returns {any} the same `ast`, mutated.
+ * @returns {any} the same `ast`, mutated
  */
 function reconstruct_in(ast, starts, source, is_svelte) {
-	const comments = is_svelte && Array.isArray(ast?.comments) ? ast.comments : null;
-	const elements = comments !== null && comments.length > 0 ? [] : null;
-	walk_add_loc(ast, { starts, source, is_svelte, elements });
-	if (elements !== null) {
-		// `<svelte:options>` is the one attribute-bearing tag head whose wire node
-		// carries no `type` (Svelte's `root.options`), so the type-keyed walk can't
-		// collect it as a host — push it directly so its in-tag comments get the
-		// `character`-bearing loc like any element's.
-		if (ast?.options) elements.push(ast.options);
-		stamp_in_tag_comment_locs(comments, elements, starts, source);
-	}
+	walk_add_loc(ast, { starts, source, is_svelte });
+	if (is_svelte && Array.isArray(ast?.comments)) stamp_in_tag_comment_locs(ast.comments, starts);
 	return ast;
 }
 
@@ -496,7 +448,7 @@ const LANGUAGES = new Set(['typescript', 'svelte', 'css']);
  * don't rebuild it. Prefer this over the bare `loc_of`/`reconstruct_locations`
  * helpers for heavy sparse use — those rebuild the O(source) table per call.
  *
- * @param {string} source - the exact source the span-only wire was parsed from.
+ * @param {string} source - the exact source the span-only wire was parsed from
  * @param {{language: 'typescript' | 'svelte' | 'css'}} opts - `language` (required)
  *   selects the document's line rule and coordinates: `typescript` (ECMAScript line
  *   terminators, a leading BOM counted), `svelte` or `css` (LF alone, a leading BOM elided).
@@ -539,8 +491,8 @@ export function create_locator(source, opts) {
  *
  * The result deep-equals the loc-bearing wire of the same parse — see the module doc.
  *
- * @param {any} ast - a span-only AST, as every tsv parse returns it by default.
- * @param {string} source - the exact source `ast` was parsed from.
+ * @param {any} ast - a span-only AST, as every tsv parse returns it by default
+ * @param {string} source - the exact source `ast` was parsed from
  * @param {{language?: 'typescript' | 'svelte' | 'css'}} [opts] - the document's language;
  *   inferred from the root node (`Root`/`Program`/`StyleSheetFile`) when omitted.
  * @returns {any} the same `ast`, now with `loc` on every node (plus `name_loc` on
@@ -549,12 +501,17 @@ export function create_locator(source, opts) {
  *   roots, or when it is set and not one of the three languages
  */
 export function reconstruct_locations(ast, source, opts) {
-	const language = opts?.language ?? infer_language(ast);
+	const language = opts?.language ?? infer_language(ast, source);
 	if (language === undefined) {
 		const type = ast && typeof ast === 'object' ? ast.type : undefined;
+		const root =
+			type === 'Program'
+				? "a 'Program' that does not span the source"
+				: typeof type === 'string'
+					? `a '${type}' root`
+					: 'a root with no type';
 		throw new Error(
-			`locations: cannot infer the document's language from ` +
-				`${typeof type === 'string' ? `a '${type}' root` : 'a root with no type'} — ` +
+			`locations: cannot infer the document's language from ${root} — ` +
 				`pass {language: 'typescript' | 'svelte' | 'css'}, or the parse's own root ` +
 				`(Root, Program or StyleSheetFile)`
 		);
@@ -571,9 +528,9 @@ export function reconstruct_locations(ast, source, opts) {
  * Convenience form: it rebuilds the O(source) line-start table on every call, so for
  * more than a couple of lookups against one source reuse a `create_locator`.
  *
- * @param {any} node - a node from a span-only wire (must carry numeric `start`/`end`).
- * @param {string} source - the exact source the node was parsed from.
- * @param {{language: 'typescript' | 'svelte' | 'css'}} opts - as for `create_locator`.
+ * @param {any} node - a node from a span-only wire (must carry numeric `start`/`end`)
+ * @param {string} source - the exact source the node was parsed from
+ * @param {{language: 'typescript' | 'svelte' | 'css'}} opts - as for `create_locator`
  * @returns {{start: {line: number, column: number}, end: {line: number, column: number}} | null}
  * @throws {Error} when `opts.language` is missing or not one of the three
  */

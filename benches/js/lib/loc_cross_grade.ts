@@ -18,9 +18,7 @@
 
 // @ts-types="../../../crates/tsv_wasm/npm/locations.d.ts"
 import { reconstruct_locations } from '../../../crates/tsv_wasm/npm/locations.js';
-
-/** A language as the reconstruction names it. */
-export type LocLanguage = 'typescript' | 'svelte' | 'css';
+import type { Language } from './types.ts';
 
 /**
  * The first difference between two JSON values, as `path: a vs b`, or `null` when they are
@@ -69,7 +67,7 @@ export function loc_definition_violation(
 	loc_wire: unknown,
 	span_wire: unknown,
 	source: string,
-	language: LocLanguage
+	language: Language
 ): string | null {
 	const reconstructed = reconstruct_locations(structuredClone(span_wire), source, { language });
 	return first_difference(loc_wire, reconstructed);

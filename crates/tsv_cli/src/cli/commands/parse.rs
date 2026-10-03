@@ -72,8 +72,8 @@ impl ParseCommand {
         )
         .unwrap_or_else(|e| exit_with_error(1, format_args!("Parse error: {e}")));
         // The wire bytes are UTF-8 by construction; writing them directly skips the
-        // O(output) validation a `String` round trip would pay on ~15×-source-sized
-        // JSON. The newline is a second write rather than a `push` onto the same
+        // O(output) validation a `String` round trip would pay on JSON several times
+        // the source's size. The newline is a second write rather than a `push` onto the same
         // buffer: the writer sizes its `Vec` from an estimate
         // (`estimated_json_capacity`), so a wire that lands exactly on its capacity
         // would pay a realloc and a full copy of the output for one byte — and two
@@ -94,16 +94,16 @@ fn parse_to_json(
     goal: tsv_ts::Goal,
     locations: bool,
 ) -> Result<Vec<u8>, String> {
-    // Every output rides a byte writer — `convert_ast_json_bytes_no_locations`
-    // (the span-only wire, the default) or `convert_ast_json_bytes` (the `loc`
+    // Every output rides a byte writer — `convert_ast_json_bytes`
+    // (the span-only wire, the default) or `convert_ast_json_bytes_with_locations` (the `loc`
     // wire, `--locations`) — with no intermediate tree, and no output UTF-8
     // validation a String would require: compact returns the bytes verbatim, and
     // `--pretty` re-indents them in one linear pass (`indent_json_with_tabs`)
     // rather than reading them back into a `serde_json::Value` — a read that
     // recursed per JSON level and, at serde_json's default recursion limit,
     // refused past ~60 nested arrays what the compact form of the same input
-    // emitted fine. So the pretty
-    // route has no depth ceiling of its own; it stops where the parser stops.
+    // emitted fine. So the pretty route has no depth ceiling of its own; it stops
+    // where the parser stops.
     // The arena owns the internal AST; convert produces owned JSON, so nothing
     // borrowed escapes this function. Pre-sized to the source to avoid the
     // bump's chunk-doubling tail on the parse.
@@ -115,25 +115,25 @@ fn parse_to_json(
         ParserType::Svelte => {
             let ast = tsv_svelte::parse(source, &arena).map_err(|e| e.to_string())?;
             if locations {
-                tsv_svelte::convert_ast_json_bytes(&ast, source)
+                tsv_svelte::convert_ast_json_bytes_with_locations(&ast, source)
             } else {
-                tsv_svelte::convert_ast_json_bytes_no_locations(&ast, source)
+                tsv_svelte::convert_ast_json_bytes(&ast, source)
             }
         }
         ParserType::Css => {
             let ast = tsv_css::parse(source, &arena).map_err(|e| e.to_string())?;
             if locations {
-                tsv_css::convert_ast_json_bytes(&ast, source)
+                tsv_css::convert_ast_json_bytes_with_locations(&ast, source)
             } else {
-                tsv_css::convert_ast_json_bytes_no_locations(&ast, source)
+                tsv_css::convert_ast_json_bytes(&ast, source)
             }
         }
         ParserType::TypeScript => {
             let ast = tsv_ts::parse_with_goal(source, goal, &arena).map_err(|e| e.to_string())?;
             if locations {
-                tsv_ts::convert_ast_json_bytes(&ast, source)
+                tsv_ts::convert_ast_json_bytes_with_locations(&ast, source)
             } else {
-                tsv_ts::convert_ast_json_bytes_no_locations(&ast, source)
+                tsv_ts::convert_ast_json_bytes(&ast, source)
             }
         }
     };

@@ -1364,7 +1364,7 @@ mod tests {
             is_block: false,
             multiline: false,
             span: Span::new(start, start + 4),
-            emit_character_field: false,
+            from_template_reader: false,
             owned_by_node: false,
         }
     }

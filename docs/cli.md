@@ -360,10 +360,11 @@ is the same shape as the arena-retention advice in
 overflow there is a bare `SIGSEGV` with no message, since Rust's guard-page handler is
 installed by its runtime startup and a cdylib loaded into Node never runs it.
 
-The packages' `{locations: true}` reconstruction (`locations.js`) recurses once per nesting
-level in JS, so on a deep tree it can meet the host's JS stack (a catchable `RangeError`)
-before the parser's own ceiling does — on the N-API addon; on WASM the parser's own ceiling
-comes first. The default span-only parse runs no such step.
+The packages' `{locations: true}` reconstruction (`locations.js`) walks the tree with an
+explicit stack rather than recursion, so it adds no ceiling of its own: a deep tree that
+parses gets its `loc` on every engine. A JS frame per nesting level would meet the host's
+JS stack (a `RangeError`) several times shallower than the N-API parse reaches on nested
+elements and arrays.
 
 The WASM overflow is a trap the process survives but the *instance* does not — it
 poisons every later call. The npm packages ship a `reinstantiate()` recovery hook, and

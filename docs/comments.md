@@ -12,7 +12,7 @@ pub struct Comment {
     pub is_block: bool,
     pub multiline: bool,           // content contains '\n' (precomputed; block-only in practice)
     pub span: Span,                // full comment span, delimiters included
-    pub emit_character_field: bool, // Serializer hint: include `character` in JSON loc
+    pub from_template_reader: bool, // collected by Svelte's template reader (in-tag), not acorn
     pub owned_by_node: bool,        // Printed by the node it's bound to, not by the enclosing gap
 }
 ```

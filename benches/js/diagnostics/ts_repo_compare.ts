@@ -70,6 +70,7 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 
 import { init_compare_implementations } from '../lib/compare_cli.ts';
+import { first_line } from '../lib/error_text.ts';
 import { TS_REPO_PINS } from '../lib/gate_counts.ts';
 import { type KnownGap, TS_REPO_SANCTIONS } from '../lib/parse_sanctions.ts';
 import { load_typescript, tsc_parse } from '../lib/tsc.ts';
@@ -456,10 +457,6 @@ const BEYOND_ACORN_KNOWN_GAPS: BeyondAcornKnownGap[] = [
 			'`import { type "<A>" as typeA }` — a string-named specifier behind the `type` modifier (the unmodified `{ "<X>" as x }` in the same file parses)'
 	}
 ];
-
-function first_line(e: unknown): string {
-	return String(e instanceof Error ? e.message : e).split('\n')[0];
-}
 
 /** Where a graded parse unit came from — a single-file case, or one unit of a multi-file test. */
 interface Located {

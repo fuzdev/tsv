@@ -109,3 +109,7 @@ export const { format_svelte, format_typescript, format_css } = create_format_ap
 // as `@fuzdev/tsv-wasm`'s, including `undefined` (not `null`) from the three
 // maybe-a-warning methods, so `cli.js` drives either package's copy unchanged.
 export const IgnoreStack = addon.IgnoreStack;
+
+// The reconstruction helpers — pure JS over the span-only wire, no addon — staged
+// beside this file from `crates/tsv_wasm/npm/`, the wasm packages' copy verbatim.
+export * from './locations.js';

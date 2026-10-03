@@ -35,7 +35,7 @@
 /// a caller fed only the writer's own bytes never needs and a fuzzed one does.
 pub fn indent_json_with_tabs(compact: &[u8]) -> Vec<u8> {
     // Each member costs a newline plus its indent; a generous guess that avoids
-    // the early doublings on the ~15×-source-sized wire.
+    // the early doublings on a wire several times the source.
     let mut out = Vec::with_capacity(compact.len() + compact.len() / 2);
     let mut depth = 0usize;
     // Set on an opening bracket and cleared by the first member (which writes the

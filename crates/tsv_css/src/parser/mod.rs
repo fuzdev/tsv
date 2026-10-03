@@ -203,7 +203,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
                 start: self.span_pos(self.current_start()),
                 end: self.span_pos(self.current_end()),
             },
-            emit_character_field: false,
+            from_template_reader: false,
             owned_by_node: false,
         };
         comment.debug_assert_span_len();

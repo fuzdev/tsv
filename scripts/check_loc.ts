@@ -31,10 +31,11 @@
  * `deno run --allow-read --allow-run=target/corpus/tsv_debug scripts/check_loc.ts [root]`.
  */
 
-import { type LocLanguage, loc_definition_violation } from '../benches/js/lib/loc_cross_grade.ts';
+import { loc_definition_violation } from '../benches/js/lib/loc_cross_grade.ts';
+import { TSV_DEBUG_CORPUS as TSV_DEBUG } from '../benches/js/lib/loc_wire_client.ts';
+import type { Language } from '../benches/js/lib/types.ts';
 import { lines_of } from '../benches/js/lib/text_lines.ts';
 
-const TSV_DEBUG = 'target/corpus/tsv_debug';
 const DEFAULT_ROOT = 'tests/fixtures';
 /** The prettier-side documents tsv rejects, relative to `DEFAULT_ROOT` — the ledger. */
 const REJECTS_LEDGER = new URL('./check_loc_rejects.txt', import.meta.url);
@@ -44,7 +45,7 @@ const MAX_REPORTED = 20;
 /** One graded document's two wires. */
 interface WireRecord {
 	path: string;
-	language: LocLanguage;
+	language: Language;
 	source: string;
 	loc: unknown;
 	span: unknown;
@@ -101,7 +102,7 @@ async function main(): Promise<void> {
 		stderr: 'inherit'
 	}).spawn();
 
-	const graded: Record<LocLanguage, number> = { svelte: 0, typescript: 0, css: 0 };
+	const graded: Record<Language, number> = { svelte: 0, typescript: 0, css: 0 };
 	const mismatches: string[] = [];
 	const rejected = new Set<string>();
 	for await (const line of lines_of(child.stdout)) {
@@ -134,9 +135,14 @@ async function main(): Promise<void> {
 	const failures: string[] = [];
 	if (!status.success) failures.push(`\`${TSV_DEBUG} loc_wires\` exited ${status.code}`);
 	// Every language reached the grade: a walk that silently stopped producing one would
-	// leave it ungraded while the run reads green.
-	for (const [language, count] of Object.entries(graded)) {
-		if (count === 0) failures.push(`no ${language} document was graded`);
+	// leave it ungraded while the run reads green. Only the whole tree holds all three; a
+	// narrowed root (one language's subtree) is held to grading something.
+	if (root === DEFAULT_ROOT) {
+		for (const [language, count] of Object.entries(graded)) {
+			if (count === 0) failures.push(`no ${language} document was graded`);
+		}
+	} else if (total === 0) {
+		failures.push(`no document under ${root} was graded`);
 	}
 	const new_rejects = [...rejected].filter((path) => !ledger.has(path)).sort();
 	if (new_rejects.length > 0) {

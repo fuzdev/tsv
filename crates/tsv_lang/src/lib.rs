@@ -2,8 +2,10 @@
 //!
 //! This crate provides core types shared across all language implementations:
 //! - `Span` - source code location tracking
-//! - `LocationTracker` / `ByteToCharMap` / `LocationMapper` / `WirePositions` -
-//!   line/column information and byte→UTF-16 position mapping
+//! - `WireTables` / `WirePositions` - what a wire writer emits positions from (the
+//!   byte→UTF-16 map, and the line table under the `locations` feature);
+//!   `LocationTracker` / `ByteToCharMap` / `LocationMapper` - the line/column machinery
+//!   beneath them
 //! - `ParseError` - error types and result aliases
 //! - `OutputBuffer` - shared printer output utilities
 //! - `config` - hardcoded formatter settings (`PRINT_WIDTH` / `TAB_WIDTH` / `INDENT`)
@@ -62,7 +64,7 @@ pub use hash::{FxBuildHasher, FxHashMap, FxHashSet, FxHasher};
 pub use json_writer::{JsonWriter, StageRun, StagedDigits, write_array, write_or_null};
 pub use location::{
     BOM, ByteToCharMap, LeadingBom, LocationMapper, LocationTracker, Position, WirePositions,
-    leading_bom_len,
+    WireTables, leading_bom_len,
 };
 pub use output::{OutputBuffer, write_indent};
 pub use sizing::{estimated_ast_arena_capacity, estimated_json_capacity};

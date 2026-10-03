@@ -135,23 +135,23 @@ pub(crate) fn tsv_parse_to_value(source: &str, parser: ParserType) -> Option<Val
 /// node census ([`streamed_node_census`]), which the bytes answer directly, and the tree it
 /// would otherwise build costs more than the parse, the emit and the census together.
 ///
-/// ## The audit substrate's wire is the `no-locations` wire
+/// ## The audit substrate's wire is the span-only wire
 ///
-/// Both halves emit the **narrower** `convert_ast_json_bytes_no_locations` product — `start` /
-/// `end` offsets, no per-node `loc` (and, on the Svelte wire, no `name_loc`). That is not a
-/// cheaper approximation of the drop-in wire: `loc` is a pure function of `start` / `end` plus
-/// the source, and **no consumer in this crate reads one**. Every walk over an audit wire either
-/// skips the key by name (the node census's [`census_skips_key`], the leaf multiset's
-/// [`collect_conserved_leaves`], [`node_edge`](crate::audit::node_edge)'s non-structural set, the
-/// site scans, the blank audit's verbatim-region scan, `ast_census`) or strips it first
+/// Both halves emit the `convert_ast_json_bytes` product every binding ships — `start` /
+/// `end` offsets, no per-node `loc` (and, on the Svelte wire, no `name_loc`). `loc` is a pure
+/// function of `start` / `end` plus the source, and **no consumer in this crate reads one**.
+/// Every walk over an audit wire either skips the key by name (the node census's
+/// [`census_skips_key`], the leaf multiset's [`collect_conserved_leaves`],
+/// [`node_edge`](crate::audit::node_edge)'s non-structural set, the site scans, the blank
+/// audit's verbatim-region scan, `ast_census`) or strips it first
 /// ([`remove_locations`](crate::fixtures::remove_locations), which every `Value`-compare runs
 /// ahead of the skeleton). The span consumers read `start` / `end`, which are untouched.
 ///
 /// Dropping it is the substrate's single biggest lever, because the audits pay the wire on the
 /// hottest path they have — once per injection, per side. Three nested objects and six numbers
-/// per node is ~40% of the wire bytes over the fixture corpus, and the `Value` tree those bytes
-/// build is the dominant cost of a per-injection property battery (the workspace enables
-/// `serde_json`'s `arbitrary_precision`, so every one of those numbers is also a heap `String`).
+/// per node are a large share of the wire bytes, and the `Value` tree those bytes build is the
+/// dominant cost of a per-injection property battery (the workspace enables `serde_json`'s
+/// `arbitrary_precision`, so every one of those numbers is also a heap `String`).
 ///
 /// A future consumer that genuinely wants line/column asks the emitter for it directly rather
 /// than widening this one — the whole point of the narrower product is that the audits never
@@ -161,17 +161,15 @@ pub(crate) fn tsv_parse_to_wire_bytes(source: &str, parser: ParserType) -> Optio
     match parser {
         ParserType::TypeScript => {
             let ast = tsv_ts::parse_with_goal_or_fallback(source, None, &arena).ok()?;
-            Some(tsv_ts::convert_ast_json_bytes_no_locations(&ast, source))
+            Some(tsv_ts::convert_ast_json_bytes(&ast, source))
         }
         ParserType::Svelte => {
             let ast = tsv_svelte::parse(source, &arena).ok()?;
-            Some(tsv_svelte::convert_ast_json_bytes_no_locations(
-                &ast, source,
-            ))
+            Some(tsv_svelte::convert_ast_json_bytes(&ast, source))
         }
         ParserType::Css => {
             let ast = tsv_css::parse(source, &arena).ok()?;
-            Some(tsv_css::convert_ast_json_bytes_no_locations(&ast, source))
+            Some(tsv_css::convert_ast_json_bytes(&ast, source))
         }
     }
 }

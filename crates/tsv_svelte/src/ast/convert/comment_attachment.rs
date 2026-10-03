@@ -566,7 +566,7 @@ mod tests {
         }
 
         /// Assert `source`'s placements on both wires — the attach knows nothing about
-        /// line and column, so the `no-locations` variant must place every comment
+        /// line and column, so the span-only wire must place every comment
         /// identically.
         #[expect(clippy::expect_used)]
         fn assert_placements(source: &str, expected: &[(&str, u64, u64, &'static str, &str)]) {
@@ -579,10 +579,12 @@ mod tests {
                 })
                 .collect();
             for (wire_name, bytes) in [
-                ("default", crate::convert_ast_json_bytes(&root, source)),
+                ("span-only", crate::convert_ast_json_bytes(&root, source)),
+                // the loc-bearing wire exists only under `tsv_lang`'s `locations` feature
+                #[cfg(feature = "locations")]
                 (
-                    "no-locations",
-                    crate::convert_ast_json_bytes_no_locations(&root, source),
+                    "loc",
+                    crate::convert_ast_json_bytes_with_locations(&root, source),
                 ),
             ] {
                 let wire: Value = serde_json::from_slice(&bytes).expect("wire");

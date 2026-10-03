@@ -6,7 +6,7 @@
  * tsv's bindings emit one wire, span-only: `start`/`end` offsets, no per-node `loc`
  * (Svelte also no `name_loc`). The oracles emit `loc` (acorn under Svelte's
  * `locations: true`, Svelte's own reader), so the span grading strips exactly those keys
- * from the oracle's output — the definition `tests/no_locations.rs` (`strip_locations`)
+ * from the oracle's output — the definition `tests/loc_definition.rs` (`strip_locations`)
  * encodes, and the whole of what the span-only wire omits (the `character` field Svelte
  * puts on a name-shaped or in-tag-comment position lives inside one of them). Nothing
  * else differs, so the diff engine and its documented matchers grade the result
@@ -24,7 +24,7 @@
  * for lone surrogates, because its response crosses a Rust boundary where serde_json
  * rejects the document outright. Nothing crosses a boundary here, so the canonical AST
  * keeps acorn's TRUE lone-surrogate value — which is the only reason
- * `corpus_compare_parse.ts`'s `lone_surrogate_value` divergence matcher can still fire.
+ * `parse_divergences.ts`'s `lone_surrogate_value` divergence matcher can still fire.
  * Substituting here would make the canonical side agree with ours by construction and
  * silently retire that matcher.
  */

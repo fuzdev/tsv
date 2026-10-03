@@ -162,13 +162,7 @@ macro_rules! lang_bindings {
         pub fn $parse_fn(source: String, source_type: Option<String>) -> napi::Result<String> {
             let goal = napi_source_type(source_type, goal_allowed!($goalness), "parse")?
                 .unwrap_or(tsv_ts::Goal::Module);
-            parse_convert!(
-                $goalness,
-                $lang,
-                convert_ast_json_string_no_locations,
-                &source,
-                goal
-            )
+            parse_convert!($goalness, $lang, convert_ast_json_string, &source, goal)
         }
 
         /// Parse source to the internal AST only (no conversion, no
@@ -542,7 +536,6 @@ mod tests {
 
     #[test]
     fn format_normalizes_per_language() {
-        // Annotate the array type so the fn items coerce to `StringFn` (no casts).
         let cases: [(&str, StringFn, &str, &str); 3] = [
             (
                 "typescript",
@@ -598,7 +591,6 @@ mod tests {
     fn typescript_goal_switches_await() {
         // `await` is an ordinary identifier at Script goal, reserved at Module goal.
         let src = "var await = 1;\n";
-        // Annotate the array type so the fn items coerce to `StringFn` (no casts).
         assert!(at_goal(parse_typescript, src, "script").is_ok());
         assert!(at_goal(parse_typescript, src, "module").is_err());
         // An omitted goal is the Module default, not a third behavior.

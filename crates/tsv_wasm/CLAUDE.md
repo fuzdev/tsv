@@ -66,7 +66,7 @@ expected a string ('script' or 'module'), got a number`) — where N-API refuses
 conversion. `JsValue` is wasm-bindgen's own, so the format-only build still links no
 `js-sys`. The raw `parse_<lang>` still returns an object (`js_sys::JSON::parse` over
 the wire), so the bench's fairness probe and `scripts/validate_artifacts.ts`'s deno-bundle
-smoke read the raw module as before.
+smoke read the raw module directly.
 
 **The format-only package loads no parse code.** `api.js` imports nothing;
 `api_parse.js` imports `api.js`'s reader and `locations.js`. `@fuzdev/tsv-format-wasm`
@@ -143,7 +143,7 @@ smoked per variant by `scripts/validate_artifacts.ts`.
 ## JSON-String Transport
 
 The AST crosses the JS↔WASM boundary as **one compact JSON string** — the span-only wire:
-`parse_*` builds it with the lang crate's `convert_ast_json_string_no_locations` (each
+`parse_*` builds it with the lang crate's `convert_ast_json_string` (each
 language's wire-JSON writer emits it directly from the internal AST — no intermediate
 `serde_json::Value` or typed public tree) and calls the engine's native `JSON.parse` from
 Rust via `js_sys::JSON::parse`, so the export returns the object. Building the JS object
@@ -196,7 +196,7 @@ Six bags, declared in the facade's `.d.ts`: `FormatOptions` / `TypeScriptFormatO
 (`api.d.ts`), and `ParseOptions` / `TypeScriptParseOptions` (the object parsers) and
 `ParseJsonOptions` / `TypeScriptParseJsonOptions` (the `_json` exports, no `locations`)
 in `api_parse.d.ts`. The non-TypeScript bags — `FormatOptions`, `ParseOptions`,
-`ParseJsonOptions` — all declare **`sourceType?: undefined`**. Neither may be `{}`, and
+`ParseJsonOptions` — all declare **`sourceType?: undefined`**. None may be `{}`, and
 none may omit the key. Two independent reasons:
 
 - **An empty interface guards nothing.** `{}` opts out of *both*
@@ -205,7 +205,8 @@ none may omit the key. Two independent reasons:
   `format_svelte(src, 'script')`, `format_css(src, ['script'])` would all
   compile and all throw. That is the one shape where the types are *looser*
   than the runtime rather than stricter. One declared key restores both checks.
-  (`ParseOptions` was never empty — it has `locations`.)
+  (`ParseOptions` would not be empty without it — it has `locations` — so this reason
+  binds the other two.)
 - **Omitting the key breaks forwarding.** `npm/cli.js` builds
   `{sourceType: <maybe undefined>}` and hands it to whichever export rather than
   branching the call, and the runtime reads a `sourceType` set to `undefined` as
@@ -245,7 +246,7 @@ the same on every binding (`tsv_napi`, `tsv_ffi`). Line/column is a pure functio
 offset plus the source, so `loc` is a **view**: `{locations: true}` on a `parse_<lang>`
 call runs the shipped reconstruction (below) over the tree it just parsed and returns
 the tree with `loc` on every node — acorn-exact for TypeScript. The `loc`-bearing JSON
-form still exists in Rust (`convert_ast_json_*` in each language crate), reachable
+form still exists in Rust (`convert_ast_json_bytes_with_locations` in each language crate), reachable
 through no binding: the native CLI's `tsv parse --locations`, `tsv_debug`, and the
 corpus tools. `npm/cli.js`'s `parse --locations` is reconstruct-then-stringify, so its
 trees deep-equal the native CLI's while their key order differs (the Rust writer puts
@@ -275,9 +276,10 @@ On top of that it restores the Svelte-only fields, each an exact function of a n
 and type: `name_loc` on elements, attributes and directives, and the `character` field on
 the positions Svelte's own template reader creates — a shorthand attribute's identifier, a
 snippet name, a simple-identifier block pattern, and an in-tag comment, recovered
-structurally (a comment sitting between an element's attributes, i.e. inside its opening
-tag at brace depth 0 — including the `<svelte:options>` head, whose wire node carries no
-`type` and is pushed into the host-element pass explicitly). Svelte's own `loc` quirks are
+from the tree's own spans (a comment inside its innermost element, ahead of the first
+child, and inside no attribute's span nor a `this={…}`'s braces — including the
+`<svelte:options>` head, whose wire node carries no `type` and is pushed into the
+host-element pass explicitly). Svelte's own `loc` quirks are
 reproduced by neither implementation; the corpus comparator grades them as named
 tolerances (see [docs/conformance_svelte.md](../../docs/conformance_svelte.md)).
 
@@ -300,7 +302,7 @@ timing what `{locations: true}` costs over the default.
 A definition that is itself wrong makes both halves wrong the same way, and the
 cross-grade stays green. The outside reference is the canonical parsers' own `loc`,
 graded by `corpus:compare:parse` — exactly against acorn for TypeScript, against Svelte
-through its six cataloged tolerance rows.
+through its cataloged tolerance rows.
 
 **`.d.ts` export-name constraint.** `index.d.ts` re-exports both `tsv_ast.d.ts`
 (`export type *`) and `locations.d.ts` (`export *`), so a name exported by BOTH is

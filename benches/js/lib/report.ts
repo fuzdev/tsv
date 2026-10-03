@@ -316,10 +316,11 @@ export function generate_summary_report(
 	}
 
 	// Parse performance comparison. Every row renders as an ordinary bar against the
-	// canonical baseline; curated payload-matched lines are appended per language (see
-	// below) — tsv's span-only wire against oxc and yuku (the same span-only shape,
-	// though theirs write out default-valued fields tsv omits, ~1.3x the bytes), and
-	// its `+reconstruct` rows against the canonical parser, whose AST carries `loc`.
+	// canonical baseline; curated lines pairing like payloads are appended per language
+	// (see below) — tsv's span-only wire against oxc and yuku (the same span-only shape,
+	// though theirs write out default-valued fields tsv omits, ~1.3x the bytes), and its
+	// `+reconstruct` rows against the canonical parser, whose AST carries `loc` (exact
+	// on TypeScript; on Svelte tsv's is a superset, as the line's note says).
 	lines.push('');
 	lines.push('Parse Performance:');
 	for (const lang of languages) {

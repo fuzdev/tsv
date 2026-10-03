@@ -19,6 +19,7 @@ import {
 } from './types.ts';
 import { CanonicalImplementation } from './canonical.ts';
 import { check_executed_artifacts } from './check_artifact_freshness.ts';
+import { first_line } from './error_text.ts';
 import { NativeImplementation } from './ffi.ts';
 import { NapiImplementation } from './napi.ts';
 import { WasmImplementation } from './wasm.ts';
@@ -288,7 +289,7 @@ async function init_optional<T extends { init: () => Promise<void> }>(
 		unavailable.push({
 			key,
 			impl: missing_label,
-			reason: String(e instanceof Error ? e.message : e).split('\n')[0]
+			reason: first_line(e)
 		});
 		return undefined;
 	}
@@ -884,13 +885,35 @@ export function get_defined_rows(
 ): DefinedRow[] {
 	const rows = new Map<string, DefinedRow>();
 	for (const operation of operations) {
-		for (const language of LANGUAGES) {
-			for (const task of get_benchmark_tasks(impls.complete, operation, language, options)) {
-				if (!rows.has(task.name)) rows.set(task.name, { name: task.name, impl: task.impl });
-			}
+		for (const { name, impl } of get_defined_cells(impls, operation, options)) {
+			if (!rows.has(name)) rows.set(name, { name, impl });
 		}
 	}
 	return [...rows.values()];
+}
+
+/** One cell this surface defines: a row in one language. */
+export interface DefinedCell extends DefinedRow {
+	language: Language;
+}
+
+/**
+ * Every cell `operation` DEFINES — `get_defined_rows` before its dedupe by name, for
+ * a guard that asks per language (`PARSE_PAYLOAD_TIERS` is keyed by cell). Plain
+ * data, for the same reason.
+ */
+export function get_defined_cells(
+	impls: InitializedImplementations,
+	operation: 'parse' | 'format',
+	options: BenchmarkTaskOptions = {}
+): DefinedCell[] {
+	return LANGUAGES.flatMap((language) =>
+		get_benchmark_tasks(impls.complete, operation, language, options).map((task) => ({
+			name: task.name,
+			impl: task.impl,
+			language
+		}))
+	);
 }
 
 /**

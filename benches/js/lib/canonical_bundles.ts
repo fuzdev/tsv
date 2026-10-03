@@ -27,6 +27,8 @@ import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
+import { first_line } from './error_text.ts';
+
 const exec_file = promisify(execFile);
 
 /** One canonical size bundle: the row's label and the entry that defines its scope. */
@@ -82,7 +84,7 @@ async function build_bundle(bundle: CanonicalBundle): Promise<string | null> {
 	} catch (error) {
 		// The report records only THAT the row is absent; the cause lives here. A missing
 		// `deno` and a broken entry are different repairs and read alike without it.
-		const reason = (error instanceof Error ? error.message : String(error)).split('\n')[0];
+		const reason = first_line(error);
 		console.error(`⚠ size bundle "${bundle.label}" not built: ${reason}`);
 		return null;
 	}

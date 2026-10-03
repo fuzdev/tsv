@@ -1,10 +1,12 @@
 //! Writer-mode conversion: emit compact wire JSON directly from the internal
 //! Svelte AST.
 //!
-//! The Svelte sibling of `tsv_ts`'s and `tsv_css`'s `ast/convert/write*` — the
-//! hot path behind `convert_ast_json_bytes` (FFI/CLI compact output, WASM
-//! `JSON.parse`). It walks the *internal* Svelte AST once and writes the final
-//! JSON bytes as it goes, never materializing the typed public `Root`.
+//! The Svelte sibling of `tsv_ts`'s and `tsv_css`'s `ast/convert/write*`, writing
+//! both wires: the span-only one behind `convert_ast_json_bytes`
+//! (every parse binding, the CLI's default output) and the loc-bearing one behind
+//! `convert_ast_json_bytes_with_locations` (`tsv parse --locations`). It walks the
+//! *internal* Svelte AST once and writes the final JSON bytes as it goes, never
+//! materializing the typed public `Root`.
 //!
 //! **Fused emission.** The Svelte spine (elements, blocks, tags, directives,
 //! attributes, `name_loc`, positions) is emitted *fused* — final char-space
@@ -113,8 +115,8 @@ use crate::ast::internal;
 use crate::whitespace::is_svelte_ws;
 use tsv_css::ast::convert::{write_css_children, write_css_comments};
 use tsv_lang::{
-    ByteToCharMap, Comment, JsonWriter, LeadingBom, LocationMapper, LocationTracker, Span,
-    WirePositions, estimated_json_capacity, write_array, write_or_null,
+    Comment, JsonWriter, LeadingBom, LocationMapper, Span, WirePositions, WireTables,
+    estimated_json_capacity, write_array, write_or_null,
 };
 use tsv_ts::ast::convert::{
     CommentAttach, CommentMode, EmbedWriter, ProgramWriter, Schema, write_expression_embedded,
@@ -130,21 +132,15 @@ use super::special::{bool_option, component_is_typescript, find_option_values, t
 
 /// Convert an internal Svelte `Root` straight to its compact wire-JSON bytes.
 ///
-/// One AST walk, no intermediate `serde_json::Value` for the spine — the fused
-/// char-space wire the FFI/CLI/WASM parse bindings ship.
-pub(crate) fn write_root_bytes(root: &internal::Root<'_>, source: &str) -> Vec<u8> {
-    write_root_bytes_variant(root, source, true)
-}
-
-/// The span-only twin of `write_root_bytes`: drops every line/column object
-/// from the Svelte wire — every `loc` and every `name_loc`. Only `start`/`end`
-/// offsets remain; nothing else changes. Because that removes *all* line/column
-/// emission, no line table is built.
-pub(crate) fn write_root_bytes_no_locations(root: &internal::Root<'_>, source: &str) -> Vec<u8> {
-    write_root_bytes_variant(root, source, false)
-}
-
-fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: bool) -> Vec<u8> {
+/// One AST walk, no intermediate `serde_json::Value` for the spine. With `locations`
+/// unset it writes the span-only wire every binding ships — only `start`/`end` offsets,
+/// no `loc` and no `name_loc`, and no line table built; set, it adds every line/column
+/// object, the loc-bearing wire `tsv parse --locations` prints.
+pub(crate) fn write_root_bytes(
+    root: &internal::Root<'_>,
+    source: &str,
+    locations: bool,
+) -> Vec<u8> {
     // One LF-only line table (Svelte's `locate-character` convention) for the whole
     // document — template, every acorn island, `<script>` bodies, root comments and
     // `<style>` — built with the byte→UTF-16 map in one source scan, and only when the
@@ -156,12 +152,7 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
     // the `<style>` sheet, and every acorn island, which Svelte hands the BOM-less string
     // too — indexes one UTF-16 unit below the author's file, and a line-1 column one
     // lower. The parser's spans stay file-true; only the emitted position moves.
-    let (tracker, map) = if emit_loc {
-        let (tracker, map) = LocationTracker::new_with_map(source, LeadingBom::Elided);
-        (Some(tracker), map)
-    } else {
-        (None, ByteToCharMap::new(source, LeadingBom::Elided))
-    };
+    let tables = WireTables::lf(source, LeadingBom::Elided, locations);
 
     // Template comments (outside `<script>` content spans) are the only comments
     // the template attach passes move; everything else stays where it is.
@@ -174,7 +165,7 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
 
     let ctx = Ctx {
         source,
-        positions: WirePositions::new(&map, tracker.as_ref()),
+        positions: tables.positions(),
         snippet_wire_parameters: root.snippet_wire_parameters,
         comments: &template_comments,
         // Component-global: `lang="ts"` on any script makes *every* script emit the
@@ -182,7 +173,7 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
         component_is_ts: component_is_typescript(root, source),
     };
 
-    let mut w = JsonWriter::with_capacity(estimated_json_capacity(source.len()));
+    let mut w = JsonWriter::with_capacity(estimated_json_capacity(source.len(), locations));
     write_root(&mut w, root, &ctx);
     w.into_bytes()
 }
@@ -448,17 +439,17 @@ fn write_root(w: &mut JsonWriter, root: &internal::Root<'_>, ctx: &Ctx<'_>) {
 }
 
 /// A root-level comment, emitted fused in final char space. Svelte's two
-/// comment collectors build different literals: a `<script>` comment (acorn's
-/// `onComment` wrapper) is `{type, value, start, end, loc}`, a
-/// template-expression comment `{type, start, end, value, loc}` with
-/// `character` in its `loc` — the `emit_character_field` axis keys both
-/// differences. tsv writes `loc` immediately after `end` in both, from the
-/// document's one line table.
+/// comment collectors build different literals: one acorn collected (a `<script>`
+/// or template-expression comment, through its `onComment` wrapper) is
+/// `{type, value, start, end, loc}`; an in-tag one its template reader collected,
+/// `{type, start, end, value, loc}` with `character` in its `loc` — the
+/// `from_template_reader` axis keys both differences. tsv writes `loc` immediately
+/// after `end` in both, from the document's one line table.
 fn write_root_comment(w: &mut JsonWriter, comment: &Comment, ctx: &Ctx<'_>) {
     let span = comment.span;
     w.raw("{\"type\":\"");
     w.raw(if comment.is_block { "Block" } else { "Line" });
-    if comment.emit_character_field {
+    if comment.from_template_reader {
         w.raw("\",\"start\":");
         w.start_end(ctx.pos(span.start), ctx.pos(span.end));
         if let Some(lines) = ctx.positions.lines() {
@@ -2047,16 +2038,29 @@ fn write_optional_fragment(
     write_or_null(w, fragment, |w, f| write_fragment(w, f, ctx));
 }
 
+// The tests that read `name_loc` / `loc` need `tsv_lang`'s `locations` feature — on in every
+// workspace-wide test run (`tsv_cli` and `tsv_debug` enable it), off in a bare
+// `cargo test -p tsv_svelte` — and are gated on it one by one; the rest grade the span-only
+// wire and run either way.
 #[cfg(test)]
 mod tests {
     use serde_json::Value;
 
-    /// Parse full Svelte source and return the public JSON AST.
+    /// Parse full Svelte source and return its span-only wire.
     fn convert_svelte(source: &str) -> Value {
         let arena = bumpalo::Bump::new();
         // Test inputs are hardcoded valid sources; a parse failure should panic
         let root = crate::parse(source, &arena).expect("parse");
         serde_json::from_slice(&crate::convert_ast_json_bytes(&root, source)).expect("wire")
+    }
+
+    /// Parse full Svelte source and return its loc-bearing wire.
+    #[cfg(feature = "locations")]
+    fn convert_svelte_with_locations(source: &str) -> Value {
+        let arena = bumpalo::Bump::new();
+        let root = crate::parse(source, &arena).expect("parse");
+        serde_json::from_slice(&crate::convert_ast_json_bytes_with_locations(&root, source))
+            .expect("wire")
     }
 
     // Svelte hard-codes a `{@const}` declaration's `end` to `parser.index - 1`
@@ -2077,6 +2081,7 @@ mod tests {
     }
 
     /// Every node's `name_loc` from the wire, as `(start, end)` `{line, column, character}`.
+    #[cfg(feature = "locations")]
     fn name_locs(node: &Value, out: &mut Vec<(Value, Value)>) {
         match node {
             Value::Object(fields) => {
@@ -2102,6 +2107,7 @@ mod tests {
     /// own, so the grade holds without debug assertions; the writer's debug assertion also
     /// re-derives both endpoints the unfused way on every name the test suite parses.
     #[test]
+    #[cfg(feature = "locations")]
     fn name_loc_end_shares_its_start_line() {
         for term in ["\n", "\r", "\r\n", "\u{2028}", "\u{2029}", "\t", " "] {
             for lead in ["", "é\n", "😀", "\r\n\n"] {
@@ -2117,7 +2123,7 @@ mod tests {
                 for source in &sources {
                     let units: Vec<u16> = source.encode_utf16().collect();
                     let mut locs = Vec::new();
-                    name_locs(&convert_svelte(source), &mut locs);
+                    name_locs(&convert_svelte_with_locations(source), &mut locs);
                     assert!(!locs.is_empty(), "{source:?} carries a name_loc");
                     for (start, end) in locs {
                         assert_eq!(start["line"], end["line"], "{source:?}");
@@ -2160,7 +2166,7 @@ mod tests {
     fn element_and_attribute_shapes_write_these_bytes() {
         let arena = bumpalo::Bump::new();
         let root = crate::parse(SHAPES, &arena).expect("parse");
-        let wire = crate::convert_ast_json_bytes_no_locations(&root, SHAPES);
+        let wire = crate::convert_ast_json_bytes(&root, SHAPES);
         let expected = concat!(
             r#"{"css":null,"js":[],"start":0,"end":111,"type":"Root","fragment":{"type":"Fragment","#,
             r#""nodes":[{"type":"RegularElement","start":0,"end":111,"name":"div","#,
@@ -2230,8 +2236,9 @@ mod tests {
             let arena = bumpalo::Bump::new();
             let root = crate::parse(source, &arena).expect("parse");
             [
+                #[cfg(feature = "locations")]
+                crate::convert_ast_json_bytes_with_locations(&root, source),
                 crate::convert_ast_json_bytes(&root, source),
-                crate::convert_ast_json_bytes_no_locations(&root, source),
             ]
             .map(|wire| serde_json::from_slice::<Value>(&wire).expect("wire"))
         };
@@ -2257,6 +2264,7 @@ mod tests {
     /// at each decimal width of the line, over every name shape, against the line the
     /// source puts the name on.
     #[test]
+    #[cfg(feature = "locations")]
     fn name_loc_line_repeats_at_every_digit_width() {
         for line in [
             1usize, 9, 10, 99, 100, 999, 1_000, 9_999, 10_000, 99_999, 100_000,
@@ -2266,7 +2274,7 @@ mod tests {
                 "\n".repeat(line - 1)
             );
             let mut locs = Vec::new();
-            name_locs(&convert_svelte(&source), &mut locs);
+            name_locs(&convert_svelte_with_locations(&source), &mut locs);
             assert_eq!(locs.len(), 6, "line {line}");
             for (start, end) in locs {
                 assert_eq!(start["line"], line, "line {line}");

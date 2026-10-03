@@ -25,17 +25,19 @@ pub struct Comment {
     /// only ever `true` for block comments.
     pub multiline: bool,
     pub span: Span,
-    /// Public-AST serializer hint: when true, the JSON `loc` for this comment
-    /// includes a `character` (byte-offset) field alongside `line`/`column`.
-    /// Set by parsers that emit comments matching Svelte's template open-tag
-    /// shape; cleared for comments inside `<script>`/expressions/CSS that
-    /// follow the standard Svelte/acorn shape.
+    /// Whether Svelte's template reader collected this comment — one written between an
+    /// element's attributes (`<div /* c */ class="x">`) — rather than acorn or the CSS
+    /// parser. Three wire facts key off that provenance: the comment's `value` keeps its
+    /// raw content (no block-comment dedent, [`Comment::wire_value`]), it takes no part in
+    /// the nestled-comment merge (an acorn rule, `is_slash_star_acorn_comment`), and its
+    /// `loc` on the loc-bearing wire carries a `character` field (the emitted UTF-16
+    /// offset) beside `line`/`column`.
     //
-    // TODO: this serializer flag is a stopgap for the detached-comment model.
-    // Once an LSP/linter consumer arrives, promote to a structural attachment
-    // (a parallel comment collection on the language root, or per-element
-    // attachment if a richer model is needed).
-    pub emit_character_field: bool,
+    // TODO: a per-comment provenance flag stands in for structure in the detached-comment
+    // model. Once an LSP/linter consumer arrives, promote to a structural attachment (a
+    // parallel comment collection on the language root, or per-element attachment if a
+    // richer model is needed).
+    pub from_template_reader: bool,
     /// Whether this comment is **bound to the token that follows it**, and so is printed by
     /// the AST node that token begins rather than by the enclosing gap. Set by `tsv_ts`'s
     /// parser; always a **block** comment, and only ever when glued to its token (a comment
@@ -128,10 +130,10 @@ impl Comment {
     /// `svelte/packages/svelte/src/compiler/phases/1-parse/acorn.js`). This applies **only
     /// to comments acorn parses** — `<script>` bodies and template expressions — not to
     /// comments Svelte's own template reader collects (in-tag `//` / `/* */` between
-    /// attributes), which keep their raw content. [`Comment::emit_character_field`]
+    /// attributes), which keep their raw content. [`Comment::from_template_reader`]
     /// distinguishes the two: it is set for template-open-tag-shape comments (the
     /// template-reader ones) and cleared for acorn-shape ones, so the dedent is gated on
-    /// `!emit_character_field`.
+    /// `!from_template_reader`.
     ///
     /// The indentation is the one the comment's line opens with **in the document** — where
     /// Svelte measures the string its reader handed acorn, which four of its readers
@@ -146,7 +148,7 @@ impl Comment {
     #[must_use]
     pub fn wire_value<'s>(&self, source: &'s str) -> Cow<'s, str> {
         let content = self.content(source);
-        if self.is_block && self.multiline && !self.emit_character_field {
+        if self.is_block && self.multiline && !self.from_template_reader {
             Cow::Owned(printing::strip_comment_indentation(
                 source,
                 content,
@@ -236,7 +238,7 @@ fn is_indentable_block_content(comment: &Comment, content: &str) -> bool {
 ///   + `*//*` + `b's first`, which is `*`-prefixed either way.)
 /// - **`/*`-delimited and acorn-shape** — the rule is a JS-parse postprocess, so it reaches
 ///   `<script>` bodies and template expressions but never Svelte's own template-reader
-///   comments (`emit_character_field`, the same discriminator [`Comment::wire_value`]
+///   comments (`from_template_reader`, the same discriminator [`Comment::wire_value`]
 ///   splits on) nor an HTML `<!-- -->`, whose four-byte introducer would also make the
 ///   merged content a lie.
 ///
@@ -290,7 +292,7 @@ pub fn merge_nestled_block_comments<'c>(
 /// left operand against the entry it has already extended. The two answer alike, and
 /// `nestled_run_start_names_the_runs_the_merge_folds` pins it: a pair is only reached
 /// after its right neighbour's own step passed, which is where the fold's kept flags
-/// (`is_block`, `multiline`, [`Comment::emit_character_field`] — all the trailing
+/// (`is_block`, `multiline`, [`Comment::from_template_reader`] — all the trailing
 /// entry's) and its own content were already graded, and a merged content is indentable
 /// exactly when both halves are (the weld line inherits the left half's last line).
 #[must_use]
@@ -325,7 +327,7 @@ fn nestles_with<'s>(a: &Comment, b: &Comment, content_of: &impl Fn(&Comment) -> 
 
 /// Whether `comment` is a `/* … */` that an **acorn** parse collected.
 ///
-/// Two conjuncts doing two different jobs. `!emit_character_field` is the live
+/// Two conjuncts doing two different jobs. `!from_template_reader` is the live
 /// discriminator and the one prettier's own scope turns on: it is set for the
 /// template-open-tag-shape comments Svelte's *template reader* collects (an in-tag
 /// `<div /* c */ >`) and cleared for everything an acorn parse produced, which is exactly
@@ -339,7 +341,7 @@ fn nestles_with<'s>(a: &Comment, b: &Comment, content_of: &impl Fn(&Comment) -> 
 /// introducer being two bytes wide — a merged entry's content is a raw source slice, so a
 /// wider introducer would make it something other than `a *//* b`, silently, in release.
 fn is_slash_star_acorn_comment(comment: &Comment) -> bool {
-    !comment.emit_character_field && comment.content_span.start == comment.span.start + 2
+    !comment.from_template_reader && comment.content_span.start == comment.span.start + 2
 }
 
 //
@@ -1306,7 +1308,7 @@ mod tests {
             is_block,
             multiline: Comment::content_is_multiline(is_block, content),
             span: Span::new(start, end),
-            emit_character_field: false,
+            from_template_reader: false,
             owned_by_node: false,
         }
     }
@@ -1526,7 +1528,7 @@ mod tests {
             is_block: true,
             multiline: Comment::content_is_multiline(true, content),
             span: Span::new(start as u32, end as u32),
-            emit_character_field: false,
+            from_template_reader: false,
             owned_by_node: false,
         }
     }

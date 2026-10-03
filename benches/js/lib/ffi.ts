@@ -231,8 +231,8 @@ export class NativeImplementation extends BaseImplementation {
 		// fires — see `lib/reject_probe.ts`.
 		assert_binding_reports_rejection('tsv (FFI)', this);
 
-		// The parse wire is span-only — prove this artifact emits it, so a library built
-		// before the bindings went span-only can't be timed under the span rows' label.
+		// The parse wire is span-only — prove this artifact emits it, so a stale library
+		// whose parse still emits `loc` can't be timed under the span rows' label.
 		// See `lib/locations_probe.ts`.
 		assert_binding_emits_span_only('tsv (FFI)', { path: lib_path, rebuild }, this);
 	}

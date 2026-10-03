@@ -214,6 +214,20 @@ Deno.test('reconstruct_locations: the language is inferred from a root, never gu
 			"{language: 'typescript' | 'svelte' | 'css'}, or the parse's own root " +
 			'(Root, Program or StyleSheetFile)'
 	);
+	// a Svelte `<script>`'s program is a `Program` that starts after its tag: refused,
+	// rather than read as a TypeScript root (ECMAScript terminators, a counted BOM)
+	const svelte_source = '<script>\na\rb\n</script>';
+	const script_program = { type: 'Program', start: 8, end: 13, body: [], sourceType: 'module' };
+	throws_exactly(
+		() => reconstruct_locations(script_program, svelte_source),
+		"locations: cannot infer the document's language from a 'Program' that does not " +
+			"span the source — pass {language: 'typescript' | 'svelte' | 'css'}, or the " +
+			"parse's own root (Root, Program or StyleSheetFile)"
+	);
+	strictEqual(
+		reconstruct_locations(script_program, svelte_source, { language: 'svelte' }).loc.end.line,
+		3
+	);
 	// named, a subtree reconstructs under that language's rule
 	strictEqual(reconstruct_locations(fragment, lf_cr, { language: 'svelte' }).loc.end.line, 1);
 	// a named language that is not one of the three keeps the locator's own refusal
@@ -222,6 +236,60 @@ Deno.test('reconstruct_locations: the language is inferred from a root, never gu
 		/`language` must be 'typescript', 'svelte' or 'css'.*\(got 'html'\)/
 	);
 });
+
+Deno.test('reconstruct_locations: depth costs no JS stack', () => {
+	// far past where a frame-per-level walk throws a `RangeError` on every runtime; each
+	// level nests an array too, which a recursive walk pays a frame for as well
+	const depth = 100_000;
+	let element: Record<string, unknown> = { type: 'Text', start: 0, end: 1, raw: 'x', data: 'x' };
+	const innermost = element;
+	for (let i = 0; i < depth; i++) {
+		element = {
+			type: 'RegularElement',
+			start: 0,
+			end: 1,
+			name: 'div',
+			attributes: [],
+			fragment: { type: 'Fragment', nodes: [[element]] }
+		};
+	}
+	const root = { type: 'Root', start: 0, end: 1, fragment: { type: 'Fragment', nodes: [element] } };
+	reconstruct_locations(root, 'x');
+	deepStrictEqual(innermost.loc, { start: { line: 1, column: 0 }, end: { line: 1, column: 1 } });
+});
+
+Deno.test(
+	'reconstruct_locations: an in-tag comment is told by the key order its collector wrote',
+	() => {
+		// Svelte's template reader writes `{type, start, end, value}` (an in-tag comment, which
+		// gets `character`); acorn's `onComment` wrapper `{type, value, start, end}` (the plain
+		// shape) — whatever the tree around them says
+		const source = '<div /* a */ title={/* b */ x}></div>';
+		const at = (needle: string) => source.indexOf(needle);
+		const template_reader: Record<string, unknown> = {
+			type: 'Block',
+			start: at('/* a'),
+			end: at('/* a') + 7,
+			value: ' a '
+		};
+		const acorn: Record<string, unknown> = {
+			type: 'Block',
+			value: ' b ',
+			start: at('/* b'),
+			end: at('/* b') + 7
+		};
+		const root = { type: 'Root', start: 0, end: source.length, comments: [acorn, template_reader] };
+		reconstruct_locations(root, source);
+		deepStrictEqual(template_reader.loc, {
+			start: { line: 1, column: 5, character: 5 },
+			end: { line: 1, column: 12, character: 12 }
+		});
+		deepStrictEqual(acorn.loc, {
+			start: { line: 1, column: at('/* b') },
+			end: { line: 1, column: at('/* b') + 7 }
+		});
+	}
+);
 
 Deno.test('parse: the source type is forwarded, unset when not named', () => {
 	const { engine, calls } = fake_engine(false);
@@ -278,6 +346,31 @@ Deno.test('format: the source type forwarded, `locations` unknown', () => {
 		() => api.format_css('x', { sourceType: 'script' }),
 		"format option 'sourceType' is only supported for TypeScript"
 	);
+});
+
+Deno.test('a non-string source is refused before the engine sees it', () => {
+	const { engine, calls } = fake_engine(false);
+	const api = { ...create_parse_api(engine), ...create_format_api(engine.format) };
+	for (const [name, noun] of [
+		['parse_typescript', 'parse'],
+		['parse_svelte_json', 'parse'],
+		['format_css', 'format']
+	] as const) {
+		for (const [source, got] of [
+			[42, 'number'],
+			[null, 'null'],
+			[undefined, 'undefined'],
+			[{}, 'object']
+		] as const) {
+			throws(
+				() => (api[name] as (source: unknown) => unknown)(source),
+				(error: unknown) =>
+					error instanceof TypeError &&
+					error.message === `${noun} source must be a string (got ${got})`
+			);
+		}
+	}
+	strictEqual(calls.length, 0);
 });
 
 Deno.test('the facade builds exactly the engine families it is handed', () => {

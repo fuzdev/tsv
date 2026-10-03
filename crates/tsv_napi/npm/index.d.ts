@@ -8,9 +8,9 @@
  * `reinstantiate()` (no instance to poison), and `IgnoreStack`'s `free()` /
  * `[Symbol.dispose]` (a GC-managed native object has no handle to release).
  * That list is the whole delta — `scripts/test_napi_npm.ts` diffs the two
- * packages' export names rather than trusting it. The
- * `locations.js` helper's types are appended at stage time by
- * `scripts/build_napi_packages.ts`, alongside the copy of the helper itself.
+ * packages' export names rather than trusting it. The `locations.js` helper's
+ * functions and types are re-exported whole, from the copy
+ * `scripts/build_napi_packages.ts` stages beside this file.
  *
  * Relative specifiers carry the **`.js`** extension, here and in every
  * `import(...)` below: under `moduleResolution: node16`/`nodenext` a relative
@@ -19,6 +19,9 @@
  * `./tsv_ast.d.ts`. Same rule the wasm packages' generated declarations follow.
  */
 export type * from './tsv_ast.js';
+// `export *`, not `export type *` — the helper's functions AND its types flow through,
+// matching the wasm packages' index.d.ts.
+export * from './locations.js';
 
 // The parse/format surface is the shared facade's, declared once beside it
 // (`api.d.ts` / `api_parse.d.ts`, staged in from `crates/tsv_wasm/npm/`). Re-exported by

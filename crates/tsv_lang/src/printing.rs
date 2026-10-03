@@ -2129,7 +2129,8 @@ fn next_line_terminator(bytes: &[u8], from: usize) -> Option<(usize, usize)> {
 /// ([`crate::Comment::content_is_multiline`]) — and the `[ \t]` indentation class are Svelte's
 /// too. All five spellings of both steps are pinned by
 /// `tests/comment_dedent_line_terminators.rs`, whose module doc says why a fixture cannot
-/// carry what it holds; which line the run is read from, by `tests/comment_dedent_document_line.rs`.
+/// carry what it holds; which line the run is read from, by
+/// `tests/comment_dedent_document_line.rs`.
 ///
 /// # Examples
 ///

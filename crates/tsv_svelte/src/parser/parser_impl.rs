@@ -20,14 +20,14 @@ fn expression_comment(
     content_span: Span,
     is_block: bool,
     content: &str,
-    emit_character_field: bool,
+    from_template_reader: bool,
 ) -> Comment {
     let comment = Comment {
         content_span,
         is_block,
         multiline: Comment::content_is_multiline(is_block, content),
         span,
-        emit_character_field,
+        from_template_reader,
         owned_by_node: false,
     };
     comment.debug_assert_span_len();
@@ -669,7 +669,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             tsv_ts::pattern_type_annotation(&pattern).is_none(),
             "a block pattern's `: T` is its own sub-parse (`parse_block_pattern`)"
         );
-        self.expression_comments.extend(comments.iter().copied());
+        self.expression_comments.extend_from_slice(comments);
         Ok(self.arena.alloc(pattern))
     }
 

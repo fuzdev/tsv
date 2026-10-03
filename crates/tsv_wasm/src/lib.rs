@@ -452,7 +452,7 @@ macro_rules! lang_bindings {
             .unwrap_or(tsv_ts::Goal::Module);
             with_ast_arena(|arena| {
                 let ast = parse_ast!($goalness, $lang, source, goal, arena).map_err(err)?;
-                Ok($lang::convert_ast_json_string_no_locations(&ast, source))
+                Ok($lang::convert_ast_json_string(&ast, source))
             })
         }
 
