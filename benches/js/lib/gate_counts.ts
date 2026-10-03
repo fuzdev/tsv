@@ -96,7 +96,7 @@ export const GATE_CHECKOUT_IDS: Record<
 	// its manifest.
 	[CORPORA_ROOT]: {
 		tree: CORPORA_TREE,
-		hash: '434f81a60',
+		hash: '9b64dd2a4',
 		pins: ['CORPUS_FORMAT_*', 'CORPUS_PARSE_*', 'SVELTE_STYLES_BLOCKS_PIN']
 	},
 	// `../svelte` feeds the conformance view alone (its `tests` tree); its
@@ -297,8 +297,12 @@ export const CORPUS_PARSE_COMPARED_PIN: Record<Language, number> = {
 	// §Comment Attachment Differences). The tsv-side failure counts below did not move, and
 	// neither did the snapshot's `collections/` tree id — nothing it vendors changed, only
 	// which of it the view reads.
-	svelte: 3450,
-	typescript: 5255,
+	//
+	// 3450 / 5255 / 185 → 3428 / 5206 / 185: kit's sync test fixtures leave the snapshot (22
+	// svelte, 49 js — see `CORPUS_FORMAT_MATCH_MIN`), every one of them compared before. The
+	// tsv-side failure counts below hold.
+	svelte: 3428,
+	typescript: 5206,
 	css: 185
 };
 
@@ -352,7 +356,15 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// line, 995/995, rewritten 5316/5316), and the `--all --json` bucket lists set-diffed
 	// across the two corpus-profile FFI builds — nothing arrives anywhere, `partial` /
 	// `safety` / `errors` / `expected_errors` identical file-for-file.
-	svelte: 2706,
+	//
+	// 2706 → 2694: the snapshot's kit collection drops `core/sync/write_types/test` and
+	// `core/sync/create_manifest_data/test`, the fixture apps kit's type-generation and
+	// manifest specs read: 22 near-empty `+page.svelte` / `+layout.svelte` files, every one a
+	// `match`. The tree measured 2716 before the drop, ten above the old floor, so the floor
+	// tightens to the measured count. Measured by formatting the removed files on their own
+	// (22 / 22 match) beside the full `--all` run, where `unknown` and `partial` hold in every
+	// language.
+	svelte: 2694,
 	// 4169 → 5124 and (css) 125 → 133: the `third_party` tier — see svelte. 955 of its 966
 	// typescript files match (flowbite-svelte 338 of 338, layerchart 188 of 190, layercake 65 of
 	// 66, svelte-ux 100 of 100, svelte-maplibre 57 of 57, language-tools 207 of 215), none
@@ -569,7 +581,14 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// Measured by an `--all --json` bucket set-diff between a baseline `--profile corpus` FFI
 	// build and the tip: those four are the only movers in `unknown`, `partial` and `safety` of
 	// any language.
-	typescript: 5190,
+	//
+	// 5190 → 5141: the same kit drop — 49 `.js` files, the fixture apps' `+page.js` /
+	// `+layout.js` / `+server.js` and the manifest spec's two param matchers, every one a
+	// `match` (49 / 49 on their own). kit's collection also moves from a local
+	// prettier-baseline commit to its upstream parent, which re-authors four `.d.ts` unions
+	// (`exports/public.d.ts`, `types/{ambient,internal,private}.d.ts`); all four match before
+	// and after.
+	typescript: 5141,
 	// ⚠️ A short `svelte_styles` cache understates every css count at once and reads exactly
 	// like a regression: the harvest is a CORPUS INPUT, not a measurement of tsv, and a
 	// standalone `corpus:compare:format --all` is the one entry point that does not chain it
@@ -1181,12 +1200,14 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
  * id), a collection joining a perf tier, or a broken extraction, and the harvest fails
  * BEFORE writing so a wrong cache never replaces a good one. Stamped on the snapshot's
  * `collections/` tree id and the perf view's entry list (`lib/harvest_stamp.ts`).
- * Measured 2026-09-05: ../corpora `collections/` at 5f40c547c, over the perf view's
- * 951 `.svelte` files.
+ * Measured 2026-10-02: ../corpora `collections/` at 9b64dd2a4, over the perf view's
+ * 929 `.svelte` files.
  *
  * 278 → 401: earbetter and cosmicplayground join the `real` tier, so the perf view gains
  * their `.svelte` files (58 + 65 blocks) with the snapshot's tree id unmoved — the
  * view-composition move the stamp's `perf_entries` input exists to notice.
+ *
+ * 401 holds over kit's fixture drop: none of its 22 removed pages carries a `<style>`.
  */
 export const SVELTE_STYLES_BLOCKS_PIN = 401;
 
