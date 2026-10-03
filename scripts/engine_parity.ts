@@ -54,13 +54,12 @@ import { tmpdir } from 'node:os';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { CORE_CRATES, wasm_bundle_dir } from '../benches/js/lib/tsv_artifacts.ts';
 import {
-	CORE_CRATES,
-	WASM_CRATES,
-	wasm_bundle_dir,
-	wasm_bundle_path
-} from '../benches/js/lib/tsv_artifacts.ts';
-import { assert_staged_fresh, type StagedCheck } from './check_staged_freshness.ts';
+	assert_staged_fresh,
+	type StagedCheck,
+	wasm_package_checks
+} from './check_staged_freshness.ts';
 import { host_triple } from './napi_host.ts';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -166,22 +165,10 @@ const freshness: StagedCheck[] = [
 		files: native.label === 'target/release' ? [] : ['scripts/build_napi_packages.ts'],
 		rebuild: 'deno task build:napi:packages'
 	},
-	{
-		// the engine bytes themselves: `cli.js` is re-copied on every patcher run, so a
-		// fresh `cli.js` over a stale `.wasm` would otherwise grade as fresh
-		label: 'wasm package engine',
-		staged: repo_rel(wasm_bundle_path('all', 'npm')),
-		crates: [...CORE_CRATES, ...WASM_CRATES],
-		files: ['deno.json'],
-		rebuild: 'deno task build:npm:all'
-	},
-	{
-		label: 'wasm package cli.js',
-		staged: repo_rel(wasm_cli),
-		crates: [...CORE_CRATES, ...WASM_CRATES],
-		files: ['crates/tsv_wasm/npm/cli.js', 'scripts/patch_npm_package.ts', 'deno.json'],
-		rebuild: 'deno task build:npm:all'
-	}
+	// the wasm package as every reader of its staging dates it — the engine bytes
+	// themselves included, since `cli.js` is re-copied on every patcher run and a fresh
+	// `cli.js` over a stale `.wasm` would otherwise grade as fresh
+	...wasm_package_checks('all')
 ];
 await assert_staged_fresh(freshness);
 const extensions = await formattable_extensions(native.path);

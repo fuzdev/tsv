@@ -21,6 +21,13 @@
  * `test_napi_npm.ts` over `@fuzdev/tsv-wasm`). Both read the same mtimes, so a
  * skip and an abort never disagree about what is stale.
  *
+ * The check LISTS for a staged wasm package and the staged napi loader are stated here
+ * once (`wasm_package_checks`, `napi_loader_checks`), so every reader of one staging — the
+ * package suites, artifact validation, the napi suite's export-set parity, the engine
+ * parity audit and `scripts/typecheck_packages.ts` — dates it by the same sources. A reader with an artifact
+ * of its own (the napi platform binaries, the deno bundles, `engine_parity.ts`'s native
+ * binary) adds that check beside the shared list.
+ *
  * Staleness here has two lags — the `target/` build behind the sources, and the
  * staged copy behind the build — and comparing the staged file's mtime directly
  * against the SOURCES catches both with one check.
@@ -35,10 +42,18 @@
  */
 
 import { stat } from 'node:fs/promises';
+import { relative } from 'node:path';
 import { env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { fmt_mtime, newest_source_mtime } from '../benches/js/lib/check_artifact_freshness.ts';
+import {
+	CORE_CRATES,
+	WASM_CRATES,
+	wasm_bundle_dir,
+	type WasmVariant
+} from '../benches/js/lib/tsv_artifacts.ts';
+import { facade_sources } from './npm_facade.ts';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -147,8 +162,8 @@ export async function assert_staged_fresh(checks: readonly StagedCheck[]): Promi
 			...(fatal
 				? [
 						'',
-						'  Run the build-first task rather than the `:run` variant, run the restage',
-						'  command(s) above, or set BENCH_STALE_OK=1 to override (stale only —',
+						'  Run the restage command(s) above (or the build-first task, where a `:run`',
+						'  variant skipped it), or set BENCH_STALE_OK=1 to override (stale only —',
 						'  a missing staged file is always fatal).'
 					]
 				: []),
@@ -156,4 +171,113 @@ export async function assert_staged_fresh(checks: readonly StagedCheck[]): Promi
 		].join('\n')
 	);
 	if (fatal) exit(1);
+}
+
+/** The staging scripts and metadata that write a wasm package's generated entries. */
+const PATCHER_SOURCES = [
+	'scripts/patch_npm_package.ts',
+	'scripts/npm_facade.ts',
+	'scripts/npm_metadata.ts'
+];
+
+/** A wasm variant's npm staging (`scripts/patch_npm_package.ts` writes it), repo-relative. */
+export function wasm_package_dir(variant: WasmVariant): string {
+	return relative(ROOT, wasm_bundle_dir(variant, 'npm'));
+}
+
+/**
+ * The checks that date one staged wasm package — the one list every reader of a
+ * `pkg/<variant>/npm` staging grades it by (the package suite, artifact validation, the
+ * napi suite's export-set parity, the engine parity audit, the declaration check). One check per staging step, keyed
+ * on a file that step writes: the bundle (wasm-pack, whose features are a `deno.json` task
+ * string), the generated entries (the patcher and its inputs), the copied facade, and for
+ * the `all` variant the copied `cli.js`.
+ */
+export function wasm_package_checks(
+	variant: WasmVariant,
+	dir: string = wasm_package_dir(variant)
+): Array<StagedCheck> {
+	const rebuild = `deno task build:npm:${variant}`;
+	return [
+		{
+			label: `staged WASM bundle (${variant})`,
+			staged: `${dir}/tsv_wasm_bg.wasm`,
+			crates: [...CORE_CRATES, ...WASM_CRATES],
+			files: ['deno.json'],
+			rebuild
+		},
+		{
+			// the patcher derives the entries from wasm-pack's generated JS, so whatever feeds
+			// that (the crates, the feature set in deno.json) feeds them too — a wasm-pack rerun
+			// the patcher did not follow must stale them, and `cli.js`, written in the same pass
+			label: `staged package entries (${variant})`,
+			staged: `${dir}/index.js`,
+			crates: [...CORE_CRATES, ...WASM_CRATES],
+			files: [...PATCHER_SOURCES, 'deno.json'],
+			rebuild
+		},
+		{
+			// every facade file the variant ships — the AST types included — is copied in
+			// the same staging step, so the first one's age speaks for the rest
+			label: `staged facade (${variant})`,
+			staged: `${dir}/api.js`,
+			crates: [],
+			files: [...facade_sources(variant !== 'format'), 'scripts/npm_facade.ts'],
+			rebuild
+		},
+		...(variant === 'all'
+			? [
+					{
+						label: 'staged cli.js (all)',
+						staged: `${dir}/cli.js`,
+						crates: [],
+						files: ['crates/tsv_wasm/npm/cli.js'],
+						rebuild
+					}
+				]
+			: [])
+	];
+}
+
+/** Where `scripts/build_napi_packages.ts` stages the N-API packages, repo-relative. */
+export const NAPI_PKG_ROOT = 'crates/tsv_napi/pkg';
+
+/** The `@fuzdev/tsv` loader's staging. */
+export const NAPI_LOADER_DIR = `${NAPI_PKG_ROOT}/napi`;
+
+/**
+ * The checks that date the staged `@fuzdev/tsv` loader. Every hand-written code source the
+ * loader package copies, not just `index.js`: the staged files are written in one pass,
+ * so `index.js`'s mtime dates the whole staging and a sibling edited since then is the
+ * same staleness. (`cli.js` gets its own check only because it is the one shared with the
+ * wasm package. `README.md` and `LICENSE` are copied too and absent here — a reader that
+ * grades the README adds its own check.)
+ */
+export function napi_loader_checks(): Array<StagedCheck> {
+	const rebuild = 'deno task build:napi:packages';
+	return [
+		{
+			label: 'staged loader',
+			staged: `${NAPI_LOADER_DIR}/index.js`,
+			crates: [],
+			files: [
+				'crates/tsv_napi/npm/index.js',
+				'crates/tsv_napi/npm/index.d.ts',
+				'crates/tsv_napi/npm/platform.js',
+				'crates/tsv_napi/npm/bin.js',
+				...facade_sources(true),
+				'scripts/build_napi_packages.ts',
+				'scripts/npm_facade.ts',
+				'scripts/npm_metadata.ts'
+			],
+			rebuild
+		},
+		{
+			label: 'staged cli.js mirror',
+			staged: `${NAPI_LOADER_DIR}/cli.js`,
+			crates: [],
+			files: ['crates/tsv_wasm/npm/cli.js'],
+			rebuild
+		}
+	];
 }

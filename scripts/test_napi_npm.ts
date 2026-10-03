@@ -56,16 +56,25 @@ import { constants as os_constants, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/tsv_artifacts.ts';
-import { assert_staged_fresh, staged_staleness } from './check_staged_freshness.ts';
-import { facade_files, facade_sources, facade_type_names } from './npm_facade.ts';
+import { CORE_CRATES } from '../benches/js/lib/tsv_artifacts.ts';
+import {
+	assert_staged_fresh,
+	NAPI_LOADER_DIR,
+	NAPI_PKG_ROOT,
+	napi_loader_checks,
+	staged_staleness,
+	type StagedStaleness,
+	wasm_package_checks,
+	wasm_package_dir
+} from './check_staged_freshness.ts';
+import { facade_files, facade_type_names } from './npm_facade.ts';
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
 import { register_dts_specifier_test } from './dts_specifiers.ts';
 import { register_syntax_error_suite, syntax_errors } from './syntax_error_suite.ts';
 
-const pkg_root = 'crates/tsv_napi/pkg';
-if (!existsSync(join(pkg_root, 'napi'))) {
-	console.error(`${pkg_root}/napi not staged. Run 'deno task build:napi:packages' first.`);
+const pkg_root = NAPI_PKG_ROOT;
+if (!existsSync(NAPI_LOADER_DIR)) {
+	console.error(`${NAPI_LOADER_DIR} not staged. Run 'deno task build:napi:packages' first.`);
 	process.exit(1);
 }
 const platform_dirs = readdirSync(pkg_root).filter((d) => d !== 'napi');
@@ -85,7 +94,7 @@ const stage = (with_platform: boolean): string => {
 	const tmp = mkdtempSync(join(tmpdir(), 'tsv_napi_npm_'));
 	const scope = join(tmp, 'node_modules', '@fuzdev');
 	mkdirSync(scope, { recursive: true });
-	cpSync(join(pkg_root, 'napi'), join(scope, 'tsv'), { recursive: true });
+	cpSync(NAPI_LOADER_DIR, join(scope, 'tsv'), { recursive: true });
 	if (with_platform) {
 		cpSync(join(pkg_root, triple), join(scope, `tsv-${triple}`), { recursive: true });
 	}
@@ -121,36 +130,7 @@ await assert_staged_fresh([
 		files: ['scripts/build_napi_packages.ts'],
 		rebuild: 'deno task build:napi:packages'
 	},
-	{
-		// Every hand-written CODE source the loader package copies, not just
-		// index.js: the staged files are written in one pass, so index.js's mtime
-		// dates the whole staging and a sibling edited since then is the same
-		// staleness. (`cli.js` gets its own check below only because it is the one
-		// shared with the wasm package. `README.md` and `LICENSE` are copied too
-		// and deliberately absent — nothing here reads them, so their age cannot
-		// make a verdict wrong.)
-		label: 'staged loader',
-		staged: `${pkg_root}/napi/index.js`,
-		crates: [],
-		files: [
-			'crates/tsv_napi/npm/index.js',
-			'crates/tsv_napi/npm/index.d.ts',
-			'crates/tsv_napi/npm/platform.js',
-			'crates/tsv_napi/npm/bin.js',
-			...facade_sources(true),
-			'scripts/build_napi_packages.ts',
-			'scripts/npm_facade.ts',
-			'scripts/npm_metadata.ts'
-		],
-		rebuild: 'deno task build:napi:packages'
-	},
-	{
-		label: 'staged cli.js mirror',
-		staged: `${pkg_root}/napi/cli.js`,
-		crates: [],
-		files: ['crates/tsv_wasm/npm/cli.js'],
-		rebuild: 'deno task build:napi:packages'
-	}
+	...napi_loader_checks()
 ]);
 
 // The one artifact this suite READS but does not build: `@fuzdev/tsv-wasm`,
@@ -158,21 +138,14 @@ await assert_staged_fresh([
 // or STALE it is skipped, not failed — `deno task test:napi:npm` cannot
 // refresh another package's staging, and the two cases are equally unusable
 // here, since an export set captured before the delta moved reads as clean.
-// Sources are the wasm bundle's own (`scripts/validate_artifacts.ts` names the
-// same set), because a feature or an export moves with them.
-const wasm_package_index = 'crates/tsv_wasm/pkg/all/npm/index.js';
-const wasm_parity_staleness = await staged_staleness({
-	label: 'the @fuzdev/tsv-wasm package',
-	staged: wasm_package_index,
-	crates: [...CORE_CRATES, ...WASM_CRATES],
-	files: [
-		'scripts/patch_npm_package.ts',
-		'scripts/npm_facade.ts',
-		'scripts/npm_metadata.ts',
-		'deno.json'
-	],
-	rebuild: 'deno task build:npm:all'
-});
+// Graded by the one list every reader of that staging shares
+// (`wasm_package_checks`), because a feature or an export moves with any of them.
+const wasm_package_index = `${wasm_package_dir('all')}/index.js`;
+let wasm_parity_staleness: StagedStaleness | undefined;
+for (const check of wasm_package_checks('all')) {
+	wasm_parity_staleness = await staged_staleness(check);
+	if (wasm_parity_staleness) break;
+}
 const wasm_parity_skip: string | false = wasm_parity_staleness
 	? `${wasm_parity_staleness.reason} — restage: deno task build:npm:all`
 	: false;
@@ -509,7 +482,7 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 	it('the loader ships the shared facade verbatim', () => {
 		for (const { published, source } of facade_files(true)) {
 			assert.equal(
-				readFileSync(join(pkg_root, 'napi', published), 'utf8'),
+				readFileSync(join(NAPI_LOADER_DIR, published), 'utf8'),
 				readFileSync(source, 'utf8'),
 				published
 			);
@@ -521,7 +494,7 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 	// that same derived set: every option and error type the facade declares, by name, from
 	// the file that declares it.
 	it("index.d.ts re-exports exactly the facade's declared types", () => {
-		const index_dts = readFileSync(join(pkg_root, 'napi', 'index.d.ts'), 'utf8');
+		const index_dts = readFileSync(join(NAPI_LOADER_DIR, 'index.d.ts'), 'utf8');
 		const reexported = (from: string): Array<string> =>
 			[...index_dts.matchAll(/^export type \{([^}]*)\} from '([^']+)';/gm)]
 				.filter((m) => m[2] === from)

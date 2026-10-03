@@ -25,9 +25,10 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Raw-find scan](#raw-find-scan-audit-scanaudit) | `scan:audit` | new raw substring scans over source (comment-blind delimiter matching) | `deno task check` |
 | [Self-format](#self-format-audit-formataudit) | `format:audit` | tsv failing to format its OWN TS/JS — a would-change file (non-idempotency) or a parse error (over-rejection) | `deno task check` |
 | [Discovery parity](#corpus-discovery-parity-audit-discoveryaudit) | `discovery:audit` | `tsv format --list` over the `../corpora` snapshot naming a different file set than the snapshot's committed tree holds in tsv's extensions — a discovery prune firing on real code, or an extension drift | `deno task check` (when `../corpora` is present) |
-| [Engine parity](#engine-parity-audit-enginesaudit) | `engines:audit` | the WASM engine and the native engine formatting the same file to DIFFERENT bytes — a wasm32-only divergence every other gate is blind to, since they all grade the native build | CI's `artifacts` job ONLY (needs both packages built; NOT in `deno task check`, and not on the publish path either — `scripts/publish.ts` runs `validate:artifacts` and `test:npm`, neither of which compares engines) |
+| [Engine parity](#engine-parity-audit-enginesaudit) | `engines:audit` | the WASM engine and the native engine formatting the same file to DIFFERENT bytes — a wasm32-only divergence every other gate is blind to, since they all grade the native build | CI's `artifacts` job ONLY (needs both packages built; NOT in `deno task check`, and not on the publish path either — `scripts/publish.ts` runs `validate:artifacts`, `test:npm` and `typecheck:packages`, none of which compares engines) |
 | [Doc link](#doc-link-audit-docsaudit) | `docs:audit` | a doc-comment `[link]` that no longer resolves — a stale doc | `deno task check` |
 | [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts` no longer describing what the wire-JSON writers emit — plus a wire type it never declared at all | `deno task check` |
+| [Package declarations](#package-declaration-check-typecheckpackages) | `typecheck:packages` | a staged package's published `.d.ts` failing a consumer's strict compile — a lib the consumer did not ask for (TS2550), a name star-export ambiguation drops (TS2308), a type a package must not export, a README example that does not compile | `scripts/publish.ts` Step 6 (all four packages); on demand (needs `deno task bench:install`, so NOT in `deno task check`) |
 | [Loc cross-grade](#loc-cross-grade-checkloc) | `check:loc` | tsv's loc wire and the shipped `locations.js` reconstruction of its span-only wire disagreeing on any fixture input — the two implementations of the one `loc` definition drifting apart | `deno task check` |
 | [Pin agreement](#canonical-pin-agreement-audit-pinsaudit) | `pins:audit` | the five canonical-oracle pin sites disagreeing — including the lockfile, which alone pins the oracle's own transitive deps | `deno task check` |
 | [Checkout alignment](#checkout-alignment-audit-pinsauditcheckouts) | `pins:audit:checkouts` | a present `../svelte` / `../acorn-typescript` clone that is not the pinned version; checkout drift (warn — HEAD, or the `../corpora` snapshot's `collections/` tree id) | `deno task conformance` (preflight) |
@@ -903,7 +904,7 @@ conformance gates' business, not this one.
 which both artifacts exist (`build:packages` made the wasm one, the N-API step's
 `cargo build -p tsv_cli --release` the native one). Deliberately **not** in `deno task
 check`, which builds no packages — and not on the publish path either: `scripts/publish.ts`
-runs `validate:artifacts` and `test:npm`, which grade each bundle alone, so the one
+runs `validate:artifacts`, `test:npm` and `typecheck:packages`, which grade each bundle alone, so the one
 engine-agreement verdict a release gets is the CI run on the commit it ships. Locally: `deno task build:npm:all && deno task
 build:napi:packages` first. Both bins are mtime-guarded like every other staged
 artifact, so a run against a binary from before a formatter change refuses rather than
@@ -1146,6 +1147,71 @@ all, each by a declaration: `input_invalid_*` (it must fail both parsers) and a
 - **The fixture tree's inputs are format fixed points**, so no input holds a raw `<CR>`; the
   lone-`<CR>` rule is graded by the injection variants of `wire:audit:terminators` (whose
   comparator runs the same check) and by the package tests in `scripts/test_npm.ts`.
+
+## Package-Declaration Check (`typecheck:packages`)
+
+```bash
+deno task typecheck:packages                         # every staged package (fails when none is)
+deno task typecheck:packages format parse all napi   # exactly these, each required (publish.ts)
+```
+
+**What it proves.** That the declarations a staged npm package ships compile in a consumer
+project as published — the MERGED surface, which no other gate types: `check:ast-types` grades
+`tsv_ast.d.ts` alone and the package suites run the JS. `scripts/typecheck_packages.ts` installs
+each package (`@fuzdev/tsv-format-wasm`, `-parse-wasm`, `-wasm`, and the napi loader
+`@fuzdev/tsv`) into a temp consumer's `node_modules` — its `package.json` plus exactly the
+`files` it declares — and compiles lean consumer modules against it through the `exports` map,
+every subpath (the root, `./worker`, `./locations`). What they type:
+
+- every facade function's return (`string` from each formatter and `_json` export, `Root` /
+  `Program` / `StyleSheetFile` from the object parsers) and every option type by name, with a
+  forwarded `{sourceType: undefined}` bag on the goalless exports;
+- `TsvSyntaxError`'s `start` and `loc` fields, the `IgnoreStack` verdict union, the locator's
+  `position_at` / `loc_of` / `reconstruct` and `reconstruct_locations`;
+- the WASM lifecycle per condition: under `node`, `init` / `init_sync` / `reinstantiate` and
+  `wasm_module` handed to the `./worker` entry's `init_sync`; under `bundler`, the lazy entry
+  without `wasm_module`;
+- type EQUALITY where an assignment would pass an `any` (`wasm_module` is exactly
+  `WebAssembly.Module`, `loc_of` returns exactly `SourceLocation | null`);
+- `// @ts-expect-error` negatives for what must not compile — an unknown option key,
+  `locations` on a `_json` export, `sourceType` on a goalless export, a function or option type
+  from the other single-family package, `Position` from `./locations`, `wasm_module` from
+  `./worker` or the browser entry, the WASM lifecycle from the napi loader. An unused directive
+  is itself an error, so the negatives are pinned too.
+
+Every ```ts / ```typescript block of the README the package ships compiles too, each as its
+own module, and every ```js / ```javascript block under `checkJs` — so an example must carry
+its own imports.
+
+**The matrix.** `strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`,
+`skipLibCheck: false`, `types: []`; `useUnknownInCatchVariables` off, as a JS reader's catch binding is `any`; `nodenext` resolution (the `node` condition — a wasm
+package's `index.d.ts`) and `bundler` (its `browser.d.ts`). The wasm packages grade with the
+DOM lib their entries name; the napi loader and every `./locations` subpath grade on `es2022`
+alone, which pins that they need none. One program per package and configuration, so one
+package's lib reference cannot satisfy another's declarations. A README block that only
+compiles under Node (it imports a `node:` builtin or the Node-only `wasm_module`) carries
+`<!-- typecheck: node -->` on the line directly above its fence and grades under `nodenext`
+with `@types/node`; any other `typecheck:` marker, or one not directly above a graded fence,
+fails the run (the grammar is unit-tested in `test:deno`). Every `types` target the `exports`
+map names must be loaded by some program, so a subpath no consumer module reaches fails rather
+than passes ungraded, and a staging missing a file its `files` declares fails naming the file.
+
+**Where it runs.** TypeScript and `@types/node` come from `benches/js/node_modules`; without
+them the task fails, pointing at `deno task bench:install`. CI installs no `node_modules`, so it
+is not in `deno task check`; `scripts/publish.ts` runs it in Step 6 over all four packages —
+the three wasm packages it builds, and the napi loader, which it stages for this (a file copy,
+no cargo build) although the loader itself publishes from the release workflow. Its preflight
+asks for the install. A stale staging is refused as the package suites refuse it
+(`scripts/check_staged_freshness.ts`'s shared lists, `BENCH_STALE_OK=1`).
+
+**Blind spots.**
+
+- **One compiler.** It grades with the TypeScript `benches/js` pins; a consumer on another
+  major can see diagnostics this run cannot.
+- **Lean consumers, not a restatement.** The modules wire the surface; a wrong field type deep
+  in the AST declarations is `check:ast-types`'s to catch.
+- **A shipped declaration no entry reaches is not graded** — nor can a consumer's compiler reach
+  it (the parse-only package ships `api.d.ts` and `tsv_wasm.d.ts` that no entry imports).
 
 ## Canonical-Pin Agreement Audit (`pins:audit`)
 

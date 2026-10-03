@@ -92,6 +92,8 @@ A source that doesn't parse throws a `SyntaxError` — from a parser and a forma
 - Read `start` and `loc` rather than `line` / `column`, which some runtimes put on every `Error`.
 
 ```javascript
+import {format_typescript} from '@fuzdev/tsv';
+
 try { format_typescript('let a;\nconst = ;'); } catch (e) {
 	e instanceof SyntaxError; // true — the message ends with the line and a caret
 	[e.start, e.loc]; // [13, {line: 2, column: 6}]

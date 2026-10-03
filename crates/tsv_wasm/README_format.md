@@ -66,6 +66,8 @@ A second argument that isn't an object throws too, arrays included. That makes `
 A source that doesn't parse throws a `SyntaxError` with two own properties, `start` and `loc` (typed `TsvSyntaxError`, exported). `start` is the UTF-16 offset of the error and `loc` its `{line, column}` (1-based line, 0-based UTF-16 column), in the same coordinates as the AST's own positions: TypeScript counts ECMAScript line terminators (LF, CR, CRLF, U+2028, U+2029) and a leading BOM; Svelte (`<script>`, `<style>` and template expressions included) and CSS count LF alone and leave a leading BOM out of the offsets. The position is into your own source even where it has CRLF line endings, so for the same error it is the offset [`@fuzdev/tsv-parse-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-parse-wasm) reports — but with no `sourceType` named, `format_typescript` retries a failed module parse as a script, and can report that attempt's error where a module parse reports its own. Read `start` and `loc` rather than `line` / `column`, which some runtimes put on every `Error`. The message's second line starts with `loc` as `line:column + 1`:
 
 ```javascript
+import {format_typescript} from '@fuzdev/tsv-format-wasm';
+
 try { format_typescript('let a;\nconst = ;'); } catch (e) {
 	e instanceof SyntaxError; // true — the message ends with the line and a caret
 	[e.start, e.loc]; // [13, {line: 2, column: 6}]
@@ -80,13 +82,14 @@ Deeply nested input has a ceiling: the WASM stack is 1 MiB, and the deepest shap
 
 To format across threads, compile once and share: the main entry exports `wasm_module`, the compiled `WebAssembly.Module` behind its exports, and the `@fuzdev/tsv-format-wasm/worker` subpath is the same API without the import-time initialization, so a worker starts from that module instead of reading and compiling the WASM again. Compiled code is shared across isolates, so no worker pays for a second compile. `wasm_module` is the Node/Bun entry's alone — that entry is the one that compiles at import — so in a browser Worker call `await init()` instead, or `postMessage` a `WebAssembly.Module` you compiled yourself.
 
+<!-- typecheck: node -->
 ```typescript
 // main thread
 import {Worker} from 'node:worker_threads';
 import {wasm_module} from '@fuzdev/tsv-format-wasm';
-new Worker(worker_url, {workerData: {wasm_module}});
+new Worker(new URL('./worker.js', import.meta.url), {workerData: {wasm_module}});
 
-// worker
+// worker.js
 import {workerData} from 'node:worker_threads';
 import {format_typescript, init_sync} from '@fuzdev/tsv-format-wasm/worker';
 init_sync({module: workerData.wasm_module});

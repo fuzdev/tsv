@@ -443,9 +443,9 @@ const api_parse_types = has_parse_exports ? facade_type_names('api_parse.d.ts') 
 // name that drifts out does NOT fail loudly downstream — without `skipLibCheck` it is
 // a TS2614 *inside the shipped package*, and WITH it (the common consumer config)
 // the export silently degrades to `any`, so the package keeps type-checking while
-// checking nothing. Nothing in-repo type-checks the merged `.d.ts`
-// (`check:ast-types` covers `tsv_ast.d.ts` alone), so this is the only place the
-// drift can still fail a build. Checked here, with the other export validations,
+// checking nothing. `deno task typecheck:packages` grades the merged `.d.ts` as a
+// consumer compiles it, but only at release (publish.ts Step 6) or on demand; this is
+// the one place the drift fails the build itself. Checked here, with the other export validations,
 // so a failure leaves no half-patched package behind.
 const generated_dts = Deno.readTextFileSync(`${pkg_root}/${dts_file}`);
 const api_dts_source = Deno.readTextFileSync(`${FACADE_SOURCE_DIR}/${api_dts}`);

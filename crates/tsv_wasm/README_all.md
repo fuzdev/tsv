@@ -106,6 +106,8 @@ The helper is also its own entry point, `@fuzdev/tsv-wasm/locations` — the sam
 A source that doesn't parse throws a `SyntaxError` — from a parser and a formatter alike — with two own properties, `start` and `loc` (typed `TsvSyntaxError`, exported). `start` is the UTF-16 offset of the error and `loc` its `{line, column}` (1-based line, 0-based UTF-16 column), in the same coordinates as the AST's own positions: TypeScript counts ECMAScript line terminators (LF, CR, CRLF, U+2028, U+2029) and a leading BOM; Svelte (`<script>`, `<style>` and template expressions included) and CSS count LF alone and leave a leading BOM out of the offsets. So `loc` is `create_locator(source, {language}).position_at(start)`, and the message's second line starts with `loc` as `line:column + 1`. A formatter's position is into your own source even where it has CRLF line endings, so for the same error a formatter reports what a parser does — but with no `sourceType` named, `format_typescript` retries a failed module parse as a script and can report that attempt's error where `parse_typescript` (a module unless told otherwise) reports its own. Read `start` and `loc` rather than `line` / `column`, which some runtimes put on every `Error`:
 
 ```javascript
+import {format_typescript} from '@fuzdev/tsv-wasm';
+
 try { format_typescript('let a;\nconst = ;'); } catch (e) {
 	e instanceof SyntaxError; // true — the message ends with the line and a caret
 	[e.start, e.loc]; // [13, {line: 2, column: 6}]

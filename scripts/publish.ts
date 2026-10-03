@@ -30,7 +30,8 @@
  *   --no-check       skip `deno task check`, the Step 3b conformance gates, AND the
  *                    Step 3c corpus audit (faster retries; also the only way to --wetrun
  *                    on a machine missing the Step 3b/3c oracle checkouts — a missing
- *                    oracle otherwise FAILS a wetrun)
+ *                    oracle otherwise FAILS a wetrun). It does not waive the benches/js
+ *                    TypeScript install, which Step 6's declaration check needs
  *   --no-git         skip the git commit + tag + push finalization
  *
  * Retry: a failed wetrun leaves the bump in place plus a sentinel file; re-run
@@ -51,6 +52,7 @@ import {
 	changelog_unreleased_content
 } from './changelog.ts';
 import { format_size, gzip_size } from './size.ts';
+import { TYPECHECK_INSTALL } from './typecheck_packages.ts';
 
 const KNOWN_FLAGS = new Set(['--wetrun', '--no-check', '--no-git', '--bump']);
 // A misspelled --wetrun fails safe (dry-run), but a misspelled --no-git or
@@ -229,6 +231,18 @@ if (!node_check.success) {
 	Deno.exit(1);
 }
 console.log(`  node: ${node_check.stdout}`);
+
+// Step 6's declaration check loads TypeScript and @types/node from the benches/js
+// install — asked here so a missing install fails before the bump and the build
+const missing_typecheck_install = TYPECHECK_INSTALL.filter(({ path }) => !exists(path));
+if (missing_typecheck_install.length > 0) {
+	console.error(
+		`  FAIL: benches/js/node_modules lacks ${missing_typecheck_install.map((m) => m.what).join(' + ')} — ` +
+			'required to type-check the built packages (deno task typecheck:packages); ' +
+			'run `deno task bench:install`'
+	);
+	Deno.exit(1);
+}
 
 // Step 2: Resolve version
 
@@ -490,7 +504,7 @@ for (const { label, dir } of packages) {
 
 // Step 6: Test the built artifacts
 
-console.log('\n=== Step 6: Validate built packages (sizes + Deno + Node) ===');
+console.log('\n=== Step 6: Validate built packages (sizes + Deno + Node + declarations) ===');
 run('deno task validate:artifacts', 'deno', ['task', 'validate:artifacts']);
 for (const { label, dir } of packages) {
 	const result = new Deno.Command('node', {
@@ -505,6 +519,26 @@ for (const { label, dir } of packages) {
 		Deno.exit(1);
 	}
 }
+// The merged published declarations, as a consumer's compiler sees them, for every npm
+// package this release ships. The napi loader publishes from release_napi.yml, but its
+// staging is a file copy (no cargo build), so it is staged here at this version and graded
+// beside the three wasm packages — all four named, so each is required. Needs the
+// benches/js install whatever --no-check says: it grades what is about to ship.
+run('stage the @fuzdev/tsv loader', 'deno', [
+	'run',
+	'--allow-read',
+	'--allow-write=crates/tsv_napi/pkg',
+	'scripts/build_napi_packages.ts',
+	'--loader-only'
+]);
+run('deno task typecheck:packages', 'deno', [
+	'task',
+	'typecheck:packages',
+	'format',
+	'parse',
+	'all',
+	'napi'
+]);
 
 // Step 7: Publish
 

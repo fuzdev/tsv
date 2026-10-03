@@ -372,26 +372,26 @@ types and re-exports neither. That import resolves only where the two files sit 
 side, i.e. in a package; in the source tree they don't, so in-repo TypeScript importing
 `locations.js` takes its types from the module's JSDoc, not from this file
 (`benches/js/lib/loc_cross_grade.ts`). Any future hand-written
-`.d.ts` added to the parse packages faces the same rule; nothing in-repo type-checks
-the merged package `.d.ts` (`check:ast-types` covers `tsv_ast.d.ts` alone), so a
-collision only surfaces at a consumer's compile — check names against `tsv_ast`
-before adding.
+`.d.ts` added to the parse packages faces the same rule. `deno task typecheck:packages`
+(`scripts/typecheck_packages.ts`) is the gate: it installs each staged package into a temp
+consumer and compiles consumer modules against the merged `.d.ts`, so a collision fails
+from both sides — the entry's own TS2308 (graded, since the consumer runs without
+`skipLibCheck`), and a consumer import of `Position` from `./locations` that must fail. It
+needs the `benches/js` TypeScript, so it runs from `scripts/publish.ts` (Step 6) and on
+demand, not in `check` ([docs/audits.md §Package-Declaration Check](../../docs/audits.md#package-declaration-check-typecheckpackages)).
 
-That blind spot has two classes, and the second is gated. A relative
-specifier inside a shipped `.d.ts` must carry the **`.js`** extension
+A relative specifier inside a shipped `.d.ts` must carry the **`.js`** extension
 (`'./tsv_ast.js'`, which TypeScript resolves to `./tsv_ast.d.ts`): extensionless
 is TS2834/TS2835 under `moduleResolution: node16`/`nodenext`, raised from inside
-the package at every consumer without `skipLibCheck`. Both package suites assert
-it over every declared `.d.ts` — a regex, not a typechecker, but it pins the
-class without putting `tsc` in the package tests (`scripts/dts_specifiers.ts`, one test
-both suites register). **The TS2308 collision rule above is still ungated**, so it remains a
-review-time check. (The facade's functions and its option and error types are re-exported
-**by name** from `api.d.ts` / `api_parse.d.ts`, which explicit form star-export ambiguation
-can't drop — but the names were checked against `tsv_ast.d.ts` and `locations.d.ts` anyway.
-The type names are read off those two files (`scripts/npm_facade.ts`'s
-`facade_type_names`), so a type the facade declares reaches every wasm entry with no list to
-keep; the napi loader's hand-written `index.d.ts` is held to the same derived set by
-`scripts/test_napi_npm.ts`.)
+the package at every consumer without `skipLibCheck`. `typecheck:packages` grades that
+under `nodenext`, and both package suites also assert it over every declared `.d.ts` — a
+regex, not a typechecker, but it runs wherever the suites do, with no TypeScript install
+(`scripts/dts_specifiers.ts`, one test both suites register). The facade's functions and
+its option and error types are re-exported **by name** from `api.d.ts` /
+`api_parse.d.ts` / `syntax_error.d.ts`, an explicit form star-export ambiguation can't
+drop. The type names are read off those files (`scripts/npm_facade.ts`'s `facade_type_names`), so a type
+the facade declares reaches every wasm entry with no list to keep; the napi loader's
+hand-written `index.d.ts` is held to the same derived set by `scripts/test_napi_npm.ts`.
 
 A declaration can also need a **lib** the consumer did not ask for. wasm-bindgen declares
 each class's `[Symbol.dispose]()`, which only the `esnext.disposable` lib types, so a
@@ -400,7 +400,10 @@ package; `patch_npm_package.ts` prepends `/// <reference lib="esnext.disposable"
 generated `tsv_wasm.d.ts` of every variant whose classes declare it. The entries' own
 `init` / `init_sync` / `wasm_module` types name the DOM lib's `RequestInfo`, `Response` and
 `WebAssembly`, so the wasm packages type-check under `lib: dom` or `skipLibCheck`, as their
-READMEs say (the napi loader declares none of those).
+READMEs say (the napi loader declares none of those). `typecheck:packages` grades both
+claims: the wasm packages under `es2022` + `dom` — one program per package, so another
+package's lib reference cannot stand in — and the napi loader and every `./locations`
+subpath under `es2022` alone.
 
 ## The `./worker` Entry
 
@@ -626,7 +629,7 @@ require dual updates.
 - `npm/locations.js` + `npm/locations.d.ts` — Pure-JS line/column reconstruction for the span-only wire; ships in the parse-capable packages, run by `api_parse.js` for `{locations: true}`, re-exported from index.js/browser.js by `patch_npm_package.ts`, and exported alone as the `./locations` subpath. Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — this file is the single source for both, which is what the napi loader being ESM bought (see [Line/Column Reconstruction Helper](#linecolumn-reconstruction-helper-npmlocationsjs))
 - `README_format.md` — Shipped as `README.md` in `@fuzdev/tsv-format-wasm` (copied by `patch_npm_package.ts`)
 - `README_parse.md` — Shipped as `README.md` in `@fuzdev/tsv-parse-wasm` (copied by `patch_npm_package.ts`)
-- `README_all.md` — Shipped as `README.md` in `@fuzdev/tsv-wasm` (copied by `patch_npm_package.ts`)
+- `README_all.md` — Shipped as `README.md` in `@fuzdev/tsv-wasm` (copied by `patch_npm_package.ts`). Each README's TypeScript and JavaScript blocks (```ts / ```typescript / ```js / ```javascript, the JavaScript under `checkJs`) compile against its package in `deno task typecheck:packages`, so every one must be a standalone module with its own imports; a block that only compiles under Node carries `<!-- typecheck: node -->` on the line above its fence
 - `pkg/` — Build output (gitignored), `pkg/<variant>/<target>/`
 
 ## Build Targets
@@ -657,7 +660,8 @@ checks tight wasm size bounds plus a Deno runtime smoke of every built
 bundle — the auto-init entries, and the two lazy ones with their
 not-initialized guards — under the same freshness guard, since `pkg/` is
 gitignored and a stale bundle sizes and smokes exactly as cleanly as a fresh
-one (both run in the publish pipeline). The npm package itself covers
+one (both run in the publish pipeline, followed by `deno task typecheck:packages`,
+which compiles the staged packages' declarations as a consumer does). The npm package itself covers
 Node/browser/bundler consumers, so there is no standalone `web`-target
 build beyond the npm artifacts; the `nodejs`-target `pkg/all/nodejs/` build
 exists solely to feed the Node bench runner (`build:bench:node`).

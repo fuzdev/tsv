@@ -198,6 +198,16 @@ end the dispatcher (SIGUSR1, which would start Node's inspector instead). The la
 fallback branch keys on any spawn error, so a Windows staging would re-enter
 an already-proven branch, and signal death has no Windows analogue.
 
+The loader's declarations are graded by `deno task typecheck:packages napi` (also part of
+a bare `typecheck:packages` run while the loader is staged): the staged package installed
+into a temp consumer, its root, `./locations` and README examples compiled on `es2022`
+alone — no DOM lib, which pins that it declares none — under `nodenext` and `bundler`
+resolution. `scripts/publish.ts` Step 6 runs it: staging the loader is a file copy
+(`build_napi_packages.ts --loader-only`, no cargo build), so the WASM release stages it at
+the release version and grades it beside the three wasm packages. It needs the `benches/js`
+TypeScript, so neither `test:napi:npm` nor the release workflow runs it
+([docs/audits.md §Package-Declaration Check](../../docs/audits.md#package-declaration-check-typecheckpackages)).
+
 Both CLIs exist here and only here, so this is also where their contract is
 held together, in five claims the hand-written mirror can drift on and
 nothing else can see. All three read the native side from the platform

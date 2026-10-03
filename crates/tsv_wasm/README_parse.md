@@ -53,6 +53,8 @@ A second argument that isn't an object throws too, arrays included. That makes `
 Every argument error — a source that isn't a string, an options argument that isn't an object, an unknown key, a wrong-typed or invalid value, a key the export doesn't take — is a `TypeError`. A source that doesn't parse throws a `SyntaxError` with two own properties, `start` and `loc` (typed `TsvSyntaxError`, exported). `start` is the UTF-16 offset of the error and `loc` its `{line, column}` (1-based line, 0-based UTF-16 column), in the same coordinates as the AST's own positions: TypeScript counts ECMAScript line terminators (LF, CR, CRLF, U+2028, U+2029) and a leading BOM; Svelte (`<script>`, `<style>` and template expressions included) and CSS count LF alone and leave a leading BOM out of the offsets. So `loc` is `create_locator(source, {language}).position_at(start)`, and the message's second line starts with it as `line:column + 1`. Read `start` and `loc` rather than `line` / `column`, which some runtimes put on every `Error`:
 
 ```javascript
+import {parse_typescript} from '@fuzdev/tsv-parse-wasm';
+
 try { parse_typescript('let a;\nconst = ;'); } catch (e) {
 	e instanceof SyntaxError; // true — the message ends with the line and a caret
 	[e.start, e.loc]; // [13, {line: 2, column: 6}]
