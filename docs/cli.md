@@ -214,7 +214,11 @@ the screen column differ. The text comes from `tsv_lang`'s `ParseError` and is t
 on both bins and in every package — where it is the message of the `SyntaxError` the facade
 throws, whose `start` and `loc` properties carry the same point (`crates/tsv_wasm/npm/api.js`).
 
-One `format` error is not a parse error, though it prints the same way: a Svelte document
+Two errors are not parse errors, and a single input prints them after `Error: ` rather than
+`Parse error: ` (a path-mode `format` names the file either way): a source over the 4 GiB
+size cap the parsers' `u32` offsets index, and a `format` refusal — positionless errors (no
+`ParseError` position), which the native bin tells from a parse error by that alone
+(`cli::out::exit_with_parse_error`) and `cli.js` by the facade's `SyntaxError`. A Svelte document
 holding a lone CR (not part of a CRLF) with comment text after it inside a `//` comment
 between a tag's attributes is **refused** (a CR with only whitespace after it, as in a doubled
 `CR CR LF` ending, ends the comment where the fold does, and formats). Svelte ends that comment at LF alone, so the CR is comment text, and the format

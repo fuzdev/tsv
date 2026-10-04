@@ -3,7 +3,9 @@ use crate::cli::discover::{
 };
 use crate::cli::format_source::{format_source_in, format_source_with_source_type};
 use crate::cli::input::{InputArgs, ParserType, ResolvedInput};
-use crate::cli::out::{exit_with_error, path_bytes, path_text, write_stdout};
+use crate::cli::out::{
+    exit_with_error, exit_with_parse_error, path_bytes, path_text, write_stdout,
+};
 use crate::cli::pool::{
     FileQueue, QueueSink, ReleasePoolOnUnwind, default_jobs, drain, join_pool, slot_outcomes,
     spawn_pool,
@@ -157,7 +159,7 @@ impl FormatCommand {
         .resolve_with_source_type(self.source_type.as_deref())
         .unwrap_or_else(|e| exit_with_error(2, format_args!("Error: {e}")));
         let formatted = format_source_with_source_type(input.content(), parser_type, goal)
-            .unwrap_or_else(|e| exit_with_error(2, format_args!("Parse error: {e}")));
+            .unwrap_or_else(|e| exit_with_parse_error(2, &e));
         if self.check {
             if formatted != input.content() {
                 exit_with_error(1, "would change");
@@ -509,7 +511,7 @@ fn format_file(
     }));
     let formatted = match result {
         Ok(Ok(formatted)) => formatted,
-        Ok(Err(e)) => return FileOutcome::Error(e),
+        Ok(Err(e)) => return FileOutcome::Error(e.to_string()),
         Err(_) => return FileOutcome::Error("panic while formatting (internal bug)".to_string()),
     };
     if formatted == source {

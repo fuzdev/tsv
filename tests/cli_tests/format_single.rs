@@ -324,7 +324,7 @@ fn test_format_source_type_module_rejects_script_only_content() {
 #[test]
 fn test_format_content_unset_source_type_falls_back_to_script() {
     // The `--content` arm is a different call site from path mode
-    // (`format_source_with_goal_option`, not `format_source_in`), so the fallback is
+    // (`format_source_with_source_type`, not `format_source_in`), so the fallback is
     // pinned there too: an UNSET source type formats a script-only source.
     let output = tsv(&[
         "format",
@@ -586,7 +586,8 @@ fn test_format_reports_a_parse_error_in_the_files_own_coordinates() {
 /// that comment at `\n` alone, so the fold would end it early and print the rest of its line
 /// as markup — here a real `class` attribute on a `div` the author's bytes give none
 /// (`tsv_svelte::parse_folded`). The refusal is a format error on every input arm (exit 2,
-/// nothing written), while `parse` accepts the same bytes.
+/// nothing written), while `parse` accepts the same bytes — so a single input prints it after
+/// `Error: `, never `Parse error: ` (`cli::out::exit_with_parse_error`).
 #[test]
 fn test_format_refuses_a_lone_cr_in_an_in_tag_line_comment() {
     const SOURCE: &str = "<div // c\rclass=\"x\"\n>hi</div>\n";
@@ -596,7 +597,8 @@ fn test_format_refuses_a_lone_cr_in_an_in_tag_line_comment() {
     let stderr = String::from_utf8_lossy(&content.stderr);
     assert_eq!(content.status.code(), Some(2), "{stderr}");
     assert!(content.stdout.is_empty(), "nothing is printed: {stderr}");
-    assert!(stderr.contains(REFUSAL), "{stderr}");
+    // positionless, and no parse error: the bytes parse
+    assert!(stderr.starts_with(&format!("Error: {REFUSAL}")), "{stderr}");
     assert!(
         stderr.contains("\n1:10 <div // c\n"),
         "the CR's point: {stderr}"

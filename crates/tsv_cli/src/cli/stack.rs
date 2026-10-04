@@ -71,7 +71,7 @@ const PANIC_EXIT_CODE: i32 = 101;
 /// Workers per logical CPU an explicit `--jobs` is held to.
 ///
 /// Four is far past anything tsv's workloads can *use*: the format pool's own default
-/// (`commands::format::default_jobs`) deliberately lands **below** the logical count,
+/// (`pool::default_jobs`) deliberately lands **below** the logical count,
 /// because the per-file work is memory-bound and a discovery walk competes with the pool
 /// for the same cores. So this is not a tuning knob — it is loose enough that no
 /// deliberate over-subscription (a slow filesystem, a shared machine, a bench sweep

@@ -1,5 +1,5 @@
 use crate::cli::input::{InputArgs, ParserType, ResolvedInput};
-use crate::cli::out::{exit_with_error, write_stdout};
+use crate::cli::out::{exit_with_error, exit_with_parse_error, write_stdout};
 use crate::json_utils::indent_json_with_tabs;
 use argh::FromArgs;
 
@@ -70,7 +70,7 @@ impl ParseCommand {
             goal,
             self.locations,
         )
-        .unwrap_or_else(|e| exit_with_error(1, format_args!("Parse error: {e}")));
+        .unwrap_or_else(|e| exit_with_parse_error(1, &e));
         // The wire bytes are UTF-8 by construction; writing them directly skips the
         // O(output) validation a `String` round trip would pay on JSON several times
         // the source's size. The newline is a second write rather than a `push` onto the same
@@ -93,7 +93,7 @@ fn parse_to_json(
     parser_type: ParserType,
     goal: tsv_ts::Goal,
     locations: bool,
-) -> Result<Vec<u8>, String> {
+) -> Result<Vec<u8>, tsv_lang::ParseError> {
     // Every output rides a byte writer — `convert_ast_json_bytes`
     // (the span-only wire, the default) or `convert_ast_json_bytes_with_locations` (the `loc`
     // wire, `--locations`) — with no intermediate tree, and no output UTF-8
@@ -113,7 +113,7 @@ fn parse_to_json(
     // no goal.
     let bytes = match parser_type {
         ParserType::Svelte => {
-            let ast = tsv_svelte::parse(source, &arena).map_err(|e| e.to_string())?;
+            let ast = tsv_svelte::parse(source, &arena)?;
             if locations {
                 tsv_svelte::convert_ast_json_bytes_with_locations(&ast, source)
             } else {
@@ -121,7 +121,7 @@ fn parse_to_json(
             }
         }
         ParserType::Css => {
-            let ast = tsv_css::parse(source, &arena).map_err(|e| e.to_string())?;
+            let ast = tsv_css::parse(source, &arena)?;
             if locations {
                 tsv_css::convert_ast_json_bytes_with_locations(&ast, source)
             } else {
@@ -129,7 +129,7 @@ fn parse_to_json(
             }
         }
         ParserType::TypeScript => {
-            let ast = tsv_ts::parse_with_goal(source, goal, &arena).map_err(|e| e.to_string())?;
+            let ast = tsv_ts::parse_with_goal(source, goal, &arena)?;
             if locations {
                 tsv_ts::convert_ast_json_bytes_with_locations(&ast, source)
             } else {

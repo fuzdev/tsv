@@ -124,6 +124,22 @@ pub fn exit_with_error(code: i32, message: impl std::fmt::Display) -> ! {
     std::process::exit(code)
 }
 
+/// [`exit_with_error`] for a single input the engine rejected (`parse`, and `format
+/// --content`/`--stdin`), prefixed by what the error is: `Parse error:` for a syntax
+/// error ([`tsv_lang::ParseError::is_syntax_error`]), and `Error:` for the positionless
+/// kinds — the size cap and a format's refusal of a source that parses
+/// ([`tsv_lang::ParseError::refusal`]), neither of which is a parse error. The JS mirror makes the same split on the facade's
+/// `SyntaxError` (`cli.js`'s `single_input_failure`). A path-mode `format` names the file
+/// instead, with no prefix (`error: <path>: …`).
+pub fn exit_with_parse_error(code: i32, error: &tsv_lang::ParseError) -> ! {
+    let prefix = if error.is_syntax_error() {
+        "Parse error"
+    } else {
+        "Error"
+    };
+    exit_with_error(code, format_args!("{prefix}: {error}"))
+}
+
 /// `println!` over [`write_stdout`] — the only stdout line-writer in the CLI.
 #[macro_export]
 macro_rules! out_line {
