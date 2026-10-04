@@ -5,8 +5,8 @@
 //! would otherwise hand-sync them, and each encodes a contract too subtle to
 //! keep three copies of honest (see the crate's CLAUDE.md §Why this crate
 //! exists). The arenas are the bulk of it and are described below; the goal
-//! macros ([`parse_ast!`], [`goal_allowed!`], and the format path's `parse_format!`) sit at
-//! the bottom of this file.
+//! macros ([`parse_ast!`], [`goal_allowed!`], and the format path's `parse_format!`) and
+//! the string-axis decoder ([`decode_source_type`]) sit at the bottom of this file.
 //!
 //! # The arenas
 //!
@@ -76,6 +76,13 @@
 use std::cell::Cell;
 use std::thread::LocalKey;
 
+/// `tsv_lang`, re-exported for [`parse_format!`]'s expansion alone: a macro's paths
+/// resolve in the *caller's* crate, so without this every binding would need its own
+/// `tsv_lang` edge just to spell the line-terminator fold. Not API.
+#[cfg(feature = "format")]
+#[doc(hidden)]
+pub use tsv_lang as __tsv_lang;
+
 /// Take the parked arena out of `slot` (building one with `make` when the slot
 /// is empty — first call, or a prior call that panicked), `reset` it, run `f`
 /// over it, and park it back.
@@ -144,27 +151,47 @@ pub fn with_doc_arena<R>(f: impl FnOnce(&tsv_lang::doc::arena::DocArena) -> R) -
 // shared substrate goes rather than in any one of them (see the crate's
 // CLAUDE.md §Why this crate exists).
 
-/// The refusal for a `sourceType` named on a language that has no goal axis
-/// (Svelte hard-wires `Module`; CSS has no goal), `noun` naming the export family
-/// (`parse` / `format`) the way the binding's other option errors do.
+/// Decode a string-spelled source type — `tsv_wasm` and `tsv_napi`'s trailing optional
+/// argument — into the language's goal; `None` (omitted, `undefined`, `null`) stays
+/// **unset**, and what that means is the caller's (a parse reads it as `Module`, a
+/// format as "none named").
 ///
-/// One spelling for `tsv_wasm` and `tsv_napi`'s raw decoders — the npm facade both
-/// package sets publish through (`crates/tsv_wasm/npm/api.js`) restates it by hand in
+/// `allowed` is the language's goal axis ([`goal_allowed!`]): a source type named on a
+/// language with none (Svelte hard-wires `Module`; CSS has no goal) is refused rather
+/// than ignored, `"module"` included, so a caller cannot believe it selected a goal that
+/// was silently dropped. `noun` names the export family (`parse` / `format`). A value
+/// naming neither goal is refused with the value echoed. `from_source_type` is the
+/// language crate's own spelling table (`tsv_ts::Goal::from_source_type`), passed in so
+/// this crate depends on no language crate.
+///
+/// One spelling of both refusals for the two string-axis bindings — the npm facade both
+/// package sets publish through (`crates/tsv_wasm/npm/api.js`) restates them by hand in
 /// JS, the one copy this crate cannot reach — so a caller reads the same text past the
 /// facade or through it, and swapping `@fuzdev/tsv-wasm` for `@fuzdev/tsv` changes
-/// nothing. The C FFI has no noun (a code, not a bag) and spells its own.
-#[must_use]
-pub fn source_type_unsupported_message(noun: &str) -> String {
-    format!("{noun} option 'sourceType' is only supported for TypeScript")
-}
-
-/// The refusal for a `sourceType` value that names neither goal — the value echoed,
-/// the two accepted spellings listed. Shared by the same two bindings as
-/// [`source_type_unsupported_message`]; the CLI's `--source-type` spells the flag
-/// instead of the key and keeps its own copy.
-#[must_use]
-pub fn invalid_source_type_message(source_type: &str) -> String {
-    format!("invalid sourceType '{source_type}' (expected 'script' or 'module')")
+/// nothing. The C FFI spells the axis as a code, not a string, and words its own; the
+/// CLI's `--source-type` spells the flag instead of the key and keeps its own copy.
+///
+/// # Errors
+///
+/// The refusal message, for a source type on a goalless language or one naming neither
+/// goal.
+pub fn decode_source_type<G>(
+    source_type: Option<&str>,
+    allowed: bool,
+    noun: &str,
+    from_source_type: impl FnOnce(&str) -> Option<G>,
+) -> Result<Option<G>, String> {
+    let Some(source_type) = source_type else {
+        return Ok(None);
+    };
+    if !allowed {
+        return Err(format!(
+            "{noun} option 'sourceType' is only supported for TypeScript"
+        ));
+    }
+    from_source_type(source_type).map(Some).ok_or_else(|| {
+        format!("invalid sourceType '{source_type}' (expected 'script' or 'module')")
+    })
 }
 
 /// The per-language parse call behind each binding's uniform exports.
@@ -231,8 +258,9 @@ macro_rules! parse_ast_for_format {
 /// binding's own error type (a message string, a located failure, a JS value).
 ///
 /// Expands to `Result<String, _>` inside the caller's `with_*_arena` closures, so the
-/// caller's `?`-conversion rules apply; `$lang` and `tsv_lang` resolve in the caller's
-/// scope, as in [`parse_ast!`]. The parse exports skip the fold: their wire's offsets are
+/// caller's `?`-conversion rules apply; `$lang` resolves in the caller's scope, as in
+/// [`parse_ast!`], while `tsv_lang` is reached through this crate (`$crate::__tsv_lang`),
+/// so a binding needs no `tsv_lang` edge of its own. The parse exports skip the fold: their wire's offsets are
 /// a drop-in contract over the author's own bytes.
 ///
 /// ```ignore
@@ -242,7 +270,7 @@ macro_rules! parse_ast_for_format {
 #[macro_export]
 macro_rules! parse_format {
     ($goalness:ident, $lang:ident, $source:expr, $goal:expr, $map_err:expr) => {{
-        let folded = tsv_lang::printing::normalize_carriage_returns($source);
+        let folded = $crate::__tsv_lang::printing::normalize_carriage_returns($source);
         $crate::with_ast_arena(|arena| {
             let ast = folded
                 .parse_with(|source| {
@@ -467,6 +495,45 @@ mod tests {
             parse_ast_for_format!(nogoal, fake_lang, "src", None::<&str>, "arena"),
             "parse(src, arena)",
             "`nogoal` must drop the option and take the goalless entry point"
+        );
+    }
+
+    #[test]
+    fn decode_source_type_decodes_and_words_every_refusal() {
+        let from = |s: &str| match s {
+            "module" => Some("M"),
+            "script" => Some("S"),
+            _ => None,
+        };
+        assert_eq!(decode_source_type(None, true, "parse", from), Ok(None));
+        assert_eq!(decode_source_type(None, false, "format", from), Ok(None));
+        assert_eq!(
+            decode_source_type(Some("script"), true, "parse", from),
+            Ok(Some("S"))
+        );
+        assert_eq!(
+            decode_source_type(Some("module"), true, "format", from),
+            Ok(Some("M"))
+        );
+        // a goalless language refuses the axis, `"module"` included, ahead of the value
+        for noun in ["parse", "format"] {
+            for value in ["script", "module", "sloppy"] {
+                assert_eq!(
+                    decode_source_type(Some(value), false, noun, from),
+                    Err(format!(
+                        "{noun} option 'sourceType' is only supported for TypeScript"
+                    ))
+                );
+            }
+        }
+        assert_eq!(
+            decode_source_type(Some("sloppy"), true, "parse", from),
+            Err("invalid sourceType 'sloppy' (expected 'script' or 'module')".to_owned())
+        );
+        // the empty string is a string — refused by value
+        assert_eq!(
+            decode_source_type(Some(""), true, "parse", from),
+            Err("invalid sourceType '' (expected 'script' or 'module')".to_owned())
         );
     }
 

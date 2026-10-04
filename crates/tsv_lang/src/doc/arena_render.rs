@@ -888,6 +888,14 @@ fn render_embed_end<P: RenderPolicy>(
 #[cold]
 #[inline(never)]
 #[expect(clippy::too_many_arguments)]
+#[cfg_attr(
+    not(feature = "swallow_check"),
+    expect(
+        clippy::needless_pass_by_ref_mut,
+        reason = "`policy` is mutated only by the `swallow_check` audit seam; one signature \
+                  serves both builds"
+    )
+)]
 fn shed_host_separator<P: RenderPolicy>(
     ctx: &RenderCtx<'_>,
     nodes: &[DocNode],

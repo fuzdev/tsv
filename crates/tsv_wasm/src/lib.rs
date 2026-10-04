@@ -42,6 +42,13 @@ use tsv_arena::parse_format;
 #[cfg(feature = "parse")]
 use tsv_arena::with_ast_arena;
 
+// The one parse-error type, shared by every language crate: each re-exports
+// `tsv_lang::ParseError` (and the `WirePoint` its `wire_point` returns), so the shared
+// error helpers below take a Svelte or CSS failure as readily as a TypeScript one. Named
+// through `tsv_ts` only because this crate takes no `tsv_lang` edge of its own.
+#[cfg(any(feature = "parse", feature = "format"))]
+use tsv_ts::ParseError;
+
 // WASM global allocator: talc replaces std's default dlmalloc on wasm32. The
 // format path is allocation-heavy (doc IR, output string, memo vecs) and
 // dlmalloc's grow/memcpy behavior is the measured allocation wall there; talc
@@ -131,7 +138,7 @@ extern "C" {
 /// that property and keeps it non-enumerable; with nothing to delete (Node, Deno, a
 /// browser) the delete is a no-op.
 #[cfg(any(feature = "parse", feature = "format"))]
-fn parse_err(e: &tsv_ts::ParseError) -> JsValue {
+fn parse_err(e: &ParseError) -> JsValue {
     let message = e.to_string();
     let Some(point) = e.wire_point() else {
         return err(message);
@@ -423,10 +430,10 @@ impl SourceTypeArg {
 /// The npm packages' facade (`npm/api.js`) validates its options bag before it calls
 /// here, so this is the decoder a caller importing the raw wasm-bindgen module past
 /// the facade meets — and it still refuses rather than defaulting: a value that is not
-/// a string, by its kind (where N-API refuses at its own conversion); then, in the
-/// facade's own words (`tsv_arena`'s two message functions, shared with `tsv_napi`'s
-/// `napi_source_type`), a source type on a language with no goal axis (Svelte
-/// hard-wires `Module`, CSS has none), and a value naming neither goal.
+/// a string, by its kind (where N-API refuses at its own conversion); then, through
+/// the decoder `tsv_napi` shares (`tsv_arena::decode_source_type`, in the facade's own
+/// words), a source type on a language with no goal axis (Svelte hard-wires `Module`,
+/// CSS has none), and a value naming neither goal.
 ///
 /// What an unset one means is the caller's: a parse reads it as `Module` (its wire's
 /// `Program.sourceType` is a claim one settled grammar has to produce), a format as
@@ -439,8 +446,8 @@ fn wasm_source_type(
     noun: &str,
 ) -> Result<Option<tsv_ts::Goal>, String> {
     let source_type = match source_type {
-        SourceTypeArg::Unset => return Ok(None),
-        SourceTypeArg::Text(text) => text,
+        SourceTypeArg::Unset => None,
+        SourceTypeArg::Text(text) => Some(text),
         SourceTypeArg::Other(kind) => {
             let article = if kind.starts_with(['a', 'e', 'i', 'o', 'u']) {
                 "an"
@@ -453,12 +460,12 @@ fn wasm_source_type(
             ));
         }
     };
-    if !allowed {
-        return Err(tsv_arena::source_type_unsupported_message(noun));
-    }
-    tsv_ts::Goal::from_source_type(&source_type)
-        .map(Some)
-        .ok_or_else(|| tsv_arena::invalid_source_type_message(&source_type))
+    tsv_arena::decode_source_type(
+        source_type.as_deref(),
+        allowed,
+        noun,
+        tsv_ts::Goal::from_source_type,
+    )
 }
 
 /// Generate `parse_<lang>` / `parse_<lang>_json` / `parse_internal_<lang>` /

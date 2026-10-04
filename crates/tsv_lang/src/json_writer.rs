@@ -1068,6 +1068,48 @@ impl StageRun<'_> {
         self.len = end.min(at + MAX_U64_DIGITS);
     }
 
+    /// A `loc`-shaped object, led by `key` (`,"loc":`, or Svelte's `,"name_loc":`):
+    /// `{"start":{"line":L,"column":C},"end":{"line":L,"column":C}}`, each point with a
+    /// trailing `"character":N` (its emitted offset) when `CHARACTER` — the one spelling
+    /// of the object every wire writer's `loc` and `name_loc` take. Each point is
+    /// `(emitted offset, line and column)`, as
+    /// [`LocationMapper::span_positions`](crate::LocationMapper::span_positions) returns
+    /// it.
+    ///
+    /// Most spans end on the line they start on, and that line's digits are already in
+    /// hand, so the end's line is then appended again ([`StageRun::repeat`]) rather than
+    /// converted twice.
+    #[inline(always)]
+    pub fn loc_object<const CHARACTER: bool>(
+        &mut self,
+        key: &str,
+        (start_char, start): (u32, Position),
+        (end_char, end): (u32, Position),
+    ) {
+        self.raw(key);
+        self.raw("{\"start\":{\"line\":");
+        let start_line = self.usize_kept(start.line);
+        self.raw(",\"column\":");
+        self.usize(start.column);
+        if CHARACTER {
+            self.raw(",\"character\":");
+            self.u32(start_char);
+        }
+        self.raw("},\"end\":{\"line\":");
+        if end.line == start.line {
+            self.repeat(start_line, end.line);
+        } else {
+            self.usize(end.line);
+        }
+        self.raw(",\"column\":");
+        self.usize(end.column);
+        if CHARACTER {
+            self.raw(",\"character\":");
+            self.u32(end_char);
+        }
+        self.raw("}}");
+    }
+
     /// Append the run to the output buffer — the single write the whole shape
     /// exists to reach.
     #[inline(always)]
@@ -2106,24 +2148,19 @@ impl JsonWriter {
 
     /// `,"loc":{"start":{"line":L,"column":C},"end":{"line":L,"column":C}}` — the
     /// `loc` field, which every wire writer places immediately after `end` (acorn's
-    /// key order). One staged run: four integers between five static fragments, and
-    /// the end's line is the start's digits again when the two share a line.
+    /// key order); with `CHARACTER`, each point also carries its emitted offset as
+    /// `character`, the shape Svelte's own `locate-character` positions take. One
+    /// staged run ([`StageRun::loc_object`]). Each point is `(emitted offset, line and
+    /// column)`, as [`LocationMapper::span_positions`](crate::LocationMapper::span_positions)
+    /// returns it.
     #[inline(never)]
-    pub fn loc_field(&mut self, start: Position, end: Position) {
+    pub fn loc_field<const CHARACTER: bool>(
+        &mut self,
+        start: (u32, Position),
+        end: (u32, Position),
+    ) {
         let mut run = self.stage_run();
-        run.raw(",\"loc\":{\"start\":{\"line\":");
-        let start_line = run.usize_kept(start.line);
-        run.raw(",\"column\":");
-        run.usize(start.column);
-        run.raw("},\"end\":{\"line\":");
-        if end.line == start.line {
-            run.repeat(start_line, end.line);
-        } else {
-            run.usize(end.line);
-        }
-        run.raw(",\"column\":");
-        run.usize(end.column);
-        run.raw("}}");
+        run.loc_object::<CHARACTER>(",\"loc\":", start, end);
         run.flush();
     }
 
@@ -2133,9 +2170,36 @@ impl JsonWriter {
     #[inline]
     pub fn span_loc(&mut self, positions: WirePositions<'_>, start: u32, end: u32) {
         if let Some(lines) = positions.lines() {
-            let ((_, start), (_, end)) = lines.span_positions(start, end);
-            self.loc_field(start, end);
+            let (start, end) = lines.span_positions(start, end);
+            self.loc_field::<false>(start, end);
         }
+    }
+
+    /// N `,"end":` M and, on a wire that carries it, `,"loc":…` — the byte span
+    /// `[start, end)` translated under `positions` ([`JsonWriter::start_end`], then
+    /// [`JsonWriter::span_loc`]), for a caller whose literal ends in `"start":`. The
+    /// offsets-then-`loc` pair every node of the Svelte and CSS writers carries.
+    #[inline]
+    pub fn span_start_end(&mut self, positions: WirePositions<'_>, start: u32, end: u32) {
+        self.start_end(positions.pos(start), positions.pos(end));
+        self.span_loc(positions, start, end);
+    }
+
+    /// `,"start":` N `,"end":` M and, on a wire that carries it, `,"loc":…` —
+    /// [`JsonWriter::span_start_end`] with its key, for a pair that trails other fields.
+    #[inline]
+    pub fn span_start_end_field(&mut self, positions: WirePositions<'_>, start: u32, end: u32) {
+        self.start_end_field(positions.pos(start), positions.pos(end));
+        self.span_loc(positions, start, end);
+    }
+
+    /// `{"start":` N `,"end":` M and, on a wire that carries it, `,"loc":…` —
+    /// [`JsonWriter::span_start_end`] with its key, for a node whose fields open with
+    /// its positions.
+    #[inline]
+    pub fn span_start_end_object(&mut self, positions: WirePositions<'_>, start: u32, end: u32) {
+        self.start_end_object(positions.pos(start), positions.pos(end));
+        self.span_loc(positions, start, end);
     }
 
     /// A `u64` value. **Every integer the writers actually emit — offsets,

@@ -17,7 +17,7 @@ mod whitespace;
 
 // Re-export commonly used types
 pub use ast::{CssDeclaration, CssNode, CssRule, CssStyleSheet};
-pub use tsv_lang::{ParseError, Result};
+pub use tsv_lang::{ParseError, Result, WirePoint};
 
 /// The coordinates a CSS document's positions are reported in — `parseCss`'s: a leading
 /// BOM **elided** (`parseCss` strips it before parsing, so every offset indexes the

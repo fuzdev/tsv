@@ -19,7 +19,9 @@
 //! The reference is the test's own — a line-start scan over the document's UTF-16 units —
 //! so it shares nothing with `tsv_lang`. It grades every `input_invalid_*` fixture file
 //! (each as written, and with its line feeds respelled CRLF) and the inputs no fixture can
-//! hold: a lone CR, U+2028, a BOM, an astral character ahead of the error.
+//! hold: a lone CR, U+2028, a BOM, an astral character ahead of the error — and, since no
+//! invalid fixture is CSS, a table of invalid CSS. Each synthetic case also names where its
+//! error sits, so the error's byte `position` is graded as well as the point taken from it.
 
 use bumpalo::Bump;
 use std::path::Path;
@@ -112,11 +114,47 @@ fn point_violations(source: &str, language: Language, error: &ParseError) -> Vec
     out
 }
 
-/// Grade one failing source: its parse error against the reference, and its format error
-/// against its parse error. `None` when the source parses.
-fn grade(source: &str, language: Language) -> Option<Vec<String>> {
+/// Where a synthetic case's error sits, read off the source it is graded over (so a CRLF
+/// respelling moves it with the text): the start of the first or last occurrence of a
+/// fragment, just past the last one, or the end of the source. The ground truth the error's
+/// own `position` is held to — the point is then graded from it.
+#[derive(Clone, Copy, Debug)]
+enum At {
+    First(&'static str),
+    Last(&'static str),
+    AfterLast(&'static str),
+    End,
+}
+
+impl At {
+    fn offset(self, source: &str) -> usize {
+        match self {
+            At::First(fragment) => source.find(fragment).expect("the anchor fragment"),
+            At::Last(fragment) => source.rfind(fragment).expect("the anchor fragment"),
+            At::AfterLast(fragment) => {
+                source.rfind(fragment).expect("the anchor fragment") + fragment.len()
+            }
+            At::End => source.len(),
+        }
+    }
+}
+
+/// Grade one failing source: its parse error against the reference — at `at`, when the
+/// caller knows where the error sits — and its format error against its parse error.
+/// `None` when the source parses.
+fn grade(source: &str, language: Language, at: Option<At>) -> Option<Vec<String>> {
     let parsed = parse_error(source, language)?;
-    let mut out = point_violations(source, language, &parsed);
+    let mut out = Vec::new();
+    if let Some(at) = at {
+        let want = at.offset(source);
+        if parsed.position() != Some(want) {
+            out.push(format!(
+                "position {:?} != {want} ({at:?})",
+                parsed.position()
+            ));
+        }
+    }
+    out.extend(point_violations(source, language, &parsed));
     match format_error(source, language) {
         None => out.push("the format succeeded where the parse failed".to_string()),
         Some(formatted) => {
@@ -160,7 +198,8 @@ fn every_invalid_fixture_reports_its_point() {
     let mut paths = Vec::new();
     invalid_inputs(&root, &mut paths);
     paths.sort();
-    let mut graded = [0usize; 2];
+    // per language: TypeScript, Svelte, CSS
+    let mut graded = [0usize; 3];
     let mut failures = Vec::new();
     for path in paths {
         let name = path.to_string_lossy();
@@ -171,7 +210,7 @@ fn every_invalid_fixture_reports_its_point() {
         } else if name.ends_with(".css") {
             Language::Css
         } else {
-            continue;
+            panic!("{name}: an invalid input in no language this test grades");
         };
         let source = std::fs::read_to_string(&path).expect("read the input");
         let mut variants = vec![("as written", source.clone())];
@@ -181,13 +220,17 @@ fn every_invalid_fixture_reports_its_point() {
         for (variant, text) in variants {
             // A Script-goal fixture is invalid at its own goal, and may parse under the
             // fallback; there is no error to grade then.
-            let Some(found) = grade(&text, language) else {
+            let Some(found) = grade(&text, language, None) else {
                 continue;
             };
             if !found.is_empty() {
                 failures.push(format!("{name} ({variant}):\n  {}", found.join("\n  ")));
             }
-            graded[usize::from(language == Language::Svelte)] += 1;
+            graded[match language {
+                Language::TypeScript => 0,
+                Language::Svelte => 1,
+                Language::Css => 2,
+            }] += 1;
         }
     }
     assert!(
@@ -201,7 +244,17 @@ fn every_invalid_fixture_reports_its_point() {
             .collect::<Vec<_>>()
             .join("\n")
     );
-    assert!(graded.iter().all(|&n| n > 0), "graded: {graded:?}");
+    let [typescript, svelte, css] = graded;
+    assert!(
+        typescript > 0 && svelte > 0,
+        "every fixture language graded: {graded:?}"
+    );
+    // No `input_invalid_*.css` fixture exists — CSS error points are graded by the
+    // synthetic `CSS_CASES` alone. One added here is graded above; raise this floor then.
+    assert_eq!(
+        css, 0,
+        "an invalid CSS fixture now exists: give CSS a floor here"
+    );
 }
 
 /// The inputs no fixture holds — a terminator other than LF ahead of the error, a BOM, an
@@ -209,47 +262,68 @@ fn every_invalid_fixture_reports_its_point() {
 /// respelled with CRLF line breaks, which the format path folds.
 #[test]
 fn synthetic_errors_report_their_points() {
-    let cases: &[(Language, &str)] = &[
-        (Language::TypeScript, "const 𝒜 = 1;\nconst = ;"),
-        (Language::TypeScript, "\u{feff}const = ;"),
-        (Language::TypeScript, "\u{feff}a;\nconst = ;"),
-        (Language::TypeScript, "a;\rconst = ;"),
-        (Language::TypeScript, "a;\u{2028}b;\u{2029}const = ;"),
-        (Language::TypeScript, "function f() {\n\tlet x = '𝒜';\n"),
+    let cases: &[(Language, &str, At)] = &[
+        (
+            Language::TypeScript,
+            "const 𝒜 = 1;\nconst = ;",
+            At::Last("="),
+        ),
+        (Language::TypeScript, "\u{feff}const = ;", At::Last("=")),
+        (Language::TypeScript, "\u{feff}a;\nconst = ;", At::Last("=")),
+        (Language::TypeScript, "a;\rconst = ;", At::Last("=")),
+        (
+            Language::TypeScript,
+            "a;\u{2028}b;\u{2029}const = ;",
+            At::Last("="),
+        ),
+        (
+            Language::TypeScript,
+            "function f() {\n\tlet x = '𝒜';\n",
+            At::End,
+        ),
         // the module grammar fails at `with`, the script retry further on: the format
         // fallback reports the further error, and so does the parse it is graded against
-        (Language::TypeScript, "with (a) {}\nconst = ;"),
+        (
+            Language::TypeScript,
+            "with (a) {}\nconst = ;",
+            At::Last("="),
+        ),
         (
             Language::Svelte,
             "<script>\nlet a = '𝒜';\nconst = ;\n</script>",
+            At::Last("="),
         ),
-        (Language::Svelte, "\u{feff}<div {"),
-        (Language::Svelte, "\u{feff}<p>x</p>\n{a +}"),
-        (Language::Svelte, "<p>a\rb</p>\n{a +}"),
-        (Language::Svelte, "<p>a\u{2028}b</p>{a +}"),
-        (Language::Svelte, "<script>\na;\rconst = ;\n</script>"),
+        (Language::Svelte, "\u{feff}<div {", At::Last("{")),
+        (Language::Svelte, "\u{feff}<p>x</p>\n{a +}", At::Last("}")),
+        (Language::Svelte, "<p>a\rb</p>\n{a +}", At::Last("}")),
+        (Language::Svelte, "<p>a\u{2028}b</p>{a +}", At::Last("}")),
+        (
+            Language::Svelte,
+            "<script>\na;\rconst = ;\n</script>",
+            At::Last("="),
+        ),
         (
             Language::Svelte,
             "<style>\na { color: red; }\n𝒜 {\n</style>",
+            At::Last("</style>"),
         ),
-        (Language::Svelte, "<div>{a b}</div>"),
-        (Language::Svelte, "<p>𝒜</p>\n<div"),
-        (Language::Css, "\u{feff}a {"),
-        (Language::Css, "a { color: red; }\rb {"),
-        (Language::Css, "/* \u{2028} 𝒜 */ a {"),
-        (Language::Css, "a {\n  b: c;\n"),
+        (Language::Svelte, "<div>{a b}</div>", At::Last("b")),
+        (Language::Svelte, "<p>𝒜</p>\n<div", At::End),
     ];
     let mut cases = cases.to_vec();
-    cases.extend_from_slice(ESCAPE_CASES);
-    cases.extend_from_slice(OPTIONAL_TOKEN_ESCAPE_CASES);
+    cases.extend_from_slice(CSS_CASES);
+    let backslash =
+        |&(language, source): &(Language, &'static str)| (language, source, At::First("\\"));
+    cases.extend(ESCAPE_CASES.iter().map(backslash));
+    cases.extend(OPTIONAL_TOKEN_ESCAPE_CASES.iter().map(backslash));
     let mut failures = Vec::new();
-    for (language, source) in cases {
+    for (language, source, at) in cases {
         let mut variants = vec![source.to_string()];
         if !source.contains('\r') && source.contains('\n') {
             variants.push(source.replace('\n', "\r\n"));
         }
         for text in variants {
-            let found = grade(&text, language)
+            let found = grade(&text, language, Some(at))
                 .unwrap_or_else(|| vec!["the source parses; the case asserts nothing".to_string()]);
             if !found.is_empty() {
                 failures.push(format!("{language:?} {text:?}:\n  {}", found.join("\n  ")));
@@ -258,6 +332,32 @@ fn synthetic_errors_report_their_points() {
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
+
+/// Invalid CSS — the one language no `input_invalid_*` fixture covers, so its points are
+/// graded here alone: a leading BOM, lone terminators, and then, each behind content
+/// holding an astral character and a line break so a position counted in the wrong units
+/// or from the wrong line cannot pass, an unclosed block or at-rule, a stray closer and
+/// opener, an unterminated comment and string, and the selector grammar's own errors.
+const CSS_CASES: &[(Language, &str, At)] = &[
+    (Language::Css, "\u{feff}a {", At::End),
+    (Language::Css, "a { color: red; }\rb {", At::End),
+    (Language::Css, "/* \u{2028} 𝒜 */ a {", At::End),
+    (Language::Css, "a {\n  b: c;\n", At::End),
+    (Language::Css, "a { b: '𝒜' }\n\tb {\n\t\tc: d;\n", At::End),
+    (Language::Css, "a { b: '𝒜' }\n@media screen {", At::End),
+    (Language::Css, "a { b: '𝒜' }\n@import", At::End),
+    (Language::Css, "a { b: '𝒜' }\nb { c: d; }}", At::Last("}")),
+    (Language::Css, "a { b: '𝒜' }\n{ b: c }", At::Last("{")),
+    (
+        Language::Css,
+        "a {}\n/* 𝒜 */ b { c: d }\n/* x",
+        At::Last("/*"),
+    ),
+    (Language::Css, "a { b: '𝒜' }\n\"x", At::Last("\"")),
+    (Language::Css, "a { b: '𝒜' }\nb { : c }", At::AfterLast(":")),
+    (Language::Css, "a { b: '𝒜' }\nb[ { }", At::Last("{")),
+    (Language::Css, "a { b: '𝒜' }\nb { c d }", At::Last("}")),
+];
 
 /// Malformed escapes, each behind content and a line break so a position relative to the
 /// literal (or to its island) cannot pass for the escape's own: the decoder's errors, a

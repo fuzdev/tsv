@@ -53,7 +53,7 @@ a message; a number or boolean as written; `null`; `none` for `undefined`; else 
 the offset of its first lone surrogate (`<noun> source must be well-formed UTF-16 (a lone
 surrogate at offset N)`) — both engines read the source as UTF-8, whose conversion would
 silently turn it into U+FFFD. The raw decoders below keep
-`tsv_arena`'s own texts (`source_type_unsupported_message`, `invalid_source_type_message`),
+`tsv_arena`'s own texts (`decode_source_type`, the string-axis decoder both raw engines share),
 which no facade call reaches, since the facade grades the source type first. **Every
 argument refusal is a `TypeError`** — the
 bag's, `read_source`'s (a non-string or ill-formed source), and `locations.js`'s (a non-string source, a non-object bag or unknown key, a
@@ -97,7 +97,7 @@ tests pin the texts.
 
 **The raw exports refuse rather than default.** A caller importing the wasm-bindgen
 module past the facade gets a typed error, not a silent `Module`: `wasm_source_type` in
-`src/lib.rs` decodes the optional string exactly as `tsv_napi`'s `napi_source_type` does —
+`src/lib.rs` decodes the optional string through the decoder `tsv_napi`'s `napi_source_type` calls too (`tsv_arena::decode_source_type`) —
 a source type on a goalless language and a value naming neither goal both throw, in
 `tsv_arena`'s words (`invalid sourceType 'sloppy' (expected 'script' or 'module')`), not the
 facade's. The argument is a `JsValue`, not an `Option<String>`, because
@@ -584,8 +584,8 @@ Maintenance checklist when a writer's emitted shape changes:
    is optional in TS (`T?`); one it never emits is absent from the interface.
 5. If the field carries positions (`start`/`end`/`loc`/`character`), make sure
    the writer (`ast/convert/write*`) emits them through the document's
-   `WirePositions` (each writer's `Ctx::pos` and the node-header / `start_end` helpers over it for offsets,
-   `JsonWriter::span_loc` / `loc_field` for `loc`) — a raw byte offset means
+   `WirePositions` (each writer's `Ctx::pos` and node-header helpers and
+   `JsonWriter::span_start_end*` for offsets, `span_loc` / `loc_field` for `loc`) — a raw byte offset means
    silently untranslated positions on multibyte sources.
 6. Run `cargo test --workspace` and `deno task check:ast-types`.
 
@@ -642,7 +642,7 @@ by the acorn interfaces that positions reference directly by name
 (`Identifier`, `Property`, `BlockStatement`, `SwitchCase`, …). A new acorn
 node reachable only by name needs the `extends`; the gate is what says so.
 
-`Schema::Acorn` vs `Schema::SvelteScript` deltas the writer emits
+The acorn-typescript vs vanilla-acorn deltas the writer emits (`vanilla_acorn`)
 require dual updates.
 
 ## Files

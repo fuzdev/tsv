@@ -84,7 +84,10 @@ impl ErrorContext {
         // says — its stops are absolute, so no fixed width can stand in for one. So a tab
         // is echoed AS a tab (both lines then reach the same stop, whatever it is) and
         // everything else is padded by its display width.
-        let header = format!("{}:{}", self.point.line, self.point.column + 1);
+        // Widened before the `+ 1`: a column can be `u32::MAX` (the cap admits a source of
+        // exactly `u32::MAX` bytes, so an EOF error on its one line sits there), and a
+        // `u32` add would overflow. The line prints as taken, saturated by the point walk.
+        let header = format!("{}:{}", self.point.line, u64::from(self.point.column) + 1);
         // Everything printed ahead of the excerpt: the whole `{line}:{col}` header plus its
         // one separating space. Measuring only `{line}:` left the caret short by the
         // column's own digits at every position past column 9.
@@ -317,9 +320,10 @@ impl ParseError {
     /// Every public parse entry point calls this before touching the source; the
     /// lexers and `Span`/`Token` assume the cap holds rather than re-checking.
     pub fn ensure_source_fits(source: &str) -> Result<()> {
-        const MAX: usize = u32::MAX as usize;
-        if source.len() > MAX {
-            return Err(ParseError::file_too_large(source.len(), MAX));
+        // `try_from` rather than `len > u32::MAX as usize`: on a 32-bit target (wasm32)
+        // `usize` is `u32`, the comparison is vacuous, and clippy rejects it as such.
+        if u32::try_from(source.len()).is_err() {
+            return Err(ParseError::file_too_large(source.len(), u32::MAX as usize));
         }
         Ok(())
     }
@@ -490,6 +494,21 @@ mod tests {
     fn header(rendered: &str) -> &str {
         let located = rendered.lines().nth(1).expect("a located line");
         located.split_once(' ').map_or(located, |(head, _)| head)
+    }
+
+    /// A column at the `u32` cap prints its 1-based form without overflowing: the cap
+    /// admits a source of exactly `u32::MAX` bytes, so an EOF error on its single line
+    /// sits at column `u32::MAX`.
+    #[test]
+    fn test_header_column_at_the_u32_cap() {
+        let ctx = ErrorContext {
+            source_line: "x".into(),
+            caret_column: 1,
+            point: point(u32::MAX, 1, u32::MAX),
+            coordinates: ECMA,
+        };
+        let rendered = ctx.format_with_caret("Unexpected end of input");
+        assert_eq!(header(&rendered), "1:4294967296", "{rendered:?}");
     }
 
     /// The goal-gate mark rides the payload through the two rewrites a located error

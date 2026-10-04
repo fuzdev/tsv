@@ -25,8 +25,11 @@ Plus the goal-axis macros, `#[macro_export]`ed; `parse_ast!`, `parse_ast_for_for
 - `parse_ast_for_format!($goalness, $lang, $source, $goal, $arena)` — the format path's twin, whose `$goal` is an `Option`: `goal` calls `$lang::parse_with_goal_or_fallback`, so a named source type is exact and an unnamed one takes the module-then-script fallback (see [../../docs/cli.md §Multi-File Formatting](../../docs/cli.md#multi-file-formatting)); `nogoal` drops it as above. The parse exports keep `parse_ast!`, whose goal is settled: their product is a wire carrying `Program.sourceType`, a claim no retry may make depend on the input.
 - `parse_format!($goalness, $lang, $source, $goal, $map_err)` — a binding's whole format export body, behind the **`format`** feature: fold the source's carriage returns, parse it through `parse_ast_for_format!` into the per-thread AST arena, and print it into the per-thread doc arena, with a parse error mapped back onto the caller's own source (`FoldedSource::parse_with`) and then through `$map_err`, the binding's own error type.
 - `goal_allowed!($goalness)` — `true` / `false`, read by each binding's own goal decoder (`ffi_source_type`, `napi_source_type`, `wasm_source_type`).
+Plus one function:
 
-The load-bearing property is that **one `$goalness` tag drives every macro**: a language with no axis *rejects* a set goal rather than ignoring it, and the macro that picks the parse call and the macro that licenses the refusal can't come to disagree about which languages those are. Each binding still owns its own `lang_bindings!` (three different export signatures) and its own refusal wording.
+- `decode_source_type(source_type, allowed, noun, from_source_type)` — the two string-axis bindings' shared decoder (`napi_source_type`, and `wasm_source_type` past its own not-a-string arm): unset stays unset, a source type on a goalless language and a value naming neither goal are refused, worded once for both (the npm facade restates the words in JS). A plain function generic over the goal type, the language crate's spelling table passed in, so this crate still depends on no language crate. `tsv_ffi` spells the axis as a code and keeps its own `ffi_source_type`.
+
+The load-bearing property is that **one `$goalness` tag drives every macro**: a language with no axis *rejects* a set goal rather than ignoring it, and the macro that picks the parse call and the macro that licenses the refusal can't come to disagree about which languages those are. Each binding still owns its own `lang_bindings!` (three different export signatures); the C FFI words its own refusals, and the two string-axis bindings share `decode_source_type`'s.
 
 ## Abort safety: take and park
 
@@ -39,7 +42,7 @@ What the module docs don't carry, because it is evidence rather than rationale:
 
 ## Features
 
-- `format` (default) — adds `with_doc_arena`, `parse_format!` + the optional `tsv_lang` dep.
+- `format` (default) — adds `with_doc_arena`, `parse_format!` + the optional `tsv_lang` dep, re-exported `#[doc(hidden)]` as `__tsv_lang` so `parse_format!`'s expansion reaches `tsv_lang::printing::normalize_carriage_returns` as `$crate::__tsv_lang::…` — a macro path resolves in the *caller's* crate, and this keeps the bindings free of a `tsv_lang` edge of their own.
 
 The **workspace dependency entry is `default-features = false`**, so a binding gets only `with_ast_arena` by default and re-enables `format` from its own `format` feature — that's what keeps the parse-only binding build from pulling `tsv_lang`. A standalone `cargo test -p tsv_arena` uses the crate's own `default = ["format"]`, so both helpers are exercised.
 

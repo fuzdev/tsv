@@ -714,7 +714,6 @@ dependencies = [
  "serde_json",
  "tsv_arena",
  "tsv_css",
- "tsv_lang",
  "tsv_svelte",
  "tsv_ts",
 ]
@@ -755,7 +754,6 @@ dependencies = [
  "tsv_css",
  "tsv_discover",
  "tsv_ignore",
- "tsv_lang",
  "tsv_svelte",
  "tsv_ts",
 ]
@@ -807,7 +805,6 @@ dependencies = [
  "tsv_css",
  "tsv_discover",
  "tsv_ignore",
- "tsv_lang",
  "tsv_svelte",
  "tsv_ts",
  "wasm-bindgen",

@@ -534,7 +534,9 @@ pub fn convert_ast_json_string(program: &Program<'_>, source: &str) -> String {
 ///
 /// An error is positioned in the host document (`base_offset` included) but carries no
 /// point — [`ParseError::wire_point`] is `None` — until the host fills its context over
-/// the whole document ([`ParseError::with_context`], as `tsv_svelte::parse` does).
+/// the whole document ([`ParseError::with_context`], as `tsv_svelte::parse` does): a
+/// context taken over `source`, a slice, would read that position against the wrong
+/// text. The same holds for every embedded entry point here that takes a `base_offset`.
 // The `Parser::parse` method-path form clippy suggests for the bare `parser.parse()`
 // closure fails the higher-ranked lifetime check on `with_embedding_parser`'s `f`
 // bound (the closure lets the compiler infer it), so allow the closure here.
@@ -585,9 +587,8 @@ fn with_embedding_parser<'arena, T>(
 ///
 /// # Errors
 ///
-/// An error is positioned in the host document (`base_offset` included) but carries no
-/// point — [`ParseError::wire_point`] is `None` — until the host fills its context over
-/// the whole document ([`ParseError::with_context`], as `tsv_svelte::parse` does).
+/// As [`parse_embedded`]'s: positioned in the host document, with no point until the
+/// host fills its context.
 pub fn parse_embedded_preserve_parens<'arena>(
     source: &str,
     base_offset: usize,
@@ -607,9 +608,8 @@ pub fn parse_embedded_preserve_parens<'arena>(
 ///
 /// # Errors
 ///
-/// An error is positioned in the host document (`base_offset` included) but carries no
-/// point — [`ParseError::wire_point`] is `None` — until the host fills its context over
-/// the whole document ([`ParseError::with_context`], as `tsv_svelte::parse` does).
+/// As [`parse_embedded`]'s: positioned in the host document, with no point until the
+/// host fills its context.
 pub fn parse_expression_with_comments<'arena>(
     source: &str,
     base_offset: usize,
@@ -650,9 +650,8 @@ pub fn parse_expression_with_comments<'arena>(
 ///
 /// # Errors
 ///
-/// An error is positioned in the host document (`base_offset` included) but carries no
-/// point — [`ParseError::wire_point`] is `None` — until the host fills its context over
-/// the whole document ([`ParseError::with_context`], as `tsv_svelte::parse` does).
+/// As [`parse_embedded`]'s: positioned in the host document, with no point until the
+/// host fills its context.
 pub fn parse_pattern_with_comments<'arena>(
     source: &str,
     base_offset: usize,
@@ -671,25 +670,18 @@ pub fn parse_pattern_with_comments<'arena>(
 /// Attach a `: T` annotation to a **Svelte block-position** binding pattern
 /// (`{#each xs as p: T}`, `{:then p: T}`, `{:catch p: T}`, `{@const p: T = v}`).
 ///
-/// **The span stays on the bare pattern** — for every kind. That is the canonical
-/// parser's shape, and it is not the same as a *signature* parameter's:
+/// **The span stays on the bare pattern** — for every kind — and the wire writer
+/// widens the emitted `end` to `type_annotation.end` (a `max`, so a signature
+/// parameter, whose span already covers its annotation, is unaffected). That is the
+/// canonical parser's byte range: Svelte's `read_pattern` (`1-parse/read/context.js`)
+/// parses the bare pattern with acorn, then patches `expression.end =
+/// typeAnnotation.end`. The same convention already holds for an `Identifier`, whose
+/// span stays on the bare name with the annotation hanging off as a sibling.
 ///
-/// | | `{ a }: T` as a Svelte block binding | `{ a }: T` as a function parameter |
-/// |---|---|---|
-/// | wire `start`/`end` | over the annotation | over the annotation |
-/// | wire `loc` | **bare pattern only** | over the annotation |
-///
-/// Svelte's `read_pattern` (`1-parse/read/context.js`) parses the bare pattern
-/// with acorn, then patches `expression.end = typeAnnotation.end` — and never
-/// touches `expression.loc`. acorn, parsing a real signature, extends both. So a
-/// block pattern's byte range and its line/column range genuinely disagree, and
-/// the internal span cannot encode both.
-///
-/// The span therefore records the **bare** pattern (which `loc` is derived from)
-/// and the wire writer widens `end` to `type_annotation.end` — a `max`, so a
-/// signature parameter, whose span already covers its annotation, is unaffected.
-/// The same convention already holds for an `Identifier`, whose span stays on the
-/// bare name with the annotation hanging off as a sibling.
+/// `loc` follows the emitted `start`/`end`, as on every node (one definition — see
+/// `docs/architecture.md` §`loc`), so it runs over the annotation too. Svelte's own
+/// `loc` does not: its patch never touches `expression.loc`, which keeps the bare
+/// pattern's — one of the canonical `loc` quirks tsv does not reproduce.
 ///
 /// A kind with no place to put the annotation must never silently swallow it: a
 /// dropped node is an **invisible** node — it vanishes from the wire AST, prints
@@ -803,9 +795,8 @@ pub fn pattern_binding_end(pattern: &Expression<'_>) -> u32 {
 ///
 /// # Errors
 ///
-/// An error is positioned in the host document (`base_offset` included) but carries no
-/// point — [`ParseError::wire_point`] is `None` — until the host fills its context over
-/// the whole document ([`ParseError::with_context`], as `tsv_svelte::parse` does).
+/// As [`parse_embedded`]'s: positioned in the host document, with no point until the
+/// host fills its context.
 pub fn parse_type_annotation_partial<'arena>(
     source: &str,
     base_offset: usize,
@@ -833,9 +824,8 @@ pub fn parse_type_annotation_partial<'arena>(
 ///
 /// # Errors
 ///
-/// An error is positioned in the host document (`base_offset` included) but carries no
-/// point — [`ParseError::wire_point`] is `None` — until the host fills its context over
-/// the whole document ([`ParseError::with_context`], as `tsv_svelte::parse` does).
+/// As [`parse_embedded`]'s: positioned in the host document, with no point until the
+/// host fills its context.
 pub fn parse_expression_partial_with_comments<'arena>(
     source: &str,
     base_offset: usize,
@@ -863,9 +853,8 @@ pub fn parse_expression_partial_with_comments<'arena>(
 ///
 /// # Errors
 ///
-/// An error is positioned in the host document (`base_offset` included) but carries no
-/// point — [`ParseError::wire_point`] is `None` — until the host fills its context over
-/// the whole document ([`ParseError::with_context`], as `tsv_svelte::parse` does).
+/// As [`parse_embedded`]'s: positioned in the host document, with no point until the
+/// host fills its context.
 // The method-path form clippy suggests fails the higher-ranked lifetime check on
 // `with_embedding_parser`'s `f` bound — same reason as [`parse_embedded`]'s closure.
 #[expect(clippy::redundant_closure_for_method_calls)]
@@ -881,9 +870,8 @@ pub fn parse_type_extent(source: &str, base_offset: usize, arena: &bumpalo::Bump
 ///
 /// # Errors
 ///
-/// An error is positioned in the host document (`base_offset` included) but carries no
-/// point — [`ParseError::wire_point`] is `None` — until the host fills its context over
-/// the whole document ([`ParseError::with_context`], as `tsv_svelte::parse` does).
+/// As [`parse_embedded`]'s: positioned in the host document, with no point until the
+/// host fills its context.
 pub fn parse_statement_with_comments<'arena>(
     source: &str,
     base_offset: usize,

@@ -33,7 +33,7 @@
 //! `(start, end, type)` can hold an entry no node ever closes with (a silently dropped
 //! comment) and needs a consume-once rule to tell two same-span nodes apart; and a
 //! separate pass that builds such a map must be configured *identically* to the emit
-//! that reads it (parser variant, schema). Here the node that closes first **is** the
+//! that reads it (the parser variant). Here the node that closes first **is** the
 //! node that attached first, and one emission carries the configuration.
 //!
 //! **A subtree that provably takes no comment is skipped.** Most of a comment-bearing
@@ -717,11 +717,7 @@ impl<'a> CommentAttach<'a> {
             w.raw(if comment.is_block { "Block" } else { "Line" });
             w.raw("\",\"value\":");
             w.string(&comment.wire_value(self.source));
-            w.start_end_field(
-                positions.pos(comment.span.start),
-                positions.pos(comment.span.end),
-            );
-            w.span_loc(positions, comment.span.start, comment.span.end);
+            w.span_start_end_field(positions, comment.span.start, comment.span.end);
             w.raw("}");
         }
     }

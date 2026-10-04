@@ -48,6 +48,14 @@ use tsv_arena::parse_format;
 #[cfg(any(feature = "parse", feature = "panic_probe"))]
 use tsv_arena::with_ast_arena;
 
+// The one parse-error type, shared by every language crate: each re-exports
+// `tsv_lang::ParseError` (and the `WirePoint` its `wire_point` returns), so the shared
+// error helpers below take a Svelte or CSS failure as readily as a TypeScript one. Named
+// through `tsv_ts` only because this crate takes no `tsv_lang` edge of its own.
+#[cfg(any(feature = "parse", feature = "format"))]
+use tsv_ts::ParseError;
+use tsv_ts::WirePoint;
+
 /// Decode the optional `sourceType` argument (`"script"` / `"module"`); omitted
 /// or `undefined` stays **unset**.
 ///
@@ -68,20 +76,16 @@ fn napi_source_type(
     allowed: bool,
     noun: &str,
 ) -> Result<Option<tsv_ts::Goal>, Failure> {
-    let Some(source_type) = source_type else {
-        return Ok(None);
-    };
-    if !allowed {
-        // `noun` names the export family (`parse` / `format`), as the npm facade's
-        // options reader and `tsv_wasm` spell it — this addon is published on its own
-        // (`@fuzdev/tsv-<triple>`), so it says the whole sentence itself
-        return Err(Failure::Plain(tsv_arena::source_type_unsupported_message(
-            noun,
-        )));
-    }
-    tsv_ts::Goal::from_source_type(&source_type)
-        .map(Some)
-        .ok_or_else(|| Failure::Plain(tsv_arena::invalid_source_type_message(&source_type)))
+    // `noun` names the export family (`parse` / `format`), as the npm facade's options
+    // reader and `tsv_wasm` spell it — this addon is published on its own
+    // (`@fuzdev/tsv-<triple>`), so it says the whole sentence itself
+    tsv_arena::decode_source_type(
+        source_type.as_deref(),
+        allowed,
+        noun,
+        tsv_ts::Goal::from_source_type,
+    )
+    .map_err(Failure::Plain)
 }
 
 /// What an export's engine half fails with, before it meets the JS boundary — split from
@@ -95,17 +99,14 @@ enum Failure {
     Plain(String),
     /// A parse failure at a point in the document's wire coordinates
     /// (`ParseError::wire_point`).
-    Syntax {
-        message: String,
-        point: tsv_ts::WirePoint,
-    },
+    Syntax { message: String, point: WirePoint },
 }
 
 impl Failure {
     /// A parse error: located ones carry their point, the positionless one (a source over
     /// the size cap) is plain.
     #[cfg(any(feature = "parse", feature = "format"))]
-    fn parse(e: &tsv_ts::ParseError) -> Self {
+    fn parse(e: &ParseError) -> Self {
         let message = e.to_string();
         match e.wire_point() {
             Some(point) => Failure::Syntax { message, point },
@@ -146,9 +147,9 @@ impl Failure {
 /// non-enumerable `line` and `column` at construction, and a plain set writes through
 /// that property and keeps it non-enumerable; with nothing to delete (Node, Deno) the
 /// delete is a no-op.
-fn pointed_error(env: Env, message: &str, point: tsv_ts::WirePoint) -> napi::Result<napi::Error> {
+fn pointed_error(env: Env, message: &str, point: WirePoint) -> napi::Result<napi::Error> {
     let mut error = env.create_error(napi::Error::from_reason(message))?;
-    let tsv_ts::WirePoint {
+    let WirePoint {
         start,
         line,
         column,
@@ -201,8 +202,9 @@ macro_rules! parse_internal {
 // One export per (language, operation), each taking the same
 // `(source, sourceType?)` arguments. The `$goalness` axis decides only whether a
 // `sourceType` ARGUMENT is accepted, never the arity: there is no goalless twin
-// of a goal-aware export to drift from it, and the `@fuzdev/tsv` loader hands
-// every export the same bag.
+// of a goal-aware export to drift from it, and the `@fuzdev/tsv` loader (through the
+// shared npm facade's `call_engine`, `crates/tsv_wasm/npm/api.js`) calls every export
+// the same way — the source, then the decoded source type as a string or `undefined`.
 //
 // At Script goal `await` is an ordinary identifier and `import`/`export`/
 // `import.meta` are syntax errors. See `tsv parse --source-type` and
@@ -771,8 +773,8 @@ mod tests {
             for goal in ["script", "module"] {
                 assert_eq!(
                     at_goal(f, src, goal),
-                    Err(Failure::Plain(tsv_arena::source_type_unsupported_message(
-                        noun
+                    Err(Failure::Plain(format!(
+                        "{noun} option 'sourceType' is only supported for TypeScript"
                     ))),
                     "{label} at {goal}"
                 );
@@ -796,9 +798,9 @@ mod tests {
             for goal in ["script", "module"] {
                 assert_eq!(
                     f(src, Some(goal.to_owned())),
-                    Err(Failure::Plain(tsv_arena::source_type_unsupported_message(
-                        "parse"
-                    ))),
+                    Err(Failure::Plain(
+                        "parse option 'sourceType' is only supported for TypeScript".to_owned()
+                    )),
                     "{label} at {goal}"
                 );
             }
@@ -894,7 +896,7 @@ mod tests {
             matches!(
                 parse_err,
                 Failure::Syntax {
-                    point: tsv_ts::WirePoint {
+                    point: WirePoint {
                         start: 23,
                         line: 2,
                         column: 6,

@@ -163,21 +163,6 @@ impl Ctx<'_> {
         self.positions.pos(byte)
     }
 
-    /// N `,"end":` M and, on a wire that carries it, `,"loc":…` — for a caller whose
-    /// literal ends in `"start":`. `start` / `end` are byte offsets.
-    #[inline]
-    fn start_end(&self, w: &mut JsonWriter, start: u32, end: u32) {
-        w.start_end(self.pos(start), self.pos(end));
-        w.span_loc(self.positions, start, end);
-    }
-
-    /// `,"start":` N `,"end":` M and, on a wire that carries it, `,"loc":…`.
-    #[inline]
-    fn start_end_field(&self, w: &mut JsonWriter, start: u32, end: u32) {
-        w.start_end_field(self.pos(start), self.pos(end));
-        w.span_loc(self.positions, start, end);
-    }
-
     /// A node's closing burst (`lead`, `"start":` N `,"end":` M, `close`) as
     /// [`JsonWriter::start_end_tail`]'s one window — or, on a wire that carries `loc`,
     /// the same bytes with `loc` after `end`, written piecewise.
@@ -194,7 +179,7 @@ impl Ctx<'_> {
         if self.positions.has_locations() {
             w.raw_fixed(lead);
             w.raw("\"start\":");
-            self.start_end(w, start, end);
+            w.span_start_end(self.positions, start, end);
             w.raw_fixed(close);
         } else {
             w.start_end_tail(lead, self.pos(start), self.pos(end), close);
@@ -216,7 +201,7 @@ impl Ctx<'_> {
     ) {
         if self.positions.has_locations() {
             w.raw_fixed(lead);
-            self.start_end(w, start, end);
+            w.span_start_end(self.positions, start, end);
             w.raw_fixed(close);
         } else {
             w.start_end_head(lead, self.pos(start), self.pos(end), close);
@@ -305,7 +290,7 @@ fn write_stylesheet_file(
     ctx: &Ctx<'_>,
 ) {
     w.raw("{\"type\":\"StyleSheetFile\",\"start\":");
-    ctx.start_end(w, 0, ctx.source.len() as u32);
+    w.span_start_end(ctx.positions, 0, ctx.source.len() as u32);
     w.raw(",\"children\":");
     let comments = write_children(w, stylesheet, ctx);
     w.raw(",\"comments\":");
@@ -367,7 +352,7 @@ fn write_comments(w: &mut JsonWriter, comments: &CssComments, ctx: &Ctx<'_>) {
         let interior = Span::new(c.span.start + 2, c.span.end - 2);
         w.raw("{\"type\":\"CSSComment\",\"value\":");
         write_string(w, interior.extract(ctx.source));
-        ctx.start_end_field(w, c.span.start, c.span.end);
+        w.span_start_end_field(ctx.positions, c.span.start, c.span.end);
         if let Some(position) = c.position {
             w.raw(",\"position\":");
             w.u32(position);
@@ -423,7 +408,7 @@ fn write_atrule(
     comments: &mut Vec<WireComment>,
 ) {
     w.raw("{\"type\":\"Atrule\",\"start\":");
-    ctx.start_end(w, atrule.span.start, atrule.span.end);
+    w.span_start_end(ctx.positions, atrule.span.start, atrule.span.end);
     w.raw(",\"name\":");
     // Half-decoded from source, like a selector name: parseCss reads both with
     // `read_identifier`, so an identity escape keeps its backslash (`@a\?b` → `a\?b`)
@@ -696,7 +681,7 @@ fn write_relative_selector(w: &mut JsonWriter, r: &internal::RelativeSelector<'_
 fn write_combinator(w: &mut JsonWriter, name: &'static str, span: Span, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"Combinator\",\"name\":");
     w.token(name); // ` ` / `>` / `+` / `~` / `||` — escape-free
-    ctx.start_end_field(w, span.start, span.end);
+    w.span_start_end_field(ctx.positions, span.start, span.end);
     w.raw("}");
 }
 
@@ -762,7 +747,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             // `*` and the empty prefix fall out of the same slice.
             let namespace = namespace_span.map(|ns| raw_selector_name(ctx.source, ns, 0));
             w.raw("{\"type\":\"AttributeSelector\",\"start\":");
-            ctx.start_end(w, span.start, span.end);
+            w.span_start_end(ctx.positions, span.start, span.end);
             w.raw(",\"name\":");
             write_string(w, &name);
             w.raw(",\"matcher\":");
@@ -793,7 +778,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             write_string(w, &name);
             w.raw(",\"args\":");
             write_or_null(w, args.as_ref(), |w, a| write_pseudo_args(w, a, ctx));
-            ctx.start_end_field(w, span.start, span.end);
+            w.span_start_end_field(ctx.positions, span.start, span.end);
             w.raw("}");
         }
         internal::SimpleSelector::PseudoElement {
@@ -814,7 +799,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             );
             w.raw("{\"type\":\"PseudoElementSelector\",\"name\":");
             write_string(w, &name);
-            ctx.start_end_field(w, span.start, span.end);
+            w.span_start_end_field(ctx.positions, span.start, span.end);
             // `args` is emitted only when present — Svelte spreads the key in
             // conditionally (`...(args && { args })`), so an argument-less
             // `::before` carries no `args` at all, unlike a pseudo-CLASS (which
@@ -833,7 +818,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             };
             w.raw("{\"type\":\"Percentage\",\"value\":");
             write_string(w, &value_str);
-            ctx.start_end_field(w, span.start, span.end);
+            w.span_start_end_field(ctx.positions, span.start, span.end);
             w.raw("}");
         }
         internal::SimpleSelector::Nth { span } => {
@@ -846,7 +831,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             // `Nth.selector`).
             w.raw("{\"type\":\"Nth\",\"value\":");
             write_string(w, span.extract(ctx.source));
-            ctx.start_end_field(w, span.start, span.end);
+            w.span_start_end_field(ctx.positions, span.start, span.end);
             w.raw("}");
         }
         // Forgiving-list `Invalid`s are filtered before convert (see
@@ -940,7 +925,7 @@ fn write_pseudo_args(w: &mut JsonWriter, args: &internal::PseudoClassArgs<'_>, c
             write_wrap_single_selector(w, public_span, ctx, |w, ctx| {
                 w.raw("{\"type\":\"Nth\",\"value\":");
                 write_string(w, value);
-                ctx.start_end_field(w, public_span.start, public_span.end);
+                w.span_start_end_field(ctx.positions, public_span.start, public_span.end);
                 if let Some(sel) = of_selector {
                     w.raw(",\"selector\":");
                     write_selector_list_filtered(w, sel, ctx);
@@ -1028,9 +1013,9 @@ fn write_synth_selector_list(
     emit_relatives: impl FnOnce(&mut JsonWriter, &Ctx<'_>),
 ) {
     w.raw("{\"type\":\"SelectorList\",\"start\":");
-    ctx.start_end(w, span.start, span.end);
+    w.span_start_end(ctx.positions, span.start, span.end);
     w.raw(",\"children\":[{\"type\":\"ComplexSelector\",\"start\":");
-    ctx.start_end(w, span.start, span.end);
+    w.span_start_end(ctx.positions, span.start, span.end);
     w.raw(",\"children\":");
     emit_relatives(w, ctx);
     if ctx.has_metadata {
@@ -1060,7 +1045,7 @@ fn write_synth_relative_selector(
     w.raw(",\"selectors\":[");
     emit_simple(w, ctx);
     w.raw("],\"start\":");
-    ctx.start_end(w, span.start, span.end);
+    w.span_start_end(ctx.positions, span.start, span.end);
     if ctx.has_metadata {
         w.raw(RELATIVE_META);
     }

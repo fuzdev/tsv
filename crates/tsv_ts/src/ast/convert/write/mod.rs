@@ -27,7 +27,7 @@
 //! `TSInstantiationExpression` wrap is decided before its fields are emitted.
 
 use super::super::internal;
-use super::{Schema, bigint_to_decimal};
+use super::bigint_to_decimal;
 use tsv_lang::{Span, StageRun, Wire, WirePositions, WireTables};
 // The JSON-scalar substrate is shared across the three language writers (so the
 // Svelte writer can compose embedded TS/CSS emission into one buffer). Only the
@@ -68,7 +68,7 @@ pub(crate) fn write_program_bytes(
     wire: Wire,
 ) -> Vec<u8> {
     let tables = WireTables::new(source, crate::WIRE_COORDINATES, wire);
-    let ctx = Ctx::new(source, tables.positions(), Schema::Acorn, CommentMode::Off);
+    let ctx = Ctx::new(source, tables.positions(), CommentMode::Off);
     let mut w = JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(source.len(), wire));
     write_program(&mut w, program, &ctx);
     w.into_bytes()
@@ -201,21 +201,19 @@ fn write_program(w: &mut JsonWriter, program: &internal::Program<'_>, ctx: &Ctx<
 /// Emit an embedded `<script>` `Program`'s wire JSON into a caller-owned writer —
 /// for `tsv_svelte` composing a `<script>` block's `content` into its own buffer.
 /// Shares the host document's `WirePositions` (spans are host-file coordinates)
-/// and threads the `Schema`; the node is emitted exactly as a standalone
-/// `Program` is, its `loc` included (the content span's, under the host
-/// document's line table).
+/// and takes the island's parser variant from `env.vanilla_acorn` (a plain
+/// `<script>` in a non-TS component is vanilla acorn's: `importKind`/`exportKind`
+/// omitted when `"value"`, `attributes` always emitted on import/export
+/// declarations, plus every expression quirk the islands carry); the node is
+/// emitted exactly as a standalone `Program` is, its `loc` included (the content
+/// span's, under the host document's line table). `env.annotation_comments` is
+/// inert here — only a block pattern carries a second parse.
 pub fn write_program_embedded(
     w: &mut JsonWriter,
     program: &internal::Program<'_>,
-    env: ProgramWriter<'_>,
+    env: EmbedWriter<'_>,
 ) {
-    let ProgramWriter {
-        source,
-        positions,
-        schema,
-        comments,
-    } = env;
-    let ctx = Ctx::new(source, positions, schema, comments);
+    let ctx = Ctx::from_embed(env);
     write_program(w, program, &ctx);
 }
 
@@ -232,8 +230,8 @@ pub enum CommentMode<'a> {
     Attach(&'a CommentAttach<'a>),
 }
 
-/// The per-document inputs the four "plain" embedded writers share
-/// (`write_expression_embedded`, `write_pattern_embedded`,
+/// The per-document inputs every embedded writer shares (`write_program_embedded`,
+/// `write_expression_embedded`, `write_pattern_embedded`,
 /// `write_variable_declaration_embedded`,
 /// `write_identifier_expression_with_character`) — the source text, positions,
 /// comment role and parser variant each one funnels into a `Ctx`.
@@ -241,8 +239,7 @@ pub enum CommentMode<'a> {
 /// Bundled into one `Copy` value so the call sites stop re-threading the same
 /// arguments. It is an entry-boundary value: each writer destructures it into a
 /// stack `Ctx` (`Ctx::from_embed`) and the per-node walk threads `&Ctx`, so it
-/// is copied once per island rather than once per node. `ProgramWriter` is its
-/// sibling for a `<script>`'s `Program`, and says there why that one is separate.
+/// is copied once per island rather than once per node.
 #[derive(Clone, Copy)]
 pub struct EmbedWriter<'a> {
     pub source: &'a str,
@@ -255,21 +252,6 @@ pub struct EmbedWriter<'a> {
     /// The block pattern's trailing `: T` — its comment role, see
     /// `Ctx::annotation_comments`. `Off` for every other entry.
     pub annotation_comments: CommentMode<'a>,
-}
-
-/// The per-document inputs `write_program_embedded` takes — `EmbedWriter`'s
-/// sibling for a `<script>`'s `Program`.
-///
-/// A separate bundle rather than a sixth `EmbedWriter` field because it carries the
-/// `Schema`, from which the parser variant is *derived*, not passed, and an
-/// `annotation_comments` role has no meaning here — only a block pattern can carry a
-/// second parse.
-#[derive(Clone, Copy)]
-pub struct ProgramWriter<'a> {
-    pub source: &'a str,
-    pub positions: WirePositions<'a>,
-    pub schema: Schema,
-    pub comments: CommentMode<'a>,
 }
 
 /// The per-document environment every writer function shares (`source` and the
@@ -317,26 +299,21 @@ pub(super) struct Ctx<'a> {
 }
 
 impl<'a> Ctx<'a> {
-    /// The per-document context for a whole-`Program` writer, and the one place
-    /// `Schema` becomes the `vanilla_acorn` fact.
+    /// The per-document context for a standalone TypeScript document — acorn-typescript's
+    /// wire, so never vanilla acorn's.
     ///
     /// Every per-document field is set in the initializer, like `from_embed`:
     /// a field that a caller must remember to overwrite afterwards is a default
     /// waiting to be inherited by the next caller, which is exactly how the
     /// embedded path shipped `vanilla_acorn: false` to every expression island.
     #[inline]
-    fn new(
-        source: &'a str,
-        positions: WirePositions<'a>,
-        schema: Schema,
-        comments: CommentMode<'a>,
-    ) -> Self {
+    fn new(source: &'a str, positions: WirePositions<'a>, comments: CommentMode<'a>) -> Self {
         Ctx {
             source,
             positions,
             pattern_ann_span: Span::new(u32::MAX, u32::MAX),
             comments,
-            vanilla_acorn: schema.is_svelte_script(),
+            vanilla_acorn: false,
             annotation_comments: CommentMode::Off,
         }
     }
@@ -609,34 +586,12 @@ fn position_fields<const CHARACTER: bool>(run: &mut StageRun<'_>, span: Span, ct
         run.u32(ctx.pos(span.end));
         return;
     };
-    let ((start_pos, start), (end_pos, end)) = lines.span_positions(span.start, span.end);
+    let (start, end) = lines.span_positions(span.start, span.end);
     run.raw(",\"start\":");
-    run.u32(start_pos);
+    run.u32(start.0);
     run.raw(",\"end\":");
-    run.u32(end_pos);
-    run.raw(",\"loc\":{\"start\":{\"line\":");
-    let start_line = run.usize_kept(start.line);
-    run.raw(",\"column\":");
-    run.usize(start.column);
-    if CHARACTER {
-        run.raw(",\"character\":");
-        run.u32(start_pos);
-    }
-    run.raw("},\"end\":{\"line\":");
-    // Most nodes end on the line they start on, and that line's digits are
-    // already in hand.
-    if end.line == start.line {
-        run.repeat(start_line, end.line);
-    } else {
-        run.usize(end.line);
-    }
-    run.raw(",\"column\":");
-    run.usize(end.column);
-    if CHARACTER {
-        run.raw(",\"character\":");
-        run.u32(end_pos);
-    }
-    run.raw("}}");
+    run.u32(end.0);
+    run.loc_object::<CHARACTER>(",\"loc\":", start, end);
 }
 
 /// Emit `,"typeParameters":<declaration>` when present (skip-if-none field).
@@ -1134,7 +1089,7 @@ mod tests {
         emit: impl FnOnce(&mut JsonWriter, &Ctx<'_>),
     ) -> String {
         let tables = WireTables::new(source, crate::WIRE_COORDINATES, wire);
-        let ctx = Ctx::new(source, tables.positions(), Schema::Acorn, comments);
+        let ctx = Ctx::new(source, tables.positions(), comments);
         let mut w = JsonWriter::with_capacity(0);
         emit(&mut w, &ctx);
         String::from_utf8(w.into_bytes()).expect("the wire is UTF-8")

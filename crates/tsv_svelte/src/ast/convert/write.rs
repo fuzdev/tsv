@@ -67,29 +67,30 @@
 //! within a node exactly as acorn's appended keys place them, and the walk's
 //! child-visit order IS the emitted field order.
 //!
-//! **Staged runs.** Four fixed-shape bursts here — the `name_loc` field
-//! ([`write_name_loc_field`]) and the `Attribute` / element / `Text` node
-//! headers — assemble in the writer's scratch and reach the buffer as one
-//! append (`JsonWriter::stage_run`), the shape `tsv_ts`'s `node_header_impl`
-//! already uses. Written directly, a burst pays `Vec`'s append protocol per
-//! fragment *and* re-loads the buffer's pointer, length and capacity after
-//! every integer, because `JsonWriter::u32` is deliberately `inline(never)`
-//! (a size constraint — see its comment). A run stops at its first dynamic
-//! string — a `w.string(…)`, or a name field ([`write_element_name_field`],
-//! [`write_scanned_name_field`], which write their own key): its length is
-//! dynamic, so the value cannot be staged. Staging these four is
-//! `instructions:u` **−1.64%** on the wire path over 1,695 real components,
-//! cycles **−0.84 pts** and wall **−0.89 pts** against a layout null.
+//! **Staged runs.** Three fixed-shape bursts on the span-only wire — the
+//! `Attribute` / element / `Text` node headers — assemble in the writer's scratch
+//! and reach the buffer as one append (`JsonWriter::stage_run`), the shape
+//! `tsv_ts`'s `node_header_impl` already uses. Written directly, a burst pays
+//! `Vec`'s append protocol per fragment *and* re-loads the buffer's pointer, length
+//! and capacity after every integer, because `JsonWriter::u32` is deliberately
+//! `inline(never)` (a size constraint — see its comment). A run stops at its first
+//! dynamic string — a `w.string(…)`, or a name field ([`write_element_name_field`],
+//! [`write_scanned_name_field`], which write their own key): its length is dynamic,
+//! so the value cannot be staged. The loc-bearing wire stages one more, the
+//! `name_loc` field ([`write_name_loc_field`]); that wire is compiled out of every
+//! binding, so it costs no shipped artifact anything.
 //!
-//! **Four, because a run is earned by frequency.** Those bursts emit 4.6–14.1
-//! times per KB of source, and each staged emitter is *inlined at its site* —
-//! so a rare burst buys nothing and still costs `@fuzdev/tsv-parse-wasm` bytes.
+//! **A run is earned by frequency.** Those headers are among the most frequent
+//! bursts the writer emits, and each staged emitter is *inlined at its site* — so
+//! a rare burst buys nothing and still costs `@fuzdev/tsv-parse-wasm` bytes.
 //! `ExpressionTag`, `write_text`'s raw-content arm, `write_sequence_text` and
 //! the directive heads are deliberately left unstaged: their `start`/`end`
 //! pairs are one out-of-line call each (`JsonWriter::start_end`, or its
 //! `start_end_field` / `start_end_object` forms, which also write the
-//! `,"start":` / `{"start":` key), the pair written into one fixed-width window
-//! of the buffer rather than as two `u32` calls around an append.
+//! `,"start":` / `{"start":` key — reached through `JsonWriter::span_start_end`
+//! and its twins, which add the `loc` a loc-bearing wire carries), the pair
+//! written into one fixed-width window of the buffer rather than as two `u32`
+//! calls around an append.
 //! ⚠️ It is the *staged emitters* that pay, not the `StageRun::flush` copy — grade
 //! any change here on `cycles:u`, since the run's narrow stores feed a
 //! `memmove` that reads them back.
@@ -120,7 +121,7 @@ use tsv_lang::{
     estimated_json_capacity, write_array, write_or_null,
 };
 use tsv_ts::ast::convert::{
-    CommentAttach, CommentMode, EmbedWriter, ProgramWriter, Schema, write_expression_embedded,
+    CommentAttach, CommentMode, EmbedWriter, write_expression_embedded,
     write_identifier_expression_with_character, write_pattern_embedded, write_program_embedded,
     write_variable_declaration_embedded,
 };
@@ -182,9 +183,10 @@ struct Ctx<'a> {
     /// template — the whole spine then fuses).
     comments: &'a [&'a Comment],
     /// Whether the component parses as TypeScript (component-global, from the first
-    /// lang-bearing `<script>` — see `component_is_typescript`). Selects every `<script>`'s
-    /// wire schema (`Schema::Acorn` vs `Schema::SvelteScript`), so a plain `<script>` beside a
-    /// `lang="ts"` sibling still emits the acorn-typescript import/export shape.
+    /// lang-bearing `<script>` — see `component_is_typescript`). Selects the parser variant
+    /// every embedded writer reads (`EmbedWriter::vanilla_acorn`, via `Ctx::embed`), so a
+    /// plain `<script>` beside a `lang="ts"` sibling still emits the acorn-typescript
+    /// import/export shape.
     component_is_ts: bool,
 }
 
@@ -193,34 +195,6 @@ impl<'a> Ctx<'a> {
     #[inline]
     fn pos(&self, byte: u32) -> u32 {
         self.positions.pos(byte)
-    }
-
-    /// The `loc` field of the byte span `[start, end)` — nothing on the span-only wire.
-    #[inline]
-    fn loc(&self, w: &mut JsonWriter, start: u32, end: u32) {
-        w.span_loc(self.positions, start, end);
-    }
-
-    /// N `,"end":` M, then `loc` — for a caller whose literal ends in `"start":`.
-    #[inline]
-    fn start_end(&self, w: &mut JsonWriter, start: u32, end: u32) {
-        w.start_end(self.pos(start), self.pos(end));
-        self.loc(w, start, end);
-    }
-
-    /// `,"start":` N `,"end":` M, then `loc`.
-    #[inline]
-    fn start_end_field(&self, w: &mut JsonWriter, start: u32, end: u32) {
-        w.start_end_field(self.pos(start), self.pos(end));
-        self.loc(w, start, end);
-    }
-
-    /// `{"start":` N `,"end":` M, then `loc` — a node whose fields open with its
-    /// positions.
-    #[inline]
-    fn start_end_object(&self, w: &mut JsonWriter, start: u32, end: u32) {
-        w.start_end_object(self.pos(start), self.pos(end));
-        self.loc(w, start, end);
     }
 
     /// The preserved-paren parameter list of the `{#snippet}` block starting at
@@ -239,11 +213,11 @@ impl<'a> Ctx<'a> {
     /// The shared inputs for an embedded `tsv_ts` writer — this document's `source`,
     /// positions and parser variant, plus the per-call comment `mode`.
     ///
-    /// Every expression island funnels through here, which is what makes the
-    /// parser variant reach them: it is component-global (the same fact that
-    /// selects each `<script>`'s schema in `write_script`), so a `{expr}` tag,
-    /// an attribute or directive value, a `{@const}` and a `{#snippet}` body all
-    /// carry vanilla acorn's wire quirks in a non-TS component.
+    /// Every embedded emission funnels through here — each `<script>`'s `Program`
+    /// and every expression island — which is what makes the parser variant reach
+    /// them: it is component-global, so a `<script>`, a `{expr}` tag, an attribute
+    /// or directive value, a `{@const}` and a `{#snippet}` body all carry vanilla
+    /// acorn's wire quirks in a non-TS component.
     #[inline]
     fn embed(&self, mode: CommentMode<'a>) -> EmbedWriter<'a> {
         EmbedWriter {
@@ -402,7 +376,7 @@ fn write_root(w: &mut JsonWriter, root: &internal::Root<'_>, ctx: &Ctx<'_>) {
         write_style_sheet(w, style, style_comment, ctx);
     });
     w.raw(",\"js\":[],\"start\":");
-    ctx.start_end(w, 0, source.len() as u32);
+    w.span_start_end(ctx.positions, 0, source.len() as u32);
     w.raw(",\"type\":\"Root\",\"fragment\":");
     write_fragment(w, &root.fragment, ctx);
     w.raw(",\"options\":");
@@ -442,35 +416,19 @@ fn write_root_comment(w: &mut JsonWriter, comment: &Comment, ctx: &Ctx<'_>) {
         w.raw("\",\"start\":");
         w.start_end(ctx.pos(span.start), ctx.pos(span.end));
         if let Some(lines) = ctx.positions.lines() {
-            write_character_loc_field(w, span, lines);
+            // `character` in each point, the shape Svelte's own `locate-character`
+            // positions take
+            let (start, end) = lines.span_positions(span.start, span.end);
+            w.loc_field::<true>(start, end);
         }
         w.raw(",\"value\":");
         w.string(&comment.wire_value(ctx.source));
     } else {
         w.raw("\",\"value\":");
         w.string(&comment.wire_value(ctx.source));
-        ctx.start_end_field(w, span.start, span.end);
+        w.span_start_end_field(ctx.positions, span.start, span.end);
     }
     w.raw("}");
-}
-
-/// A `,"loc":` field whose two positions also carry `character` (the emitted
-/// offset) — the shape Svelte's own `locate-character` positions take.
-fn write_character_loc_field(w: &mut JsonWriter, span: Span, lines: LocationMapper<'_>) {
-    let ((start_char, start), (end_char, end)) = lines.span_positions(span.start, span.end);
-    w.raw(",\"loc\":{\"start\":{\"line\":");
-    w.usize(start.line);
-    w.raw(",\"column\":");
-    w.usize(start.column);
-    w.raw(",\"character\":");
-    w.u32(start_char);
-    w.raw("},\"end\":{\"line\":");
-    w.usize(end.line);
-    w.raw(",\"column\":");
-    w.usize(end.column);
-    w.raw(",\"character\":");
-    w.u32(end_char);
-    w.raw("}}");
 }
 
 /// Emits a `Fragment` node.
@@ -558,21 +516,16 @@ fn write_braced_island(
 }
 
 /// The `,"name_loc":` field and the shared `NameLocation` shape it holds:
-/// `start`/`end` each `{line, column, character}` (all three, always). Char-space
-/// via one fused translation per endpoint.
+/// `start`/`end` each `{line, column, character}` (all three, always) — the `loc`
+/// object's character-bearing form, spelled once for every writer by
+/// `StageRun::loc_object`. Char-space via one fused translation per endpoint. Only the
+/// loc-bearing wire has one: the span-only wire every binding ships carries no
+/// `name_loc`.
 ///
-/// Emitted as a **staged run** (`JsonWriter::stage_run`) — the fixed-shape burst
-/// that machinery exists for, and the same shape as `tsv_ts`'s node header: six
-/// integers between seven static fragments, no dynamic string and no branch, ~110
-/// bytes wide. Written directly it pays `Vec`'s append protocol thirteen times and,
-/// because `JsonWriter::u32` is deliberately `inline(never)`, forces the buffer's
-/// pointer, length and capacity back out of registers after each of the six.
-///
-/// The field **key is inside the run** rather than a `raw` at the four call sites:
-/// every caller emits the same key, and a byte added to a staged run costs a store
-/// where a separate `raw` costs the whole append protocol. That is also why the
-/// callers name this `_field` — it emits the key, so it may not be spliced into a
-/// position where some other key precedes the object.
+/// Emitted as one **staged run** (`JsonWriter::stage_run`), the field **key inside
+/// it** rather than a `raw` at the call sites: every caller emits the same key, which
+/// is also why the callers name this `_field` — it emits the key, so it may not be
+/// spliced into a position where some other key precedes the object.
 ///
 /// A name never crosses a line, so only its start is resolved to one
 /// ([`LocationMapper::one_line_span_positions`]): the line table here is Svelte's,
@@ -580,26 +533,13 @@ fn write_braced_island(
 /// includes `\n` — an element or component name, an attribute name and a directive's
 /// head (`on:click|once`) are each read to Svelte whitespace, `/`, `>` or `=` at the
 /// latest, and a shorthand attribute's (`{x}`) is its identifier's span, which holds
-/// no whitespace at all. So the end's line is the start's digits appended again
-/// (`StageRun::usize_kept` / `StageRun::repeat`) rather than a second conversion.
+/// no whitespace at all. So the end's line is the start's, which `loc_object` appends
+/// again from the digits already in hand rather than converting it a second time.
 fn write_name_loc_field(w: &mut JsonWriter, span: Span, lines: LocationMapper<'_>) {
-    let ((start_char, start_pos), (end_char, end_pos)) =
-        lines.one_line_span_positions(span.start, span.end);
-    debug_assert_eq!(start_pos.line, end_pos.line, "a name span lies on one line");
+    let (start, end) = lines.one_line_span_positions(span.start, span.end);
+    debug_assert_eq!(start.1.line, end.1.line, "a name span lies on one line");
     let mut run = w.stage_run();
-    run.raw(",\"name_loc\":{\"start\":{\"line\":");
-    let line = run.usize_kept(start_pos.line);
-    run.raw(",\"column\":");
-    run.usize(start_pos.column);
-    run.raw(",\"character\":");
-    run.u32(start_char);
-    run.raw("},\"end\":{\"line\":");
-    run.repeat(line, end_pos.line);
-    run.raw(",\"column\":");
-    run.usize(end_pos.column);
-    run.raw(",\"character\":");
-    run.u32(end_char);
-    run.raw("}}");
+    run.loc_object::<true>(",\"name_loc\":", start, end);
     run.flush();
 }
 
@@ -670,7 +610,7 @@ fn write_element(w: &mut JsonWriter, elem: &internal::Element<'_>, ctx: &Ctx<'_>
     run.raw(",\"end\":");
     run.u32(ctx.pos(elem.span.end));
     run.flush();
-    ctx.loc(w, elem.span.start, elem.span.end);
+    w.span_loc(ctx.positions, elem.span.start, elem.span.end);
     write_element_name_field(w, elem, ctx);
     if let Some(lines) = ctx.positions.lines() {
         write_name_loc_field(w, elem.name_span, lines);
@@ -722,7 +662,7 @@ fn write_special_element(w: &mut JsonWriter, elem: &internal::SpecialElement<'_>
     w.raw("{\"type\":\"");
     w.raw(elem.kind.node_type());
     w.raw("\",\"start\":");
-    ctx.start_end(w, elem.span.start, elem.span.end);
+    w.span_start_end(ctx.positions, elem.span.start, elem.span.end);
     w.raw(",\"name\":");
     // Escape-free `&'static str` (`svelte:head`, `slot`, `title`, …) → skip the
     // string-escape scan.
@@ -774,7 +714,7 @@ fn write_special_tag(w: &mut JsonWriter, this: &internal::SpecialThis<'_>, ctx: 
             w.raw(",\"raw\":");
             // Svelte reports the raw as a single-quoted string regardless of source.
             w.string(&format!("'{content}'"));
-            ctx.start_end_field(w, span.start, span.end);
+            w.span_start_end_field(ctx.positions, span.start, span.end);
             w.raw("}");
         }
         internal::SpecialThis::Braced(tag) => {
@@ -786,7 +726,7 @@ fn write_special_tag(w: &mut JsonWriter, this: &internal::SpecialThis<'_>, ctx: 
 /// Emits an `ExpressionTag` node (fragment `{expr}`).
 fn write_expression_tag(w: &mut JsonWriter, tag: &internal::ExpressionTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"ExpressionTag\",\"start\":");
-    ctx.start_end(w, tag.span.start, tag.span.end);
+    w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"expression\":");
     write_braced_island(w, tag.expression, tag.span, ctx);
     w.raw("}");
@@ -802,7 +742,7 @@ fn write_shorthand_expression_tag(
     ctx: &Ctx<'_>,
 ) {
     w.raw("{\"type\":\"ExpressionTag\",\"start\":");
-    ctx.start_end(w, tag.span.start, tag.span.end);
+    w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"expression\":");
     write_identifier_expression_with_character(w, tag.expression, ctx.embed(CommentMode::Off));
     w.raw("}");
@@ -817,7 +757,7 @@ fn write_shorthand_expression_tag(
 /// to earn a staged run's inlined emitters (module doc, Staged runs).
 fn write_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
     if matches!(text.decoding, internal::TextDecoding::Raw) {
-        ctx.start_end_object(w, text.span.start, text.span.end);
+        w.span_start_end_object(ctx.positions, text.span.start, text.span.end);
         // `data`, then `raw`: a `Raw` decoding is no decode at all, so the two
         // are always the same bytes and the pair escapes them once.
         debug_assert_eq!(text.data(ctx.source), text.raw(ctx.source));
@@ -834,7 +774,7 @@ fn write_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
     run.u32(ctx.pos(text.span.end));
     if ctx.positions.has_locations() {
         run.flush();
-        ctx.loc(w, text.span.start, text.span.end);
+        w.span_loc(ctx.positions, text.span.start, text.span.end);
         w.raw(",\"raw\":");
     } else {
         run.raw(",\"raw\":");
@@ -897,7 +837,7 @@ fn write_content_raw_then_data(w: &mut JsonWriter, text: &internal::Text, ctx: &
 /// — an attribute value's text part, and a `<textarea>`'s content, which Svelte reads as
 /// the same sequence.
 fn write_sequence_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
-    ctx.start_end_object(w, text.span.start, text.span.end);
+    w.span_start_end_object(ctx.positions, text.span.start, text.span.end);
     w.raw(",\"type\":\"Text\",\"raw\":");
     write_raw_then_data(w, text, ctx);
     w.raw("}");
@@ -906,7 +846,7 @@ fn write_sequence_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>)
 /// Emits a `Comment` node (HTML `<!-- … -->`).
 fn write_html_comment(w: &mut JsonWriter, comment: &internal::HtmlComment, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"Comment\",\"start\":");
-    ctx.start_end(w, comment.span.start, comment.span.end);
+    w.span_start_end(ctx.positions, comment.span.start, comment.span.end);
     w.raw(",\"data\":");
     w.string(comment.content(ctx.source));
     w.raw("}");
@@ -922,11 +862,11 @@ fn write_html_comment(w: &mut JsonWriter, comment: &internal::HtmlComment, ctx: 
 /// literal orders, keyed exactly by `elseif`.
 fn write_if_block(w: &mut JsonWriter, block: &internal::IfBlock<'_>, ctx: &Ctx<'_>) {
     if block.elseif {
-        ctx.start_end_object(w, block.span.start, block.span.end);
+        w.span_start_end_object(ctx.positions, block.span.start, block.span.end);
         w.raw(",\"type\":\"IfBlock\",\"elseif\":true");
     } else {
         w.raw("{\"type\":\"IfBlock\",\"elseif\":false,\"start\":");
-        ctx.start_end(w, block.span.start, block.span.end);
+        w.span_start_end(ctx.positions, block.span.start, block.span.end);
     }
     let range_end = fragment_first_start(&block.consequent).unwrap_or(block.span.end);
     w.raw(",\"test\":");
@@ -943,7 +883,7 @@ fn write_if_block(w: &mut JsonWriter, block: &internal::IfBlock<'_>, ctx: &Ctx<'
 /// `index`/`key`/`fallback` are skip-if-none.
 fn write_each_block(w: &mut JsonWriter, block: &internal::EachBlock<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"EachBlock\",\"start\":");
-    ctx.start_end(w, block.span.start, block.span.end);
+    w.span_start_end(ctx.positions, block.span.start, block.span.end);
     let range_end = fragment_first_start(&block.body).unwrap_or(block.span.end);
     w.raw(",\"expression\":");
     write_generic_island(w, block.expression, block.span.start, range_end, ctx);
@@ -977,7 +917,7 @@ fn write_each_block(w: &mut JsonWriter, block: &internal::EachBlock<'_>, ctx: &C
 /// `Option` → `null` when absent (no skip).
 fn write_await_block(w: &mut JsonWriter, block: &internal::AwaitBlock<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"AwaitBlock\",\"start\":");
-    ctx.start_end(w, block.span.start, block.span.end);
+    w.span_start_end(ctx.positions, block.span.start, block.span.end);
     let range_end = [
         block.pending.as_ref(),
         block.then.as_ref(),
@@ -1018,7 +958,7 @@ fn write_await_block(w: &mut JsonWriter, block: &internal::AwaitBlock<'_>, ctx: 
 /// Emits a `KeyBlock` node.
 fn write_key_block(w: &mut JsonWriter, block: &internal::KeyBlock<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"KeyBlock\",\"start\":");
-    ctx.start_end(w, block.span.start, block.span.end);
+    w.span_start_end(ctx.positions, block.span.start, block.span.end);
     let range_end = fragment_first_start(&block.fragment).unwrap_or(block.span.end);
     w.raw(",\"expression\":");
     write_generic_island(w, block.expression, block.span.start, range_end, ctx);
@@ -1032,7 +972,7 @@ fn write_key_block(w: &mut JsonWriter, block: &internal::KeyBlock<'_>, ctx: &Ctx
 /// `expression` (Svelte assigns it before reading the parameters).
 fn write_snippet_block(w: &mut JsonWriter, block: &internal::SnippetBlock<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"SnippetBlock\",\"start\":");
-    ctx.start_end(w, block.span.start, block.span.end);
+    w.span_start_end(ctx.positions, block.span.start, block.span.end);
     let range_end = fragment_first_start(&block.body).unwrap_or(block.span.end);
     w.raw(",\"expression\":");
     write_snippet_name(w, block.expression, block.span.start, range_end, ctx);
@@ -1109,7 +1049,7 @@ fn write_snippet_parameters(
 /// Emits an `HtmlTag` node (`{@html expr}`).
 fn write_html_tag(w: &mut JsonWriter, tag: &internal::HtmlTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"HtmlTag\",\"start\":");
-    ctx.start_end(w, tag.span.start, tag.span.end);
+    w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"expression\":");
     write_braced_island(w, tag.expression, tag.span, ctx);
     w.raw("}");
@@ -1118,7 +1058,7 @@ fn write_html_tag(w: &mut JsonWriter, tag: &internal::HtmlTag<'_>, ctx: &Ctx<'_>
 /// Emits a `RenderTag` node (`{@render expr}`).
 fn write_render_tag(w: &mut JsonWriter, tag: &internal::RenderTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"RenderTag\",\"start\":");
-    ctx.start_end(w, tag.span.start, tag.span.end);
+    w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"expression\":");
     write_braced_island(w, tag.expression, tag.span, ctx);
     w.raw("}");
@@ -1133,7 +1073,7 @@ fn write_render_tag(w: &mut JsonWriter, tag: &internal::RenderTag<'_>, ctx: &Ctx
 /// (root-fallback trailing).
 fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"DebugTag\",\"start\":");
-    ctx.start_end(w, tag.span.start, tag.span.end);
+    w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"identifiers\":");
     // The internal entries keep what the author wrote — a JSDoc cast around the
     // whole comma list (`{@debug /** @type {B} */ (b, c)}`) is ONE entry so the
@@ -1200,7 +1140,7 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
 /// comment in one window can never reach another's tree.
 fn write_const_tag(w: &mut JsonWriter, tag: &internal::ConstTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"ConstTag\",\"start\":");
-    ctx.start_end(w, tag.span.start, tag.span.end);
+    w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"declaration\":");
     // The declaration `end` is always `tag.span.end - 1` — canonical Svelte
     // hard-codes `parser.index - 1` (the byte before the closing `}`).
@@ -1303,9 +1243,9 @@ fn write_const_declaration(
     write_pattern_embedded(w, tag.id, ctx.embed_pattern(id_mode, id_annotation_mode));
     w.raw(",\"init\":");
     write_expression_embedded(w, tag.init, ctx.embed(init_mode));
-    ctx.start_end_field(w, tag.id.span().start, declarator_end);
+    w.span_start_end_field(ctx.positions, tag.id.span().start, declarator_end);
     w.raw("}],\"start\":");
-    ctx.start_end(w, tag.span.start + 2, decl_end);
+    w.span_start_end(ctx.positions, tag.span.start + 2, decl_end);
     w.raw("}");
 }
 
@@ -1321,7 +1261,7 @@ fn write_const_declaration(
 /// a later declarator (`{let a = 1, /* c */ b}`) unattached.
 fn write_declaration_tag(w: &mut JsonWriter, tag: &internal::DeclarationTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"DeclarationTag\",\"start\":");
-    ctx.start_end(w, tag.span.start, tag.span.end);
+    w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"declaration\":");
     // Scoped comment pre-check (see `write_const_tag`): no comment inside this
     // tag's span means the attach queue is empty, so fuse directly.
@@ -1370,7 +1310,7 @@ fn write_attribute(w: &mut JsonWriter, attr: &internal::Attribute<'_>, ctx: &Ctx
     run.raw(",\"end\":");
     run.u32(ctx.pos(attr.span.end));
     run.flush();
-    ctx.loc(w, attr.span.start, attr.span.end);
+    w.span_loc(ctx.positions, attr.span.start, attr.span.end);
     write_scanned_name_field(w, name_bytes(attr.name_span, ctx));
     if let Some(lines) = ctx.positions.lines() {
         write_name_loc_field(w, attr.name_span, lines);
@@ -1434,7 +1374,7 @@ fn write_spread_attribute(
     ctx: &Ctx<'_>,
 ) {
     w.raw("{\"type\":\"SpreadAttribute\",\"start\":");
-    ctx.start_end(w, spread.span.start, spread.span.end);
+    w.span_start_end(ctx.positions, spread.span.start, spread.span.end);
     w.raw(",\"expression\":");
     write_braced_island(w, spread.expression, spread.span, ctx);
     w.raw("}");
@@ -1443,7 +1383,7 @@ fn write_spread_attribute(
 /// Emits an `AttachTag` node (`{@attach expr}`).
 fn write_attach_tag(w: &mut JsonWriter, tag: &internal::AttachTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"AttachTag\",\"start\":");
-    ctx.start_end(w, tag.span.start, tag.span.end);
+    w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"expression\":");
     write_braced_island(w, tag.expression, tag.span, ctx);
     w.raw("}");
@@ -1462,7 +1402,7 @@ fn write_directive_head(
     head_span: Span,
     ctx: &Ctx<'_>,
 ) {
-    ctx.start_end_object(w, span.start, span.end);
+    w.span_start_end_object(ctx.positions, span.start, span.end);
     w.raw(",\"type\":\"");
     w.raw(node_type);
     w.raw("\",\"name\":");
@@ -1555,7 +1495,7 @@ fn write_directive_value_expression(
         let tsv_ts::ast::internal::ExpressionKind::Identifier(id) = &expr.kind else {
             unreachable!("shorthand directive expression is always an Identifier");
         };
-        ctx.start_end_object(w, id.span.start, id.span.end);
+        w.span_start_end_object(ctx.positions, id.span.start, id.span.end);
         w.raw(",\"type\":\"Identifier\",\"name\":");
         w.string(id.name(ctx.source));
         w.raw("}");
@@ -1633,7 +1573,7 @@ fn write_style_sheet(
     ctx: &Ctx<'_>,
 ) {
     w.raw("{\"type\":\"StyleSheet\",\"start\":");
-    ctx.start_end(w, style.span.start, style.span.end);
+    w.span_start_end(ctx.positions, style.span.start, style.span.end);
     w.raw(",\"attributes\":");
     write_value_attributes(w, style.attributes, ctx);
     w.raw(",\"children\":");
@@ -1641,7 +1581,11 @@ fn write_style_sheet(
     w.raw(",\"comments\":");
     write_css_comments(w, &css_comments, ctx.source, ctx.positions);
     w.raw(",\"content\":{\"start\":");
-    ctx.start_end(w, style.content_span.start, style.content_span.end);
+    w.span_start_end(
+        ctx.positions,
+        style.content_span.start,
+        style.content_span.end,
+    );
     w.raw(",\"styles\":");
     w.string(style.content_span.extract(ctx.source));
     w.raw(",\"comment\":");
@@ -1651,17 +1595,21 @@ fn write_style_sheet(
 }
 
 /// A `<script>` block. `content` always fuses via `write_program_embedded`; the
-/// schema and (when needed) the island's online comment attach handle the acorn
-/// quirks:
+/// parser variant and (when needed) the island's online comment attach handle the
+/// acorn quirks:
 ///
-/// - **Schema**: `lang="ts"` → `Schema::Acorn`; a plain `<script>` →
-///   `Schema::SvelteScript` (omit `importKind`/`exportKind="value"`, always emit
-///   `attributes`, and select vanilla acorn's expression quirks — see
-///   `Ctx::vanilla_acorn` in `tsv_ts`, which the expression islands reach
-///   through `Ctx::embed` instead).
+/// - **Parser variant**: component-global (Svelte's single `this.ts`), read through
+///   `Ctx::embed` like every expression island's — a TS component emits acorn-typescript's
+///   wire for *every* script, a non-TS one vanilla acorn's (omit
+///   `importKind`/`exportKind="value"`, always emit `attributes`, and the expression
+///   quirks — see `Ctx::vanilla_acorn` in `tsv_ts`).
 /// - **Comments**: a script whose `Program` carries comments (its own or a
 ///   preceding HTML comment) runs acorn's leading/trailing attach online off this
 ///   emit (`attach_script`); the common comment-free case fuses without one.
+///
+/// The `Program`'s `loc` is its content span's, like every other node's — Svelte's own
+/// sits at the `<script>` tag (`read/script.js`, for its sourcemaps), which tsv does not
+/// reproduce.
 fn write_script(
     w: &mut JsonWriter,
     script: &internal::Script<'_>,
@@ -1669,24 +1617,15 @@ fn write_script(
     ctx: &Ctx<'_>,
 ) {
     w.raw("{\"type\":\"Script\",\"start\":");
-    ctx.start_end(w, script.span.start, script.span.end);
+    w.span_start_end(ctx.positions, script.span.start, script.span.end);
     w.raw(",\"context\":");
     // Escape-free `&'static str` (`default` / `module`) → skip the escape scan.
     w.token(script.context.as_str());
     w.raw(",\"content\":");
-    // The schema is component-global (Svelte's single `this.ts`): a TS component uses acorn's
-    // schema for *every* script, a non-TS one uses Svelte's (omit `importKind`/`exportKind="value"`,
-    // always emit `attributes`, and — at emit time — vanilla acorn's expression quirks). The
-    // expression islands read that same component-global fact through `Ctx::embed`.
-    let schema = if ctx.component_is_ts {
-        Schema::Acorn
-    } else {
-        Schema::SvelteScript
-    };
     // A script whose `Program` carries comments (its own or a preceding HTML
     // comment) needs acorn's leading/trailing attach, which runs online off this
     // emit's own node opens and closes. The common case (no comments) fuses with
-    // no attach at all (`options: null` still comes from the schema).
+    // no attach at all.
     let attach = if script.content.comments.is_empty() && html_leading_comment.is_none() {
         None
     } else {
@@ -1699,33 +1638,10 @@ fn write_script(
     let mode = attach
         .as_ref()
         .map_or(CommentMode::Off, CommentAttach::mode);
-    write_script_program_fused(w, script, ctx, schema, mode);
+    write_program_embedded(w, &script.content, ctx.embed(mode));
     w.raw(",\"attributes\":");
     write_value_attributes(w, script.attributes, ctx);
     w.raw("}");
-}
-
-/// Fuse a script's `Program` (threading the schema and the island's comment mode).
-/// Its `loc` is its content span's, like every other node's — Svelte's own sits at
-/// the `<script>` tag (`read/script.js`, for its sourcemaps), which tsv does not
-/// reproduce.
-fn write_script_program_fused(
-    w: &mut JsonWriter,
-    script: &internal::Script<'_>,
-    ctx: &Ctx<'_>,
-    schema: Schema,
-    comments: CommentMode<'_>,
-) {
-    write_program_embedded(
-        w,
-        &script.content,
-        ProgramWriter {
-            source: ctx.source,
-            positions: ctx.positions,
-            schema,
-            comments,
-        },
-    );
 }
 
 /// A `<svelte:options>`: everything fuses. Field order: `start, end,
@@ -1733,7 +1649,7 @@ fn write_script_program_fused(
 /// preserveWhitespace, namespace, customElement` (no `type`).
 fn write_svelte_options(w: &mut JsonWriter, options: &internal::SvelteOptions<'_>, ctx: &Ctx<'_>) {
     let attrs = options.attributes;
-    ctx.start_end_object(w, options.span.start, options.span.end);
+    w.span_start_end_object(ctx.positions, options.span.start, options.span.end);
     w.raw(",\"attributes\":");
     write_value_attributes(w, attrs, ctx);
     if let Some(runes) = bool_option(attrs, "runes", ctx.source) {

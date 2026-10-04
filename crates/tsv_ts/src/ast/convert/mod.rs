@@ -6,38 +6,14 @@
 // emission path; `convert_ast_json_bytes` / `convert_ast_json_string` and
 // `convert_ast_json_bytes_with_locations` in `lib.rs` call it.
 
-/// Schema choice for public-AST serialization.
-///
-/// Svelte's parser (for non-lang="ts" `<script>`) and acorn-typescript differ in
-/// which fields they emit on import/export nodes. This enum is threaded through
-/// conversion so each call site produces the correct JSON shape.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum Schema {
-    /// acorn-typescript schema: always emit `importKind`/`exportKind`,
-    /// omit empty `attributes`.
-    #[default]
-    Acorn,
-    /// Svelte non-lang="ts" `<script>` schema: omit `importKind`/`exportKind`
-    /// when the value is `"value"`, always emit `attributes` on
-    /// `ImportDeclaration`/`ExportNamedDeclaration`/`ExportAllDeclaration`.
-    SvelteScript,
-}
-
-impl Schema {
-    #[inline]
-    pub(crate) fn is_svelte_script(self) -> bool {
-        matches!(self, Schema::SvelteScript)
-    }
-}
-
 // The writer — the sole emission mode.
 mod write;
 
 pub(crate) use write::write_program_bytes;
 pub use write::{
-    CommentAttach, CommentMode, EmbedWriter, IslandComments, ProgramWriter,
-    write_expression_embedded, write_identifier_expression_with_character, write_pattern_embedded,
-    write_program_embedded, write_variable_declaration_embedded,
+    CommentAttach, CommentMode, EmbedWriter, IslandComments, write_expression_embedded,
+    write_identifier_expression_with_character, write_pattern_embedded, write_program_embedded,
+    write_variable_declaration_embedded,
 };
 
 /// Convert non-decimal BigInt values to decimal string (matching acorn behavior).

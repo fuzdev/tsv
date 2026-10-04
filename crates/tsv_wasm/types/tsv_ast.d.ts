@@ -130,8 +130,8 @@ export interface PrivateIdentifier {
  * Acorn `Program` node — root of a TypeScript/JS source file.
  *
  * When the source is a Svelte `<script>` block (non-`lang="ts"`), some
- * import/export fields use the SvelteScript schema variant (notably
- * `importKind`/`exportKind` may be omitted). The resulting shape is a
+ * import/export fields take vanilla acorn's shape, as Svelte's parser emits
+ * it (notably `importKind`/`exportKind` may be omitted). The resulting shape is a
  * subset of this interface; no extra fields are added.
  */
 export interface Program extends AcornCommentAttachment {
