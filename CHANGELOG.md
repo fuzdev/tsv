@@ -52,6 +52,9 @@ Each `## Unreleased` section must be non-empty and carry a
   `loc_of` throw a `RangeError` for an offset the source doesn't hold
 - feat: a `./locations` subpath export on the parse-capable packages — the line/column helpers
   alone, loading no engine
+- fix: in a Svelte template expression, comments around a JSDoc cast's parens or a grouping
+  paren pair attach as Svelte's parser attaches them — a comment Svelte gives the discarded
+  paren, the cast's own `@type` comment included, is no longer attached to the inner expression
 - fix: a Svelte multi-line block comment's `value` is dedented by its own line in the document,
   not by the text Svelte's reader handed acorn, so it can differ from Svelte's where a
   `<script>` prefix, block binding or `{#snippet}` head shares that line

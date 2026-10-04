@@ -9,19 +9,18 @@ wrapper. Svelte then runs `remove_parens` on the result
 `leadingComments`** — so the comment survives only in the root `comments` array,
 never attached to the inner expression.
 
-**tsv has no `ParenthesizedExpression` in its tree** (parens are not preserved
-as nodes, matching Svelte's *final* shape), so the comment attaches to the inner
-expression (`expected_ours.json` vs `expected_svelte.json`). It is never lost:
+**tsv keeps no span for a bare pair inside an expression** (parens are not
+preserved as nodes, matching Svelte's *final* shape), so the comment attaches to
+the inner expression (`expected_ours.json` vs `expected_svelte.json`). The pairs
+it does keep a span for — a JSDoc cast's, and the bare pairs around an island's
+root — run as the same discarded nodes and match Svelte. The comment is never lost:
 both parsers keep it in the root `comments` array, the distinct-comment set is
 identical, and `ast_diff` confirms semantic (code) equivalence.
 
 Note this is **template-only**: in a plain `<script>`, Svelte's `parse` does
 *not* set `preserveParens`, so the same comment attaches to the inner expression
-in both parsers (no divergence). The real-world trigger is a JSDoc cast
-`/** @type {T} */ (expr)` inside a handler or expression tag; this fixture uses
-precedence-required parens instead so the input is format-stable (a JSDoc cast's
-parens interact with a separate paren-stripping formatting difference, which
-this parser fixture deliberately avoids conflating).
+in both parsers (no divergence). The pair here is precedence-required, so the
+input is format-stable.
 
-See [conformance_svelte.md](../../../../../../docs/conformance_svelte.md)
+See [conformance_svelte.md](../../../../../../docs/conformance_svelte.md#comment-attachment-differences)
 §Comment Attachment Differences.

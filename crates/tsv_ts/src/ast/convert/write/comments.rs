@@ -116,6 +116,27 @@ pub struct IslandComments<'a> {
     /// prepended after the fact so a `Program` whose first attach touch was *trailing*
     /// still serializes `trailingComments` first.
     pub html_leading: Option<&'a str>,
+    /// The canonical reader parsed this island with acorn's `preserveParens: true` and
+    /// then dropped every `ParenthesizedExpression` (Svelte's `parse_expression_at` +
+    /// `remove_parens`): each grouping pair was a node of the walk — it took the comments
+    /// the walk handed it, and its child saw it as the parent — and then vanished with
+    /// those comments. tsv keeps a span for exactly one kind of pair, a JSDoc cast's, so
+    /// with this set the writer runs every cast as a **silent frame** (`paren_open` /
+    /// [`paren_close`](CommentAttach::paren_close)): it claims as the pair would and emits
+    /// nothing.
+    ///
+    /// `false` for an island read without `preserveParens` (a `<script>`, a `{const}` /
+    /// `{let}` declaration tag) and for the `{#snippet}` parameter list, which Svelte
+    /// reads with `preserveParens` but never strips.
+    pub removes_parens: bool,
+    /// The bare grouping pairs wrapping the island's ROOT, outermost first, as `(`…`)`
+    /// spans — the pairs tsv's parse discarded and the canonical walk entered ahead of the
+    /// root. Each is a silent frame below the root, opened before it and closed after it,
+    /// so a comment before a `(` leads the pair and dies with it, the root sees the
+    /// innermost pair's end as its `parent.end`, and the root fallback lands on the
+    /// outermost pair, which `remove_parens` throws away. Empty unless
+    /// [`removes_parens`](Self::removes_parens).
+    pub root_parens: Vec<Span>,
 }
 
 /// One open node on the emit stack.
@@ -149,6 +170,11 @@ struct State {
     /// [`CommentAttach::mark_last_body_element`]). Consumed by that open.
     next_is_last_body: bool,
     frames: Vec<Frame>,
+    /// How many of `frames` are the island's root grouping pairs
+    /// ([`IslandComments::root_parens`]) — the bottom of the stack until the root closes,
+    /// then `0`. The node opening above them is the island's root: never skipped, and its
+    /// close closes them.
+    virtual_roots: usize,
     /// Every assigned comment index, in assignment order. At a frame's close its leading
     /// run is `attached[lead_start..lead_end]` and its trailing run `attached[lead_end..]`
     /// — each child truncates back to its own `lead_start`, so by the time a node closes
@@ -204,12 +230,27 @@ impl<'a> CommentAttach<'a> {
     /// One island's attach, over the window its caller already settled.
     #[must_use]
     pub fn new(source: &'a str, island: IslandComments<'a>) -> Self {
-        Self {
+        let attach = Self {
             source,
             island,
             skip_depth: Cell::new(0),
             state: RefCell::new(State::default()),
+        };
+        if !attach.island.root_parens.is_empty() {
+            let st = &mut *attach.state.borrow_mut();
+            for &span in &attach.island.root_parens {
+                attach.push_frame(st, "ParenthesizedExpression", span, false);
+            }
+            st.virtual_roots = st.frames.len();
         }
+        attach
+    }
+
+    /// Whether a JSDoc cast in this island is a silent frame
+    /// ([`IslandComments::removes_parens`]).
+    #[must_use]
+    pub(super) fn removes_parens(&self) -> bool {
+        self.island.removes_parens
     }
 
     /// The mode an emission of this island should run under: `Off` where the window
@@ -256,16 +297,17 @@ impl<'a> CommentAttach<'a> {
     /// A node opens outside a skipped subtree: shift every comment before the node's
     /// start onto it as leading — or, when nothing in the subtree it roots can take a
     /// comment, start skipping that subtree.
-    // `node_type` feeds only the open/close pairing and the skip's checks, which are
-    // debug-only.
     #[cold]
-    #[cfg_attr(not(debug_assertions), expect(unused_variables))]
     fn open_attached(&self, node_type: &'static str, span: Span) {
         let st = &mut *self.state.borrow_mut();
         let is_last_in_body = std::mem::take(&mut st.next_is_last_body);
         #[cfg(debug_assertions)]
         self.debug_check_open(st, node_type, span);
-        if let Some(parent_end) = st.frames.last().map(|f| f.span.end)
+        // The root is never skipped — its root grouping pairs, if any, sit below it on
+        // the stack but are no parent the skip may test against, since closing them is
+        // the root's own close.
+        if st.frames.len() > st.virtual_roots
+            && let Some(parent_end) = st.frames.last().map(|f| f.span.end)
             && self.subtree_takes_nothing(st, span, parent_end, is_last_in_body)
         {
             self.skip_depth.set(1);
@@ -277,6 +319,19 @@ impl<'a> CommentAttach<'a> {
             });
             return;
         }
+        self.push_frame(st, node_type, span, is_last_in_body);
+    }
+
+    /// Open a frame: shift every comment before `span.start` onto it as leading.
+    // `node_type` feeds only the open/close pairing, which is debug-only.
+    #[cfg_attr(not(debug_assertions), expect(unused_variables))]
+    fn push_frame(
+        &self,
+        st: &mut State,
+        node_type: &'static str,
+        span: Span,
+        is_last_in_body: bool,
+    ) {
         let lead_start = st.attached.len() as u32;
         while self.front(st).is_some_and(|c| c.span.start < span.start) {
             st.attached.push(st.head as u32);
@@ -393,6 +448,70 @@ impl<'a> CommentAttach<'a> {
         positions: WirePositions<'_>,
     ) {
         let st = &mut *self.state.borrow_mut();
+        let Some(frame) = self.pop_frame(st, node_type, span) else {
+            return;
+        };
+        let is_root = st.frames.is_empty();
+        self.claim_at_close(st, &frame, node_type, span);
+        let leading = &st.attached[frame.lead_start as usize..frame.lead_end as usize];
+        let trailing = &st.attached[frame.lead_end as usize..];
+        let html = if is_root {
+            self.island.html_leading
+        } else {
+            None
+        };
+        self.emit(w, leading, trailing, html, positions);
+        st.attached.truncate(frame.lead_start as usize);
+        if st.virtual_roots != 0 {
+            self.close_root_parens(st);
+        }
+    }
+
+    /// A grouping pair the canonical reader discards opens — a JSDoc cast's `(`…`)`
+    /// under [`IslandComments::removes_parens`]. It is a node of acorn's walk, so it opens
+    /// as one: it consumes a last-body mark, claims the comments ahead of it, may root a
+    /// skipped subtree, and is its inner expression's parent.
+    #[cold]
+    pub(super) fn paren_open(&self, span: Span) {
+        self.open("ParenthesizedExpression", span);
+    }
+
+    /// The pair opened by [`paren_open`](Self::paren_open) closes: it claims what the
+    /// pair would, at the root the fallback included, and emits **nothing** — what it
+    /// claimed `remove_parens` discards with it. Every claimed comment is still in the
+    /// root `comments` array.
+    #[cold]
+    #[inline(never)]
+    pub(super) fn paren_close(&self, span: Span) {
+        const NODE_TYPE: &str = "ParenthesizedExpression";
+        let depth = self.skip_depth.get();
+        if depth > 0 {
+            self.skip_depth.set(depth - 1);
+            #[cfg(debug_assertions)]
+            self.debug_close_skipped(NODE_TYPE, span);
+            return;
+        }
+        let st = &mut *self.state.borrow_mut();
+        let Some(frame) = self.pop_frame(st, NODE_TYPE, span) else {
+            return;
+        };
+        self.claim_at_close(st, &frame, NODE_TYPE, span);
+        st.attached.truncate(frame.lead_start as usize);
+        if st.virtual_roots != 0 {
+            self.close_root_parens(st);
+        }
+    }
+
+    /// Pop the closing node's frame, checking it against the node the writer closes.
+    ///
+    /// `#[inline(always)]`, as is [`claim_at_close`](Self::claim_at_close): both are the
+    /// body of every attached close, split out only so the silent pair close
+    /// ([`paren_close`](Self::paren_close)) shares it. A `<script>` with a comment runs
+    /// every node it does not skip through here.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    #[cfg_attr(not(debug_assertions), expect(unused_variables))]
+    fn pop_frame(&self, st: &mut State, node_type: &'static str, span: Span) -> Option<Frame> {
         debug_assert!(
             !st.next_is_last_body,
             "{node_type} closed with an unconsumed last-body mark — the marked element \
@@ -400,7 +519,7 @@ impl<'a> CommentAttach<'a> {
         );
         let Some(frame) = st.frames.pop() else {
             debug_assert!(false, "attach close without open: {node_type}");
-            return;
+            return None;
         };
         #[cfg(debug_assertions)]
         assert!(
@@ -419,6 +538,14 @@ impl<'a> CommentAttach<'a> {
             "a closing node's descendants left entries behind — its trailing run must \
              start exactly at the end of its own leading run"
         );
+        Some(frame)
+    }
+
+    /// acorn's post-recursion rules for a node whose frame was just popped: its trailing
+    /// claim, then — at the island's root — the leftover fallback.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    fn claim_at_close(&self, st: &mut State, frame: &Frame, node_type: &'static str, span: Span) {
         let is_root = st.frames.is_empty();
         let parent_end = if is_root {
             self.island.root_parent_end
@@ -429,15 +556,25 @@ impl<'a> CommentAttach<'a> {
         if is_root && self.island.root_fallback {
             self.attach_root_fallback(st, node_type, span);
         }
-        let leading = &st.attached[frame.lead_start as usize..frame.lead_end as usize];
-        let trailing = &st.attached[frame.lead_end as usize..];
-        let html = if is_root {
-            self.island.html_leading
-        } else {
-            None
-        };
-        self.emit(w, leading, trailing, html, positions);
-        st.attached.truncate(frame.lead_start as usize);
+    }
+
+    /// Once the root has closed, close the grouping pairs below it
+    /// ([`IslandComments::root_parens`]), innermost first: each claims as acorn's walk
+    /// has the pair claim, the outermost takes the root fallback, and none emits. Its
+    /// callers ask `virtual_roots != 0` first, so an island without root pairs never
+    /// calls it.
+    #[cold]
+    #[inline(never)]
+    fn close_root_parens(&self, st: &mut State) {
+        if st.frames.len() != st.virtual_roots {
+            return;
+        }
+        st.virtual_roots = 0;
+        while let Some(frame) = st.frames.pop() {
+            debug_assert_eq!(frame.lead_end as usize, st.attached.len());
+            self.claim_at_close(st, &frame, "ParenthesizedExpression", frame.span);
+            st.attached.truncate(frame.lead_start as usize);
+        }
     }
 
     /// The queue front, or `None` when the island is drained.
@@ -510,7 +647,9 @@ impl<'a> CommentAttach<'a> {
             // The root's children are exempt: a typed block binding's annotation runs
             // past its bare root (the writer asserts that binding is a root where it
             // emits one), and the root is never skipped.
-            None if st.frames.len() >= 2 => st.frames.last().map(|f| (f.node_type, f.span)),
+            None if st.frames.len() >= st.virtual_roots + 2 => {
+                st.frames.last().map(|f| (f.node_type, f.span))
+            }
             None => None,
         };
         if let Some((parent_type, parent_span)) = parent {

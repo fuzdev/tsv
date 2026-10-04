@@ -1234,6 +1234,8 @@ mod tests {
                     root_parent_end: None,
                     root_fallback: true,
                     html_leading: None,
+                    removes_parens: false,
+                    root_parens: Vec::new(),
                 },
             )
         };

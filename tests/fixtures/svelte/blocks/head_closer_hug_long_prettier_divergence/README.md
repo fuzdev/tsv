@@ -19,7 +19,7 @@ closer onto a line of *content*. So a wrapper recurses on its operand even where
 sometimes synthesizes a paren shell of its own, and a **JSDoc cast is deliberately off the
 list** despite owning its parens: the shape where a *flat* cast sits under a multi-line
 comment that broke the head for it is already pinned at
-[head_jsdoc_cast_multiline_comment](../head_jsdoc_cast_multiline_comment_svelte_prettier_divergence/).
+[head_jsdoc_cast_multiline_comment](../head_jsdoc_cast_multiline_comment_prettier_divergence/).
 
 Shapes covered: an object-literal head; an array-literal head, where the `as x` clause joins
 the dedented `]`; a block-bodied arrow head; a prefix operator over a wrapped call; an

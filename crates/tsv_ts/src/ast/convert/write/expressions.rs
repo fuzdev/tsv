@@ -13,9 +13,9 @@ use super::patterns::{
 };
 use super::types::{write_type, write_type_parameter_instantiation};
 use super::{
-    Ctx, JsonWriter, close_node, node_header, write_array, write_bare_node, write_identifier_parts,
-    write_identifier_plain, write_literal, write_name_field, write_type_annotation_field,
-    write_type_arguments_field,
+    CommentAttach, CommentMode, Ctx, JsonWriter, close_node, node_header, write_array,
+    write_bare_node, write_identifier_parts, write_identifier_plain, write_literal,
+    write_name_field, write_type_annotation_field, write_type_arguments_field,
 };
 use tsv_lang::Span;
 
@@ -132,6 +132,28 @@ pub(super) fn write_expression_inner(
     }
 }
 
+/// A JSDoc cast in an island whose canonical reader discards grouping pairs
+/// (`CommentAttach::removes_parens`): acorn's walk entered the cast's
+/// `ParenthesizedExpression` before its inner node, so the pair runs as a **silent frame**
+/// around the inner emission — it takes the comments the pair took (the cast's own
+/// `@type` comment among them, which leads the pair) and the inner sees the pair's `)` as
+/// its parent's end — and emits nothing, since `remove_parens` discards the pair with
+/// whatever it claimed.
+#[cold]
+#[inline(never)]
+fn write_jsdoc_cast_paren_frame(
+    w: &mut JsonWriter,
+    span: Span,
+    inner: &internal::Expression<'_>,
+    ctx: &Ctx<'_>,
+    flags: ExprFlags,
+    attach: &CommentAttach<'_>,
+) {
+    attach.paren_open(span);
+    write_expression_inner(w, inner, ctx, flags);
+    attach.paren_close(span);
+}
+
 /// An `Identifier` in expression position — the arm both dispatches share.
 /// `force_optional` is the acorn `?.<T>(...)` quirk ([`ExprFlags::force_optional`]).
 // Out of line so the front stays frameless: inlined, this arm's frame is set up on entry
@@ -170,18 +192,20 @@ fn write_expression_full_dispatch(
         // public AST). `chain: ChainState::Unresolved` — the cast's parens seal any chain;
         // force/strip pass through (they act on the converted inner).
         internal::ExpressionKind::JsdocCast(cast) => {
-            write_expression_inner(
-                w,
-                cast.inner,
-                ctx,
-                ExprFlags {
-                    // The cast's parens seal the chain, so the inner
-                    // expression inherits no verdict — `/** @type {T} */
-                    // (a?.b)` still opens its own wrap.
-                    chain: ChainState::Unresolved,
-                    ..flags
-                },
-            );
+            let flags = ExprFlags {
+                // The cast's parens seal the chain, so the inner
+                // expression inherits no verdict — `/** @type {T} */
+                // (a?.b)` still opens its own wrap.
+                chain: ChainState::Unresolved,
+                ..flags
+            };
+            if let CommentMode::Attach(attach) = ctx.comments
+                && attach.removes_parens()
+            {
+                write_jsdoc_cast_paren_frame(w, expr.span, cast.inner, ctx, flags, attach);
+            } else {
+                write_expression_inner(w, cast.inner, ctx, flags);
+            }
         }
         // Preserved grouping parens (snippet parameters): emit the wrapper with
         // its paren-covering span, then the inner expression. Only produced under

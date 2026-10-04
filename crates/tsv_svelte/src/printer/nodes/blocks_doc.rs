@@ -92,7 +92,7 @@ pub(super) struct AwaitPieces {
 /// idempotent, so one could only bake the hugged form in as canonical.
 /// `JsdocCast` is deliberately **absent** for that reason and no other: its parens are
 /// unconditional, but the flat-cast-under-a-multi-line-comment shape is the one this
-/// codebase already pins (`svelte/blocks/head_jsdoc_cast_multiline_comment_svelte_prettier_divergence`),
+/// codebase already pins (`svelte/blocks/head_jsdoc_cast_multiline_comment_prettier_divergence`),
 /// so adding it would move a committed shape to fix a rarer one.
 ///
 /// False for a binary/logical chain (ends on an operand), a multi-segment member chain (a

@@ -128,7 +128,8 @@ use tsv_ts::ast::convert::{
 
 use super::comment_attachment::{
     AttachInputs, attach_binding_pattern, attach_const_tag_init, attach_expression,
-    attach_expression_list, attach_script, is_template_comment, pattern_comment_window,
+    attach_expression_list, attach_script, attach_statement, is_template_comment,
+    pattern_comment_window,
 };
 use super::special::{bool_option, component_is_typescript, find_option_values, text_value};
 
@@ -463,9 +464,9 @@ fn write_fragment_node(w: &mut JsonWriter, node: &internal::FragmentNode<'_>, ct
 /// island's online attach driving `leadingComments` / `trailingComments` off this
 /// emit's own node opens and closes (`attach_expression`).
 ///
-/// The attach is anchored on `expr`'s own span end — where the PARSE ended, which
-/// for a JSDoc cast is past its `)` and so is not the emitted root's end; see
-/// `attach_expression`.
+/// The attach is keyed on `expr`'s own span — a JSDoc cast's covers its `(`…`)` — and
+/// reads the bare grouping pairs around it back off the source, since the canonical root
+/// is the outermost pair and the parse ended past its `)`; see `attach_expression`.
 ///
 /// Call this directly only for a window that is **deliberately asymmetric** — a block head,
 /// whose attach runs from the `{#` to the end of its clause rather than to the expression's
@@ -479,12 +480,8 @@ fn write_generic_island(
     ctx: &Ctx<'_>,
 ) {
     if ctx.any_comment_in(container_start, range_end) {
-        let attach = attach_expression(
-            ctx.attach_inputs(),
-            container_start,
-            expr.span().end,
-            range_end,
-        );
+        let attach =
+            attach_expression(ctx.attach_inputs(), container_start, expr.span(), range_end);
         write_expression_embedded(w, expr, ctx.embed(attach.mode()));
     } else {
         write_expression_embedded(w, expr, ctx.embed(CommentMode::Off));
@@ -899,12 +896,14 @@ fn write_each_block(w: &mut JsonWriter, block: &internal::EachBlock<'_>, ctx: &C
     }
     if let Some(key) = &block.key {
         w.raw(",\"key\":");
-        // The key's window opens at its own `(`, not at the block's `{#` — canonical
+        // The key's window is INSIDE its own parens, not at the block's `{#` — canonical
         // filters each parse's comments to `start >= index`, and the key's
-        // `read_expression` begins after the paren (only whitespace can sit between).
+        // `read_expression` begins after the `(` (only whitespace can sit between).
         // Anchored on the head, this window reaches back over the CONTEXT PATTERN and
-        // claims a comment written inside it, which the pattern island also attaches.
-        write_generic_island(w, key.expression, key.span.start, range_end, ctx);
+        // claims a comment written inside it, which the pattern island also attaches. The
+        // key's own `(`…`)` are block syntax, not a grouping pair around the root, so the
+        // window stops short of both (no comment can follow the `)` before the `}`).
+        write_generic_island(w, key.expression, key.span.start + 1, key.span.end - 1, ctx);
     }
     if let Some(fallback) = &block.fallback {
         w.raw(",\"fallback\":");
@@ -1006,12 +1005,8 @@ fn write_snippet_name(
     ctx: &Ctx<'_>,
 ) {
     if ctx.any_comment_in(container_start, range_end) {
-        let attach = attach_expression(
-            ctx.attach_inputs(),
-            container_start,
-            expr.span().end,
-            range_end,
-        );
+        let attach =
+            attach_expression(ctx.attach_inputs(), container_start, expr.span(), range_end);
         write_identifier_expression_with_character(w, expr, ctx.embed(attach.mode()));
     } else {
         write_identifier_expression_with_character(w, expr, ctx.embed(CommentMode::Off));
@@ -1031,7 +1026,9 @@ fn write_snippet_parameters(
     ctx: &Ctx<'_>,
 ) {
     if !parameters.is_empty() && ctx.any_comment_in(container_start, range_end) {
-        let attach = attach_expression_list(ctx.attach_inputs(), container_start, range_end, None);
+        // Svelte keeps this parse's grouping pairs on the wire (no `remove_parens`)
+        let attach =
+            attach_expression_list(ctx.attach_inputs(), container_start, range_end, None, false);
         write_array(w, parameters, |w, p| {
             write_expression_embedded(w, p, ctx.embed(attach.mode()));
         });
@@ -1115,6 +1112,7 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
             tag.span.start,
             tag.span.end,
             Some(Span::new(first.span().start, last.span().end)),
+            true,
         );
         write_array(w, identifiers, |w, id| {
             write_expression_embedded(w, id, ctx.embed(attach.mode()));
@@ -1268,7 +1266,7 @@ fn write_declaration_tag(w: &mut JsonWriter, tag: &internal::DeclarationTag<'_>,
     if !ctx.any_comment_in(tag.span.start, tag.span.end) {
         write_variable_declaration_embedded(w, &tag.declaration, ctx.embed(CommentMode::Off));
     } else {
-        let attach = attach_expression(
+        let attach = attach_statement(
             ctx.attach_inputs(),
             tag.span.start,
             tag.declaration.span.end,

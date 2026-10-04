@@ -1407,10 +1407,8 @@ only the directive's own line is new there. Inside a whitespace-significant elem
   alike; the lone exception is `{@const}`'s initializer, where the paren is fully redundant
   and normalizes away frozen or not. Prettier has no freeze to
   compare against here: its `remove_parens` pass **deletes** the directive along with the
-  wrapper it attached to, so the value normalizes and the comment is lost outright. Also a
-  `_svelte_divergence` — the same pass moves the parser's attachment (§Comment Attachment
-  Differences in [conformance_svelte.md](./conformance_svelte.md)) —
-  [assignment head](../tests/fixtures/svelte/tags/assignment_prettier_ignore_head_svelte_prettier_divergence/)
+  wrapper it attached to, so the value normalizes and the comment is lost outright —
+  [assignment head](../tests/fixtures/svelte/tags/assignment_prettier_ignore_head_prettier_divergence/)
 - **`{@debug}` head** — ◆comment_preservation ◆prettier_bug — prettier supplies no freeze
   semantics to compare against, because it **deletes** every comment inside a `{@debug}`,
   directive included (the content loss

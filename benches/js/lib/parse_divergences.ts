@@ -660,11 +660,13 @@ export const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 		// comment before a parenthesized subexpression attaches to the synthetic
 		// ParenthesizedExpression, which Svelte's remove_parens then strips —
 		// dropping the attachment (the comment survives only in root `comments`).
-		// tsv has no ParenthesizedExpression node, so it keeps the comment on the
-		// inner expression — a template-expression attachment Svelte lacks
-		// (`missing_canonical` under a `fragment.` path). Template-only; a plain
-		// `<script>` parse does not set preserveParens. LEADING only: the trailing side
-		// of the wrapper attaches in both parsers. Gated on the shape itself: the node
+		// tsv keeps no span for a bare pair inside an expression, so it keeps the comment
+		// on the inner expression — a template-expression attachment Svelte lacks
+		// (`missing_canonical` under a `fragment.` path). (A JSDoc cast's pair, and the
+		// bare pairs around an island's root, run as discarded nodes of tsv's attach and
+		// match.) Template-only; a plain `<script>` parse does not set preserveParens.
+		// LEADING only — the trailing side of an inner bare pair (`{[(a) /* c */ /* d */]}`)
+		// is the same divergence but unclaimed here, so a real case would gate. Gated on the shape itself: the node
 		// tsv attached to is the inside of a paren — the first token before its start
 		// is a `(` — tsv's comments are the run directly ahead of that `(` (nothing but
 		// whitespace and comments from the first of them to it, so a call's `(` after a

@@ -15,7 +15,7 @@
 // `tsv_ts`'s `ast/convert/write/comments.rs`.
 
 use crate::ast::internal;
-use crate::whitespace::svelte_ws_width_at;
+use crate::whitespace::{is_svelte_ws, svelte_ws_width_at};
 
 use tsv_lang::{Comment, Span, source_scan::skip_comment};
 use tsv_ts::ast::convert::{CommentAttach, CommentMode, IslandComments};
@@ -39,45 +39,76 @@ impl<'a> AttachInputs<'a> {
     }
 }
 
-/// The attach for a comment-bearing island whose canonical parse is ONE acorn
-/// parse ending in a trailing-comment scan — the shape shared by every island
-/// below, which is why one builder serves them all:
+/// The attach for a comment-bearing template expression island — every island
+/// canonical Svelte reads with `read_expression`, i.e. `parse_expression_at` (acorn with
+/// `preserveParens: true`) followed by `remove_parens`:
 ///
 /// - a template expression (`{expr}`, block test, directive expression,
 ///   `{@debug}` id, spread, `<svelte:element>` tag / `<svelte:component>`
-///   expression, snippet name), via `write_generic_island` / `write_snippet_name`
+///   expression, snippet name, an `{#each}` key), via `write_generic_island` /
+///   `write_snippet_name`
 /// - a `{@const}`'s **init**, through [`attach_const_tag_init`], which supplies
 ///   the binding's end as the window start
-/// - a `{const …}` / `{let …}` **declaration tag**, whose canonical parse is
-///   `parse_statement_at` rather than `parse_expression_at`. Only the parse
-///   ENTRY POINT differs; `add_comments` is the same call on the same shape, so
-///   the whole `VariableDeclaration` tree (every declarator and its id/init)
-///   attaches through this one window. Hence "expression" in the name is the
-///   common case, not the contract.
 ///
 /// The window runs from the container's start (canonical filters each parse's
 /// comments to `start >= index`, where `index` is where *that* parse began) to
 /// the end of the trailing-comment run acorn scans past after the parsed region.
 /// Leftovers trail the root, as acorn's own post-walk special case does.
 ///
-/// ⚠️ **`parse_end` is where the PARSE ended, not where the emitted root node
-/// ends** — the two differ wherever tsv discards a wrapper acorn kept. A JSDoc
-/// cast is the live case: `parse_expression_at` runs with `preserveParens: true`,
-/// so acorn's root for `/** @type {T} */ (x)` is a `ParenthesizedExpression`
-/// ending after the `)`, and its own post-expression token scan starts there.
-/// Anchoring the scan at the emitted root (the *inner* expression, which stops
-/// short of the `)`) kills it on that `)` instead, so every comment past it is
-/// filtered out before the walk ever runs — canonical attaches it to the inner
-/// node (the `)` is in acorn's own `/^[,) \t]*$/` trailing gap class) and tsv
-/// had nowhere to put it. `internal::JsdocCast`'s span covers the parens, which
-/// is what makes the caller's expression the right anchor.
+/// ⚠️ **The canonical root is the outermost grouping pair, not the node the wire
+/// emits.** `preserveParens` makes every pair a `ParenthesizedExpression` the walk
+/// enters, and `remove_parens` then discards it together with every comment it claimed.
+/// tsv's parse keeps a span for one kind of pair — a JSDoc cast's
+/// (`internal::JsdocCast`'s span covers its `(`…`)`), which the writer runs as a silent
+/// frame (`IslandComments::removes_parens`) — and discards the rest, so the bare pairs
+/// around the ROOT are recovered here ([`root_grouping_parens`]) and handed over as
+/// `IslandComments::root_parens`. Two things follow from the root being a pair:
 ///
-/// A **bare** grouping paren is the residual: tsv discards those at parse time and
-/// keeps no span, so `{(x) /* c */}` still loses the attachment. It is not
-/// format-stable (tsv and prettier both print `{x /* c */}`), so the shape cannot
-/// be fixtured — see [conformance_svelte.md](../../../../../docs/conformance_svelte.md)
-/// §Comment Attachment Differences.
+/// - **where the parse ended** is past the outermost `)`, and that is where acorn's
+///   post-expression token scan starts. Anchoring the scan at the emitted root kills it
+///   on the first `)`, filtering out every comment after it before the walk runs;
+/// - **what the root keeps** is only what acorn's per-node trailing rule gives the inner
+///   node against its pair (the first comment of a same-line run, through the `)` in
+///   the `/^[,) \t]*$/` gap class) — the root fallback lands on the outermost pair and
+///   dies with it, so the rest of a run, and anything past a line break, attaches
+///   nowhere.
+///
+/// Bare pairs that are not around the root keep no span and stay unmodeled — see
+/// [conformance_svelte.md](../../../../../docs/conformance_svelte.md) §Comment Attachment
+/// Differences.
+///
+/// `range_end` bounds the island: no comment past it is queued, and no `)` at or past
+/// it closes a root pair — an `{#each}` key's own `)` belongs to the block syntax, so its
+/// caller passes the key's inner bounds.
 pub(super) fn attach_expression<'a>(
+    attach: AttachInputs<'a>,
+    container_start: u32,
+    root: Span,
+    range_end: u32,
+) -> CommentAttach<'a> {
+    let root_parens = root_grouping_parens(attach, container_start, root, range_end);
+    let parse_end = root_parens.first().map_or(root.end, |pair| pair.end);
+    let window_end = scan_past_trailing_comments(attach.source, parse_end, range_end);
+    CommentAttach::new(
+        attach.source,
+        IslandComments {
+            queue: attach.window_queue(container_start, window_end),
+            root_parent_end: None,
+            root_fallback: true,
+            html_leading: None,
+            removes_parens: true,
+            root_parens,
+        },
+    )
+}
+
+/// The attach for a `{const …}` / `{let …}` **declaration tag**, whose canonical parse is
+/// `parse_statement_at`: one acorn parse ending in a trailing-comment scan, like
+/// [`attach_expression`]'s, but **without** `preserveParens` — no grouping pair is a node
+/// of that walk, so a JSDoc cast is its inner expression and the root is the
+/// `VariableDeclaration` itself. `add_comments` is the same call on the same shape, so
+/// the whole tree (every declarator and its id/init) attaches through this one window.
+pub(super) fn attach_statement<'a>(
     attach: AttachInputs<'a>,
     container_start: u32,
     parse_end: u32,
@@ -91,8 +122,88 @@ pub(super) fn attach_expression<'a>(
             root_parent_end: None,
             root_fallback: true,
             html_leading: None,
+            removes_parens: false,
+            root_parens: Vec::new(),
         },
     )
+}
+
+/// The bare grouping pairs wrapping an island's root expression at `root`, outermost
+/// first, as `(`…`)` spans — what the canonical `preserveParens` parse has above the node
+/// the wire emits (see [`attach_expression`]).
+///
+/// tsv's parse discards a bare pair and its root keeps the inner span, so the pairs are
+/// read back off the source: the `(`s met walking back from `root.start` and the `)`s met
+/// walking forward from `root.end`, over whitespace and comments only, inside
+/// `[container_start, range_end)`. Within an island's own window such a bracket can only
+/// belong to a pair around the root — every other bracket of the island's grammar sits
+/// past a token of its own (a call's `(` after its callee), and the one that does not, an
+/// `{#each}` key's own parens, is outside the bounds its caller passes. The two walks
+/// pair innermost-out; a JSDoc cast root's own pair is its span, so the walks start
+/// outside it.
+fn root_grouping_parens(
+    attach: AttachInputs<'_>,
+    container_start: u32,
+    root: Span,
+    range_end: u32,
+) -> Vec<Span> {
+    let source = attach.source;
+    let bytes = source.as_bytes();
+    let mut opens = Vec::new();
+    let mut pos = root.start as usize;
+    let floor = container_start as usize;
+    while pos > floor {
+        let Some(ch) = source[floor..pos].chars().next_back() else {
+            break;
+        };
+        if is_svelte_ws(ch) {
+            pos -= ch.len_utf8();
+        } else if ch == '(' {
+            pos -= 1;
+            opens.push(pos as u32);
+        } else if let Some(comment) = comment_ending_at(attach.template_comments, pos as u32)
+            && comment.span.start >= container_start
+        {
+            pos = comment.span.start as usize;
+        } else {
+            break;
+        }
+    }
+    if opens.is_empty() {
+        return Vec::new();
+    }
+    let mut closes = Vec::with_capacity(opens.len());
+    let limit = (range_end as usize).min(bytes.len());
+    let mut pos = root.end as usize;
+    while pos < limit && closes.len() < opens.len() {
+        if let Some(width) = svelte_ws_width_at(source, pos) {
+            pos += width;
+        } else if bytes[pos] == b')' {
+            pos += 1;
+            closes.push(pos as u32);
+        } else if let Some(next) = skip_comment(bytes, pos, bytes.len()) {
+            pos = next;
+        } else {
+            break;
+        }
+    }
+    let mut pairs: Vec<Span> = opens
+        .iter()
+        .zip(&closes)
+        .map(|(&open, &close)| Span::new(open, close))
+        .collect();
+    pairs.reverse();
+    pairs
+}
+
+/// The template comment whose span ends exactly at `end`, if any. `template_comments`
+/// is sorted by start, and comments never overlap, so it is sorted by end too.
+fn comment_ending_at<'a>(template_comments: &[&'a Comment], end: u32) -> Option<&'a Comment> {
+    let idx = template_comments.partition_point(|c| c.span.end < end);
+    template_comments
+        .get(idx)
+        .copied()
+        .filter(|c| c.span.end == end)
 }
 
 /// The attaches for a comment-bearing **block binding pattern** — the `{#each … as ctx}`
@@ -132,6 +243,10 @@ pub(super) fn attach_binding_pattern<'a>(
                 root_parent_end: None,
                 root_fallback: false,
                 html_leading: None,
+                // `read_pattern` and `read_type_annotation` both `remove_parens` their
+                // `parse_expression_at` parse
+                removes_parens: true,
+                root_parens: Vec::new(),
             },
         )
     };
@@ -192,7 +307,7 @@ pub(super) fn attach_const_tag_init<'a>(
     attach: AttachInputs<'a>,
 ) -> CommentAttach<'a> {
     let binding_end = pattern_comment_window(tag.id).end;
-    attach_expression(attach, binding_end, tag.init.span().end, tag.span.end)
+    attach_expression(attach, binding_end, tag.init.span(), tag.span.end)
 }
 
 /// The attach for a comment-bearing expression LIST that canonical Svelte parses
@@ -214,11 +329,16 @@ pub(super) fn attach_const_tag_init<'a>(
 /// `comments` array. (A single-identifier `{@debug}` has no wrapper — the
 /// identifier is the parse root itself — so it takes [`attach_expression`] with
 /// its root-fallback trailing, and its leading run does attach.)
+///
+/// `removes_parens` is whether the canonical reader strips the parse's grouping pairs
+/// (`IslandComments::removes_parens`): `{@debug}`'s `read_expression` does, the
+/// `{#snippet}` head's reader keeps them on the wire.
 pub(super) fn attach_expression_list<'a>(
     attach: AttachInputs<'a>,
     container_start: u32,
     range_end: u32,
     wrapper: Option<Span>,
+    removes_parens: bool,
 ) -> CommentAttach<'a> {
     let queue_start = wrapper.map_or(container_start, |w| w.start);
     CommentAttach::new(
@@ -228,6 +348,8 @@ pub(super) fn attach_expression_list<'a>(
             root_parent_end: wrapper.map(|w| w.end),
             root_fallback: false,
             html_leading: None,
+            removes_parens,
+            root_parens: Vec::new(),
         },
     )
 }
@@ -251,6 +373,8 @@ pub(super) fn attach_script<'a>(
             root_parent_end: None,
             root_fallback: true,
             html_leading: html_leading_comment.map(|c| c.content(attach.source)),
+            removes_parens: false,
+            root_parens: Vec::new(),
         },
     )
 }
@@ -306,10 +430,10 @@ fn window_queue<'a>(template_comments: &[&'a Comment], start: u32, end: u32) -> 
 /// block tags hand their content to the TS parser, whose one-token lookahead
 /// lexes all trivia after the expression and hard-errors on an unterminated
 /// block comment. This scanner's trivia set is the lexer's own
-/// ([`is_svelte_ws`](crate::whitespace::is_svelte_ws) + JS comments) rather than a proper
+/// ([`is_svelte_ws`] + JS comments) rather than a proper
 /// subset of it, so it can never walk past that validated region either.
 ///
-/// ⚠️ The whitespace class is [`is_svelte_ws`](crate::whitespace::is_svelte_ws) — acorn's,
+/// ⚠️ The whitespace class is [`is_svelte_ws`] — acorn's,
 /// which this mimics — and NOT an
 /// ASCII `b' ' | b'\t' | b'\r' | b'\n'` byte match. With that class a non-ASCII JS `\s`
 /// between an expression and its trailing comment (`{expr<NBSP>/* c */}`) ends the scan
