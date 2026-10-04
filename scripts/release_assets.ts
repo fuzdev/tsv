@@ -65,9 +65,9 @@ const LOADER = '@fuzdev/tsv';
 
 /** How long a registry read is given to see a just-published version:
  * `REGISTRY_ATTEMPTS` tries, `REGISTRY_RETRY_MS` apart (about ten minutes of
- * waiting in total). A first-ever package's packument has lagged the read path
- * past two and a half minutes (v0.3.0's bootstrap release), so the window is
- * sized for that case; the workflow's job timeout must stay above it. */
+ * waiting in total). A first-ever package's packument has been seen to lag the
+ * read path by minutes, so the window is sized for that case; the workflow's job
+ * timeout must stay above it. */
 const REGISTRY_ATTEMPTS = 30;
 const REGISTRY_RETRY_MS = 20_000;
 

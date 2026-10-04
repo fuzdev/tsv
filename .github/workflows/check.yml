@@ -18,7 +18,7 @@
 #               cadence, in audit:corpus).
 #   artifacts — publish-parity: builds the WASM/npm packages, checks size
 #               bounds, runs the Node package tests, and covers the Linux half
-#               of the N-API npm shape (see the job comment).
+#               of the N-API npm shape and its size bounds (see the job comment).
 #   platforms — macOS + Windows confidence for the native builds: the full
 #               `cargo test --workspace` suite plus the N-API JS-boundary and
 #               npm-package tests, per OS (see the job comment). Linux is
@@ -89,7 +89,7 @@ jobs:
           # Key on the sidecar pins (fetched at runtime, not lockfile-pinned) so a
           # bump invalidates the cached deps. The sidecar's prettier/svelte fetches
           # are the only runtime npm `check` does: `test:deno` runs the
-          # dependency-free divergence suite (node: builtins + relative imports, no
+          # node-modules-free deno tests (node: builtins + relative imports, no
           # node_modules — proven by a clean checkout), and the bench's heavy npm
           # tree (biome/oxc/oxfmt) is never installed here. The only deno.lock is the
           # sidecar's (crates/tsv_debug/src/deno/deno.lock, embedded + frozen); the
@@ -112,8 +112,8 @@ jobs:
         run: deno task check
 
   # Publish-parity gate for BOTH published sets: builds every WASM/npm artifact,
-  # checks the size bounds, runs the Node package tests, and stages + tests the
-  # Linux N-API package — none of which `check` exercises, so a packaging break
+  # checks the size bounds, runs the Node package tests, and stages, tests and
+  # size-checks the Linux N-API package — none of which `check` exercises, so a packaging break
   # surfaces on PRs instead of at release time. Runs the same `build:packages`
   # task as scripts/publish.ts (6 wasm-pack release builds + wasm-opt) and the
   # same `build:napi:packages` staging as release_napi.yml, so none can drift.
@@ -202,12 +202,21 @@ jobs:
       - name: N-API npm package test (linux)
         run: deno task test:napi:npm
 
+      # The native sibling of `validate:artifacts`: the size bands for the two
+      # binaries the step above staged (the napi-profile addon and the release
+      # `tsv_cli`), graded here on every PR instead of only at the release
+      # matrix, so a size move surfaces where it is made. The host build lands
+      # within the linux-x64-gnu band the matrix's almalinux:8 build anchors
+      # (scripts/validate_napi_artifact.ts says how close).
+      - name: Validate N-API artifact sizes (linux)
+        run: deno task validate:napi
+
       # ENGINE PARITY, and the only place it can run: one Rust source compiled
       # to wasm32 and natively must format to the same bytes, and this is the
       # first step at which BOTH artifacts exist — `build:packages` above made
       # the wasm one, the N-API step just made the native `tsv_cli`. The corpus
       # is the fixture trees plus, when the snapshot checkout is present, the
-      # real-code one; ~7s for ~18k files.
+      # real-code one.
       - name: Engine parity (wasm vs native)
         run: deno task engines:audit
 

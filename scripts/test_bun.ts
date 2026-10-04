@@ -30,15 +30,7 @@
 
 import { after } from 'node:test';
 import { spawnSync } from 'node:child_process';
-import {
-	cpSync,
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	symlinkSync,
-	writeFileSync
-} from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { argv, env, exit, versions } from 'node:process';
@@ -46,11 +38,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
 	assert_staged_fresh,
-	NAPI_LOADER_DIR,
-	NAPI_PKG_ROOT,
 	napi_addon_check,
 	napi_loader_checks,
 	napi_staged_triple,
+	stage_napi_consumer,
 	wasm_package_checks,
 	wasm_package_dir
 } from './check_staged_freshness.ts';
@@ -147,10 +138,8 @@ async function register(packages: Array<string>): Promise<void> {
 	for (const p of named) {
 		let name: string;
 		if (p === 'napi') {
-			// copies, not links: the loader resolves `@fuzdev/tsv-<triple>` from its REAL path
 			name = '@fuzdev/tsv';
-			cpSync(join(ROOT, NAPI_LOADER_DIR), join(scope, 'tsv'), { recursive: true });
-			cpSync(join(ROOT, NAPI_PKG_ROOT, triple), join(scope, `tsv-${triple}`), { recursive: true });
+			stage_napi_consumer(consumer, triple);
 		} else {
 			// a link: the wasm packages import nothing but their own relative files
 			const dir = join(ROOT, wasm_package_dir(p));

@@ -119,6 +119,8 @@ stack.is_ignored('build/out.js', false); // → true
 stack.is_ignored('keep.log', false); // → false (the tsv layer re-includes it)
 ```
 
+The class is the WASM binding's own, re-exported as is: unlike the format and parse functions, its arguments are checked by the binding layer rather than the shared facade, so pass the declared types — a wrong-typed argument is refused or coerced differently here than by the native [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv)'s twin.
+
 ## Status
 
 Near production-ready. A long tail of rare bugs remains and APIs may still change; reports are appreciated.

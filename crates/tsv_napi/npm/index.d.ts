@@ -56,7 +56,10 @@ export { format_svelte, format_typescript, format_css } from './facade_format.js
  * two type-check interchangeably — save the WASM class's wasm-bindgen
  * lifecycle pair, `free()` and `[Symbol.dispose]()`: this class is
  * GC-managed and has neither, so a `using stack = new IgnoreStack()` or an
- * explicit `stack.free()` is a WASM-only spelling.
+ * explicit `stack.free()` is a WASM-only spelling. The two agree on every call
+ * these declarations admit; argument checking past them is each engine's own
+ * (the class is the binding's, with no facade reading its arguments), so a
+ * wrong-typed argument is refused or coerced differently by each.
  */
 export class IgnoreStack {
 	constructor();

@@ -41,7 +41,6 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
 	chmodSync,
-	cpSync,
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
@@ -63,15 +62,23 @@ import {
 	napi_addon_check,
 	napi_loader_checks,
 	napi_staged_triple,
+	stage_napi_consumer,
 	staged_staleness,
 	type StagedStaleness,
 	wasm_package_checks,
 	wasm_package_dir
 } from './check_staged_freshness.ts';
+import { cli_binary_name } from './napi_host.ts';
 import { ALL_FAMILIES, facade_files, facade_type_names } from './npm_facade.ts';
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
 import { register_dts_specifier_test } from './dts_specifiers.ts';
-import { register_syntax_error_suite, syntax_errors } from './syntax_error_suite.ts';
+import { register_facade_surface_suite } from './facade_surface_suite.ts';
+import {
+	LONE_CR_REFUSAL,
+	LONE_CR_TAG_COMMENT,
+	register_syntax_error_suite,
+	syntax_errors
+} from './syntax_error_suite.ts';
 
 const pkg_root = NAPI_PKG_ROOT;
 // The staged dir name is the BUILD script's triple detection (Deno-side);
@@ -82,16 +89,11 @@ const triple = napi_staged_triple();
 /** Stage the loader (+ optionally the platform package) into a fresh temp node_modules. */
 const stage = (with_platform: boolean): string => {
 	const tmp = mkdtempSync(join(tmpdir(), 'tsv_napi_npm_'));
-	const scope = join(tmp, 'node_modules', '@fuzdev');
-	mkdirSync(scope, { recursive: true });
-	cpSync(NAPI_LOADER_DIR, join(scope, 'tsv'), { recursive: true });
-	if (with_platform) {
-		cpSync(join(pkg_root, triple), join(scope, `tsv-${triple}`), { recursive: true });
-	}
+	stage_napi_consumer(tmp, with_platform ? triple : null);
 	return tmp;
 };
 
-const cli_binary_name = process.platform === 'win32' ? 'tsv.exe' : 'tsv';
+const cli_binary = cli_binary_name(triple);
 
 // A stale staging silently green-tests OLD code: this suite once sat over a
 // pre-fix `tsv_cli` binary in crates/tsv_napi/pkg (it still panicked on
@@ -107,7 +109,7 @@ await assert_staged_fresh([
 	{
 		// the incident artifact: the real tsv_cli binary shipped beside the addon
 		label: 'staged native CLI binary',
-		staged: `${pkg_root}/${triple}/${cli_binary_name}`,
+		staged: `${pkg_root}/${triple}/${cli_binary}`,
 		crates: [...CORE_CRATES, 'tsv_cli', 'tsv_ignore', 'tsv_discover'],
 		files: ['scripts/build_napi_packages.ts'],
 		rebuild: 'deno task build:napi:packages'
@@ -137,7 +139,7 @@ const staged_bare = stage(false);
 // The dispatcher-fallback staging: platform package present, CLI binary
 // removed — bin.js must degrade to the cli.js JS mirror over the native engine.
 const staged_no_binary = stage(true);
-rmSync(join(staged_no_binary, 'node_modules', '@fuzdev', `tsv-${triple}`, cli_binary_name));
+rmSync(join(staged_no_binary, 'node_modules', '@fuzdev', `tsv-${triple}`, cli_binary));
 
 // Degraded-binary stagings, posix-only: Windows has no execute bit, and the
 // signal fake is a shell script.
@@ -148,14 +150,11 @@ let staged_signal_usr1 = '';
 if (posix) {
 	// binary present but not executable — the spawn-EACCES fallback path
 	staged_bad_mode = stage(true);
-	chmodSync(
-		join(staged_bad_mode, 'node_modules', '@fuzdev', `tsv-${triple}`, cli_binary_name),
-		0o644
-	);
+	chmodSync(join(staged_bad_mode, 'node_modules', '@fuzdev', `tsv-${triple}`, cli_binary), 0o644);
 	// "binary" that kills itself — the signal re-raise path
 	staged_signal = stage(true);
 	writeFileSync(
-		join(staged_signal, 'node_modules', '@fuzdev', `tsv-${triple}`, cli_binary_name),
+		join(staged_signal, 'node_modules', '@fuzdev', `tsv-${triple}`, cli_binary),
 		'#!/bin/sh\nkill -TERM $$\n',
 		{ mode: 0o755 }
 	);
@@ -163,7 +162,7 @@ if (posix) {
 	// rather than end the dispatcher, so it is reported instead
 	staged_signal_usr1 = stage(true);
 	writeFileSync(
-		join(staged_signal_usr1, 'node_modules', '@fuzdev', `tsv-${triple}`, cli_binary_name),
+		join(staged_signal_usr1, 'node_modules', '@fuzdev', `tsv-${triple}`, cli_binary),
 		'#!/bin/sh\nkill -USR1 $$\n',
 		{ mode: 0o755 }
 	);
@@ -461,30 +460,8 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		throws_with(() => api.format_css(42), 'format source must be a string (got number)');
 	});
 
-	// A caller's stack trace and a `function.name` check read an export's own name; the
-	// facade's functions once all shipped as `''` (`scripts/test_npm.ts` grades the wasm
-	// entries the same way).
-	it('every exported function is named for its export', () => {
-		const functions = Object.entries(api).filter(([, value]) => typeof value === 'function');
-		assert.ok(functions.length > 5, `expected the published functions, found ${functions.length}`);
-		for (const [name, value] of functions) {
-			assert.equal((value as { name: string }).name, name, name);
-		}
-	});
-
-	// The addon reads the source as UTF-8, which would silently replace a lone surrogate
-	// with U+FFFD — the facade refuses one first, every export.
-	it('a source holding a lone surrogate is refused, never converted lossily', () => {
-		const exports = Object.keys(api).filter((name) => /^(format|parse)_/.test(name));
-		assert.equal(exports.length, 9);
-		for (const name of exports) {
-			const noun = name.startsWith('format_') ? 'format' : 'parse';
-			assert.throws(() => api[name]('"\uD800";'), {
-				name: 'TypeError',
-				message: `${noun} source must be well-formed UTF-16 (a lone surrogate at offset 1)`
-			});
-		}
-	});
+	// export names and the lone-surrogate refusal, shared with the wasm entries' suite
+	register_facade_surface_suite('@fuzdev/tsv loader', api, { facade_exports: 9 });
 
 	it('the loader ships the shared facade verbatim', () => {
 		for (const { published, source } of facade_files(ALL_FAMILIES)) {
@@ -654,14 +631,14 @@ process.stdout.write(JSON.stringify({
 		assert.equal(platform_pkg.main, 'tsv_napi.node');
 		// The native CLI binary ships beside the addon, executable — what the
 		// loader's bin.js execs. Every declared platform file actually shipped.
-		assert.ok(platform_pkg.files.includes(cli_binary_name), `files declares ${cli_binary_name}`);
+		assert.ok(platform_pkg.files.includes(cli_binary), `files declares ${cli_binary}`);
 		for (const file of platform_pkg.files) {
 			const path = join(staged, 'node_modules', '@fuzdev', `tsv-${triple}`, file);
 			assert.ok(existsSync(path), `declared platform file missing: ${file}`);
 		}
 		if (process.platform !== 'win32') {
 			const mode = statSync(
-				join(staged, 'node_modules', '@fuzdev', `tsv-${triple}`, cli_binary_name)
+				join(staged, 'node_modules', '@fuzdev', `tsv-${triple}`, cli_binary)
 			).mode;
 			assert.ok(mode & 0o111, 'the CLI binary must be executable');
 		}
@@ -807,7 +784,7 @@ describe('libc detection (platform.js)', () => {
 const bin_path = join(staged, 'node_modules', '@fuzdev', 'tsv', 'bin.js');
 const cli_path = join(staged, 'node_modules', '@fuzdev', 'tsv', 'cli.js');
 /** The real `tsv_cli` binary the platform package ships — what `bin.js` execs. */
-const native_path = join(staged, 'node_modules', '@fuzdev', `tsv-${triple}`, cli_binary_name);
+const native_path = join(staged, 'node_modules', '@fuzdev', `tsv-${triple}`, cli_binary);
 /** Through the `tsv` bin — the `npx tsv` path, and this suite's subject. */
 const run_cli = (args: Array<string>, stdin?: string) =>
 	spawnSync(process.execPath, [bin_path, ...args], { encoding: 'utf-8', input: stdin });
@@ -868,8 +845,8 @@ describe('cli (bin.js): the tsv bin dispatching to the native CLI binary', () =>
 		});
 		assert.equal(result.status, 0, result.stderr);
 		const [report] = JSON.parse(result.stdout);
-		const entry = report.files.find((f: { path: string }) => f.path === cli_binary_name);
-		assert.ok(entry, `${cli_binary_name} missing from the packed file list`);
+		const entry = report.files.find((f: { path: string }) => f.path === cli_binary);
+		assert.ok(entry, `${cli_binary} missing from the packed file list`);
 		if (posix) {
 			assert.ok(entry.mode & 0o111, `packed mode ${entry.mode.toString(8)} is not executable`);
 		}
@@ -1386,6 +1363,34 @@ describe('message parity: the native CLI and cli.js refuse in the same order', (
 				}
 				assert.equal(readFileSync(path, 'utf8'), source, 'neither bin rewrote the file');
 			}
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	// The format refusal of a source that parses is positionless, and no parse error:
+	// both bins print it after `Error: ` on a single input — the native CLI reading the
+	// `ParseError`'s missing position, the mirror the facade's plain `Error` — and after
+	// the path, with no prefix, in path mode.
+	it('a format refusal prints the same error on both bins, never as a parse error', () => {
+		const args = ['format', '--content', LONE_CR_TAG_COMMENT, '--parser', 'svelte'];
+		const native = run_native(args);
+		const mirror = run_mirror(args);
+		assert.equal(native.status, 2, native.stderr);
+		assert.equal(mirror.status, 2, mirror.stderr);
+		assert.equal(mirror.stderr, native.stderr);
+		assert.ok(native.stderr.startsWith(`Error: ${LONE_CR_REFUSAL}\n`), native.stderr);
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-refusal-'));
+		try {
+			const path = join(dir, 'a.svelte');
+			writeFileSync(path, LONE_CR_TAG_COMMENT);
+			const native = run_native(['format', path]);
+			const mirror = run_mirror(['format', path]);
+			assert.equal(native.status, 2, native.stderr);
+			assert.equal(mirror.status, 2, mirror.stderr);
+			assert.equal(mirror.stderr, native.stderr);
+			assert.ok(native.stderr.includes(`${path}: ${LONE_CR_REFUSAL}`), native.stderr);
+			assert.equal(readFileSync(path, 'utf8'), LONE_CR_TAG_COMMENT, 'neither bin wrote it');
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
 		}

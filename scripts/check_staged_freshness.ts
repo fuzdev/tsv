@@ -42,9 +42,9 @@
  * toolchain change; after one, rebuild once via the build-first task.
  */
 
-import { existsSync, readdirSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
-import { relative } from 'node:path';
+import { join, relative } from 'node:path';
 import { env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 
@@ -269,6 +269,26 @@ export function napi_staged_triple(): string {
 		exit(1);
 	}
 	return platform_dirs[0]!;
+}
+
+/**
+ * Lay the staged `@fuzdev/tsv` loader — and, given a triple, that platform package beside
+ * it — into `consumer`'s `node_modules/@fuzdev/`, as npm installs them, for a suite that
+ * imports the loader by bare specifier. Copies, not links: the loader resolves
+ * `@fuzdev/tsv-<triple>` with `createRequire` from its REAL path, which a link would put
+ * outside the consumer's `node_modules`.
+ *
+ * @param consumer - the consumer directory (its `node_modules` is created as needed)
+ * @param triple - the platform package to stage beside the loader, or `null` for the loader
+ *   alone (the unsupported-platform shape)
+ */
+export function stage_napi_consumer(consumer: string, triple: string | null): void {
+	const scope = join(consumer, 'node_modules', '@fuzdev');
+	mkdirSync(scope, { recursive: true });
+	cpSync(`${ROOT}${NAPI_LOADER_DIR}`, join(scope, 'tsv'), { recursive: true });
+	if (triple !== null) {
+		cpSync(`${ROOT}${NAPI_PKG_ROOT}/${triple}`, join(scope, `tsv-${triple}`), { recursive: true });
+	}
 }
 
 /** The check that dates the staged N-API addon in the platform package for `triple`. */

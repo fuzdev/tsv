@@ -65,6 +65,9 @@ export interface TypeScriptFormatOptions {
  *   object, or `options` carries an unknown key or a set `sourceType`
  * @throws SyntaxError when the source does not parse — a `TsvSyntaxError`, its position on
  *   `start` and `loc`
+ * @throws Error when the source exceeds the 4 GiB size cap, or parses but cannot be
+ *   formatted faithfully — a lone CR inside an in-tag `//` comment, which the format's CR
+ *   fold would end early
  */
 export declare function format_svelte(source: string, options?: FormatOptions): string;
 /**
@@ -74,6 +77,7 @@ export declare function format_svelte(source: string, options?: FormatOptions): 
  *   `'module'`
  * @throws SyntaxError when the source does not parse — a `TsvSyntaxError`, its position on
  *   `start` and `loc`
+ * @throws Error when the source exceeds the 4 GiB size cap
  */
 export declare function format_typescript(
 	source: string,
@@ -85,5 +89,6 @@ export declare function format_typescript(
  *   object, or `options` carries an unknown key or a set `sourceType`
  * @throws SyntaxError when the source does not parse — a `TsvSyntaxError`, its position on
  *   `start` and `loc`
+ * @throws Error when the source exceeds the 4 GiB size cap
  */
 export declare function format_css(source: string, options?: FormatOptions): string;

@@ -170,6 +170,7 @@
 		"test:deno:canonical": "deno test --config benches/js/deno.json --allow-read --allow-env --allow-sys benches/js/lib/canonical_test.ts",
 
 		"test:npm": "deno task build:npm:format && deno task test:npm:run",
+		"//test:npm:run": "The three wasm package suites' `:run` tasks have a SECOND spelling: scripts/publish.ts Step 6 runs `node --test scripts/test_npm.ts` per package itself (its own `PKG_DIR` loop, then `test:bun` once over all three with `--require-bun`) rather than calling these tasks. A leg added to one of them here is therefore NOT run by a publish until publish.ts gains it too — change both together.",
 		"test:npm:run": "PKG_DIR=crates/tsv_wasm/pkg/format/npm node --test scripts/test_npm.ts && deno task test:bun format",
 		"test:npm:parse": "deno task build:npm:parse && deno task test:npm:parse:run",
 		"test:npm:parse:run": "PKG_DIR=crates/tsv_wasm/pkg/parse/npm node --test scripts/test_npm.ts && deno task test:bun parse",

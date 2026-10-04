@@ -3,7 +3,8 @@
  * (`crates/tsv_napi/pkg/<triple>/` — the `tsv_napi.node` addon and the native
  * `tsv` CLI binary beside it) — the native sibling of
  * `scripts/validate_artifacts.ts`'s wasm bounds, run per matrix target by the
- * release workflow (and locally after `deno task build:napi:packages`).
+ * release workflow, on the linux host build by check.yml's `artifacts` job, and
+ * locally after `deno task build:napi:packages`.
  *
  * Deliberately tight (~±8%) around a measured value, same philosophy as the
  * wasm bounds: a legitimate size change fails the release until the constant
@@ -37,8 +38,8 @@ const { values: args } = parseArgs({
  * Anchored on a full matrix run, where each row is built in the environment
  * that ships it (the gnu rows in almalinux:8, musl in rust:alpine, win and
  * darwin-arm64 natively, darwin-x64 cross-compiled on the arm64 runner) — the
- * only measurement the gate ever sees. A host build of the same commit came
- * within 1,840 B of the almalinux linux-x64-gnu figure, so the container is not
+ * only measurement the gate ever sees. A host build of the same commit lands
+ * within a few KB of the almalinux linux-x64-gnu figure, so the container is not
  * the size variable it might have looked like; the size variable is the TARGET
  * (win32/darwin-arm64 sit ~10% under the linux rows, darwin-x64 ~4%). */
 const BOUNDS: Record<string, [number, number]> = {

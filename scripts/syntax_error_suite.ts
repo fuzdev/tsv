@@ -283,10 +283,10 @@ export function syntax_errors(api: Record<string, any>): Map<string, ThrownSynta
 }
 
 /** A `div` with no attributes: Svelte's reader runs the `//` comment past the CR to the `\n`. */
-const LONE_CR_TAG_COMMENT = '<div // c\rclass="x"\n>hi</div>\n';
+export const LONE_CR_TAG_COMMENT = '<div // c\rclass="x"\n>hi</div>\n';
 
 /** The first line of the refusal's message, and its `line:col` header (the CR's point). */
-const LONE_CR_REFUSAL =
+export const LONE_CR_REFUSAL =
 	"Lone carriage return inside a '//' comment in a tag: formatting folds it to a line feed, which would end the comment early";
 const LONE_CR_REFUSAL_HEADER = '1:10';
 
@@ -338,10 +338,9 @@ export function register_syntax_error_suite(
 				const error = thrown_by(() => api.format_svelte(LONE_CR_TAG_COMMENT));
 				assert.ok(error instanceof Error, `an Error, got ${String(error)}`);
 				assert.ok(!(error instanceof SyntaxError), `not a SyntaxError: ${String(error)}`);
-				// no point, the source not being malformed (napi's every `Error` has a `code`)
-				for (const key of ['start', 'loc', 'line', 'column']) {
-					assert.ok(!Object.prototype.propertyIsEnumerable.call(error, key), key);
-				}
+				// no point, the source not being malformed — and no own keys at all, on either
+				// engine (napi-rs's `code` is deleted, as the wasm engine's errors carry none)
+				assert.deepEqual(Object.keys(error), []);
 				const [message, located = ''] = error.message.split('\n');
 				assert.equal(message, LONE_CR_REFUSAL);
 				assert.equal(located.split(' ')[0], LONE_CR_REFUSAL_HEADER, 'the CR is named');

@@ -88,6 +88,7 @@ const same = reconstruct_locations(parse_typescript(src), src);
 It adds `loc` to every object with `start`/`end` and `name_loc` to Svelte elements, attributes, and directives, **in place** (keys appended last); `structuredClone` the tree first to keep the input. The tree must be acyclic — the parse's own, or a clone of it; one given `parent` back-pointers never finishes.
 
 - Lines follow the document's rule: ECMAScript's terminators for TypeScript (as acorn counts them), LF alone for a whole Svelte document and for CSS. Offsets are UTF-16 units; a leading BOM counts in TypeScript offsets, not in Svelte or CSS ones.
+- On the nodes where Svelte's own `loc` carries a `character` offset (listed on the bundled `Position` type), so does this one.
 - For Svelte it is a superset of Svelte's own output (which has `loc` only on acorn-parsed nodes), following the offsets where Svelte's `loc` departs from them ([docs/conformance_svelte.md](https://github.com/fuzdev/tsv/blob/main/docs/conformance_svelte.md)).
 - The language is read off the root (`Root`, `StyleSheetFile`, or a whole-source `Program`); pass `{language}` for a subtree, or it throws rather than guess.
 
@@ -103,9 +104,9 @@ locator.loc_of(b); // {start: {line: 2, column: 0}, end: {line: 2, column: 6}}
 locator.position_at(7); // {line: 2, column: 0}
 ```
 
-A locator's single lookups throw a `RangeError` for an offset or span the text doesn't hold (a `TypeError` for an offset that isn't a number); the whole-tree forms check nothing per node. A missing or unknown `language`, an uninferable root, or a non-string source throws a `TypeError`. So does an options argument that isn't an object, or a key other than `language` — a typo like `{langauge: 'css'}` throws rather than falling back to inference.
+A locator's single lookups throw a `RangeError` for an offset or span the text doesn't hold (a `TypeError` for an offset that isn't a number, or a node whose `start`/`end` getter throws); the whole-tree forms check nothing per node. A missing or unknown `language`, an uninferable root, or a non-string source throws a `TypeError`. So does an options argument that isn't an object, or a key other than `language` — a typo like `{langauge: 'css'}` throws rather than falling back to inference.
 
-`reconstruct_locations` and `create_locator` are also the `@fuzdev/tsv-wasm/locations` entry point, pure JS that loads no WASM.
+`reconstruct_locations` and `create_locator` are also the `@fuzdev/tsv-wasm/locations` entry point, pure JS that loads no WASM; the `SourceLocation` and `Position` types they return come from the package root.
 
 ### Errors and depth limits
 

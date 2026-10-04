@@ -25,7 +25,8 @@
  *
  * **Errors.** A bad argument — a `source` that is not a string, a missing or unknown
  * `language`, a root whose language cannot be inferred, an offset handed to `position_at`
- * that is not a number — throws a `TypeError`. A numeric offset outside the indexed text
+ * that is not a number, a node handed to `loc_of` whose `start` or `end` getter throws —
+ * throws a `TypeError`. A numeric offset outside the indexed text
  * (or not an integer) throws a `RangeError` from a locator's two single lookups
  * (`position_at`, `loc_of`), which check what they are handed; `loc_of` answers `null` for
  * a value without numeric `start` and `end`, as the walk skips one. The whole-tree walk
@@ -106,28 +107,40 @@ function indexed_text(source, language) {
 	return source;
 }
 
+/** The ECMAScript line terminators other than LF — what makes a TypeScript document's
+ * line starts more than its LFs. */
+const NON_LF_TERMINATOR = /[\r\u2028\u2029]/;
+
 /**
  * Line-start offsets (UTF-16 units); the rightmost start `<=` an offset gives its
  * line. Built once per source and reused for every `loc_at` lookup. A TypeScript
  * document counts the ECMAScript LineTerminators (`\n`, `\r`, `\r\n` as one, U+2028,
  * U+2029); a Svelte or CSS document counts LF alone.
+ *
+ * When LF is the only terminator in play — any Svelte or CSS document, and a TypeScript
+ * one holding no other terminator — the starts are collected with native `indexOf`
+ * rather than a per-unit scan — the common case, and the far cheaper path.
  * @param {string} source
  * @param {boolean} ecmascript
  * @returns {number[]}
  */
 function build_line_starts(source, ecmascript) {
 	const starts = [0];
+	if (!ecmascript || !NON_LF_TERMINATOR.test(source)) {
+		for (let i = source.indexOf('\n'); i !== -1; i = source.indexOf('\n', i + 1)) {
+			starts.push(i + 1);
+		}
+		return starts;
+	}
 	for (let i = 0; i < source.length; i++) {
 		const c = source.charCodeAt(i);
 		if (c === LF) {
 			starts.push(i + 1);
-		} else if (ecmascript) {
-			if (c === CR) {
-				if (source.charCodeAt(i + 1) === LF) i++; // \r\n counts as one line break
-				starts.push(i + 1);
-			} else if (c === LINE_SEPARATOR || c === PARAGRAPH_SEPARATOR) {
-				starts.push(i + 1);
-			}
+		} else if (c === CR) {
+			if (source.charCodeAt(i + 1) === LF) i++; // \r\n counts as one line break
+			starts.push(i + 1);
+		} else if (c === LINE_SEPARATOR || c === PARAGRAPH_SEPARATOR) {
+			starts.push(i + 1);
 		}
 	}
 	return starts;
@@ -507,6 +520,24 @@ function read_language_option(options) {
 }
 
 /**
+ * Read one offset off a node handed to `loc_of`, once — the node is the caller's, so a
+ * getter that throws is named rather than escaping raw, as the option readers name theirs.
+ *
+ * @param {object} node - the caller's node
+ * @param {'start' | 'end'} key
+ * @returns {unknown}
+ * @throws TypeError when the key's getter throws (the getter's error rides along as the
+ *   `cause`)
+ */
+function read_node_offset(node, key) {
+	try {
+		return /** @type {Record<string, unknown>} */ (node)[key];
+	} catch (cause) {
+		throw new TypeError(`loc_of: failed to read the node's '${key}'`, { cause });
+	}
+}
+
+/**
  * Whether `offset` is a position in a text of `length` UTF-16 units: an integer from 0
  * through `length` (the end of the text is a position — a node ending there names it).
  *
@@ -583,7 +614,8 @@ const TERMINAL_UNSAFE = /[\u007f-\u009f\u061c\u2028\u2029\u200e\u200f\u202a-\u20
  * CSS. `position_at` refuses an offset that is not a number with a `TypeError`, and
  * `position_at` and `loc_of` refuse a numeric offset that is not an integer within that
  * text with a `RangeError`; `loc_of` answers `null` for a value without numeric `start`
- * and `end`. `reconstruct` checks nothing, and takes an acyclic tree (see the module doc).
+ * and `end`, reads each once, and names a getter that throws with a `TypeError`.
+ * `reconstruct` checks nothing, and takes an acyclic tree (see the module doc).
  *
  * @param {string} source - the exact source the span-only wire was parsed from
  * @param {{language: 'typescript' | 'svelte' | 'css'}} options - `language` (required)
@@ -628,10 +660,11 @@ export function create_locator(source, options) {
 			return loc_at(offset + 0, starts);
 		},
 		loc_of(node) {
-			if (!node || typeof node.start !== 'number' || typeof node.end !== 'number') {
-				return null;
-			}
-			const { start, end } = node;
+			if (!node) return null;
+			const start = read_node_offset(node, 'start');
+			if (typeof start !== 'number') return null;
+			const end = read_node_offset(node, 'end');
+			if (typeof end !== 'number') return null;
 			if (!is_offset_in(start, text.length) || !is_offset_in(end, text.length) || start > end) {
 				throw new RangeError(
 					`loc_of: node span ${start}..${end} is not a range of the indexed text ` +

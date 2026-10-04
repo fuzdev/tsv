@@ -90,6 +90,10 @@ const workspace_pkg_re = /(\[workspace\.package\][^[]*?^version\s*=\s*)"([^"]*)"
 
 const dec = new TextDecoder();
 
+/** The oldest node Step 6 runs on — the first with native TypeScript type stripping
+ * unflagged, which `node --test` needs to execute the `.ts` test files directly. */
+const NODE_MIN = [22, 18] as const;
+
 /** The published packages, in publish order. */
 const packages = [
 	{
@@ -225,27 +229,47 @@ if (wetrun) {
 	console.log(`  npm authenticated as: ${whoami.stdout}`);
 }
 
-// node is required for the artifact tests
-const node_check = capture('node', ['--version']);
-if (!node_check.success) {
+// node runs Step 6's artifact tests, which `node --test` executes as .ts by native type
+// stripping — so a node older than that fails there, after the bump, as plainly as a
+// missing one
+const node_version = probe_version('node');
+if (node_version === null) {
 	console.error('  FAIL: node not found — required to test the built packages');
 	Deno.exit(1);
 }
-console.log(`  node: ${node_check.stdout}`);
+const node_semver = /^v(\d+)\.(\d+)\./.exec(node_version);
+if (
+	!node_semver ||
+	Number(node_semver[1]) < NODE_MIN[0] ||
+	(Number(node_semver[1]) === NODE_MIN[0] && Number(node_semver[2]) < NODE_MIN[1]) ||
+	// odd 23.x took default type stripping only at 23.6
+	(Number(node_semver[1]) === 23 && Number(node_semver[2]) < 6)
+) {
+	console.error(
+		`  FAIL: node ${node_version} — Step 6 needs >= ${NODE_MIN.join('.')} ` +
+			'(node --test runs the .ts test files by native type stripping)'
+	);
+	Deno.exit(1);
+}
+console.log(`  node: ${node_version}`);
+
+// wasm-pack builds every WASM bundle in Step 4 — asked here so a missing one fails
+// before the bump rather than after it
+const wasm_pack_version = probe_version('wasm-pack');
+if (wasm_pack_version === null) {
+	console.error(
+		'  FAIL: wasm-pack not found — required to build the packages (`cargo install wasm-pack`)'
+	);
+	Deno.exit(1);
+}
+console.log(`  ${wasm_pack_version}`);
 
 // Step 6 runs the parse-failure table under Bun (`deno task test:bun`), the one leg that
 // grades the engines' deletes of Bun's own `Error` `line` / `column` — asked here so a
 // --wetrun without bun fails before the bump. Waived like Step 3b's oracles: a dry run or
 // --no-check warn-skips, re-warned in the final summary.
 let bun_skip_reason: string | null = null;
-let bun_version: string | null = null;
-try {
-	const bun_check = capture('bun', ['--version']);
-	if (bun_check.success) bun_version = bun_check.stdout;
-} catch (e) {
-	// not installed — `Deno.Command` throws NotFound rather than failing the run
-	if (!(e instanceof Deno.errors.NotFound)) throw e;
-}
+const bun_version = probe_version('bun');
 if (bun_version !== null) {
 	console.log(`  bun: ${bun_version}`);
 } else if (wetrun && !no_check) {
@@ -273,6 +297,15 @@ if (missing_typecheck_install.length > 0) {
 	);
 	Deno.exit(1);
 }
+
+// The N-API half of the release is a different machine's: the tag Step 8 pushes triggers
+// release_napi.yml, AFTER this script has published the wasm packages — so a matrix that
+// fails then leaves a half-released version. Its dispatch dry run on this commit is the
+// rehearsal that answers that ahead of time, and nothing here can ask GitHub for it.
+console.log(
+	'  REMINDER: the release_napi workflow_dispatch dry run must be green on this commit ' +
+		'before a --wetrun (the wasm packages publish before the tag starts the N-API matrix)'
+);
 
 // Step 2: Resolve version
 
@@ -462,8 +495,8 @@ if (no_check) {
 // svelte_styles cache and the live diff of this machine's working trees against the snapshot
 // — and the pinned Prettier suites). This is the
 // extension-robustness bar: `tests/fixtures` is format-stable by construction, so `deno task check`
-// is structurally blind to a content-loss / panic / reflow bug in real code — every such bug this
-// cycle was found by a corpus audit or a wide fuzz seed, never by `check`. `deno task audit:corpus`
+// is structurally blind to a content-loss / panic / reflow bug in real code — such bugs are found
+// by a corpus audit or a wide fuzz seed, never by `check`. `deno task audit:corpus`
 // warn-skips absent working trees, so its reproducible floor is the whole ../corpora snapshot;
 // like Step 3b, a --wetrun without that floor BLOCKS (releasing without the audit needs --no-check),
 // a dry-run warn-and-skips. The FFI/prettier SAFETY half (content loss vs prettier) rides Step 3b's
@@ -536,6 +569,8 @@ for (const { label, dir } of packages) {
 
 console.log('\n=== Step 6: Validate built packages (sizes + Deno + Node + Bun + declarations) ===');
 run('deno task validate:artifacts', 'deno', ['task', 'validate:artifacts']);
+// A second spelling of deno.json's `test:npm*:run` tasks (see `//test:npm:run`): a leg added
+// there must be added here too, or a publish silently skips it.
 for (const { label, dir } of packages) {
 	const result = new Deno.Command('node', {
 		args: ['--test', 'scripts/test_npm.ts'],
@@ -614,7 +649,7 @@ for (let i = 0; i < packages.length; i++) {
 		if (res.stderr) console.log(res.stderr);
 		if (res.success) {
 			console.log(`  PASS: ${label} packs cleanly`);
-		} else if (/cannot publish over|previously published version/i.test(res.stderr)) {
+		} else if (/cannot publish over the previously published versions/i.test(res.stderr)) {
 			// Dry-run never bumps, so it dry-publishes the CURRENT (already-published)
 			// version. The real wetrun bumps first, so this isn't a real failure.
 			const preview = (bump as BumpLevel | null) ?? read_declared_bump();
@@ -711,9 +746,7 @@ if (wetrun) {
 			? `\n  The N-API set does NOT publish until the v${version} tag is pushed —`
 			: `\n  The pushed v${version} tag triggers release_napi.yml —`
 	);
-	console.log(
-		'  the seven N-API packages (@fuzdev/tsv + its six platform packages) publish there.'
-	);
+	console.log('  the N-API set (@fuzdev/tsv + its platform packages) publishes there.');
 	console.log(
 		no_git
 			? '  Finish the finalize above, then watch that run.'
@@ -767,6 +800,19 @@ function capture(
 		stdout: dec.decode(result.stdout).trim(),
 		stderr: dec.decode(result.stderr).trim()
 	};
+}
+
+/** A tool's `--version` output, or `null` when it is not installed or fails — `Deno.Command`
+ * throws `NotFound` for a missing binary rather than failing the run, which would otherwise
+ * surface as a raw stack. */
+function probe_version(cmd: string): string | null {
+	try {
+		const result = capture(cmd, ['--version']);
+		return result.success ? result.stdout : null;
+	} catch (error) {
+		if (error instanceof Deno.errors.NotFound) return null;
+		throw error;
+	}
 }
 
 function exists(path: string): boolean {

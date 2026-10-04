@@ -52,7 +52,12 @@ import { facade_files } from './npm_facade.ts';
 import { assert_staged_fresh, wasm_package_checks } from './check_staged_freshness.ts';
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
 import { register_dts_specifier_test } from './dts_specifiers.ts';
-import { register_syntax_error_suite } from './syntax_error_suite.ts';
+import { register_facade_surface_suite } from './facade_surface_suite.ts';
+import {
+	LONE_CR_REFUSAL,
+	LONE_CR_TAG_COMMENT,
+	register_syntax_error_suite
+} from './syntax_error_suite.ts';
 
 const pkg_dir = process.env.PKG_DIR;
 if (!pkg_dir) {
@@ -416,9 +421,6 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		assert.equal(node_entry.format_css('a{color:red}', null), 'a {\n\tcolor: red;\n}\n');
 	});
 
-	// A caller's stack trace and a `function.name` check read an export's own name. The
-	// facade builds its functions under computed keys, which name them; an assignment to a
-	// computed member leaves it `''`.
 	// the node entry initializes at import, so both lifecycle calls are no-ops that hand
 	// back nothing — never wasm-bindgen's own init output (the raw exports and memory)
 	it('init and init_sync return nothing', async () => {
@@ -426,27 +428,8 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		assert.equal(node_entry.init_sync(), undefined);
 	});
 
-	it('every exported function is named for its export', () => {
-		const functions = Object.entries(node_entry).filter(([, value]) => typeof value === 'function');
-		assert.ok(functions.length > 5, `expected the published functions, found ${functions.length}`);
-		for (const [name, value] of functions) {
-			assert.equal((value as { name: string }).name, name, name);
-		}
-	});
-
-	// The engines read the source as UTF-8, which would silently replace a lone surrogate
-	// with U+FFFD — so the facade refuses one before either engine sees it, every export.
-	it('a source holding a lone surrogate is refused, never converted lossily', () => {
-		const exports = Object.keys(node_entry).filter((name) => /^(format|parse)_/.test(name));
-		assert.ok(exports.length >= 3, `expected the facade's exports, found ${exports.length}`);
-		for (const name of exports) {
-			const noun = name.startsWith('format_') ? 'format' : 'parse';
-			assert.throws(() => node_entry[name]('"\uD800";'), {
-				name: 'TypeError',
-				message: `${noun} source must be well-formed UTF-16 (a lone surrogate at offset 1)`
-			});
-		}
-	});
+	// export names and the lone-surrogate refusal, shared with the napi loader's suite
+	register_facade_surface_suite(`index.js: ${pkg_dir}`, node_entry);
 
 	it('format_* absent from the parse-only build', { skip: has_format }, () => {
 		assert.equal(node_entry.format_typescript, undefined);
@@ -813,12 +796,9 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 
 	// the lazy entry builds its own facade over the guarded engine functions, and writes
 	// its own `init` / `init_sync` / class wrappers, so its names are graded apart from
-	// the node entry's
-	it('every exported function is named for its export', () => {
-		for (const [name, value] of Object.entries(browser)) {
-			if (typeof value === 'function') assert.equal((value as { name: string }).name, name, name);
-		}
-	});
+	// the node entry's — and its lone-surrogate refusal BEFORE init, which the facade
+	// answers ahead of the guard
+	register_facade_surface_suite(`browser.js (lazy entry, before init): ${pkg_dir}`, () => browser);
 
 	it('exports throw before init', () => {
 		const guarded = has_format ? 'format_typescript' : 'parse_typescript';
@@ -915,6 +895,95 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 			assert.equal(browser.parse_typescript('const x = 1;').type, 'Program');
 		}
 	});
+});
+
+// Overlapping inits must keep ONE instance. The glue's async init checks `wasm` only
+// before its awaits, so an `init()` overlapping another `init()`, or an `init_sync()`
+// that ran during the await, once instantiated a second instance that silently replaced
+// the first when it finished last — and a handle minted in between then read the other
+// instance's memory, answering wrongly with no stale-handle error. Each case runs in a
+// worker thread: a fresh isolate is the only way to get an uninitialized copy of the
+// lazy entry here, since this file's own `browser` import is initialized above.
+describe(`overlapping init (browser.js): ${pkg_dir}`, () => {
+	const browser_url = new URL(`../${pkg_dir}/browser.js`, import.meta.url).href;
+	/** A worker-side expression: whether this variant's engine answers correctly. */
+	const works = has_format
+		? `tsv.format_typescript('const   x=1') === 'const x = 1;\\n'`
+		: `tsv.parse_typescript('const x = 1;').type === 'Program'`;
+	/** Run `body` in a worker over a fresh import of the lazy entry bound to `tsv`, with
+	 * `module` (the compiled module) and `instantiations` (a running count of
+	 * `WebAssembly.instantiate` calls) in scope; resolves to what `body` posts. */
+	const run_in_worker = (body: string): Promise<unknown> =>
+		new Promise((resolve, reject) => {
+			const source = `import {workerData, parentPort} from 'node:worker_threads';
+				const module = workerData.module;
+				let instantiations = 0;
+				const instantiate = WebAssembly.instantiate;
+				WebAssembly.instantiate = (...args) => {
+					instantiations++;
+					return instantiate(...args);
+				};
+				const tsv = await import(${JSON.stringify(browser_url)});
+				${body}`;
+			const worker = new Worker(source, {
+				eval: true,
+				workerData: { module: node_entry.wasm_module }
+			});
+			worker.on('message', (message) => {
+				void worker.terminate();
+				resolve(message);
+			});
+			worker.on('error', reject);
+		});
+
+	it('two overlapping init() calls instantiate once', async () => {
+		const result = await run_in_worker(
+			`await Promise.all([
+					tsv.init({module_or_path: module}),
+					tsv.init({module_or_path: module})
+				]);
+				parentPort.postMessage({instantiations, works: ${works}});`
+		);
+		assert.deepEqual(result, { instantiations: 1, works: true });
+	});
+
+	// the shared in-flight init is cleared when it fails, so a failed init never wedges
+	// the entry: a later init() with good bytes initializes it
+	it('a failed init() can be retried', async () => {
+		const result = await run_in_worker(
+			`const failed = await tsv.init({module_or_path: new Uint8Array([0, 1, 2, 3])}).then(
+					() => 'resolved',
+					(error) => error.constructor.name
+				);
+				await tsv.init({module_or_path: module});
+				parentPort.postMessage({failed, works: ${works}});`
+		);
+		assert.deepEqual(result, { failed: 'CompileError', works: true });
+	});
+
+	it(
+		'an init_sync during a pending init() keeps the instance its handles were minted on',
+		{ skip: !has_format },
+		async () => {
+			const result = await run_in_worker(
+				`const pending = tsv.init({module_or_path: module});
+					tsv.init_sync({module});
+					const stack = new tsv.IgnoreStack();
+					stack.push_gitignore('', 'keep_me/\\n');
+					const before = stack.is_ignored('keep_me/x.ts', false);
+					await pending;
+					const other = new tsv.IgnoreStack();
+					other.push_gitignore('', 'zzz\\n');
+					parentPort.postMessage({
+						before,
+						after: stack.is_ignored('keep_me/x.ts', false),
+						unrelated: stack.is_ignored('zzz', false),
+						other: other.is_ignored('zzz', false)
+					});`
+			);
+			assert.deepEqual(result, { before: true, after: true, unrelated: false, other: true });
+		}
+	);
 });
 
 // The worker-pool contract: the node entry exposes its compiled module, and the
@@ -1617,6 +1686,13 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		const result = run_cli(['format', '--content', 'const =', '--parser', 'ts']);
 		assert.equal(result.status, 2);
 		assert.match(result.stderr, /Parse error/);
+	});
+
+	it('a format refusal of a source that parses exits 2 as an Error, not a parse error', () => {
+		const result = run_cli(['format', '--content', LONE_CR_TAG_COMMENT, '--parser', 'svelte']);
+		assert.equal(result.status, 2);
+		assert.equal(result.stdout, '');
+		assert.ok(result.stderr.startsWith(`Error: ${LONE_CR_REFUSAL}\n`), result.stderr);
 	});
 
 	it('unknown flags exit 1', () => {

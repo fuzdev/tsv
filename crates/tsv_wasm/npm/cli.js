@@ -601,8 +601,15 @@ function has_extension_ignoring_case(path, ext) {
 	return (
 		name.length > ext.length + 1 &&
 		name[name.length - ext.length - 1] === '.' &&
-		name.slice(-ext.length).toLowerCase() === ext
+		ascii_lowercase(name.slice(-ext.length)) === ext
 	);
+}
+
+/** `text` with its ASCII uppercase letters lowered and every other character kept — the fold
+ * behind Rust's `eq_ignore_ascii_case`, which the native extension reads use. `toLowerCase` is
+ * the Unicode mapping, which also folds non-ASCII letters (the Kelvin sign U+212A to `k`). */
+function ascii_lowercase(text) {
+	return text.replace(/[A-Z]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x20));
 }
 
 /** Extension-based parser detection, mirroring the native `ParserType::from_extension`. */
@@ -887,15 +894,21 @@ function is_engine_failure(error) {
 /**
  * The line a single-input run — `--content`/`--stdin` (`format_single`), or `parse` on
  * any of its three inputs, a file path included (`run_parse`) — dies with when the
- * engine throws: `Parse error:` for a rejected input, as the native CLI prints one, and
- * `Error:` naming the engine for a trap or a stack overflow — the one mode where the
- * message is the whole output, so calling `memory access out of bounds` a parse error
- * blamed the input for the engine's ceiling. No recovery is attempted: the process
- * exits on this line. (On the N-API engine a native overflow is a SIGSEGV that reaches
- * no catch — docs/cli.md §Recursion Depth.)
+ * engine throws: `Parse error:` for the facade's `SyntaxError`, a source that does not
+ * parse, and `Error:` for the engine's other refusals — the size cap and a format's
+ * refusal of a source that parses, plain `Error`s with no point — as the native CLI
+ * splits the two (`exit_with_parse_error`); and `Error:` naming the engine for a trap or
+ * a stack overflow — the one mode where the message is the whole output, so calling
+ * `memory access out of bounds` a parse error blamed the input for the engine's
+ * ceiling. No recovery is attempted: the process exits on this line. (On the N-API
+ * engine a native overflow is a SIGSEGV that reaches no catch — docs/cli.md §Recursion
+ * Depth.)
  */
 function single_input_failure(error) {
-	if (!is_engine_failure(error)) return `Parse error: ${error_message(error)}`;
+	if (!is_engine_failure(error)) {
+		const prefix = error instanceof SyntaxError ? 'Parse error' : 'Error';
+		return `${prefix}: ${error_message(error)}`;
+	}
 	const message = error_message(error);
 	// a trap and V8's `Maximum call stack size exceeded` are the input's nesting; the one
 	// other `RangeError` the engine can throw — `Invalid string length`, an output past

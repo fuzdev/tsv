@@ -340,6 +340,59 @@ Deno.test('locations: a non-string source is refused, as read_source refuses one
 	}
 });
 
+// The line table has two builders — an `indexOf('\n')` walk when LF is the only terminator in
+// play (every Svelte and CSS document, and a TypeScript one with no CR, U+2028 or U+2029),
+// and a per-unit scan otherwise. Both are graded here against one reference over every
+// offset of seeded random documents drawn from the terminator alphabet, in each language,
+// so a document routed to either builder answers as the per-unit rule says.
+Deno.test('create_locator: both line-table builders answer as the per-unit rule', () => {
+	/** The reference: every offset's `{line, column}` by one per-unit pass. */
+	const reference = (text: string, ecmascript: boolean) => {
+		const points = [];
+		let line = 1;
+		let line_start = 0;
+		for (let i = 0; i <= text.length; i++) {
+			points.push({ line, column: i - line_start });
+			const c = text[i];
+			const breaks =
+				c === '\n' ||
+				(ecmascript && c === '\r' && text[i + 1] !== '\n') ||
+				(ecmascript && (c === '\u2028' || c === '\u2029'));
+			if (breaks) {
+				line++;
+				line_start = i + 1;
+			}
+		}
+		return points;
+	};
+	const alphabet = ['a', '\n', '\r', '\r\n', '\u2028', '\u2029', '\u0085', '😀'];
+	let seed = 0x9e3779b9;
+	/** A seeded xorshift32 draw in `[0, n)`, so a failure reproduces. */
+	const draw = (n: number) => {
+		seed ^= seed << 13;
+		seed ^= seed >>> 17;
+		seed ^= seed << 5;
+		return (seed >>> 0) % n;
+	};
+	for (let k = 0; k < 2000; k++) {
+		let text = '';
+		for (let n = draw(12); n > 0; n--) text += alphabet[draw(alphabet.length)];
+		// every third document LF-only, so the TypeScript fast path is drawn too
+		if (k % 3 === 0) text = text.replace(/[\r\u2028\u2029]/g, 'b');
+		for (const language of ['typescript', 'svelte', 'css'] as const) {
+			const locator = create_locator(text, { language });
+			const expected = reference(text, language === 'typescript');
+			for (let offset = 0; offset <= text.length; offset++) {
+				deepStrictEqual(
+					locator.position_at(offset),
+					expected[offset],
+					`${language} ${JSON.stringify(text)} at ${offset}`
+				);
+			}
+		}
+	}
+});
+
 Deno.test("create_locator: position_at answers one offset in the wire's coordinates", () => {
 	const ts = create_locator('ab\r\ncd', { language: 'typescript' });
 	deepStrictEqual(ts.position_at(0), { line: 1, column: 0 });
@@ -416,6 +469,41 @@ Deno.test(
 		});
 	}
 );
+
+Deno.test("a locator's loc_of names a throwing getter and reads each offset once", () => {
+	const locator = create_locator('a\nbc', { language: 'svelte' });
+	const cause = new Error('boom');
+	for (const key of ['start', 'end'] as const) {
+		const node = { start: 0, end: 1 };
+		Object.defineProperty(node, key, {
+			get() {
+				throw cause;
+			}
+		});
+		throws(
+			() => locator.loc_of(node),
+			(e: unknown) =>
+				e instanceof TypeError &&
+				e.message === `loc_of: failed to read the node's '${key}'` &&
+				e.cause === cause
+		);
+	}
+	// a getter answering a number once and a string after is read once, as the number
+	const reads = { start: 0, end: 0 };
+	const node = {
+		get start() {
+			return reads.start++ === 0 ? 2 : 'x';
+		},
+		get end() {
+			return reads.end++ === 0 ? 4 : 'x';
+		}
+	};
+	deepStrictEqual(locator.loc_of(node as never), {
+		start: { line: 2, column: 0 },
+		end: { line: 2, column: 2 }
+	});
+	deepStrictEqual(reads, { start: 1, end: 1 });
+});
 
 Deno.test('locations: the options bag is read as the facade reads one', () => {
 	const ast = { type: 'Program', start: 0, end: 1 };
@@ -783,7 +871,7 @@ Deno.test('anything else an engine throws passes through as the same object', ()
 	const values: Array<() => unknown> = [
 		// the size cap (or a raw engine's own refusal, reached past the facade): a plain
 		// Error with no point
-		() => new Error('File too large: 5 bytes (maximum: 4 bytes / 4GB)'),
+		() => new Error('File too large: 5 bytes (maximum: 4 bytes / 4 GiB)'),
 		// a WASM trap, and V8's stack exhaustion
 		() => new RuntimeError('unreachable'),
 		() => new RangeError('Maximum call stack size exceeded'),

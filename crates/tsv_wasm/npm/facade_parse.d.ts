@@ -79,6 +79,7 @@ export interface TypeScriptParseJsonOptions {
  *   `sourceType`
  * @throws SyntaxError when the source does not parse — a `TsvSyntaxError`, its position on
  *   `start` and `loc`
+ * @throws Error when the source exceeds the 4 GiB size cap
  */
 export declare function parse_svelte(
 	source: string,
@@ -90,6 +91,7 @@ export declare function parse_svelte(
  *   object, or `options` carries `locations`, an unknown key or a set `sourceType`
  * @throws SyntaxError when the source does not parse — a `TsvSyntaxError`, its position on
  *   `start` and `loc`
+ * @throws Error when the source exceeds the 4 GiB size cap
  */
 export declare function parse_svelte_json(source: string, options?: ParseJsonOptions): string;
 
@@ -101,6 +103,7 @@ export declare function parse_svelte_json(source: string, options?: ParseJsonOpt
  *   `sourceType` other than `'script'` or `'module'`
  * @throws SyntaxError when the source does not parse — a `TsvSyntaxError`, its position on
  *   `start` and `loc`
+ * @throws Error when the source exceeds the 4 GiB size cap
  */
 export declare function parse_typescript(
 	source: string,
@@ -113,6 +116,7 @@ export declare function parse_typescript(
  *   `'script'` or `'module'`
  * @throws SyntaxError when the source does not parse — a `TsvSyntaxError`, its position on
  *   `start` and `loc`
+ * @throws Error when the source exceeds the 4 GiB size cap
  */
 export declare function parse_typescript_json(
 	source: string,
@@ -127,6 +131,7 @@ export declare function parse_typescript_json(
  *   `sourceType`
  * @throws SyntaxError when the source does not parse — a `TsvSyntaxError`, its position on
  *   `start` and `loc`
+ * @throws Error when the source exceeds the 4 GiB size cap
  */
 export declare function parse_css(
 	source: string,
@@ -138,5 +143,6 @@ export declare function parse_css(
  *   object, or `options` carries `locations`, an unknown key or a set `sourceType`
  * @throws SyntaxError when the source does not parse — a `TsvSyntaxError`, its position on
  *   `start` and `loc`
+ * @throws Error when the source exceeds the 4 GiB size cap
  */
 export declare function parse_css_json(source: string, options?: ParseJsonOptions): string;

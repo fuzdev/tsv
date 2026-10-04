@@ -31,7 +31,7 @@
 #
 # Auth: NPM_TOKEN secret (granular, publish-only) for the bootstrap releases —
 # npm trusted publishing is only configurable on packages that already exist.
-# Once the seven packages are live, configure Trusted Publishers and switch this
+# Once the packages are live, configure Trusted Publishers and switch this
 # to OIDC, dropping the token. `id-token: write` is already scoped on the
 # publish job for `npm --provenance`.
 #
@@ -365,9 +365,11 @@ jobs:
       - name: Stage loader package
         run: deno run --allow-read --allow-write=crates/tsv_napi/pkg scripts/build_napi_packages.ts --loader-only
 
-      # Completeness (all six platforms, versions in lockstep), tag↔version
-      # agreement, platforms-then-loader order, and skip-if-already-published
-      # idempotency all live in the script. A missing NPM_TOKEN secret yields
+      # Completeness (every platform the loader pins, versions in lockstep),
+      # tag↔version agreement, platforms-then-loader order, and
+      # skip-if-already-published idempotency all live in the script; a dry run
+      # skips nothing, packing every package with `npm publish --dry-run` even
+      # at a version already live. A missing NPM_TOKEN secret yields
       # an EMPTY token, which `npm view` (public) and `npm publish --dry-run`
       # both tolerate — so the dry-run rehearsal works before the secret exists.
       #

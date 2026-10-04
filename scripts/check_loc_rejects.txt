@@ -4,8 +4,8 @@
 # `prettier_intermediate*_*` kinds) carries no tsv-parse claim, because prettier's output is
 # not always valid source: each document below is one prettier emits and the validity
 # oracle for the syntax it breaks rejects — Svelte's parser for template syntax, tsc for
-# TypeScript (CLAUDE.md §Strictness), the CSS spec for a `<style>` — and each fixture's
-# README says why. The lines marked `canonical-accepts` are documents the canonical parser
+# TypeScript (CLAUDE.md §Strictness), the CSS spec for a `<style>`; a fixture's README
+# describes prettier's output. The lines marked `canonical-accepts` are documents the canonical parser
 # (acorn-typescript, or Svelte's for the CSS one) accepts while tsc or the CSS spec rejects
 # them: neither canonical parser is a validity oracle, so tsv rejecting them is the stance,
 # not a gap.

@@ -25,7 +25,10 @@
  * `scripts/publish.ts`: a version already on the registry is skipped
  * (re-running a partially-failed workflow publishes only what's missing).
  * `npm view` errors other than E404 (auth, network) fail loudly rather than
- * being read as "not published".
+ * being read as "not published". A `--dry-run` skips that check and runs
+ * `npm publish --dry-run` over every package, reading npm's already-published
+ * refusal as a pass — the rehearsal must pack each package even when its
+ * version is live, which a dispatch or cron dry run between releases always is.
  *
  * Usage: deno run --allow-read --allow-write=crates/tsv_napi/pkg --allow-env \
  *          --allow-run=npm scripts/publish_napi.ts \
@@ -160,12 +163,23 @@ const already_published = (name: string): boolean => {
 	Deno.exit(1);
 };
 
+/** What npm says when the version is already live — a dry run's pass, since it packs the
+ * staged version without bumping (the same reading `scripts/publish.ts` takes). */
+// Only the over-an-existing-version refusal: npm 11's other client-side one (a version below
+// the registry's highest cannot implicitly take `latest`) also says "previously published
+// version", and is a real failure.
+const ALREADY_PUBLISHED = /cannot publish over the previously published versions/i;
+
 // Platforms first, loader last — the loader must never precede its binaries.
 const to_publish = [...platform_dirs, { name: loader.name, dir: `${pkg_root}/napi` }];
 let published = 0;
 let skipped = 0;
 for (const { name, dir } of to_publish) {
-	if (already_published(name)) {
+	// A dry run checks nothing against the registry first: it exists to run `npm publish
+	// --dry-run` over every package (the rehearsal release_napi.yml's dispatch and weekly
+	// cron promise), and the staged version is usually already live there — skipping
+	// those would rehearse nothing.
+	if (!args['dry-run'] && already_published(name)) {
 		console.log(`skip: ${name}@${version} already on the registry`);
 		skipped++;
 		continue;
@@ -180,6 +194,11 @@ for (const { name, dir } of to_publish) {
 	];
 	console.log(`npm ${publish_args.join(' ')}`);
 	const res = npm(publish_args);
+	if (res.code !== 0 && args['dry-run'] && ALREADY_PUBLISHED.test(res.stderr)) {
+		console.log(`PASS: ${name} packs cleanly (v${version} already on the registry)`);
+		skipped++;
+		continue;
+	}
 	if (res.code !== 0) {
 		console.error(`FAIL: npm publish ${name}@${version} exited ${res.code}:`);
 		console.error(res.stderr || res.stdout);
@@ -188,6 +207,8 @@ for (const { name, dir } of to_publish) {
 	published++;
 }
 console.log(
-	`${args['dry-run'] ? 'DRY-RUN: would publish' : 'published'} ${published}, skipped ${skipped} ` +
-		`(of ${to_publish.length}) at v${version}`
+	args['dry-run']
+		? `DRY-RUN: ${published + skipped} of ${to_publish.length} packed cleanly at v${version} ` +
+				`(${published} would publish, ${skipped} already on the registry)`
+		: `published ${published}, skipped ${skipped} (of ${to_publish.length}) at v${version}`
 );

@@ -8,7 +8,8 @@
  * writers, which emit it on the loc-bearing wire, and by the shipped `locations.js`, which
  * reconstructs it in JS from the span-only wire plus the source. Neither carries a
  * hand-written expectation; each is the other's drift check. The fixtures pin the span-only
- * wire, so this is the only `deno task check` leg that grades `loc` at all. (Its outside
+ * wire, so this is the only `deno task check` leg that grades the JS reconstruction
+ * (`tests/loc_definition.rs` grades the Rust loc wire against an independent reference). (Its outside
  * reference — acorn's and Svelte's own `loc` — is graded at conformance cadence by
  * `corpus:compare:parse`, whose loc arm runs this same reconstruction over the corpus.)
  *

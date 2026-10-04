@@ -92,16 +92,15 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 			assert.equal(pointed.column, 6);
 			// own and enumerable, which the facade requires of a point; under Node there is
 			// nothing to delete, so Bun's own `line` / `column` are graded by `deno task test:bun`
-			for (const key of ['start', 'line', 'column']) {
-				assert.ok(Object.prototype.propertyIsEnumerable.call(thrown, key), key);
-			}
+			// exactly the point — no napi-rs `code`, which the wasm engine's errors lack too
+			assert.deepEqual(Object.keys(thrown as object), ['start', 'line', 'column']);
 			assert.match(pointed.message, /\n2:7 const = ;\n/);
 		}
 		// a refusal carries no point
 		assert.throws(
 			() => addon.parse_css_json('a {}', 'script'),
-			(e: any) => e.start === undefined && e instanceof Error,
-			'a source type on CSS must throw, with no point'
+			(e: any) => e instanceof Error && Object.keys(e).length === 0,
+			'a source type on CSS must throw, with no point and no own keys'
 		);
 	});
 

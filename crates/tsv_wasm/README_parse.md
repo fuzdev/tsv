@@ -85,7 +85,7 @@ locator.loc_of(b); // {start: {line: 2, column: 0}, end: {line: 2, column: 6}}
 locator.position_at(7); // {line: 2, column: 0}
 ```
 
-A locator's single lookups throw a `RangeError` for an offset or span the text doesn't hold (a `TypeError` for an offset that isn't a number); the whole-tree forms check nothing per node. A missing or unknown `language`, an uninferable root, or a non-string source throws a `TypeError`. So does an options argument that isn't an object, or a key other than `language` — a typo like `{langauge: 'css'}` throws rather than falling back to inference.
+A locator's single lookups throw a `RangeError` for an offset or span the text doesn't hold (a `TypeError` for an offset that isn't a number, or a node whose `start`/`end` getter throws); the whole-tree forms check nothing per node. A missing or unknown `language`, an uninferable root, or a non-string source throws a `TypeError`. So does an options argument that isn't an object, or a key other than `language` — a typo like `{langauge: 'css'}` throws rather than falling back to inference.
 
 `reconstruct_locations` and `create_locator` are also the `@fuzdev/tsv-parse-wasm/locations` entry point, pure JS that loads no WASM; the `SourceLocation` and `Position` types they return come from the package root.
 

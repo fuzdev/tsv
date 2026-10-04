@@ -18,7 +18,8 @@
  * unrecoverable after a poisoning stack-overflow trap — and guards each class's
  * FinalizationRegistry so a stale handle GC'd after a reinstantiation leaks
  * instead of freeing an old pointer into the fresh instance. Every entry
- * re-exports the hook. See step 1b below.
+ * re-exports the hook. It also makes the async init re-check `wasm` after its
+ * load, so two overlapping inits keep one instance. See step 1b below.
  *
  * Also patches package.json (name, description, conditional exports, npm
  * metadata) and copies the variant README + repo LICENSE into the package
@@ -171,7 +172,7 @@ const classes = [...generated_js.matchAll(/^export class (\w+)/gm)].map((m) => m
 
 // 1b. Append the `reinstantiate` hook to the generated glue.
 //
-// A WASM stack overflow (input nested past the shadow stack, ~2,500 levels) is
+// A WASM stack overflow (input nested past the shadow stack) is
 // the one trap the instance does not survive: `__stack_pointer` is a plain
 // mutable global the trap never restores, so every later call on the instance
 // throws `memory access out of bounds` — and wasm-bindgen's `initSync`
@@ -228,6 +229,15 @@ const free_pattern =
 // instead. Both call shapes wasm-bindgen emits are covered: the receiver first,
 // or after the return-slot pointer (`retptr`) of a method returning a string.
 const method_pattern = /(wasm\.\w+\((?:retptr, )?)this\.__wbg_ptr/g;
+// The async init's re-check. `__wbg_init` tests `wasm !== undefined` only BEFORE its
+// awaits, so an init that overlaps another — a second `init()`, or an `initSync` that
+// ran while the fetch/compile was pending — instantiates a second instance and, when it
+// finishes last, silently replaces `wasm` without bumping the instance generation: a
+// handle minted in between then reads the new instance's memory with no stale-handle
+// error. Re-testing after the load keeps whichever instance initialized first, so the
+// late instance is simply dropped (it was never finalized, so nothing references it).
+const init_load_pattern = /^([ \t]*)(const \{ instance, module \} = await __wbg_load\(.*\);)$/gm;
+let init_load_rewrites = 0;
 let registry_rewrites = 0;
 let free_rewrites = 0;
 let method_rewrites = 0;
@@ -269,6 +279,17 @@ const patched_glue =
 		.replace(method_pattern, (_m, call) => {
 			method_rewrites++;
 			return `${call}__tsv_live(this).__wbg_ptr`;
+		})
+		.replace(init_load_pattern, (_m, indent, load) => {
+			init_load_rewrites++;
+			return (
+				`${indent}${load}\n` +
+				`${indent}// patched by patch_npm_package.ts: an overlapping init (a second init, or\n` +
+				`${indent}// an initSync during the await) may have initialized the module meanwhile —\n` +
+				`${indent}// keep that instance, since replacing it would orphan every handle minted\n` +
+				`${indent}// against it\n` +
+				`${indent}if (wasm !== undefined) return wasm;`
+			);
 		}) +
 	`
 // ---- appended by patch_npm_package.ts ----
@@ -311,6 +332,16 @@ export function reinstantiate() {
     initSync({ module });
 }
 `;
+// The async init has exactly one load site, and it must be re-checked: a reshaped
+// `__wbg_init` would otherwise reopen the overlapping-init race in silence.
+if (init_load_rewrites !== 1) {
+	console.error(
+		`FAIL: found ${init_load_rewrites} \`const { instance, module } = await __wbg_load(…);\` ` +
+			`site(s) in ${main_js}, expected exactly one (in \`__wbg_init\`) — the async init drifted ` +
+			`from the shape the overlapping-init re-check patches`
+	);
+	Deno.exit(1);
+}
 // Every method site must be routed, and none may remain: a receiver handed to
 // `wasm` any other way is a stale-handle path the guard does not cover.
 if (classes.length > 0 && method_rewrites === 0) {
@@ -534,6 +565,24 @@ ${locations_reexport}`;
 Deno.writeTextFileSync(`${pkg_root}/index.js`, index_js);
 console.log(`Created ${pkg_root}/index.js`);
 
+/** The `init` doc's lines, shared by browser.js and both `.d.ts`: what it is required for
+ * (an engine call), and what needs no init — the facade's argument checks always, and the
+ * pure-JS reconstruction helper where the variant ships it. */
+const init_doc_lines = has_parse_exports
+	? [
+			'Initialize the WASM module. Required in browsers before any engine call; the pure-JS',
+			'reconstruction helper (`create_locator`, `reconstruct_locations`) and the option and',
+			'source checks need none. No-op if already initialized; overlapping calls share one',
+			'initialization.'
+		]
+	: [
+			'Initialize the WASM module. Required in browsers before any engine call; the option',
+			'and source checks need none. No-op if already initialized; overlapping calls share one',
+			'initialization.'
+		];
+/** `init_doc_lines` as a doc comment. */
+const init_doc = `/**\n${init_doc_lines.map((line) => ` * ${line}\n`).join('')} */`;
+
 // 3. Create browser.js — Browser/default entry: async init() with guards.
 // Vite and other bundlers pick this via the "default" export condition and handle
 // the `new URL('./tsv_wasm_bg.wasm', import.meta.url)` pattern natively.
@@ -550,6 +599,9 @@ ${
 	locations_reexport
 }
 let _ready = false;
+/** The in-flight async init, shared by every overlapping \`init()\` so they compile and
+ * instantiate once; cleared on failure so a later call can retry. */
+let _init_p;
 
 function _check() {
 	if (!_ready) throw new Error('${pkg_name}: WASM not initialized. Call \\\`await init()\\\` first.');
@@ -565,11 +617,20 @@ const _guarded =
 		return f(...args);
 	};
 
-/** Initialize the WASM module. Required in browsers before calling any other export. No-op if already initialized. */
+${init_doc}
 export async function init(...args) {
 	if (_ready) return;
-	await _init(...args);
-	_ready = true;
+	await (_init_p ??= _init(...args).then(
+		() => {
+			_ready = true;
+		},
+		(error) => {
+			_init_p = undefined;
+			// an init_sync() that landed while this one was pending already initialized
+			if (_ready) return;
+			throw error;
+		}
+	));
 }
 
 /** Synchronously initialize the WASM module. Works in Workers (not Chrome main thread for >4KB WASM). */
@@ -654,7 +715,7 @@ const named_reexport = (names: Array<string>, from: string, type_only: boolean):
 // per-condition `types` in `exports` that lets each be reached.
 const shared_dts = `${ast_reexport}${locations_reexport}${named_reexport(api_parse_types, dts_specifier(parse_dts), true)}${named_reexport(api_types, dts_specifier(format_dts), true)}${named_reexport(error_types, 'syntax_error.js', true)}${named_reexport(parse_fns, dts_specifier(parse_dts), false)}${named_reexport(format_fns, dts_specifier(format_dts), false)}${
 	classes.length ? `export { ${classes.join(', ')} } from '${dts_module}';\n` : ''
-}/** Initialize the WASM module. Required in browsers before calling any other export. No-op if already initialized. */
+}${init_doc}
 export declare function init(module_or_path?: {
 	module_or_path: RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 }): Promise<void>;

@@ -57,8 +57,10 @@ export interface Locator {
 	/**
 	 * Line/column for one node's `start` and `end`, or `null` when either is not a number
 	 * (`null` and `undefined` nodes included) — the same objects the whole-tree walk skips,
-	 * since only an object carrying numeric `start`/`end` gets a `loc`.
+	 * since only an object carrying numeric `start`/`end` gets a `loc`. Each is read once.
 	 *
+	 * @throws TypeError when reading the node's `start` or `end` throws (that error is the
+	 *   `cause`)
 	 * @throws RangeError when `start` and `end` are numbers but not a range of the indexed
 	 *   text — an offset that is not an integer, one past its end, or `start` after `end`
 	 */
