@@ -82,6 +82,8 @@ try { format_typescript('let a;\nconst = ;'); } catch (e) {
 }
 ```
 
+`format_svelte` refuses one source that does parse: a lone CR (not part of a CRLF) with comment text after it inside a `//` comment between a tag's attributes, which Svelte ends at LF alone — the formatter's CR-to-LF fold would end that comment early and turn the rest of its line into markup. The refusal is a plain `Error`, not a `SyntaxError`; its message names the CR's line and column.
+
 A Rust panic — always a tsv bug, please report it — surfaces as a `RuntimeError: unreachable` with the real message on `console.error`; the instance survives it, so the next call works.
 
 Deeply nested input has a ceiling: the WASM stack is 1 MiB, and the deepest shapes — nested arrow bodies and member chains — cost several times more of it per level than nested parens (the per-shape stack costs and each surface's ceiling are in the repo's [docs/cli.md](https://github.com/fuzdev/tsv/blob/main/docs/cli.md#recursion-depth)). Past the ceiling the call traps with `memory access out of bounds`, and unlike a parse error or a panic it **poisons the instance** — every later call throws the same thing. `reinstantiate()` is the recovery: it synchronously swaps in a fresh instance from the already-compiled module (no recompile — same environment constraints as `init_sync`), and every import keeps working against it. Objects created before the swap (an `IgnoreStack`) are invalidated — rebuild them after: every method on a stale one throws, and `free()` on it is a safe no-op. Real code is nowhere near this ceiling; generated and minified code can be.

@@ -79,10 +79,14 @@ wrapped around the engine call alone, rebuilds that as the `SyntaxError`, so bot
 (`scripts/syntax_error_suite.ts` holds both package suites to one table, and the napi suite
 compares the two engines directly; `deno task test:bun` runs that table under Bun, the one
 runtime where the delete is not a no-op, so it is what fails without it). Anything else an engine throws passes through as itself:
-the raw engines' own source-type refusals and a source over the 4 GiB cap (plain `Error`s with
-no point), a caught panic, a WASM trap (`RuntimeError`) or stack exhaustion (`RangeError`). A
-format parses the CR-folded text through `FoldedSource::parse_with`, which maps the error
-back onto the caller's source, so it reports the point a parse of that source would. Where the facade `JSON.parse`s an engine's wire itself (the native engine), a failure
+the raw engines' own source-type refusals, a source over the 4 GiB cap and a format's refusal
+of a source that parses (plain `Error`s with no point), a caught panic, a WASM trap
+(`RuntimeError`) or stack exhaustion (`RangeError`). A format parses the CR-folded text through
+the language's `parse_folded` (`FoldedSource::parse_with`), which maps the error back onto the
+caller's source, so it reports the point a parse of that source would — and `format_svelte`
+refuses a lone CR inside an in-tag `//` comment, which the fold would end early
+(`tsv_svelte::parse_folded`): the message names the CR's `line:col`, but the source is valid
+Svelte, so the error is positionless (`ParseError::refusal`) and never the `SyntaxError`. Where the facade `JSON.parse`s an engine's wire itself (the native engine), a failure
 there is rethrown as `Error('internal error: AST serialized to invalid JSON', {cause})` —
 the WASM engine's own text for that case — never as the bare `SyntaxError` that would read
 as a parse failure.
@@ -226,7 +230,8 @@ non-object argument errors, arrays included.
 
 **An unset `sourceType` is the one key whose default differs between the two
 families.** The facade forwards it unset, and the raw format exports hand that to
-`parse_format!` → `parse_ast_for_format!` → `tsv_ts::parse_with_goal_or_fallback`:
+`parse_format!` → `parse_ast_for_format!` → `tsv_ts::parse_folded` →
+`tsv_ts::parse_with_goal_or_fallback`:
 the module grammar, retried as a script only if that parse *fails*, reporting the
 module's error when both do if the script retry died on a top-level `import`/`export`, an `import.meta`, a top-level `for await` or a top-level `await`'s operand, else the further-reaching one (the module's on a tie). That is what lets `format_typescript(source)` with no bag
 — an editor's whole call, and `npm/cli.js`'s path mode — format a legacy sloppy

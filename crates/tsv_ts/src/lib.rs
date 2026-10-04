@@ -258,9 +258,9 @@ pub fn parse_with_goal_or_fallback<'arena>(
     parse_with_goal(source, Goal::Module, arena).or_else(|module_error| {
         parse_with_goal(source, Goal::Script, arena).map_err(|script_error| {
             // A goal gate proves the source a module; past that, the further error is
-            // the file's own and a tie keeps the module's. The one positionless error
-            // (`FileTooLarge`) is raised by both attempts alike, so the comparison never
-            // sees a `None` against a `Some`.
+            // the file's own and a tie keeps the module's. The one positionless error a
+            // TypeScript parse raises (`FileTooLarge`) is raised by both attempts alike, so
+            // the comparison never sees a `None` against a `Some`.
             if !script_error.is_goal_gated() && script_error.position() > module_error.position() {
                 script_error
             } else {
@@ -268,6 +268,20 @@ pub fn parse_with_goal_or_fallback<'arena>(
             }
         })
     })
+}
+
+/// [`parse_with_goal_or_fallback`] over a document the format path folded
+/// (`tsv_lang::printing::normalize_carriage_returns`) — the parse every TypeScript format
+/// entry point runs (the CLI, the bindings' `parse_format!`, [`format_str`]), its error
+/// reported in the caller's own coordinates (`FoldedSource::parse_with`). The fold keeps
+/// meaning everywhere in TypeScript, whose line rule ends a line at a `<CR>` already, so
+/// this is the folded parse alone; `tsv_svelte::parse_folded` is the sibling that is not.
+pub fn parse_folded<'arena>(
+    folded: &FoldedSource<'_>,
+    goal: Option<Goal>,
+    arena: &'arena bumpalo::Bump,
+) -> Result<Program<'arena>> {
+    folded.parse_with(|text| parse_with_goal_or_fallback(text, goal, arena))
 }
 
 /// Parse standalone TypeScript with grouping parens preserved.
@@ -345,7 +359,7 @@ pub fn format_str(source: &str) -> Result<String> {
     // drop-in contract over the author's own bytes.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
     let arena = bumpalo::Bump::new();
-    let program = folded.parse_with(|text| parse_with_goal_or_fallback(text, None, &arena))?;
+    let program = parse_folded(&folded, None, &arena)?;
     let doc_arena = DocArena::for_source(folded.text());
     Ok(format_folded_in(&program, &folded, &doc_arena))
 }

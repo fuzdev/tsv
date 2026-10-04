@@ -155,6 +155,10 @@ enum ParseErrorKind {
     // `u32` offsets sound (see `tsv_ts/src/lexer/token.rs`).
     #[error("File too large: {size} bytes (maximum: {max} bytes / 4GB)")]
     FileTooLarge { size: usize, max: usize },
+    // Constructed only by `ParseError::refusal`. Positionless on purpose, though its text
+    // names a position: see that constructor.
+    #[error("{rendered}")]
+    Refused { rendered: Box<str> },
 }
 
 /// A parse error — **8 bytes**, because the payload lives behind the `Box`.
@@ -304,9 +308,9 @@ impl ParseError {
 
     /// The byte offset the error is reported at, in the coordinates the error was
     /// built in (host coordinates for a parser error; see [`ParseError::shift_position`]
-    /// for the lexer case). `None` for the one positionless kind, a source over the
-    /// `u32` cap. A caller holding two errors for one source reads this to say which got
-    /// further — the format fallback's module-vs-script choice.
+    /// for the lexer case). `None` for the positionless kinds, a source over the `u32` cap
+    /// and a [`ParseError::refusal`]. A caller holding two errors for one source reads this
+    /// to say which got further — the format fallback's module-vs-script choice.
     pub fn position(&self) -> Option<usize> {
         self.0.kind.located().map(|(position, _)| *position)
     }
@@ -314,6 +318,31 @@ impl ParseError {
     /// Source exceeds the 4 GB cap the `u32` span offsets assume.
     fn file_too_large(size: usize, max: usize) -> Self {
         ParseError::new(ParseErrorKind::FileTooLarge { size, max })
+    }
+
+    /// A **refusal**: `source` parses, but a format cannot print it without changing what it
+    /// means — the one case is a Svelte in-tag `//` comment holding a lone `<CR>`, which the
+    /// format path's line-terminator fold would end early (`tsv_svelte::parse_folded`).
+    ///
+    /// The message is rendered here, with the `line:col` header and excerpt of `position` in
+    /// `source` under `coordinates` that a located error prints, so it reads like every other
+    /// format error. But the error itself is **positionless** — no [`ParseError::position`],
+    /// no [`ParseError::wire_point`] — like the size cap's: the source is not malformed, so no
+    /// binding may report it through its syntax-error channel (the published `SyntaxError`
+    /// with `start` / `loc` is a parse failure, and `parse` accepts this source).
+    #[cold]
+    #[inline(never)]
+    pub fn refusal(
+        message: &str,
+        source: &str,
+        position: usize,
+        coordinates: WireCoordinates,
+    ) -> Self {
+        let rendered =
+            ErrorContext::from_source(source, position, coordinates).format_with_caret(message);
+        ParseError::new(ParseErrorKind::Refused {
+            rendered: rendered.into(),
+        })
     }
 
     /// Reject a source longer than the `u32` span offsets can index (> 4 GiB − 1).
@@ -398,7 +427,8 @@ impl ParseError {
     /// (`line` 1-based, `column` 0-based UTF-16 units) the document's line rule gives it —
     /// the numbers its message header prints, as `line:column+1`.
     ///
-    /// `None` for the positionless kind (a source over the `u32` cap) and for an error no
+    /// `None` for the positionless kinds (a source over the `u32` cap, a
+    /// [`ParseError::refusal`]) and for an error no
     /// [`ParseError::with_context`] has filled — which only the embedded entry points
     /// return, ahead of their host's fill; no whole-document parse entry point does.
     pub fn wire_point(&self) -> Option<WirePoint> {
@@ -427,8 +457,8 @@ impl ParseError {
 }
 
 impl ParseErrorKind {
-    /// The position and context slots of a located error, `None` for the one
-    /// positionless kind (`FileTooLarge`). Which variants carry a position is stated here
+    /// The position and context slots of a located error, `None` for the positionless
+    /// kinds (`FileTooLarge`, `Refused`). Which variants carry a position is stated here
     /// and in [`ParseErrorKind::located_mut`] — one match cannot lend both a shared and
     /// an exclusive borrow — so `position`, `shift_position` and `with_context` restate
     /// no variant list of their own, and a new variant is classified in these two.
@@ -444,7 +474,7 @@ impl ParseErrorKind {
             | ParseErrorKind::InvalidExpression {
                 position, context, ..
             } => Some((position, context)),
-            ParseErrorKind::FileTooLarge { .. } => None,
+            ParseErrorKind::FileTooLarge { .. } | ParseErrorKind::Refused { .. } => None,
         }
     }
 
@@ -461,7 +491,7 @@ impl ParseErrorKind {
             | ParseErrorKind::InvalidExpression {
                 position, context, ..
             } => Some((position, context)),
-            ParseErrorKind::FileTooLarge { .. } => None,
+            ParseErrorKind::FileTooLarge { .. } | ParseErrorKind::Refused { .. } => None,
         }
     }
 }
@@ -754,6 +784,24 @@ mod tests {
         for (folded, original_pos) in expected.into_iter().enumerate() {
             assert_eq!(unfold_position(original, folded), original_pos, "{folded}");
         }
+    }
+
+    /// A refusal renders the located error's `line:col` header and excerpt, but carries no
+    /// position a binding could report as a syntax error's point — and an unfold, which
+    /// re-takes a located error's context, leaves its already-caller-side text alone.
+    #[test]
+    fn a_refusal_renders_its_point_but_is_positionless() {
+        let source = "ab\nc\rd";
+        // The `<CR>` itself, as `tsv_svelte::parse_folded` points: the header counts `\n`
+        // lines, the excerpt stops at the `<CR>`.
+        let refusal = ParseError::refusal("no", source, 4, LF);
+        assert_eq!(refusal.to_string(), "no\n2:2 c\n     ^ here");
+        assert_eq!(refusal.position(), None);
+        assert_eq!(refusal.wire_point(), None);
+        assert_eq!(
+            refusal.clone().unfold(source).to_string(),
+            refusal.to_string()
+        );
     }
 
     /// An error raised over the folded text, unfolded, is the error a parse of the original

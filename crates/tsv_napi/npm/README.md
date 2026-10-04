@@ -106,6 +106,8 @@ try { format_typescript('let a;\nconst = ;'); } catch (e) {
 }
 ```
 
+`format_svelte` refuses one source that does parse: a lone CR (not part of a CRLF) with comment text after it inside a `//` comment between a tag's attributes, which Svelte ends at LF alone — the formatter's CR-to-LF fold would end that comment early and turn the rest of its line into markup. The refusal is a plain `Error`, not a `SyntaxError`; its message names the CR's line and column.
+
 A Rust panic — always a tsv bug, please report it — is also thrown rather than aborting the process; stack overflow is the one crash that still aborts, as a bare `SIGSEGV`. Its depth is your thread's, not the addon's: a main thread has the process stack limit (commonly 8 MiB) and a `worker_threads` worker has Node's 4 MiB default, so a worker reaches about half as deep; the deepest shapes — nested arrow bodies and member chains — cost several times more stack per level than nested parens (the per-shape stack costs and each surface's ceiling are in the repo's [docs/cli.md](https://github.com/fuzdev/tsv/blob/main/docs/cli.md#recursion-depth)). Raise the worker's stack with `new Worker(path, {resourceLimits: {stackSizeMb: 16}})` if you format generated or minified input. The bundled `tsv` CLI is unaffected; it sizes its own. Reconstructing `loc` — `{locations: true}`, or `reconstruct_locations` — runs in JS without recursion, so it reaches as deep as the parse does.
 
 ## Status

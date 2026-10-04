@@ -94,7 +94,7 @@ fn install_panic_hook() {
 }
 
 /// A refusal or an internal failure — a source type the export cannot take, a source over
-/// the size cap — as a plain JS `Error` carrying `message`.
+/// the size cap, a format refusal — as a plain JS `Error` carrying `message`.
 fn err(message: impl ToString) -> JsValue {
     JsError::new(&message.to_string()).into()
 }
@@ -130,7 +130,7 @@ extern "C" {
 /// error's point in the document's wire coordinates (`ParseError::wire_point`). The npm
 /// facade (`npm/api.js`) reads those three to rethrow it as the published `SyntaxError`, so
 /// these names are its contract, shared with `tsv_napi`. A positionless error (a source over
-/// the size cap) stays a plain `Error`.
+/// the size cap, a format refusal) stays a plain `Error`.
 ///
 /// Each property is deleted before it is set, so all three are own ENUMERABLE data
 /// properties — what the facade requires of a point. Bun gives every `Error` its own

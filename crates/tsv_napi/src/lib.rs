@@ -103,8 +103,8 @@ enum Failure {
 }
 
 impl Failure {
-    /// A parse error: located ones carry their point, the positionless one (a source over
-    /// the size cap) is plain.
+    /// A parse error: located ones carry their point, the positionless ones (a source over
+    /// the size cap, a format refusal) are plain.
     #[cfg(any(feature = "parse", feature = "format"))]
     fn parse(e: &ParseError) -> Self {
         let message = e.to_string();

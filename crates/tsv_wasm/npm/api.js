@@ -37,8 +37,9 @@
  * own enumerable integer `start`, `line` and `column` set on it; `call_engine` rethrows that
  * as the `SyntaxError`. Anything else an engine throws passes through as itself. The
  * facade's own checks leave an engine no argument to refuse, so that is a source over the
- * size cap (a plain `Error` with no point), a caught panic, a WASM trap (`RuntimeError`) or
- * stack exhaustion (`RangeError`).
+ * size cap or a format's refusal of a source that parses (a lone CR inside a Svelte in-tag
+ * `//` comment, which the format's CR fold would end early) — plain `Error`s with no point —
+ * a caught panic, a WASM trap (`RuntimeError`) or stack exhaustion (`RangeError`).
  *
  * A `source` that is not a string is refused before the engine sees it
  * (`read_source`), since the engines would each answer it differently.

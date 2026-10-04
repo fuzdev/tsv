@@ -214,6 +214,16 @@ the screen column differ. The text comes from `tsv_lang`'s `ParseError` and is t
 on both bins and in every package — where it is the message of the `SyntaxError` the facade
 throws, whose `start` and `loc` properties carry the same point (`crates/tsv_wasm/npm/api.js`).
 
+One `format` error is not a parse error, though it prints the same way: a Svelte document
+holding a lone CR (not part of a CRLF) with comment text after it inside a `//` comment
+between a tag's attributes is **refused** (a CR with only whitespace after it, as in a doubled
+`CR CR LF` ending, ends the comment where the fold does, and formats). Svelte ends that comment at LF alone, so the CR is comment text, and the format
+path's CR fold would end the comment there and print the rest of its line as markup. The
+message names the CR's `line:col`; `parse` accepts the same bytes. It is a per-file error
+(exit 2) like any other, and in the packages a plain `Error` with no `start` / `loc` rather
+than the `SyntaxError` (`tsv_svelte::parse_folded`). A document whose own bytes do not parse
+reports that parse error first, exactly as `parse` does.
+
 ## Recursion Depth
 
 The parser and the printer are recursive descents, so nesting depth costs stack — and a

@@ -582,6 +582,59 @@ fn test_format_reports_a_parse_error_in_the_files_own_coordinates() {
     assert_eq!(fs::read_to_string(&file).unwrap(), source);
 }
 
+/// A lone CR inside a Svelte in-tag `//` comment is refused rather than folded: Svelte ends
+/// that comment at `\n` alone, so the fold would end it early and print the rest of its line
+/// as markup — here a real `class` attribute on a `div` the author's bytes give none
+/// (`tsv_svelte::parse_folded`). The refusal is a format error on every input arm (exit 2,
+/// nothing written), while `parse` accepts the same bytes.
+#[test]
+fn test_format_refuses_a_lone_cr_in_an_in_tag_line_comment() {
+    const SOURCE: &str = "<div // c\rclass=\"x\"\n>hi</div>\n";
+    const REFUSAL: &str = "Lone carriage return inside a '//' comment in a tag";
+
+    let content = tsv(&["format", "--content", SOURCE, "--parser", "svelte"]);
+    let stderr = String::from_utf8_lossy(&content.stderr);
+    assert_eq!(content.status.code(), Some(2), "{stderr}");
+    assert!(content.stdout.is_empty(), "nothing is printed: {stderr}");
+    assert!(stderr.contains(REFUSAL), "{stderr}");
+    assert!(
+        stderr.contains("\n1:10 <div // c\n"),
+        "the CR's point: {stderr}"
+    );
+
+    let check = tsv(&[
+        "format",
+        "--check",
+        "--content",
+        SOURCE,
+        "--parser",
+        "svelte",
+    ]);
+    assert_eq!(check.status.code(), Some(2), "a refusal is no would-change");
+
+    let dir = temp_dir("lone_cr_tag_comment");
+    let file = dir.join("a.svelte");
+    fs::write(&file, SOURCE).unwrap();
+    let path = file.to_str().unwrap();
+    let formatted = tsv(&["format", path]);
+    let stderr = String::from_utf8_lossy(&formatted.stderr);
+    assert_eq!(formatted.status.code(), Some(2), "{stderr}");
+    assert!(stderr.contains(&format!("{path}: {REFUSAL}")), "{stderr}");
+    assert_eq!(
+        fs::read_to_string(&file).unwrap(),
+        SOURCE,
+        "the file is left alone"
+    );
+
+    let parsed = tsv(&["parse", "--content", SOURCE, "--parser", "svelte"]);
+    assert_eq!(parsed.status.code(), Some(0), "the bytes are valid Svelte");
+    assert!(
+        String::from_utf8_lossy(&parsed.stdout).contains(r#""attributes":[]"#),
+        "the author's div has no attributes: {}",
+        String::from_utf8_lossy(&parsed.stdout)
+    );
+}
+
 /// Reading is strict UTF-8 on every input arm, each with its own message: `--stdin`
 /// refuses the stream (exit 2 for `format`, 1 for `parse` — each command's own
 /// argument-error code), and `parse <file>` refuses the file the way `format <file>`

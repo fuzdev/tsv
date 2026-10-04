@@ -54,6 +54,20 @@ pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<CssSt
     parser::parse_css(source, 0, arena).map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
 
+/// [`parse`] over a document the format path folded
+/// (`tsv_lang::printing::normalize_carriage_returns`) — the parse every CSS format entry
+/// point runs (the CLI, the bindings' `parse_format!`, [`format_str`]), its error reported in
+/// the caller's own coordinates (`FoldedSource::parse_with`). The fold keeps meaning
+/// everywhere in CSS, whose syntax normalizes a `<CR>` to `<LF>` itself (css-syntax-3
+/// §Preprocessing the input stream), so this is the folded parse alone;
+/// `tsv_svelte::parse_folded` is the sibling that is not.
+pub fn parse_folded<'arena>(
+    folded: &tsv_lang::printing::FoldedSource<'_>,
+    arena: &'arena bumpalo::Bump,
+) -> Result<CssStyleSheet<'arena>> {
+    folded.parse_with(|text| parse(text, arena))
+}
+
 /// Parse embedded CSS source into internal AST
 ///
 /// Use this when parsing CSS embedded in another language (e.g., Svelte `<style>` tags)
@@ -118,7 +132,7 @@ pub fn format_str(source: &str) -> Result<String> {
     // alone so its offsets stay a drop-in contract with `parseCss`'s.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
     let arena = bumpalo::Bump::new();
-    let stylesheet = folded.parse_with(|text| parse(text, &arena))?;
+    let stylesheet = parse_folded(&folded, &arena)?;
     let doc_arena = tsv_lang::doc::arena::DocArena::for_source(folded.text());
     Ok(format_folded_in(&stylesheet, &folded, &doc_arena))
 }

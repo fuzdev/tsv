@@ -18,7 +18,8 @@ breaks, and alignment; everything else in the file is formatted normally.
 terminators: a format run folds every `<CR>` in its input to `<LF>` before it
 parses (the same fold, in the same place, that prettier and the HTML and CSS
 tokenizers do), so a frozen region in a CRLF file comes out LF-terminated like
-the rest of it.
+the rest of it. (The one lone `<CR>` the fold cannot take is refused instead — see
+[cli.md §Parse errors](./cli.md#parse-errors).)
 
 It is also verbatim about the construct, not about where the construct ends up.
 A frozen Svelte template text that the section reorder moves to the very end of

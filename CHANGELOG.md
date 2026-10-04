@@ -36,10 +36,11 @@ Each `## Unreleased` section must be non-empty and carry a
   the source — and throws on anything else passed without `{language}`
 - **breaking** feat: `locations.d.ts` renames `Loc` to `SourceLocation` and `LocationOptions` to
   `ReconstructLocationsOptions`
-- **breaking** feat: a parse or format failure throws a `SyntaxError` (typed `TsvSyntaxError`)
-  with `start` — the UTF-16 offset, in the AST's coordinates — and `loc: {line, column}`; the
-  message's `line:col` header follows the same definition, its excerpt drops a leading BOM, and
-  a format error is located in the caller's own source, CRLF included
+- **breaking** feat: a parse or format of a source that does not parse throws a `SyntaxError`
+  (typed `TsvSyntaxError`) with `start` — the UTF-16 offset, in the AST's coordinates — and
+  `loc: {line, column}`; the message's `line:col` header follows the same definition, its
+  excerpt drops a leading BOM, and a format error is located in the caller's own source, CRLF
+  included
 - **breaking** feat: every argument error is a `TypeError`, with one message in every package —
   a source that is not a string or not well-formed UTF-16 (the WASM packages read a non-string
   as the empty document outside Node, and a lone surrogate became U+FFFD), a bad options bag, an
@@ -52,6 +53,9 @@ Each `## Unreleased` section must be non-empty and carry a
   `loc_of` throw a `RangeError` for an offset the source doesn't hold
 - feat: a `./locations` subpath export on the parse-capable packages — the line/column helpers
   alone, loading no engine
+- fix: format refuses a Svelte document with a lone CR inside an in-tag `//` comment, where
+  folding the CR to a line feed ended the comment early and turned the rest of its line into
+  markup
 - fix: in a Svelte template expression, comments around a JSDoc cast's parens or a grouping
   paren pair attach as Svelte's parser attaches them — a comment Svelte gives the discarded
   paren, the cast's own `@type` comment included, is no longer attached to the inner expression

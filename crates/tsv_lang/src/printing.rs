@@ -369,18 +369,26 @@ pub fn normalize_carriage_returns(source: &str) -> FoldedSource<'_> {
             original: source,
             text: Cow::Borrowed(source),
             lf_only,
+            folded_lone_cr: false,
         };
     };
     let mut out = String::with_capacity(source.len());
     out.push_str(&source[..first]);
     let mut rest = &source[first..];
+    let mut folded_lone_cr = false;
     while let Some(i) = rest.find('\r') {
         out.push_str(&rest[..i]);
         out.push('\n');
         let after = &rest[i + 1..];
         // A CRLF pair is ONE LineTerminatorSequence: consume the `\n` so it does not
         // become a second.
-        rest = after.strip_prefix('\n').unwrap_or(after);
+        rest = match after.strip_prefix('\n') {
+            Some(after_pair) => after_pair,
+            None => {
+                folded_lone_cr = true;
+                after
+            }
+        };
     }
     out.push_str(rest);
     debug_assert_eq!(lf_only, line_terminators_are_lf_only(out.as_bytes()));
@@ -388,6 +396,7 @@ pub fn normalize_carriage_returns(source: &str) -> FoldedSource<'_> {
         original: source,
         text: Cow::Owned(out),
         lf_only,
+        folded_lone_cr,
     }
 }
 
@@ -434,12 +443,29 @@ pub struct FoldedSource<'a> {
     original: &'a str,
     text: Cow<'a, str>,
     lf_only: bool,
+    /// Whether the fold rewrote a **lone** `<CR>` (one not opening a `<CR><LF>`).
+    folded_lone_cr: bool,
 }
 
 impl<'a> FoldedSource<'a> {
     /// The folded text — borrowed when the source held no `<CR>`.
     pub fn text(&self) -> &str {
         &self.text
+    }
+
+    /// The text the fold was applied to — the caller's own bytes.
+    pub fn original(&self) -> &'a str {
+        self.original
+    }
+
+    /// Whether the fold rewrote a **lone** `<CR>` — one not opening a `<CR><LF>` pair — to
+    /// `<LF>`. A `<CR><LF>` is one line break under every line rule tsv reads, so folding it
+    /// moves no line; a lone `<CR>` is a line break only where the rule says so, which a
+    /// Svelte document's markup does not (`tsv_svelte::parse_folded` reads this to decide
+    /// whether the author's own bytes need a parse of their own). Taken by the fold's own
+    /// pass, so a source with no `<CR>` answers `false` without a scan.
+    pub fn folded_lone_cr(&self) -> bool {
+        self.folded_lone_cr
     }
 
     /// Whether every line terminator in [`Self::text`] is a `\n` — the fact
@@ -3286,6 +3312,19 @@ mod tests {
             Cow::Borrowed(_)
         ));
         assert_eq!(once, "a\nb\nc");
+    }
+
+    /// The fold says whether it rewrote a LONE `<CR>` — one not opening a `<CR><LF>` — the
+    /// fact `tsv_svelte::parse_folded` keys its refusal check on, so a CRLF-only document
+    /// pays nothing.
+    #[test]
+    fn the_fold_says_whether_it_rewrote_a_lone_cr() {
+        assert!(!normalize_carriage_returns("a\nb").folded_lone_cr());
+        assert!(!normalize_carriage_returns("a\r\nb\r\n").folded_lone_cr());
+        assert!(normalize_carriage_returns("a\rb").folded_lone_cr());
+        assert!(normalize_carriage_returns("a\r\nb\r").folded_lone_cr());
+        assert!(normalize_carriage_returns("\r\r\n").folded_lone_cr());
+        assert!(normalize_carriage_returns("a\n\rb").folded_lone_cr());
     }
 
     /// The verdict the fold's pass takes is the verdict over the FOLDED text: a `\r` or a

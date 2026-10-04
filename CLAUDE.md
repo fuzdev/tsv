@@ -900,7 +900,10 @@ hands its printer, so a document that folds is walked once. Ahead of the parse i
 that answers it once: the printers ask "where are the lines?" in several places that split
 on `'\n'` alone, and folding the finished string instead leaves those disagreeing with the
 output — the same document then formats two ways on two passes. `<LS>` / `<PS>` are
-deliberately NOT folded.
+deliberately NOT folded. The one `<CR>` the fold would change the meaning of — a lone one
+with comment text after it inside a Svelte in-tag `//` comment, which Svelte ends at `\n` alone — is **refused**
+(`tsv_svelte::parse_folded`, a positionless `ParseError::refusal`), the author's bytes parsed
+first so a document they don't parse reports `parse`'s own error.
 
 **A leading byte-order mark is the one input `parse` reads two ways, because the oracles
 do.** No parser rewrites the source — every lexer skips a BOM at byte 0 and its spans stay

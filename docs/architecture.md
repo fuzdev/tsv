@@ -610,7 +610,8 @@ Svelte / `parseCss` over the bytes on disk. Every **parse-then-format** entry po
 contrast, folds `<CR>` and `<CR><LF>` to `<LF>` *before* it parses
 (`tsv_lang::printing::normalize_carriage_returns`, called from each language crate's
 `format_str`, the CLI's `format_source`, each binding's format export, and
-`tsv_svelte_compile`'s `canonicalize_js`). tsv's output is therefore
+`tsv_svelte_compile`'s `canonicalize_js`, each of which parses the folded document through
+its language's `parse_folded`). tsv's output is therefore
 LF-only, including inside the regions it copies verbatim — a frozen embedded body, a
 `format-ignore` region, a multi-line comment, a template literal. The fold returns a
 `FoldedSource`: the folded text with the line verdict its one pass took over it (is every
@@ -630,6 +631,19 @@ tokenization stage", CSS Syntax §3.3 filters `<CR>` / `<FF>` / `<CR><LF>` to on
 and ECMAScript normalizes `<CR>` and `<CR><LF>` to `<LF>` in both TV and TRV. `<LS>` /
 `<PS>` are deliberately untouched — ECMAScript keeps each as itself, and HTML and CSS read
 them as ordinary characters.
+
+**The one position the fold would change meaning is refused, not folded.** Svelte's
+template reader ends an in-tag `//` comment (`<div // c⏎class="x">`) at `\n` alone — none of
+the preprocessing above reaches inside a tag's comment — so a lone `<CR>` there is comment
+text, and folding it would end the comment early and print the rest of its line as markup
+(a real attribute, or a document whose own bytes do not parse). So when the fold rewrote a
+lone `<CR>` in a Svelte document, the format parses the author's bytes first
+(`tsv_svelte::parse_folded`, the parse every Svelte format entry point runs): their parse
+error is the format's error, and an in-tag `//` comment holding a lone `<CR>` with comment text after it is refused with
+a positionless `ParseError::refusal` whose message names the `<CR>` — positionless because
+the source is valid Svelte, so no binding reports it as a syntax error. A `<CR><LF>` is one
+line break in both readings and never refuses; a document the fold rewrote no lone `<CR>` in
+pays nothing.
 
 **A leading byte-order mark is never rewritten either — but its *position* is read the way
 each oracle reads it.** Every lexer skips a U+FEFF at byte 0 and keeps its spans file-true;

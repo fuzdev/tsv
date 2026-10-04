@@ -36,7 +36,9 @@
  * Every argument refusal — a source that is not a well-formed UTF-16 string, a bad
  * options bag — is a `TypeError` instead, and nothing else an engine throws is a
  * `SyntaxError` either: a
- * plain `Error` (a source over the 4 GiB size cap, an internal failure), a
+ * plain `Error` (a source over the 4 GiB size cap, a format's refusal of a source that
+ * parses — a lone CR inside a Svelte in-tag `//` comment, which the format's CR fold would
+ * end early — an internal failure), a
  * `WebAssembly.RuntimeError` (a WASM trap) or a `RangeError` (stack exhaustion). So
  * `instanceof SyntaxError` asks exactly "did the source fail to parse".
  *

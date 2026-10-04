@@ -49,6 +49,73 @@ pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Root<
     parser::parse_svelte(source, arena).map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
 
+/// Parse a document the format path folded (`tsv_lang::printing::normalize_carriage_returns`)
+/// — the parse every Svelte format entry point runs: the CLI, the bindings' `parse_format!`
+/// and [`format_str`]. A parse error is reported in the caller's own coordinates
+/// (`FoldedSource::parse_with`).
+///
+/// **The one place the fold could change meaning, refused.** Svelte's template reader ends
+/// an in-tag `//` comment (`<div // c⏎class="x">`) at the next `\n` alone, so a lone `<CR>`
+/// inside one is comment text — and folding it to `<LF>` would end the comment there, turning
+/// the rest of its line into markup (a real `class` attribute above, or a parse of a document
+/// whose own bytes do not parse). A `<CR>` with only whitespace after it in the comment (a
+/// doubled `<CR><CR><LF>` ending) ends it where the fold does, and is let through. Everywhere else the fold keeps meaning (acorn ends a line at
+/// a `<CR>` too; HTML normalizes it in text and attribute values; a block comment only changes
+/// its own bytes). So when the fold rewrote a lone `<CR>`
+/// (`FoldedSource::folded_lone_cr`), the author's own bytes are parsed first: their parse
+/// error is this one (exactly what `parse` reports for them), and an in-tag `//` comment
+/// holding a lone `<CR>` is refused ([`ParseError::refusal`], positionless — the document is
+/// valid Svelte). A `<CR><LF>` is one line break in both readings, and a document the fold
+/// rewrote no lone `<CR>` in pays nothing.
+pub fn parse_folded<'arena>(
+    folded: &tsv_lang::printing::FoldedSource<'_>,
+    arena: &'arena bumpalo::Bump,
+) -> Result<Root<'arena>> {
+    if folded.folded_lone_cr() {
+        refuse_lone_cr_in_tag_line_comment(folded.original(), arena)?;
+    }
+    folded.parse_with(|text| parse(text, arena))
+}
+
+/// [`parse_folded`]'s refusal: parse the author's own bytes, and refuse the first in-tag `//`
+/// comment that holds a lone `<CR>`. Its parse lands in `arena` beside the folded one, which
+/// the caller resets with it — a cost only a document holding a lone `<CR>` pays.
+#[cold]
+#[inline(never)]
+fn refuse_lone_cr_in_tag_line_comment(source: &str, arena: &bumpalo::Bump) -> Result<()> {
+    let root = parse(source, arena)?;
+    let bytes = source.as_bytes();
+    for comment in &root.comments {
+        // Only the template reader's `//` runs to a `\n` alone; acorn's and the CSS
+        // parser's end at a `<CR>` already.
+        if !comment.from_template_reader || comment.is_block {
+            continue;
+        }
+        // A `<CR>` opening a `<CR><LF>` is the comment's own line end, folded with its pair;
+        // a lone one with only whitespace after it (`<CR><CR><LF>`, a doubled line ending)
+        // ends the comment where the fold does, so nothing turns into markup.
+        let content = comment.content_span.range();
+        let end = content.end;
+        let lone = content
+            .clone()
+            .find(|&i| bytes[i] == b'\r' && bytes.get(i + 1) != Some(&b'\n'));
+        if let Some(position) = lone
+            && bytes[position + 1..end]
+                .iter()
+                .any(|b| !matches!(b, b' ' | b'\t' | b'\r'))
+        {
+            return Err(ParseError::refusal(
+                "Lone carriage return inside a '//' comment in a tag: formatting folds it to a \
+                 line feed, which would end the comment early",
+                source,
+                position,
+                WIRE_COORDINATES,
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Format a Svelte AST back to source code
 ///
 /// # Arguments
@@ -83,7 +150,7 @@ pub fn format_str(source: &str) -> Result<String> {
     // alone so its offsets stay a drop-in contract with Svelte's.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
     let arena = bumpalo::Bump::new();
-    let root = folded.parse_with(|text| parse(text, &arena))?;
+    let root = parse_folded(&folded, &arena)?;
     let doc_arena = tsv_lang::doc::arena::DocArena::for_source(folded.text());
     Ok(format_folded_in(&root, &folded, &doc_arena))
 }

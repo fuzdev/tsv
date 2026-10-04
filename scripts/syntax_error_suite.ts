@@ -19,6 +19,11 @@
  * named outright (exact on every export), and malformed string and template escapes,
  * reported at their own backslash. Invisible characters — a BOM, U+2028, U+2029, a CR —
  * are spelled as escapes, never written literally.
+ *
+ * Beside the table, the one format **refusal** of a source that parses: a lone CR inside a
+ * Svelte in-tag `//` comment, which the format path's CR fold would end early
+ * (`tsv_svelte::parse_folded`). The source is valid Svelte, so the refusal is a plain
+ * `Error` with no point — never the `SyntaxError` a parse failure is.
  */
 
 import { describe, it } from 'node:test';
@@ -277,6 +282,14 @@ export function syntax_errors(api: Record<string, any>): Map<string, ThrownSynta
 	return out;
 }
 
+/** A `div` with no attributes: Svelte's reader runs the `//` comment past the CR to the `\n`. */
+const LONE_CR_TAG_COMMENT = '<div // c\rclass="x"\n>hi</div>\n';
+
+/** The first line of the refusal's message, and its `line:col` header (the CR's point). */
+const LONE_CR_REFUSAL =
+	"Lone carriage return inside a '//' comment in a tag: formatting folds it to a line feed, which would end the comment early";
+const LONE_CR_REFUSAL_HEADER = '1:10';
+
 /**
  * Register the table against one package's published API. `api` is the module, or a
  * function returning it for an entry only usable once a test ahead of these has run (the
@@ -317,5 +330,26 @@ export function register_syntax_error_suite(
 				}
 			});
 		}
+	});
+	describe(`a format refusal of a source that parses is a plain Error: ${label}`, () => {
+		it('svelte: a lone CR inside an in-tag // comment', () => {
+			const api = typeof api_or_getter === 'function' ? api_or_getter() : api_or_getter;
+			if (typeof api.format_svelte === 'function') {
+				const error = thrown_by(() => api.format_svelte(LONE_CR_TAG_COMMENT));
+				assert.ok(error instanceof Error, `an Error, got ${String(error)}`);
+				assert.ok(!(error instanceof SyntaxError), `not a SyntaxError: ${String(error)}`);
+				// no point, the source not being malformed (napi's every `Error` has a `code`)
+				for (const key of ['start', 'loc', 'line', 'column']) {
+					assert.ok(!Object.prototype.propertyIsEnumerable.call(error, key), key);
+				}
+				const [message, located = ''] = error.message.split('\n');
+				assert.equal(message, LONE_CR_REFUSAL);
+				assert.equal(located.split(' ')[0], LONE_CR_REFUSAL_HEADER, 'the CR is named');
+			}
+			if (typeof api.parse_svelte === 'function') {
+				const ast = api.parse_svelte(LONE_CR_TAG_COMMENT);
+				assert.deepEqual(ast.fragment.nodes[0].attributes, [], 'the bytes parse');
+			}
+		});
 	});
 }
