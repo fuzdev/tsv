@@ -8,16 +8,17 @@
  * Every `parse_*`, `parse_*_json` and `format_*` call on a source that does not parse
  * throws a `SyntaxError` whose own enumerable keys are exactly `start` then `loc`, where
  * `loc` is `create_locator(source, {language}).position_at(start)` and the message's
- * `line:col` header is `loc.line:loc.column + 1`. The rows reach what the definition turns
- * on: an astral character ahead of the error (two UTF-16 units), a leading BOM (counted
- * by TypeScript, elided by Svelte and CSS), a lone CR, U+2028 and U+2029 (a line for
- * TypeScript, a character for Svelte and CSS), CRLF on the format path (whose parse reads
- * the CR-folded text, yet reports the caller's own coordinates), errors inside a Svelte
- * `<script>` (plain and `lang="ts"`), `<style>`, template expression, attribute expression
- * and `{#snippet}` head, errors at the end of the source, the format path's Module→Script
- * fallback beside a source type named outright (exact on every export), and malformed
- * string and template escapes, reported at their own backslash. Invisible characters —
- * a BOM, U+2028, U+2029, a CR — are spelled as escapes, never written literally.
+ * `line:col` header is `loc.line:loc.column + 1`, with no leading BOM echoed in the
+ * excerpt after it. The rows reach what the definition turns on: an astral character ahead
+ * of the error (two UTF-16 units), a leading BOM (counted by TypeScript, elided by Svelte
+ * and CSS), a lone CR, U+2028 and U+2029 (a line for TypeScript, a character for Svelte
+ * and CSS), CRLF on the format path (whose parse reads the CR-folded text, yet reports the
+ * caller's own coordinates), errors inside a Svelte `<script>` (plain and `lang="ts"`),
+ * `<style>`, template expression, attribute expression and `{#snippet}` head, errors at
+ * the end of the source, the format path's Module→Script fallback beside a source type
+ * named outright (exact on every export), and malformed string and template escapes,
+ * reported at their own backslash. Invisible characters — a BOM, U+2028, U+2029, a CR —
+ * are spelled as escapes, never written literally.
  */
 
 import { describe, it } from 'node:test';
@@ -227,8 +228,13 @@ export function assert_syntax_error(
 		`${label}: loc is the locator's point at start`
 	);
 	if (at !== undefined) assert.equal(start, expected_start(row, at), `${label}: start`);
-	const header = error.message.split('\n')[1]?.split(' ')[0];
+	const located = error.message.split('\n')[1] ?? '';
+	const header = located.split(' ')[0];
 	assert.equal(header, `${loc.line}:${loc.column + 1}`, `${label}: the message header`);
+	assert.ok(
+		!located.slice(header.length + 1).startsWith('\uFEFF'),
+		`${label}: the excerpt echoes no leading BOM`
+	);
 	// V8 opens a stack with the error's own line; JavaScriptCore's holds frames alone
 	const stack = String(error.stack);
 	assert.ok(

@@ -60,17 +60,21 @@ Three formatters (`format_svelte`, `format_typescript`, `format_css`) take a sou
 
 ### Options
 
-Every export shares one signature — `(source, options?)` with an acorn-style options object.
+Every export takes `(source, options?)` with an acorn-style options object.
 
-`{sourceType: 'script' | 'module'}` sets the parse goal — at `'script'` the code is also sloppy unless its own `"use strict"` prologue makes it strict. TypeScript only: `parse_svelte`/`parse_css` and `format_svelte`/`format_css` throw on the key, so forward it as `undefined` when it doesn't apply. The two families read an **omitted** `sourceType` differently: a parse takes it as `'module'`, while a format takes it as *none named* and parses as a module, retried as a script only if that fails — so a legacy sloppy script formats with no bag at all, and a set value is exact on both. When both grammars reject a format's unnamed source, the error is the one that best explains the failure (the rule is in the repo's [docs/cli.md](https://github.com/fuzdev/tsv/blob/main/docs/cli.md#multi-file-formatting)).
+`{sourceType: 'script' | 'module'}` sets TypeScript's parse goal — at `'script'` the code is sloppy unless its own `"use strict"` prologue makes it strict. `parse_svelte`/`parse_css` and `format_svelte`/`format_css` throw on a set value. An **omitted** `sourceType` is `'module'` to a parser, while a formatter parses as a module and retries as a script only if that fails, so a legacy sloppy script formats with no options; a set value is exact on both. When both grammars reject a format's source, the error is the one that best explains the failure (the rule is in the repo's [docs/cli.md](https://github.com/fuzdev/tsv/blob/main/docs/cli.md#multi-file-formatting)).
 
-The object parsers additionally take `{locations: true}`, which adds per-node `loc` (line/column, as acorn's `locations: true` does; Svelte also `name_loc`), computed in JS from the offsets plus the source. The `parse_*_json` variants return the wire itself and the formatters emit none, so both reject that key — a `_json` variant with a message pointing at its object parser — and the formatters, being non-configurable, take no option beyond the source type. A **`sourceType`-only** bag is therefore the one that forwards to any export, parser or formatter; a bag carrying `locations` is an object-parse bag and throws anywhere else.
+The object parsers also take `{locations: true}`, adding per-node `loc` (line/column, as acorn's `locations: true` does) and Svelte's `name_loc`. Every other export throws on a `locations` key, whatever its value, so only a `sourceType`-only bag forwards to any export.
 
-Unknown option keys throw, whatever their value; a supported key set to `undefined` is read as absent. A second argument that isn't an object throws too, arrays included — that makes `sources.map(format_typescript)` an error, since `map` passes the index as the second argument, so write `sources.map((s) => format_typescript(s))`. Every argument error — a source that isn't a string, a bad options argument, an unknown key, a wrong-typed or invalid value — is a `TypeError`; a source that doesn't parse throws a `SyntaxError` ([below](#errors-and-depth-limits)).
+A supported key set to `undefined` reads as its default — `sourceType: undefined` included on Svelte and CSS. Argument errors are `TypeError`s:
+
+- an unknown key, whatever its value;
+- a wrong-typed or invalid value, or a non-string source;
+- a non-object second argument, arrays included — write `sources.map((s) => format_typescript(s))`, not `sources.map(format_typescript)`, which passes the index.
 
 ### Reconstructing line/column
 
-`{locations: true}` runs `reconstruct_locations(ast, source)` over the parsed tree — one extra walk, no re-parse — and the function is also exported for a tree you already hold:
+`{locations: true}` runs `reconstruct_locations`, a pure-JS helper the package also exports for a tree you already hold:
 
 ```typescript
 import {parse_typescript, reconstruct_locations} from '@fuzdev/tsv-wasm';
@@ -81,11 +85,13 @@ const ast = parse_typescript(src, {locations: true});
 const same = reconstruct_locations(parse_typescript(src), src);
 ```
 
-It adds `loc` to every node — and the Svelte `name_loc` — mutating in place (`structuredClone` first to keep the input), with the key appended last on each object. Each `loc` follows the document's line rule: ECMAScript's terminators for TypeScript (acorn's count exactly), `\n` alone for a Svelte document and for CSS. For a Svelte document this is a superset of Svelte's own `parse` output, which carries `loc` only on the nodes acorn parsed, and it keeps to this rule where Svelte's `loc` departs from its own offsets (Svelte's `<script>` `Program.loc` sits at the tag; here it matches `start`/`end`) — cataloged in the repo's [docs/conformance_svelte.md](https://github.com/fuzdev/tsv/blob/main/docs/conformance_svelte.md).
+It adds `loc` to every object with `start`/`end` and `name_loc` to Svelte elements, attributes, and directives, **in place** (keys appended last); `structuredClone` the tree first to keep the input.
 
-Without a `language`, it is read off the root (`Root`, `StyleSheetFile`, or a `Program` spanning the whole source), so for a subtree — a Svelte `Fragment`, a `<script>`'s `Program`, a single statement — pass `{language}`; it throws rather than guess.
+- Lines follow the document's rule: ECMAScript's terminators for TypeScript (as acorn counts them), LF alone for a whole Svelte document and for CSS. Offsets are UTF-16 units; a leading BOM counts in TypeScript offsets, not in Svelte or CSS ones.
+- For Svelte it is a superset of Svelte's own output (which has `loc` only on acorn-parsed nodes), following the offsets where Svelte's `loc` departs from them ([docs/conformance_svelte.md](https://github.com/fuzdev/tsv/blob/main/docs/conformance_svelte.md)).
+- The language is read off the root (`Root`, `StyleSheetFile`, or a whole-source `Program`); pass `{language}` for a subtree, or it throws rather than guess.
 
-For sparse lookups, `create_locator(source, {language})` builds one line table and reuses it across `position_at(offset)` (one offset's `{line, column}`), `loc_of(node)` (one node's `loc`, or `null` without numeric `start`/`end`) and `reconstruct(ast)` calls. The language (`'typescript'`, `'svelte'`, or `'css'`) is required, since it picks the line rule. Offsets are the AST's own: UTF-16 units, into the source with a leading BOM dropped for Svelte and CSS and as given for TypeScript.
+For sparse lookups, `create_locator(source, {language})` builds the line table once for `position_at(offset)`, `loc_of(node)` (`null` for a node without numeric `start`/`end`) and `reconstruct(ast)`. Its `language` (`'typescript'`, `'svelte'`, or `'css'`) is required.
 
 ```typescript
 import {create_locator, parse_typescript} from '@fuzdev/tsv-wasm';
@@ -99,11 +105,16 @@ locator.position_at(7); // {line: 2, column: 0}
 
 A locator's single lookups throw a `RangeError` for an offset or span the text doesn't hold; the whole-tree forms check nothing per node. A missing or unknown `language`, an uninferable root, or a non-string source throws a `TypeError`. So does an options argument that isn't an object, or a key other than `language` — a typo like `{langauge: 'css'}` throws rather than falling back to inference.
 
-The helper is also its own entry point, `@fuzdev/tsv-wasm/locations` — the same two functions as pure JS that loads no WASM — for code that holds a tree and only needs line/column.
+`reconstruct_locations` and `create_locator` are also the `@fuzdev/tsv-wasm/locations` entry point, pure JS that loads no WASM.
 
 ### Errors and depth limits
 
-A source that doesn't parse throws a `SyntaxError` — from a parser and a formatter alike — with two own properties, `start` and `loc` (typed `TsvSyntaxError`, exported). `start` is the UTF-16 offset of the error and `loc` its `{line, column}` (1-based line, 0-based UTF-16 column), in the same coordinates as the AST's own positions: TypeScript counts ECMAScript line terminators (LF, CR, CRLF, U+2028, U+2029) and a leading BOM; Svelte (`<script>`, `<style>` and template expressions included) and CSS count LF alone and leave a leading BOM out of the offsets. So `loc` is `create_locator(source, {language}).position_at(start)`, and the message's second line starts with `loc` as `line:column + 1`. A formatter's position is into your own source even where it has CRLF line endings, so for the same error a formatter reports what a parser does — but with no `sourceType` named, `format_typescript` retries a failed module parse as a script and can report that attempt's error where `parse_typescript` (a module unless told otherwise) reports its own. Read `start` and `loc` rather than `line` / `column`, which some runtimes put on every `Error`:
+A source that doesn't parse throws a `SyntaxError` — from a parser and a formatter alike — with two own properties, `start` and `loc` (typed `TsvSyntaxError`, exported), in the AST's coordinates ([above](#reconstructing-linecolumn)):
+
+- `start` is the error's UTF-16 offset and `loc` its `{line, column}` (1-based line, 0-based UTF-16 column), equal to `create_locator(source, {language}).position_at(start)`.
+- The message's second line starts with `loc` as `line:column + 1`.
+- A formatter reports positions in your own source, CRLF line endings included — the error a parser reports, except that with no `sourceType`, `format_typescript` may report its script retry's error instead.
+- Read `start` and `loc`, not `line` / `column`, which some runtimes put on every `Error`.
 
 ```javascript
 import {format_typescript} from '@fuzdev/tsv-wasm';

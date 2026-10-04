@@ -16,7 +16,9 @@ use crate::location::{WireCoordinates, WirePoint};
 /// **excerpt** is for a terminal: it is bounded by every ECMAScript terminator whatever
 /// the language, since a raw `<CR>`, `<LS>` or `<PS>` printed mid-line overwrites or
 /// garbles the text the caret points into, so on a Svelte or CSS line holding one the
-/// excerpt is the stretch after it while the header still counts the whole `\n` line.
+/// excerpt is the stretch after it while the header still counts the whole `\n` line. Nor
+/// does it echo a leading byte-order mark, in any language — the header alone says how the
+/// language's wire counts one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ErrorContext {
     /// The excerpted source line (no terminator). A `Box<str>` rather than a `String`, and
@@ -48,13 +50,22 @@ impl ErrorContext {
         // The excerpt's bounds, over the ECMAScript terminator class (`\n`, `\r`, `\r\n`,
         // `<LS>`, `<PS>`) rather than `\n` alone — one question, stated once, in `printing`
         // beside the class itself.
-        let (line_start, line_end, _) = crate::printing::line_bounds_at(source, position);
+        let (mut line_start, line_end, _) = crate::printing::line_bounds_at(source, position);
+        // A leading byte-order mark is never echoed, in any language: the excerpt is display
+        // text, whatever the header's column makes of the mark. It is no terminator, so line
+        // 1 always reaches past it.
+        if line_start == 0 && source.starts_with('\u{FEFF}') {
+            line_start = '\u{FEFF}'.len_utf8();
+        }
 
         // Clamped to the line's own end, which `position` can exceed only by sitting inside
-        // the terminator sequence that ends it.
+        // the terminator sequence that ends it, and to its start, which it falls short of
+        // only at the dropped mark (floored to byte 0) — the caret then sits under the
+        // excerpt's first character.
         // Saturating: every source a parse accepts is under the `u32` cap, so a column
         // past it would be one no parse could report.
-        let caret_column = source[line_start..position.min(line_end)].chars().count();
+        let caret_end = position.min(line_end).max(line_start);
+        let caret_column = source[line_start..caret_end].chars().count();
         let caret_column = u32::try_from(caret_column).unwrap_or(u32::MAX);
 
         ErrorContext {
@@ -615,8 +626,8 @@ mod tests {
         );
     }
 
-    /// The rendered excerpt never carries a raw terminator, and the header is the point's
-    /// `line:column+1` — whatever the coordinates and wherever the error sits.
+    /// The rendered excerpt never carries a raw terminator or a leading BOM, and the header
+    /// is the point's `line:column+1` — whatever the coordinates and wherever the error sits.
     #[test]
     fn header_is_the_point_and_the_excerpt_holds_no_terminator() {
         let sources = [
@@ -636,6 +647,10 @@ mod tests {
                     let excerpt = rendered.lines().nth(1).expect("located line");
                     assert!(
                         !excerpt.contains(['\r', '\u{2028}', '\u{2029}']),
+                        "{source:?} @ {position}: {rendered:?}"
+                    );
+                    assert!(
+                        !excerpt.contains('\u{FEFF}'),
                         "{source:?} @ {position}: {rendered:?}"
                     );
                     assert_eq!(rendered.split('\n').count(), 3, "{rendered:?}");
@@ -794,15 +809,84 @@ mod tests {
             "bad\n1:12 \tconst a = ;\n     \t          ^ here"
         );
 
-        // An elided BOM moves line 1's header column, never the caret: the excerpt still
-        // carries it, and it prints zero columns wide.
+        // An elided BOM moves line 1's header column, never the caret: the excerpt leaves
+        // it out (`leading_bom_is_not_echoed`).
         let src = "\u{FEFF}a = ;";
         let ctx = ErrorContext::from_source(src, src.find(';').expect("semi"), LF);
         assert_eq!(ctx.point, point(4, 1, 4));
         assert_eq!(
             ctx.format_with_caret("bad"),
-            "bad\n1:5 \u{FEFF}a = ;\n        ^ here"
+            "bad\n1:5 a = ;\n        ^ here"
         );
+    }
+
+    /// The excerpt is display text, so it never shows a leading BOM, whatever the language;
+    /// the header keeps the wire's reading of it — counted on line 1 for TypeScript, elided
+    /// for Svelte and CSS. Only the byte-0 mark goes: a content U+FEFF stays, and so does
+    /// every line past the first.
+    #[test]
+    fn leading_bom_is_not_echoed() {
+        let src = "\u{FEFF}a = ;";
+        let semi = src.find(';').expect("semi");
+        // Counted: the header's column is one higher, the excerpt and caret the same.
+        let ctx = ErrorContext::from_source(src, semi, ECMA);
+        assert_eq!(&*ctx.source_line, "a = ;");
+        assert_eq!(ctx.caret_column, 4);
+        assert_eq!(ctx.point, point(5, 1, 5));
+        assert_eq!(
+            ctx.format_with_caret("bad"),
+            "bad\n1:6 a = ;\n        ^ here"
+        );
+        let ctx = ErrorContext::from_source(src, semi, LF);
+        assert_eq!(&*ctx.source_line, "a = ;");
+        assert_eq!(ctx.caret_column, 4);
+
+        // At the BOM itself, and inside its three bytes (floored to it): the caret is under
+        // the excerpt's first character.
+        for position in 0..=2 {
+            for coordinates in [ECMA, LF] {
+                let ctx = ErrorContext::from_source(src, position, coordinates);
+                assert_eq!(&*ctx.source_line, "a = ;");
+                assert_eq!(ctx.caret_column, 0);
+                assert_eq!(ctx.format_with_caret("bad"), "bad\n1:1 a = ;\n    ^ here");
+            }
+        }
+        // Just past it: the excerpt's first character, the header counting the BOM or not.
+        assert_eq!(
+            ErrorContext::from_source(src, 3, ECMA).format_with_caret("bad"),
+            "bad\n1:2 a = ;\n    ^ here"
+        );
+        assert_eq!(
+            ErrorContext::from_source(src, 3, LF).format_with_caret("bad"),
+            "bad\n1:1 a = ;\n    ^ here"
+        );
+
+        // A BOM-only source is one empty line, at either end of the mark.
+        for position in [0, 3] {
+            let ctx = ErrorContext::from_source("\u{FEFF}", position, ECMA);
+            assert_eq!(&*ctx.source_line, "");
+            assert_eq!(ctx.caret_column, 0);
+            let ctx = ErrorContext::from_source("\u{FEFF}", position, LF);
+            assert_eq!(ctx.format_with_caret("bad"), "bad\n1:1 \n    ^ here");
+        }
+
+        // A content U+FEFF later on line 1 is echoed: only the byte-0 mark is metadata.
+        let src = "\u{FEFF}a\u{FEFF}b = ;";
+        let ctx = ErrorContext::from_source(src, src.find(';').expect("semi"), LF);
+        assert_eq!(&*ctx.source_line, "a\u{FEFF}b = ;");
+        assert_eq!(ctx.caret_column, 6);
+        // ...and a U+FEFF that is not at byte 0 is never a mark.
+        let src = " \u{FEFF}a = ;";
+        let ctx = ErrorContext::from_source(src, src.find(';').expect("semi"), LF);
+        assert_eq!(&*ctx.source_line, " \u{FEFF}a = ;");
+
+        // A line-2 error is untouched.
+        let src = "\u{FEFF}a;\nb = ;";
+        for coordinates in [ECMA, LF] {
+            let ctx = ErrorContext::from_source(src, src.rfind(';').expect("semi"), coordinates);
+            assert_eq!(&*ctx.source_line, "b = ;");
+            assert_eq!(ctx.caret_column, 4);
+        }
     }
 
     #[test]

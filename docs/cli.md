@@ -204,12 +204,13 @@ it prints exactly what `parse` does. The same *error* is not guaranteed: with no
 ([§Multi-File Formatting](#multi-file-formatting)) and can report the script attempt's error
 where a module-only `parse` reports the module's — at one goal the two agree. The excerpt is a
 display line, bounded by every ECMAScript terminator whatever the language, since a raw CR,
-U+2028 or U+2029 printed mid-line garbles the text the caret points into; the caret is padded
-by the display width of what the excerpt prints ahead of it (a tab echoed as a tab), so it
-sits under the error's character even where the header's UTF-16 column and the screen column
-differ. The text comes from `tsv_lang`'s `ParseError` and is the same on both bins and in every
-package — where it is the message of the `SyntaxError` the facade throws, whose `start` and
-`loc` properties carry the same point (`crates/tsv_wasm/npm/api.js`).
+U+2028 or U+2029 printed mid-line garbles the text the caret points into; it never echoes a
+leading byte-order mark, in any language (the header alone carries the wire's reading of one).
+The caret is padded by the display width of what the excerpt prints ahead of it (a tab echoed
+as a tab), so it sits under the error's character even where the header's UTF-16 column and
+the screen column differ. The text comes from `tsv_lang`'s `ParseError` and is the same
+on both bins and in every package — where it is the message of the `SyntaxError` the facade
+throws, whose `start` and `loc` properties carry the same point (`crates/tsv_wasm/npm/api.js`).
 
 ## Recursion Depth
 

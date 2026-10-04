@@ -71,13 +71,17 @@ A set value is exact. With none named and both grammars rejecting the source, th
 
 ### Parsing
 
-`parse_svelte` / `parse_typescript` / `parse_css` return the language's public JSON AST as an object — span-only by default, `start`/`end` offsets on every node and no per-node `loc`; the `parse_*_json` siblings return that wire as a JSON string for consumers that forward it without paying `JSON.parse`. The object parsers take an optional `{locations?, sourceType?}` bag, the `_json` ones `{sourceType?}`, and `sourceType` is TypeScript-only. A `locations` key on a `_json` sibling throws, pointing at the object parser. TypeScript types for the AST are bundled in `tsv_ast.d.ts` and re-exported from the package (`import type {...} from '@fuzdev/tsv'`).
+`parse_svelte` / `parse_typescript` / `parse_css` return the language's public JSON AST as an object — span-only by default, `start`/`end` offsets on every node and no per-node `loc`; the `parse_*_json` siblings return that wire as a JSON string for consumers that forward it without paying `JSON.parse`. The object parsers take an optional `{locations?, sourceType?}` bag, the `_json` ones `{sourceType?}`, and `sourceType` is TypeScript-only. TypeScript types for the AST are bundled in `tsv_ast.d.ts` and re-exported from the package (`import type {...} from '@fuzdev/tsv'`).
 
-`locations: true` adds `loc` (and Svelte's `name_loc`), computed in JS from the offsets plus the source by the bundled `reconstruct_locations` (one extra walk over the tree after the parse). It is exported too, with `create_locator` for sparse lookups (its `position_at(offset)` / `loc_of(node)`), which takes the document's `language`. The helper is also its own entry point, `@fuzdev/tsv/locations`: pure JS that loads no native addon, for code that holds a tree and only needs line/column.
+`locations: true` adds `loc` (and Svelte's `name_loc`), computed in JS after the parse by `reconstruct_locations`. It is exported too, with `create_locator(source, {language})` for sparse lookups (`language` required), whose `position_at(offset)` / `loc_of(node)` throw a `RangeError` for an offset or span the source doesn't hold; the whole-tree forms (`reconstruct_locations`, the locator's `reconstruct(ast)`) check nothing per node. Both are also the `@fuzdev/tsv/locations` entry point, pure JS that loads no native addon.
 
 ### Options
 
-Option semantics are identical to the WASM package's: unknown keys throw whatever their value; a supported key set to `undefined` means its default — including the TypeScript-only `sourceType` on the other languages, so one bag forwards to whichever function; a non-object options argument throws, arrays included, which makes `sources.map(format_typescript)` an error — write `sources.map((s) => format_typescript(s))`. Every argument error is a `TypeError`; a source that doesn't parse throws a `SyntaxError` (below). A locator's single lookups (`position_at`, `loc_of`) throw a `RangeError` for an offset the source doesn't hold.
+Options behave as in `@fuzdev/tsv-wasm`: a supported key set to `undefined` reads as its default, and a `sourceType`-only bag forwards to any function (`sourceType: undefined` included on Svelte and CSS; a `locations` key, whatever its value, throws anywhere but an object parser). Argument errors are `TypeError`s:
+
+- an unknown key, whatever its value;
+- a wrong-typed or invalid value, or a non-string source;
+- a non-object second argument, arrays included — write `sources.map((s) => format_typescript(s))`, not `sources.map(format_typescript)`, which passes the index.
 
 ### File scoping
 
@@ -85,11 +89,13 @@ Option semantics are identical to the WASM package's: unknown keys throw whateve
 
 ### Errors
 
-A source that doesn't parse throws a `SyntaxError` — from a parser and a formatter alike — with two own properties, `start` and `loc` (typed `TsvSyntaxError`, exported). It is the same error `@fuzdev/tsv-wasm` throws for the same call, message included.
+A source that doesn't parse throws a `SyntaxError` — from a parser and a formatter alike, the same one `@fuzdev/tsv-wasm` throws — with two own properties, `start` and `loc` (typed `TsvSyntaxError`, exported), in the same coordinates as the AST's own positions:
 
-- `start` is the UTF-16 offset of the error and `loc` its `{line, column}` (1-based line, 0-based UTF-16 column), in the same coordinates as the AST's own positions: TypeScript counts ECMAScript line terminators (LF, CR, CRLF, U+2028, U+2029) and a leading BOM; Svelte (`<script>`, `<style>` and template expressions included) and CSS count LF alone and leave a leading BOM out of the offsets. So `loc` is `create_locator(source, {language}).position_at(start)`, and the message's second line starts with `loc` as `line:column + 1`.
-- A formatter's position is into your own source even where it has CRLF line endings, so for the same error a formatter reports what a parser does — but with no `sourceType` named, `format_typescript` retries a failed module parse as a script and can report that attempt's error where `parse_typescript` (a module unless told otherwise) reports its own.
-- Read `start` and `loc` rather than `line` / `column`, which some runtimes put on every `Error`.
+- `start` is the error's UTF-16 offset and `loc` its `{line, column}` (1-based line, 0-based UTF-16 column), equal to `create_locator(source, {language}).position_at(start)`.
+- TypeScript counts ECMAScript line terminators (LF, CR, CRLF, U+2028, U+2029) and a leading BOM; Svelte (`<script>`, `<style>` and template expressions included) and CSS count LF alone and leave a leading BOM out.
+- The message's second line starts with `loc` as `line:column + 1`.
+- A formatter reports positions in your own source, CRLF line endings included — the error a parser reports, except that with no `sourceType`, `format_typescript` may report its script retry's error instead.
+- Read `start` and `loc`, not `line` / `column`, which some runtimes put on every `Error`.
 
 ```javascript
 import {format_typescript} from '@fuzdev/tsv';

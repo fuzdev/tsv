@@ -10,7 +10,8 @@
 //! (every island in it included) and for a CSS one — with a leading byte-order mark
 //! counted by TypeScript and elided by Svelte and CSS. That is the `loc` definition
 //! (`tests/loc_definition.rs`), so an error's point is the `loc` a node at the error would
-//! carry. The message's `line:col` header prints the same point, as `line:column+1`.
+//! carry. The message's `line:col` header prints the same point, as `line:column+1`, and
+//! the excerpt under it never echoes a leading BOM, whichever way the header counts it.
 //!
 //! A format reports the error of the caller's source, not of the CR-folded text its parse
 //! actually reads: the same point and message a parse of that source reports.
@@ -95,14 +96,18 @@ fn point_violations(source: &str, language: Language, error: &ParseError) -> Vec
         ));
     }
     let rendered = error.to_string();
-    let header = rendered
+    let located = rendered
         .lines()
         .nth(1)
-        .and_then(|line| line.split_once(' '))
-        .map(|(head, _)| head);
+        .and_then(|line| line.split_once(' '));
+    let header = located.map(|(head, _)| head);
     let want = format!("{}:{}", point.line, point.column + 1);
     if header != Some(want.as_str()) {
         out.push(format!("header {header:?} != {want}"));
+    }
+    // the excerpt is display text: it never echoes a leading BOM, whatever the header counts
+    if located.is_some_and(|(_, excerpt)| excerpt.starts_with('\u{feff}')) {
+        out.push(format!("the excerpt echoes a leading BOM: {rendered:?}"));
     }
     out
 }

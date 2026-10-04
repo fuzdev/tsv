@@ -57,13 +57,21 @@ Each function also takes an optional trailing options object. Formatting itself 
 
 A set value is exact. With none named and both grammars rejecting the source, the error thrown is the one that best explains the failure (the rule is in the repo's [docs/cli.md](https://github.com/fuzdev/tsv/blob/main/docs/cli.md#multi-file-formatting)).
 
-`format_svelte`/`format_css` **throw** on the key rather than ignoring it (Svelte's `<script>` is always a module, CSS has no goal), so code forwarding one options object to whichever formatter should spell the inapplicable source type as `undefined` — a supported key set to `undefined` reads as its default. Unknown option keys throw, whatever their value.
+`format_svelte`/`format_css` throw on a set `sourceType`. A supported key set to `undefined` reads as its default, so one options object forwards to every formatter. Argument errors are `TypeError`s:
 
-A second argument that isn't an object throws too, arrays included. That makes `sources.map(format_typescript)` an error, since `map` passes the index as the second argument — write `sources.map((s) => format_typescript(s))`. Every argument error — a source that isn't a string, a bad options argument, an unknown key, a wrong-typed or invalid value — is a `TypeError`; a source that doesn't parse throws a `SyntaxError` (below).
+- an unknown key, whatever its value;
+- a wrong-typed or invalid value, or a non-string source;
+- a non-object second argument, arrays included — write `sources.map((s) => format_typescript(s))`, not `sources.map(format_typescript)`, which passes the index.
 
 ### Errors and depth limits
 
-A source that doesn't parse throws a `SyntaxError` with two own properties, `start` and `loc` (typed `TsvSyntaxError`, exported). `start` is the UTF-16 offset of the error and `loc` its `{line, column}` (1-based line, 0-based UTF-16 column), in the same coordinates as the AST's own positions: TypeScript counts ECMAScript line terminators (LF, CR, CRLF, U+2028, U+2029) and a leading BOM; Svelte (`<script>`, `<style>` and template expressions included) and CSS count LF alone and leave a leading BOM out of the offsets. The position is into your own source even where it has CRLF line endings, so for the same error it is the offset [`@fuzdev/tsv-parse-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-parse-wasm) reports — but with no `sourceType` named, `format_typescript` retries a failed module parse as a script, and can report that attempt's error where a module parse reports its own. Read `start` and `loc` rather than `line` / `column`, which some runtimes put on every `Error`. The message's second line starts with `loc` as `line:column + 1`:
+A source that doesn't parse throws a `SyntaxError` with two own properties, `start` and `loc` (typed `TsvSyntaxError`, exported):
+
+- `start` is the error's UTF-16 offset and `loc` its `{line, column}` (1-based line, 0-based UTF-16 column).
+- TypeScript counts ECMAScript line terminators (LF, CR, CRLF, U+2028, U+2029) and a leading BOM; Svelte (`<script>`, `<style>` and template expressions included) and CSS count LF alone and leave a leading BOM out.
+- The message's second line starts with `loc` as `line:column + 1`.
+- The position is into your own source, CRLF line endings included — the one [`@fuzdev/tsv-parse-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-parse-wasm) reports, except that with no `sourceType`, `format_typescript` may report its script retry's error instead.
+- Read `start` and `loc`, not `line` / `column`, which some runtimes put on every `Error`.
 
 ```javascript
 import {format_typescript} from '@fuzdev/tsv-format-wasm';

@@ -48,8 +48,8 @@ Each `## Unreleased` section must be non-empty and carry a
   outside Node, and each engine's error differed
 - **breaking** feat: a parse or format failure throws a `SyntaxError` (typed `TsvSyntaxError`)
   with `start` — the UTF-16 offset, in the AST's coordinates — and `loc: {line, column}`; the
-  message's `line:col` header follows the same definition, and a format error is reported in
-  the caller's own source, CRLF included
+  message's `line:col` header follows the same definition, its excerpt no longer echoes a
+  leading BOM, and a format error is reported in the caller's own source, CRLF included
 - **breaking** feat: every argument error is a `TypeError` — a non-string source, a bad options
   bag, an unknown key, a wrong-typed value — and the locations helpers refuse a bad bag too
 - **breaking** feat: `locations.d.ts` drops `Loc` for `SourceLocation` and renames
