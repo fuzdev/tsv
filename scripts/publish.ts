@@ -30,8 +30,9 @@
  *   --no-check       skip `deno task check`, the Step 3b conformance gates, AND the
  *                    Step 3c corpus audit (faster retries; also the only way to --wetrun
  *                    on a machine missing the Step 3b/3c oracle checkouts — a missing
- *                    oracle otherwise FAILS a wetrun). It does not waive the benches/js
- *                    TypeScript install, which Step 6's declaration check needs
+ *                    oracle otherwise FAILS a wetrun — or without bun, which Step 6's
+ *                    Bun leg otherwise requires of a wetrun). It does not waive the
+ *                    benches/js TypeScript install, which Step 6's declaration check needs
  *   --no-git         skip the git commit + tag + push finalization
  *
  * Retry: a failed wetrun leaves the bump in place plus a sentinel file; re-run
@@ -231,6 +232,35 @@ if (!node_check.success) {
 	Deno.exit(1);
 }
 console.log(`  node: ${node_check.stdout}`);
+
+// Step 6 runs the parse-failure table under Bun (`deno task test:bun`), the one leg that
+// grades the engines' deletes of Bun's own `Error` `line` / `column` — asked here so a
+// --wetrun without bun fails before the bump. Waived like Step 3b's oracles: a dry run or
+// --no-check warn-skips, re-warned in the final summary.
+let bun_skip_reason: string | null = null;
+let bun_version: string | null = null;
+try {
+	const bun_check = capture('bun', ['--version']);
+	if (bun_check.success) bun_version = bun_check.stdout;
+} catch (e) {
+	// not installed — `Deno.Command` throws NotFound rather than failing the run
+	if (!(e instanceof Deno.errors.NotFound)) throw e;
+}
+if (bun_version !== null) {
+	console.log(`  bun: ${bun_version}`);
+} else if (wetrun && !no_check) {
+	console.error(
+		'  FAIL: bun not found — required to run the parse-failure table under Bun (deno task test:bun). ' +
+			'Install bun, or pass --no-check to release without it (explicitly).'
+	);
+	Deno.exit(1);
+} else {
+	bun_skip_reason = no_check ? 'bun not found; waived by --no-check' : 'bun not found';
+	console.warn(
+		`  WARN: ${bun_skip_reason} — Step 6 skips the Bun leg` +
+			(wetrun || no_check ? '' : '; a --wetrun would FAIL here')
+	);
+}
 
 // Step 6's declaration check loads TypeScript and @types/node from the benches/js
 // install — asked here so a missing install fails before the bump and the build
@@ -504,7 +534,7 @@ for (const { label, dir } of packages) {
 
 // Step 6: Test the built artifacts
 
-console.log('\n=== Step 6: Validate built packages (sizes + Deno + Node + declarations) ===');
+console.log('\n=== Step 6: Validate built packages (sizes + Deno + Node + Bun + declarations) ===');
 run('deno task validate:artifacts', 'deno', ['task', 'validate:artifacts']);
 for (const { label, dir } of packages) {
 	const result = new Deno.Command('node', {
@@ -518,6 +548,22 @@ for (const { label, dir } of packages) {
 		console.error(`\n  FAIL: artifact tests for ${label}`);
 		Deno.exit(1);
 	}
+}
+// The parse-failure table under Bun, the one runtime that grades the engines' point
+// properties (deno.json `//test:bun`), over the three wasm packages this script publishes —
+// the napi engine under Bun is graded locally by `test:napi:npm`, not here. Bun's presence
+// was settled by the preflight, so the leg requires it.
+if (bun_skip_reason === null) {
+	run('deno task test:bun', 'deno', [
+		'task',
+		'test:bun',
+		'--require-bun',
+		'format',
+		'parse',
+		'all'
+	]);
+} else {
+	console.warn(`  WARN: skipping deno task test:bun — ${bun_skip_reason}`);
 }
 // The merged published declarations, as a consumer's compiler sees them, for every npm
 // package this release ships. The napi loader publishes from release_napi.yml, but its
@@ -687,6 +733,14 @@ if (audit_corpus_skip_reason !== null) {
 	// robustness audit never ran must be the last thing on screen, not a scrolled-away footnote.
 	console.warn(`\n  ⚠ Step 3c corpus robustness audit did NOT run (${audit_corpus_skip_reason}).`);
 	console.warn('    Run `deno task audit:corpus` and verify it passes for this release.');
+}
+if (bun_skip_reason !== null) {
+	// Re-warn at the very end, beside the Step 3b/3c re-warns: the engines' Bun-only point
+	// properties went ungraded for this release.
+	console.warn(`\n  ⚠ Step 6 parse-failure table under Bun did NOT run (${bun_skip_reason}).`);
+	console.warn(
+		'    Run `deno task test:bun format parse all` with bun installed for this release.'
+	);
 }
 if (!wetrun) {
 	console.log(`\n  Dry-run complete for v${version} — all checks passed.`);

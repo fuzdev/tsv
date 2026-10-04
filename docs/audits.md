@@ -25,7 +25,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Raw-find scan](#raw-find-scan-audit-scanaudit) | `scan:audit` | new raw substring scans over source (comment-blind delimiter matching) | `deno task check` |
 | [Self-format](#self-format-audit-formataudit) | `format:audit` | tsv failing to format its OWN TS/JS — a would-change file (non-idempotency) or a parse error (over-rejection) | `deno task check` |
 | [Discovery parity](#corpus-discovery-parity-audit-discoveryaudit) | `discovery:audit` | `tsv format --list` over the `../corpora` snapshot naming a different file set than the snapshot's committed tree holds in tsv's extensions — a discovery prune firing on real code, or an extension drift | `deno task check` (when `../corpora` is present) |
-| [Engine parity](#engine-parity-audit-enginesaudit) | `engines:audit` | the WASM engine and the native engine formatting the same file to DIFFERENT bytes — a wasm32-only divergence every other gate is blind to, since they all grade the native build | CI's `artifacts` job ONLY (needs both packages built; NOT in `deno task check`, and not on the publish path either — `scripts/publish.ts` runs `validate:artifacts`, `test:npm` and `typecheck:packages`, none of which compares engines) |
+| [Engine parity](#engine-parity-audit-enginesaudit) | `engines:audit` | the WASM engine and the native engine formatting the same file to DIFFERENT bytes — a wasm32-only divergence every other gate is blind to, since they all grade the native build | CI's `artifacts` job ONLY (needs both packages built; NOT in `deno task check`, and not on the publish path either — `scripts/publish.ts` runs `validate:artifacts`, `test:npm`, `test:bun` (the wasm packages under Bun) and `typecheck:packages`, none of which compares engines) |
 | [Doc link](#doc-link-audit-docsaudit) | `docs:audit` | a doc-comment `[link]` that no longer resolves — a stale doc | `deno task check` |
 | [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts` no longer describing what the wire-JSON writers emit — plus a wire type it never declared at all | `deno task check` |
 | [Package declarations](#package-declaration-check-typecheckpackages) | `typecheck:packages` | a staged package's published `.d.ts` failing a consumer's strict compile — a lib the consumer did not ask for (TS2550), a name star-export ambiguation drops (TS2308), a type a package must not export, a README example that does not compile | `scripts/publish.ts` Step 6 (all four packages); on demand (needs `deno task bench:install`, so NOT in `deno task check`) |
@@ -904,7 +904,7 @@ conformance gates' business, not this one.
 which both artifacts exist (`build:packages` made the wasm one, the N-API step's
 `cargo build -p tsv_cli --release` the native one). Deliberately **not** in `deno task
 check`, which builds no packages — and not on the publish path either: `scripts/publish.ts`
-runs `validate:artifacts`, `test:npm` and `typecheck:packages`, which grade each bundle alone, so the one
+runs `validate:artifacts`, `test:npm`, `test:bun` (the wasm packages under Bun) and `typecheck:packages`, which grade each bundle alone, so the one
 engine-agreement verdict a release gets is the CI run on the commit it ships. Locally: `deno task build:npm:all && deno task
 build:napi:packages` first. Both bins are mtime-guarded like every other staged
 artifact, so a run against a binary from before a formatter change refuses rather than

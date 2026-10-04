@@ -1,8 +1,9 @@
 /**
  * The parse-failure contract every tsv npm package's facade publishes, as one table run
  * by both package suites (`scripts/test_npm.ts` over each WASM variant's auto-init and
- * lazy entries, `scripts/test_napi_npm.ts` over the native loader), so the two engines
- * are held to one table by one runner.
+ * lazy entries, `scripts/test_napi_npm.ts` over the native loader) and, under Bun, by
+ * `scripts/test_bun.ts` over the staged packages, so the two engines are held to one
+ * table.
  *
  * Every `parse_*`, `parse_*_json` and `format_*` call on a source that does not parse
  * throws a `SyntaxError` whose own enumerable keys are exactly `start` then `loc`, where

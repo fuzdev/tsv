@@ -192,8 +192,11 @@ if (node_version === null) {
 }
 
 const bun_version = run_version('bun');
-if (bun_version === null) warn('bun missing — bench:bun unavailable (optional)');
-else ok(`bun ${bun_version}`);
+if (bun_version === null) {
+	warn(
+		"bun missing — bench:bun unavailable, test:bun and the package suites' Bun legs warn-skip, and a publish --wetrun fails without it (--no-check waives)"
+	);
+} else ok(`bun ${bun_version}`);
 
 const cargo_version = run_version('cargo');
 if (cargo_version === null) fail('cargo missing — nothing Rust builds without it');

@@ -45,7 +45,6 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
-	readdirSync,
 	readFileSync,
 	rmSync,
 	statSync,
@@ -61,7 +60,9 @@ import {
 	assert_staged_fresh,
 	NAPI_LOADER_DIR,
 	NAPI_PKG_ROOT,
+	napi_addon_check,
 	napi_loader_checks,
+	napi_staged_triple,
 	staged_staleness,
 	type StagedStaleness,
 	wasm_package_checks,
@@ -73,21 +74,10 @@ import { register_dts_specifier_test } from './dts_specifiers.ts';
 import { register_syntax_error_suite, syntax_errors } from './syntax_error_suite.ts';
 
 const pkg_root = NAPI_PKG_ROOT;
-if (!existsSync(NAPI_LOADER_DIR)) {
-	console.error(`${NAPI_LOADER_DIR} not staged. Run 'deno task build:napi:packages' first.`);
-	process.exit(1);
-}
-const platform_dirs = readdirSync(pkg_root).filter((d) => d !== 'napi');
-if (platform_dirs.length !== 1) {
-	console.error(
-		`expected exactly one staged platform package under ${pkg_root}, got: ${platform_dirs.join(', ') || '(none)'}`
-	);
-	process.exit(1);
-}
 // The staged dir name is the BUILD script's triple detection (Deno-side);
 // the loader detects with Node's own APIs. The import below succeeds only
 // when the two agree, so host-triple agreement is gated here for free.
-const triple = platform_dirs[0]!;
+const triple = napi_staged_triple();
 
 /** Stage the loader (+ optionally the platform package) into a fresh temp node_modules. */
 const stage = (with_platform: boolean): string => {
@@ -111,17 +101,9 @@ const cli_binary_name = process.platform === 'win32' ? 'tsv.exe' : 'tsv';
 // staged copy behind the build. `deno task test:napi:npm` (build-first)
 // passes this for free; BENCH_STALE_OK=1 is the deliberate-stale override.
 await assert_staged_fresh([
-	{
-		label: 'staged N-API addon',
-		staged: `${pkg_root}/${triple}/tsv_napi.node`,
-		// the addon links the discovery crates too (its `format` feature pulls
-		// `tsv_ignore` + `tsv_discover` for the `IgnoreStack` export), so an edit there
-		// must stale it — the parity rows over that class are exactly what would
-		// otherwise grade a stale addon green
-		crates: [...CORE_CRATES, 'tsv_napi', 'tsv_ignore', 'tsv_discover'],
-		files: ['scripts/build_napi_packages.ts'],
-		rebuild: 'deno task build:napi:packages'
-	},
+	// the discovery crates it names are what the parity rows over `IgnoreStack` would
+	// otherwise grade stale and green
+	napi_addon_check(triple),
 	{
 		// the incident artifact: the real tsv_cli binary shipped beside the addon
 		label: 'staged native CLI binary',

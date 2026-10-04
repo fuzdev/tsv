@@ -71,7 +71,8 @@ every `Error` — here a hand-declared `#[wasm_bindgen] extern` `Error` (`Pointe
 `tsv_napi` an `Error` built on the injected `Env` the same way — and `api.js`'s `call_engine`,
 wrapped around the engine call alone, rebuilds that as the `SyntaxError`, so both engines' errors for one input are identical
 (`scripts/syntax_error_suite.ts` holds both package suites to one table, and the napi suite
-compares the two engines directly). Anything else an engine throws passes through as itself:
+compares the two engines directly; `deno task test:bun` runs that table under Bun, the one
+runtime where the delete is not a no-op, so it is what fails without it). Anything else an engine throws passes through as itself:
 the raw engines' own source-type refusals and a source over the 4 GiB cap (plain `Error`s with
 no point), a caught panic, a WASM trap (`RuntimeError`) or stack exhaustion (`RangeError`). A
 format parses the CR-folded text through `FoldedSource::parse_with`, which maps the error
@@ -652,10 +653,11 @@ patched by `scripts/patch_npm_package.ts` into the multi-entry package shape
 metadata, README, the `reinstantiate` glue hook — plus `cli.js` and the `tsv`
 bin for the `all` variant).
 `deno task test:npm[:parse|:all]` builds the package and then runs Node tests
-against it (the `all` variant adds CLI subprocess tests; the `:run` suffix —
+against it (the `all` variant adds CLI subprocess tests), then the parse-failure table
+under Bun (`deno task test:bun <variant>`, warn-skipped without bun). The `:run` suffix —
 e.g. `test:npm:run` — skips the rebuild, as in the publish/CI pipelines, and is
 freshness-guarded: `scripts/check_staged_freshness.ts` aborts it when a staged
-artifact is older than its sources), and `deno task validate:artifacts`
+artifact is older than its sources. `deno task validate:artifacts`
 checks tight wasm size bounds plus a Deno runtime smoke of every built
 bundle — the auto-init entries, and the two lazy ones with their
 not-initialized guards — under the same freshness guard, since `pkg/` is

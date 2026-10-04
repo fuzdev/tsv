@@ -90,8 +90,8 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 			assert.equal(pointed.start, start);
 			assert.equal(pointed.line, 2);
 			assert.equal(pointed.column, 6);
-			// own and enumerable, which the facade requires of a point — Bun's own
-			// non-enumerable `line` / `column` on every Error must not survive the set
+			// own and enumerable, which the facade requires of a point; under Node there is
+			// nothing to delete, so Bun's own `line` / `column` are graded by `deno task test:bun`
 			for (const key of ['start', 'line', 'column']) {
 				assert.ok(Object.prototype.propertyIsEnumerable.call(thrown, key), key);
 			}

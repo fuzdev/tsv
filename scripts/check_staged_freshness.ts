@@ -24,9 +24,10 @@
  * The check LISTS for a staged wasm package and the staged napi loader are stated here
  * once (`wasm_package_checks`, `napi_loader_checks`), so every reader of one staging — the
  * package suites, artifact validation, the napi suite's export-set parity, the engine
- * parity audit and `scripts/typecheck_packages.ts` — dates it by the same sources. A reader with an artifact
- * of its own (the napi platform binaries, the deno bundles, `engine_parity.ts`'s native
- * binary) adds that check beside the shared list.
+ * parity audit, `scripts/typecheck_packages.ts` and the Bun leg (`scripts/test_bun.ts`) — dates it by the same sources. A reader with an artifact
+ * of its own (the napi platform package's CLI binary, the deno bundles, `engine_parity.ts`'s
+ * native binary) adds that check beside the shared list; the platform package's addon has
+ * one of its own, `napi_addon_check`, since two suites load it.
  *
  * Staleness here has two lags — the `target/` build behind the sources, and the
  * staged copy behind the build — and comparing the staged file's mtime directly
@@ -41,6 +42,7 @@
  * toolchain change; after one, rebuild once via the build-first task.
  */
 
+import { existsSync, readdirSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { relative } from 'node:path';
 import { env, exit } from 'node:process';
@@ -188,7 +190,7 @@ export function wasm_package_dir(variant: WasmVariant): string {
 /**
  * The checks that date one staged wasm package — the one list every reader of a
  * `pkg/<variant>/npm` staging grades it by (the package suite, artifact validation, the
- * napi suite's export-set parity, the engine parity audit, the declaration check). One check per staging step, keyed
+ * napi suite's export-set parity, the engine parity audit, the declaration check, the Bun leg). One check per staging step, keyed
  * on a file that step writes: the bundle (wasm-pack, whose features are a `deno.json` task
  * string), the generated entries (the patcher and its inputs), the copied facade, and for
  * the `all` variant the copied `cli.js`.
@@ -244,6 +246,40 @@ export const NAPI_PKG_ROOT = 'crates/tsv_napi/pkg';
 
 /** The `@fuzdev/tsv` loader's staging. */
 export const NAPI_LOADER_DIR = `${NAPI_PKG_ROOT}/napi`;
+
+/**
+ * The triple of the one platform package staged beside the loader — the BUILD script's
+ * host detection, which a loader resolving its sibling by its own detection then agrees
+ * with or fails. Exits naming what is staged when the loader is absent or the platform
+ * packages are not exactly one.
+ */
+export function napi_staged_triple(): string {
+	if (!existsSync(`${ROOT}${NAPI_LOADER_DIR}`)) {
+		console.error(`${NAPI_LOADER_DIR} not staged. Run 'deno task build:napi:packages' first.`);
+		exit(1);
+	}
+	const platform_dirs = readdirSync(`${ROOT}${NAPI_PKG_ROOT}`).filter((d) => d !== 'napi');
+	if (platform_dirs.length !== 1) {
+		console.error(
+			`expected exactly one staged platform package under ${NAPI_PKG_ROOT}, got: ${platform_dirs.join(', ') || '(none)'}`
+		);
+		exit(1);
+	}
+	return platform_dirs[0]!;
+}
+
+/** The check that dates the staged N-API addon in the platform package for `triple`. */
+export function napi_addon_check(triple: string): StagedCheck {
+	return {
+		label: 'staged N-API addon',
+		staged: `${NAPI_PKG_ROOT}/${triple}/tsv_napi.node`,
+		// the addon links the discovery crates too (its `format` feature pulls `tsv_ignore` +
+		// `tsv_discover` for the `IgnoreStack` export), so an edit there must stale it
+		crates: [...CORE_CRATES, 'tsv_napi', 'tsv_ignore', 'tsv_discover'],
+		files: ['scripts/build_napi_packages.ts'],
+		rebuild: 'deno task build:napi:packages'
+	};
+}
 
 /**
  * The checks that date the staged `@fuzdev/tsv` loader. Every hand-written code source the
