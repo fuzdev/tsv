@@ -285,13 +285,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse a parenthesized parameter list that **rejects** parameter decorators.
     ///
-    /// Used where a decorator is a grammar error acorn also rejects: arrow-function
-    /// parameters (acorn parses the `(…)` as a parenthesized expression first, where
-    /// a leading `@` is a class decorator — "Leading decorators must be attached to a
-    /// class declaration") and type-member signatures (interface / type-literal
+    /// Used where acorn rejects a parameter decorator: arrow-function parameters (acorn
+    /// parses the `(…)` as a parenthesized expression first, where a leading `@` is a
+    /// class decorator — "Leading decorators must be attached to a class declaration")
+    /// and type-member signatures (interface / type-literal
     /// method, call, construct, and accessor signatures — "Unexpected character
-    /// '@'"). tsc and prettier reject both ("Decorators are not valid here"), so this
-    /// is an unconditional-local grammar violation rejected inline for drop-in parity.
+    /// '@'"). tsc's parser rejects only the non-generic arrow forms, an artifact of its
+    /// arrow lookahead; it accepts the generic arrows and the type-member signatures,
+    /// raising "Decorators are not valid here" (TS1206) from its checker. So the
+    /// uniform rejection here does not rest on tsc's parser, and the reject-vs-defer
+    /// line (`docs/conformance_tsc.md`) normally defers a checker-raised rule.
     pub(super) fn parse_parameter_list_no_decorators(
         &mut self,
     ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, ParseError> {

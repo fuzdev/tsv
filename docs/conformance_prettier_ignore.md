@@ -721,15 +721,19 @@ at those hosts (a frozen call argument, object value or substitution holding a d
 print bare and match prettier.
 
 ⚠️ Two `[+In]` positions carry a spec-vs-tsc split rather than a clean skip: an **array
-element** and a **parameter default**. The spec threads `[+In]` into both, so
-`for (['aaa' in bbb]; ;)` and `for (function (q = 'aaa' in bbb) {}; ;)` are legal and V8
-accepts them, but tsc reports `',' expected`. tsv's parser sides with tsc on the arrow
-spelling — `for ((q = 'aaa' in bbb) => 1; ;)` is rejected at parse, as prettier and tsc
-reject it — and its unfrozen printer supplies the pair (`[('aaa' in bbb)]`,
-`function (q = ('aaa' in bbb))`) like prettier does. The frozen path supplies it too for a
-BARE element or default, through that position's own paren rule; what is left unparenthesized
-is a DESCENDED `in` there (`[ccc || 'aaa' in bbb]`), which the walk does not reach because it
-does not descend into a `[+In]` position. Pre-existing, and not re-synthesized by the freeze.
+element** and **every parameter default** — function, arrow and async arrow alike (each
+default is an `Initializer[+In]`, and `ArrowParameters` takes no `[In]` of its own). So
+`for (['aaa' in bbb]; ;)`, `for (function (q = 'aaa' in bbb) {}; ;)` and
+`for ((q = 'aaa' in bbb) => 1; ;)` are legal; V8, acorn and prettier's babel parser accept
+them and tsv parses all three, while tsc and prettier's typescript parser report
+`',' expected` (tsc lifts `[~In]` at call arguments and grouping parens but not at these two
+positions). tsv's unfrozen printer supplies the pair at every one (`[('aaa' in bbb)]`,
+`function (q = ('aaa' in bbb))`, `(q = ('aaa' in bbb)) => 1`) like prettier's babel output, so
+its output is tsc-valid. The frozen path supplies it too for a BARE element or default, through
+that position's own paren rule; what is left unparenthesized is a DESCENDED `in` there
+(`[ccc || 'aaa' in bbb]`, `(q = ccc || 'aaa' in bbb) => 1`), which the walk does not reach
+because it does not descend into a `[+In]` position — spec-valid, but still the tsc-rejected
+spelling. Pre-existing, and not re-synthesized by the freeze.
 
 Two places under a for init print one pair FEWER than prettier, both pre-existing and both
 tsc-valid. A `typeof` / `!` / `void` / `delete` operand, where the printer's own

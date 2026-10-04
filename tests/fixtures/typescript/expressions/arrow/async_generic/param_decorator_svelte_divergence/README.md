@@ -24,13 +24,13 @@ alone.
 | `<T>(@dec a) => a` | accept | TS1206 | reject | reject | **reject** |
 | `async <T>(@dec a) => a` | accept | TS1206 | **accept** | reject | **reject** |
 
-So the rejection tsv keeps here rests on **prettier**, not on tsc's parser: a
-construct prettier cannot parse is one tsv rejects, and TS1206 is an
-*unconditional-local* grammar error — a parameter decorator on an arrow is invalid in
-every context, not in some mode or scope — which is the bucket tsv rejects rather
-than defers to a diagnostics layer (root `CLAUDE.md` §Strictness). The three
-non-fixture rows are the ordinary drop-in rejections pinned by the `input_invalid_*`
-cases in
+So tsv's uniform rejection does not rest on tsc's parser, whose split between the
+generic and non-generic forms is an artifact of its arrow lookahead, nor on prettier,
+which is the formatting reference only. On the generic forms tsc raises TS1206 from its
+checker, which the reject-vs-defer line
+([conformance_tsc.md](../../../../../../../docs/conformance_tsc.md#the-reject-vs-defer-line))
+normally defers. The three non-fixture rows are the ordinary drop-in rejections pinned by
+the `input_invalid_*` cases in
 [typescript_specific/decorators/parameter_arrow](../../../../typescript_specific/decorators/parameter_arrow/).
 
 What makes the **async generic** form need a fixture of its own is acorn, not tsc:

@@ -727,10 +727,11 @@ rejects every one at `'module'`.
 ## tsv rejects what prettier formats
 
 The reverse of the section above, and rarer: prettier parses and prints the input,
-and tsv **refuses** it. The bar is high — tsv is first a formatter, so "prettier
-formats it" is normally the accept test — and it is cleared here only because
-accepting would require tsv's **grammar** to leave ECMAScript, which no amount of
-oracle agreement buys.
+and tsv **refuses** it. Rejecting costs the file its formatting, so the bar is high;
+prettier is not an accept/reject signal — the spec's layering is
+([conformance_tsc.md §The reject-vs-defer line](./conformance_tsc.md#the-reject-vs-defer-line))
+— and each refusal here is a production rule: accepting would require tsv's **grammar**
+to leave the language's own productions, which no amount of oracle agreement buys.
 
 **A `declare` head followed on the SAME line by a non-declaration word** —
 `declare async⏎function f(): Promise<void>;`, `declare abstract⏎class B {}`,

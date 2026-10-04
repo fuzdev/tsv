@@ -1662,14 +1662,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // (TS 4.7), in ANY order. tsc's parser collects them with an order-free modifier
         // loop and leaves "'const' modifier must precede 'in'" to its grammar checker, so
         // the ordering rule joins the static-semantic early-errors tsv defers — and
-        // prettier formats every ordering on a class, interface or type alias, which is
-        // the accept test.
-        //
-        // TODO: the variance *context* rule is a different matter and should be
-        // rejected, not deferred — prettier refuses `function f<in T>() {}` ("'in'
-        // modifier can only appear on a type parameter of a class, interface or type
-        // alias"), so tsv accepting it is an over-acceptance. Enforcing it needs the
-        // declaring construct threaded down to here, which no caller passes today.
+        // prettier formats every ordering on a class, interface or type alias.
         let mut modifiers = TSTypeParameterModifiers::default();
 
         loop {
@@ -1705,15 +1698,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 break;
             }
             // A REPEAT is rejected HERE, at the offending keyword, rather than left to
-            // fail as a stray token further along: `<out out T>` is a duplicate modifier
-            // in every context, adjudicable from the construct alone — the
-            // unconditional-local bucket tsv rejects rather than defers (see
-            // `../../CLAUDE.md` §Strictness), and the same call tsv already makes
-            // one position over for a class member (`public public foo`). ⚠️ tsc's
-            // parser instead accepts and raises TS1030 `'out' modifier already seen`
-            // from its grammar checker, and prettier collapses the repeat — so this is
-            // a deliberate rejection of input prettier formats, not a gap. acorn agrees
-            // with tsv, message and all (`Duplicate modifier: 'out'`).
+            // fail as a stray token further along: `<out out T>`. ⚠️ tsc's parser
+            // instead accepts and raises TS1030 `'out' modifier already seen` from its
+            // grammar checker, and prettier collapses the repeat. Under the
+            // reject-vs-defer line (`docs/conformance_tsc.md`) a checker-raised rule only
+            // *normally* defers, and this keeps the line the sibling positions already
+            // draw — a repeated class-member modifier (`public public foo`) rejects too,
+            // as a stray token. A deliberate rejection of input prettier formats, not a
+            // gap. acorn agrees with tsv, message and all (`Duplicate modifier: 'out'`).
             //
             // The guard above runs FIRST, so a trailing repeat that is really the NAME
             // never reaches this: `<out out>` is variance `out` on a parameter named

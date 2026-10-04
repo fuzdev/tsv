@@ -232,8 +232,9 @@ The verdict rule every ledger entry names. The discriminator is the spec's own
 layering, not a tsv-invented label:
 
 - A rule that lives in a **production** — including its grammar parameters
-  (`[Await]`, `[Yield]`), its arities (`get x()` / `set x(v)` are productions), and its
-  `[no LineTerminator here]` gates — is the **parser's**; violating it is a parse error.
+  (`[In]`, `[Return]`, `[Await]`, `[Yield]`), its arities (`get x()` / `set x(v)` are
+  productions), and its `[no LineTerminator here]` gates — is the **parser's**;
+  violating it is a parse error.
 - A rule under **Static Semantics: Early Errors** is the **diagnostics layer's**: tsv
   parses it and defers.
 - The early-error phrasing *"It is a Syntax Error if any source text is matched by this
@@ -241,10 +242,26 @@ layering, not a tsv-invented label:
   it rejects.
 - **TypeScript's analog:** what `parser.ts` diagnoses is grammar; what tsc raises from
   the binder or checker, `checkGrammar*` included, is *normally* the diagnostics layer's.
-  Normally, not always: where tsc's parser is deliberately looser than the published
-  grammar for recovery, the checker-raised code is not evidence that the rule is an
-  early error (the `tsc_recovery` category). The tiebreaker is the simpler uniform
-  rule that matches prettier on the forms real code holds.
+  Normally, not always: where tsc's parser departs from the published grammar — looser
+  for recovery (the `tsc_recovery` category), or stricter through a lookahead artifact
+  (a decorated non-generic arrow parameter) — its verdict is not evidence of the rule's
+  layer; the published grammar governs there.
+- **Precedence:** for constructs ECMAScript defines, the spec outranks tsc's layering in
+  both directions — accessor arity rejects though tsc raises it from the checker, and a
+  parameter default is an `Initializer[+In]`, so `for ((q = a in b) => 1; ;)` parses
+  though tsc's parser reports `',' expected`.
+- **Floors:** deferring requires that the drop-in wire shape can represent the construct
+  and that the format output reprints it faithfully; failing either, tsv rejects.
+- Where the rules leave a row open, accept is the default; a reject must pay for itself —
+  forced by a floor, or the simpler line to state because the sibling positions already
+  draw it (a repeated type-parameter modifier, `<out out T>`, rejects as a repeated
+  class-member modifier does). Prettier is the formatting reference only, never by
+  itself an accept/reject signal.
+
+Some rows still sit on the wrong side of the line — early errors that reject inline
+(e.g. `get`/`set constructor`, duplicate `import`-attribute keys) and a production rule
+that still parses (a top-level `return`, excluded by the `[Return]` parameter). They
+are known gaps against the line, not exceptions to it.
 
 ## Triage
 

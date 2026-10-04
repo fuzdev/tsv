@@ -6,7 +6,7 @@
 //! "'const' modifier must precede 'in' modifier" to its grammar checker, so the
 //! ordering rule joins the static-semantic early-errors tsv defers (as the *context*
 //! rule — "only on a class, interface or type alias" — already is). Prettier formats
-//! every ordering, which is the accept test.
+//! every ordering.
 //!
 //! Two opposite claims meet on that fact, and this file is where they can both be
 //! stated:
@@ -117,10 +117,10 @@ fn printer_normalizes_to_canonical_order() {
 /// repeat, printing `<out T>`), and the one place this family parts from tsc: tsc's
 /// parser accepts with an empty `parseDiagnostics` and raises TS1030 `'out' modifier
 /// already seen` from its grammar checker, exactly as it does the TS1029 ordering rule
-/// tsv *defers*. The two are graded differently on purpose — a duplicate is
-/// **unconditional-local** (invalid in every context, adjudicable from the construct
-/// alone), the bucket `CLAUDE.md` §Strictness rejects rather than defers, and the
-/// call tsv already makes one position over for a class member (`public public foo`).
+/// tsv *defers*. The two are graded differently on purpose: under the reject-vs-defer
+/// line (`docs/conformance_tsc.md`) a checker-raised rule only *normally* defers, and
+/// rejecting the repeat keeps the line the sibling positions already draw — a repeated
+/// class-member modifier (`public public foo`) rejects too.
 /// acorn agrees with the verdict, so the drop-in rejection is pinned as ordinary
 /// `input_invalid_*` files in
 /// `typescript/typescript_specific/generics/type_param_modifier_order`; what lives here
