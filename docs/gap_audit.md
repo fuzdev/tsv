@@ -5,11 +5,10 @@
 `gap_audit` is the **discovery** arm of the dropped-comment class. The print-once ledger
 ([Comment Ledger Audit](audits.md#comment-ledger-audit-commentsaudit)) is the detector, but it only ever sees
 a document **as authored** — so a gap no fixture happens to put a comment in is a gap it
-never checks. Eight such drops were found by hand, each green on `cargo test`,
-`comments:audit`, `roundtrip:audit`, and the corpus diff, purely because no fixture covered
-the position. This audit closes that hole mechanically: for each seed file it injects a
-comment into **every** candidate gap, one at a time, formats, and runs the ledger over the
-result.
+never checks. Drops found by hand were green on `cargo test`, `comments:audit`,
+`roundtrip:audit`, and the corpus diff, purely because no fixture covered the position. This
+audit closes that hole mechanically: for each seed file it injects a comment into **every**
+candidate gap, one at a time, formats, and runs the ledger over the result.
 
 Pure Rust, no sidecar. Gated in `deno task check` as a **ratchet**, not a green gate.
 
@@ -17,9 +16,8 @@ Pure Rust, no sidecar. Gated in `deno task check` as a **ratchet**, not a green 
 twice?"; the render-time [swallow check](audits.md#line-comment-swallow-audit-swallowaudit)
 answers "did a `//` comment eat following content on its output line?" — a class the ledger is
 **structurally blind** to, since a swallowing comment is printed exactly once and the
-print-once account balances. Arming both on the *same* format call is what makes the second
-detector affordable: no extra format, no extra parse. The third asks the one question neither
-of those can: "does the output still **parse**?" — a bare reparse, no wire. All three
+print-once account balances. Both arm on the *same* format call, so the second costs no
+extra format or parse. The third asks the one question neither can: "does the output still **parse**?" — a bare reparse, no wire. All three
 detectors' findings are ratcheted (see [The SWALLOW class](#the-swallow-class) and
 [The UNREPARSEABLE class](#the-unreparseable-class)).
 
@@ -31,7 +29,7 @@ what a green run does *not* prove: see the module docs at the top of
 ## Running it
 
 ```bash
-deno task gaps:audit           # the gate: tests/fixtures, ~17 s
+deno task gaps:audit           # the gate: tests/fixtures, ~37 s
 deno task gaps:audit:update    # regenerate the snapshot after fixing a shape
 
 # Directly, against a real codebase — where the real yield is:
@@ -78,8 +76,8 @@ is news, and any finding exits 1.
 
 `crates/tsv_debug/src/cli/commands/gap_audit_known.txt` is a **machine-generated** snapshot
 of every finding shape `tests/fixtures` currently produces. Unlike `scan_audit`'s
-hand-curated `ALLOW`, it carries **no per-entry rationale by design**: at the scale the file
-has run at (several hundred shapes at its peak) that is not a thing a human can keep honest.
+hand-curated `ALLOW`, it carries **no per-entry rationale by design**: at its scale no human
+could keep that honest.
 Every line is a **known bug**, and the file shrinking is the goal.
 
 ```
@@ -95,9 +93,9 @@ The gate fails on:
 - a listed shape that **no longer fires** — a stale entry, so the list can't rot;
 - a **panic**, always. A crash is never pinnable (see below).
 
-What it deliberately does **not** pin is **counts**. They churn with every ordinary fixture
-PR, and a gate that fails per added fixture would just get turned off. The tradeoff is named:
-a new drop at an **existing** shape is invisible.
+It deliberately does **not** pin **counts**: they churn with every ordinary fixture PR, and
+a gate failing per added fixture would get turned off. The named tradeoff: a new drop at an
+**existing** shape is invisible.
 
 The **payload set is** part of the key, though. A shape that drops only a `line` comment
 today and starts dropping a `block` one tomorrow is a new bug on a new ownership path — keyed
@@ -131,13 +129,12 @@ Most shapes fire on the `line` payload alone — the injected `//` is the swallo
 carry the block payloads too: there the injection merely reflowed the file and a comment the
 *author* wrote does the swallowing, which is the same bug reached from further away.
 
-Cost: arming the check adds roughly **+10% CPU** to a run (measured over `tests/fixtures`:
-~146 s → ~160 s user, ~17 s → ~19 s wall) — a couple of seconds on a whole-`deno
-task check` wall clock measured in minutes. The rejected alternative — running
-the full `f1_check` battery per injection — was
-measured at **>40x** baseline CPU, because it pays `tsv_parse_to_value` twice per accepted
-injection and, unlike `blank_audit`, gap injection has no absorbed-input fast path (an
-injected comment must appear in the output, so it is never absorbed).
+Cost: arming the check adds roughly **+10% CPU** (measured over `tests/fixtures`: ~146 s →
+~160 s user, ~17 s → ~19 s wall) — seconds on a `deno task check` wall clock measured in
+minutes. The rejected alternative — the full `f1_check` battery per injection — measured
+**>40x** baseline CPU: it pays `tsv_parse_to_value` twice per accepted injection and, unlike
+`blank_audit`, gap injection has no absorbed-input fast path (an injected comment must appear
+in the output, so it is never absorbed).
 
 ### The UNREPARSEABLE class
 
@@ -150,11 +147,11 @@ kinds. A **printer** shape emits invalid text: a multi-line block moved across a
 paren into a `[no LineTerminator here]` slot (`yield (/* a⏎b */x)` → `yield /* a⏎b */ x`,
 and the same before `=>`, a non-null `!`, a tuple `?`, a conditional type's `extends`), two
 comments welded into one by a line-suffix flush inside a multi-line block
-(`/* a /* t */⏎b */`, unterminated — once, before the renderer drained a pending suffix
-AHEAD of a multi-line text rather than at its interior breaks), a `;` placed where the enclosing grammar admits none
+(`/* a /* t */⏎b */`, unterminated — the renderer drained a pending suffix at a multi-line
+text's interior breaks rather than AHEAD of it), a `;` placed where the enclosing grammar admits none
 (`{let a; /* c */}` in a Svelte declaration tag). A **parser** shape emits VALID text tsv's
 own parser over-rejects — the union printer's leading-pipe layout inside a type argument's
-index (`fn<⏎A[⏎| B // c⏎| C]⏎>()`), which the type-argument lookahead once refused — or
+index (`fn<⏎A[⏎| B // c⏎| C]⏎>()`), which the type-argument lookahead refused — or
 mis-parses an input it should have refused (`new async⏎function f() {}` read as an async
 function expression, then printed in a paren shell the grammar rejects). Bucket a shape by
 its reparse ERROR before choosing the seam: the parse-side shapes are the only ones a
@@ -174,10 +171,9 @@ The detector is a bare parse of the output through the same grammar a second for
 fallback). It is **self-verified** by re-running that reparse on the re-spliced example — a
 directly observable property, so the verdict is exact — and it takes no `⚑ ANCHOR?` probe (the
 probe asks whether a leading space rescues a *drop*). It has no bystander axis: the property
-belongs to the whole output, so every finding keys at its injection site. Note the same
-detector is also the `OUTPUT-UNPARSEABLE` cause the verify pass already reported on a ledger
-shape's kept examples; that cause could only see an output dead *beside* a drop, where this
-kind sees every dead output.
+belongs to the whole output, so every finding keys at its injection site. The same detector
+is the verify pass's `OUTPUT-UNPARSEABLE` cause on a ledger shape's kept examples; that cause
+sees only an output dead *beside* a drop, this kind every dead output.
 
 Cost: one bare parse per accepted injection, measured over `tests/fixtures` against a baseline
 binary built from the same tree without the detector (2026-09-13, 12-core box, quiet):
@@ -209,8 +205,8 @@ next fixture edit.
   **this** example, at this offset, in this file. Re-injecting some other payload of the
   union at that offset need not fire, or even parse.
 - **`(N of M hits knock out a bystander)`** is the scarier half: the offending comment is one
-  the author already had, knocked out by an injection *elsewhere*. An existing comment
-  vanishing because someone added another one nearby. A bystander finding is **keyed and
+  the author already had, knocked out by an injection *elsewhere* — an existing comment
+  vanishing because someone added one nearby. A bystander finding is **keyed and
   reported at the victim's own site** — the emitter that dropped the comment — not at the
   perturbation site the payload went in at (the finding's span, in the formatted input's
   coordinates, is mapped back across the splice to the seed). Its example reads
@@ -263,13 +259,12 @@ on that (hits as tie-break, both still reported). A comment inside a gap splits 
 keys — a small accepted residual.
 
 **Each cluster also carries its edge CLASS and kind COMPOSITION.** The class —
-`leading` (`^→…`), `trailing` (`…→$`), or `interior` — is the boundary/interior split that
-reframed the remainder (boundary regions are the fused-`text()`-with-no-query territory;
-interior gaps are the element-comma-seam family). The kind cell (`drop 12 · swal 3`, compact
+`leading` (`^→…`), `trailing` (`…→$`), or `interior` — is the boundary/interior split
+(boundary regions are the fused-`text()`-with-no-query territory; interior gaps are the
+element-comma-seam family). The kind cell (`drop 12 · swal 3`, compact
 labels, nonzero only) says what a slice against the cluster would actually yield **before**
 the slice starts: a gap-ranked #1 that is all `SWALLOW` has zero pinned-ratchet presence, so
-its yield is silent-corruption fixes rather than line retirement — a lesson once rediscovered
-mid-slice, now a column.
+its yield is silent-corruption fixes rather than line retirement.
 
 `--json` carries the ranked work-list as one additive top-level section, `by_node` — one
 `{node, edge, edge_class, hits, gaps, shapes, share, gaps_share, example_shape, kinds}` per
@@ -287,11 +282,9 @@ consumes directly instead of parsing `--json` and hand-transcribing (all report-
 byte-identical to the gate):
 
 - **`deno task gaps:audit:rank`** (`--rank`, `--top N`) prints the top-N clusters as a
-  **paste-ready markdown table** — rank, `` `(node, edge)` ``, edge
-  class, distinct gaps, hits, shapes, kind composition, gap share (sorted by distinct gaps;
-  see the by-node section above) — so
-  a burn-down's fattest-first work-list stays current by paste, not by re-transcription (which rots as
-  slices land).
+  **paste-ready markdown table** — rank, `` `(node, edge)` ``, edge class, distinct gaps, hits,
+  shapes, kind composition, gap share (sorted by distinct gaps) — so a burn-down's
+  fattest-first work-list stays current by paste, not by re-transcription (which rots).
 - **`--since <baseline.json>`** diffs this run against a prior `--json` output, in three
   report-only sections. The **ranking diff** lists the clusters whose hit count **changed** —
   `(CallExpression, arguments→$) 2861 → 2790 (−71)`, biggest reduction first — the direct
@@ -319,10 +312,9 @@ falsifiable: the multiset of comment **contents** in the injected input vs the f
 output. Each content is whitespace-normalized first (split on newlines, trim each line, rejoin)
 so a legitimate re-indent of a multi-line comment (`/* a⏎   b */` → `/* a⏎b */`) normalizes
 equal and is *not* a false alarm — while a **mangle** that collapses the newline
-(`/* a⏎b */` → `/* ab */`) yields fewer lines, normalizes different, and *is* caught. This
-supersedes the earlier `parsed - dropped + double` count comparison, closing both of the
-count's blind spots: a balancing drop+duplicate (equal count, unequal contents) and a mangle
-(equal count, unequal content).
+(`/* a⏎b */` → `/* ab */`) yields fewer lines, normalizes different, and *is* caught. That
+closes both blind spots of a `parsed - dropped + double` count comparison: a balancing
+drop+duplicate (equal count, unequal contents) and a mangle (equal count, unequal content).
 
 A shape keeps up to five examples (the smallest by `(path, attribution_offset)` — the
 victim's own site for a bystander, the injection site otherwise — so the set is
@@ -343,9 +335,9 @@ causes divide into three families:
 
 - **`content-conserved`** — the output holds the same comment **contents** as its input, so
   something printed the comment without recording the emit: a genuine instrument gap, not the
-  content loss it is filed as. (A mangled rebuild — which the old count read as UNCONFIRMED,
-  since a mangle keeps the comment *count* — normalizes different and reproduces as
-  **CONFIRMED**, the real corruption it is.) The residual, far narrower than the count's: a
+  content loss it is filed as. (A mangled rebuild keeps the comment *count* but normalizes
+  different, so it reproduces as **CONFIRMED**, the real corruption it is.) The residual,
+  far narrower than a count's: a
   multiset can still balance if the *same* content is dropped in one place and duplicated in
   another; no corpus example does this.
 - **`OUTPUT-UNPARSEABLE` / `OUTPUT-PANICKED`** — the formatter's **own output fails a
@@ -375,8 +367,7 @@ moment worth naming the ones the audit couldn't reproduce.
 ## Triaging and fixing a shape
 
 1. **Reproduce by hand.** Take the example triple verbatim — inject that payload at that
-   offset in that file — and format. The report gives you everything needed; nothing else is
-   required.
+   offset in that file — and format. The report carries everything needed.
 2. **Check it's this class**, not an over-acceptance. tsv's parser is deliberately more
    permissive than the canonical one, so confirm the injected form is something an author
    could actually write (Svelte rejects `<script lang="ts"/* c */>` outright, for instance —
@@ -407,7 +398,7 @@ the short version:
   `<style>` block yields **zero sites**. `Root::css`'s `content_span` names it in a line, and
   a discovery run with it named (a `gap_audit`-only opt-in — `code_regions` is shared
   substrate, and `ignore_audit`'s injected directive is the JS spelling, wrong inside CSS)
-  found two real emitter bugs on its first pass, a dropped `selector()` list-comma comment
+  found two real emitter bugs, a dropped `selector()` list-comma comment
   ([supports_selector_list_comment](../tests/fixtures/css/at_rules/supports_selector_list_comment_prettier_divergence/))
   and a double-printed at-rule prelude comment after a same-line sibling
   ([atrule_prelude_after_sibling](../tests/fixtures/css/tokens/comments/atrule_prelude_after_sibling/)),
@@ -415,13 +406,10 @@ the short version:
   +8–12% CPU over `tests/fixtures`, and with both fixed the region yields no shape over the
   fixtures or the real-code corpus. Switching it on is the queued follow-up. Every `<style>`
   island qualifies alike — the top-level section and an element nested in markup both
-  register host-absolute spans under the host's ledger key. What stays outside the model
-  regardless is the declaration-value comment
-  the ledger cannot see at all — the census, not the ledger, covers that surface.
+  register host-absolute spans under the host's ledger key.
   A **foreign-language `<script>` body** (a `lang`/`type` outside the JS/TS family) is a
   different case: it is excluded on purpose rather than deferred, because the printer
-  freezes it verbatim
-  ([conformance_prettier_svelte.md §Foreign-language embedded bodies](conformance_prettier_svelte.md#svelte-foreign-language-embedded-bodies)),
+  freezes it verbatim ([conformance_prettier_svelte.md §Foreign-language embedded bodies](conformance_prettier_svelte.md#svelte-foreign-language-embedded-bodies)),
   so a probe there proves only that verbatim is verbatim while its preserved blank runs read
   as violations of the formatted-output model they are exempt from by design.
 

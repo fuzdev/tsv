@@ -2,11 +2,16 @@
 
 > The standing correctness audits over the formatter, the parsers and their wire contract, the Svelte compiler, and the canonical oracles all of them are graded against — what each proves, what it is blind to, how to run it, and where it gates. The `deno task` entry points are indexed in [CLAUDE.md §Fixtures](../CLAUDE.md#fixtures-rust--deno-based); this doc is the full reference.
 
-Most audits are pure Rust (no Deno sidecar). Those gated in `deno task check` scan `tests/fixtures` — a curated, format-stable tree — so several are cheap tripwires there whose real yield is external corpora (`../prettier/tests/format`, the `../corpora` snapshot's collections, the `live` working trees): point them at real code after a printer change, or run `deno task audit:corpus`, the standing bundle for exactly that. Audits that need the feature-gated instrumentation (`swallow_check` / `comment_check`) build via the `audits` umbrella feature under `--profile corpus` — the single build world every `deno task check` audit shares (optimized + `panic = "unwind"`, so a formatter panic is caught and reported instead of killing the process; plain `--release` is `panic = "abort"`). ⚠️ A **stack overflow** is the one failure this containment cannot reach — it is not a panic, so no `catch_unwind` sees it and the sweep dies outright rather than reporting one file. That is why `tsv_debug`'s dispatch runs on the same stated reservation the `tsv` binary does (`tsv_cli::cli::stack`), which puts the depth an audit survives out of reach of ordinary input and, more to the point, makes it the same on every machine; see [cli.md §Recursion Depth](./cli.md#recursion-depth).
+Most audits are pure Rust (no Deno sidecar). Those gated in `deno task check` scan `tests/fixtures` — a curated, format-stable tree — so several are cheap tripwires there whose real yield is external corpora (`../prettier/tests/format`, the `../corpora` snapshot's collections, the `live` working trees): point them at real code after a printer change, or run `deno task audit:corpus`, the standing bundle for exactly that. Audits that need the feature-gated instrumentation (`swallow_check` / `comment_check`) build via the `audits` umbrella feature under `--profile corpus` — the single build world every `deno task check` audit shares (optimized + `panic = "unwind"`, so a formatter panic is caught and reported; plain `--release` is `panic = "abort"`, which kills the process). Every "build with `--profile corpus`" below means this.
+
+⚠️ A **stack overflow** is the one failure this containment cannot reach — not a panic, so no `catch_unwind` sees it and the sweep dies outright rather than reporting one file. So `tsv_debug`'s dispatch runs on the `tsv` binary's stated stack reservation (`tsv_cli::cli::stack`), which puts the depth an audit survives out of reach of ordinary input and, more to the point, makes it the same on every machine; see [cli.md §Recursion Depth](./cli.md#recursion-depth).
 
 The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, the validation-suite ratchet, the differential compile fuzzer — are not audits in this sense and are not gated here; they live in [compile_tooling.md](compile_tooling.md) and [compile_validation_ratchet.md](compile_validation_ratchet.md). The compile fixtures are the one split case: their parity legs are pure Rust and gate in `check`, their oracle-freshness leg needs the sidecar and gates in `conformance`, so both are documented [below](#compile-fixture-validation-compilefixturesvalidate).
 
-**One seed resolution, one directory walk, and a vacuity floor that is not scope-dependent.** Every corpus-walking audit resolves its corpus through `resolve_seed_files` / `resolve_seed_files_named` (`tsv_debug`'s `cli/commands/profile.rs`): positional paths defaulting to `tests/fixtures`, one walk that prunes what `tsv format`'s own discovery prunes and keeps its extension set (`tsv_discover`'s safety nets, build-output heuristic, and `FORMATTABLE_EXTENSIONS` — so an audit's scope is the set the production formatter would process, not a hand-mirrored list beside it), then the audit's own subject filter, so an empty scan says "no `.svelte` files found" rather than a flattened message. **An empty scan is an error at every scope, and so is a run that resolves files but grades none of them** (`check_graded_nonzero` — the case where the corpus resolves fine and the parser rejects all of it). Each audit floors the count its own *verdict* rests on, not the count resolution returned: files formatted, files compared, boundary sites probed, render keys checked. The rule for picking it — count every outcome that carries a verdict, exclude only the ones that could not be evaluated. A trivially-clean outcome is a verdict (a no-op format renders identically by identity) and counts; "the parser rejected it" is not, and does not. The pinned minimums (`FIXTURES_FORMATTED_MIN`, `comments:audit`'s `REGISTERED_MIN`) are the stronger *default-corpus* guard layered above that floor: they catch a corpus that shrank rather than one that vanished, and only a default run can be held to a number, so they stay `default_paths`-gated. The two pins ask different questions — the file count catches a corpus that shrank or a skip policy that diverged, the comment count catches *registration* collapsing while every file still formats — so `comments:audit` passes both. Ignore files are deliberately **not** consulted by the walk — the root `.formatignore` prunes the fixture trees (they are data, not format fixed points), so a walk honoring them would resolve the audits' own default corpus to nothing.
+**One seed resolution, one directory walk, and a vacuity floor that is not scope-dependent.** Every corpus-walking audit resolves its corpus through `resolve_seed_files` / `resolve_seed_files_named` (`tsv_debug`'s `cli/commands/profile.rs`): positional paths defaulting to `tests/fixtures`, one walk that prunes what `tsv format`'s own discovery prunes and keeps its extension set (`tsv_discover`'s safety nets, build-output heuristic, and `FORMATTABLE_EXTENSIONS` — so an audit's scope is the set the production formatter would process, not a hand-mirrored list), then the audit's own subject filter, so an empty scan says "no `.svelte` files found" rather than a flattened message. Ignore files are deliberately **not** consulted: the root `.formatignore` prunes the fixture trees (data, not format fixed points), so honoring it would resolve the audits' own default corpus to nothing.
+
+- **An empty scan is an error at every scope, and so is a run that resolves files but grades none** (`check_graded_nonzero` — the corpus resolves fine and the parser rejects all of it). Each audit floors the count its own *verdict* rests on — files formatted, files compared, boundary sites probed, render keys checked: count every outcome that carries a verdict, exclude only those that could not be evaluated. A trivially-clean outcome is a verdict (a no-op format renders identically by identity) and counts; "the parser rejected it" does not.
+- **The pinned minimums** (`FIXTURES_FORMATTED_MIN`, `comments:audit`'s `REGISTERED_MIN`) are the stronger *default-corpus* guard above that floor: they catch a corpus that shrank rather than vanished, and only a default run can be held to a number, so they stay `default_paths`-gated. They ask different questions — the file count catches a shrunken corpus or a diverged skip policy, the comment count catches *registration* collapsing while every file still formats — so `comments:audit` passes both.
 
 ## Overview
 
@@ -25,7 +30,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Raw-find scan](#raw-find-scan-audit-scanaudit) | `scan:audit` | new raw substring scans over source (comment-blind delimiter matching) | `deno task check` |
 | [Self-format](#self-format-audit-formataudit) | `format:audit` | tsv failing to format its OWN TS/JS — a would-change file (non-idempotency) or a parse error (over-rejection) | `deno task check` |
 | [Discovery parity](#corpus-discovery-parity-audit-discoveryaudit) | `discovery:audit` | `tsv format --list` over the `../corpora` snapshot naming a different file set than the snapshot's committed tree holds in tsv's extensions — a discovery prune firing on real code, or an extension drift | `deno task check` (when `../corpora` is present) |
-| [Engine parity](#engine-parity-audit-enginesaudit) | `engines:audit` | the WASM engine and the native engine formatting the same file to DIFFERENT bytes — a wasm32-only divergence every other gate is blind to, since they all grade the native build | CI's `artifacts` job ONLY (needs both packages built; NOT in `deno task check`, and not on the publish path either — `scripts/publish.ts` runs `validate:artifacts`, `test:npm`, `test:bun` (the wasm packages under Bun) and `typecheck:packages`, none of which compares engines) |
+| [Engine parity](#engine-parity-audit-enginesaudit) | `engines:audit` | the WASM engine and the native engine formatting the same file to DIFFERENT bytes — a wasm32-only divergence every other gate is blind to, since they all grade the native build | CI's `artifacts` job ONLY (needs both packages built; neither `deno task check` nor the publish path compares engines) |
 | [Doc link](#doc-link-audit-docsaudit) | `docs:audit` | a doc-comment `[link]` that no longer resolves — a stale doc | `deno task check` |
 | [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts` no longer describing what the wire-JSON writers emit — plus a wire type it never declared at all | `deno task check` |
 | [Package declarations](#package-declaration-check-typecheckpackages) | `typecheck:packages` | a staged package's published `.d.ts` failing a consumer's strict compile — a lib the consumer did not ask for (TS2550), a name star-export ambiguation drops (TS2308), a type a package must not export, a README example that does not compile | `scripts/publish.ts` Step 6 (all four packages); on demand (needs `deno task bench:install`, so NOT in `deno task check`) |
@@ -50,88 +55,80 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Compile fixtures](#compile-fixture-validation-compilefixturesvalidate) | `compile:fixtures:validate` | a stale compile expectation (oracle freshness) · tsv-vs-expected compile parity · expected-file idempotence | parity legs in `deno task check` (`cargo test`); freshness in `deno task conformance` |
 | [Fixture validation](./fixture_overview.md) | `fixtures:validate` | a fixture claim no longer holding — parser/formatter parity vs the committed files · the ORACLE itself having moved (freshness, sidecar) | parity in `deno task check` (`cargo test --test fixtures_tests`); freshness in `deno task conformance` (with `bench:pins:suites`, its pin-freshness preflight) |
 
-**How a corpus-walking audit walks.** Every one of them — the injection audits directly, the
+**How a corpus-walking audit walks.** Every one — the injection audits directly, the
 as-authored ones through the shared pristine sweep — runs its per-file loop on
 `audit::parallel::run_pool`: a stride-chunked pool on the stated stack reservation, `--jobs N`
-held to `tsv format`'s own ceiling, folding a per-worker tally through an order-independent
-merge. Two properties follow, and both are load-bearing rather than incidental. A worker that
-panics *outside* the per-file `catch_unwind` **fails the run** rather than losing its tally,
-because a lost tally can silently flip a ratchet verdict (a dropped `new` shape reads as a
-false pass, a dropped sole instance of a pinned one as a false stale). And the reports are
-`--jobs`-invariant **by order, not merely by set**: a ratchet's key set is a `BTreeSet` and so
-is order-free already, while a finding LIST ends on `audit::sweep::sort_findings_by_path`,
-a stable sort that reproduces the serial walk's order byte for byte (the corpus is resolved in
-path order and each file is visited by exactly one worker, so a merged vector is per-file
-blocks in join order and a stable sort by path restores them). Chunking is by stride rather
-than contiguous block because fixture sizes cluster by directory and the per-file work is
+held to `tsv format`'s own ceiling, folding per-worker tallies through an order-independent
+merge. Two load-bearing properties follow. A worker that panics *outside* the per-file
+`catch_unwind` **fails the run** rather than losing its tally, because a lost tally can
+silently flip a ratchet verdict (a dropped `new` shape reads as a false pass, a dropped sole
+instance of a pinned one as a false stale). And reports are `--jobs`-invariant **by order, not
+merely by set**: a ratchet's key set is an order-free `BTreeSet`, while a finding LIST ends on
+`audit::sweep::sort_findings_by_path`, a stable sort that reproduces the serial walk's order
+byte for byte (the corpus resolves in path order and each file is visited by exactly one
+worker, so the merged vector is per-file blocks that a stable sort by path restores).
+Chunking is by stride because fixture sizes cluster by directory and per-file work is
 quadratic in file size.
 
 **What the fixture-tree audits format each seed AS.** Every audit that drives
 `tsv_cli::cli::format_source` names no source type, so a TypeScript seed is parsed as a
 **module and retried as a script** if that fails
-([cli.md §Multi-File Formatting](./cli.md#multi-file-formatting)). The
-`typescript/script_goal/*` inputs are therefore ordinary seeds — before the retry
-existed they failed the module parse and every one of these audits silently skipped
-them. Fixture *validation* is the exception: it formats at each fixture's own `goal`
-marker (`fixtures/mod.rs` → `format_source_with_source_type` with the goal named), so the F-rules keep grading the
-exact claim the fixture makes.
+([cli.md §Multi-File Formatting](./cli.md#multi-file-formatting)) — the
+`typescript/script_goal/*` inputs are ordinary seeds. Fixture *validation* is the exception:
+it formats at each fixture's own `goal` marker (`fixtures/mod.rs` →
+`format_source_with_source_type` with the goal named), so the F-rules keep grading the exact
+claim the fixture makes.
 
 ⚠️ **Editing whitespace in a fixture is never local to that fixture.** The three
 injection ratchets — [gaps](#gap-injection-audit-gapsaudit),
 [blanks](#blank-line-injection-audit-blanksaudit),
 [ignore](#ignore-directive-honoring-audit-ignoreaudit) — enumerate their sites **from
 the seed text**, and the seeds are every fixture file, variants included (the
-[fabrication](#blank-fabrication-audit-fabricationaudit) sweep injects nothing — it
-grades the pristine seeds — but its pinned shapes are seed-dependent the same way).
-Whitespace
-you delete is a site they can no longer probe, so a pinned bug whose only reproducer
-lived in that spelling stops firing and its ratchet fails **STALE**. The fix is to
-restore the shape, never to re-pin: a `known.txt` line is a real bug on a work list,
-and dropping it retires a bug nobody fixed. Find what was lost by running the audit
-with `--report` (gaps/blanks/ignore; fabrication reports via `--json`) against an
-unmodified checkout — that also answers "did I cause this
-or inherit it?" — and re-home the shape in a variant whose name describes it. A shape
-that is *bidirectional* (a space before a bracket, the identifier glued after) fits
-neither bare `_compact` nor `_spaces` and needs its own qualified variant. After any
-whitespace edit across many fixtures, run all four.
+[fabrication](#blank-fabrication-audit-fabricationaudit) sweep injects nothing, but its
+pinned shapes are seed-dependent the same way). Whitespace you delete is a site they can no
+longer probe, so a pinned bug whose only reproducer lived in that spelling stops firing and
+its ratchet fails **STALE**. Restore the shape, never re-pin: a `known.txt` line is a real
+bug on a work list, and dropping it retires a bug nobody fixed. Find what was lost by
+running the audit with `--report` (gaps/blanks/ignore; fabrication via `--json`) against an
+unmodified checkout — which also answers "did I cause this or inherit it?" — and re-home
+the shape in a variant whose name describes it. A *bidirectional* shape (a space before a
+bracket, the identifier glued after) fits neither bare `_compact` nor `_spaces` and needs
+its own qualified variant. After any whitespace edit across many fixtures, run all four.
 
 ## Line-Comment Swallow Audit (`swallow:audit`)
 
 ```bash
-# swallow_audit - format files with the render-time swallow check on and report
-# any `//` line comment followed by content on the same output line (silent
-# content loss). Pure Rust, no Deno. Defaults to tests/fixtures; pass dirs/files
-# to audit real code. Exits 1 on any finding.
 cargo run --profile corpus -p tsv_debug --features audits swallow_audit                # audit all fixtures
 cargo run --profile corpus -p tsv_debug --features audits swallow_audit ../corpora/collections/zzz/src  # audit a real codebase
-# Also: --json, --jobs N. The check lives in tsv_lang::doc::swallow behind the `swallow_check`
-# cargo feature — off by default, so it's compiled out of prod wasm/cli/ffi AND
-# default tsv_debug builds (profile/perf sessions measure production-shaped render
-# code). The `swallow:audit` deno task builds it via the `audits` umbrella feature
-# (swallow_check + comment_check) under `--profile corpus`, the single build world
-# EVERY `deno task check` audit shares; `--features swallow_check` alone still works
-# for a targeted run. Gated in `deno task check` (via `swallow:audit`) over tests/fixtures,
-# and as a leg of `deno task audit:corpus` over the real-code corpus + the prettier suites —
-# where the class actually lives (the callee-position swallow sits in ONE file anywhere).
-#
-# Coverage is every render that appends to the output buffer — the main loop AND
-# its sub-renders (fill segments, the line-suffix flush), all driving one
-# per-thread state machine. A `line_suffix` comment is NOT exempt: two of them
-# flushed at the same line break land back-to-back on one line (`x; // c2 // c1`)
-# and the first `//` swallows the second.
-#
-# ONLY a `//` (and the hashbang) can swallow — `/* */` and `<!-- -->` close at their
-# own delimiter, so they carry no tag and appear here only as a swallow's VICTIM.
-# What arms the check is a text node carrying the WHOLE comment
-# (`line_comment_source_span` / `line_comment_text_pooled`); an emitter that spells
-# one as `text("//") + <content>` is invisible to it, so every line-comment emitter
-# in tsv_ts and tsv_svelte uses the one-node form. Out of scope, victim-direction
-# only: content written straight to the output buffer (the Svelte hoisted-section
-# `<!-- -->` path), and a `//` left pending across a top-level render boundary
-# (each `<script>`/`<style>`/template root node is its own render, which clears the
-# pending state). Neither is reachable today — every Svelte `//` emitter ends its
-# line — and the census covers both from the output side.
+# Also: --json, --jobs N
 ```
+
+Formats files with the render-time swallow check on and reports any `//` line comment followed
+by content on the same output line (silent content loss). Pure Rust, no Deno; defaults to
+`tests/fixtures`, pass dirs/files to audit real code; exits 1 on any finding. The check lives
+in `tsv_lang::doc::swallow` behind the `swallow_check` cargo feature — off by default, so it is
+compiled out of prod wasm/cli/ffi AND default `tsv_debug` builds (profile/perf sessions measure
+production-shaped render code). The `swallow:audit` task builds it via the `audits` umbrella
+feature (`swallow_check` + `comment_check`) under `--profile corpus`; `--features swallow_check`
+alone still works for a targeted run. Gated in `deno task check` over `tests/fixtures`, and as
+a leg of `deno task audit:corpus` over the real-code corpus + the prettier suites — where the
+class actually lives (the callee-position swallow sits in ONE file anywhere).
+
+**Coverage** is every render that appends to the output buffer — the main loop AND its
+sub-renders (fill segments, the line-suffix flush), all driving one per-thread state machine.
+A `line_suffix` comment is NOT exempt: two flushed at the same line break land back-to-back on
+one line (`x; // c2 // c1`) and the first `//` swallows the second.
+
+**What arms it.** ONLY a `//` (and the hashbang) can swallow — `/* */` and `<!-- -->` close at
+their own delimiter, so they carry no tag and appear here only as a swallow's VICTIM. The check
+is armed by a text node carrying the WHOLE comment (`line_comment_source_span` /
+`line_comment_text_pooled`); an emitter that spells one as `text("//") + <content>` is
+invisible to it, so every line-comment emitter in tsv_ts and tsv_svelte uses the one-node form.
+Out of scope, victim-direction only: content written straight to the output buffer (the Svelte
+hoisted-section `<!-- -->` path), and a `//` left pending across a top-level render boundary
+(each `<script>`/`<style>`/template root node is its own render, which clears the pending
+state). Neither is reachable today — every Svelte `//` emitter ends its line — and the census
+covers both from the output side.
 
 ⚠️ **A green `swallow:audit` does not mean "no swallows"** — it formats each file **as
 authored**, so a swallow only reachable once a comment sits in some other gap is a swallow it
@@ -148,60 +145,54 @@ reach (its first external sweep caught a live `as const` swallow this way).
 The print-once comment ledger: every comment a document PARSES must be EMITTED exactly once. tsv's answer to prettier's `ensureAllCommentsPrinted`, and the structural guard on the [detached comment model](./comments.md): nothing else *inside the model* forces a comment that the parser produced to actually reach the output. (The [comment census](#comment-census-audit-censusaudit) forces conservation from *outside* the model — content-level, registration-independent — which is what covers the comments the parser never produced at all.)
 
 ```bash
-# comment_audit - format files with the print-once comment ledger on and report every
-# comment the format DROPPED (parsed, never emitted — silent content loss) or
-# DOUBLE-PRINTED. Pure Rust, no Deno. Defaults to tests/fixtures; pass dirs/files to
-# audit real code. Exits 1 on any finding.
 cargo run --profile corpus -p tsv_debug --features audits comment_audit                # audit all fixtures
 cargo run --profile corpus -p tsv_debug --features audits comment_audit ../corpora/collections/zzz/src  # audit a real codebase
-# Also: --json, --jobs N. The ledger lives in tsv_lang::comment_ledger behind the `comment_check`
-# cargo feature — off by default, so it's compiled out of prod wasm/cli/ffi AND default
-# tsv_debug builds (profile/perf sessions measure production-shaped code). The
-# `comments:audit` deno task builds it via the `audits` umbrella feature (swallow_check +
-# comment_check) under `--profile corpus`, the single build world EVERY `deno task check`
-# audit shares; `--features comment_check` alone still works for a targeted run. Gated in
-# `deno task check` (via `comments:audit`) over tests/fixtures.
+# Also: --json, --jobs N
 ```
 
-The corpus walk is the shared pristine-format sweep, as in its twin [`swallow:audit`](#line-comment-swallow-audit-swallowaudit) — same skip buckets, and a formatter panic mid-walk is caught, counted, and named with its input rather than killing the run (panics are reported, not gated: the panic gates own that class).
+Reports every comment the format DROPPED (parsed, never emitted — silent content loss) or
+DOUBLE-PRINTED; exits 1 on any finding. The ledger lives in `tsv_lang::comment_ledger` behind
+the `comment_check` cargo feature, compiled out and built exactly as its twin
+[`swallow:audit`](#line-comment-swallow-audit-swallowaudit)'s check is (`--features comment_check`
+alone works for a targeted run). Gated in `deno task check` (via `comments:audit`) over
+`tests/fixtures`. The corpus walk is the same shared pristine-format
+sweep — same skip buckets, and a formatter panic mid-walk is caught, counted, and named with
+its input rather than killing the run (panics are reported, not gated: the panic gates own
+that class).
 
 **Model.** A format entry point (`tsv_ts::format_in`, `tsv_css`'s `format_css*`, `tsv_svelte`'s `format_svelte*`) REGISTERS the comment list it is about to print — that is the expectation. A doc-based printer (tsv_ts, tsv_svelte) TAGS each comment's doc node (`DocArena::tag_comment_doc`) and the RENDERER records the emit when it reaches the node; tsv_css, which writes comments straight to its buffer, records at the write. The render-time seam is load-bearing: a builder may assemble the same subtree into two `conditional_group` candidates of which one renders, so counting at build time reads as a double-print (and a comment built only into a LOSING candidate would read as printed while being lost). A `format-ignore` region — and any other raw source slice that carries comments out verbatim (a raw at-rule prelude, a glued CSS compound selector) — records a VERBATIM RANGE that counts as one emit per comment it covers; keep those ranges tight, a too-wide carve-out silently re-opens the hole.
 
 **Scope.** Both comment carriers are registered and guarded: the DETACHED comments (the flat `Vec<Comment>` on the language root) and the AST-NODE comments — a Svelte `<!-- … -->` (`FragmentNode::Comment`) and a CSS in-block `CssBlockChild::Comment`. The latter are carried by the tree rather than by the positional model, but a printer can still drop or double-print one, so each format entry walks its tree and registers their spans; with that, `unregistered emits` is a pure registration-gap signal (0 over clean fixtures) — a nonzero count means the walk missed a container. CSS declaration-VALUE comments remain outside the model by construction — never lexed as `Comment`s at all (re-derived from source), so there is nothing to register. Everything outside the ledger's model — those value comments, and any comment a parse path consumes without registering — is the [comment census](#comment-census-audit-censusaudit)'s remit, which lexes both raw sides and never consults registration at all.
 
-**Blind to: any position no input actually puts a comment in.** The ledger grades a document AS AUTHORED, so its verdict is only ever as strong as the corpus. A builder that emits its children's docs and never looks up a gap at all ([comments.md](./comments.md) hazard 4) drops *every* comment in that gap and still reports green everywhere the shape happens not to occur — `build_object_doc_expanded` / `build_array_doc_expanded` did exactly that on the member-chain hugged-argument route while `comments:audit` passed over tests/fixtures, zzz, gro, fuz_app, fuz_ui, prettier's TS+JS suites, and svelte's own source. `gaps:audit` is the discovery arm for that class — it had the same drops pinned as sixteen known shapes. A green ledger is evidence about the corpus, not about the printer; when adding or changing an alternate-layout builder, inject a comment into each of its gaps by hand.
+**Blind to: any position no input actually puts a comment in.** The ledger grades a document AS AUTHORED, so its verdict is only ever as strong as the corpus. A builder that emits its children's docs and never looks up a gap at all ([comments.md](./comments.md) hazard 4) drops *every* comment in that gap and still reports green everywhere the shape happens not to occur — `build_object_doc_expanded` / `build_array_doc_expanded` did exactly that on the member-chain hugged-argument route while `comments:audit` passed over tests/fixtures, zzz, gro, fuz_app, fuz_ui, prettier's TS+JS suites, and svelte's own source. `gaps:audit` is the discovery arm for that class — it had the same drops pinned as known shapes. A green ledger is evidence about the corpus, not about the printer; when adding or changing an alternate-layout builder, inject a comment into each of its gaps by hand.
 
 ## Gap-Injection Audit (`gaps:audit`)
 
 Full reference — flags, the ratchet, reading a finding, triage + re-pin workflow, scope: **[gap_audit.md](./gap_audit.md)**. Design rationale (why byte offsets and not tokens, why the ledger is the oracle, why five payloads) lives in the `gap_audit` module docs.
 
 ```bash
-# gap_audit - inject a comment into EVERY gap and re-run the print-once ledger. The
-# DISCOVERY arm `comments:audit` can't be: the ledger only ever sees a document AS
-# AUTHORED, so a gap no fixture puts a comment in is one it never checks (eight such
-# drops were found BY HAND, all green on every gate). Pure Rust, no sidecar.
 cargo run --profile corpus -p tsv_debug --features audits gap_audit   # tests/fixtures
 cargo run --profile corpus -p tsv_debug --features audits gap_audit ../corpora/collections/zzz/src
-# Also: --json, --jobs N, --limit N, --payload <one>, --all-bytes, --update.
-# Build with `--profile corpus` (optimized + panic=unwind): plain `--release` is
-# panic=abort, so a formatter panic kills the process instead of being caught + reported.
-#
-# GATED as a RATCHET, not a green gate: `gap_audit_known.txt` is a machine-generated
-# snapshot of every shape tests/fixtures produces, every line a KNOWN BUG, the file
-# shrinking is the goal. A shape not on the list, one on it that no longer fires, or any
-# PANIC, FAILS. `--limit`/`--payload`/`--all-bytes`/a path narrow a run, so they skip the
-# ratchet and refuse `--update`. ~37 s wall over tests/fixtures (2026-09-13, 12-core box).
-#
-# Three detectors ride the one format, and ALL are ratcheted: the ledger's DROPPED /
-# DOUBLE-PRINTED; the render-time swallow check's SWALLOW — a `//` eating the content
-# after it, i.e. lost CODE, which the print-once ledger is structurally blind to (the
-# comment IS printed once); and a bare reparse of the output, UNREPARSEABLE — the
-# formatter's own output no longer parses (a multi-line comment relocated across a
-# stripped paren into a `[no LineTerminator here]` slot, a weld, a misplaced `;` — or a
-# VALID output the parser over-rejects, the one shape prettier emits identically), which
-# the ledger and the swallow check are both blind to and no as-authored gate can reach.
-# A holding run names the swallow and unreparseable shares on their own lines.
+# Also: --json, --jobs N, --limit N, --payload <one>, --all-bytes, --update
 ```
+
+Injects a comment into EVERY gap and re-runs the print-once ledger — the DISCOVERY arm
+`comments:audit` can't be, since the ledger only sees a document AS AUTHORED (eight drops in
+gaps no fixture covered were found BY HAND, all green on every gate). Pure Rust, no sidecar.
+
+**Gated as a RATCHET**, not a green gate: `gap_audit_known.txt` is a machine-generated
+snapshot of every shape `tests/fixtures` produces, every line a KNOWN BUG, the file shrinking
+is the goal. A shape not on the list, one on it that no longer fires, or any PANIC, FAILS.
+`--limit`/`--payload`/`--all-bytes`/a path narrow a run, so they skip the ratchet and refuse
+`--update`. ~37 s over `tests/fixtures`.
+
+Three detectors ride the one format, all ratcheted: the ledger's DROPPED / DOUBLE-PRINTED; the
+swallow check's SWALLOW — lost CODE, to which the print-once ledger is structurally blind (the
+comment IS printed once); and a bare reparse's UNREPARSEABLE — the formatter's own output no
+longer parses (a printer shape, or a VALID output the parser over-rejects), which neither of
+the others nor any as-authored gate can reach. A holding run names the swallow and
+unreparseable shares on their own lines. The shapes each class has caught:
+[gap_audit.md §The UNREPARSEABLE class](./gap_audit.md#the-unreparseable-class).
 
 `deno task gaps:audit:update` regenerates the snapshot after fixing a shape (or when a new fixture merely REACHES a pre-existing one); it refuses a narrowed run.
 
@@ -225,18 +216,17 @@ off line 1) and the **span arm** (the span-only wire against the oracle with `lo
 `name_loc` stripped).
 
 **Why it exists — the shape of the hole it fills.** Every other injection or fuzz audit
-in this repo grades a *formatter-side, self-referential* property: gap and blank
-injection check formatting, the fuzzer checks no-panic + idempotency + structural
-reparse, round-trip checks that output reparses. The wire-vs-canonical comparison is the
-opposite — a genuine external oracle — but it only ever ran over inputs someone had
-already **written**: committed fixtures and real repos. Nothing manufactured an input
-and graded the resulting *wire*.
+grades a *formatter-side, self-referential* property (gap and blank injection check
+formatting, the fuzzer no-panic + idempotency + structural reparse, round-trip that output
+reparses). The wire-vs-canonical comparison is a genuine external oracle, but it only ever ran
+over inputs someone had already **written** — committed fixtures and real repos. Nothing
+manufactured an input and graded the resulting *wire*.
 
-A hand-rolled scan can therefore be confidently wrong about a spelling no document
-contains: where a `: T` annotation's own parse is anchored, say, is wrong for any spelling
-that puts whitespace between a binding and its colon if the scan assumed `x: T` — invisible
-to every fixture and every real repo, because everyone writes `x: T`. The comparison
-catches it the instant such an input exists; this audit makes such inputs exist.
+So a hand-rolled scan can be confidently wrong about a spelling no document contains: a scan
+that anchors a `: T` annotation's parse assuming `x: T` is wrong for any spelling with
+whitespace between binding and colon — invisible to every fixture and every real repo, because
+everyone writes `x: T`. The comparison catches it the instant such an input exists; this audit
+makes such inputs exist.
 
 **What it perturbs — two families, because there are two kinds of claim to break.**
 
@@ -247,20 +237,19 @@ catches it the instant such an input exists; this audit makes such inputs exist.
   adjacent?). Heads are where tsv hand-rolls its scanning — head splitting,
   binding/annotation separation, delimiter finding — rather than delegating to acorn.
 
-  ⚠️ **The marker position is the sharpest of the three, and was reachable only for `:`
-  until it was made explicit** (`:` is in the delimiter set; `#` and `@` are not, so the
-  axis was blind for exactly the two markers a placement rule reads). It is the one
-  position where the two sides of the language disagree by design — Svelte's `tag()` and
-  `read_attribute` run `allow_whitespace()` after the `{`, its `read_sequence` does not —
-  so a reader mirroring either reads a byte at a **fixed offset** from the brace, i.e.
-  assumes a gap of width **zero**. That is the same emit-set ⊆ parse-set hazard a baked-in
-  keyword width is, one notch narrower: the formatter's brace normalization *closes* that
-  gap, so the assumption is reachable from tsv's own output. Three bugs came out of it at
-  once — `<div { @attach fn}>` rejected though prettier formats it, a `{ #x in y}` the
+  ⚠️ **The marker position is the sharpest of the three.** It is its own axis because `:` is
+  in the delimiter set while `#` and `@` are not — without it the family is blind for exactly
+  the two markers a placement rule reads. It is the one position where the two sides of the
+  language disagree by design — Svelte's `tag()` and `read_attribute` run `allow_whitespace()`
+  after the `{`, its `read_sequence` does not — so a reader mirroring either reads a byte at a
+  **fixed offset** from the brace, i.e. assumes a gap of width **zero**. That is the same
+  emit-set ⊆ parse-set hazard a baked-in keyword width is, one notch narrower: the formatter's
+  brace normalization *closes* that gap, so the assumption is reachable from tsv's own output.
+  Its yield: `<div { @attach fn}>` rejected though prettier formats it, a `{ #x in y}` the
   printer glued into a form tsv then refused to reparse, and a static `<script { #a}>` head
-  whose attribute-name run folded the author's whitespace into the name (that third one
-  reaches the gap through a lexer TOKEN's end rather than through byte arithmetic, so it is
-  the spelling a `+ 2` sweep does not find).
+  whose attribute-name run folded the author's whitespace into the name (that one reaches the
+  gap through a lexer TOKEN's end rather than through byte arithmetic, so it is the spelling a
+  `+ 2` sweep does not find).
 - **`terminators`** — a lone `\r`, `<LS>` or `<PS>` at every whitespace-run start in the
   document, head or not. These are exactly the spellings on which ECMAScript's line
   terminators and `\n` DISAGREE. tsv's `loc` counts `\n` alone across a whole Svelte
@@ -339,9 +328,10 @@ files are controls and are dropped; only the delta is reported. Subtraction is b
   them — both are baseline-subtracted on their own side (`TSV_REFUSED` / `CANONICAL_REFUSED`
   in `wire_inject.ts`), and both are listed per file in `--json`'s `errors`. Reported, never
   gated, in both directions: a deferred early error is a documented tsv posture. On
-  `tests/fixtures` today: 196 over-rejections under `terminators` (against 577 before the
-  inherited ones — every `input_invalid_*` fixture's — were subtracted out), and under `ws`
-  0 over-rejections against **33** over-acceptances (against 64 raw, the rest inherited).
+  `tests/fixtures`, `terminators` keeps a large over-rejection count even after the inherited
+  ones (every `input_invalid_*` fixture's) are subtracted out — about a third of the raw count
+  — while `ws` has none, against a few dozen over-acceptances (about half the raw count, the
+  rest inherited).
   ⚠️ The subtraction is what makes the number readable: raw, the oracle-side count
   re-reports each `_svelte_divergence` fixture's own sanctioned over-acceptance once per
   variant derived from it, so it sizes the fixture tree rather than the injection.
@@ -383,33 +373,31 @@ both need the canonical parser, so they are conformance-tier at best. Standing f
   reformats a script's body through an ignore directive, and both formatters move its content
   off the tag's line), so there the Rust test is the sole pin.
 
-  The sibling it retired was a **comment extent clipped at a trimmed slice boundary**: the
-  bounded head readers handed their interior to the sub-parse whitespace-trimmed at BOTH
-  ends, so a `//` that ended the interior ended where the trim did — a line comment runs to
-  the terminator, so the space in `{@html expr // c ⏎}` is the comment's own text. **Eight**
-  readers spelled it that way against the neighbours' leading-only trim, and the census could
-  name only five: it injects WHITESPACE, so it reveals the bug just where a fixture already
-  carried a trailing `//` in that head. Defining the class by the trim rather than by the
-  bases it surfaced is what reached the `{#each}` key and the `{#key}` head; enumerating the
-  sub-parse ENTRY POINT's callers is what reached the eighth, `reparse_each_iterable`, whose
-  slice ends at a `{#each}` head's second `as` and which no head-shaped sweep passes over.
-  That last enumeration also bounds the class: the three remaining both-ends trims that feed
-  a sub-parse (the `{#each}` binding's, the `{:then}`/`{:catch}` region's, the `{@const}`
-  binding's) are unreachable, each guarded by an explicit rejection of the trailing comment
-  that canonical rejects too. `Parser::parse_ts_expression` now states the rule for its
-  callers, and the extents of every head — the trimmed ones and the agreeing neighbours, in
-  one wire — are pinned by
+  The sibling it retired was a **comment extent clipped at a trimmed slice boundary**: bounded
+  head readers handed their interior to the sub-parse whitespace-trimmed at BOTH ends, so a `//`
+  that ended the interior ended where the trim did — but a line comment runs to the terminator,
+  so the space in `{@html expr // c ⏎}` is the comment's own text. The census could name only
+  some of the readers spelling it that way: it injects WHITESPACE, so it reveals the bug just
+  where a fixture already carried a trailing `//` in that head. Defining the class by the trim
+  rather than by the bases it surfaced is what reached the `{#each}` key and the `{#key}` head;
+  enumerating the sub-parse ENTRY POINT's callers reached `reparse_each_iterable`, whose slice
+  ends at a `{#each}` head's second `as` and which no head-shaped sweep passes over. That
+  enumeration also bounds the class: the three remaining both-ends trims that feed a sub-parse
+  (the `{#each}` binding's, the `{:then}`/`{:catch}` region's, the `{@const}` binding's) are
+  unreachable, each guarded by an explicit rejection of the trailing comment that canonical
+  rejects too. `Parser::parse_ts_expression` states the rule for its callers, and the extents
+  of every head — the trimmed ones and the agreeing neighbours, in one wire — are pinned by
   [head_final_line_comment_extent](../tests/fixtures/svelte/syntax/comments/head_final_line_comment_extent/),
   whose `prettier-ignore` is what makes the trigger format-stable enough to be a fixture at
   all (both formatters trim a line comment's trailing whitespace).
 
   Because the family is a census it is now at zero, which makes `ws` a candidate to become a
   **green gate at zero**, not a ratchet: there is nothing left to pin. Its oracle-side
-  rejections are separately sized above and are currently **all documented** — 32 split
+  rejections are separately sized above and are currently **all documented** — all but one split
   `!==` into `! ==`, whose non-null assertion only a TS parse
   accepts (the tracked [TypeScript-mode
   gating](./conformance_svelte.md#typescript-mode-gating-tracked-over-acceptance)
-  over-acceptance), and 1 splits `?:` into `? :`, feeding Svelte's own `/\?\s*:/g` template
+  over-acceptance), and one splits `?:` into `? :`, feeding Svelte's own `/\?\s*:/g` template
   rewrite (pinned in
   [`block_pattern_annotation_span.rs`](../tests/block_pattern_annotation_span.rs)).
 - **`terminators`** (sampled), over `tests/fixtures` — every standing finding is a SPAN
@@ -452,44 +440,41 @@ both need the canonical parser, so they are conformance-tier at best. Standing f
 Full reference — flags, the ratchet, the absorb pin, reading a finding, the six invariants, scope: **[blank_audit.md](./blank_audit.md)**. Design rationale (the fast path, why a blank is graded against the injected input not the pristine, the string-interior exclusion) lives in the `blank_audit` module docs.
 
 ```bash
-# blank_audit - inject a blank line into EVERY code gap and grade six policy-free
-# invariants on the result: (1) no panic, (2) F1 idempotency (pass 2 is a fixed
-# point), (3) structural reparse (incl. NODE-LOSS, gated), (4) leaf conservation, (5) ledger-clean (no
-# dropped/double-printed comment), (6) blank-run ≤ 1 (no 2+ blank run outside a
-# template quasi / <pre> / <textarea> / format-ignore region). Mechanizes the
-# blank-line handling class — the specifier-list / array-pattern bugs. Invariants
-# 1-4 are the shared `f1_check` (also driving `fuzz`); 5 is the print-once ledger;
-# 6 is a region-scoped output scan. Pure Rust, no sidecar.
 cargo run --profile corpus -p tsv_debug --features audits blank_audit   # tests/fixtures
 cargo run --profile corpus -p tsv_debug --features audits blank_audit ../corpora/collections/zzz/src
-# Also: --json, --report, --jobs N, --limit N, --update. Build with `--profile
-# corpus` (optimized + panic=unwind) so a formatter panic is caught + reported.
-#
-# GATED as a RATCHET (like gap_audit): `blank_audit_known.txt` is a machine-generated
-# snapshot of the known-bug shapes, every line a bug, the file shrinking is the goal.
-# A graded shape not on the list, one that no longer fires, or any PANIC, FAILS. Unlike
-# fuzz/roundtrip, NON-IDEMPOTENT and every policy kind ARE pinned (born red over a live
-# bug family); PANIC stays absolute; and STRUCTURAL-DIVERGENCE is held REPORT-ONLY
-# (fuzz-soft parity — reported but never gated, filtered out of the ratchet, `"gated":
-# false` in --json). A FAST PATH — a blank the formatter ABSORBS reproduces the file's
-# proven-clean pristine output byte-for-byte, so nothing is checked — keeps it near
-# gap_audit's one-format-per-site cost; only a KEPT blank pays the full battery (~22%
-# of injections over tests/fixtures). ~52 s wall over tests/fixtures (2026-09-15, 12-core
-# box) — the figure moves with the fixture tree, so re-date it rather than trusting it.
-#
-# A SECOND snapshot, `blank_absorb_known.txt`, pins the blank-DROP class the six
-# invariants deliberately don't grade (a silently deleted blank is its own fixed point,
-# so F1 / fuzz / roundtrip / ledger / census are all blind — only a prettier compare on
-# the authored shape sees one): every NODE-EDGE class `(node_type, left→right)` where an
-# injected blank is absorbed WITHOUT an authored blank already in the gap (that case is
-# the sanctioned 2+→1 run collapse, exempt). ⚠️ A BEHAVIOR PIN, not a bug list
-# (width_audit's stance — most absorption is sanctioned; prettier collapses those blanks
-# too): a NEW class is a QUESTION to triage against prettier, never a silent pass. New
-# and stale classes FAIL; graded only on the full default corpus. `--report` lists every
-# class with its reproducer.
-# Scope: TS + Svelte body; CSS deferred; string/template interiors excluded (a raw
-# newline there is lexed as content, not a gap); only format fixed points injected.
+# Also: --json, --report, --jobs N, --limit N, --update
 ```
+
+Injects a blank line into EVERY code gap and grades six policy-free invariants: (1) no panic,
+(2) F1 idempotency (pass 2 is a fixed point), (3) structural reparse (incl. NODE-LOSS, gated),
+(4) leaf conservation, (5) ledger-clean (no dropped/double-printed comment), (6) blank-run ≤ 1
+(no 2+ blank run outside a template quasi / `<pre>` / `<textarea>` / format-ignore region).
+Invariants 1-4 are the shared `f1_check` (also driving `fuzz`); 5 is the print-once ledger; 6
+is a region-scoped output scan. It mechanizes the blank-line handling class — the
+specifier-list / array-pattern bugs. Pure Rust, no sidecar.
+
+**Gated as a RATCHET** like `gaps:audit`: `blank_audit_known.txt` snapshots the known-bug
+shapes, every line a bug; a graded shape not on the list, one that no longer fires, or any
+PANIC, FAILS. Unlike fuzz/roundtrip, NON-IDEMPOTENT and every policy kind ARE pinned (born red
+over a live bug family); PANIC stays absolute; STRUCTURAL-DIVERGENCE is REPORT-ONLY (fuzz-soft
+parity — reported, never gated, filtered out of the ratchet, `"gated": false` in `--json`). A
+FAST PATH — an ABSORBED blank reproduces the file's proven-clean pristine output byte-for-byte,
+so nothing is checked — keeps it near `gaps:audit`'s one-format-per-site cost; only a KEPT
+blank pays the full battery. ~30 s over `tests/fixtures`, a figure that moves with the fixture
+tree.
+
+A SECOND snapshot, `blank_absorb_known.txt`, pins the blank-DROP class the six invariants
+deliberately don't grade (a silently deleted blank is its own fixed point, so F1 / fuzz /
+roundtrip / ledger / census are all blind — only a prettier compare on the authored shape sees
+one): every NODE-EDGE class `(node_type, left→right)` where an injected blank is absorbed
+WITHOUT an authored blank already in the gap (that case is the sanctioned 2+→1 run collapse,
+exempt). ⚠️ A BEHAVIOR PIN, not a bug list (`width:audit`'s stance — most absorption is
+sanctioned; prettier collapses those blanks too): a NEW class is a QUESTION to triage against
+prettier, never a silent pass. New and stale classes FAIL; graded only on the full default
+corpus; `--report` lists every class with its reproducer.
+
+Scope: TS + Svelte body; CSS deferred; string/template interiors excluded (a raw newline there
+is lexed as content, not a gap); only format fixed points injected.
 
 `deno task blanks:audit:update` regenerates both snapshots after fixing a shape (or sanctioning a new absorb class); it refuses a narrowed run. ⚠️ A fix routinely shrinks the **bug** snapshot while leaving its **absorb** line in place — the absorb key is a node edge and its reproducer only one of the textual shapes that key it, so a line goes stale only when nothing at that edge absorbs anymore. Grading a pinned absorb line means running the prettier compare by hand; [blank_audit.md](./blank_audit.md#the-absorb-pin--the-blank-drop-class) carries that harness and its traps — and grade the `--json` `absorb_variants` work-list (one row per class × textual shape) rather than the per-class reproducers, which under-report by a measured ~40×.
 
@@ -504,18 +489,17 @@ Why it needs its own gate. A fabricated blank is indistinguishable from an autho
 - **Corpus format compare** — a fabrication prettier also makes is a match, not a divergence.
 
 ```bash
-# fabrication_audit - format each pristine seed and report every blank RUN the output
-# holds that the input did not, minus three structurally sanctioned layout rules.
-# Pure Rust, no Deno. Defaults to tests/fixtures; pass dirs/files to audit real code.
 cargo run --profile corpus -p tsv_debug --features audits fabrication_audit
 cargo run --profile corpus -p tsv_debug --features audits fabrication_audit ../corpora/collections/zzz/src
 # Also: --json, --jobs N, --update. ~0.2 s over tests/fixtures.
-#
-# GATED as a RATCHET over `fabrication_audit_known.txt`, keyed by the SHAPE of the two
-# lines bracketing the invented blank (`{:catch` ⇢ blank ⇢ `{/await`), not by path — so
-# the snapshot is corpus-portable and states the bug rather than a location. Every line
-# is a bug; the file shrinking is the goal. Currently EMPTY (born green).
 ```
+
+Formats each pristine seed and reports every blank RUN the output holds that the input did
+not, minus three structurally sanctioned layout rules. Pure Rust, no Deno; defaults to
+`tests/fixtures`. **Gated as a RATCHET** over `fabrication_audit_known.txt`, keyed by the SHAPE
+of the two lines bracketing the invented blank (`{:catch` ⇢ blank ⇢ `{/await`), not by path —
+so the snapshot is corpus-portable and states the bug rather than a location. Every line is a
+bug; the file shrinking is the goal. Currently EMPTY (born green).
 
 **The metric.** Blank *runs*, not blank lines: collapsing `a⏎⏎⏎⏎b` to `a⏎⏎b` removes newlines but not the author's "there is a break here" signal. A finding is `unsanctioned_runs(output) > runs(input)`.
 
@@ -527,7 +511,7 @@ cargo run --profile corpus -p tsv_debug --features audits fabrication_audit ../c
 
    **Known blind spot: the carve-out is keyed on the tag, not the lang.** The line shapes it matches strip attributes, so `<script lang="coffee">` and a plain `<script>` are one token — the sanction exempts a *formattable* body's blank too. What keeps that from being a hole is the printer, not the carve-out: a formattable body cannot reach the shape (empty → `<tag></tag>` with no newlines; whitespace-only → the single delimiter break, adjacent lines with no run between), so a blank there could only have been authored, and an authored one is already in the input count. That premise is pinned by the fixture above; if it ever breaks, the arm goes quiet on the two commonest tags in the corpus rather than failing.
 
-**A section's leading comment run is rule 1 one step removed.** Comments travel with the section, so a glued `<div>block1</div>⏎<!-- comment -->⏎<style>` puts the section's **leading comment** where the tag would be, and the bracketing shape reads `</div` ⇢ `<!--` — a blank prettier emits too. The audit reads forward from the run (`leads_section`): one or more full-line comments (multi-line ones and blank lines between them allowed) ending at a `<script>` / `<style>` / `<svelte:options>` line excuse the run, and the seam blank *between* two comments of that run is the same run read from its middle. Anything else between the comments and the tag — content, or text on a comment's closing line — refuses, which is what keeps this narrower than "a blank before some comment" (a widening once refused for blinding the audit to a whole class of real fabrications). Surfaced by the `svelte/script/ordering` variants that author a comment glued to the last template node; before them an already-formatted corpus carried the blank in its input, so the counts matched and the gap was latent.
+**A section's leading comment run is rule 1 one step removed.** Comments travel with the section, so a glued `<div>block1</div>⏎<!-- comment -->⏎<style>` puts the section's **leading comment** where the tag would be, and the bracketing shape reads `</div` ⇢ `<!--` — a blank prettier emits too. The audit reads forward from the run (`leads_section`): one or more full-line comments (multi-line ones and blank lines between them allowed) ending at a `<script>` / `<style>` / `<svelte:options>` line excuse the run, and the seam blank *between* two comments of that run is the same run read from its middle. Anything else between the comments and the tag — content, or text on a comment's closing line — refuses, which is what keeps this narrower than "a blank before some comment" (a widening refused because it blinded the audit to a whole class of real fabrications). Exercised by the `svelte/script/ordering` variants that author a comment glued to the last template node.
 
 **A section's region-end trail is the same rule from the other side.** A `#endregion` written directly below a section travels with it and prints below it, so the section seam's blank follows the trail instead of the closing tag and the run reads `<!--` ⇢ the template. The audit reads back from the run (`trails_section`): a full-line comment (multi-line allowed) that is a region-end marker (`tsv_lang::is_region_end_marker`, the formatter's own spelling), with nothing but blank lines between it and a `</script>` / `</style>` / `<svelte:options>` line, excuses the run. Any other comment there refuses — an ordinary comment below a section stays in the template, so a blank after it would be invented — and so does a comment below ordinary content. Surfaced by the `svelte/script/ordering/lifted_run_region_trails` variants, whose sections are written between template nodes with their trails glued to the next one.
 
@@ -545,28 +529,26 @@ The whole-comment conservation gate: does every comment the author wrote survive
 Why it needs its own gate: every other comment instrument reads a channel the parser controls. The print-once ledger guards what a format entry *registered*; `parse().comments` is what the parser chose to carry. A comment a parse path consumes without registering (the CSS `skip_boundary_whitespace_and_comments` class that motivated this audit) never existed as far as those instruments know — the corpus stays green **by absence**, and every corrupted output in that family was a format fixed point, so F1, roundtrip, fuzz, and the authoring audit were all structurally blind too. The census's independence from the parser's comment carrying is its entire design.
 
 ```bash
-# census_audit - format each pristine seed, lex comment trivia from BOTH raw sides with
-# self-contained scanners (audit/census.rs), and compare normalized interior
-# multisets per language bucket: `ts` (TS-family files, <script> islands, template
-# {expressions}), `css` (.css files, <style> islands), `template` (Svelte <!-- -->,
-# plus every open-tag NAME and `{#…}` / `{@…}` HEAD — the template-head census, so a
-# template node the PARSER consumed, which no wire-vs-wire compare can see, is a
-# MISSING here). MISSING = dropped comment / node; EXTRA = duplicated/fabricated one; a
-# merge or interior rewrite shows as a MISSING + EXTRA pair. Pure Rust, no Deno.
 cargo run --profile corpus -p tsv_debug --features audits census_audit                # tests/fixtures
 cargo run --profile corpus -p tsv_debug --features audits census_audit ../corpora/collections/zzz/src  # a real codebase
 # Also: --json, --jobs N, --update. ~0.35 s over tests/fixtures.
-#
-# GATED as a RATCHET over `census_audit_known.txt`, keyed (path, bucket, direction) —
-# file-level, like the compile validation ratchet (the file IS the reproducer). Born
-# EMPTY: over tests/fixtures it stands as the tripwire that keeps the CSS parse-time-drop
-# class it was argued from closed. Whole-comment drops are sanctioned in exactly ONE place — the CSS CDO/CDC
-# `<!-- ... -->` span, which tsv (matching parseCss) discards WHOLESALE, CSS between the
-# markers included — and that carve-out lives in the scanner (those comments never enter
-# the input multiset), so a snapshot line is always a bug. Rejected inputs make no
-# format claim and are skipped; a format PANIC is counted, not gated (the panic gates
-# own that class).
 ```
+
+The scanners are self-contained (`audit/census.rs`); the buckets are `ts` (TS-family files,
+`<script>` islands, template `{expressions}`), `css` (`.css` files, `<style>` islands), and
+`template` (Svelte `<!-- -->`, plus every open-tag NAME and `{#…}` / `{@…}` HEAD — the
+template-head census, so a template node the PARSER consumed, which no wire-vs-wire compare
+can see, is a MISSING here). MISSING = dropped comment / node; EXTRA = duplicated/fabricated
+one; a merge or interior rewrite shows as a MISSING + EXTRA pair. Pure Rust, no Deno.
+
+**Gated as a RATCHET** over `census_audit_known.txt`, keyed (path, bucket, direction) —
+file-level, like the compile validation ratchet (the file IS the reproducer). Born EMPTY: over
+`tests/fixtures` it is the tripwire keeping closed the CSS parse-time-drop class it was argued
+from. Whole-comment drops are sanctioned in exactly ONE place — the CSS CDO/CDC
+`<!-- ... -->` span, which tsv (matching parseCss) discards WHOLESALE, CSS between the markers
+included — and that carve-out lives in the scanner (those comments never enter the input
+multiset), so a snapshot line is always a bug. Rejected inputs make no format claim and are
+skipped; a format PANIC is counted, not gated (the panic gates own that class).
 
 **The scanners** (`audit/census.rs`) are deliberately self-contained rather than driving the product lexers: TS comment *extents* depend on parser context (a regex body is opaque only because the parser said "regex here"), so a raw `next_token` loop mis-lexes real code — and an instrument sharing the product lexer's extent rules would inherit its bugs. TS handles strings, template literals (interpolation stack included), and regexes via the classic previous-token heuristic; CSS handles strings and unquoted `url()` opacity; Svelte is a lexical mode machine — `<script>`/`<style>` raw-text islands bounded by the first matching close tag (exactly Svelte's own rule, so a `</script>` inside a JS string bounds identically), `<textarea>` content as RCDATA (only a `{...}` is live there — a `<!--` is text — bounded by the first `</textarea` at a tag boundary), `{...}` expressions in text, attribute, and quoted-attribute-value position, block sigils stepped over so `{/if}` is never a regex head. Interiors normalize by **exactly the line-edge trim the printer is licensed to make, which is a different trim per comment KIND** — prettier's `printComment` transcribed, since that is what tsv mirrors: a line comment (and the hashbang) is emitted `.trimEnd()`-ed, so its trailing edge is trimmed; an *indentable* block (`*`-aligned) reindents, so each of its lines is trimmed both ends; and every other block — single-line, or multi-line and non-indentable — plus a Svelte `<!-- … -->` is emitted verbatim and gets **no trim at all**, so every line edge there is content. The class is JS `\s` (`tsv_lang::is_js_whitespace`), because the trims it models are `String.prototype.trim*` calls; a `<CR>` fold runs first, through the format path's own `normalize_carriage_returns`.
 
@@ -576,7 +558,15 @@ cargo run --profile corpus -p tsv_debug --features audits census_audit ../corpor
 
 - **Position-blind by construction.** The multiset compares interiors, not placements — a comment relocated anywhere in the document (even to a semantically wrong place) balances. Placement is `binding:audit`'s and the fixtures' remit.
 - **Same-content cancellation.** A dropped `// x` plus a fabricated identical `// x` elsewhere in the same file nets zero, the same net-zero blindness `fabrication:audit` documents.
-- **Instrument-symmetry residue.** The scanners misread rare shapes (a regex after `)`, post-`}` division) — but they misread input and output with the same eyes, so the phantoms cancel. A false positive needs the formatter to rewrite text the scanner misreads *differently* across the two sides. The one such rewrite seen is a paren STRIP or a literal normalization at a `/`: `(f<T>) / 2` → `f<T> / 2`, `(a!) / 2` → `a! / 2`, `1. / 2` → `1 / 2`, where the plain previous-token rule divides on the authored side and opens a regex on the printed one. So the TS scanner reads those operand ends itself — a `!` and a digit's trailing `.` leave its state as they found it, and a `>` that closes a type-argument list ends a value. Which `<`…`>` pair is a type-argument list it decides by the printer's **canonical spelling**, not by the grammar: a `<` GLUED to the value before it opens one and a `>` glued to the byte before it closes one, while a spaced `<` or `>` is an operator. tsv's printer, like prettier, prints every type-argument list glued and every comparison spaced, so the formatted side reads each one right by construction, whatever sits between the two delimiters — the rule never asks what the bytes between them could be. Around it, only what is cheap and holds for any spelling: a tracked `<` is forgotten when the brackets it opened in close, at a `;` or line break at its own nesting, and at a logical `&&`, `||` or `??`, which no type spells; an arrow's `=>` never closes one; and a spaced `>` retires the `<` it answers without closing it. The rule's price is an author's **non-canonical spelling**, which the scanner misreads on the input side alone — so it reports in the same direction whichever way the misread runs: the misread swallows the comment on the input side, a KEPT comment reads as EXTRA (a false positive, loud) and a DROPPED one balances (a false NEGATIVE, silent — the danger direction). Two spellings do that. A **fully glued comparison** with no logical operator between its delimiters (`x = a<b()>/'/.test(d); // c`, printed `a < b() > /'/…`) reads as a list, so the regex after its `>` reads as a division and a quote in it opens a string that swallows the comment; the pre-rule census, which read every `>` as an operator, caught those drops. **Type arguments spaced on either side** (`x = f < T > / 2; // c`, `f<T > / 2`, printed `f<T> / 2`) read as a comparison, so the division after the `>` opens a regex that swallows the comment; the pre-rule census missed those drops too, though it flagged fewer of their kept twins. A glued `<` answered by a spaced `>` (`a<b && c > /'/`, `a<b() > /'/`) is read right, and so is a type-argument list the author wrapped in parens with spaces inside (`(f < T >) / 2`), which the `)` settles. Measured with a formatter build that drops every comment carrying a marker, over generated grids of comparison and type-argument shapes (type literals with method, call, construct and accessor signatures, `new` / `abstract new`, `keyof`, `typeof`, `readonly`, `infer`, `asserts`, `unique symbol`, leading bars, `typeof import(…)`, and comparisons whose `<`…`>` run holds a type keyword, a call, an object literal's method, a conditional, arithmetic or logical expression) in `.ts`, Svelte `<script>` and template expressions: on every cell spelled as the printer spells it, no drop the pre-rule census caught went unseen and no kept twin was flagged; every miss and every false positive the grids produced sits on the two non-canonical spellings above, save one canonical shape: a type-argument list whose last token is a block comment (`x = f<T /* b */> / 2; // c`), whose `>` follows `*/` and so does not read as glued — the division after it opens a regex that swallows the comment on both sides, a false negative the pre-rule census shared. That is a bound on what the grids generate, not a proof. One more one-sided cost: a type-argument list the author broke across lines at its own nesting and divided (`f<⏎A⏎> / 2`, printed `f<A> / 2`) reads as a comparison on the authored side only — the price of forgetting a `<` at a line break, kept because an authored glued comparison ended by ASI needs it (`let k = a<b⏎let m = c>/'/.test(d)`).
+- **Instrument-symmetry residue.** The scanners misread rare shapes (a regex after `)`, post-`}` division) — but they misread input and output with the same eyes, so the phantoms cancel. A false positive needs the formatter to rewrite text the scanner misreads *differently* across the two sides. The one such rewrite seen is a paren STRIP or a literal normalization at a `/`: `(f<T>) / 2` → `f<T> / 2`, `(a!) / 2` → `a! / 2`, `1. / 2` → `1 / 2`, where the plain previous-token rule divides on the authored side and opens a regex on the printed one. So the TS scanner reads those operand ends itself — a `!` and a digit's trailing `.` leave its state as they found it, and a `>` that closes a type-argument list ends a value.
+
+  Which `<`…`>` pair is a type-argument list it decides by the printer's **canonical spelling**, not by the grammar: a `<` GLUED to the value before it opens one and a `>` glued to the byte before it closes one, while a spaced `<` or `>` is an operator. tsv's printer, like prettier, prints every type-argument list glued and every comparison spaced, so the formatted side reads each one right by construction, whatever sits between the two delimiters — the rule never asks what the bytes between them could be. Around it, only what is cheap and holds for any spelling: a tracked `<` is forgotten when the brackets it opened in close, at a `;` or line break at its own nesting, and at a logical `&&`, `||` or `??`, which no type spells; an arrow's `=>` never closes one; and a spaced `>` retires the `<` it answers without closing it.
+
+  The rule's price is an author's **non-canonical spelling**, which the scanner misreads on the input side alone — so it reports in the same direction whichever way the misread runs: the misread swallows the comment on the input side, a KEPT comment reads as EXTRA (a false positive, loud) and a DROPPED one balances (a false NEGATIVE, silent — the danger direction). Two spellings do that. A **fully glued comparison** with no logical operator between its delimiters (`x = a<b()>/'/.test(d); // c`, printed `a < b() > /'/…`) reads as a list, so the regex after its `>` reads as a division and a quote in it opens a string that swallows the comment; the pre-rule census, which read every `>` as an operator, caught those drops. **Type arguments spaced on either side** (`x = f < T > / 2; // c`, `f<T > / 2`, printed `f<T> / 2`) read as a comparison, so the division after the `>` opens a regex that swallows the comment; the pre-rule census missed those drops too, though it flagged fewer of their kept twins. A glued `<` answered by a spaced `>` (`a<b && c > /'/`, `a<b() > /'/`) is read right, and so is a type-argument list the author wrapped in parens with spaces inside (`(f < T >) / 2`), which the `)` settles.
+
+  Measured with a formatter build that drops every comment carrying a marker, over generated grids of comparison and type-argument shapes (type literals with method, call, construct and accessor signatures, `new` / `abstract new`, `keyof`, `typeof`, `readonly`, `infer`, `asserts`, `unique symbol`, leading bars, `typeof import(…)`, and comparisons whose `<`…`>` run holds a type keyword, a call, an object literal's method, a conditional, arithmetic or logical expression) in `.ts`, Svelte `<script>` and template expressions: on every cell spelled as the printer spells it, no drop the pre-rule census caught went unseen and no kept twin was flagged; every miss and every false positive the grids produced sits on the two non-canonical spellings above, save one canonical shape: a type-argument list whose last token is a block comment (`x = f<T /* b */> / 2; // c`), whose `>` follows `*/` and so does not read as glued — the division after it opens a regex that swallows the comment on both sides, a false negative the pre-rule census shared. That is a bound on what the grids generate, not a proof.
+
+  One more one-sided cost: a type-argument list the author broke across lines at its own nesting and divided (`f<⏎A⏎> / 2`, printed `f<A> / 2`) reads as a comparison on the authored side only — the price of forgetting a `<` at a line break, kept because an authored glued comparison ended by ASI needs it (`let k = a<b⏎let m = c>/'/.test(d)`).
 - **As-authored only.** Like every pristine audit, a drop in a gap no corpus file puts a comment in stays invisible — `gaps:audit` is the injection arm for that class (with the ledger, not the census, as its oracle).
 - **The kind-aware trim is per KIND, not per BUCKET.** `is_indentable_block_comment` has exactly one printer *emitter* behind it — `tsv_ts`'s `build_comment_doc` (its other callers, via `tsv_lang::is_indentable_block`, are layout gates that reindent nothing) — so the reindent licence the Block arm grants belongs to the TS printer alone. A `*`-aligned comment in the **css** bucket gets it too, where the CSS printer in fact emits every comment verbatim (conformance_prettier_css.md §CSS: Comments, "the comment interior stays verbatim"). Nothing rewrites there today, so this hides no live bug; it is why a future CSS comment re-indent would land silently.
 - **The Svelte scanner's own attribute terminator is ASCII.** `scan_svelte_tag`'s unquoted-value run stops at `[ \t\n\r>{]`, where Svelte's `regex_invalid_unquoted_attribute_value` spells that class as JS `\s` — so a comment after a non-ASCII-separated unquoted value (`<div a=x<NBSP>/* c */>`) is read as part of the value and never counted. Symmetric, so it cannot false-positive; it is a blind spot at exactly the spellings the parser's own terminator was fixed for. The scanners are deliberately self-contained (above), so the fix is a deliberate one, not a share.
@@ -599,19 +589,18 @@ Why it needs its own gate: **every other gate is blind to an over-width line, by
 Two real bugs (the mid-run comment weld and its leading twin) shipped an over-width line — one of them also non-idempotent — with `deno task check` green throughout.
 
 ```bash
-# width_audit - format each seed and report every output line over PRINT_WIDTH,
-# rolled up by shape. Pure Rust, no Deno, no instrumentation feature.
 cargo run --profile corpus -p tsv_debug --features audits width_audit
 cargo run --profile corpus -p tsv_debug --features audits width_audit ../corpora/collections/zzz/src
 # Also: --json, --jobs N, --verbose (every line, not the per-shape rollup), --limit N, --update.
-# A narrowed run (explicit paths / --limit) reports and exits 0 without grading — the
-# snapshot pins the full default run — and says so, so it cannot read as a green gate.
-#
-# GATED as a RATCHET over `width_audit_known.txt` — a no-new-KINDS gate, NOT a debt
-# list. Unlike gaps/blanks, "zero" is not the target: most over-width lines are the
-# overruns §Print Width Philosophy sanctions. A shape found but not pinned FAILS; a
-# pinned shape that stops firing FAILS.
 ```
+
+Reports every output line over `PRINT_WIDTH`, rolled up by shape; pure Rust, no Deno, no
+instrumentation feature. **Gated as a RATCHET** over `width_audit_known.txt` — a no-new-KINDS
+gate, NOT a debt list: unlike gaps/blanks, "zero" is not the target, since most over-width
+lines are the overruns §Print Width Philosophy sanctions. A shape found but not pinned FAILS; a
+pinned shape that stops firing FAILS. A narrowed run (explicit paths / `--limit`) reports and
+exits 0 without grading — the snapshot pins the full default run — and says so, so it cannot
+read as a green gate.
 
 `deno task width:audit:update` regenerates the snapshot; it refuses a narrowed run.
 
@@ -619,9 +608,9 @@ cargo run --profile corpus -p tsv_debug --features audits width_audit ../corpora
 
 **The key is `head…tail`, and the tail half is why it works.** A shape is the language bucket plus how the over-width line opens and ends. The head alone does **not** discriminate — measured against the reverted fix, a head-only key produced *no* new shape, while `head…tail` produced `IDENT…-->` (a long word running into a comment), which is exactly what that bug emitted. Identifiers collapse to `IDENT` so an ordinary rename does not churn the snapshot.
 
-**A third component, `inner`, keeps a weld out of the fattest shapes.** The two ends put a whole comment and two comments *welded onto one line* in the same bucket: `<!-- a -->` and `<!-- a --><!-- b -->` both open `<!--` and end `-->`. That matters because the fattest shape is exactly that one — measured over `tests/fixtures`, `<!--…-->` carries 218 of the 480 over-width lines (45%, across 134 files), and **every one of them is a single whole comment**. So its members are all *forced* overruns (tsv never rewraps a comment interior), and a weld is the only bug the silhouette could ever hide — the same class the trailing-run comment emitters have produced before, and one the ledger, census, F1 and round-trip are all blind to. `inner` records whether a `-->` or `*/` closes before the line does (`-` when none), rendered spliced (`head…-->…tail`). It costs **one** shape over `tests/fixtures`: the three `IDENT…WORD` lines that were mid-line comment glue split off from the 43 ordinary ones, and `<!--…WORD` becomes `<!--…-->…WORD` outright. Neither marker can occur inside the comment it closes, so a whole comment never reads as a weld.
+**A third component, `inner`, keeps a weld out of the fattest shapes.** The two ends put a whole comment and two comments *welded onto one line* in the same bucket: `<!-- a -->` and `<!-- a --><!-- b -->` both open `<!--` and end `-->`. That matters because the fattest shape is exactly that one — measured over `tests/fixtures`, `<!--…-->` carries nearly half the over-width lines, and **every one of them is a single whole comment**. So its members are all *forced* overruns (tsv never rewraps a comment interior), and a weld is the only bug the silhouette could ever hide — the same class the trailing-run comment emitters have produced before, and one the ledger, census, F1 and round-trip are all blind to. `inner` records whether a `-->` or `*/` closes before the line does (`-` when none), rendered spliced (`head…-->…tail`). It costs **one** shape over `tests/fixtures`: the `IDENT…WORD` lines that were mid-line comment glue split off from the ordinary ones, and `<!--…WORD` becomes `<!--…-->…WORD` outright. Neither marker can occur inside the comment it closes, so a whole comment never reads as a weld.
 
-⚠️ **What a non-`-` `inner` means over real code is NOT what it means over `tests/fixtures`, and the difference was mis-stated here before it was triaged.** Over `tests/fixtures` the only interior closers are the two `-->` weld shapes just described (`<!--…-->…WORD` and `IDENT…-->…WORD`) — no JSDoc-cast or string-interior kind occurs there. Over real code (`../svelte/packages/svelte/src` + `../zzz/src`: 1,255 overruns, 91 shapes) they mint 13 shapes / 24 lines, and reading every one of those lines splits them two ways:
+⚠️ **What a non-`-` `inner` means over real code is NOT what it means over `tests/fixtures`.** Over `tests/fixtures` the only interior closers are the two `-->` weld shapes just described (`<!--…-->…WORD` and `IDENT…-->…WORD`) — no JSDoc-cast or string-interior kind occurs there. Over real code (`../svelte/packages/svelte/src` + `../zzz/src`: 1,255 overruns, 91 shapes) they mint 13 shapes / 24 lines, and reading every one of those lines splits them two ways:
 
 - **9 shapes / 13 lines are minted by a genuine interior comment that is not a weld** — overwhelmingly the JSDoc cast (`… /** @type {T} */ (expr) …`), which really does close a block comment mid-line. `inner` is reporting the truth; it just isn't reporting a bug.
 - **4 shapes / 11 lines are the mirror false positive** — a `-->` or `*/` inside a *string*, *template*, *regex*, or the text of a `//` comment, read as interior with no comment involved. Only one of the four is the template-literal case (Svelte's migrator building `<!-- @migration-task … -->` text); string literals, regex literals and comment text produce it too.
@@ -634,77 +623,80 @@ So the triage note in the snapshot header holds — a new `inner` shape is a **q
 
 **Blind spots.**
 
-- **Not a bug list.** A pinned shape is a *kind of line that exists*, not a defect. Triage a new one against §Print Width Philosophy before pinning it; the sanctioned overruns are real and numerous (~480 lines over `tests/fixtures`, dominated by fixture prose headers a formatter never rewraps).
-- **Shape collision — the residual blind spot, and it is NOT closable by a fourth key component.** A width bug whose line happens to open, close inside, and end like an existing pinned shape passes. The key is a silhouette, not a proof; it catches new *kinds*, and a same-kind regression needs a fixture. The distribution says how concentrated that risk is: the fattest shape holds 45% of the lines and the top three hold 65%, so most of the corpus's absorbing power sits in a handful of buckets. `inner` (above) drains the specific bug class the fattest ones could hide; what remains is a *breakable* line — one with a real seam tsv failed to take — landing on a pinned silhouette. No third component separates that, because **nothing in the finished text distinguishes a seam tsv declined from one it never had** — that is a property of the artifact being measured, not a gap in the key, which is why no amount of further silhouette engineering reaches it. The rejected render-time hook (above) is the design that tried to read the seam instead of the text, and it is blind for its own, worse reason.
+- **Not a bug list.** A pinned shape is a *kind of line that exists*, not a defect. Triage a new one against §Print Width Philosophy before pinning it; the sanctioned overruns are real and numerous (hundreds of lines over `tests/fixtures`, dominated by fixture prose headers a formatter never rewraps).
+- **Shape collision — the residual blind spot, and it is NOT closable by a fourth key component.** A width bug whose line happens to open, close inside, and end like an existing pinned shape passes. The key is a silhouette, not a proof: it catches new *kinds*, and a same-kind regression needs a fixture. The risk is concentrated — the fattest shape holds 45% of the lines and the top three hold 65%. `inner` (above) drains the specific bug class the fattest ones could hide; what remains is a *breakable* line — one with a real seam tsv failed to take — landing on a pinned silhouette. No further component separates that, because **nothing in the finished text distinguishes a seam tsv declined from one it never had** — a property of the artifact being measured, not a gap in the key, so no silhouette engineering reaches it. The rejected render-time hook (above) tried to read the seam instead of the text, and is blind for its own, worse reason.
 
-  Worked example, found by triaging this audit over real code rather than hypothesized: tsv granted the flat test-call layout to `test('<long name>', (a, b) => { … })` and broke the callback's *parameter list* to chase the width, where prettier keeps the parameters flat — and to two 3-argument shapes prettier's `isTestCall` excludes outright, where prettier breaks every argument out and holds 100 (see [conformance_prettier.md §Print Width Philosophy](./conformance_prettier.md#print-width-philosophy)). Those emitted an over-width line ending in `(`, whose shape is `svelte IDENT…(` — **already pinned**, so the ratchet stayed green on all of it. That is the blind spot behaving exactly as described, and the only thing that reached it was a fixture with a parameterized callback: `test_functions`, the fixture that pins this layout, uses only parameterless ones, so the two cases are held by [test_functions_params](../tests/fixtures/typescript/expressions/calls/test_functions_params/) and [test_functions_timeout](../tests/fixtures/typescript/expressions/calls/test_functions_timeout/) instead.
+  Worked example, from triaging this audit over real code: tsv granted the flat test-call layout to `test('<long name>', (a, b) => { … })` and broke the callback's *parameter list* to chase the width, where prettier keeps the parameters flat — and to two 3-argument shapes prettier's `isTestCall` excludes outright, where prettier breaks every argument out and holds 100 (see [conformance_prettier.md §Print Width Philosophy](./conformance_prettier.md#print-width-philosophy)). Those emitted an over-width line ending in `(`, whose shape is `svelte IDENT…(` — **already pinned**, so the ratchet stayed green on all of it. That is the blind spot behaving exactly as described, and the only thing that reached it was a fixture with a parameterized callback: `test_functions`, the fixture that pins this layout, uses only parameterless ones, so the two cases are held by [test_functions_params](../tests/fixtures/typescript/expressions/calls/test_functions_params/) and [test_functions_timeout](../tests/fixtures/typescript/expressions/calls/test_functions_timeout/) instead.
 
-  So the honest answer is the one already stated: **a same-kind regression needs a fixture**, and the ratchet's job is new kinds. Read this audit's real-code output as a *triage list* for finding those fixtures — which is what produced the example above — never as a verdict.
+  So **a same-kind regression needs a fixture**, and the ratchet's job is new kinds: read this audit's real-code output as a *triage list* for finding those fixtures — which is what produced the example above — never as a verdict.
 - **Vacuous on a corpus with no wide lines.** `FIXTURES_FORMATTED_MIN` guards the file count, not the line count.
 
 ## Ignore-Directive Honoring Audit (`ignore:audit`)
 
-The mechanized discovery of unhonored `// prettier-ignore` / `format-ignore` positions (Arm A of the systematic ignore-honoring gap). Recognition is centralized (`tsv_lang::is_format_ignore_directive`), but *consumption* is a per-node opt-in the printer makes at ~15 scattered sites — any position without one silently reformats an ignored construct, which prettier-authored code does not expect. This audit turns the guess-list of suspected positions into a computed ledger, the way `comments:audit` structurally guards the per-site `owned_by_node` model rather than trusting each site by inspection. Design rationale lives in the `ignore_audit` module docs.
+The mechanized discovery of unhonored `// prettier-ignore` / `format-ignore` positions (Arm A of the systematic ignore-honoring gap). Recognition is centralized (`tsv_lang::is_format_ignore_directive`), but *consumption* is a per-node opt-in the printer makes at scattered sites — any position without one silently reformats an ignored construct, which prettier-authored code does not expect. This audit turns the guess-list of suspected positions into a computed ledger, the way `comments:audit` structurally guards the per-site `owned_by_node` model rather than trusting each site by inspection. Design rationale lives in the `ignore_audit` module docs.
 
 ```bash
-# ignore_audit - inject `// prettier-ignore` before every JS node and grade FIVE checks.
-# Per candidate node that leads its line (inside a code_regions JS span), prepend the
-# directive on its own line and DOUBLE the node's interior structural spaces
-# (reformat-removable; string/template/comment/regex interiors excluded), format, and grade:
-#   1 honoring        — the perturbed slice survives verbatim (absent ⇒ UNHONORED at the
-#                       node's AST position `{parent}.{field}`);
-#   2 stability       — the accepted output formats to ITSELF on a second pass (else
-#                       UNSTABLE — the freeze-on-pass-1/inert-on-pass-2 relocation class);
-#   3 scope           — the same injection with every structural space OUTSIDE the node
-#                       also doubled formats byte-identically to the primary output (else
-#                       OVERFROZEN — over-freezing otherwise reads as "honored");
-#   4 trailing inert  — the directive appended to the END of the preceding line instead
-#                       freezes nothing (else TRAILING_FROZEN — the decided placement
-#                       floor: a directive freezes only when alone on its line, no
-#                       exceptions; trailing an opening `{`/`[`/`(`/`<` is inert too);
-#   5 output reparse  — the accepted output still PARSES (else UNREPARSEABLE — a freeze
-#                       that dropped a required paren pair or welded the frozen `;` onto a
-#                       trailing `//` emitted a dead document; per candidate, like honoring,
-#                       and a dead output takes no second pass).
-# Checks 2-4 run only on the span-maximal node beginning on each line — the directive
-# binds to the OUTERMOST construct beginning there, so a narrower same-line candidate
-# would grade that decided wider freeze as a finding. Honoring stays per-candidate.
-# A cheaper per-injection battery (<= 4 formats + one bare parse) than blank_audit's F1. Pure Rust, no sidecar.
 cargo run --profile corpus -p tsv_debug --features audits ignore_audit   # tests/fixtures
 cargo run --profile corpus -p tsv_debug --features audits ignore_audit ../corpora/collections/zzz/src
-# Also: --json, --report, --jobs N, --limit N, --update. Build with `--profile corpus`
-# (optimized + panic=unwind) so a formatter panic is caught + reported.
-#
-# GATED as a RATCHET (like gap_audit / blank_audit): `ignore_audit_known.txt` pins the known
-# findings per (KIND, position). ⚠️ Unlike those two, the file is NOT a burn-down list: the
-# head families (list items, value heads, paren / assignment / statement / declaration heads)
-# are closed, and the remaining UNHONORED positions are predominantly expression-INTERIOR —
-# a directive written mid-expression, rare in authoring and a position where prettier's own
-# behavior is emergent rather than designed — held under a standing SANCTION rather than
-# queued for opt-ins. Lines outside that class (the UNSTABLE relocation transients, a few
-# non-interior positions) remain ordinary pinned bugs. The gate's job is unchanged: a NEW
-# (kind, position) pair, a STALE one (no longer fires), or any PANIC (a crash on the
-# injected directive — unpinnable) FAILS. Keyed
-# by AST position, so every site of a position rolls up to one line; a "covered" position
-# can still appear when an uncovered SUB-PATH of it (e.g. an object property nested in a
-# member chain) doesn't honor.
-# A Union/Intersection candidate is excluded outright (paren-transparently): Rule A freezes only its
-# first member at a single-child head, so the whole-node substring check is the wrong expectation
-# there — the member-level positions (`TSUnionType.types` / `TSIntersectionType.types`) carry that
-# placement. A closed line at a single-child head (e.g. `TSTypeAliasDeclaration.typeAnnotation`)
-# means only its non-composite sites honor; union-typed LIST members (whole-member freezes) also go
-# untested by the skip and ride on the member-freeze fixtures.
-# A statement whose declaration's decorators precede it (a decorator-first `@dec⏎export class C {}`
-# or `@dec⏎export declare class C {}`) is excluded too: the gap before `export` is inside the decorated declaration, where a directive is
-# inert in prettier and tsv alike (conformance_prettier_ignore.md, the decorator→declaration gap).
-# Scope: JS positions only (the TS `//` directive over code_regions — standalone .ts/.svelte.ts +
-# Svelte <script>/{expr}); CSS `/* prettier-ignore */` and Svelte template `<!-- prettier-ignore -->`
-# are a follow-up — and the template one has the most reach of any uncovered surface, because there
-# the gap between the directive and the node it freezes is itself whitespace the printer emits, so
-# getting it wrong is render-visible rather than a layout choice (conformance_prettier_ignore.md
-# §Format-ignore directive); whitespace-perturbation only (a quote/paren-only reformat is invisible — Arm B's
-# remit); only format fixed points injected.
+# Also: --json, --report, --jobs N, --limit N, --update
 ```
+
+Per candidate node that leads its line (inside a `code_regions` JS span), the audit prepends
+`// prettier-ignore` on its own line and DOUBLES the node's interior structural spaces
+(reformat-removable; string/template/comment/regex interiors excluded), formats, and grades
+five checks:
+
+1. **honoring** — the perturbed slice survives verbatim (absent ⇒ UNHONORED at the node's AST
+   position `{parent}.{field}`);
+2. **stability** — the accepted output formats to ITSELF on a second pass (else UNSTABLE — the
+   freeze-on-pass-1/inert-on-pass-2 relocation class);
+3. **scope** — the same injection with every structural space OUTSIDE the node also doubled
+   formats byte-identically to the primary output (else OVERFROZEN — over-freezing otherwise
+   reads as "honored");
+4. **trailing inert** — the directive appended to the END of the preceding line instead freezes
+   nothing (else TRAILING_FROZEN — the decided placement floor: a directive freezes only when
+   alone on its line, no exceptions; trailing an opening `{`/`[`/`(`/`<` is inert too);
+5. **output reparse** — the accepted output still PARSES (else UNREPARSEABLE — a freeze that
+   dropped a required paren pair or welded the frozen `;` onto a trailing `//` emitted a dead
+   document; per candidate, like honoring, and a dead output takes no second pass).
+
+Checks 2-4 run only on the span-maximal node beginning on each line — the directive binds to
+the OUTERMOST construct beginning there, so a narrower same-line candidate would grade that
+decided wider freeze as a finding. Honoring stays per-candidate. At most 4 formats + one bare
+parse per injection, cheaper than `blanks:audit`'s F1 battery. Pure Rust, no sidecar.
+
+**Gated as a RATCHET** (like gaps/blanks): `ignore_audit_known.txt` pins the known findings
+per (KIND, position). Keyed by AST position, so every site of a position rolls up to one line;
+a "covered" position can still appear when an uncovered SUB-PATH of it (e.g. an object
+property nested in a member chain) doesn't honor. A NEW (kind, position) pair, a STALE one (no
+longer fires), or any PANIC (a crash on the injected directive — unpinnable) FAILS. ⚠️ Unlike
+gaps/blanks, the file is NOT a burn-down list: the head families (list items, value heads,
+paren / assignment / statement / declaration heads) are closed, and the remaining UNHONORED
+positions are predominantly expression-INTERIOR — a directive written mid-expression, rare in
+authoring and a position where prettier's own behavior is emergent rather than designed — held
+under a standing SANCTION rather than queued for opt-ins. Lines outside that class (the
+UNSTABLE relocation transients, a few non-interior positions) remain ordinary pinned bugs.
+
+**Excluded candidates.**
+
+- **A Union/Intersection** (paren-transparently): Rule A freezes only its first member at a
+  single-child head, so the whole-node substring check is the wrong expectation there — the
+  member-level positions (`TSUnionType.types` / `TSIntersectionType.types`) carry that
+  placement. A closed line at a single-child head (e.g. `TSTypeAliasDeclaration.typeAnnotation`)
+  means only its non-composite sites honor; union-typed LIST members (whole-member freezes) also
+  go untested by the skip and ride on the member-freeze fixtures.
+- **A statement whose declaration's decorators precede it** (a decorator-first
+  `@dec⏎export class C {}` or `@dec⏎export declare class C {}`): the gap before `export` is
+  inside the decorated declaration, where a directive is inert in prettier and tsv alike
+  (conformance_prettier_ignore.md, the decorator→declaration gap).
+
+**Scope.** JS positions only (the TS `//` directive over `code_regions` — standalone
+`.ts`/`.svelte.ts` + Svelte `<script>`/`{expr}`). CSS `/* prettier-ignore */` and Svelte
+template `<!-- prettier-ignore -->` are a follow-up — the template one has the most reach of any
+uncovered surface, because there the gap between the directive and the node it freezes is
+itself whitespace the printer emits, so getting it wrong is render-visible rather than a layout
+choice (conformance_prettier_ignore.md §Format-ignore directive). Whitespace-perturbation only
+(a quote/paren-only reformat is invisible — Arm B's remit); only format fixed points injected.
 
 `deno task ignore:audit:update` regenerates the snapshot after adding a printer opt-in (a now-honored position goes stale → drop its line) or fixing a misbinding, over-freeze, or relocation transient; it refuses a narrowed run.
 
@@ -725,25 +717,29 @@ the anchor rule is `Printer::element_claim_anchor`.
 ## Build-Fanout Audit (`fanout:audit`)
 
 ```bash
-# build_fanout_audit - guard the O(1)-doc-builds-per-source-node invariant. A builder
-# that assembles `conditional_group` candidates by RE-INVOKING the recursive builder
-# on the same nodes — instead of building the subtree once and reusing the DocId —
-# grows the doc-node count exponentially in nesting depth (hang/OOM on a deeply-nested
-# but ordinary file). Builds synthetic nested inputs across one axis per
-# candidate-building construct (svelte elements / {#if} / {#each} / {#await} /
-# sibling-`>` dangle / glued inline-element runs and element→block dangles nested behind
-# block-holding wrappers, each compact and authored-multiline / {#snippet} / {#key}; ts member
-# chains, ternaries, conditional types, nested calls, and the expand-last arrow family
-# — plain, multi-arg, `new`, chain, object-body, conditional-body, `function`, and
-# curried, the last in untyped / typed / `new` / chain / object-TERMINAL spellings,
-# the object-terminal one again in single-argument, multi-argument and chain forms) at
-# increasing depth, failing if the doc-node count grows faster than ~depth^3. An axis
-# earns its place by REACHING a builder no other axis does; the curried axes came from
-# real 2^depth regressions that the family as it then stood could not see.
-# Deterministic, pure Rust, no Deno. Exits 1 on any super-linear case.
 cargo run -p tsv_debug build_fanout_audit
-# Also: --json. Gated in `deno task check` via the `fanout:audit` task.
+# Also: --json
 ```
+
+Guards the O(1)-doc-builds-per-source-node invariant. A builder that assembles
+`conditional_group` candidates by RE-INVOKING the recursive builder on the same nodes — instead
+of building the subtree once and reusing the DocId — grows the doc-node count exponentially in
+nesting depth (hang/OOM on a deeply-nested but ordinary file). The audit builds synthetic
+nested inputs at increasing depth along one axis per candidate-building construct, failing if
+the doc-node count grows faster than ~depth^3:
+
+- **Svelte** — elements, {#if}, {#each}, {#await}, the sibling-`>` dangle, glued inline-element
+  runs and element→block dangles nested behind block-holding wrappers (each compact and
+  authored-multiline), {#snippet}, {#key};
+- **TS** — member chains, ternaries, conditional types, nested calls, and the expand-last arrow
+  family: plain, multi-arg, `new`, chain, object-body, conditional-body, `function`, and
+  curried, the last in untyped / typed / `new` / chain / object-TERMINAL spellings, the
+  object-terminal one again in single-argument, multi-argument and chain forms.
+
+An axis earns its place by REACHING a builder no other axis does; the curried axes came from
+real 2^depth regressions that the family as it then stood could not see. Deterministic, pure
+Rust, no Deno; exits 1 on any super-linear case. Gated in `deno task check` via the
+`fanout:audit` task.
 
 **What it is blind to.** The audit measures how the doc-node count *grows with depth*, so it
 sees only violations that **compound**. Two shapes escape it:
@@ -762,28 +758,26 @@ a parenthesized binary chain base; see the `chain/printing.rs` note in the perf 
 ## Raw-Find Scan Audit (`scan:audit`)
 
 ```bash
-# scan_audit - guard against new raw position-anchoring substring scans over
-# source. A raw `self.source[..].find(delim)` can match the glyph inside an
-# enclosed comment/string and drop content (the "Comment-Aware Delimiter Scans"
-# bug class); the fix is the trivia-aware cursor (`tsv_lang::source_scan`).
-# Flags every `find`/`rfind`/`match_indices`/`rmatch_indices` (non-closure pattern)
-# in the four language crates and fails on any not in the reviewed, categorized
-# in-code allow-list (ALLOW). A new scan must move onto the cursor or be consciously
-# allow-listed; a migrated/reformatted scan must drop its now-stale entry (the list
-# mirrors the live sites exactly). Pure Rust, no Deno.
 cargo run -p tsv_debug scan_audit            # audit (exit 1 on any violation/stale)
 cargo run -p tsv_debug scan_audit --list     # enumerate every scan site
-# Also: --json. Gated in `deno task check` via the `scan:audit` task. Out of scope:
-# closure `.find(|…|)` (iterator/predicate), counting/existence checks, and hand
-# byte-loops (the cursor is their sanctioned home).
+# Also: --json
 ```
+
+Guards against new raw position-anchoring substring scans over source. A raw
+`self.source[..].find(delim)` can match the glyph inside an enclosed comment/string and drop
+content (the "Comment-Aware Delimiter Scans" bug class); the fix is the trivia-aware cursor
+(`tsv_lang::source_scan`). It flags every `find`/`rfind`/`match_indices`/`rmatch_indices`
+(non-closure pattern) in the four language crates and fails on any not in the reviewed,
+categorized in-code allow-list (ALLOW). A new scan must move onto the cursor or be consciously
+allow-listed; a migrated/reformatted scan must drop its now-stale entry (the list mirrors the
+live sites exactly). Out of scope: closure `.find(|…|)` (iterator/predicate), counting/existence
+checks, and hand byte-loops (the cursor is their sanctioned home). Pure Rust, no Deno; gated in
+`deno task check` via the `scan:audit` task.
 
 ## Self-Format Audit (`format:audit`)
 
 ```bash
-# tsv formats its own TS/JS. Runs `tsv format --check .` over the repo, so the
-# formatter's own output on real, non-fixture source is a standing gate.
-deno task format:audit
+deno task format:audit   # `tsv format --check .` over the repo
 ```
 
 **What it proves.** Two things at once, and it fails on either:
@@ -816,13 +810,12 @@ own TS never writes stays invisible here. The injection audits (`gaps:audit`,
 
 **Build world.** Runs the `tsv` binary of the shared `--profile corpus` world, which
 `deno task build:check` builds — `tsv_cli` and `tsv_debug` selected in ONE cargo
-invocation, so it adds no separate compile. That is the mechanism, not a happy accident:
-this leg wants the `tsv` BINARY, which the audits' own `-p tsv_debug --features audits`
-selection builds only as a library, and a `-p tsv_cli` selection of its own resolves
-features without `audits` and so compiles the whole stack a second time in the same
-profile (20.5 s of a 30.4 s stack rebuild, on every edit). Reintroducing `cargo run -p
-tsv_cli` here silently restores that second world — the claim above is only true while
-this leg and `discovery:audit` go through `build:check`.
+invocation, so it adds no separate compile. This leg wants the `tsv` BINARY, which the
+audits' own `-p tsv_debug --features audits` selection builds only as a library; a
+`-p tsv_cli` selection of its own resolves features without `audits` and so compiles the
+whole stack a second time in the same profile (20.5 s of a 30.4 s stack rebuild, on every
+edit). Reintroducing `cargo run -p tsv_cli` here silently restores that second world — the
+claim holds only while this leg and `discovery:audit` go through `build:check`.
 
 ## Corpus Discovery Parity Audit (`discovery:audit`)
 
@@ -876,19 +869,18 @@ requires the two runs to agree on everything observable: exit code, the changed-
 list on stdout, the diagnostics on stderr, and every resulting byte on disk. Both bins
 run with the temp tree as cwd, so even the paths they print are comparable. The default
 roots are `tests/fixtures` and `tests/fixtures_compile` plus `../corpora/collections`
-when the snapshot is present — ~18,000 files, several hundred of them the
-`input_invalid_*` family, so a refusal has to be worded alike as much as a format.
+when the snapshot is present — the `input_invalid_*` family among them, so a refusal has to be worded alike as much as a format.
 
 Two trees rather than one tree twice, deliberately: formatting with native and then
 re-running WASM over the SAME tree would prove only that native's output is a WASM fixed
 point, which two engines with genuinely different outputs can both satisfy.
 
 The WASM side runs under **node**, the host `cli.js` ships for, not under Deno's compat
-layer — which is not a detail. The audit's first honest run failed, and the finding was
-a `cli.js` bug that only exists on that host: spawning the worker pool pipes the
-workers' stdio through the parent, flipping fd 1 to non-blocking, after which the
-CLI's synchronous `writeFileSync(1, …)` threw `EAGAIN` into a full pipe and killed the
-run — with files already rewritten and the report of what changed lost.
+layer — which is not a detail. The audit's first run failed on a `cli.js` bug that exists
+only on that host: spawning the worker pool pipes the workers' stdio through the parent,
+flipping fd 1 to non-blocking, after which the CLI's synchronous `writeFileSync(1, …)` threw
+`EAGAIN` into a full pipe and killed the run — with files already rewritten and the report of
+what changed lost.
 
 **Blind spots.** It compares the two CLI **drivers** as well as the two engines, so a
 driver-only difference reads as a failure here (a real finding, just a differently
@@ -899,14 +891,15 @@ conformance gates' business, not this one.
 
 **Gating.** CI's `artifacts` job, immediately after the N-API step — the first point at
 which both artifacts exist (`build:packages` made the wasm one, the N-API step's
-`cargo build -p tsv_cli --release` the native one). Deliberately **not** in `deno task
-check`, which builds no packages — and not on the publish path either: `scripts/publish.ts`
-runs `validate:artifacts`, `test:npm`, `test:bun` (the wasm packages under Bun) and `typecheck:packages`, which grade each bundle alone, so the one
-engine-agreement verdict a release gets is the CI run on the commit it ships. Locally: `deno task build:npm:all && deno task
-build:napi:packages` first. Both bins are mtime-guarded like every other staged
-artifact, so a run against a binary from before a formatter change refuses rather than
-reporting a stale agreement. `../corpora` absent is a warn-skip (CI has no sibling
-checkouts); every root skipping is a failure, since then nothing was compared. ~7 s.
+`cargo build -p tsv_cli --release` the native one). Deliberately **not** in `deno task check`,
+which builds no packages — nor on the publish path: `scripts/publish.ts` runs
+`validate:artifacts`, `test:npm`, `test:bun` (the wasm packages under Bun) and
+`typecheck:packages`, which grade each bundle alone, so the one engine-agreement verdict a
+release gets is the CI run on the commit it ships. Locally:
+`deno task build:npm:all && deno task build:napi:packages` first. Both bins are mtime-guarded like every other staged artifact,
+so a run against a binary from before a formatter change refuses rather than reporting a stale
+agreement. `../corpora` absent is a warn-skip (CI has no sibling checkouts); every root
+skipping is a failure, since then nothing was compared. ~7 s.
 
 ## Doc-Link Audit (`docs:audit`)
 
@@ -918,45 +911,42 @@ deno task docs:audit
 
 **What it proves.** That every `[`path`]` in a doc comment still names something that
 exists. A doc link is the only claim a doc comment makes that a machine can check, so an
-unresolvable one is not a formatting nit — it is a **stale doc**. Every occurrence found
-when this gate was introduced was a rename that left its back-references behind:
-
-- a struct field doc'd as mirroring `ElementContext::block_flow_multiline`, a field that
-  had never existed on that struct (the value is a local, cached for two readers);
-- `stripped_redundant_paren_leading_line_comments`, renamed to
-  `stripped_redundant_paren_member_leading_run`, still named by two callers — one of
-  which also mis-described how the two forms differ;
-- `ControlFlowGap::BlockToKeyword`, an enum that exists nowhere; the real thing is
-  `push_block_to_keyword_gap`, called twenty lines below the comment naming it.
-
-None of those were reachable by any other gate. They were found only because clearing the
-27 accumulated broken links made them visible — which is the argument for denying rather
-than warning: a pile of known-broken links is precisely what hides the next one.
+unresolvable one is a **stale doc**, not a formatting nit. Every occurrence found when this
+gate was introduced was a rename that left back-references behind: a struct field doc'd as
+mirroring `ElementContext::block_flow_multiline`, a field that never existed on that struct
+(the value is a local, cached for two readers); `stripped_redundant_paren_leading_line_comments`,
+renamed to `stripped_redundant_paren_member_leading_run`, still named by two callers — one of
+which also mis-described how the two forms differ; and `ControlFlowGap::BlockToKeyword`, an
+enum that exists nowhere, for `push_block_to_keyword_gap` twenty lines below. None was
+reachable by any other gate; they surfaced only once the accumulated broken links were
+cleared — the argument for denying rather than warning: a pile of known-broken links is
+precisely what hides the next one.
 
 **Why `--document-private-items`.** All three staleness findings above were on **private**
 items, which a default `cargo doc` never checks. This codebase puts its design rationale
 on private functions, so the private-items build is both the one maintainers read and the
 only one where the gate has teeth.
 
-**Why the whole crate has to reach it — two silent coverage holes.** `cargo doc` documents a
-crate's *targets*, and a bin target whose name collides with its lib's is skipped outright.
-`tsv_debug` has exactly that shape — a `[[bin]] name = "tsv_debug"` beside a lib of the same
-name — so with `audit/` and `cli/` declared only in `main.rs` (two trees that are ~36k of the
-crate's ~56k lines) the gate would grade roughly a third of it and report green, a deliberately
-broken link in either passing. The crate is therefore one lib, with `main.rs` a shim over `cli`,
-which also keeps the shared modules from compiling twice under two roots. The second
-hole is `#[cfg(feature)]`: five `audit` submodules sit behind `comment_check`, so a default-feature
-build cannot resolve a link that names them — hence `--all-features`, which reaches gated code in
-every crate, not only this one. A **third** hole is `#[cfg(test)]`: rustdoc does not document test items under any feature
-set, so **every doc link inside a `#[cfg(test)] mod tests` is ungated** — including the ones on
-test-only `static`s and helpers, which is where a codebase like this one parks its oracles. A
-rename that leaves a back-reference in a test module's docs is invisible here and is caught only
-by reading the diff. (Found in `tsv_ts::lexer::token`, where the `KEYWORDS` oracle's doc still
-named a `const` that a perf change had replaced.)
+**Why the whole crate has to reach it — three silent coverage holes**, all failing the same
+way, which is the thing to remember about this gate: **absent code is indistinguishable from
+clean code**, so its coverage is a claim about what got compiled, not about what is in the tree.
 
-All three holes fail the same way, which is the thing to remember about
-this gate: **absent code is indistinguishable from clean code**, so its coverage is a claim about
-what got compiled, not about what is in the tree.
+- **A bin target whose name collides with its lib's is skipped outright** — `cargo doc`
+  documents a crate's *targets*. `tsv_debug` has exactly that shape —
+  a `[[bin]] name = "tsv_debug"` beside a lib of the same name — so with `audit/` and `cli/` declared only in
+  `main.rs` (two trees that are most of the crate) the gate would grade only the rest and
+  report green, a deliberately broken link in either passing. The crate is therefore one lib,
+  with `main.rs` a shim over `cli`, which also keeps the shared modules from compiling twice
+  under two roots.
+- **`#[cfg(feature)]`** — several `audit` submodules sit behind `comment_check`, so a
+  default-feature build cannot resolve a link that names them; hence `--all-features`, which
+  reaches gated code in every crate, not only this one.
+- **`#[cfg(test)]`** — rustdoc does not document test items under any feature set, so **every
+  doc link inside a `#[cfg(test)] mod tests` is ungated** — including the ones on test-only
+  `static`s and helpers, which is where a codebase like this one parks its oracles. A rename
+  that leaves a back-reference in a test module's docs is invisible here and is caught only by
+  reading the diff (as in `tsv_ts::lexer::token`, where the `KEYWORDS` oracle's doc still named
+  a `const` that a perf change had replaced).
 
 ⚠️ **A link in a module's `//!` docs resolves in the parent module's scope, not the module's own.**
 A `super::` path in an inner-doc block therefore means one level higher than the same path written
@@ -989,13 +979,12 @@ world the other `check` audits use, so it adds a short compile of its own.
 ## Wire-Type Drift Check (`check:ast-types`)
 
 ```bash
-# scripts/check_ast_types.ts — three arms over crates/tsv_wasm/types/tsv_ast.d.ts:
-# (A) `tsv parse --locations` a curated sample set, (B) assert every wire discriminant the fixture
-# corpus produces is declared, (C) type a computed cover of the corpus against the .d.ts.
-# A and C share one generated file and one `deno check`. ~20 s when the generated content
-# changes (nearly all arm C); an unchanged rerun hits deno's check cache at ~4.5 s.
-deno task check:ast-types
+deno task check:ast-types   # scripts/check_ast_types.ts
 ```
+
+Three arms (below) over `crates/tsv_wasm/types/tsv_ast.d.ts`; A and C share one generated file
+and one `deno check`. ~20 s when the generated content changes (nearly all arm C); an
+unchanged rerun hits deno's check cache at ~4.5 s.
 
 **What it proves.** That `crates/tsv_wasm/types/tsv_ast.d.ts` still describes what the
 converter emits. That `.d.ts` is hand-maintained and it **ships** — `@fuzdev/tsv-parse-wasm`
@@ -1061,14 +1050,13 @@ C keeps reporting truthfully about the `.d.ts`. Oracle freshness is
 **Blind spots.**
 
 - **A position under an `unknown`-typed field is not graded** — arm B covers only the *names*
-  under it. Five such fields remain, and the shape of the list is the point: three are the CSS
-  tree below the stylesheet root (`StyleSheet.children` / `.attributes`,
-  `StyleSheetFile.children`), opaque by an explicit decision; the other two are single nodes
-  (a regex `value`, which acorn itself emits as `{}`, and `<svelte:options customElement>`,
-  which the corpus samples four times). Everything else is typed. Widening one is how a region
-  gets *behind* the gate rather than merely inside it — `Script.content` was the big one, and
-  typing it (`unknown` → `Program`) is what put the `<script>` side of all ~4200 `.svelte`
-  fixtures under arm C at all.
+  under it. Few such fields remain, and the shape of the list is the point: the CSS tree below
+  the stylesheet root (`StyleSheet.children` / `.attributes`, `StyleSheetFile.children`),
+  opaque by an explicit decision, and two single nodes (a regex `value`, which acorn itself
+  emits as `{}`, and `<svelte:options customElement>`). Everything else is typed. Widening one
+  is how a region gets *behind* the gate rather than merely inside it — typing `Script.content`
+  (`unknown` → `Program`) is what put the `<script>` side of every `.svelte` fixture under arm
+  C at all.
 - **It asks only whether the two sides AGREE on a shape arm A reaches** — never whether that
   shape is the one acorn / `parseCss` / Svelte actually produce. Arm C narrows this a long way
   by grading the committed oracle wire, but the parse conformance gates remain the authority.
@@ -1109,7 +1097,9 @@ parseable source file in each fixture directory at its `goal` marker's goal — 
 `input.*` and its format variants, since `loc` needs no oracle (a lone leading BOM among
 them) — and streams both wires and the exact source as NDJSON; `scripts/check_loc.ts`
 reconstructs each span-only wire and compares (`benches/js/lib/loc_cross_grade.ts`, shared
-with the corpus comparator). No sidecar, no `node_modules`. A document the fixture tree
+with the corpus comparator). No sidecar, no `node_modules`.
+
+A document the fixture tree
 requires tsv to parse — the input and every variant tsv's own formatter reads
 (`unformatted_*`, `unformatted_ours_*`, `prettier_variant_*`, `variant_*`,
 `divergent_variant_*`) — fails the run if it does not parse. A prettier-side form
@@ -1120,7 +1110,9 @@ not always valid source — and the ones tsv rejects are a **ledger**,
 validity oracle for the syntax it breaks rejects (Svelte's parser, tsc, the CSS spec — some
 of them ones the canonical acorn / Svelte parser accepts, since tsc is the TypeScript oracle
 per [CLAUDE.md §Strictness](../CLAUDE.md#strictness-module-strict-script-by-directive)),
-the fixture's README saying why. It is graded both ways: a prettier-side reject the ledger
+the fixture's README saying why.
+
+It is graded both ways: a prettier-side reject the ledger
 does not list fails the run (tsv started rejecting a prettier output it parsed, or a new
 fixture's prettier output is invalid and needs listing), and a listed document the run walked
 that tsv now parses fails as stale (a run over a narrowed root grades the entries under it). Not graded at
@@ -1241,10 +1233,10 @@ learn first.
 names: the oracle's own transitive dependencies, which float on THEIR declared ranges. Today
 that is `esrap`, the printer that emits the JS `svelte.compile()` returns and therefore the
 effective oracle for every compile fixture — which svelte depends on as `^2.2.12`, a caret.
-Before the lockfile the compile oracle's output could change with no version in this repo
-changing and no pin site able to see it, which is exactly what happened: esrap 2.3.1 stopped
-dropping a string-literal specifier's `as` alias and silently staled five committed fixtures
-while `deno task check` stayed green. Bumping one is a deliberate oracle move — regenerate the
+Without the lock the compile oracle's output can change with no version in this repo
+changing and no pin site able to see it — esrap 2.3.1 did exactly that, ceasing to drop a
+string-literal specifier's `as` alias and silently staling committed fixtures with
+`deno task check` green. Bumping one is a deliberate oracle move — regenerate the
 lock, re-run `deno task compile:fixtures:validate`, update the constant, all in one change.
 
 **Blind spots.**
@@ -1316,72 +1308,74 @@ the `diverge (dual-stable)` bucket — sanctioned holds and accidental ones alik
 never graded and carries no ratchet file.
 
 ```bash
-# authoring_audit - probe whether the SAME logical document, authored with
-# different boundary whitespace, formats to ONE tsv fixed point. Stronger than the
-# corpus idempotency sweep: a formatter can be idempotent yet authoring-DEPENDENT
-# (two authorings settling on two different stable outputs). Two mutation families,
-# never a blank line (Tier-1 significant) and never inside <pre>/<textarea>:
-#   - BETWEEN siblings — space↔single-newline only. Inter-node whitespace is
-#     render-SIGNIFICANT (it collapses to one space, it doesn't vanish), so the run is
-#     reshaped, never created or destroyed. Both forms collapse identically ⇒ safe.
-#   ⚠️ The audit's own whitespace class is `is_collapsible_ws_char` (`[ \t\n\r]`), never Rust's
-#   `is_ascii_whitespace`. Every site it finds is spliced over WHOLESALE, so a character it
-#   wrongly counts as whitespace is one the mutation DELETES — the mutant is then a different
-#   document, and its second fixed point is a fact about the instrument rather than about the
-#   formatter. With the wide class a form-feed-bearing document reported 11 spurious
-#   dual-stable sites where its NBSP twin (the same document, same classification) reported 2.
-#   - At a tag's CONTENT BOUNDARY — hug↔space↔newline, i.e. the run IS created and
-#     destroyed. Svelte 5 removes start/end-of-content whitespace at compile, so all
-#     three authorings render identically. This is the family that catches a formatter
-#     letting a render-free character pick the layout (the delimiter-dangle class).
-#     Fits-inline content is probed too — tsv trims a render-free boundary run even when
-#     the content fits (`<span> text </span>` → `<span>text</span>`, the Svelte-mirror
-#     trim; fixture `inline_boundary_whitespace_prettier_divergence`,
-#     conformance_prettier_svelte.md
-#     §Svelte: Inline content block-style), so hug↔space↔newline reach ONE fixed point at
-#     every content boundary outside pre/textarea. Sanctioned residual: a BOTH-side
-#     newline-authored boundary around an ELEMENT child keeps its multiline layout
-#     (newlines are intent; text-only content glues regardless — width alone decides), so
-#     its single-boundary mutants settle glued — reported dual-stable, deliberate.
-# The element expansion a mutation may trigger is the property under test. Svelte only.
-# Gated in `deno task check` via the `authoring:audit` task — which scans tests/fixtures
-# ONLY, so point it at a real codebase too: findings live there (a non-idempotent fill
-# 2-cycle was green on fixtures while failing on ../zzz).
 cargo run -p tsv_debug authoring_audit                  # audit tests/fixtures (pure Rust)
 cargo run -p tsv_debug authoring_audit ../corpora/collections/zzz/src    # audit a real codebase
-# Pure-Rust verdict per site: converge / diverge (dual-stable) / diverge
-# (NON-IDEMPOTENT); exits 1 on any non-idempotency — site-level, and also a
-# base-non-idempotent FILE (one whose own format isn't a fixed point). Such a file
-# is excluded from the authoring analysis (its fixed point is undefined, so the
-# converge/diverge verdict would be meaningless), but the exclusion is not a reason
-# to pass the run — that is how a whole-file reflow could sit here reported-but-green.
-#
-# ⚠️ That file-level rule is a constraint on FIXTURE DESIGN, and it is the only gate
-# that states it: the walk takes every `.svelte` under tests/fixtures whose own format
-# is claimed stable — `output_prettier.*` included — so a `_prettier_divergence` whose
-# prettier form tsv does NOT hold stable fails `deno task check` HERE, several gates
-# after `fixtures:validate` reported the fixture green (`fixtures:validate` grades
-# `output_prettier` by F2 alone: it is prettier's output of `input`, and carries no tsv
-# claim). It bites when prettier's form is *mangled* rather than merely different, since
-# tsv often re-mangles it: prettier deletes the separator in `@supports (a: x\#FFF 0.5px)`
-# → `x\#FFF0.5px`, and tsv formats THAT to `x\#FFF00.5px`. Pick the divergence's case so
-# prettier's own output is a tsv fixed point — the same divergence with an integer
-# (`x\#FFF 5px` → `x\#FFF5px`) is stable on both sides and pins the identical claim.
-#
-# --prettier adds sidecar triage:
-# (a) tsv diverges where prettier converges (bug); (b) tsv converges where prettier
-# diverges (a _prettier_divergence to pin, the space_after_block class); (c) both
-# diverge (sanctioned, e.g. Tier-2 element expansion). --dump-dir writes byte-exact
-# repro artifacts per hard finding — the basis for a fixtures-first fix.
+cargo run -p tsv_debug authoring_audit ../corpora/collections/zzz/src --prettier --dump-dir /tmp/audit
 # Also: --json, --verbose, --site-limit N (sites per FILE — named apart from the sibling
 # audits' --limit, which caps files), --examples N.
-cargo run -p tsv_debug authoring_audit ../corpora/collections/zzz/src --prettier --dump-dir /tmp/audit
-# Containment: each file's tsv-side work (the prettier pass: each sync piece) runs under
-# catch_unwind with the default panic hook suppressed, like the pristine sweep and the
-# injection audits — a panic is a PANICKED entry (path + message, exact count, bounded
-# sample) and the walk continues; it FAILS the run. Needs the corpus profile's
-# panic = "unwind"; a stack overflow is not a panic and still aborts.
 ```
+
+Probes whether the SAME logical document, authored with different boundary whitespace,
+formats to ONE tsv fixed point — stronger than the corpus idempotency sweep, since a formatter
+can be idempotent yet authoring-DEPENDENT (two authorings settling on two different stable
+outputs). Svelte only. Two mutation families, never a blank line (Tier-1 significant) and never
+inside `<pre>`/`<textarea>`; the element expansion a mutation may trigger is the property under
+test:
+
+- **BETWEEN siblings** — space↔single-newline only. Inter-node whitespace is render-SIGNIFICANT
+  (it collapses to one space, it doesn't vanish), so the run is reshaped, never created or
+  destroyed. Both forms collapse identically ⇒ safe.
+- **At a tag's CONTENT BOUNDARY** — hug↔space↔newline, i.e. the run IS created and destroyed.
+  Svelte 5 removes start/end-of-content whitespace at compile, so all three authorings render
+  identically. This is the family that catches a formatter letting a render-free character pick
+  the layout (the delimiter-dangle class). Fits-inline content is probed too — tsv trims a
+  render-free boundary run even when the content fits (`<span> text </span>` →
+  `<span>text</span>`, the Svelte-mirror trim; fixture
+  `inline_boundary_whitespace_prettier_divergence`, conformance_prettier_svelte.md §Svelte:
+  Inline content block-style), so hug↔space↔newline reach ONE fixed point at every content
+  boundary outside pre/textarea. Sanctioned residual: a BOTH-side newline-authored boundary
+  around an ELEMENT child keeps its multiline layout (newlines are intent; text-only content
+  glues regardless — width alone decides), so its single-boundary mutants settle glued —
+  reported dual-stable, deliberate.
+
+⚠️ The audit's own whitespace class is `is_collapsible_ws_char` (`[ \t\n\r]`), never Rust's
+`is_ascii_whitespace`. Every site it finds is spliced over WHOLESALE, so a character it wrongly
+counts as whitespace is one the mutation DELETES — the mutant is then a different document, and
+its second fixed point is a fact about the instrument rather than about the formatter. With the
+wide class a form-feed-bearing document reported 11 spurious dual-stable sites where its NBSP
+twin (the same document, same classification) reported 2.
+
+**Verdicts.** Per site, pure Rust: converge / diverge (dual-stable) / diverge
+(NON-IDEMPOTENT); exits 1 on any non-idempotency — site-level, and also a base-non-idempotent
+FILE (one whose own format isn't a fixed point). Such a file is excluded from the authoring
+analysis (its fixed point is undefined, so the converge/diverge verdict would be meaningless),
+but the exclusion is not a reason to pass the run — that is how a whole-file reflow could sit
+here reported-but-green. Gated in `deno task check` via the `authoring:audit` task — which
+scans tests/fixtures ONLY, so point it at a real codebase too: findings live there (a
+non-idempotent fill 2-cycle was green on fixtures while failing on ../zzz).
+
+⚠️ **That file-level rule is a constraint on FIXTURE DESIGN, and this is the only gate that
+states it.** The walk takes every `.svelte` under tests/fixtures whose own format is claimed
+stable — `output_prettier.*` included — so a `_prettier_divergence` whose prettier form tsv
+does NOT hold stable fails `deno task check` HERE, several gates after `fixtures:validate`
+reported the fixture green (`fixtures:validate` grades `output_prettier` by F2 alone: it is
+prettier's output of `input`, and carries no tsv claim). It bites when prettier's form is
+*mangled* rather than merely different, since tsv often re-mangles it: prettier deletes the
+separator in `@supports (a: x\#FFF 0.5px)` → `x\#FFF0.5px`, and tsv formats THAT to
+`x\#FFF00.5px`. Pick the divergence's case so prettier's own output is a tsv fixed point — the
+same divergence with an integer (`x\#FFF 5px` → `x\#FFF5px`) is stable on both sides and pins
+the identical claim.
+
+**`--prettier`** adds sidecar triage: (a) tsv diverges where prettier converges (bug); (b) tsv
+converges where prettier diverges (a _prettier_divergence to pin, the space_after_block class);
+(c) both diverge (sanctioned, e.g. Tier-2 element expansion). `--dump-dir` writes byte-exact
+repro artifacts per hard finding — the basis for a fixtures-first fix.
+
+**Containment.** Each file's tsv-side work (the prettier pass: each sync piece) runs under
+catch_unwind with the default panic hook suppressed, like the pristine sweep and the injection
+audits — a panic is a PANICKED entry (path + message, exact count, bounded sample) and the walk
+continues; it FAILS the run. Needs the corpus profile's panic = "unwind"; a stack overflow is
+not a panic and still aborts.
 
 ## Paren-Authoring Independence Audit (`paren:audit`)
 
@@ -1405,12 +1399,12 @@ redundant paren carries no authoring signal either formatter honors.
 **Why it exists.** tsv cannot rebalance: acorn keeps the right-nested shape and tsv's wire must
 match it (the drop-in AST contract, priority #1). So every rule prettier asks of the rebalanced
 tree, tsv asks through a rebalanced *view* — `BinaryExpression::rebalanced_right`, named for
-prettier's `isUnbalancedLogicalTree`. That is a per-rule obligation across six callers, and **a
+prettier's `isUnbalancedLogicalTree`. That is a per-rule obligation across every caller, and **a
 rule left on the raw `binary.right` is invisible on every paren-free authoring** — which is
 every authoring a formatted corpus contains, since tsv's own output normalizes the parens away.
-bug539 was exactly that (one half of `should_inline_logical_expression`): it passed all ~4,300
-fixtures *and* the whole 9,305-file `corpus:compare:format` gate, and only a hand-written
-paren-nested twin exposed it. Nothing else enumerates that twin.
+One half of `should_inline_logical_expression` was exactly that: it passed every fixture *and*
+the whole `corpus:compare:format` gate, and only a hand-written paren-nested twin exposed it.
+Nothing else enumerates that twin.
 
 ### The relational chain class
 
@@ -1482,45 +1476,40 @@ greppable and cannot silently mean the wrong thing on a subtree run, and a **nar
 under the flag fails its floor, like a ratchet's refusal of a narrowed `:update`.
 
 ```bash
-# paren_audit - for every same-operator logical chain in the formatted base, insert the
-# redundant parens that re-associate it one level (`a op b op c` -> `a op (b op c)`), and for
-# every relational `<`…`>` chain insert each of its two shells, then require the twin to format
-# back to the base, byte for byte. Pure Rust, no sidecar —
-# one format per site. Defaults to tests/fixtures; pass dirs/files to audit real code.
-# Exits 1 on any finding. ~1.4 s over tests/fixtures.
 cargo run --profile corpus -p tsv_debug --features audits paren_audit
 cargo run --profile corpus -p tsv_debug --features audits paren_audit ../corpora/collections
-# Also: --json, --limit N (files), --examples N (findings shown, default 20), and
-# --dump-dir DIR — a byte-exact repro per finding (base / variant / ftry / ftry2 + note.txt,
-# the same four files `authoring_audit --dump-dir` writes), which is the seed a fixture is
-# made from without re-deriving the splice by hand.
-#
-# The LOGICAL mutation is a pure two-character insertion, and each of its three soundness
-# facts is a property of the acorn wire rather than an assumption about the text: both offsets are token
-# boundaries; the close offset is the OUTER node's end (`lastTokEnd`), so it lands past every
-# closing paren the node holds, and a group opened inside the spliced range also closes inside
-# it; and `&&` / `||` / `??` re-associate (all three short-circuit left to right). `LogicalExpression`
-# carries exactly those three operators, which is why the walk keys on the node TYPE and not on an
-# operator list — a `BinaryExpression` (`+`, `&`) is not re-associable and prettier does not
-# rebalance it. The RELATIONAL splices are insertions too, with none of that argument to make —
-# nothing re-associates; their own precondition is that tsv reads the twin as the same document,
-# which is checked per site. The walk is over the WIRE, so one enumerator covers a `.ts` module
-# and a Svelte component's <script>, template expression, block head, attribute and `{@const}` alike.
-#
-# Verdicts: converge / DIVERGE (dual-stable) / DIVERGE (non-idempotent) / variant parse error.
-# Everything but converge FAILS — there is no sanctioned remainder here. A variant parse error
-# would falsify the splice's own soundness argument, so it is a finding about the instrument,
-# never a pass. A base-non-idempotent FILE also fails: it is excluded from the re-association
-# analysis (its fixed point is undefined, so "formats back to the base" is meaningless), but
-# excluding it is not a reason to pass the run.
-# Containment: each file runs under catch_unwind with the default panic hook suppressed, like
-# the pristine sweep and the injection audits — a panic is a PANICKED entry (path + message,
-# exact count, bounded sample) and the walk continues; it FAILS the run. Needs the corpus
-# profile's panic = "unwind"; a stack overflow is not a panic and still aborts. Found the way
-# every corpus tool wants it: one 208-wire-level tsc file (minified asm.js) killed a whole
-# ../typescript/tests/cases run at the reader's old 128-level recursion limit — the reader is
-# now unbounded (tsv_debug::json), and the walk now survives whatever the next one is.
+# Also: --json, --limit N (files), --examples N (findings shown, default 20), --dump-dir DIR
 ```
+
+For every same-operator logical chain in the formatted base, the audit inserts the redundant
+parens that re-associate it one level (`a op b op c` -> `a op (b op c)`), and for every
+relational `<`…`>` chain each of its two shells, then requires the twin to format back to the
+base, byte for byte. Pure Rust, no sidecar — one format per site; defaults to tests/fixtures;
+exits 1 on any finding; ~1.4 s over tests/fixtures. `--dump-dir DIR` writes a byte-exact repro
+per finding (base / variant / ftry / ftry2 + note.txt, the same four files
+`authoring_audit --dump-dir` writes) — the seed a fixture is made from without re-deriving the splice by hand.
+
+**The splices.** The LOGICAL mutation is a pure two-character insertion, and each of its three
+soundness facts is a property of the acorn wire rather than an assumption about the text: both
+offsets are token boundaries; the close offset is the OUTER node's end (`lastTokEnd`), so it
+lands past every closing paren the node holds, and a group opened inside the spliced range also
+closes inside it; and `&&` / `||` / `??` re-associate (all three short-circuit left to right).
+`LogicalExpression` carries exactly those three operators, which is why the walk keys on the
+node TYPE and not on an operator list — a `BinaryExpression` (`+`, `&`) is not re-associable
+and prettier does not rebalance it. The RELATIONAL splices are insertions too, with none of
+that argument to make — nothing re-associates; their own precondition is that tsv reads the
+twin as the same document, which is checked per site. The walk is over the WIRE, so one
+enumerator covers a `.ts` module and a Svelte component's <script>, template expression, block
+head, attribute and `{@const}` alike.
+
+**Verdicts**: converge / DIVERGE (dual-stable) / DIVERGE (non-idempotent) / variant parse
+error. Everything but converge FAILS — there is no sanctioned remainder here. A variant parse
+error would falsify the splice's own soundness argument, so it is a finding about the
+instrument, never a pass. A base-non-idempotent FILE also fails, as in `authoring:audit`:
+excluded from the re-association analysis ("formats back to the base" is meaningless without a
+fixed point), but not a reason to pass the run. **Containment** is also `authoring:audit`'s:
+per-file catch_unwind with the default panic hook suppressed, a panic a PANICKED entry that
+FAILS the run while the walk continues; a stack overflow still aborts.
 
 **Graded as a hard gate, not a ratchet — measured before deciding.** Zero findings over
 `tests/fixtures` (1,377 logical sites), the `../corpora`
@@ -1532,12 +1521,12 @@ own rather than reading their real-code zero as coverage.
 
 It gates twice, on `tests/fixtures` in `deno task check` and over **real code** as a leg of
 [`audit:corpus`](#the-corpus-bundle-auditcorpus) — the real-code corpus carries more logical
-chains than the fixture tree (2,532 sites), and the class it grades is one no corpus of
-formatted code can show on its own. The prettier suites are deliberately not a seed there: six of their files
+chains than the fixture tree, and the class it grades is one no corpus of
+formatted code can show on its own. The prettier suites are deliberately not a seed there: a few of their files
 are not tsv F1 fixed points, which this audit reports as a failure of its own, and that question
 belongs to the bundle's F1 sweep.
 
-**Positive control (the logical class).** Reverting bug539's one-line fix
+**Positive control (the logical class).** Reverting that one-line fix
 (`binary.rebalanced_right()` →
 `binary.right`) turns the fixtures run red with **30 findings across 11 files**, ten of which
 are ordinary fixtures that predate the bug — so this audit would have caught it automatically,
@@ -1563,7 +1552,6 @@ spelled both ways.
   and no fixture or corpus file holds them — so the count printed here is where they surface.
 - **CSS has no expression grammar**, so `.css` seeds hold no sites at all; the audit's subject
   filter is the Svelte + TypeScript families.
-
 - **Only the paren-INSERTING direction.** Sites are enumerated from tsv's own fixed point, which
   normalizes the parens away, so a chain reaches this audit paren-free. Were tsv's fixed point
   ever to *retain* a redundant paren, that shape's paren-free twin would go unprobed — that is
@@ -1575,7 +1563,7 @@ spelled both ways.
 - **A site whose `(` would land after a forward-binding block comment is excluded** — the splice
   would re-bind a JSDoc cast or a bundler annotation (`err && /** @type {any} */ (err).name && …`
   becomes `err && /** @type {any} */ ((err).name && …)`, where the cast now annotates the whole
-  chain), making the twin a different document. Both of the corpus's only two divergences were
+  chain), making the twin a different document. Every divergence the corpus produced was
   exactly this. The count is printed rather than dropped silently — an audit that quietly stops
   probing a class reads like one that finds nothing in it. Paren-vs-comment binding is
   [`binding:audit`](#commenttoken-binding-audit-bindingaudit)'s subject, where a migrating paren
@@ -1629,15 +1617,14 @@ known geometry rather than confounding width with the first format's reflow.
   the run to one space either way); only a column separates the two forms.
 
 **The oracle is structural, and that is measured, not assumed.** A raw text scan for "line
-starts with indent + a space" is unusable: 406 lines across the fixture tree's own *output*
+starts with indent + a space" is unusable: hundreds of lines across the fixture tree's own *output*
 files already do, dominated by block-comment continuations (` *`, ` */`), expression alignment
 (` )`, ` }`), multiline attribute values and `<pre>` content — all legitimate. So the scan asks
 the **parse**: a violation is a space at a line head *inside a fragment `Text` node*. The
 exclusions mirror the printer's own verbatim-emission dispatch rather than re-deriving a rule
 — `<pre>`/`<textarea>`, `<script>`/`<style>`, a foreign-language `<template>`, non-`Fragment`
 text decodings, and format-ignore in **both** its node and **range** forms. (Missing the range
-form was a real false-positive class caught on the first run: it accused 476 lines of the
-author's own frozen bytes.)
+form would be a real false-positive class: it would accuse the author's own frozen bytes.)
 
 **Validated against a known bug rather than asserted.** Built pre-fix (the tail-boundary claim
 reverse-applied, gated on an `objcopy .text` comparison so no stale binary could fake either
@@ -1655,65 +1642,70 @@ shared sweep's worker pool buys the most: ~14.6 s at `--jobs 1`).
 ## Format→Reparse Round-Trip Audit (`roundtrip:audit`)
 
 ```bash
-# roundtrip_audit - corpus-scale "does format(src) reparse to the SAME document?".
-# Catches the class the other gates can't see: output that mis-delimits but loses no
-# characters (attr='a"b' → attr="a"b", `+(+x)` → `++x`) — corpus:compare:format's
-# SAFETY is char-frequency, BLIND to delimiter/structure corruption. Two phases
-# (tsv-self pre-filter → canonical confirm via sidecar): parse input and formatted
-# output, take the NODE-POPULATION CENSUS of each (every node by `type`, minus the
-# wrappers and separators the formatter rewrites by design — whitespace Text, EmptyStatement,
-# union/intersection/paren/instantiation/chain shells, directive shorthand values — plus
-# every word of template text, read across a fragment's text siblings as the page renders
-# them, so a word that straddles a hoisted section or a comment is one word;
-# `node_conservation_diff`'s table is the invariant), then
-# reduce each to a STRUCTURAL SKELETON (node-tree shape + `type`, erasing
-# reformattable leaf scalars, acorn `extra`, and per-node comment ATTACHMENT — the root
-# `comments` array still pins every comment's presence + kind, the leaf check its text),
-# compare — so legit reformatting doesn't read as corruption. Buckets:
-# {tsv,canonical}_unreparseable (the prize — output the parser rejects),
-# {tsv,canonical}_node_loss (a node dropped / duplicated / re-typed — the class the skeleton
-# SEES but filed into the render-noisy divergent bucket, which is how a glued element run
-# before a block printing only its last member shipped; zero-tolerance, no ratchet),
-# {tsv,canonical}_leaf_corruption (the skeleton holds but conserved leaf text changed) and
-# {tsv,canonical}_divergent (structural change); read_error, format_error,
-# canonical_rejects_input and canonical_diverges_on_input are skips that carry no verdict.
-# The gate buckets read zero on real formatted code; the divergent bucket there holds a
-# handful of template files where a whitespace Text node appears or vanishes beside a BLOCK
-# element — real document drift for this audit's deliberately narrower question (see
-# `render_browser`'s module doc), render-free for the compiler (`render:audit` grades the
-# same files equivalent) — so point it at the delimiter-dense prettier suites for the
-# work-list.
 cargo run -p tsv_debug roundtrip_audit                              # audit tests/fixtures
 cargo run -p tsv_debug roundtrip_audit ../prettier/tests/format/js ../corpora/collections/zzz/src
-# --gate fails on the *_unreparseable, *_node_loss and *_leaf_corruption buckets (divergent
-# is render-model noise over tests/fixtures). Bare --gate runs phase 1 only via a
-# population-only fast path (reparse + the node census, no skeleton / leaves; pure Rust,
-# no sidecar) — which censuses each side's wire BYTES and builds no AST tree at all, since
-# the tree is what the checks it skips wanted — the `deno task roundtrip:audit` check gate;
-# a cheap tripwire over tests/fixtures, real yield on external corpora.
-# --canonical-all confirms every file (also guards canonical_unreparseable: tsv's
-# parser accepting output the real parser rejects).
 cargo run -p tsv_debug roundtrip_audit --gate                       # the check gate (pure Rust, tests/fixtures)
 deno task roundtrip:audit:prettier                                 # the check gate's second scope (the prettier suites)
 cargo run -p tsv_debug roundtrip_audit --gate --canonical-all ../prettier/tests/format  # thorough
-# Also: --no-render, --verbose (AST diff per finding), --limit N, --json. The full
-# (non-gate) run is a diagnostic: it reports every finding bucket and exits 0 (the divergent
-# bucket over tests/fixtures is Svelte-reflow-noisy vs render_normalize's simpler whitespace
-# model).
 cargo run -p tsv_debug roundtrip_audit --canonical-all --verbose ../prettier/tests/format/typescript
+# Also: --no-render, --verbose (AST diff per finding), --limit N, --json
 ```
+
+Corpus-scale "does format(src) reparse to the SAME document?". It catches the class the other
+gates can't see: output that mis-delimits but loses no characters (attr='a"b' → attr="a"b",
+`+(+x)` → `++x`) — corpus:compare:format's SAFETY is char-frequency, BLIND to
+delimiter/structure corruption.
+
+**How.** Two phases (tsv-self pre-filter → canonical confirm via sidecar). Parse input and
+formatted output and take the NODE-POPULATION CENSUS of each — every node by `type`, minus the
+wrappers and separators the formatter rewrites by design (whitespace Text, EmptyStatement,
+union/intersection/paren/instantiation/chain shells, directive shorthand values), plus every
+word of template text, read across a fragment's text siblings as the page renders them, so a
+word that straddles a hoisted section or a comment is one word; `node_conservation_diff`'s
+table is the invariant. Then reduce each to a STRUCTURAL SKELETON (node-tree shape + `type`,
+erasing reformattable leaf scalars, acorn `extra`, and per-node comment ATTACHMENT — the root
+`comments` array still pins every comment's presence + kind, the leaf check its text) and
+compare, so legit reformatting doesn't read as corruption.
+
+**Buckets.**
+
+- {tsv,canonical}_unreparseable — the prize: output the parser rejects;
+- {tsv,canonical}_node_loss — a node dropped / duplicated / re-typed: the class the skeleton
+  SEES but filed into the render-noisy divergent bucket, which is how a glued element run
+  before a block printing only its last member shipped; zero-tolerance, no ratchet;
+- {tsv,canonical}_leaf_corruption — the skeleton holds but conserved leaf text changed;
+- {tsv,canonical}_divergent — structural change;
+- read_error, format_error, canonical_rejects_input and canonical_diverges_on_input — skips
+  that carry no verdict.
+
+The gate buckets read zero on real formatted code; the divergent bucket there holds a handful
+of template files where a whitespace Text node appears or vanishes beside a BLOCK element —
+real document drift for this audit's deliberately narrower question (see `render_browser`'s
+module doc), render-free for the compiler (`render:audit` grades the same files equivalent) —
+so point it at the delimiter-dense prettier suites for the work-list.
+
+**Modes.** `--gate` fails on the *_unreparseable, *_node_loss and *_leaf_corruption buckets
+(divergent is render-model noise over tests/fixtures). A bare `--gate` runs phase 1 only, via
+a population-only fast path (reparse + the node census, no skeleton / leaves; pure Rust, no
+sidecar) that censuses each side's wire BYTES and builds no AST tree at all, since the tree is
+what the skipped checks wanted — the `deno task roundtrip:audit` check gate, a cheap tripwire
+over tests/fixtures with its real yield on external corpora. `--canonical-all` confirms every
+file (also guards canonical_unreparseable: tsv's parser accepting output the real parser
+rejects). The full (non-gate) run is a diagnostic: it reports every finding bucket and exits 0
+(the divergent bucket over tests/fixtures is Svelte-reflow-noisy vs render_normalize's simpler
+whitespace model).
 
 ### Two scopes in `check`, and why the second one is opportunistic
 
 `deno task check` runs the audit twice: over `tests/fixtures` (`roundtrip:audit`) and over the
-pinned Prettier format suites (`roundtrip:audit:prettier`, ~2,350 files in ~0.17 s on the binary
+pinned Prettier format suites (`roundtrip:audit:prettier`, ~0.17 s on the binary
 the first leg already built; the first leg is ~0.9 s over `tests/fixtures`, about two thirds of
 it the format itself and the rest emitting both wires and censusing them — see the command's
 module doc for the measured board). The second scope is not redundancy — it is the only corpus in
 `check` that is **not format-stable**. The fixture tree cannot contain the input shape that
 triggers a valid→unreparseable regression, which is how a statement-head paren strip
 (`for ((let) of foo);` → `for (let of foo);`, output tsv's own parser rejects) sat behind a green
-`check` for a whole PR while three prettier-suite files caught it on the first run.
+`check` while prettier-suite files caught it on the first run.
 
 Its corpus is a **sibling checkout**, so it is read opportunistically: present ⇒ it gates,
 absent ⇒ a loud `NOT RUN` line and exit 0. That keeps `check` runnable on a bare clone (the CI
@@ -1744,10 +1736,10 @@ Corrections, the `:nth-child(… of …)` selectors and the consecutive combinat
 Corrections, the entity decodings under §Entity Decoding Corrections — and in every one of
 them tsc, prettier, or the spec grades tsv right and the canonical parser wrong.
 
-It stays **tight**, which is the property that makes it safe: 20 of 10,171 `tests/fixtures`
-files, 2 of the 2,351 files the pinned prettier suites walk (3 of 4,784 across all of
-`../prettier/tests/format`), and **0 of 6,702** in the `../corpora` snapshot. 18 of those 20
-sit in fixture directories whose own `_svelte_divergence` /
+It stays **tight**, which is the property that makes it safe: a handful of `tests/fixtures`
+files, a couple of the files the pinned prettier suites walk (and of all of
+`../prettier/tests/format`), and **none** in the `../corpora` snapshot. All but two of the
+fixture hits sit in fixture directories whose own `_svelte_divergence` /
 `_svelte_prettier_divergence` suffix already declares the parse divergence, so the census
 rediscovers the declared set from the other side. The two that do not are
 [class/abstract/export_default_line_break](../tests/fixtures/typescript/declarations/class/abstract/export_default_line_break/)
@@ -1774,89 +1766,81 @@ so it is blind to anything inside a `<script>` island — both fixtures live in 
 ## Comment↔Token Binding Audit (`binding:audit`)
 
 ```bash
-# binding_audit - does format re-bind a FORWARD-binding comment to a different
-# subtree? Two comment kinds bind to the token AFTER them: a JSDoc type cast
-# (`/** @type {T} */ (x)` — the parens + comment ARE the cast) and a bundler
-# annotation (`/* @__PURE__ */ f()` — marks the call side-effect-free). A paren
-# migrating across such a comment under formatting silently re-binds it (a cast
-# annotating a wider node, an annotation gone inert). This class is INVISIBLE to
-# every other gate — neither a cast, a grouping paren, nor an annotation is a
-# public-AST node, so both forms serialize to byte-identical wire JSON: ast_diff
-# says "equivalent", roundtrip_audit's skeleton can't see it, corpus SAFETY is
-# char-frequency (the characters only MOVE). Pure Rust, no sidecar.
-#
-# Signal: reparse input + tsv-formatted output with `preserve_parens` (grouping
-# parens become ParenthesizedExpression nodes), and per glued comment compare the
-# bound subtree. A cast stays invisible even so (its JsdocCast node emits its bare
-# inner), so the audit anchors INSIDE the cast's `(`. And since the only structural
-# delta formatting can add under preserve_parens is a clarity-paren (roundtrip_audit
-# gates the rest), the skeleton is compared with ParenthesizedExpression STRIPPED —
-# the binding-paren signal rides a separate `anchor_is_paren` flag. So a clarity
-# paren deep inside is not a finding; a GROUPING paren at the anchor is.
-#
-# ⚠️ Both `(` tests ask for a NODE, never for the byte. An arrow's parameter list
-# also opens with `(` and is the arrow's own syntax, so `/* c */ x => x` ->
-# `/* c */ (x) => x` (`arrowParens: always`) binds the same ArrowFunctionExpression
-# either way, and a cast-shaped comment on a bare parameter is not a cast. The byte
-# test called both re-bindings and reported HARD on ordinary JS
-# (`arr.map(/* index unused */ x => x.id)`). "No node begins at the `(`" is NOT the
-# cast test either: a real cast's parens are swallowed by whatever encloses it, so
-# `(root).head` has a MemberExpression starting right there. Only an arrow begins
-# at its own parameter `(`.
-#
-# HARD (a parser-owned glued comment re-binds) fails --gate — every glued block
-# comment is owned, so a cast, an annotation, and a plain glued comment alike; SOFT
-# (an unowned glued block comment, now rare) is informational. TS-family files
-# only (.ts/.js/.mts/.cts/…); casts/annotations concentrate in JSDoc-typed JS.
 cargo run -p tsv_debug binding_audit                                  # audit tests/fixtures
 cargo run -p tsv_debug binding_audit ../svelte/packages/svelte/src ../prettier/tests/format/js
 cargo run -p tsv_debug binding_audit --gate                          # the check gate (HARD only)
-# Also: --verbose (in→out bound-subtree per finding), --limit N, --json. A run without
-# --gate reports HARD and SOFT findings and exits 0; only --gate fails (on HARD). A bare
-# --gate over tests/fixtures is a cheap tripwire (fixtures are format-stable); the
-# real yield is external corpora, where JSDoc casts + annotations are dense.
 cargo run -p tsv_debug binding_audit --verbose ../svelte/packages/svelte/src
+# Also: --verbose (in→out bound-subtree per finding), --limit N, --json
 ```
+
+Does format re-bind a FORWARD-binding comment to a different subtree? Two comment kinds bind to
+the token AFTER them: a JSDoc type cast (`/** @type {T} */ (x)` — the parens + comment ARE the
+cast) and a bundler annotation (`/* @__PURE__ */ f()` — marks the call side-effect-free). A
+paren migrating across such a comment under formatting silently re-binds it (a cast annotating
+a wider node, an annotation gone inert). This class is INVISIBLE to every other gate — neither
+a cast, a grouping paren, nor an annotation is a public-AST node, so both forms serialize to
+byte-identical wire JSON: ast_diff says "equivalent", roundtrip_audit's skeleton can't see it,
+corpus SAFETY is char-frequency (the characters only MOVE). Pure Rust, no sidecar. TS-family
+files only (.ts/.js/.mts/.cts/…); casts/annotations concentrate in JSDoc-typed JS.
+
+**Signal.** Reparse input + tsv-formatted output with `preserve_parens` (grouping parens become
+ParenthesizedExpression nodes), and per glued comment compare the bound subtree. A cast stays
+invisible even so (its JsdocCast node emits its bare inner), so the audit anchors INSIDE the
+cast's `(`. And since the only structural delta formatting can add under preserve_parens is a
+clarity-paren (roundtrip_audit gates the rest), the skeleton is compared with
+ParenthesizedExpression STRIPPED — the binding-paren signal rides a separate `anchor_is_paren`
+flag. So a clarity paren deep inside is not a finding; a GROUPING paren at the anchor is.
+
+⚠️ Both `(` tests ask for a NODE, never for the byte. An arrow's parameter list also opens with
+`(` and is the arrow's own syntax, so `/* c */ x => x` -> `/* c */ (x) => x`
+(`arrowParens: always`) binds the same ArrowFunctionExpression either way, and a cast-shaped
+comment on a bare parameter is not a cast — a byte test calls both re-bindings and reports HARD
+on ordinary JS (`arr.map(/* index unused */ x => x.id)`). "No node begins at the `(`" is NOT
+the cast test either: a real cast's parens are swallowed by whatever encloses it, so
+`(root).head` has a MemberExpression starting right there. Only an arrow begins at its own
+parameter `(`.
+
+**Verdicts.** HARD (a parser-owned glued comment re-binds) fails `--gate` — every glued block
+comment is owned, so a cast, an annotation, and a plain glued comment alike; SOFT (an unowned
+glued block comment, now rare) is informational. A run without `--gate` reports both and exits
+0. A bare `--gate` over tests/fixtures is a cheap tripwire (fixtures are format-stable); the
+real yield is external corpora, where JSDoc casts + annotations are dense.
 
 ## Render-Equivalence Audit (`render:audit`)
 
 ```bash
-# render_audit - corpus-scale "does `tsv format` change what a Svelte component
-# RENDERS?". Per .svelte file: compare the browser-visible RENDER KEY of the source
-# against the render key of format(source). The key is `svelte compile --generate
-# server` reduced to its visible render (baked template text, `${…}` holed out,
-# <script>/<style>/comments stripped, whitespace collapsed with block-boundary
-# whitespace dropped) — equal keys prove equal renders (save the two misgrades
-# below), and a <script>/<style> reformatting that leaves the template alone is
-# correctly ignored.
-#
-# This is the CORPUS-SCALE arm of the fixture render-equivalence check (the R rules
-# in `fixtures:validate`). Those gate a CURATED corpus whose whitespace variants are
-# hand-authored to be render-equivalent — a regression guard, close to the least
-# likely place for a render change to hide. Real code is the exposure, the same gap
-# `audit:corpus` exists to close for the content-loss class.
-#
-# Invisible to every other gate: corpus:compare:format's SAFETY is char-frequency
-# (blind — the characters only MOVE), roundtrip_audit's structural skeleton erases
-# the very whitespace that carries the meaning, and authoring_audit asks the
-# CONVERGENCE question (do two authorings reach one fixed point), never whether that
-# fixed point renders like the input.
 cargo run --profile corpus -p tsv_debug --quiet render_audit ../corpora/collections/zzz/src
 deno task render:audit ../svelte/packages/svelte/tests   # (--gate baked in)
-# Also: --gate (exit 1 on findings), --json, --limit N (0 = unlimited, as in every
-# other audit). Needs the Deno sidecar, so
-# NOT in `deno task check` — and not in the pure-Rust `audit:corpus` either. It is
-# release-gated as a leg of `deno task conformance` (the one leg that runs as a
-# subprocess), scoped there to the WHOLE `../corpora` snapshot (every collection it
-# vendors, placed in a corpus tier or not, since this leg pins no count) plus the
-# version-pinned `suite` checkout, so a live working
-# tree can't move a release verdict; run it standalone on any corpus
-# after a printer change. Files whose format is a no-op skip the ORACLE (trivially
-# render-equal by identity) but still carry a verdict, so they count toward the
-# vacuity floor; files Svelte's semantic ANALYZER rejects are counted as
-# compile-blind (that arm cannot speak there) and do not. The in-repo, any-corpus form of
-# ../test-svelte-prettier-whitespace/whitespace-safety-check.mjs.
+# Also: --gate (exit 1 on findings), --json, --limit N (0 = unlimited, as in every other audit)
 ```
+
+Corpus-scale "does `tsv format` change what a Svelte component RENDERS?". Per .svelte file it
+compares the browser-visible RENDER KEY of the source against that of format(source). The key
+is `svelte compile --generate server` reduced to its visible render (baked template text,
+`${…}` holed out, <script>/<style>/comments stripped, whitespace collapsed with block-boundary
+whitespace dropped) — equal keys prove equal renders (save the two misgrades below), and a
+<script>/<style> reformatting that leaves the template alone is correctly ignored.
+
+It is the CORPUS-SCALE arm of the fixture render-equivalence check (the R rules in
+`fixtures:validate`), which gates a CURATED corpus whose whitespace variants are hand-authored
+to be render-equivalent — a regression guard, close to the least likely place for a render
+change to hide. Real code is the exposure, the same gap `audit:corpus` exists to close for the
+content-loss class. Invisible to every other gate: corpus:compare:format's SAFETY is
+char-frequency (blind — the characters only MOVE), roundtrip_audit's structural skeleton erases
+the very whitespace that carries the meaning, and authoring_audit asks the CONVERGENCE question
+(do two authorings reach one fixed point), never whether that fixed point renders like the
+input.
+
+**Gating.** Needs the Deno sidecar, so NOT in `deno task check` — nor the pure-Rust
+`audit:corpus`. Release-gated as a leg of `deno task conformance` (the one leg that runs as a
+subprocess), scoped there to the WHOLE `../corpora` snapshot (every collection it vendors,
+placed in a corpus tier or not, since this leg pins no count) plus the version-pinned `suite`
+checkout, so a live working tree can't move a release verdict; run it standalone on any corpus
+after a printer change. Files whose format is a no-op skip the ORACLE (trivially render-equal
+by identity) but still carry a verdict, so they count toward the vacuity floor; files Svelte's
+semantic ANALYZER rejects are counted as compile-blind (that arm cannot speak there) and do
+not. The in-repo, any-corpus form of
+`../test-svelte-prettier-whitespace/whitespace-safety-check.mjs`.
 
 **What it is blind to: a shape the corpus does not contain.** It grades the files that exist, so
 it proves only that formatting preserved the render *of real code* — a render-visible deletion in
@@ -1884,78 +1868,80 @@ keys as equal — a missed finding, the direction the audit exists to refuse.
 ## Layout-Neutrality Audit (`neutrality_audit`)
 
 ```bash
-# neutrality_audit - does a comment's OWNERSHIP ever change tsv's layout? An owned
-# comment must occupy exactly the page space a same-width ordinary comment does — a
-# layout gate that instead SKIPS owned comments (asks the to-emit question where it
-# should ask on-page) goes blind, and the comment silently changes the layout it
-# should have forced. At each glued block-comment position, format the file with the
-# comment made OWNED (annotation-shaped) and made ORDINARY (plain filler) at the SAME
-# width — only ownership varies, so any layout difference is a gate reading ownership.
-# Pure Rust, no sidecar. A development / characterization tool, NOT a `deno task
-# check` gate: it needs an owned/ordinary CONTRAST to detect anything, and under the
-# "every glued block comment is owned" rule a run passes vacuously — its moment is
-# BEFORE any future ownership-rule change (run it then, over external corpora).
-# TS-family files only; defaults to tests/fixtures.
 cargo run -p tsv_debug neutrality_audit ../svelte/packages/svelte/src
 # Also: --gate (exit 1 on findings; dev-loop convenience), --verbose (the
 # owned-vs-ordinary output diff per finding), --limit N, --json.
 ```
 
+Does a comment's OWNERSHIP ever change tsv's layout? An owned comment must occupy exactly the
+page space a same-width ordinary comment does — a layout gate that instead SKIPS owned comments
+(asks the to-emit question where it should ask on-page) goes blind, and the comment silently
+changes the layout it should have forced. At each glued block-comment position the audit
+formats the file with the comment made OWNED (annotation-shaped) and made ORDINARY (plain
+filler) at the SAME width — only ownership varies, so any layout difference is a gate reading
+ownership. Pure Rust, no sidecar; TS-family files only; defaults to tests/fixtures.
+
+A development / characterization tool, NOT a `deno task check` gate: it needs an
+owned/ordinary CONTRAST to detect anything, and under the "every glued block comment is owned"
+rule a run passes vacuously — its moment is BEFORE any future ownership-rule change (run it
+then, over external corpora).
+
 ## Seeded Mutational Fuzzer (`fuzz:audit`)
 
 ```bash
-# fuzz - dep-free seeded mutational fuzzer (the coverage-trifecta fuzzing leg). A
-# SplitMix64 PRNG + byte-level mutation operators (plus multi-byte inserts: a
-# unicode span/width stress set — NBSP/zero-width/BOM/combining/CJK/emoji/CRLF —
-# and a structure-bearing token dictionary aimed at the parser's ACCEPT paths)
-# over a seed corpus (default tests/fixtures); every valid-UTF-8 mutant is driven
-# through parse+format+reparse under catch_unwind. Asserts three properties
-# nothing else guards on ARBITRARY input: (1) no panic — the parser must never
-# crash (prod WASM is panic=abort → a panic is a DoS; the corpus profile only
-# catches panics on real code); (2) format idempotency (the F1 fixed point);
-# (3) structural reparse (reusing roundtrip_audit's compare: the node-population
-# census, HARD, ahead of the soft skeleton compare).
-# Deterministic per --seed + corpus — and CORPUS-ADD-STABLE: each seed file draws
-# mutants from its own path-keyed PRNG stream, scheduled round-robin, so a
-# fixture add/remove/rename changes only that file's mutants (every other stream
-# is byte-identical; a shrunken per-file budget trims a stream's tail, never
-# rewrites it). Pure Rust, no sidecar. Not the differential (tsv-vs-canonical) leg.
-# The `fuzz:audit` deno task (fixed --seed 0 --iterations 5000 over tests/fixtures) is
-# gated in `deno task check` — a cheap standing tripwire for the three invariants.
-#
-# Hangs can't be caught in-process (the exponential-rebuild class), so two
-# tripwires: every attempt's input is written to a last-input repro file BEFORE
-# the attempt (path printed at startup; removed on a clean exit — a killed hung
-# run leaves its exact input on disk), and attempts over --slow-budget-ms
-# (default 2000) are reported, never fatally.
-#
-# TWO passes. Pass 1 drives every seed file AS AUTHORED (unmutated), pass 2 the
-# mutants. The pristine pass matters because the corpus is the richest source of
-# real, formatter-reachable inputs — and over tests/fixtures it is the ONLY gate
-# that drives the non-`input.*` fixture files: the validator claims F1 on `input.*`
-# alone, so `output_prettier.*` / `variant_*` / `unformatted_*` (all real code)
-# were never themselves formatted twice. A pristine seed's *soft* verdict does not
-# FAIL the run (the corpus deliberately holds mis-formatted `unformatted_*` files whose
-# reflow is the point) but IS reported, with paths — over a real-code corpus there are
-# no such files, so each wants triage, and the seed path is itself the repro (an
-# unmutated file on disk), so it is listed rather than dumped. HARD verdicts fail.
 cargo run -p tsv_debug fuzz                                    # 2000 iters over tests/fixtures
 cargo run -p tsv_debug fuzz --seed 7 --iterations 20000 --evolve --minimize --dump-dir /tmp/fz  # discovery
 cargo run -p tsv_debug fuzz --iterations 0 ../corpora/collections/zzz/src       # pristine pass only = an F1 sweep
-# HARD findings (exit 1): panic / unreparseable / node_loss / leaf_value_corruption /
-# non_idempotent / format_error — always real bugs. SOFT findings (reported, non-fatal): structural_divergence — the
-# render-model-noisy bucket that needs canonical confirmation (roundtrip_audit
-# --canonical-all), like roundtrip_audit --gate. --strict fails on soft too.
-#
-# Discovery aids (both opt-in, off in the gate): --evolve feeds every mutant that
-# passes all invariants back into the seed pool (bounded at 2× the initial corpus)
-# so later mutants walk deeper into the ACCEPTED-input space — the formatter's
-# coverage, since a mutant must parse before F1/reparse grade anything; --minimize
-# ddmin-shrinks each stored HARD finding (greedy chunk removal while the same
-# outcome reproduces, bounded probes) into a consumable repro before report/dump.
-# Also: --parser not applicable (per-file extension), --max-mutations N, --limit N,
-# --max-findings N (HARD only), --slow-budget-ms N, --json.
+# Also: --max-mutations N, --limit N, --max-findings N (HARD only), --slow-budget-ms N, --strict, --json
 ```
+
+A dep-free seeded mutational fuzzer (the coverage-trifecta fuzzing leg): a SplitMix64 PRNG +
+byte-level mutation operators (plus multi-byte inserts: a unicode span/width stress set —
+NBSP/zero-width/BOM/combining/CJK/emoji/CRLF — and a structure-bearing token dictionary aimed at
+the parser's ACCEPT paths) over a seed corpus (default tests/fixtures); every valid-UTF-8 mutant
+is driven through parse+format+reparse under catch_unwind. Not the differential
+(tsv-vs-canonical) leg; pure Rust, no sidecar; `--parser` does not apply (per-file extension).
+It asserts three properties nothing else guards on ARBITRARY input:
+
+1. **no panic** — the parser must never crash (prod WASM is panic=abort → a panic is a DoS; the
+   corpus profile only catches panics on real code);
+2. **format idempotency** (the F1 fixed point);
+3. **structural reparse** — reusing roundtrip_audit's compare: the node-population census,
+   HARD, ahead of the soft skeleton compare.
+
+**Findings.** HARD (exit 1): panic / unreparseable / node_loss / leaf_value_corruption /
+non_idempotent / format_error — always real bugs. SOFT (reported, non-fatal):
+structural_divergence — the render-model-noisy bucket that needs canonical confirmation
+(roundtrip_audit --canonical-all), like roundtrip_audit --gate. `--strict` fails on soft too.
+
+**Deterministic and CORPUS-ADD-STABLE** per `--seed` + corpus: each seed file draws mutants
+from its own path-keyed PRNG stream, scheduled round-robin, so a fixture add/remove/rename
+changes only that file's mutants (every other stream is byte-identical; a shrunken per-file
+budget trims a stream's tail, never rewrites it). The `fuzz:audit` deno task (fixed --seed 0
+--iterations 5000 over tests/fixtures) is gated in `deno task check` — a cheap standing
+tripwire for the three invariants.
+
+**Hangs** can't be caught in-process (the exponential-rebuild class), so two tripwires: every
+attempt's input is written to a last-input repro file BEFORE the attempt (path printed at
+startup; removed on a clean exit — a killed hung run leaves its exact input on disk), and
+attempts over `--slow-budget-ms` (default 2000) are reported, never fatally.
+
+**TWO passes.** Pass 1 drives every seed file AS AUTHORED (unmutated), pass 2 the mutants. The
+pristine pass matters because the corpus is the richest source of real, formatter-reachable
+inputs — and over tests/fixtures it is the ONLY gate that drives the non-`input.*` fixture
+files: the validator claims F1 on `input.*` alone, so `output_prettier.*` / `variant_*` /
+`unformatted_*` (all real code) were never themselves formatted twice. A pristine seed's *soft*
+verdict does not FAIL the run (the corpus deliberately holds mis-formatted `unformatted_*` files
+whose reflow is the point) but IS reported, with paths — over a real-code corpus there are no
+such files, so each wants triage, and the seed path is itself the repro (an unmutated file on
+disk), so it is listed rather than dumped. HARD verdicts fail.
+
+**Discovery aids** (both opt-in, off in the gate): `--evolve` feeds every mutant that passes
+all invariants back into the seed pool (bounded at 2× the initial corpus) so later mutants walk
+deeper into the ACCEPTED-input space — the formatter's coverage, since a mutant must parse
+before F1/reparse grade anything; `--minimize` ddmin-shrinks each stored HARD finding (greedy
+chunk removal while the same outcome reproduces, bounded probes) into a consumable repro before
+report/dump.
 
 ## F1 Idempotency Sweep (`idempotency:sweep`)
 
@@ -1963,9 +1949,10 @@ The fuzzer's pristine pass, pointed at the `robustness` corpus view (the WHOLE `
 
 ```bash
 deno task idempotency:sweep
-# Absent corpus checkouts are skipped with a warning (not a failure); builds with
-# `--profile corpus` (optimized + panic=unwind) because the fuzzer needs catch_unwind.
 ```
+
+Absent corpus checkouts are skipped with a warning (not a failure); builds with
+`--profile corpus` because the fuzzer needs catch_unwind.
 
 ## The Corpus Bundle (`audit:corpus`)
 
@@ -1975,12 +1962,12 @@ The standing content-loss / robustness gate over REAL code — the extension-rob
 deno task audit:corpus
 ```
 
-**Two of the three as-authored ratchets are legs here; the third cannot be.** `census_audit` and `fabrication_audit` both assert a **zero** — off their default corpus the snapshot is not consulted and `grade_narrowed_strictly` fails every finding, pinned or not — and the corpus currently holds that zero over all ~6,700 files, at about the cost of a leg already in the bundle. The census in particular is the leg whose own module doc names external corpora as its discovery arm, so its absence was a hole rather than a policy.
+**Two of the three as-authored ratchets are legs here; the third cannot be.** `census_audit` and `fabrication_audit` both assert a **zero** — off their default corpus the snapshot is not consulted and `grade_narrowed_strictly` fails every finding, pinned or not — and the corpus currently holds that zero over the whole snapshot, at about the cost of a leg already in the bundle. The census in particular is the leg whose own module doc names external corpora as its discovery arm.
 
 **The two authoring-independence legs are real-code-only, and for one shared reason.** Both
 `authoring_audit` and `paren_audit` fail a run on a base-non-idempotent seed — a file whose own
 format is not a fixed point is excluded from the authoring analysis (its fixed point is
-undefined) but is not a reason to pass — so the pinned prettier suites, which hold six such
+undefined) but is not a reason to pass — so the pinned prettier suites, which hold a few such
 files, are not among their seeds. That F1 question is the bundle's `fuzz --iterations 0` leg,
 over the same real seeds.
 
@@ -1989,35 +1976,34 @@ over the same real seeds.
 ## Differential Lexer Harness (`lex_diff`)
 
 ```bash
-# lex_diff - differential lexer harness: snapshot the raw token stream over a
-# corpus and diff against a golden to prove token-stream identity (kind, start, end,
-# decoded per token) after a lexer change — stronger than format byte-identity.
-# Covers the context-free next_token dispatch for the TypeScript family
-# (.ts/.mts/.cts/.js/.mjs/.cjs, .svelte.ts and .d.ts included — the whole family
-# dispatches to one lexer) plus .css.
-# Pure Rust, no Deno.
 cargo run -p tsv_debug lex_diff ../corpora/collections/zzz/src --golden /tmp/lex.golden --write  # capture golden
 cargo run -p tsv_debug lex_diff ../corpora/collections/zzz/src --golden /tmp/lex.golden          # check against it
 # Options: --write (capture instead of check), --verbose (first divergent line per file)
 ```
 
+Snapshots the raw token stream over a corpus and diffs against a golden to prove token-stream
+identity (kind, start, end, decoded per token) after a lexer change — stronger than format
+byte-identity. Covers the context-free next_token dispatch for the TypeScript family
+(.ts/.mts/.cts/.js/.mjs/.cjs, .svelte.ts and .d.ts included — the whole family dispatches to
+one lexer) plus .css. Pure Rust, no Deno.
+
 ## Variant Whitespace-Direction Audit (`variants:audit`)
 
 ```bash
-# variant_audit - the `_compact` / `_spaces` variant names are a matched pair of
-# OPPOSITE claims about one input, and the pair is the point: compact removes
-# whitespace the formatter normalizes away, spaces adds it, so between them a
-# fixture is squeezed from both sides. The N rules prove only that a variant LANDS
-# on input; nothing asked which direction it travelled from, and the corpus drifted
-# (a `_compact` padding `interface Empty {  }`, a `_spaces` stripping `h1 + p` to
-# `h1+p`). A wrong-way variant is a DUPLICATE of its sibling under the other name,
-# and the direction it was meant to cover goes untested silently.
 cargo run -p tsv_debug variant_audit          # audit (exit 1 on any wrong-way variant)
 cargo run -p tsv_debug variant_audit --list   # every graded variant + emptied/widened counts,
 #                                               then the ungraded (not whitespace-only) ones
-# Also: --json. Gated in `deno task check` via the `variants:audit` task. Pure Rust —
-# no Deno, no formatter run.
+# Also: --json
 ```
+
+The `_compact` / `_spaces` variant names are a matched pair of OPPOSITE claims about one input,
+and the pair is the point: compact removes whitespace the formatter normalizes away, spaces adds
+it, so between them a fixture is squeezed from both sides. The N rules prove only that a
+variant LANDS on input, never which direction it travelled from — and a wrong-way variant (a
+`_compact` padding `interface Empty {  }`, a `_spaces` stripping `h1 + p` to `h1+p`) is a
+DUPLICATE of its sibling under the other name, the direction it was meant to cover silently
+untested. Pure Rust — no Deno, no formatter run; gated in `deno task check` via the
+`variants:audit` task.
 
 **The instrument.** A whitespace-only variant shares its input's non-whitespace
 character stream, so the two align on it: at every position the input holds a
@@ -2064,8 +2050,8 @@ still finds fixtures but stops recognizing variants (a bucket rename, a prefix
 typo, an extension mismatch). Re-pin deliberately when a variant is renamed out of
 scope.
 
-⚠️ **Blind spot: the unalignable variants** (~303 today, ~13% of the variants in
-scope). A variant whose non-whitespace stream differs from its reference cannot be
+⚠️ **Blind spot: the unalignable variants**, a sizable minority of those in
+scope. A variant whose non-whitespace stream differs from its reference cannot be
 aligned, so it cannot be graded. They are counted, and listed by `--list` / `--json`,
 rather than dropped — a silently-excluded class reads as a covered one.
 
@@ -2076,7 +2062,7 @@ problem (a whitespace name over a genuinely mixed edit); the trailing-comma clas
 whitespace variant plus one mechanical token `trailingComma: 'none'` deletes, and its
 direction is exactly what one wants graded — normalizing a trailing comma before a
 closer would recover about half the blind spot. Both that and re-homing the tail are
-deliberately outside this gate today.
+deliberately outside this gate.
 
 **What it does NOT prove.** Only the direction, never the *extent*: a `_compact`
 variant that empties one gap and leaves twenty removable ones passes. Extent is
@@ -2089,17 +2075,16 @@ mandatory separators, and forcing maximality would delete injection sites
 pinned bug.
 
 ⚠️ **One subclass is held at zero by convention rather than by the gate: a HORIZONTAL
-gap touching a block comment.** Comment-adjacent gaps measured 59% removable (816 of
-1383) — three times the rest — because gluing is exactly what makes a comment's
+gap touching a block comment.** Comment-adjacent gaps measured 59% removable — three times the rest — because gluing is exactly what makes a comment's
 binding interesting: `owned_by_node` is *defined* by glue
 ([docs/comments.md](./comments.md)), so a space-padded comment in a compact variant
 exercises nothing its own input does not. Every newline-free one that both formatters
-still normalize is glued (334 of the 368 horizontal candidates); the 34 left are
+still normalize is glued (all but a small remainder of the horizontal candidates); the rest are
 structurally required — tsv refuses the glue (`<div/* c */>` reparses the `/` as a
 self-close), or prettier would no longer normalize the glued form back to input
 (N3/N10).
 
-**The newline-carrying ones are deliberately left alone** (1015 of them), on the same
+**The newline-carrying ones are deliberately left alone**, on the same
 reasoning that makes WIDENED horizontal-only above: whether a comment sits on its own
 line is *authorship*, not volume — it is what `is_own_line_comment` and
 `comment_hugs_next` read — so welding one onto the next line rewrites the authoring
@@ -2111,100 +2096,99 @@ reason to pad the rest.
 ## Conformance Audit (`conformance:audit`)
 
 ```bash
-# conformance_audit - doc/fixture integrity in one fixture walk. Five checks:
-#  (1) Orphans - every divergence-suffixed fixture must be linked in its conformance doc
-#      (_prettier_divergence → any docs/conformance_prettier*.md, _svelte_divergence →
-#      docs/conformance_svelte.md, _svelte_prettier_divergence in both). The glob is a
-#      hand-listed constant held to it by check 5.
-#  (2) Dead links - every Markdown link (relative path + #anchor) in every Markdown file
-#      in the repo (walked at run time, so a new doc is gated by existing) must resolve on
-#      disk (catches renamed/deleted fixtures, wrong ../ depth, stale anchors). That is
-#      docs/*.md, every fixture README, root CLAUDE.md / README.md, each crate's
-#      CLAUDE.md, the shipped
-#      crates/tsv_wasm/README_*.md, a container-directory README under tests/fixtures/.
-#      The walk shares `tsv format`'s prune policy — tsv_discover's safety nets
-#      (node_modules, .git, .sl, .hg, .svn, .jj) over tsv_ignore's IgnoreStack — so build
-#      output and the per-machine *.local.* / *.tmp conventions are pruned by the repo's
-#      own rules rather than a second copy of them, and a gate can't fail over content the
-#      repo doesn't have. It stops short of classify_dir: the build-output heuristic and
-#      the tsv layer are format-file policy, and .formatignore prunes tests/fixtures/ —
-#      the fixture READMEs are exactly what this must check. Symlinks are skipped
-#      (AGENTS.md points at CLAUDE.md; following both would report every finding twice).
-#      External URLs and targets that climb out of the repo (sibling checkouts,
-#      machine-dependent) are out of scope.
-#  (3) Missing back-links - every divergence fixture's README must contain a link resolving to
-#      a doc that CATALOGS that fixture (check 1's per-doc attribution), not merely to some
-#      member of the family. With one conformance doc "cataloged in D" and "links D" were the
-#      same fact; across the six-doc prettier family they are independent, so a README could
-#      point at the shared frame while its entry lived in a language catalog. (A missing README
-#      entirely is the validator's D1 rule.)
-#  (4) Stray READMEs - a non-divergence fixture shouldn't carry a README; exceptions live in
-#      the in-code ALLOWED_NONDIVERGENCE_READMES allowlist.
-#  (5) Catalog-family drift - the docs/conformance_prettier*.md on disk must be exactly
-#      CONFORMANCE_PRETTIER, and the frame's §Catalogs table must index every member.
-#      Checks 1+3 read a hand-listed family while REPORTING the glob, so a catalog the list
-#      omits fails only as their findings — its entries as orphans, a README aiming at it as
-#      a missing back-link — with nothing naming the constant. (The reverse, a listed member
-#      absent from disk, was already a hard error: it would make both checks vacuous.) The
-#      index half covers the reader's route — CLAUDE.md sends divergence authors to the
-#      §Catalogs table, so an unindexed member is unreachable that way with every other
-#      check green. benches/js/lib/divergence/validation.ts reads the same glob off disk
-#      rather than keeping its own copy, so only the constant needs the manual add.
-# Pure Rust (no Deno). Exits non-zero on any finding. Gated in `deno task check`.
 cargo run -p tsv_debug conformance_audit
 # Also: --json (machine-readable: {orphans, family, dead_links, missing_backlinks, stray_readmes})
 ```
 
+Doc/fixture integrity in one fixture walk. Pure Rust (no Deno); exits non-zero on any finding;
+gated in `deno task check`. Five checks:
+
+1. **Orphans** — every divergence-suffixed fixture must be linked in its conformance doc
+   (_prettier_divergence → any docs/conformance_prettier*.md, _svelte_divergence →
+   docs/conformance_svelte.md, _svelte_prettier_divergence in both). The glob is a hand-listed
+   constant held to it by check 5.
+2. **Dead links** — every Markdown link (relative path + #anchor) in every Markdown file in the
+   repo (walked at run time, so a new doc is gated by existing) must resolve on disk (catches
+   renamed/deleted fixtures, wrong ../ depth, stale anchors): docs/*.md, every fixture README,
+   root CLAUDE.md / README.md, each crate's CLAUDE.md, the shipped crates/tsv_wasm/README_*.md,
+   a container-directory README under tests/fixtures/. The walk shares `tsv format`'s prune
+   policy — tsv_discover's safety nets (node_modules, .git, .sl, .hg, .svn, .jj) over
+   tsv_ignore's IgnoreStack — so build output and the per-machine *.local.* / *.tmp conventions
+   are pruned by the repo's own rules rather than a second copy of them, and a gate can't fail
+   over content the repo doesn't have. It stops short of classify_dir: the build-output
+   heuristic and the tsv layer are format-file policy, and .formatignore prunes tests/fixtures/
+   — the fixture READMEs are exactly what this must check. Symlinks are skipped (AGENTS.md
+   points at CLAUDE.md; following both would report every finding twice). External URLs and
+   targets that climb out of the repo (sibling checkouts, machine-dependent) are out of scope.
+3. **Missing back-links** — every divergence fixture's README must contain a link resolving to
+   a doc that CATALOGS that fixture (check 1's per-doc attribution), not merely to some member
+   of the family: across the prettier catalog family "cataloged in D" and "links D" are
+   independent facts, so a README could point at the shared frame while its entry lived in a
+   language catalog. (A missing README entirely is the validator's D1 rule.)
+4. **Stray READMEs** — a non-divergence fixture shouldn't carry a README; exceptions live in the
+   in-code ALLOWED_NONDIVERGENCE_READMES allowlist.
+5. **Catalog-family drift** — the docs/conformance_prettier*.md on disk must be exactly
+   CONFORMANCE_PRETTIER, and the frame's §Catalogs table must index every member. Checks 1+3
+   read a hand-listed family while REPORTING the glob, so a catalog the list omits would fail
+   only as their findings — its entries as orphans, a README aiming at it as a missing back-link
+   — with nothing naming the constant. (The reverse, a listed member absent from disk, is a hard
+   error: it would make both checks vacuous.) The index half covers the reader's route —
+   CLAUDE.md sends divergence authors to the §Catalogs table, so an unindexed member is
+   unreachable that way with every other check green. benches/js/lib/divergence/validation.ts
+   reads the same glob off disk rather than keeping its own copy, so only the constant needs the
+   manual add.
+
 ## Compiler Conformance Audit (`conformance:audit:compiler`)
 
 ```bash
-# compile_conformance_audit - the compiler analog of conformance_audit, deliberately minimal:
-# any _compiled_divergence-suffixed compile fixture must be cataloged in
-# docs/conformance_svelte_compiler.md AND carry a README back-linking it. The catalog is expected
-# to stay EMPTY (a safety valve for declining to reproduce a genuine oracle output bug — never a
-# tolerance budget), so those two checks inspect nothing today — a tripwire armed for the first
-# entry, not a standing gate. The third check needs no fixture and is the one that holds now:
-# CHECKLIST ↔ `Refusal` DRIFT. docs/checklist_svelte_compiler.md quotes refusal bucket keys
-# verbatim in its `**Refused**:` bullets and claims it maps onto corpus runs; nothing verified
-# that. The audit extracts each quoted key and compares it against the keys the `Refusal` catalog
-# can actually produce (`Refusal::all_bucket_keys`, one representative per variant; backticks are
-# stripped on both sides, since a key may itself contain one). Only the DOC-QUOTES-A-NONEXISTENT-KEY
-# direction GATES — that is the claim being false where a reader is misled. The reverse (a
-# producible key with no bullet) is REPORT-ONLY: a variant covered by a prose paragraph rather than
-# its own bullet is fine, so gating it would be born red and would push the doc toward a mechanical
-# key dump. `Refusal::every_variant` (the oracle behind that check) is hand-maintained rather than
-# compiler-enforced, but drift is loud: a unit test scans the enum's source for the declared variant
-# names and asserts each is present (`refusal_buckets.rs`), and `all_bucket_keys_covers_the_catalog`
-# pins the produced key set — a missing variant is two named `cargo test` failures, not silence.
-# Pure Rust (no Deno). Exits non-zero on any finding. Gated in `deno task check`.
 cargo run -p tsv_debug compile_conformance_audit
 # Also: --json
 ```
 
+The compiler analog of conformance_audit, deliberately minimal. Pure Rust (no Deno); exits
+non-zero on any finding; gated in `deno task check`.
+
+- **Catalog + back-link.** Any _compiled_divergence-suffixed compile fixture must be cataloged
+  in docs/conformance_svelte_compiler.md AND carry a README back-linking it. The catalog is
+  expected to stay EMPTY (a safety valve for declining to reproduce a genuine oracle output bug
+  — never a tolerance budget), so those two checks inspect nothing today — a tripwire armed for
+  the first entry, not a standing gate.
+- **Checklist ↔ `Refusal` drift** — the check that holds now, needing no fixture.
+  docs/checklist_svelte_compiler.md quotes refusal bucket keys verbatim in its `**Refused**:`
+  bullets and claims it maps onto corpus runs; the audit extracts each quoted key and compares
+  it against the keys the `Refusal` catalog can actually produce (`Refusal::all_bucket_keys`,
+  one representative per variant; backticks are stripped on both sides, since a key may itself
+  contain one). Only the DOC-QUOTES-A-NONEXISTENT-KEY direction GATES — that is the claim being
+  false where a reader is misled. The reverse (a producible key with no bullet) is REPORT-ONLY:
+  a variant covered by a prose paragraph rather than its own bullet is fine, so gating it would
+  be born red and would push the doc toward a mechanical key dump. `Refusal::every_variant` (the
+  oracle behind that check) is hand-maintained rather than compiler-enforced, but drift is loud:
+  a unit test scans the enum's source for the declared variant names and asserts each is present
+  (`refusal_buckets.rs`), and `all_bucket_keys_covers_the_catalog` pins the produced key set — a
+  missing variant is two named `cargo test` failures, not silence.
+
 ## Canonicalizer Audit (`canonicalize:audit`)
 
 ```bash
-# canonicalize_audit - canonicalize_js (the compile-parity reprint) at corpus scale: run the
-# canonicalizer twice per TS/JS file (.ts/.js/.mts/.cts/.mjs/.cjs, .svelte.ts included) and bucket —
-# input-rejected (informational: invalid fixtures, script-goal files), read-error (informational),
-# NON-IDEMPOTENT (failure),
-# CORRUPT-OUTPUT / unreparseable reprint (failure; the canonicalizer self-validates by reparse),
-# COMMENT-LOSS (failure; whitespace-normalized comment text/order before-vs-after — the bucket the
-# other two are structurally blind to: a swallowed comment leaves valid, idempotent JS).
-# Pure Rust (no Deno). Exits 1 on any failure. Gated in `deno task check` over tests/fixtures +
-# tests/fixtures_compile (fast); point it at real corpora for the full sweep.
 cargo run -p tsv_debug canonicalize_audit                              # default scope (tests/fixtures only)
 cargo run -p tsv_debug canonicalize_audit tests/fixtures tests/fixtures_compile  # the check-gate scope
 cargo run -p tsv_debug canonicalize_audit ../corpora/collections/zzz/src ../corpora/collections/gro/src  # real-corpus sweep
 # Also: --json
 ```
 
+canonicalize_js (the compile-parity reprint) at corpus scale: runs the canonicalizer twice per
+TS/JS file (.ts/.js/.mts/.cts/.mjs/.cjs, .svelte.ts included) and buckets — input-rejected
+(informational: invalid fixtures, script-goal files), read-error (informational), NON-IDEMPOTENT
+(failure), CORRUPT-OUTPUT / unreparseable reprint (failure; the canonicalizer self-validates by
+reparse), COMMENT-LOSS (failure; whitespace-normalized comment text/order before-vs-after — the
+bucket the other two are structurally blind to: a swallowed comment leaves valid, idempotent
+JS). Pure Rust (no Deno); exits 1 on any failure. Gated in `deno task check` over
+tests/fixtures + tests/fixtures_compile (fast); point it at real corpora for the full sweep.
+
 ## Compile-Fixture Validation (`compile:fixtures:validate`)
 
 ```bash
-# per fixture in tests/fixtures_compile — three checks, all gating. The oracle leg
-# needs the Deno sidecar. Also: --list, --json, positional filter patterns.
-deno task compile:fixtures:validate
+deno task compile:fixtures:validate   # also: --list, --json, positional filter patterns
 ```
 
 **What it proves.** Per fixture:
@@ -2233,9 +2217,9 @@ command, and **that is the only place oracle freshness is graded anywhere.**
 COMMITTED file — both inside the repo. When the oracle itself moves, neither side moves, so the
 slice stays green while the expectations quietly stop describing what Svelte compiles today.
 That is the same hole [`pins:audit`](#canonical-pin-agreement-audit-pinsaudit) has from the
-other end (a self-consistent pin set says nothing about freshness), and the lockfile's `esrap`
-pin exists because it was live: five committed fixtures staled with `deno task check` green
-throughout.
+other end (a self-consistent pin set says nothing about freshness) — the hole the
+lockfile's `esrap` pin closes, after it went live with `deno task check` green (see
+`LOCKED_TRANSITIVE` above).
 
 **Blind spots.**
 

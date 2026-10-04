@@ -6,22 +6,22 @@
 
 ## Golden Rules
 
-**NEVER modify a correct fixture to make tests pass.** Fixtures define correct behavior (prettier's output). If a test fails, fix the implementation — not the fixture. A failing test is doing its job: revealing a bug.
+**NEVER modify a correct fixture to make tests pass.** Fixtures define correct behavior (prettier's output); a failing test is doing its job, revealing a bug — fix the implementation, not the fixture.
 
-**No code changes without a failing fixture first.** Even "obvious" fixes need a fixture proving the divergence exists. The fixture is the proof and the regression guard. Exception: pure comment/doc updates that don't change behavior.
+**No code changes without a failing fixture first.** Even "obvious" fixes need a fixture proving the divergence exists — it is the proof and the regression guard. Exception: pure comment/doc updates that don't change behavior.
 
 ## When a fixture is the wrong tool
 
-A fixture defines *correct formatting*, with prettier as the source of truth. That is the
-right instrument for a formatting conformance bug — our output differing from prettier's,
-which is the bulk of the work: SAFETY violations, unknowns, partials, sanctioned
-divergences. Where the bug is not about formatting output, a fixture adds ceremony without
-a claim, and a **unit test at the failure site** is the instrument:
+A fixture defines *correct formatting* (prettier the source of truth): the instrument for a
+formatting conformance bug — our output differing from prettier's, the bulk of the work:
+SAFETY violations, unknowns, partials, sanctioned divergences. Where the bug is not about
+formatting output, a fixture adds ceremony without a claim; a **unit test at the failure
+site** is the instrument:
 
-- **Parser crashes** — a panic, a stack overflow, an unbounded scan. These are internal
-  bugs, not formatting disagreements; the fix is a guard, and the test belongs on the
-  guarded function. (A `ValueCursor` state update that didn't guard parens inside quotes
-  overflowed the stack; two lines and cursor-level unit tests closed it — no fixture.)
+- **Parser crashes** — a panic, a stack overflow, an unbounded scan: internal bugs, not
+  formatting disagreements. The fix is a guard; the test belongs on the guarded function (a
+  `ValueCursor` state update that didn't guard parens inside quotes overflowed the stack — a
+  two-line guard plus cursor-level unit tests closed it, no fixture).
 - **Infrastructure** — FFI, CLI argument parsing, serialization.
 - **Lexer/parser correctness where the AST is wrong but formatting is incidentally right**
   — test at the parser level, where the wrong node is observable.
@@ -31,7 +31,7 @@ The question is what the bug *is*, not which test is cheaper to write.
 
 ## TDD Steps
 
-These steps match CLAUDE.md's numbered list. Each is expanded in a section below.
+These match CLAUDE.md's numbered list; each is expanded below.
 
 ```
 0. LOAD CONTEXT — read this file + fixture_naming.md, study 2-3 existing fixtures
@@ -43,9 +43,9 @@ These steps match CLAUDE.md's numbered list. Each is expanded in a section below
 6. VALIDATE — deno task fixtures:validate <pattern>, add unformatted_* variants
 ```
 
-**Approval Gate** (step 4) is a hard stop — what to present, and how the gate resets on rework, is stated once under [Steps 3-4](#steps-3-4-see-it-fail--approval-gate).
+**Approval Gate** (step 4) is a hard stop — what to present, and how it resets on rework: [Steps 3-4](#steps-3-4-see-it-fail--approval-gate).
 
-**Failing tests are the normal starting point.** When you create a fixture for a feature that doesn't exist yet, tests will fail. That's the workflow — the fixture defines the target, implementation catches up.
+**Failing tests are the normal starting point.** A fixture for a feature that doesn't exist yet fails — the fixture defines the target, implementation catches up.
 
 ---
 
@@ -55,11 +55,11 @@ Pick ONE item from the todo list. State: **"Working on: [item name]"**
 
 **Read these docs first** (don't skip):
 
-- ./fixture_naming.md — **REQUIRED before every fixture.** Actually open and read it — generic naming rules, `long` fixture conventions, variant naming, boundary testing
-- ./conformance_prettier.md + the language's catalog (its §Catalogs table indexes them: `_css` / `_svelte` / `_ts` / `_ts_comments` / `_ignore`) — **REQUIRED only before a `_prettier_divergence` fixture** (skip for ordinary fixtures). Read §Comment Position Philosophy in the frame + the §Comment relocation catalog in `conformance_prettier_ts_comments.md`; the divergence must be sanctioned and cataloged there (see [Step 2.3](#23-divergence-handling))
+- ./fixture_naming.md — **REQUIRED before every fixture; actually open it** — generic naming rules, `long` fixture conventions, variant naming, boundary testing
+- ./conformance_prettier.md + the language's catalog (its §Catalogs table indexes them: `_css` / `_svelte` / `_ts` / `_ts_comments` / `_ignore`) — **REQUIRED only before a `_prettier_divergence` fixture**. Read §Comment Position Philosophy in the frame + the §Comment relocation catalog in `conformance_prettier_ts_comments.md`; the divergence must be sanctioned and cataloged there (see [Step 2.3](#23-divergence-handling))
 - This file's [Golden Rules](#golden-rules) — fixture-first discipline
 
-**Always load `fixture_naming.md`** — skipping it leads to domain-specific names, missing boundary tests, and fixture rework; conventions are easy to forget. Add `conformance_prettier.md` + the language's catalog whenever the fixture will be a divergence.
+**Never skip `fixture_naming.md`** — skipping it leads to domain-specific names, missing boundary tests, and fixture rework; the conventions are easy to forget.
 
 Then find 2-3 similar existing fixtures and READ them. Note: how many examples (usually 3-6), naming conventions (`expr`, `cond`, `a`, `b` — see ./fixture_naming.md), edge cases, and `unformatted_*` variants.
 
@@ -91,9 +91,9 @@ mkdir -p tests/fixtures/typescript/[category]/[name]
 - `input.css` (rare) - Only for file-level CSS features at byte position 0 (e.g., BOM)
 - `input.svelte.ts` (runes) - Svelte rune modules (`$state`, `$derived`, etc.)
 
-⚠️ **Prefer `.svelte`** - it's the only path with an external canonical source for CSS. See [fixture_overview.md](./fixture_overview.md#why-svelte-is-the-default-canonical-source) for details.
+⚠️ **Prefer `.svelte`** — the only path with an external canonical source for CSS ([fixture_overview.md](./fixture_overview.md#why-svelte-is-the-default-canonical-source)).
 
-⚠️ **Prefer plain block comments over JSDoc** — When testing comment-related formatting (e.g., comment placement, blank line detection), use plain `/* comment */` instead of `/** @type {T} */` unless the fixture specifically tests JSDoc cast behavior. A JSDoc cast triggers paren *preservation* — a dedicated code path whose prettier-oracle behavior differs by parser backend (oxc-ts strips, babel keeps) — which can obscure the real formatting issue being tested. Plain block comments exercise the same comment-placement paths without the cast's preservation semantics.
+⚠️ **Prefer plain block comments over JSDoc** — when testing comment-related formatting (placement, blank-line detection), use `/* comment */`, not `/** @type {T} */`, unless the fixture tests JSDoc cast behavior. A JSDoc cast triggers paren *preservation* — a dedicated code path whose prettier-oracle behavior differs by parser backend (oxc-ts strips, babel keeps) — which can obscure the issue under test; a plain block comment exercises the same placement paths without it.
 
 Write input content with:
 
@@ -103,7 +103,7 @@ Write input content with:
 
 ### 1.2 Create with `fixture_init`
 
-Formats through prettier + generates `expected.json` automatically. Input is guaranteed correctly formatted by construction.
+Formats through prettier and generates `expected.json`, so the input is correctly formatted by construction.
 
 ```bash
 cargo run -p tsv_debug fixture_init tests/fixtures/.../name --content '<script>code</script>'
@@ -116,15 +116,14 @@ cargo run -p tsv_debug fixture_init tests/fixtures/.../name   # reformat existin
 Options: `--parser typescript|css|svelte-ts` (default: svelte; `ts` and `svelte.ts` are accepted aliases), `--force` (overwrite existing), `--goal script|module`.
 
 `--goal script` builds a **standalone-script** fixture: it writes the `goal` marker and
-generates `expected.json` from acorn at `sourceType: 'script'`, so `await` is an ordinary
-identifier and `import`/`export`/`import.meta` are syntax errors (tsv keeps a TypeScript
-namespace body's `import`/`export`, a cataloged divergence) — the two sides of the
-fixture then agree on the goal it is graded at. It applies to `.ts` / `.svelte.ts` inputs
-only (Svelte `<script>` is always a module, CSS has no goal); `--goal module` removes any
-marker. Either move lands only on a successful regeneration of `expected.json` — on
-failure the marker is left as it was, so it never describes a file generated at the other
-goal. With no `--goal` the directory's existing marker is kept, and no marker means
-module — so a bare reinit of a script fixture regenerates `expected.json` at script goal.
+generates `expected.json` from acorn at `sourceType: 'script'` (`await` an ordinary
+identifier, `import`/`export`/`import.meta` syntax errors — tsv keeps a TypeScript namespace
+body's `import`/`export`, a cataloged divergence), so both sides grade at the same goal.
+`.ts` / `.svelte.ts` inputs only (Svelte `<script>` is always a module, CSS has no goal);
+`--goal module` removes any marker. Either move lands only if `expected.json` regenerates —
+on failure the marker stays as it was, so it never describes a file generated at the other
+goal. With no `--goal` the existing marker is kept (none means module), so a bare reinit of
+a script fixture regenerates `expected.json` at script goal.
 See [fixture_naming.md](./fixture_naming.md#the-goal-marker) and
 [fixture_overview.md](./fixture_overview.md).
 
@@ -135,7 +134,7 @@ cargo run -p tsv_debug fixture_init tests/fixtures/typescript/script_goal/name \
 
 After running, **read the generated `input.svelte`** to verify structure. For `long` fixtures, **check the line widths in the output** — do not estimate widths manually.
 
-**⚠️ `long` fixtures MUST include BOTH boundary cases:** a line at exactly 100 chars (stays inline) AND a line at exactly 101 chars (breaks/wraps). This catches off-by-one errors. Iterate with `--force` until both widths are exact — adjust variable name length to hit the boundary precisely.
+**⚠️ `long` fixtures MUST include BOTH boundary cases:** a line at exactly 100 chars (stays inline) AND one at exactly 101 (breaks/wraps), catching off-by-one errors. Iterate with `--force`, adjusting a variable name's length, until both widths are exact.
 
 ### 1.3 Manual Alternative
 
@@ -147,14 +146,14 @@ deno task fixtures:update:parsed <pattern>  # generate expected.json separately
 ```
 
 ⚠️ **Never run `fixture_init` on an existing `_prettier_divergence` fixture whose input is
-not a prettier fixed point** — not even `--force` to pick up a case you hand-added. It
-formats the input *through prettier*, so it overwrites tsv's claimed form with prettier's,
-which is the exact thing the fixture exists to say tsv does NOT do. Nothing catches it:
-`fixtures:validate` then regenerates a self-consistent set around the new input and reports
-**green** while the fixture asserts the opposite of its README. To add a case to one of
-these, edit `input.svelte` by hand, then run `fixtures:update:parsed` and
-`fixtures:update:formatted` — which regenerate `expected.json`, `output_prettier.*` and any
-`audit_signature.txt` *from* the input rather than replacing it. Read the resulting
+not a prettier fixed point** — not even `--force` to pick up a hand-added case. It formats
+the input *through prettier*, overwriting tsv's claimed form with prettier's — exactly what
+the fixture exists to say tsv does NOT do. Nothing catches it: `fixtures:validate`
+regenerates a self-consistent set around the new input and reports **green** while the
+fixture asserts the opposite of its README. To add a case, edit `input.svelte` by hand, then
+run `fixtures:update:parsed` and `fixtures:update:formatted`, which regenerate
+`expected.json`, `output_prettier.*` and any `audit_signature.txt` *from* the input rather
+than replacing it. Read the resulting
 `git diff` of `input.svelte`: it must contain only the lines you added.
 
 ### 1.4 Quick Parse Check
@@ -180,11 +179,9 @@ Error → cause — fix:
 
 Review your fixture against these checklists. **If gaps found**: add to `input.svelte`, rerun `fixture_init` to reformat (step 1.2), and repeat.
 
-**Comments describe formatting, not bugs.** Fixture comments should explain what the correct output IS (e.g., "array expands to multi-line"), never how our formatter differs. Fixtures define correct behavior — they are not bug reports.
+**Comments describe formatting, not bugs.** A fixture comment says what the correct output IS (e.g., "array expands to multi-line"), never how our formatter differs — fixtures define correct behavior, not bug reports.
 
-**For major features**: build a feature-specific edge-case checklist first — extend the relevant language checklist below.
-
-**For comprehensive feature matrices**: See ./checklist_css.md, ./checklist_svelte.md, ./checklist_typescript.md.
+**For major features**: first build a feature-specific edge-case checklist extending the relevant one below; comprehensive feature matrices live in ./checklist_css.md, ./checklist_svelte.md, ./checklist_typescript.md.
 
 **For Statements** (`if`, `for`, `while`, `switch`, `try`):
 
@@ -238,9 +235,9 @@ When testing line-width wrapping behavior, use `long` in the directory name:
 - Use generic data: `rgba(0, 0, 0, 0.8)`, `'f0000000'` (not realistic values)
 - Add comments explaining what wraps vs what doesn't
 
-**⚠️ Always test the exact 100/101 boundary.** Include both a case that fits at exactly 100 chars and one that exceeds at 101. This catches off-by-one errors and documents the precise breakpoint. Test at multiple indent levels if the feature appears nested (each tab adds 2 visual chars).
+**⚠️ Always test the exact 100/101 boundary** — a case that fits at exactly 100 chars and one that exceeds at 101 catches off-by-one errors and documents the precise breakpoint. If the feature appears nested, test at multiple indent levels (each tab adds 2 visual chars).
 
-**Do not estimate line widths manually — they are often wrong** (tabs count as 2 visual chars, emoji/unicode vary, and off-by-one errors are common). `fixture_init` shows line widths automatically: lines at 90+ chars are listed with markers for exactly/over 100, and `_long` directories warn if nothing is near the boundary. Use `--force` to iterate until widths are correct:
+**Do not estimate line widths manually — they are often wrong** (tabs count as 2 visual chars, emoji/unicode vary, off-by-one errors are common). `fixture_init` lists lines at 90+ chars, marking exactly/over 100, and warns in a `_long` directory when nothing is near the boundary. Iterate with `--force` until widths are correct:
 
 ```bash
 # Iterate: adjust content, rerun, check widths in output
@@ -249,7 +246,7 @@ cargo run -p tsv_debug fixture_init tests/fixtures/.../name --force
 cargo run -p tsv_debug line_width input.svelte --line 5
 ```
 
-**Simplify content.** Strip the reproduction to the minimum that triggers the divergence — use simple string literals (`'aaa...'`) and generic names instead of complex expressions or domain data. The fixture should isolate the formatting behavior, not the content.
+**Simplify content.** Strip the reproduction to the minimum that triggers the divergence — simple string literals (`'aaa...'`) and generic names, not complex expressions or domain data — so the fixture isolates the formatting behavior, not the content.
 
 See [fixture_naming.md](./fixture_naming.md#line-wrapping-tests-long--_long) for full conventions.
 
@@ -264,7 +261,7 @@ cargo run -p tsv_debug canonical_parse tests/fixtures/.../input.svelte | head -8
 
 ### 2.3 Divergence Handling
 
-**The spec wins; adopting prettier's output is the default tie-breaker.** When the spec defines canonical behavior, follow the spec — even if prettier's output is itself valid CSS. Otherwise adopt prettier's output. Diverge only for a spec-defined canonical form prettier doesn't emit, documented prettier bugs, spec violations, or comment repositioning — never for preference. When prettier moves a comment to a different syntactic position, preserve the user's placement (see [conformance_prettier.md Comment Position Philosophy](./conformance_prettier.md#comment-position-philosophy)). See [fixture_overview.md Decision Framework](./fixture_overview.md#decision-framework).
+**The spec wins; adopting prettier's output is the default tie-breaker.** When the spec defines canonical behavior, follow it — even if prettier's output is itself valid CSS; otherwise adopt prettier's. Diverge only for a spec-defined canonical form prettier doesn't emit, documented prettier bugs, spec violations, or comment repositioning — never for preference. When prettier moves a comment to a different syntactic position, preserve the user's placement (see [conformance_prettier.md Comment Position Philosophy](./conformance_prettier.md#comment-position-philosophy)). See [fixture_overview.md Decision Framework](./fixture_overview.md#decision-framework).
 
 **Creating a divergence fixture** (rare):
 
@@ -274,15 +271,15 @@ cargo run -p tsv_debug canonical_parse tests/fixtures/.../input.svelte | head -8
 3. Document with: `output_prettier.*`, `prettier_variant_*.*`, `variant_*.*`, `divergent_variant_*.*`, `unformatted_ours_*.*`, `prettier_intermediate_*.*`, `prettier_intermediate_to_variant_*.*`, or `prettier_intermediate_to_divergent_variant_*.*` — see [fixture_naming.md](./fixture_naming.md#prettier-divergence-file-naming) for details
 4. Use `deno task fixtures:audit <pattern>` to investigate novel prettier outputs
 
-`deno task fixtures:update:formatted` may also auto-generate an `audit_signature.txt` next to `output_prettier.*` when prettier requires multiple passes on it. Treat it as a sibling of `output_prettier.*` — never edit by hand; regenerate with the same command. See ./fixture_overview.md (rule F4).
+`deno task fixtures:update:formatted` may also auto-generate an `audit_signature.txt` next to `output_prettier.*` when prettier needs multiple passes on it — a sibling of `output_prettier.*`, never edited by hand; regenerate with the same command. See ./fixture_overview.md (rule F4).
 
-The same command may generate an `audit_signature_<suffix>.txt` next to an `unformatted_ours_<suffix>.*` — the same file format anchored at that source instead, and the **marker of last resort**: it appears only where prettier's output from that source fits no single-form marker (a chain with two or more distinct intermediates, or a stable form tsv cannot format). Also never hand-written; the command decides whether one is warranted, deletes it when it stops being (orphaned intermediates and signatures whose source is gone are swept the same way), and refuses to delete over a chain prettier can no longer complete (an error mid-walk — investigate instead). See ./fixture_overview.md (rule N12).
+The same command may generate an `audit_signature_<suffix>.txt` next to an `unformatted_ours_<suffix>.*` — the same format anchored at that source, and the **marker of last resort**: only where prettier's output from that source fits no single-form marker (a chain with two or more distinct intermediates, or a stable form tsv cannot format). Never hand-written: the command decides whether one is warranted, deletes it when it stops being (sweeping orphaned intermediates and signatures whose source is gone the same way), and refuses to delete over a chain prettier can no longer complete (an error mid-walk — investigate instead). See ./fixture_overview.md (rule N12).
 
-If prettier **never converges** on the input (each pass keeps changing the output — no fixed point, so no `output_prettier.*` is possible), add a `prettier_nonconvergent.txt` marker + README instead of the claim files above; the validator live-verifies the non-convergence. Rare — a handful of in-tree cases. See ./fixture_overview.md (rules F5/S18).
+If prettier **never converges** on the input (each pass keeps changing the output — no fixed point, so no `output_prettier.*` is possible), add a `prettier_nonconvergent.txt` marker + README instead of the claim files above; the validator live-verifies the non-convergence. Rare. See ./fixture_overview.md (rules F5/S18).
 
-If prettier **throws** on the input (a parse rejection or a printer crash — also no `output_prettier.*` possible), add a `prettier_rejects.txt` marker + README instead. The marker's trimmed content is the position-stripped expected-error substring; the validator live-verifies that prettier still errors with that message (rules F6/S19). The input must be valid by tsv's parse oracle (Svelte / acorn-typescript) and idempotent under tsv. Hand-author it — `fixture_init` runs prettier, which throws — then `deno task fixtures:update:parsed` for `expected.json`. See ./fixture_overview.md (rules F6/S19) and the catalog of in-tree cases in ./conformance_prettier_ts.md §"Prettier rejects valid input".
+If prettier **throws** on the input (a parse rejection or a printer crash — also no `output_prettier.*` possible), add a `prettier_rejects.txt` marker + README instead. The marker's trimmed content is the position-stripped expected-error substring; the validator live-verifies that prettier still errors with that message. The input must be valid by tsv's parse oracle (Svelte / acorn-typescript) and idempotent under tsv. Hand-author it — `fixture_init` runs prettier, which throws — then `deno task fixtures:update:parsed` for `expected.json`. See ./fixture_overview.md (rules F6/S19) and the catalog of in-tree cases in ./conformance_prettier_ts.md §"Prettier rejects valid input".
 
-If **tsv** rejects an input the **canonical parser accepts** (a deliberate, spec-stricter tsv over-rejection), it can't be an `input_invalid_*` fixture (which needs *both* parsers to reject) nor a plain fixture (which needs tsv to parse+format). Add a `tsv_rejects.txt` marker to a `_svelte_divergence` dir instead: `input.*` + `tsv_rejects.txt` (the position-stripped expected **tsv**-error substring) + `expected_svelte.json` (the canonical AST) + README — no `expected.json` / `expected_ours.json`, no format-claim files, no prettier no-oracle markers. The validator live-verifies that tsv still rejects (with the substring) *and* the canonical parser still accepts and matches `expected_svelte.json` — a dead divergence (canonical rejects too) fails loudly (rules F7/S20). Prettier is never consulted (skip `fixture_init` / `output_prettier`): hand-author `input.*`, then `deno task fixtures:update:parsed` generates `expected_svelte.json` from the canonical parser (failing if it rejects). Catalog the divergence in ./conformance_svelte.md §TypeScript Corrections and back-link it from the README. See ./fixture_overview.md (rules F7/S20).
+If **tsv** rejects an input the **canonical parser accepts** (a deliberate, spec-stricter tsv over-rejection), it fits neither `input_invalid_*` (needs *both* parsers to reject) nor a plain fixture (needs tsv to parse+format). Add a `tsv_rejects.txt` marker to a `_svelte_divergence` dir instead: `input.*` + `tsv_rejects.txt` (the position-stripped expected **tsv**-error substring) + `expected_svelte.json` (the canonical AST) + README — no `expected.json` / `expected_ours.json`, no format-claim files, no prettier no-oracle markers. The validator live-verifies that tsv still rejects (with the substring) *and* the canonical parser still accepts and matches `expected_svelte.json` — a dead divergence (canonical rejects too) fails loudly. Prettier is never consulted (skip `fixture_init` / `output_prettier`): hand-author `input.*`, then `deno task fixtures:update:parsed` generates `expected_svelte.json` from the canonical parser (failing if it rejects). Catalog the divergence in ./conformance_svelte.md §TypeScript Corrections and back-link it from the README. See ./fixture_overview.md (rules F7/S20).
 
 ---
 
@@ -302,7 +299,7 @@ deno task fixtures:validate <pattern>
 
 Wait for explicit approval ("lgtm" or feedback) before writing ANY implementation code. This is a hard stop — not a suggestion.
 
-**The gate resets on rework.** If the user gives feedback that requires changing the fixture (naming, structure, cases, etc.), redo steps 1-3 and return here for approval again. Every version of the fixture must pass through this gate before implementation begins. Variants (step 6) don't need separate approval unless complex (divergence fixtures).
+**The gate resets on rework.** Feedback that changes the fixture (naming, structure, cases, etc.) means redo steps 1-3 and return here — every version of the fixture passes this gate before implementation begins. Variants (step 6) need no separate approval unless complex (divergence fixtures).
 
 ---
 
@@ -345,7 +342,7 @@ Write both where the input supports both. A variant that must move whitespace
 *both* ways (the weld itself is the subject) takes a qualified name instead —
 see [fixture_naming.md §Standard Variant Names](./fixture_naming.md#standard-variant-names).
 
-**Preserve blank lines between statements** — prettier preserves them, so compact variants must too. Without matching blank lines, the variant won't normalize to input.
+**Preserve blank lines between statements** — prettier keeps them, so a compact variant without them won't normalize to input.
 
 ```svelte
 <!-- input.svelte -->
@@ -383,8 +380,6 @@ diff .../input.svelte /tmp/s.svelte && echo "✓ spaces normalizes"
 ```
 
 **If a variant doesn't normalize**: It may be a `prettier_variant_*.*` (prettier stable, ours normalizes to input), a `variant_*.*` (both formatters keep stable), or a `divergent_variant_*.*` (prettier stable, ours rewrites to a distinct third stable form). Use `deno task fixtures:audit <pattern>` to investigate. See [fixture_overview.md](./fixture_overview.md#unformatted-variant-doesnt-normalize-prettier-variant-discovery).
-
----
 
 ### 6.4 Mark Complete
 
@@ -508,9 +503,7 @@ cargo run -p tsv_debug compare --content "<script>import {} from 'x';</script>" 
 - Formatter bug (output differs) — Keep — fix the formatter
 - Parser bug (parse error on valid code) — Keep — fix the parser
 - Feature reveals OTHER unrelated bugs — Keep — fix those bugs too
-- Parser genuinely can't parse (not impl) — Note it in the language checklist, defer fixture until parser works
-
-Only defer when the parser can't parse the syntax yet (use `--prettier-only` until ready).
+- Parser genuinely can't parse (not impl) — Note it in the language checklist, defer fixture until parser works (`--prettier-only` until ready) — the only case to defer
 
 ---
 

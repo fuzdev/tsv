@@ -15,9 +15,9 @@ authored** — so a gap no fixture puts a blank in is a gap never checked.
 For each seed file it injects a **blank line** into every candidate gap, one at a time, formats, and
 grades six policy-free invariants on the result — plus the absorb pin over the drops.
 
-Pure Rust, no sidecar. Gated in `deno task check` as a **ratchet**, not a green gate — it was born
-RED over a live bug family, and the baseline (`blank_audit_known.txt`) is a snapshot of known bugs
-whose shrinking is the goal.
+Pure Rust, no sidecar. Gated in `deno task check` as a **ratchet**, not a green gate, over a live
+bug family: the baseline (`blank_audit_known.txt`) is a snapshot of known bugs whose shrinking is
+the goal.
 
 **Design rationale lives next to the code** — why the sites are byte offsets, why a blank is graded
 against the injected input (not the pristine output), and what a green run does *not* prove: see the
@@ -62,8 +62,9 @@ to the pristine output, i.e. the blank was silently deleted). Two deliberate des
   gate, so a new kind of silently-eaten blank cannot land silently and the list cannot rot.
 - **The key is coarse on purpose.** ~81% of injections absorb, so the bug ratchet's fine token
   shape would pin the fixture tree's whole token-adjacency vocabulary (~5.7k shapes, measured) and
-  mint new ones on ordinary fixture PRs — the churn that gets gates turned off. A node-edge class
-  (~525 over `tests/fixtures`; the snapshot header carries the exact count) ≈ one emitter decision, the grain a triage verdict actually covers.
+  mint new ones on ordinary fixture PRs — the churn that gets gates turned off. The node-edge
+  classes are an order of magnitude fewer (the snapshot header carries the count), each ≈ one
+  emitter decision, the grain a triage verdict actually covers.
 
 One absorption is **exempt**: an injection beside an *already-authored* blank reproduces the
 pristine output via the sanctioned 2+→1 run collapse (invariant 6's own requirement), not a drop —
@@ -100,22 +101,22 @@ often leave its line in place, which is correct and must not be "corrected" with
 
 **`--json` therefore carries the real work-list**: `absorb_variants`, one row per
 `(class, `[site shape](#reading-a-finding)`)` pair rather than per class, each with its own
-reproducer (`class`, `shape`, `path`, `offset`, `snippet`). Over `tests/fixtures` that is ~14.8k
-rows against the ~525 pinned classes, and the difference is not academic — the first per-class sweep of the
-pin graded 10 divergences where the per-shape sweep of the same corpus graded 404. `--report`'s
+reproducer (`class`, `shape`, `path`, `offset`, `snippet`). Over `tests/fixtures` the rows
+outnumber the pinned classes many times over, and the difference is not academic — a per-class
+sweep of the pin graded 10 divergences where the per-shape sweep of the same corpus graded 404. `--report`'s
 per-class rows carry the pair count in a `[N shapes]` column, so a class whose reproducer reads
 ABSORBS still shows how much of it that one reading covered. The pin file itself stays keyed by
 class: the variants are a triage view, never pinned.
 
 **What it still cannot see**: a drop at a gap the site enumeration never injects — the sites come
 from `code_regions` (JS spans), so a Svelte **template-text** gap (where the
-after-element-fold drop itself lived) is never probed; that needs the template-gap substrate extension, and as-authored drops over real
-corpora need the blank census. Both are tracked as follow-ups, not covered here.
+after-element-fold drop itself lived) is never probed; that needs the template-gap substrate
+extension, and as-authored drops over real corpora need the blank census — both follow-ups.
 
 Every **policy** kind is **pinned** into the ratchet (NON-IDEMPOTENT, DROPPED, DOUBLE-PRINTED,
 UNREPARSEABLE, LEAF-CORRUPTION, BLANK-RUN) — deliberately unlike `fuzz` / `roundtrip_audit`, where
 non-idempotency is an absolute never-pinnable gate: this audit is a ratchet over a live bug family,
-so its day-one findings must be pinnable or the gate would hard-block `deno task check` on landing.
+so its findings must be pinnable or the gate would hard-block `deno task check`.
 Two carve-outs:
 
 - **`PANIC`** always fails and is never listed (a crash is absolute).
@@ -150,8 +151,7 @@ Build with **`--profile corpus`** (optimized + `panic = "unwind"`). Plain `--rel
 reaches, so they don't narrow it. `--limit` and an explicit path DO: `--update` refuses a narrowed
 run (it would pin a subset and silently unpin real bugs), and the ratchet is skipped with an
 explicit `○ ratchet SKIPPED` note. Off the default corpus every finding is news, and any **graded**
-finding exits 1 — STRUCTURAL-DIVERGENCE stays report-only there too (it is never in the graded set),
-matching how it is held soft on the default corpus.
+finding exits 1 (STRUCTURAL-DIVERGENCE stays report-only there too).
 
 ### Cost — the fast path
 
@@ -182,17 +182,15 @@ The gate fails on:
 
 - a **graded** shape **not** on the list — a new *kind* of break, which must not land silently;
 - a listed shape that **no longer fires** — a stale entry, so the list can't rot;
-- a **panic**, always. A crash is never pinnable — a blank in a gap must never crash the formatter,
-  so it always fails the gate rather than being ratcheted alongside the drops.
+- a **panic**, always. A crash is never pinnable: a blank in a gap must never crash the formatter.
 
-**`STRUCTURAL-DIVERGENCE` is not in the file at all** — it is held report-only (see the invariant
-table), filtered out of the graded key set, so it is neither pinned nor able to fail the gate. It
-still prints, in its own `○ N STRUCTURAL-DIVERGENCE shape(s) … reported, NOT gated` section (and
-carries `"gated": false` under `--json`).
+**`STRUCTURAL-DIVERGENCE` is not in the file at all** (report-only, above). It still prints, in
+its own `○ N STRUCTURAL-DIVERGENCE shape(s) … reported, NOT gated` section (and carries
+`"gated": false` under `--json`).
 
-What it deliberately does **not** pin is **counts** — they churn with every ordinary fixture PR, and
-a gate that fails per added fixture would just get turned off. There is no payload dimension in the
-key (there is one payload). The tradeoff is named: a new break at an **existing** shape is invisible.
+It deliberately does **not** pin **counts**: they churn with every ordinary fixture PR, and a gate
+failing per added fixture would get turned off. There is no payload dimension (there is one
+payload). The named tradeoff: a new break at an **existing** shape is invisible.
 
 ## Reading a finding
 
@@ -240,10 +238,9 @@ If a shape is genuinely pre-existing and merely newly *reached* by a fixture you
   unprobed (`code_regions` doesn't name it) — CSS's whole-file region is the most exposed to the
   string-interior class below, and its blank-line behavior is a separate follow-up.
 - **Foreign-language `<script>` bodies are excluded by design.** A `lang`/`type` outside the
-  JS/TS family freezes the body verbatim
-  ([conformance_prettier_svelte.md §Foreign-language embedded bodies](conformance_prettier_svelte.md#svelte-foreign-language-embedded-bodies)),
-  which preserves author blank runs — sanctioned output the blank-run invariant would
-  misread as violations, so `code_regions` doesn't name those spans.
+  JS/TS family freezes the body verbatim ([conformance_prettier_svelte.md §Foreign-language embedded bodies](conformance_prettier_svelte.md#svelte-foreign-language-embedded-bodies)),
+  which preserves author blank runs — sanctioned output the blank-run invariant would misread
+  as violations, so `code_regions` doesn't name those spans.
 - **String / template interiors are excluded.** tsv's lexer accepts a raw newline inside a quoted
   string as content, so a blank injected there would not be *rejected* — it would silently become
   string content and read as a false finding. `string_and_template_spans` excludes string-literal

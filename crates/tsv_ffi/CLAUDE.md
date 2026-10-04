@@ -4,9 +4,9 @@
 
 ## Architecture Position
 
-Depends on `tsv_ts`, `tsv_css`, `tsv_svelte`. Sibling binding crates: [`tsv_wasm`](../tsv_wasm/) (WebAssembly) and [`tsv_napi`](../tsv_napi/) (N-API, the Node/Bun native path). This crate is the C-ABI path — consumers include Deno FFI, Python `ctypes`, and any other C-FFI host. Node/Bun use `tsv_napi` instead (no C-FFI glue); the per-thread arena reuse below is shared across all three bindings via the [`tsv_arena`](../tsv_arena/) crate.
+Depends on `tsv_ts`, `tsv_css`, `tsv_svelte`. The C-ABI path, for Deno FFI, Python `ctypes`, and any other C-FFI host. Sibling binding crates: [`tsv_wasm`](../tsv_wasm/) (WebAssembly) and [`tsv_napi`](../tsv_napi/) (N-API — what Node/Bun use instead, no C-FFI glue).
 
-The bindings reuse a **per-thread AST `Bump`** (`with_ast_arena`) that is `reset()` between calls rather than allocated fresh per call: the bindings are invoked once per file in tight loops, and per-call arena malloc/free churns the system allocator's heap high-water in a way that is measurable through a host FFI layer. `reset()` retains the largest chunk and rewinds, so a warm thread does no per-call malloc/free. The per-file AST is fully consumed before the next call's `reset()`, so the reuse is sound (incl. after a `catch_unwind`-caught panic). The `format` path additionally reuses a **per-thread doc arena** (`with_doc_arena`, the same shape over `DocArena` and calling each language's `format_folded_in` — the fold ahead of the parse hands its line verdict to the printer, so a document is walked once). Both helpers live in the shared [`tsv_arena`](../tsv_arena/) crate (one copy for all three bindings — `tsv_ffi`, `tsv_napi`, `tsv_wasm`); this crate's `format` feature maps to `tsv_arena/format`, which pulls `tsv_lang` for the `DocArena` type and the line-terminator fold `parse_format!` runs (re-exported by `tsv_arena`, so this crate has no `tsv_lang` edge of its own), so the parse-only build stays lean.
+The bindings reuse a **per-thread AST `Bump`** (`with_ast_arena`), `reset()` between calls rather than allocated fresh per call: they are invoked once per file in tight loops, and per-call arena malloc/free churns the system allocator's heap high-water measurably through a host FFI layer. `reset()` retains the largest chunk and rewinds, so a warm thread does no per-call malloc/free; the per-file AST is fully consumed before the next call's `reset()`, so the reuse is sound (incl. after a `catch_unwind`-caught panic). The `format` path also reuses a **per-thread doc arena** (`with_doc_arena`, the same shape over `DocArena`, calling each language's `format_folded_in` — the fold ahead of the parse hands its line verdict to the printer, so a document is walked once). Both helpers live in [`tsv_arena`](../tsv_arena/), one copy for all three bindings. This crate's `format` feature maps to `tsv_arena/format`, which pulls `tsv_lang` for the `DocArena` type and the line-terminator fold `parse_format!` runs — re-exported by `tsv_arena`, so this crate has no `tsv_lang` edge of its own and the parse-only build stays lean.
 
 Build/usage commands live in [../../CLAUDE.md §JS Bindings](../../CLAUDE.md#js-bindings).
 
@@ -17,7 +17,7 @@ Mirrors `tsv_wasm`'s split so the bench can size scope-matched native artifacts:
 - `format` (default) — `tsv_format_<lang>` exports
 - `parse` (default) — `tsv_parse_<lang>` + `tsv_parse_internal_<lang>` exports, and the `convert` layer on each language crate
 
-The default both-features build is the full `libtsv_ffi` the bench perf rows load and any FFI host links. The size table also reports two subset builds, each into its own target dir so they don't clobber the full lib: `--no-default-features --features format` (the native mirror of `@fuzdev/tsv-format-wasm`, no convert layer, scope-matched to oxfmt) and `--no-default-features --features parse` (the mirror of `@fuzdev/tsv-parse-wasm`, printers dropped, scope-matched to oxc-parser). See `deno task build:ffi:format` / `build:ffi:parse` — built only by `build:bench`, which the gate never runs, so `deno task typecheck:features` (in `check`) `cargo check`s each half on its own.
+The default (both features) is the full `libtsv_ffi` the bench perf rows load and any FFI host links. The size table also reports two subset builds, each in its own target dir so they don't clobber the full lib: `--no-default-features --features format` (the native mirror of `@fuzdev/tsv-format-wasm`, no convert layer, scope-matched to oxfmt) and `--no-default-features --features parse` (the mirror of `@fuzdev/tsv-parse-wasm`, printers dropped, scope-matched to oxc-parser). See `deno task build:ffi:format` / `build:ffi:parse` — built only by `build:bench`, which the gate never runs, so `deno task typecheck:features` (in `check`) `cargo check`s each half on its own.
 
 ## Public API
 
@@ -45,23 +45,26 @@ one symbol table.
 
 `source_type` is the parse goal — `0` = Module, `1` = Script, `2` = unspecified;
 any other code is an error, never a silent default. At Script goal `await` is an
-ordinary identifier — so a top-level `await` with an operand is a syntax error — and so
-are top-level `import`/`export` declarations, `import.meta` and a top-level `for await`. Code `2`
-says the caller named **no** source type, and is accepted by the **format exports
-only**, on every language: a formatter answers it with the module grammar retried as
-a script (`tsv_ts::parse_with_goal_or_fallback` — see
-[../../docs/cli.md §Multi-File Formatting](../../docs/cli.md#multi-file-formatting)),
-and a goalless one has nothing to answer at all, while a parse export's wire carries
-a `Program.sourceType` that one settled grammar has to produce. **Svelte and CSS
-REJECT code `1`** rather than ignoring it: Svelte hard-wires `Module` and CSS has
-no goal axis, so a caller passing `1` there asked for something that cannot be
-honored and is told — the same stance `tsv_wasm`'s flat exports and the npm facade's
-options reader take (see [../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Format
-Options). `tsv_napi` and `tsv_wasm` spell the axis as a trailing optional
-`sourceType` string; each binding has its own `lang_bindings!`, but all three build their
-bodies from the **same** [`tsv_arena`](../tsv_arena/) macros (`parse_convert!` /
-`parse_internal!` / `parse_format!`, over one `goal_allowed!` tag), so which languages
-have a goal axis is one fact in one place and coverage is identical by construction.
+ordinary identifier, so a top-level `await` with an operand is a syntax error — as
+are top-level `import`/`export` declarations, `import.meta` and a top-level `for await`.
+
+- **Code `2`** says the caller named **no** source type, and is accepted by the
+  **format exports only**, on every language: a formatter answers it with the module
+  grammar retried as a script (`tsv_ts::parse_with_goal_or_fallback` — see
+  [../../docs/cli.md §Multi-File Formatting](../../docs/cli.md#multi-file-formatting)),
+  and a goalless one has nothing to answer at all, while a parse export's wire carries
+  a `Program.sourceType` that one settled grammar has to produce.
+- **Svelte and CSS REJECT code `1`** rather than ignoring it: Svelte hard-wires
+  `Module` and CSS has no goal axis, so the caller asked for something that cannot be
+  honored and is told — the stance `tsv_wasm`'s flat exports and the npm facade's
+  options reader share (see [../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Format
+  Options).
+
+`tsv_napi` and `tsv_wasm` spell the axis as a trailing optional `sourceType` string.
+Each binding has its own `lang_bindings!`, but all three build their bodies from the
+**same** [`tsv_arena`](../tsv_arena/) macros (`parse_convert!` / `parse_internal!` /
+`parse_format!`, over one `goal_allowed!` tag), so which languages have a goal axis is
+one fact in one place and coverage is identical by construction.
 
 ## Memory & Safety Contract
 
@@ -69,7 +72,7 @@ have a goal axis is one fact in one place and coverage is identical by construct
 - **Free**: Caller MUST call `tsv_free(ptr, *out_len)` exactly once per returned pointer. `tsv_free` no-ops on null or zero length.
 - **UTF-8 input**: `source_ptr`/`source_len` must point to valid UTF-8. Invalid UTF-8 is reported as an error (`{"error": "Invalid UTF-8: ..."}`), not a crash. A null `source_ptr` with `source_len == 0` is accepted as the empty source (FFI hosts commonly pass (null, 0) for an empty buffer); null with a non-zero length is an error.
 - **Errors: the status word, never the payload.** `*out_status` receives `TSV_STATUS_OK` (0) or `TSV_STATUS_ERROR` (1), written exactly once per call alongside `*out_len` — one site writes both (`bytes_to_ptr`), so they cannot disagree about which call they describe. That word is the whole verdict. A failed call's payload IS a `{"error": "..."}` JSON object with a valid pointer the caller still must free, but a caller must not sniff for it: formatted output is arbitrary source text, so no prefix test is sound in general. `tsv_parse_internal_*` is the sharpest case — its success payload is empty, carrying no shape to read a verdict off at all.
-- **Panic safety**: Every entry point wraps the work in `std::panic::catch_unwind`. Panics are caught (when built with `panic = "unwind"`) and reported as `TSV_STATUS_ERROR` with a `{"error": "panic: ..."}` payload. Under `panic = "abort"` profiles, panics still abort — the catch is profile-dependent.
+- **Panic safety**: Every entry point wraps the work in `std::panic::catch_unwind`. Built with `panic = "unwind"`, a panic is caught and reported as `TSV_STATUS_ERROR` with a `{"error": "panic: ..."}` payload; under `panic = "abort"` profiles it still aborts.
 
 ## Files
 
@@ -77,7 +80,7 @@ have a goal axis is one fact in one place and coverage is identical by construct
 - `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "allow"` (FFI requires it); deps include `tsv_arena` (`format` → `tsv_arena/format`)
 
 The in-crate test module drives every entry point in-process (real
-alloc → write `out_len`/`out_status` → `tsv_free` round-trip), covering the happy
+alloc → write `out_len`/`out_status` → `tsv_free` round-trip): the happy
 path per language, the error status on invalid syntax, the goal axis and its three
 refusals (an unknown code; a script goal on a goalless language; the unspecified
 code on a parse export) beside the fallback that code answers, the invalid-UTF-8 path,

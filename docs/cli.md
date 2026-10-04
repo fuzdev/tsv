@@ -40,9 +40,8 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
 - **`tsv` npm bin, WASM (`@fuzdev/tsv-wasm`)**: `crates/tsv_wasm/npm/cli.js`
   — a hand-written Node mirror of this CLI's contract (subcommands, flags,
   exit codes, output streams, traversal rules). `--jobs` is real: path mode
-  fans onto `node:worker_threads`, spawning `cli.js` as its own worker. Where
-  it differs from the native CLI is in the two **defaults**, both of which are
-  smaller here:
+  fans onto `node:worker_threads`, spawning `cli.js` as its own worker. Its two
+  **defaults** are both smaller than the native CLI's:
   - **When to pool at all.** A pool costs tens of milliseconds to bring up here
     against the native pool's ~50 µs of thread spawn, so with no `--jobs` given
     the run stays single-threaded until the in-scope file count clears a
@@ -56,86 +55,84 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
     N-API mirror has no compiler thread to compete with and peaks at the
     physical core count.
 
-  An explicit `--jobs N` is held to the same `4 × logical` ceiling as the
-  native CLI, warned about on stderr when it bites (see
+  An explicit `--jobs N` is held to the native CLI's `4 × logical` ceiling,
+  warned about on stderr when it bites (see
   [§Multi-File Formatting](#multi-file-formatting)'s parallelism note; `cli.js`
   restates the native `clamp_worker_count` by hand — same constant, same
   message, so both surfaces refuse the same numbers). The logical count under
-  that ceiling, and under both default widths, is Rust's
-  `available_parallelism` on either side: the affinity mask capped by the
-  cgroup CPU quota. Node's and Bun's `availableParallelism()` leave the quota
-  out (Deno's applies it), so `cli.js` reads it itself (`cgroup_cpu_quota`,
-  a transcription of std's) — under a `--cpus` or `CPUQuota=` limit every
-  runtime names the native CLI's ceiling rather than one sized past the quota. They also ACCEPT the same
-  ones, which takes its own restatement: the flag's value is parsed as a Rust
-  `usize` on one side and by a hand transcription of `usize::from_str` on the
-  other (`usize_from_str`) — ASCII digits, an optional leading `+`, nothing past
-  `usize::MAX`, refused in `ParseIntError`'s own words — and
-  `scripts/test_napi_npm.ts` runs the accept/reject table through both bins,
-  which is the only place both exist at once. Repetition needs no restatement of
-  its own: `cli.js` parses argv by a transcription of argh's grammar
-  (`parse_argv`), so a second value for any value-taking flag (`--content`,
-  `--parser`, `--source-type`, `--jobs`) is `duplicate values provided` on both.
-  Repeated SWITCHES stay fine on both — argh counts them. The bound does a
-  different job here than natively: a JS worker is a whole V8 isolate (~13 MB
-  resident on either engine, where the native thread's reservation is lazily
-  committed and costs ~none), so an unbounded width on a large tree hits the
-  machine's *memory* — ending in an uncatchable OOM SIGKILL — long before the
-  OS refuses a thread, and the file-count clamp bounds nothing on exactly the
-  trees large enough to matter. An explicit width remains the only way to
-  compare the two paths at a given size, which calibrating those defaults
-  needed; every size that calibration uses is far under the ceiling on both.
-  `--content`, `--stdin`, and `--list` are single-threaded on both CLIs, and so
-  is `--jobs 1` — except in `cli.js` over the N-API engine, where a width of 1 is
-  a pool of one worker, since a native overflow on the main thread is a `SIGSEGV`
-  no catch survives and only a pool worker carries the reserved stack
-  (§Recursion Depth). The parallel and single-threaded paths report identically
-  (same sorted stdout, same summary, same exit code), so the split is a cost
-  decision and not a contract one. One source:
-  it imports its engine from `./index.js`, so the copy staged into the native
-  `@fuzdev/tsv` (as the dispatcher's fallback) binds to the N-API engine with
-  no adapter — and its workers, having no compiled module to inherit, load
-  that engine themselves, while WASM workers take the main thread's module
-  through the package's `./worker` entry and recompile nothing.
-  Behavioral changes to `format`/`parse` here must be mirrored there and in
-  the CLI tests of `scripts/test_npm.ts` (wasm) and
+  that ceiling, and under both default widths, is Rust's `available_parallelism`
+  on either side: the affinity mask capped by the cgroup CPU quota. Node's and
+  Bun's `availableParallelism()` leave the quota out (Deno's applies it), so
+  `cli.js` reads it itself (`cgroup_cpu_quota`, a transcription of std's) —
+  under a `--cpus` or `CPUQuota=` limit every runtime names the native CLI's
+  ceiling rather than one sized past the quota.
+
+  Both also ACCEPT the same values, which takes its own restatement: the flag's
+  value is parsed as a Rust `usize` on one side and by a hand transcription of
+  `usize::from_str` on the other (`usize_from_str`) — ASCII digits, an optional
+  leading `+`, nothing past `usize::MAX`, refused in `ParseIntError`'s own words
+  — and `scripts/test_napi_npm.ts`, the only place both bins exist at once, runs
+  the accept/reject table through both. Repetition needs no restatement:
+  `cli.js` parses argv by a transcription of argh's grammar (`parse_argv`), so a
+  second value for any value-taking flag (`--content`, `--parser`,
+  `--source-type`, `--jobs`) is `duplicate values provided` on both, while
+  repeated SWITCHES stay fine on both (argh counts them).
+
+  The bound does a different job here than natively: a JS worker is a whole V8
+  isolate (~13 MB resident on either engine, where the native thread's
+  reservation is lazily committed and costs ~none), so an unbounded width on a
+  large tree hits the machine's *memory* — ending in an uncatchable OOM SIGKILL
+  — long before the OS refuses a thread, and the file-count clamp bounds nothing
+  on exactly the trees large enough to matter. An explicit width remains the
+  only way to compare the two paths at a given size, which calibrating those
+  defaults needed; every size that calibration uses is far under the ceiling on
+  both.
+
+  `--content`, `--stdin`, `--list` and `--jobs 1` are single-threaded on both
+  CLIs — except `--jobs 1` in `cli.js` over the N-API engine, a pool of one
+  worker, since a native overflow on the main thread is a `SIGSEGV` no catch
+  survives and only a pool worker carries the reserved stack (§Recursion Depth).
+  The parallel and single-threaded paths report identically (same sorted stdout,
+  summary and exit code), so the split is a cost decision, not a contract one.
+
+  One source: `cli.js` imports its engine from `./index.js`, so the copy staged
+  into the native `@fuzdev/tsv` (as the dispatcher's fallback) binds to the
+  N-API engine with no adapter — its workers, having no compiled module to
+  inherit, load that engine themselves, while WASM workers take the main
+  thread's module through the package's `./worker` entry and recompile nothing.
+  Behavioral changes to `format`/`parse` in either CLI must be mirrored in the
+  other and in the CLI tests of `scripts/test_npm.ts` (wasm) and
   `scripts/test_napi_npm.ts` (native).
 - **`tsv_debug` (development)**: Uses embedded Deno sidecar for external tools
   - Reuses `tsv_cli` infrastructure
-  - Commands: ~50 subcommands — the full catalog lives in the root [CLAUDE.md §Debug Tooling](../CLAUDE.md#debug-tooling) and [audits.md](audits.md) (which sections this list deliberately doesn't duplicate): fixtures (`fixture_init`, `fixtures_validate`, `fixtures_update*`, `fixtures_audit`), oracles (`check`, `compare`, `ast_diff`, `canonical_parse`, `format_prettier`, `test262`, `tsc_conformance` — see [typechecker.md](typechecker.md)), the standing audit family (`comment_audit`, `gap_audit`, `census_audit`, …), the compiler harnesses (`compile_*`, `canonical_compile`, `render_compare`), and profiling/metrics (`profile`, `json_profile`, `arena_stats`, `buffer_sizes`, `metrics`, `line_width`, `lex_diff`)
+  - Commands, by family (the full catalog is the root [CLAUDE.md §Debug Tooling](../CLAUDE.md#debug-tooling) and [audits.md](audits.md), not duplicated here): fixtures (`fixture_init`, `fixtures_validate`, `fixtures_update*`, `fixtures_audit`), oracles (`check`, `compare`, `ast_diff`, `canonical_parse`, `format_prettier`, `test262`, `tsc_conformance` — see [typechecker.md](typechecker.md)), the standing audit family (`comment_audit`, `gap_audit`, `census_audit`, …), the compiler harnesses (`compile_*`, `canonical_compile`, `render_compare`), and profiling/metrics (`profile`, `json_profile`, `arena_stats`, `buffer_sizes`, `metrics`, `line_width`, `lex_diff`)
 
 ### External Tools (via Embedded Deno Sidecar)
 
 `tsv_debug` calls these external tools via an embedded Deno sidecar (spawned lazily on first use; bulk commands spawn a small pool of sidecar processes — see `crates/tsv_debug/CLAUDE.md`):
 
-1. **prettier** + **prettier-plugin-svelte**
-   - Used by: `compare`, `format_prettier`, fixture management
-   - Purpose: Format code, compare outputs, validate formatter behavior
+| tool | used by | purpose |
+| --- | --- | --- |
+| **prettier** + **prettier-plugin-svelte** | `compare`, `format_prettier`, fixture management | format code, compare outputs, validate formatter behavior |
+| **svelte** | `canonical_parse`, `ast_diff`, fixture management | parse Svelte code with the official compiler |
+| **acorn** + **@sveltejs/acorn-typescript** | `canonical_parse`, `ast_diff`, fixture management | parse TypeScript code (matches Svelte's TS parser) |
 
-2. **svelte**
-   - Used by: `canonical_parse`, `ast_diff`, fixture management
-   - Purpose: Parse Svelte code with official compiler
-
-3. **acorn** + **@sveltejs/acorn-typescript**
-   - Used by: `canonical_parse`, `ast_diff`, fixture management
-   - Purpose: Parse TypeScript code (matches Svelte's TS parser)
-
-Versions are pinned (exact) in `crates/tsv_debug/src/deno/sidecar.ts` — the source of truth; they are not repeated here. `benches/js/package.json` pins the same versions independently for the bench harness; keep the two in sync.
+Versions are pinned exactly in `crates/tsv_debug/src/deno/sidecar.ts`, the source of truth (not repeated here); `benches/js/package.json` pins the same versions for the bench harness — keep the two in sync (`deno task pins:audit` gates it).
 
 ## Input Handling
 
 All content-processing commands support three input methods:
 
-- **File path**: `command <file>` - Auto-detects parser/type from extension, which must be one tsv handles (the dispatch has no unknown arm, so a `.md` would otherwise parse as TypeScript); an unsupported one is an argument error, the same message `format <file>` gives, unless `--parser` names the grammar outright; a directory is refused by name ahead of either check (`<dir>: is a directory (one file is expected)`), since every command resolving a file this way reads one file — `tsv_debug`'s too — and the read would otherwise fail under a message calling it one
+- **File path**: `command <file>` - parser from the extension, which must be one tsv handles (the dispatch has no unknown arm, so a `.md` would otherwise parse as TypeScript); an unsupported one is an argument error (`format <file>`'s message) unless `--parser` names the grammar. A directory is refused by name ahead of either check (`<dir>: is a directory (one file is expected)`): every command resolving a file this way — `tsv_debug`'s too — reads one file, and the read would otherwise fail under a message calling it one
 - **Content**: `command --content <string> --parser <type>` - Requires explicit `--parser svelte|typescript|css`
 - **Stdin**: `command --stdin --parser <type>` - Requires explicit `--parser svelte|typescript|css`
 
-`parse` and `format` also take `--source-type script|module` (TypeScript only — naming
-one for a Svelte or CSS input is an error, as it is on every JS binding, never a silent
-drop; the C FFI alone accepts its module code `0` on every language, the neutral value
-of a required `u32`, while rejecting the script code there — `tsv_ffi`'s `lib.rs` states
-the carve-out) — ESTree's own spelling, and the value the wire's `Program.sourceType`
-carries. It selects the parse goal: at `script`, `await` is an ordinary identifier
+`parse` and `format` also take `--source-type script|module` — ESTree's own spelling, and
+the value the wire's `Program.sourceType` carries — for TypeScript only: naming one for a
+Svelte or CSS input is an error, as on every JS binding, never a silent drop (the C FFI
+alone accepts its module code `0` on every language, the neutral value of a required
+`u32`, while rejecting the script code there — `tsv_ffi`'s `lib.rs` states the
+carve-out). It selects the parse goal: at `script`, `await` is an ordinary identifier
 and top-level `import`/`export`, `for await` and `import.meta` are errors (a TypeScript
 namespace body keeps its `import`/`export`). Unset, `parse` uses `module`, while
 `format` uses `module` **retried as `script`** if that parse fails (see
@@ -155,13 +152,12 @@ leading-zero numeric literal (`010`, `08`) and a legacy string escape (`'\7'`,
 ### `--source-type` is a grammar input, not a style setting
 
 tsv is non-configurable by design — "no config files, CLI flags, or runtime options"
-([CLAUDE.md §Configuration](../CLAUDE.md#configuration)) — and `--source-type` is not an
-exception to that contract, because the contract governs **style**. What this flag
+([CLAUDE.md §Configuration](../CLAUDE.md#configuration)) — and `--source-type` is no
+exception, because the contract governs **style**. What this flag
 selects is which grammar symbol the parse starts from: ecma262 gives `ParseScript` and
 `ParseModule` as two separate entry points over the same text, and a source that is a
 script is not a module with a setting flipped. The flag shapes only the parse the
-formatter runs; formatting itself is non-configurable, so no `--source-type` value
-changes how anything is printed. The same axis appears on the bindings as the
+formatter runs; no `--source-type` value changes how anything is printed. The same axis appears on the bindings as the
 `sourceType` option (`tsv_wasm`, `@fuzdev/tsv`) and as the C-ABI source-type code
 (`tsv_ffi`); there is no style knob on any of them either.
 
@@ -194,9 +190,9 @@ Parse error: Expected identifier or destructuring pattern, found '='
 ```
 
 The `line:col` header is the error's point in the **wire's coordinates** — the `loc` a node
-at the error would carry, under the same definition as `--locations`: the line (1-based) under
-the document's line rule (ECMAScript's terminators for TypeScript, LF alone for Svelte and
-everything in it, and for CSS), and the column counted in UTF-16 code units, printed 1-based. A
+at the error would carry, under the same definition as `--locations` (above): the line
+(1-based) under the document's line rule, and the column counted in UTF-16 code units,
+printed 1-based. A
 leading byte-order mark is counted on line 1 for TypeScript and elided for Svelte and CSS, as
 their wires do. `format` reports the point in the file's own coordinates: its parse reads the
 CR-folded text (see [CLAUDE.md §Line Terminators](../CLAUDE.md#line-terminators-parse-preserves-format-folds)),
@@ -216,17 +212,19 @@ throws, whose `start` and `loc` properties carry the same point (`crates/tsv_was
 
 Two errors are not parse errors, and a single input prints them after `Error: ` rather than
 `Parse error: ` (a path-mode `format` names the file either way): a source over the 4 GiB
-size cap the parsers' `u32` offsets index, and a `format` refusal — positionless errors (no
-`ParseError` position), which the native bin tells from a parse error by that alone
-(`cli::out::exit_with_parse_error`) and `cli.js` by the facade's `SyntaxError`. A Svelte document
-holding a lone CR (not part of a CRLF) with comment text after it inside a `//` comment
-between a tag's attributes is **refused** (a CR with only whitespace after it, as in a doubled
-`CR CR LF` ending, ends the comment where the fold does, and formats). Svelte ends that comment at LF alone, so the CR is comment text, and the format
-path's CR fold would end the comment there and print the rest of its line as markup. The
-message names the CR's `line:col`; `parse` accepts the same bytes. It is a per-file error
-(exit 2) like any other, and in the packages a plain `Error` with no `start` / `loc` rather
-than the `SyntaxError` (`tsv_svelte::parse_folded`). A document whose own bytes do not parse
-reports that parse error first, exactly as `parse` does.
+size cap the parsers' `u32` offsets index, and a `format` refusal. Both are positionless (no
+`ParseError` position), which is how the native bin tells them from a parse error
+(`cli::out::exit_with_parse_error`); `cli.js` tells them by the facade's `SyntaxError`.
+
+The refusal: a Svelte document holding a lone CR (not part of a CRLF) with comment text after
+it inside a `//` comment between a tag's attributes. Svelte ends that comment at LF alone, so
+the CR is comment text, and the format path's CR fold would end the comment there and print
+the rest of its line as markup. (A CR with only whitespace after it, as in a doubled
+`CR CR LF` ending, ends the comment where the fold does, and formats.) The message names the
+CR's `line:col`; `parse` accepts the same bytes. It is a per-file error (exit 2) like any
+other, and in the packages a plain `Error` with no `start` / `loc` rather than the
+`SyntaxError` (`tsv_svelte::parse_folded`). A document whose own bytes do not parse reports
+that parse error first, exactly as `parse` does.
 
 ## Recursion Depth
 
@@ -281,19 +279,17 @@ nesting ~1.9, calls ~1.44, Svelte elements ~1.32 (~0.96 to parse), TS *types* ~1
 unary chains ~1.24, nested binary operands (`1 + (1 + …)`) ~1.16, array literals ~1.05,
 parens ~0.78, CSS rules ~0.42, ternary / assignment chains ~0.38.
 
-The two chain shapes used to head that list, because a member chain is printed from a
-*grouped* view of a linearized chain and those frames sit on the expression cycle: they
-cost 7.4 and 6.7 KiB a level until `ChainGroup` stopped owning a `SmallVec` of node
-copies and became a borrowed sub-slice (16 bytes) — ~2.2 KiB a level back on both and
-~0.5 on nested arrow bodies — and 5.1 and 4.5 until the peeled trailing member tail
-stopped being collected into a second `SmallVec` and became a pair of borrowed runs,
-another ~1.2 KiB a level on both. A third slice came off five shapes at once — the same
-0.39 KiB from each — when the chain linearizer stopped *returning* its 464-byte node
-buffer and started filling the caller's: the buffer lives in the caller either way, so a
-returned one cost a second slot in the expression dispatcher's frame, which every shape on
-the expression cycle pays. Both chain shapes, nested arrow bodies and TS object literals
-each dropped 0.39, and so did unary chains (1.64 → 1.25 — nearly a quarter of what a level
-there had cost). The two chain shapes are also the ones on which the printer, not the
+The two chain shapes once headed that list, because a member chain is printed from a
+*grouped* view of a linearized chain and those frames sit on the expression cycle. Three
+borrows took them down from 7.4 and 6.7 KiB a level: `ChainGroup` is a borrowed sub-slice
+(16 bytes) rather than a `SmallVec` of node copies (~2.2 KiB a level on both, ~0.5 on
+nested arrow bodies); the peeled trailing member tail is a pair of borrowed runs rather
+than a second `SmallVec` (~1.2 KiB on both); and the chain linearizer fills the caller's
+464-byte node buffer rather than *returning* it — the buffer lives in the caller either
+way, so a returned one cost a second slot in the expression dispatcher's frame, which
+every shape on the expression cycle pays: 0.39 KiB each off both chain shapes, nested
+arrow bodies, TS object literals and unary chains (1.64 → 1.25, nearly a quarter of a
+level there). The two chain shapes are also the ones on which the printer, not the
 parser, sets the ceiling — see the bullet above. ⚠️ And they are the only two shapes the
 `Expression`'s own width does *not* reach: every other row above moved when it went
 from 176 bytes to 72 (Svelte elements 3.1 → 1.7, parens 1.2 → 0.94),
@@ -359,36 +355,37 @@ into the enum. Together those take `Statement` to **72 B rather than 544** (an 8
 span header over a 64-byte `StatementKind`); the next-widest inline variant is
 `TryStatement`, which is where the ladder stops.
 
-**The wire has no reader ceiling of its own.** `tsv parse --pretty` re-indents the
-compact wire bytes in one linear pass (`json_utils::indent_json_with_tabs`) rather than
-reading them back into a tree, so it stops exactly where the parser stops. It did not
-always: the pretty route used to round-trip through a `serde_json::Value`, and
-serde_json's default recursion limit of 128 JSON levels — two per nested array (the node
-and its `elements`), three per nested object literal — refused a wire past ~60 nested
-arrays or ~40 nested objects that the compact route had just emitted, a clean exit 1 on
-input the parser handles at 400× the depth. No tool tsv stands in for bounds depth by
-choice: `JSON.parse` is iterative in V8 and JSC and takes a million levels, and acorn,
-Svelte's parser and prettier each stop only at V8's stack (1,023 nested arrays for acorn
-+ `@sveltejs/acorn-typescript`, 767 for prettier's `typescript` parser). The one reader
-of the wire left is `tsv_debug`'s `json` module (the fixture gate, the sidecar
-transport, every audit's `Value` walk), which reads with the limit disabled on the same
-`STACK_SIZE` reservation: a `Value` read costs ~0.6 KiB of stack per JSON level
-(measured, and the same for the drop, `==` and pretty-print walks), so it binds, not the
-parse, wherever the parser spends less per source level than ~0.6 KiB times the JSON
-levels that level adds to the wire — which is **most nesting shapes**. A nested array
-adds two (~1.2 KiB against the parser's ~1.05) and reads to ~27,500 where the parse
-reaches ~31,200; a nested object literal adds three (~1.8 KiB against ~1.68) and reads to
-~18,300 where the parse reaches ~19,500. Where the parser is cheap the gap is wide:
-left-nested binary, unary and ternary chains add one JSON level each and read to
-~55,000, far under their parse ceilings, and CSS rules (three JSON levels a rule, ~0.42
-KiB to parse) read to a fraction of theirs; calls and statement nesting bind in the read
-too. The parser binds only where a level adds no wire level at all (parens) or costs more
-than the levels it adds (computed subscripts: one JSON level at ~0.80 KiB to parse, so the
-parse stops near ~41,000 where the read would reach ~55,000). All of it is input hundreds
-of times deeper than any corpus, on which a *dev tool* overflows instead of
-erroring. Fixture
+**The wire has no reader ceiling of its own.** `tsv parse --pretty` re-indents the compact
+wire bytes in one linear pass (`json_utils::indent_json_with_tabs`) rather than reading
+them back into a tree, so it stops exactly where the parser stops. The pretty route once
+round-tripped through a `serde_json::Value`, and serde_json's default recursion limit of
+128 JSON levels — two per nested array (the node and its `elements`), three per nested
+object literal — refused a wire past ~60 nested arrays or ~40 nested objects that the
+compact route had just emitted, a clean exit 1 on input the parser handles at 400× the
+depth; fixture
 [`typescript/expressions/objects/nested_deep`](../tests/fixtures/typescript/expressions/objects/nested_deep/)
-(45 nested object literals, 145 wire levels) pins the pipeline past the old ceiling.
+(45 nested object literals, 145 wire levels) pins the pipeline past that old ceiling. No
+tool tsv stands in for bounds depth by choice: `JSON.parse` is iterative in V8 and JSC and
+takes a million levels, and acorn, Svelte's parser and prettier each stop only at V8's
+stack (1,023 nested arrays for acorn + `@sveltejs/acorn-typescript`, 767 for prettier's
+`typescript` parser).
+
+The one reader of the wire left is `tsv_debug`'s `json` module (the fixture gate, the
+sidecar transport, every audit's `Value` walk), which reads with the limit disabled on the
+same `STACK_SIZE` reservation: a `Value` read costs ~0.6 KiB of stack per JSON level
+(measured, and the same for the drop, `==` and pretty-print walks), so it binds, not the
+parse, wherever the parser spends less per source level than ~0.6 KiB times the JSON levels
+that level adds to the wire — which is **most nesting shapes**. A nested array adds two
+(~1.2 KiB against the parser's ~1.05) and reads to ~27,500 where the parse reaches ~31,200;
+a nested object literal adds three (~1.8 KiB against ~1.68) and reads to ~18,300 where the
+parse reaches ~19,500. Where the parser is cheap the gap is wide: left-nested binary, unary
+and ternary chains add one JSON level each and read to ~55,000, far under their parse
+ceilings, and CSS rules (three JSON levels a rule, ~0.42 KiB to parse) read to a fraction
+of theirs; calls and statement nesting bind in the read too. The parser binds only where a
+level adds no wire level at all (parens) or costs more than the levels it adds (computed
+subscripts: one JSON level at ~0.80 KiB to parse, so the parse stops near ~41,000 where the
+read would reach ~55,000). All of it is input hundreds of times deeper than any corpus, on
+which a *dev tool* overflows instead of erroring.
 
 **The other surfaces have their own ceilings, set by their hosts, and the CLI's
 reservation does not reach them:**
@@ -463,96 +460,137 @@ output and nothing written; on the WASM engine the same input is reported as the
 
 `tsv format` accepts any mix of files and directories:
 
-- **Discovery**: directories recurse over the JS/TS family (`.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cjs`, all parsed as TypeScript — `.jsx`/`.tsx` are out of scope), `.svelte`, and `.css` (compound forms like `.svelte.ts` included), each extension read without regard to ASCII case (`A.TS`, `styles.CSS`), as prettier infers a parser from the lowercased name — a walk, a named path, the parser dispatch and the `.mjs`/`.mts` goal all read it the same way, on both bins. The **safety nets** `.git`, `node_modules`, `.sl`, `.hg`, `.svn`, `.jj` are always pruned. **A path an argument names is bounded by the ignore files alone.** The safety nets and the build-output heuristic prune what a walk *discovers* — they are tsv's guesses about a tree, and a guess never overrides a path someone typed — so they grade neither a named path nor its ancestors: `tsv format node_modules/pkg`, `dist/sub` or `.cache/x` walks what naming its parent walks there, and below the named root they classify every child as usual. An ignore rule is one the user or their repo wrote, and it bounds a named path — file or directory — exactly as it bounds the walk that would have reached it, through an ancestor or at the path itself: naming `pkg/dist` doesn't override a `dist/` rule, nor naming `vendor/x.ts` a `vendor/` one, the line prettier, ESLint, oxfmt and deno fmt draw too. Such a path is skipped. A named **file** a `.formatignore` or `.prettierignore` rule excludes is skipped quietly, as prettier skips it, whether or not a `.gitignore` excludes it too — at the file or an ancestor, and even where that `.gitignore` rule sits above the tsv rule and bounds the path on its own, the case the directory warning below names both blockers for: those files exist to say what not to format, the rule is the author's verdict on the file however the path is bounded, and a pre-commit hook handing over its staged files names such a file on every commit that touches one (ESLint, which warns there, ships `--no-warn-ignored` for exactly that noise; tsv has no flags to offer). Every other exclusion prints a stderr **warning** naming the file the excluding rule sits in and how to undo it — a `.gitignore` rule is about version control, so one excluding a named file is a surprise, and a named directory is a scope someone typed. A path only a `.gitignore` excludes gets the lines that re-include it and nothing beside it, for the repo root's own tsv file (read after every `.gitignore`, so its `!` wins): `!/src/a.gen.ts` for a path the rule matched itself, and for one under an excluded directory that directory re-included, its contents excluded again, and so on one level at a time down to the path (`!/build/`, `/build/*`, `!/build/a.ts`) — every line anchored with a leading `/`, without which a one-segment pattern matches at every depth, and spelling its path literally (each `*`, `?`, `[`, `]`, `\` and trailing space escaped), so a `[slug]` directory names itself rather than a character class. A path holding a control character other than a tab — a line feed, which splits any line; a carriage return at a file name's end, which a line's end drops; or any other, which an ignore file could hold only raw and the warning will not print — gets no lines, and the warning says to narrow the rule instead. The file named is the one the root reads: its `.prettierignore` where it has no `.formatignore`, since a `.formatignore` created beside it would shadow every rule in it. For a named directory, the rule named is the shallowest exclusion's — a `.formatignore`/`.prettierignore` rule over a `.gitignore` rule at the same prefix, the `.gitignore` rule where it excludes an ancestor above the tsv rule's — and the remedy turns on what *else* excludes the path. Only tsv rules: the rule is the user's own to narrow or negate. A `.gitignore` rule anywhere at or below the named one: narrowing a tsv rule would leave it standing, and every `!` under an excluded directory is inert, so the warning gives the lines that re-include the path level by level from the shallowest exclusion down, for the repo-root tsv file — "after that rule" when the named rule is a root tsv rule (a later line wins there), "which also override" a root tsv rule below a named `.gitignore` one — while a tsv rule in a *deeper* file, read after the root's lines, stays the user's to narrow and is named as the second blocker: one warning stating both, not one per rerun — wherever that deeper file was read. None inside a directory a rule excludes is (next), so a rule in one is named only once the directory is re-included and the path named again. A run whose every argument was an excluded **file** exits 0 rather than failing with `No files to format` — what a pre-commit hook hands over when only ignored files are staged — while a run left empty by an excluded **directory** is still that error, so a mis-scoped command fails loudly. File arguments share one ignore scope, moved from each argument's directory to the next's (popping back to their common ancestor and pushing down), so the ignore files above many named files are read and parsed once rather than once per directory holding one. No ignore file inside a directory a rule excludes is read for a named path, as the walk that prunes the directory reads none — so nothing in one is warned about, and a rule in one can still exclude the path once the directory is re-included. A file arg is held to the extension check first — the parser dispatch behind a path has no unknown arm (everything that isn't `.svelte` or `.css` goes to the TypeScript parser), so a named `.json`/`.md`/extensionless file would be parsed as TypeScript: usually a baffling syntax error, and occasionally a *successful* rewrite of a file tsv doesn't support (a top-level-array `.json` reprints as a TS expression statement, semicolon and all, which is no longer valid JSON). Naming one is an **argument** error instead — reported alongside the unresolvable-path errors, failing the run upfront with nothing written, the same line prettier draws with "No parser could be inferred". A **directory** arg is a scope rather than a target, so the check doesn't apply to it: unsupported files inside are filtered out by the walk. A shell glob (`tsv format *`) names such directories as well: a safety-net or heuristic one (`node_modules`, `dist`) it walks, and one an ignore file excludes it skips, with the directory warning. Symlinks inside directories are not followed; pass them explicitly — and a passed one is graded **where it was typed**: a path argument that is itself a symbolic link is bounded by the ignore files at its own path (its parent canonicalized, its name kept, the repo root found from there), as `git check-ignore` and prettier read it, not where it points — a `.gitignore` naming `link.ts` excludes it, a link into a gitignored `build/` is not under `build/`, and a linked directory root is bounded by the rules of the repo it sits in even when it points outside that repo; only the overlap dedup below reads the link's target. And it is graded **as the link it is**, whatever it points at, as git grades it: a directory-only rule (`foo/`) does not match a symlinked directory argument (`git check-ignore foo` says not ignored), the link is walked as a directory once it is in scope, a warning's re-include names it as a file (`!/foo`, since a `!/foo/` reaches no link), and one a rule does exclude counts as an excluded *file* argument — a run naming only such links exits 0. Hard links are not detected either: two names for one inode are two files in scope, each read and formatted by its own name — a `--check` lists both, and a format rewrites the inode through whichever name it reaches first and finds the other already formatted, so it reports one name or both (the same bytes either way; under a parallel run the second name can also read the first's write in flight, the exposure any process writing a file while tsv reads it has).
+- **Discovery**: directories recurse over the JS/TS family (`.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cjs`, all parsed as TypeScript — `.jsx`/`.tsx` are out of scope), `.svelte`, and `.css` (compound forms like `.svelte.ts` included), each extension read ASCII-case-insensitively (`A.TS`, `styles.CSS`), as prettier infers a parser from the lowercased name — a walk, a named path, the parser dispatch and the `.mjs`/`.mts` goal all read it the same way, on both bins.
+
+  The **safety nets** `.git`, `node_modules`, `.sl`, `.hg`, `.svn`, `.jj` are always pruned. **A path an argument names is bounded by the ignore files alone.** The safety nets and the build-output heuristic prune what a walk *discovers* — they are tsv's guesses about a tree, and a guess never overrides a path someone typed — so they grade neither a named path nor its ancestors: `tsv format node_modules/pkg`, `dist/sub` or `.cache/x` walks what naming its parent walks there, and below the named root they classify every child as usual. An ignore rule, which the user or their repo wrote, bounds a named path — file or directory — exactly as it bounds the walk that would have reached it, through an ancestor or at the path itself: naming `pkg/dist` doesn't override a `dist/` rule, nor naming `vendor/x.ts` a `vendor/` one, the line prettier, ESLint, oxfmt and deno fmt draw too. Such a path is skipped.
+
+  A named **file** a `.formatignore` or `.prettierignore` rule excludes is skipped quietly, as prettier skips it, whether or not a `.gitignore` excludes it too — at the file or an ancestor, and even where that `.gitignore` rule sits above the tsv rule and bounds the path on its own, the case the directory warning below names both blockers for: those files exist to say what not to format, the rule is the author's verdict on the file however the path is bounded, and a pre-commit hook handing over its staged files names such a file on every commit that touches one (ESLint, which warns there, ships `--no-warn-ignored` for exactly that noise; tsv has no flags to offer).
+
+  Every other exclusion prints a stderr **warning** naming the file the excluding rule sits in and how to undo it — a `.gitignore` rule is about version control, so one excluding a named file is a surprise, and a named directory is a scope someone typed. A path only a `.gitignore` excludes gets the lines that re-include it and nothing beside it, for the repo root's own tsv file (read after every `.gitignore`, so its `!` wins): `!/src/a.gen.ts` for a path the rule matched itself, and for one under an excluded directory that directory re-included, its contents excluded again, and so on one level at a time down to the path (`!/build/`, `/build/*`, `!/build/a.ts`) — every line anchored with a leading `/`, without which a one-segment pattern matches at every depth, and spelling its path literally (each `*`, `?`, `[`, `]`, `\` and trailing space escaped), so a `[slug]` directory names itself rather than a character class. A path holding a control character other than a tab — a line feed, which splits any line; a carriage return at a file name's end, which a line's end drops; or any other, which an ignore file could hold only raw and the warning will not print — gets no lines, and the warning says to narrow the rule instead. The file named is the one the root reads: its `.prettierignore` where it has no `.formatignore`, since a `.formatignore` created beside it would shadow every rule in it.
+
+  For a named directory, the rule named is the shallowest exclusion's — a `.formatignore`/`.prettierignore` rule over a `.gitignore` rule at the same prefix, the `.gitignore` rule where it excludes an ancestor above the tsv rule's — and the remedy turns on what *else* excludes the path. Only tsv rules: the rule is the user's own to narrow or negate. A `.gitignore` rule anywhere at or below the named one: narrowing a tsv rule would leave it standing, and every `!` under an excluded directory is inert, so the warning gives the lines that re-include the path level by level from the shallowest exclusion down, for the repo-root tsv file — "after that rule" when the named rule is a root tsv rule (a later line wins there), "which also override" a root tsv rule below a named `.gitignore` one — while a tsv rule in a *deeper* file, read after the root's lines, stays the user's to narrow and is named as the second blocker: one warning stating both, not one per rerun — wherever that deeper file was read. No ignore file inside a directory a rule excludes is read for a named path, as the walk that prunes the directory reads none — so nothing in one is warned about, and a rule in one is named, and can exclude the path, only once the directory is re-included and the path named again.
+
+  A run whose every argument was an excluded **file** exits 0 rather than failing with `No files to format` — what a pre-commit hook hands over when only ignored files are staged — while a run left empty by an excluded **directory** is still that error, so a mis-scoped command fails loudly.
+
+  File arguments share one ignore scope, moved from each argument's directory to the next's (popping back to their common ancestor and pushing down), so the ignore files above many named files are read and parsed once rather than once per directory holding one.
+
+  A file arg is held to the extension check first — the parser dispatch behind a path has no unknown arm (everything that isn't `.svelte` or `.css` goes to the TypeScript parser), so a named `.json`/`.md`/extensionless file would be parsed as TypeScript: usually a baffling syntax error, and occasionally a *successful* rewrite of a file tsv doesn't support (a top-level-array `.json` reprints as a TS expression statement, semicolon and all, which is no longer valid JSON). Naming one is an **argument** error instead — reported alongside the unresolvable-path errors, failing the run upfront with nothing written, the same line prettier draws with "No parser could be inferred". A **directory** arg is a scope rather than a target, so the check doesn't apply to it: unsupported files inside are filtered out by the walk. A shell glob (`tsv format *`) names such directories as well: a safety-net or heuristic one (`node_modules`, `dist`) it walks, and one an ignore file excludes it skips, with the directory warning.
+
+  Symlinks inside directories are not followed; pass them explicitly — and a passed one is graded **where it was typed**: a path argument that is itself a symbolic link is bounded by the ignore files at its own path (its parent canonicalized, its name kept, the repo root found from there), as `git check-ignore` and prettier read it, not where it points — a `.gitignore` naming `link.ts` excludes it, a link into a gitignored `build/` is not under `build/`, and a linked directory root is bounded by the rules of the repo it sits in even when it points outside that repo; only the overlap dedup below reads the link's target. And it is graded **as the link it is**, whatever it points at, as git grades it: a directory-only rule (`foo/`) does not match a symlinked directory argument (`git check-ignore foo` says not ignored), the link is walked as a directory once it is in scope, a warning's re-include names it as a file (`!/foo`, since a `!/foo/` reaches no link), and one a rule does exclude counts as an excluded *file* argument — a run naming only such links exits 0.
+
+  Hard links are not detected either: two names for one inode are two files in scope, each read and formatted by its own name — a `--check` lists both, and a format rewrites the inode through whichever name it reaches first and finds the other already formatted, so it reports one name or both (the same bytes either way; under a parallel run the second name can also read the first's write in flight, the exposure any process writing a file while tsv reads it has).
 - **Ignore files (two regimes, keyed on `.git`)**: for each directory root, the **format root** — the scope boundary, derived from the argument, never the cwd — is the **repo root** inside a git tree (a hard stop where the upward walk ends, so nothing above the repo is read and `--check` is reproducible) or the **filesystem root** outside one. The regime is decided **once at the target root**, and any ignored directory is pruned (its whole subtree is skipped).
   - **Inside a repo**, discovery honors, relative to the repo root:
     - **`.gitignore`** — hierarchical and repo-rooted exactly like git ([gitignore syntax](https://git-scm.com/docs/gitignore#_pattern_format), matched against `git check-ignore` on case-sensitive filesystems). This goes beyond Prettier, which reads only one `.gitignore` and one `.prettierignore`, both relative to its own directory (the cwd by default), and ignores nested ones entirely.
     - **`.formatignore`** — hierarchical (one per directory from the repo root down, deeper wins), applied after `.gitignore` so its `!` can re-include a gitignore'd path (subject to git's parent-directory rule).
-    - **`.prettierignore`** — drop-in compat, honored **hierarchically** as well (one per directory from the repo root down, deeper wins), read as the tsv-layer fallback in any directory with no `.formatignore` of its own; a *sibling* `.formatignore` shadows it per-directory (used alone when present, even if that `.formatignore` is present-but-unreadable — a read error can't silently demote tsv's native file to prettier's). Like the hierarchical `.gitignore` above, this goes beyond Prettier's single cwd-relative `.prettierignore` — so a monorepo that runs `prettier` per-package (each package with its own `.prettierignore`) is honored from one repo-root tsv invocation. Because the shadow silently drops the sibling `.prettierignore`'s rules for that directory (Prettier applies *both* files), tsv emits a non-fatal stderr warning wherever a `.formatignore` shadows a `.prettierignore`, pointing at merging the patterns into `.formatignore`. **Compat caveat:** as a tsv layer a `.prettierignore` `!` can re-include a path `.gitignore` excluded (subject to git's parent-directory rule), whereas Prettier treats `.gitignore` and `.prettierignore` as independent sources OR'd together, where a `.prettierignore` `!` can't rescue a gitignore'd file — tsv's model is the more powerful superset, and the divergence only surfaces for a `.prettierignore` `!` targeting a gitignore'd path (rare).
+    - **`.prettierignore`** — drop-in compat, honored **hierarchically** the same way, read as the tsv-layer fallback in any directory with no `.formatignore` of its own; a *sibling* `.formatignore` shadows it per-directory (used alone when present, even if that `.formatignore` is present-but-unreadable — a read error can't silently demote tsv's native file to prettier's). Like the hierarchical `.gitignore` above, this goes beyond Prettier's single cwd-relative `.prettierignore` — so a monorepo that runs `prettier` per-package (each package with its own `.prettierignore`) is honored from one repo-root tsv invocation. Because the shadow silently drops the sibling `.prettierignore`'s rules for that directory (Prettier applies *both* files), tsv emits a non-fatal stderr warning wherever a `.formatignore` shadows a `.prettierignore`, pointing at merging the patterns into `.formatignore`. **Compat caveat:** as a tsv layer a `.prettierignore` `!` can re-include a path `.gitignore` excluded (subject to git's parent-directory rule), whereas Prettier treats `.gitignore` and `.prettierignore` as independent sources OR'd together, where a `.prettierignore` `!` can't rescue a gitignore'd file — tsv's model is the more powerful superset, and the divergence only surfaces for a `.prettierignore` `!` targeting a gitignore'd path (rare).
   - **Outside a repo**, `.gitignore` and `.prettierignore` are not read (as git itself does); only `.formatignore` governs, hierarchically from the filesystem root down — so a `~/.formatignore` is global config for loose files. A `.prettierignore` in the **target root** (the directory tsv was pointed at, where prettier would have read it) raises a non-fatal stderr warning — rename it to `.formatignore`, or `git init` — without changing what gets formatted. The warning is bounded to the target root: outside a repo tsv's regime is `.formatignore`-only at every depth, so this is one courtesy heads-up at the entry point (not a per-directory scan), and an ancestor of a subdirectory target has no repo boundary to anchor on.
   - **Heuristic fallback**: a `.gitignore` in scope is **authoritative** and turns the heuristic off; with no `.gitignore`, the heuristic — hidden directories plus `dist`/`build`/`target` — is the fallback "not source" guess, except that an explicit tsv-layer `!` re-include overrides it.
-  - **Re-include idiom**: to selectively re-include under a pruned (or otherwise ignored) directory, re-include the directory itself first — `!/dist/` admits the whole directory, then `/dist/*` + `!/dist/keep.ts` narrows it back to just the files you want. The leading `/` anchors each line to the directory of the ignore file holding it; without it a one-segment `!dist/` re-includes a `dist` at every depth. A bare `!dist/keep.ts` (without the directory re-include) is a **no-op** — the heuristic prunes `dist` before descending, mirroring git's parent-directory rule, and a gitignored (or tsv-excluded) `dist/` blocks a later `!dist/keep.ts` the same way. tsv emits a **stderr warning** in either case (non-fatal — no effect on the exit code, stdout, or `--list`/`--check` output), once per pruned directory, saying what pruned it (the heuristic, or the rule and its file), naming the file the re-include was written in, and spelling the lines that reach what the rule named, for that file — anchored and relative to its directory, since a line spelled from the repo root does nothing in a nested file, and outside a repo, where the format root is the filesystem root, in any file: `!/dist/`, `/dist/*`, `!/dist/keep.ts` for `!dist/keep.ts`, with `!/dist/sub/`, `/dist/sub/*` between for a nested `!dist/sub/keep.ts` (every directory down to the target has to be opened, and a `/dist/*` alone would close `dist/sub` again), the last lines being every re-include written under the directory, each the author's own pattern anchored (a `/dist/*` line would silence any it did not re-spell after it) — so a glob (`!dist/*.ts`) keeps its glob, and a rule reaching below the directory (`!dist/**/keep.ts`) opens it with `/dist/**` + `!/dist/**/` in place of `/dist/*`, git's idiom for every directory and no file. A tsv layer is read after every `.gitignore` and a later line wins within a file, so the lines override the excluding rule wherever it sits, except a tsv rule in a file *deeper* than the re-include's, which is read after it and which the warning says to narrow or negate instead — beside the lines that pass a `.gitignore` rule standing behind it, which narrowing alone would leave in force.
+  - **Re-include idiom**: to selectively re-include under a pruned (or otherwise ignored) directory, re-include the directory itself first — `!/dist/` admits the whole directory, then `/dist/*` + `!/dist/keep.ts` narrows it back to just the files you want. The leading `/` anchors each line to the directory of the ignore file holding it; without it a one-segment `!dist/` re-includes a `dist` at every depth. A bare `!dist/keep.ts` (without the directory re-include) is a **no-op** — the heuristic prunes `dist` before descending, mirroring git's parent-directory rule, and a gitignored (or tsv-excluded) `dist/` blocks a later `!dist/keep.ts` the same way.
+
+    tsv emits a **stderr warning** in either case (non-fatal — no effect on the exit code, stdout, or `--list`/`--check` output), once per pruned directory, saying what pruned it (the heuristic, or the rule and its file), naming the file the re-include was written in, and spelling the lines that reach what the rule named, for that file — anchored and relative to its directory, since a line spelled from the repo root does nothing in a nested file, and outside a repo, where the format root is the filesystem root, in any file: `!/dist/`, `/dist/*`, `!/dist/keep.ts` for `!dist/keep.ts`, with `!/dist/sub/`, `/dist/sub/*` between for a nested `!dist/sub/keep.ts` (every directory down to the target has to be opened, and a `/dist/*` alone would close `dist/sub` again), the last lines being every re-include written under the directory, each the author's own pattern anchored (a `/dist/*` line would silence any it did not re-spell after it) — so a glob (`!dist/*.ts`) keeps its glob, and a rule reaching below the directory (`!dist/**/keep.ts`) opens it with `/dist/**` + `!/dist/**/` in place of `/dist/*`, git's idiom for every directory and no file. A tsv layer is read after every `.gitignore` and a later line wins within a file, so the lines override the excluding rule wherever it sits, except a tsv rule in a file *deeper* than the re-include's, which is read after it and which the warning says to narrow or negate instead — beside the lines that pass a `.gitignore` rule standing behind it, which narrowing alone would leave in force.
   - **Subdirectory invocation**: because the boundary is found by walking up, the repo-root rules apply even from a subdirectory, and a subdirectory named directly is bounded by the same ignore rules as when it is reached via an ancestor — only the safety nets and the heuristic, which grade no named path, can tell the two apart. But a tree that *contains* repos (a non-repo directory with `.git` subdirectories below it) does not honor the inner repos' `.gitignore`s — run tsv per repo.
-  - **Piped output — a closed consumer is not a failure.** `tsv format . | head`
-    fills the 64 KiB pipe buffer on any tree whose changed-path report exceeds
-    it, so `head` has exited by the time the rest is written. **Both bins stop
-    writing and finish the run on their own terms**: the exit code still reports
-    the work (0 clean, 1 `--check` would-change, 2 errors) and the stderr summary
-    still prints when stderr is not the closed fd, so `tsv format . | head` stays
-    informative. The rule covers **both fds** — `2>&1 | head` closes the same
-    pipe for both, and a stdout-only rule would just move the failure one line
-    down, onto the summary.
-
-    Why not the two alternatives, since this is a shipped exit-code contract:
-    **141** (what a tool killed by `SIGPIPE` reports) and **restoring `SIGPIPE`
-    to `SIG_DFL`** both replace the 0/1/2 verdict with "the reader left", and for
-    `--check` the exit code *is* the API. Exiting 0 is also the honest answer for
-    `format`, whose stdout is a *report* of files already rewritten rather than
-    the product: a reader that left does not un-format them. And only this answer
-    is one both bins can give identically — Node ignores `SIGPIPE` too, so
-    `cli.js` could never die by the signal, only fake a code where the native
-    side died by one. Any **other** write error still aborts loudly on both: a
-    report truncated by a full disk, with nothing said about it, is worse than a
-    crash.
-
-    The mechanism differs because the two runtimes fail differently. Native:
-    Rust sets `SIGPIPE` to `SIG_IGN` at startup, so the write returns `EPIPE` and
-    `println!`/`eprintln!` panic on it — every byte therefore goes through
-    `cli/out.rs` (`write_stdout` / `write_stderr`, and the `out_line!` /
-    `err_line!` macros over them), which absorbs `BrokenPipe`, waits out
-    `WouldBlock` (a backoff capped at a millisecond, partial writes honored —
-    the fd's blocking-ness belongs to the open file description a child shares
-    with its parent, and a Node parent that opens its own piped `process.stdout`
-    after spawning `tsv` asynchronously, a task runner logging beside it, flips
-    that description to non-blocking under the running child; libuv resets fds
-    0–2 to blocking at the spawn itself, so the `@fuzdev/tsv` loader, waiting in
-    `spawnSync`, never does), and panics on anything else. `parse` rides the same writer, so a closed reader there does
-    not report `1`, its parse-error code. `cli.js` writes both fds
-    **synchronously** (an async `process.stdout.write` before `process.exit`
-    truncates), which is only safe while the fd stays blocking — and it takes
-    that away from itself: spawning the worker pool pipes the workers' stdio
-    through the parent, which flips fd 1 to non-blocking. Its `write_fd`
-    therefore loops over `writeSync`, honors partial writes, sleeps 1 ms and
-    retries on `EAGAIN`, goes quiet on `EPIPE`, and on any other error prints
-    `failed printing to stdout: …` and exits with the shipped native binary's abort
-    status (134) — never a verdict code, since an uncaught throw's 1 reads as
-    `--check`'s would-change. The two bins reach `EAGAIN`
-    by different roads — `cli.js` flips its own fd, the native CLI inherits a
-    flipped one — and answer it alike. **The read side takes the same rule**: a
-    parent that opens its own piped `process.stdin` flips fd 0 the same way, and
-    `--stdin` on either bin (`Input::from_stdin`, `cli.js`'s `read_fd_to_end`)
-    waits out `EAGAIN` there too rather than reporting a slow writer as a read
-    error the moment the pipe is momentarily empty.
-
-    A consumer that is merely **slow** gets every line on both bins: `EPIPE`
-    ends the output, `EAGAIN` is waited out, and any other write error is a
-    failure. Pinned by `tests/cli_tests/` (`*_closed_pipe_*`, `*_slow_pipe_*`,
-    `*_non_blocking_stdout_*`) and `scripts/test_npm.ts`'s twin rows.
-  - **A non-UTF-8 file NAME**: the native walk joins each entry's raw bytes, so a file or directory whose name is not UTF-8 is discovered, formatted, and listed by its own bytes on unix (the changed-path report and `--list` print paths as bytes there, `cli::out::path_bytes`; elsewhere the U+FFFD spelling is all there is). A stderr diagnostic spells such a name with U+FFFD on every platform (`cli::out::path_text`), deliberately: a diagnostic is prose for a reader and a script reads stdout, and a byte-faithful stderr would put raw non-UTF-8 into the one channel every consumer reads as text. Two limits: such a name reaches the matcher in its lossy spelling, so a `?` or class counts one U+FFFD where git counts each byte (the multibyte edge `tsv_ignore`'s CLAUDE.md scopes the git parity to ASCII by), and a non-UTF-8 path given as an *argument* is refused at the argv boundary (`Invalid utf8: …`, exit 1 — argh reads `&str`), so it is reachable only through a directory. `cli.js` sees such a name only as Node spells it, lossily, on every route, so it reports the file as unreadable rather than formatting it — a deliberate, permanent split: Node hands the bytes back only as `Buffer`s (`readdir`'s `encoding: 'buffer'`), which would have to travel as a second path type through the walk, the ignore-file reads, the sort, the canonical-path dedup (`realpathSync` resolves a `Buffer` path through its lossy spelling and fails), the worker handoff and the report, for a name no published repo holds.
-  - **A path holding a control character or a double quote is printed C-quoted, as git prints one.** One rule for every path either bin prints — the `--list` and changed-path lines on stdout, the per-file `error:` lines, the traversal errors, the ignore-file warnings and the warning naming an excluded argument, a bad path argument, `parse`'s read failure — stated once in `tsv_discover::quote_path` (the warnings are built there already; the native CLI routes its own paths through `cli::out::path_bytes` / `path_text`, and `cli.js` restates the rule by hand, as it does `clamp_worker_count`): a path prints verbatim unless it holds a control character (U+0000–U+001F, U+007F) or a double quote, in which case the whole path is wrapped in double quotes and C-escaped the way `git ls-files` prints such a name under `core.quotePath=false` — `\a` `\b` `\t` `\n` `\v` `\f` `\r` `\"` `\\` by name, any other control character as three octal digits (`"r\033s.ts"`), every other byte as itself (a character outside ASCII prints raw even inside the quotes, as git prints it, and so does a non-UTF-8 byte on a unix stdout listing; a stderr diagnostic spells that byte as U+FFFD, below). A backslash escapes inside a quoted path but does not trigger the quoting on its own — every Windows path holds one — so a quoted path unquotes exactly as git's does while a plain `src\a.ts` prints as it is. Two things follow. A diagnostic that names such a path stays one line (raw, a line feed in the name would split the `warning:` line in two and a carriage return garble the terminal). And the stdout listings stay parseable by whatever already reads `git ls-files` or `git status`: a line beginning with `"` is a quoted path, any other line names the file exactly, so a script over `tsv format --list` or the changed-path report can unquote with the routine it uses for git (or treat the leading `"` as the tell that a name needs it). The one text that stays literal is a re-include **pattern** a warning offers (`` `!/build/n<TAB>o.ts` ``): it is meant to be pasted into an ignore file, which reads no escapes, so it is spelled as the file must hold it — and a pattern that would hold any control character but a tab is not offered at all, as above (a tab is spelled raw: it renders as the whitespace it is, and the pasted line reads it back as the file holds it). The ignore-file names in prose (`the repo-root .gitignore`) hold nothing to quote. Pinned by `tests/cli_tests/` (`test_format_quotes_a_path_holding_a_control_character_wherever_it_prints_it`, `test_argument_errors_quote_a_path_holding_a_control_character`) and `scripts/test_npm.ts`'s twin row; the spellings themselves by `tsv_discover`'s `quote_path_*` tests, taken from git 2.47's own output.
-  - **Invalid UTF-8 in a source file**: reading is **strict UTF-8 on both CLIs**
-    — the native one because Rust's `read_to_string` refuses invalid bytes, and
-    `cli.js` because it decodes through `TextDecoder(..., {fatal: true})` rather
-    than `readFileSync(path, 'utf-8')`, which would substitute U+FFFD. The
-    distinction is not cosmetic on the format path: a stray byte inside a string
-    literal still parses after substitution, so a lossy reader would write the
-    repaired text back over the author's file and call it formatted. Both bins
-    instead report `read failed: stream did not contain valid UTF-8`, count the
-    file as an error, and leave every byte in place. The same strict-UTF-8 rule holds
-    for `--stdin` and for `parse`, each with its own message (`Error reading from
-    stdin: …`, `Error reading file <path>: …`).
-  - **Unreadable ignore files**: a `.gitignore`/`.formatignore`/`.prettierignore` that is present but can't be read (invalid UTF-8 — reading is strict UTF-8 on both the native and WASM CLIs — or a permission error) is **not** silently treated as absent: tsv emits a non-fatal stderr warning and drops that file's rules (so an unreadable `.gitignore` also leaves the build-output heuristic *on* for its subtree). A file that genuinely isn't there, or is deleted between the directory listing and the read, stays silent. This is also a `--check` reproducibility hazard — surfacing it is the point. *Present* means a regular file, reached through a symlink when the name is one; a directory of that name is not an ignore file and stays silent — the same rule in a walked directory and a preloaded ancestor. The one exception is `.gitignore`, which git never reads through a symbolic link in a working tree (gitignore(5)): a symlinked `.gitignore` is not applied — so the build-output heuristic stays on for its subtree, as for an unreadable one — and warns, by the same rule in both walks. `.formatignore` and `.prettierignore` keep reading through links, as prettier does.
+  - **Unreadable ignore files**: a `.gitignore`/`.formatignore`/`.prettierignore` that is present but can't be read (invalid UTF-8 — read strictly, as in the invalid-UTF-8 bullet below — or a permission error) is **not** silently treated as absent: tsv emits a non-fatal stderr warning and drops that file's rules (so an unreadable `.gitignore` also leaves the build-output heuristic *on* for its subtree). A file that genuinely isn't there, or is deleted between the directory listing and the read, stays silent. This is also a `--check` reproducibility hazard — surfacing it is the point. *Present* means a regular file, reached through a symlink when the name is one; a directory of that name is not an ignore file and stays silent — the same rule in a walked directory and a preloaded ancestor. The one exception is `.gitignore`, which git never reads through a symbolic link in a working tree (gitignore(5)): a symlinked `.gitignore` is not applied — so the build-output heuristic stays on for its subtree, as for an unreadable one — and warns, by the same rule in both walks. `.formatignore` and `.prettierignore` keep reading through links, as prettier does.
   - **`--check` reproducibility** assumes the ignore files are **committed**: a local/uncommitted `.formatignore` or `.prettierignore` (or git's unread `.git/info/exclude` / `core.excludesFile`) makes a clean CI checkout disagree.
   - **Shared by construction**: the matcher is the `tsv_ignore` crate's `IgnoreStack`; the per-directory prune/descend policy (heuristic, safety nets, the shadow warning) is the `tsv_discover` crate's verdict. The WASM CLI, the native npm package, and editors call into the same two crates, so every surface agrees rather than hand-mirroring the logic. See `cli/discover.rs`.
-- **Source type: module, retried as a script.** Path mode names no source type — a directory can hold Svelte and CSS beside JS/TS, and there is no one grammar to declare for the run — so each JS/TS file is parsed as a **module**, and only if that parse *fails* is it retried as a **script**. That is what lets a legacy sloppy script (a `with` statement, a leading-zero literal or escape, `await` as an ordinary name) format from a bare path. The retry runs on the error path only, so nothing the module grammar already accepts is ever reinterpreted, and the printer never reads the goal — no formatted output changes for any module-valid file. When **both** grammars reject the file, the reported error is the attempt's whose grammar the file was written against, decided in two steps. A script retry that died on a **goal gate** — a top-level `import`/`export`, an `import.meta`, a top-level `for await`, or the operand a module reads after a top-level `await`, the constructs only a module holds — has proved the file a module wherever that construct sits, so the module error is reported: a broken module's script attempt dies there even when its real error comes first (definitions first, `export` at the bottom — position alone would blame the valid `export` line). Otherwise the error that reached **further into the source** is reported, the module's on a tie: a broken *sloppy script*'s module attempt dies early at its first `with`/legacy literal/`await` name — the construct the retry exists to admit — so the script error (the typo) is reported rather than a pointer at a line tsv accepts. prettier's babel parser reaches the same answer by tolerating those strict-mode productions at the module goal (`allowedReasonCodes`). Pinned by `tests/format_fallback_error_attribution.rs`. An explicit `--source-type` is **exact** — `--source-type module` refuses a script-only source rather than retrying — which is why it is a usage error in path mode rather than a per-run override. `parse` has no fallback at either surface: its wire's `Program.sourceType` is a claim about which grammar produced the AST, and one settled goal has to produce it. The same rule reaches every format surface that takes no source type from its caller: the JS CLI's path mode, an editor's `format_typescript(source)`, and the `format_*` exports of all three bindings called with no `sourceType`.
+- **Piped output — a closed consumer is not a failure.** `tsv format . | head`
+  fills the 64 KiB pipe buffer on any tree whose changed-path report exceeds
+  it, so `head` has exited by the time the rest is written. **Both bins stop
+  writing and finish the run on their own terms**: the exit code still reports
+  the work (0 clean, 1 `--check` would-change, 2 errors) and the stderr summary
+  still prints when stderr is not the closed fd, so `tsv format . | head` stays
+  informative. The rule covers **both fds** — `2>&1 | head` closes the same
+  pipe for both, and a stdout-only rule would just move the failure one line
+  down, onto the summary.
 
-- **Two extensions settle the goal themselves, and skip the retry.** `.mjs` and `.mts` are ES modules whatever any config says — Node loads a `.mjs` as ESM unconditionally, and TypeScript maps both to `ModuleKind.ESNext` with the extension overriding `module` — so a path with one of those names is parsed as a **module with no script retry** (`tsv_ts::Goal::from_extension`). The fallback above exists to reach a *legacy sloppy script*, and a file that is a module by its own name cannot be one; without the narrowing, `tsv format a.mjs` would format a `with` statement that no runtime would load. Nothing else settles a goal: `.js`/`.ts` are ambiguous by design, and `.cjs`/`.cts` are the CommonJS half of that same switch — script *code*, but nothing in tsv's output turns on it, so they keep the fallback with the rest. The narrowing can only ever *reject* a file the fallback would have formatted: the retry runs on a module-parse failure alone, so no module-valid source formats differently. Both `tsv` bins apply it — the native CLI per file in `format_file`, and `crates/tsv_wasm/npm/cli.js` from a hand-restated copy (as with `clamp_worker_count`), pinned on both sides. `parse <file>` reads no extension rule: with no flag every file parses as a module already, and an explicit `--source-type script` on a `.mts` is honored as the caller's exact claim rather than refused — the precedence prettier draws too (its `__babelSourceType` option beats `getSourceType(filepath)`), and the one parse takes on every surface, since the wire's `sourceType` is what was asked for. An **editor** keeps the fallback, because it has no path to read: the VS Code extension dispatches on the document's `languageId` (`.mjs` arrives as `javascript`, `.mts` as `typescript`) and calls the binding's bare `format_typescript(source)`. So a `.mjs` holding a sloppy script is unformattable from the CLI and formats on save — the same split the goal axis draws everywhere between a surface that names a file and one that is handed a buffer.
+  Why not the two alternatives, since this is a shipped exit-code contract:
+  **141** (what a tool killed by `SIGPIPE` reports) and **restoring `SIGPIPE`
+  to `SIG_DFL`** both replace the 0/1/2 verdict with "the reader left", and for
+  `--check` the exit code *is* the API. Exiting 0 is also the honest answer for
+  `format`, whose stdout is a *report* of files already rewritten rather than
+  the product: a reader that left does not un-format them. And only this answer
+  is one both bins can give identically — Node ignores `SIGPIPE` too, so
+  `cli.js` could never die by the signal, only fake a code where the native
+  side died by one. Any **other** write error still aborts loudly on both: a
+  report truncated by a full disk, with nothing said about it, is worse than a
+  crash.
+
+  The mechanism differs because the two runtimes fail differently. Native: Rust
+  sets `SIGPIPE` to `SIG_IGN` at startup, so the write returns `EPIPE` and
+  `println!`/`eprintln!` panic on it — every byte therefore goes through
+  `cli/out.rs` (`write_stdout` / `write_stderr`, and the `out_line!` / `err_line!`
+  macros over them), which absorbs `BrokenPipe`, waits out `WouldBlock` (a backoff
+  capped at a millisecond, partial writes honored), and panics on anything else.
+  `WouldBlock` is reachable because the fd's blocking-ness belongs to the open
+  file description a child shares with its parent: a Node parent that opens its
+  own piped `process.stdout` after spawning `tsv` asynchronously (a task runner
+  logging beside it) flips that description to non-blocking under the running
+  child — libuv resets fds 0–2 to blocking at the spawn itself, so the
+  `@fuzdev/tsv` loader, waiting in `spawnSync`, never does. `parse` rides the same
+  writer, so a closed reader there does not report `1`, its parse-error code.
+
+  `cli.js` writes both fds **synchronously** (an async `process.stdout.write`
+  before `process.exit` truncates), which is only safe while the fd stays blocking
+  — and it takes that away from itself: spawning the worker pool pipes the
+  workers' stdio through the parent, which flips fd 1 to non-blocking. Its
+  `write_fd` therefore loops over `writeSync`, honors partial writes, sleeps 1 ms
+  and retries on `EAGAIN`, goes quiet on `EPIPE`, and on any other error prints
+  `failed printing to stdout: …` and exits with the shipped native binary's abort
+  status (134) — never a verdict code, since an uncaught throw's 1 reads as
+  `--check`'s would-change. The two bins reach `EAGAIN` by different roads —
+  `cli.js` flips its own fd, the native CLI inherits a flipped one — and answer it
+  alike.
+
+  **The read side takes the same rule**: a parent that opens its own piped
+  `process.stdin` flips fd 0 the same way, and `--stdin` on either bin
+  (`Input::from_stdin`, `cli.js`'s `read_fd_to_end`) waits out `EAGAIN` there too
+  rather than reporting a slow writer as a read error the moment the pipe is
+  momentarily empty.
+
+  A consumer that is merely **slow** gets every line on both bins: `EPIPE`
+  ends the output, `EAGAIN` is waited out, and any other write error is a
+  failure. Pinned by `tests/cli_tests/` (`*_closed_pipe_*`, `*_slow_pipe_*`,
+  `*_non_blocking_stdout_*`) and `scripts/test_npm.ts`'s twin rows.
+- **A non-UTF-8 file NAME**: the native walk joins each entry's raw bytes, so a file or directory whose name is not UTF-8 is discovered, formatted, and listed by its own bytes on unix (the changed-path report and `--list` print paths as bytes there, `cli::out::path_bytes`; elsewhere the U+FFFD spelling is all there is). A stderr diagnostic spells such a name with U+FFFD on every platform (`cli::out::path_text`), deliberately: a diagnostic is prose for a reader and a script reads stdout, and a byte-faithful stderr would put raw non-UTF-8 into the one channel every consumer reads as text.
+
+  Two limits: such a name reaches the matcher in its lossy spelling, so a `?` or class counts one U+FFFD where git counts each byte (the multibyte edge `tsv_ignore`'s CLAUDE.md scopes the git parity to ASCII by), and a non-UTF-8 path given as an *argument* is refused at the argv boundary (`Invalid utf8: …`, exit 1 — argh reads `&str`), so it is reachable only through a directory.
+
+  `cli.js` sees such a name only as Node spells it, lossily, on every route, so it reports the file as unreadable rather than formatting it — a deliberate, permanent split: Node hands the bytes back only as `Buffer`s (`readdir`'s `encoding: 'buffer'`), which would have to travel as a second path type through the walk, the ignore-file reads, the sort, the canonical-path dedup (`realpathSync` resolves a `Buffer` path through its lossy spelling and fails), the worker handoff and the report, for a name no published repo holds.
+- **A path holding a control character or a double quote is printed C-quoted, as git prints one.** One rule for every path either bin prints — the `--list` and changed-path lines on stdout, the per-file `error:` lines, the traversal errors, the ignore-file warnings and the warning naming an excluded argument, a bad path argument, `parse`'s read failure — stated once in `tsv_discover::quote_path` (the warnings are built there already; the native CLI routes its own paths through `cli::out::path_bytes` / `path_text`, and `cli.js` restates the rule by hand, as it does `clamp_worker_count`): a path prints verbatim unless it holds a control character (U+0000–U+001F, U+007F) or a double quote, in which case the whole path is wrapped in double quotes and C-escaped the way `git ls-files` prints such a name under `core.quotePath=false` — `\a` `\b` `\t` `\n` `\v` `\f` `\r` `\"` `\\` by name, any other control character as three octal digits (`"r\033s.ts"`), every other byte as itself (a character outside ASCII prints raw even inside the quotes, as git prints it, and so does a non-UTF-8 byte on a unix stdout listing; a stderr diagnostic spells that byte as U+FFFD, above). A backslash escapes inside a quoted path but does not trigger the quoting on its own — every Windows path holds one — so a quoted path unquotes exactly as git's does while a plain `src\a.ts` prints as it is. Two things follow. A diagnostic that names such a path stays one line (raw, a line feed in the name would split the `warning:` line in two and a carriage return garble the terminal). And the stdout listings stay parseable by whatever already reads `git ls-files` or `git status`: a line beginning with `"` is a quoted path, any other line names the file exactly, so a script over `tsv format --list` or the changed-path report can unquote with the routine it uses for git (or treat the leading `"` as the tell that a name needs it).
+
+  The one text that stays literal is a re-include **pattern** a warning offers (`` `!/build/n<TAB>o.ts` ``): it is meant to be pasted into an ignore file, which reads no escapes, so it is spelled as the file must hold it — and a pattern that would hold any control character but a tab is not offered at all, as above (a tab is spelled raw: it renders as the whitespace it is, and the pasted line reads it back as the file holds it). The ignore-file names in prose (`the repo-root .gitignore`) hold nothing to quote.
+
+  Pinned by `tests/cli_tests/` (`test_format_quotes_a_path_holding_a_control_character_wherever_it_prints_it`, `test_argument_errors_quote_a_path_holding_a_control_character`) and `scripts/test_npm.ts`'s twin row; the spellings themselves by `tsv_discover`'s `quote_path_*` tests, taken from git 2.47's own output.
+- **Invalid UTF-8 in a source file**: reading is **strict UTF-8 on both CLIs**
+  — the native one because Rust's `read_to_string` refuses invalid bytes, and
+  `cli.js` because it decodes through `TextDecoder(..., {fatal: true})` rather
+  than `readFileSync(path, 'utf-8')`, which would substitute U+FFFD. The
+  distinction is not cosmetic on the format path: a stray byte inside a string
+  literal still parses after substitution, so a lossy reader would write the
+  repaired text back over the author's file and call it formatted. Both bins
+  instead report `read failed: stream did not contain valid UTF-8`, count the
+  file as an error, and leave every byte in place. The same strict-UTF-8 rule holds
+  for `--stdin` and for `parse`, each with its own message (`Error reading from
+  stdin: …`, `Error reading file <path>: …`).
+- **Source type: module, retried as a script.** Path mode names no source type — a directory can hold Svelte and CSS beside JS/TS, and there is no one grammar to declare for the run — so each JS/TS file is parsed as a **module**, and only if that parse *fails* is it retried as a **script**. That is what lets a legacy sloppy script (a `with` statement, a leading-zero literal or escape, `await` as an ordinary name) format from a bare path. The retry runs on the error path only, so nothing the module grammar already accepts is ever reinterpreted, and the printer never reads the goal — no formatted output changes for any module-valid file.
+
+  When **both** grammars reject the file, the reported error is the attempt's whose grammar the file was written against, decided in two steps. A script retry that died on a **goal gate** — a top-level `import`/`export`, an `import.meta`, a top-level `for await`, or the operand a module reads after a top-level `await`, the constructs only a module holds — has proved the file a module wherever that construct sits, so the module error is reported: a broken module's script attempt dies there even when its real error comes first (definitions first, `export` at the bottom — position alone would blame the valid `export` line). Otherwise the error that reached **further into the source** is reported, the module's on a tie: a broken *sloppy script*'s module attempt dies early at its first `with`/legacy literal/`await` name — the construct the retry exists to admit — so the script error (the typo) is reported rather than a pointer at a line tsv accepts. prettier's babel parser reaches the same answer by tolerating those strict-mode productions at the module goal (`allowedReasonCodes`). Pinned by `tests/format_fallback_error_attribution.rs`.
+
+  An explicit `--source-type` is **exact** — `--source-type module` refuses a script-only source rather than retrying — which is why it is a usage error in path mode rather than a per-run override. `parse` has no fallback at either surface: its wire's `Program.sourceType` is a claim about which grammar produced the AST, and one settled goal has to produce it. The same rule reaches every format surface that takes no source type from its caller: the JS CLI's path mode, an editor's `format_typescript(source)`, and the `format_*` exports of all three bindings called with no `sourceType`.
+
+- **Two extensions settle the goal themselves, and skip the retry.** `.mjs` and `.mts` are ES modules whatever any config says — Node loads a `.mjs` as ESM unconditionally, and TypeScript maps both to `ModuleKind.ESNext` with the extension overriding `module` — so a path with one of those names is parsed as a **module with no script retry** (`tsv_ts::Goal::from_extension`). The fallback above exists to reach a *legacy sloppy script*, and a file that is a module by its own name cannot be one; without the narrowing, `tsv format a.mjs` would format a `with` statement that no runtime would load. Nothing else settles a goal: `.js`/`.ts` are ambiguous by design, and `.cjs`/`.cts` are the CommonJS half of that same switch — script *code*, but nothing in tsv's output turns on it, so they keep the fallback with the rest. The narrowing can only ever *reject* a file the fallback would have formatted: the retry runs on a module-parse failure alone, so no module-valid source formats differently. Both `tsv` bins apply it — the native CLI per file in `format_file`, and `crates/tsv_wasm/npm/cli.js` from a hand-restated copy (as with `clamp_worker_count`), pinned on both sides. `parse <file>` reads no extension rule: with no flag every file parses as a module already, and an explicit `--source-type script` on a `.mts` is honored as the caller's exact claim rather than refused — the precedence prettier draws too (its `__babelSourceType` option beats `getSourceType(filepath)`), and the one parse takes on every surface, since the wire's `sourceType` is what was asked for.
+
+  An **editor** keeps the fallback, because it has no path to read: the VS Code extension dispatches on the document's `languageId` (`.mjs` arrives as `javascript`, `.mts` as `typescript`) and calls the binding's bare `format_typescript(source)`. So a `.mjs` holding a sloppy script is unformattable from the CLI and formats on save — the same split the goal axis draws everywhere between a surface that names a file and one that is handed a buffer.
 - **Fail-fast args, isolated traversal**: path args that don't resolve to a file or directory fail the whole run before anything is written (every bad arg reported); traversal errors below a valid root (e.g. an unreadable subdirectory) report to stderr and discovery continues. A relative directory root that cannot be made absolute — its working directory was deleted out from under the run — is such an error for that root (`cannot resolve a relative path: the working directory is unavailable`) rather than a walk anchored on no format root, which would read none of its ancestors' ignore files.
 - **No per-file options**: formatting style is fixed (see [CLAUDE.md §Configuration](../CLAUDE.md#configuration)). In particular `<svelte:options preserveWhitespace />` is not detected — whitespace handling is uniform, with only `<pre>`/`<textarea>` content whitespace-sensitive; see [conformance_svelte.md §Template Whitespace](./conformance_svelte.md#template-whitespace-clean_nodes).
-- **Deduplication**: with multiple path args, overlapping spellings of the same file (`src` vs `./src`, absolute vs relative, symlink aliases) dedupe by canonical path, keeping the first spelling in sorted order. Only arguments that can overlap pay for it — a file argument among them, or one directory root an ancestor-or-self of another; a single root or disjoint roots can't produce duplicates, so the per-file canonicalization is skipped. Discovery's **warnings and traversal errors** collapse the same way: an ignore-file warning (a shadowed `.prettierignore`, an unreadable ignore file, a `.prettierignore` outside a repo) and a traversal error (an unreadable directory) name their directory by its absolute path, whichever root or argument spelling reached it, so `tsv format . sub` — the repo root walked as `.` and preloaded as `sub`'s ancestor — and `tsv format . ./` each warn once, and `tsv format t ./t` reports an unreadable `t/locked` once. Every canonical path the native walk takes — the dedup key, the working directory, a named path's parent — is read through one `canonicalize` that strips the verbatim prefix Windows' `fs::canonicalize` returns (`\\?\C:\…` → `C:\…`, `\\?\UNC\s\v` → `\\s\v`; a no-op on unix), so a diagnostic naming the format root outside a repo prints `C:\`, and one argument whose parent would not canonicalize (spelled by the lexical fallback) does not read as a different format root from its neighbor that did. Verified against std's own Windows path code rather than on a Windows runner: every fs call re-adds the prefix itself where a path is long enough to need it (`maybe_verbatim`, behind `read_dir`, `metadata`, and the `File::open` under `read_to_string` and `write`), and passes a shorter absolute path to Win32 as spelled — the spelling every walked path, joined from the argument, already takes — so the strip opens no access path the walk did not already use. The one residual is a name only a verbatim path reaches, a trailing dot or space Win32 normalizes away or a reserved device name, which git refuses to check out on Windows and which the walk never reached through the argument's spelling either. Node's `realpathSync` never returns the prefix, so `cli.js` needs no strip.
+- **Deduplication**: with multiple path args, overlapping spellings of the same file (`src` vs `./src`, absolute vs relative, symlink aliases) dedupe by canonical path, keeping the first spelling in sorted order. Only arguments that can overlap pay for it — a file argument among them, or one directory root an ancestor-or-self of another; a single root or disjoint roots can't produce duplicates, so the per-file canonicalization is skipped.
+
+  Discovery's **warnings and traversal errors** collapse the same way: an ignore-file warning (a shadowed `.prettierignore`, an unreadable ignore file, a `.prettierignore` outside a repo) and a traversal error (an unreadable directory) name their directory by its absolute path, whichever root or argument spelling reached it, so `tsv format . sub` — the repo root walked as `.` and preloaded as `sub`'s ancestor — and `tsv format . ./` each warn once, and `tsv format t ./t` reports an unreadable `t/locked` once.
+
+  Every canonical path the native walk takes — the dedup key, the working directory, a named path's parent — is read through one `canonicalize` that strips the verbatim prefix Windows' `fs::canonicalize` returns (`\\?\C:\…` → `C:\…`, `\\?\UNC\s\v` → `\\s\v`; a no-op on unix), so a diagnostic naming the format root outside a repo prints `C:\`, and one argument whose parent would not canonicalize (spelled by the lexical fallback) does not read as a different format root from its neighbor that did. Verified against std's own Windows path code rather than on a Windows runner: every fs call re-adds the prefix itself where a path is long enough to need it (`maybe_verbatim`, behind `read_dir`, `metadata`, and the `File::open` under `read_to_string` and `write`), and passes a shorter absolute path to Win32 as spelled — the spelling every walked path, joined from the argument, already takes — so the strip opens no access path the walk did not already use. The one residual is a name only a verbatim path reaches, a trailing dot or space Win32 normalizes away or a reserved device name, which git refuses to check out on Windows and which the walk never reached through the argument's spelling either. Node's `realpathSync` never returns the prefix, so `cli.js` needs no strip.
 - **In-place writes**: files are rewritten only when output differs (no mtime churn), in place — a plain truncate-and-write, as prettier does, which keeps the inode, its mode and any hard link to it, and means a process killed or a disk filled mid-write can leave the file truncated (an atomic temp-file-and-rename would swap the inode and break hard links; not planned). `--content`/`--stdin` keep printing to stdout.
 - **`--check`**: lists files that would change without writing; exits 1 if any would. For CI. Also works with `--content`/`--stdin` (nothing printed to stdout; the exit code is the API) for editor integrations.
-- **`--list`**: prints the discovered in-scope files (one per line, a name holding a control character or a double quote C-quoted as git prints it — see above) without formatting — a read-only view of the set `format` would touch, after the ignore files are applied. Path mode only (errors with `--content`/`--stdin`), mutually exclusive with `--check`, and takes no `--jobs` (it spawns no pool, so a width there is refused as it is with `--content`). Unlike the format action, an empty scope is a valid answer (exit 0, no output) rather than the "no supported files" error; traversal errors still exit 2. Useful for debugging ignore-file scoping and for scripting over the set.
+- **`--list`**: prints the discovered in-scope files (one per line, C-quoted by the path-quoting rule above where a name needs it) without formatting — a read-only view of the set `format` would touch, after the ignore files are applied. Path mode only (errors with `--content`/`--stdin`), mutually exclusive with `--check`, and takes no `--jobs` (it spawns no pool, so a width there is refused as it is with `--content`). Unlike the format action, an empty scope is a valid answer (exit 0, no output) rather than the "no supported files" error; traversal errors still exit 2. Useful for debugging ignore-file scoping and for scripting over the set.
 - **Parallelism**: files format concurrently on `std::thread::scope` workers claiming one file at a time from a shared queue — dynamic load balancing with no thread-pool dependency. `--jobs N` overrides the worker count, floored at 1 (`--jobs 0` is a width, not an opt-out — it means `--jobs 1`) and clamped to the file count where that is known up front — explicit file arguments and multiple roots; a single directory root streams (below) and cannot know the count before it walks, so it spawns the full width and the surplus workers park; path mode only, an error with `--content`/`--stdin`. Each worker reserves the same stack every other tsv thread runs on (`STACK_SIZE`, `cli/stack.rs`), so the pool is not a route with a depth ceiling of its own — see [§Recursion Depth](#recursion-depth).
 
   **An explicit `--jobs` is held to `4 × logical CPUs`**, warned about on stderr when it bites. Four per core is far past what the workload can use — the *default* lands below the logical count for measured reasons — so the ceiling is about blast radius, not throughput: each worker reserves `STACK_SIZE` of address space, and an unbounded count takes task slots until the OS refuses, which on a systemd machine is the login session's whole `TasksMax` and wedges every other process on it.
@@ -562,5 +600,5 @@ output and nothing written; on the WASM engine the same input is reported as the
   The default is **`min(logical CPUs, ceil(1.5 × physical cores))`**, not one worker per logical CPU. This workload does not scale onto SMT siblings — the per-file work is memory-bound, and on a large tree the discovery walk is the bottleneck, so extra workers compete with it for cores. One worker per logical CPU costs up to 28% on walk-bound trees while buying nothing on flat repos. The SMT width is read once from `/sys/devices/system/cpu/cpu0/topology/thread_siblings_list`; where that is unavailable (no SMT, or a non-Linux platform) the cap is inert and the default is the logical count, so it can only ever lower the worker count.
 - **Streaming discovery**: a single directory root — the common invocation — feeds the workers *as the walk finds files*, so the directory walk runs beside the first files' parse+format rather than in front of an idle pool. It is worth having: the walk is 5–10% of the wall on an application repo, and 40–67% on a repo with a large tree, where it can outrun what the pool consumes. Other argument shapes (explicit files, multiple roots) discover the whole set first, because the canonical-path dedup above is set-wide. The set of files formatted is identical either way, as is the reporting order below — only the order work is handed out differs.
 - **Error isolation**: a per-file read/parse/write error (or panic, caught via `catch_unwind` — effective only in builds with `panic = "unwind"`; release uses `panic = "abort"`) reports to stderr and processing continues.
-- **Deterministic reporting**: changed paths print to stdout in sorted-path order regardless of completion order — component-wise, each component by code point, the order a path's UTF-8 bytes sort in, and the same order on both bins (`cli.js` compares code points rather than UTF-16 units, which would put an astral-plane name ahead of U+E000..U+FFFF) — each spelled by the one quoting rule above (verbatim, or C-quoted as git prints a name holding a control character or a double quote); errors (traversal and per-file) and the summary line go to stderr.
+- **Deterministic reporting**: changed paths print to stdout in sorted-path order regardless of completion order — component-wise, each component by code point, the order a path's UTF-8 bytes sort in, and the same order on both bins (`cli.js` compares code points rather than UTF-16 units, which would put an astral-plane name ahead of U+E000..U+FFFF) — each spelled by the path-quoting rule above; errors (traversal and per-file) and the summary line go to stderr.
 - **Exit codes**: 0 clean, 1 would-change (`--check` only), 2 errors.

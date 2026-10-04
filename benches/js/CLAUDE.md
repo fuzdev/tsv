@@ -6,10 +6,9 @@
 Uses [@fuzdev/fuz_util](https://github.com/fuzdev/fuz_util)'s benchmarking library
 for statistical analysis.
 
-**Directory note:** this is the **runtime-neutral** JS harness — named `js` (not
-`deno`) because the same code runs under Deno, Node, and Bun (see
-[Cross-Runtime](#cross-runtime-deno--node--bun)). The `corpus_compare_*` and
-`diagnostics/` entries stay Deno-idiomatic; `smoke` is portable across all three.
+**Directory note:** the **runtime-neutral** JS harness — named `js`, not `deno`, because the
+same code runs under Deno, Node, and Bun ([Cross-Runtime](#cross-runtime-deno--node--bun)). The
+`corpus_compare_*` and `diagnostics/` entries stay Deno-idiomatic; `smoke` is portable.
 
 **Companion docs** — this file is the operational surface (what to run, what it
 grades); the reference halves live in `docs/`:
@@ -24,18 +23,18 @@ grades); the reference halves live in `docs/`:
 
 ## Gate map
 
-> Which check runs which corpus/oracle, and when. `deno task check` needs only
-> this repo — its two sibling-checkout legs (`roundtrip:audit:prettier`,
-> `discovery:audit`) widen onto `../prettier` / `../corpora` when present and
-> warn-skip when not, so a bare clone still passes. Every other gate *requires* sibling checkouts (`../corpora`,
-> `../svelte`, `../acorn-typescript`, `../typescript`, `../prettier`, `../test262`, `../wpt`),
-> so they run at dev/release cadence and CI runs only the committed-tree tier.
+> Which check runs which corpus/oracle, and when. `deno task check` needs only this repo — its
+> two sibling-checkout legs (`roundtrip:audit:prettier`, `discovery:audit`) widen onto
+> `../prettier` / `../corpora` when present and loud-skip when not, so a bare clone passes. Every
+> other gate *requires* sibling checkouts (`../corpora`, `../svelte`, `../acorn-typescript`,
+> `../typescript`, `../prettier`, `../test262`, `../wpt`), so they run at dev/release cadence and
+> CI runs only the committed-tree tier.
 
 | Gate | Composition | Corpus / oracle | Cadence |
 | --- | --- | --- | --- |
-| **`deno task check`** | `cargo fmt --check` · `format:audit` · `pins:audit` · `docs:audit` · `typecheck` · `typecheck:features` · `typecheck:scripts` · `typecheck:bench-core` · `conformance:audit` · `conformance:audit:compiler` · `variants:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `roundtrip:audit:prettier` · `discovery:audit` · `canonicalize:audit` · `binding:audit` · `authoring:audit` · `paren:audit` · `razor:audit` · `fuzz:audit` · `test:deno` · `cargo test` (incl. fixtures) · `test:audits` · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `fabrication:audit` · `census:audit` · `width:audit` · `ignore:audit` · `check:ast-types` · `check:loc` · `clippy` | **committed tree only** — `tests/fixtures` + pure-Rust/Deno audits, no external oracle — save two opportunistic sibling-checkout legs: `roundtrip:audit:prettier` gates the pinned `../prettier` format suites, and `discovery:audit` checks `tsv format --list` over the `../corpora` snapshot against its committed file list (each a loud skip when its checkout is absent; ~0.1 s) | every commit; the CI `check` job |
-| **`deno task conformance:all`** | `pins:audit:checkouts` + `bench:pins:suites` + `fixtures:validate` + `compile:fixtures:validate` preflights (then `bench:harvest:svelte-styles`, late, beside the corpus legs that read its cache), then `conformance` (one process, its FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:parse tests/fixtures --fixtures` · `corpus:compare:format --all`, plus `render:audit` as its one subprocess leg) **+** `conformance:test262` (pure Rust) | `../corpora` (the real-code snapshot), `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../prettier-plugin-svelte`, `../test262`; the **`gates`** corpus view (~9,300) | release; `scripts/publish.ts` **Step 3b** |
-| **`deno task bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (~3,650; 100%-coverage invariant) / **`conformance`** view (fixtures filtered to what their own suite calls valid + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
+| **`deno task check`** | `cargo fmt --check` · `format:audit` · `pins:audit` · `docs:audit` · `typecheck` · `typecheck:features` · `typecheck:scripts` · `typecheck:bench-core` · `conformance:audit` · `conformance:audit:compiler` · `variants:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `roundtrip:audit:prettier` · `discovery:audit` · `canonicalize:audit` · `binding:audit` · `authoring:audit` · `paren:audit` · `razor:audit` · `fuzz:audit` · `test:deno` · `cargo test` (incl. fixtures) · `test:audits` · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `fabrication:audit` · `census:audit` · `width:audit` · `ignore:audit` · `check:ast-types` · `check:loc` · `clippy` | **committed tree only** (`tests/fixtures` + pure-Rust/Deno audits, no external oracle), save the two opportunistic legs: `roundtrip:audit:prettier` (the pinned `../prettier` format suites) and `discovery:audit` (`tsv format --list` over the `../corpora` snapshot vs its committed file list) | every commit; the CI `check` job |
+| **`deno task conformance:all`** | `pins:audit:checkouts` + `bench:pins:suites` + `fixtures:validate` + `compile:fixtures:validate` preflights (then `bench:harvest:svelte-styles`, late, beside the corpus legs that read its cache), then `conformance` (one process, its FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:parse tests/fixtures --fixtures` · `corpus:compare:format --all`, plus `render:audit` as its one subprocess leg) **+** `conformance:test262` (pure Rust) | `../corpora` (the real-code snapshot), `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../prettier-plugin-svelte`, `../test262`; the **`gates`** corpus view | release; `scripts/publish.ts` **Step 3b** |
+| **`deno task bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (100%-coverage invariant) / **`conformance`** view (fixtures filtered to what their own suite calls valid + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
 | **`deno task idempotency:sweep`** | `tsv_debug fuzz --iterations 0` over the corpus dirs — F1 (`format(format(x)) == format(x)`) + no-panic + structural reparse on every file **as authored** | **`robustness`** view (the WHOLE `../corpora` snapshot — every collection it vendors, placed in a tier or not — + the `svelte_styles` cache + the live working trees' DIFF against the snapshot; absent dirs skipped with a warning) | after a printer change; conformance cadence |
 | **`deno task audit:corpus`** | the pure-Rust content-loss / robustness suite over **real code**: `roundtrip_audit --gate` · `comment_audit` · `swallow_audit` · `binding_audit --gate` (real code gating; prettier suites report-only) · `authoring_audit` · `paren_audit` (both real-code-only) · `census_audit` · `fabrication_audit` (both strict-zero off their default corpus) · `fuzz --iterations 0`. `width_audit` is NOT a leg — it has no zero to grade (../../docs/audits.md §The Corpus Bundle) | **`robustness`** view (the whole snapshot + the `svelte_styles` cache + the live diff) + the pinned `../prettier` format suites (absent working trees skipped; floor = the whole `../corpora` snapshot) | release; `scripts/publish.ts` **Step 3c**; conformance cadence |
 | **`deno task render:audit <paths>`** | `render_audit --gate` — per `.svelte` file, does `tsv format` change what it RENDERS? Compares the browser-visible render key of the source vs of `format(source)`. The corpus-scale arm of the fixture **R** rules. **Needs the Deno sidecar** (`svelte compile`), so it is deliberately not a leg of the pure-Rust `audit:corpus` — it rides `conformance` instead | standalone: any `.svelte` corpus, given explicitly. As a `conformance` leg: the WHOLE `../corpora` snapshot (every collection, placed in a tier or not — this leg pins no count, so it reads the root rather than the tiers' entries) + the `suite` checkout, both version-pinned, so a live working tree can't move a release verdict | release (in `conformance`); standalone after a printer change |
@@ -43,7 +42,7 @@ grades); the reference halves live in `docs/`:
 
 **JS parser (test262) IS release-gated** — `conformance:test262` (`tsv_debug
 test262 --gate`) gates the exact test262 **positive-parse** count
-(`POSITIVE_PASSED_PIN` in the command); the ~2.5k negatives are the deferred
+(`POSITIVE_PASSED_PIN` in the command); the negatives are the deferred
 early-error frontier (reported, not gated). **Only CSS-WPT grading (`../wpt`) stays
 manual** — its frontier is deferred §5.5 error-recovery, and real-CSS regressions
 are already partly caught by `corpus:compare:parse` (CSS AST vs `parseCss`).
@@ -65,8 +64,7 @@ loss vs prettier — needs the FFI + prettier sidecar) and **Step 3c**'s
 `audit:corpus` (the pure-Rust half: reparse-corruption, dropped/double comments,
 `//` swallows, comment re-binding, boundary-whitespace + paren-authoring
 independence, F1 idempotency, whole-comment conservation, blank fabrication,
-no-panic). Every content-loss / non-idempotency bug this release cycle was found
-by one of these, never by `check`.
+no-panic). Content-loss and non-idempotency bugs have been found by these, never by `check`.
 
 `roundtrip:audit:prettier` narrows that gap without closing it: it puts one
 non-format-stable corpus inside `check`, which is enough to catch a
@@ -80,61 +78,50 @@ Corpus **views** are defined in [§Corpus](#corpus); the pinned counts are
 
 ## Cross-Runtime (Deno + Node + Bun)
 
-The bench runs under all three from one shared codebase. The motivation: a
-single-runtime bench can silently fold a runtime-specific effect into an engine
-number — the concrete case being the Deno-FFI fast-call memory sensitivity that
-mismeasured the native path (see [§Known Issues](#known-issues)). A per-runtime
+The bench runs under all three from one shared codebase, because a single-runtime bench can
+silently fold a runtime-specific effect into an engine number (the Deno-FFI fast-call memory
+sensitivity that mismeasured the native path — [§Known Issues](#known-issues)). A per-runtime
 delta on the same row is the detector.
 
 **Design:**
 
 - **Runtime-labeled sibling reports.** Each runtime writes its own
-  `results/report.<runtime>.{json,md}` (+ a timestamped `…_<commit>.<runtime>.*`
-  pair), same schema, never merged. `deno task bench:compose` (run at the end of
-  `bench:perf`) folds the siblings into the combined `results/report.{json,md}`
-  (`compose_reports.ts`; a per-runtime delta on a row is the
-  headline); tsv.fuz.dev consumes it plus `report.node.json` and
-  `report.conformance.node.json`. The composer records per-source provenance (runtime, commit,
-  timestamp, tsv version, machine — in the JSON `sources[]` and the md header) and
-  flags loudly (md banner + stderr + a JSON field): **mixed vintages**
-  (`mixed_vintage`) when siblings come from different commits/versions — it folds
-  whatever exists, so a fresh `report.deno.*` beside a stale `report.node.*` would
-  otherwise read as a runtime effect — and the same question of the one report it
-  does NOT fold, `report.conformance.node.json` (`conformance_vintage`, with a
-  `stale` flag when its commit is behind any perf sibling's: the site publishes
-  both from this directory, and that report once sat a commit and a renderer
-  behind with every banner green); **mixed machines** (`mixed_machine`) when the
-  siblings' hardware identity disagrees, since cross-runtime ratios are only
-  meaningful on same-box siblings; **within-noise** deltas (`within_noise`), the
-  per-runtime cells whose difference is smaller than the combined cv of the two
-  means they divide — this report's whole subject is those deltas, and a ratio
-  inherits both means' noise while printing neither, so the cells that are NOT a
-  runtime effect are named (a reading aid, not a significance test — that is
-  `benchmark_baseline_compare`'s Welch job, on a run the composer never sees); any
-  row whose per-runtime intersections
-  differ (`⚠ files a/b/c`) — each runtime times the files *its* impls passed
-  preflight on, so unequal counts mean a sliver of the ratio is file-set, not
-  runtime; and **partially measured** rows (`partial_rows`), which one sibling
-  measured and another doesn't carry at all with no recorded load failure to
-  explain the gap — a bare `—` cell otherwise reads identically to an impl that
-  couldn't load, so a row added since a sibling was last run is named rather than
-  left to the vintage banner. A runtime whose sibling predates the `unavailable`
-  field is skipped there rather than accused: with nothing recorded, an absent row
-  can't be told from an unloadable impl. `within_noise` skips on its own precondition
-  — a row needs ten cleaned timings a side, and prints `n` for the ones it does call —
-  classifies every PAIR of present runtimes (the site anchors its columns on node, so
-  a base-only classification left the bun/node column ungraded), and never names a
-  row listed under `unstable_cells`: those are per-runtime measurements whose cleaned
-  or raw cv passed 10% or whose `drift` passed 5%, collected AHEAD of the sample
-  gate — a measured 48% on five timings needs no minimum n to be believed, and the
-  gate had silenced exactly that cell — marked `⚠` in the tables and on stderr.
-  The bench floors iterations at 8 (16 on the canonical rows) and drives the rest from
-  `duration_ms`, so sample count spans two orders of magnitude inside one table and
-  roughly 20 of 44 rows per runtime sit under ten; this test consumes cv in the direction
-  where an UNDERestimate is expensive, since it would report a real runtime
-  difference as "no difference" — the one verdict a reader cannot check against the
-  table. The conformance surface writes its own
-  `report.conformance.node.*`, outside the compose glob.
+  `results/report.<runtime>.{json,md}` (+ a timestamped `…_<commit>.<runtime>.*` pair), same
+  schema, never merged. `deno task bench:compose` (`compose_reports.ts`, run at the end of
+  `bench:perf`) folds the siblings into the combined `results/report.{json,md}`, whose headline is
+  the per-runtime delta on a row; tsv.fuz.dev consumes it plus `report.node.json` and
+  `report.conformance.node.json` (the conformance surface's own report, outside the compose glob).
+  The composer records per-source provenance (runtime, commit, timestamp, tsv version, machine —
+  the JSON `sources[]` and the md header) and flags loudly (md banner + stderr + a JSON field):
+  - **`mixed_vintage`** — siblings from different commits/versions. It folds whatever exists, so a
+    fresh `report.deno.*` beside a stale `report.node.*` would otherwise read as a runtime effect.
+  - **`conformance_vintage`** — the same question of the one report it does NOT fold,
+    `report.conformance.node.json`, with a `stale` flag when its commit is behind any perf
+    sibling's (the site publishes both from this directory).
+  - **`mixed_machine`** — the siblings' hardware identity disagrees; cross-runtime ratios are only
+    meaningful on same-box siblings.
+  - **`within_noise`** — per-runtime cells whose difference is smaller than the combined cv of the
+    two means they divide. A ratio inherits both means' noise while printing neither, so the cells
+    that are NOT a runtime effect are named — a reading aid, not a significance test (that is
+    `benchmark_baseline_compare`'s Welch job, on a run the composer never sees). It needs ten
+    cleaned timings a side (printing `n` for the ones it calls), classifies every PAIR of present
+    runtimes (the site anchors its columns on node, so a base-only classification would leave the
+    bun/node column ungraded), and never names a row listed under `unstable_cells`.
+  - **`unstable_cells`** — per-runtime measurements whose cleaned or raw cv passed 10% or whose
+    `drift` passed 5%, marked `⚠` in the tables and on stderr. Collected AHEAD of the sample gate:
+    a measured 48% on five timings needs no minimum n to be believed. The bench floors iterations
+    at 8 (16 on the canonical rows) and drives the rest from `duration_ms`, so sample count spans
+    two orders of magnitude inside one table and many rows sit under ten — and `within_noise`
+    consumes cv in the direction where an UNDERestimate is expensive: it would report a real
+    runtime difference as "no difference", the one verdict a reader cannot check against the
+    table.
+  - **unequal file sets** (`⚠ files a/b/c`) — each runtime times the files *its* impls passed
+    preflight on, so unequal counts mean a sliver of the ratio is file-set, not runtime.
+  - **`partial_rows`** — rows one sibling measured and another doesn't carry at all, with no
+    recorded load failure to explain the gap (a bare `—` cell otherwise reads identically to an
+    impl that couldn't load, so a row added since a sibling's last run is named rather than left
+    to the vintage banner). A sibling predating the `unavailable` field is skipped rather than
+    accused: with nothing recorded, an absent row can't be told from an unloadable impl.
 - **One bench body, runtime-detected.** `bench.ts` detects the runtime
   (`lib/runtime.ts` `current_runtime()`) and selects the runtime-specific artifacts.
   No forked entry; `bench:node:run` is literally `node benches/js/bench.ts`.
@@ -153,112 +140,98 @@ delta on the same row is the detector.
   target — both with the full export set incl. `parse_internal_*`. The shipped web
   bundle is deliberately not used (it curates `parse_internal_*` out).
 
-**Dependencies: `package.json` is the source of truth.** Both runtimes consume one
-`node_modules`. Deno reads it via `"nodeModulesDir": "manual"` in `deno.json`; Node
-reads it directly. There are no jsr or remote deps — everything imports npm packages
-by bare specifier or uses `node:` builtins, so `deno.json` carries only
-`nodeModulesDir: manual` + `lock: false` (npm integrity is `package-lock.json`'s
-job). `@types/node` is a types-only devDependency so `node:` builtins type-check
-under `deno check`.
+**Dependencies: `package.json` is the source of truth.** Both runtimes consume one `node_modules`:
+Deno via `"nodeModulesDir": "manual"` in `deno.json`, Node directly. No jsr or remote deps —
+everything imports npm packages by bare specifier or uses `node:` builtins — so `deno.json`
+carries only `nodeModulesDir: manual` + `lock: false` (npm integrity is `package-lock.json`'s
+job). `@types/node` is a types-only devDependency so `node:` builtins type-check under
+`deno check`.
 
-**Install with `deno task bench:install`** (`install_deps.ts`), always — a plain
-`npm install` **prunes the `@oxc-parser/binding-wasm32-wasi` binding**, which the
-installer force-fetches back (why: ../../docs/benchmarks.md §Updating
-dependencies). Re-run after a dep bump or a stray `npm install`. Every harness
-entry point preflights `node_modules` via `lib/check_node_modules.ts`: missing is
-fatal with the installer hint, and **stale** — any exactly-pinned dep whose
-installed `version` differs from the pin (or is absent) — is fatal too, listing
-each mismatch as `name: pinned X, installed Y` (`BENCH_STALE_OK=1` downgrades stale
-to a warning), so a run can't silently measure old installed versions under new
-labels. The comparison is against the installed **versions**, not against
-`package.json`'s mtime: a mtime proxy tripped on any edit to the file (a comment, a
-branch switch restamping it) and missed an install that ran without taking. Range
-pins (`^4.4.3`) are skipped — a range constrains rather than fixes, so any
-satisfying version is legitimate. The `force_installed` pins are graded too,
-because `dependencies` is not where they live: today that is the wasi binding above,
-whose installed version must equal its own pin (the reports label its row with that
-pin, so a version skew there is exactly the mislabeling this check prevents); a range
-in that map is refused at the read, so every entry is gradable. Its **absence** is not
-graded — nothing is measured then, so nothing is mislabeled, and the report's
-`unavailable` carries the missing row's cause. The pin covers the named package only:
-`--no-save` keeps it out of the lockfile, so its transitive closure resolves live
-(`package.json` `//force_installed`).
+**Install with `deno task bench:install`** (`install_deps.ts`), always — a plain `npm install`
+**prunes the `@oxc-parser/binding-wasm32-wasi` binding**, which the installer force-fetches back
+(why: ../../docs/benchmarks.md §Updating dependencies). Re-run after a dep bump or a stray
+`npm install`. Every harness entry point preflights `node_modules` via
+`lib/check_node_modules.ts`:
 
-**Per-runtime impl availability.** `oxc-parser-wasm` runs under all three, but the
-two entries its binding ships split them 2–1 rather than by runtime family: the
-default `node:wasi` entry (`parser.wasi.cjs`) instantiates only under Node — Deno
-ships no `node:wasi`, and Bun's `WASI` class has no `initialize` — while the explicit
-fetch-based browser entry (`parser.wasi-browser.js`, `@napi-rs/wasm-runtime` +
-`WebAssembly`) loads under Deno and Bun but not Node. So `oxc_wasm.ts` sends Node
-alone to the default entry and everything else to the browser one. `dprint-wasm` runs
-under all three for a simpler reason: the `@dprint/formatter` host loads its plugin
-from a plain buffer (`createFromBuffer` over `node:fs`) with no wasm-bindgen `start`
-hook and no `node:wasi` dependency — verified byte-identical output under all three.
-`biome-wasm` runs under all three too, but only because the harness instantiates the
-wasm itself: `@biomejs/wasm-bundler`'s own entry is a wasm-bindgen *bundler*-target
-build whose `__wbindgen_start` hook Bun's ESM wasm handling never calls, so the row
-was Bun's one `unavailable` until `lib/biome.ts` stopped importing that entry — it
-compiles the `.wasm` bytes and instantiates them against the package's glue, calling
-the start hook explicitly (the same construction its per-sweep heap reset needs,
-§Report files).
+- **missing** is fatal, with the installer hint;
+- **stale** is fatal too (`BENCH_STALE_OK=1` downgrades it to a warning): any exactly-pinned dep
+  whose installed `version` differs from the pin (or is absent), each listed as
+  `name: pinned X, installed Y`, so a run can't silently measure old installed versions under new
+  labels. It compares installed **versions**, not `package.json`'s mtime (which trips on any edit
+  to the file and misses an install that didn't take). Range pins (`^4.4.3`) are skipped — a range
+  constrains rather than fixes.
+- the **`force_installed`** pins are graded too, since `dependencies` is not where they live:
+  today the wasi binding above, whose installed version must equal its own pin (the reports label
+  its row with that pin, so a skew there is exactly the mislabeling this check prevents); a range
+  in that map is refused at the read, so every entry is gradable. Its **absence** is not graded —
+  nothing is measured then, so nothing is mislabeled, and the report's `unavailable` carries the
+  missing row's cause. The pin covers the named package only: `--no-save` keeps it out of the
+  lockfile, so its transitive closure resolves live (`package.json` `//force_installed`).
+
+**Per-runtime impl availability.**
+
+- **`oxc-parser-wasm`** runs under all three, but its binding's two entries split them 2–1 rather
+  than by runtime family: the default `node:wasi` entry (`parser.wasi.cjs`) instantiates only
+  under Node (Deno ships no `node:wasi`; Bun's `WASI` class has no `initialize`), while the
+  fetch-based browser entry (`parser.wasi-browser.js`, `@napi-rs/wasm-runtime` + `WebAssembly`)
+  loads under Deno and Bun but not Node. So `oxc_wasm.ts` sends Node alone to the default entry.
+- **`dprint-wasm`** runs under all three because the `@dprint/formatter` host loads its plugin
+  from a plain buffer (`createFromBuffer` over `node:fs`) with no wasm-bindgen `start` hook and no
+  `node:wasi` dependency — verified byte-identical output under all three.
+- **`biome-wasm`** runs under all three only because the harness instantiates the wasm itself:
+  `@biomejs/wasm-bundler`'s own entry is a wasm-bindgen *bundler*-target build whose
+  `__wbindgen_start` hook Bun's ESM wasm handling never calls, so `lib/biome.ts` bypasses it —
+  compiling the `.wasm` bytes, instantiating them against the package's glue and calling the
+  start hook explicitly (the construction its per-sweep heap reset needs too, §Report files).
 
 ## Corpus Comparison
 
 Compare formatting output against Prettier on arbitrary codebases.
 
 ```bash
-# The gates corpus view (~9,300 files: the ../corpora real-code snapshot + prettier suites — see §Corpus)
-deno task corpus:compare:format --all
-
-# Single project (scans <path> recursively — NO srcDir filtering)
-# ⚠ For monorepos like svelte/, use --all instead to avoid scanning test fixtures
-deno task corpus:compare:format ../some-project
-
-# Flags (any invocation): --explain (list known divergences + patterns), --summary
-# (compact, no diffs), --limit N (per language), --filter <lang>, --strict (fail on
-# any difference), --safety-only (data loss only), --json, --audit-patterns
-# (per-pattern corpus coverage with sample diffs — spot-check for overmatching)
-
-# Run without rebuilding FFI — guarded against a stale binary (§Artifact Freshness
-# Guard); BENCH_STALE_OK=1 overrides
-deno task corpus:compare:format:run ../some-project
+deno task corpus:compare:format --all                 # the gates corpus view: ../corpora + prettier suites (§Corpus)
+deno task corpus:compare:format ../some-project       # one project, recursive — NO srcDir filtering
+deno task corpus:compare:format:run ../some-project   # skip the FFI rebuild (freshness-guarded)
 ```
 
-**`TSV_FFI_PROFILE=corpus` lives on the `:run` task, not the wrapper.** Every
-corpus/conformance FFI entry (`corpus:compare:{format,parse}:run`,
-`conformance:{svelte-fixtures,ts-fixtures,ts-repo}:run`) selects the profile itself,
-so running one directly loads `target/corpus` — the same binary the build-first
-wrapper produces — instead of falling back to `target/release`. The profile is not a
-detail: `corpus` is `panic = "unwind"`, so a formatter panic is caught and reported
-as a per-file error, where `release` (`panic = "abort"`) kills the run. It also aims
-the freshness guard (which derives its path from the same env var) at the binary
-that will actually be loaded, so its staleness verdict and its rebuild hint both
-name `build:ffi:corpus`. The **bench** and **smoke** tasks deliberately stay on
-`release` — that is the artifact they measure.
+⚠ For monorepos like `svelte/`, use `--all` instead, to avoid scanning test fixtures. Flags (any
+invocation): `--explain` (known divergences + patterns), `--summary` (compact, no diffs),
+`--limit N` (per language), `--filter <lang>`, `--strict` (fail on any difference),
+`--safety-only` (data loss only), `--json`, `--audit-patterns` (per-pattern corpus coverage with
+sample diffs — spot-check for overmatching). The `:run` freshness guard is §Artifact Freshness
+Guard; `BENCH_STALE_OK=1` overrides.
+
+**`TSV_FFI_PROFILE=corpus` lives on the `:run` task, not the wrapper.** Every corpus/conformance
+FFI entry (`corpus:compare:{format,parse}:run`, `conformance:{svelte-fixtures,ts-fixtures,ts-repo}:run`)
+selects the profile itself, so a direct run loads `target/corpus` — what the build-first wrapper
+produces — not `target/release`. It matters: `corpus` is `panic = "unwind"`, so a formatter panic
+is a reported per-file error, where `release` (`panic = "abort"`) kills the run. It also aims the
+freshness guard (same env var) at the binary actually loaded, so its verdict and rebuild hint name
+`build:ffi:corpus`. The **bench** and **smoke** tasks deliberately stay on `release` — the
+artifact they measure.
 
 `corpus:compare:format:run` sets `PRETTIER_DEBUG=1` so prettier-plugin-svelte's
-verbatim-on-error fallback (whole `<script>` block echoed when the embedded
-formatter throws) surfaces as a per-file **error** with a code frame instead of
-fake-stable prettier output that would land in `unknown`. Same posture as the
-tsv_debug sidecar; see `docs/conformance_prettier.md` §Triage caveat.
+verbatim-on-error fallback (the whole `<script>` block echoed when the embedded formatter throws)
+surfaces as a per-file **error** with a code frame instead of fake-stable prettier output landing
+in `unknown` — the tsv_debug sidecar's posture; see `docs/conformance_prettier.md` §Triage caveat.
 
-**Prettier-output cache.** The format comparison's dominant cost is prettier over
-~6k mostly-unchanged files, so its oracle calls go through a content-addressed cache
-(`lib/prettier_cache.ts`, `.cache/prettier/`): keyed on the source content +
-parser/filepath routing + the full options + the canonical-5 pins (incl. svelte, the
-plugin's peer) + `PRETTIER_DEBUG` + a schema constant — a hit is exactly equivalent
-to a live run. Success-only: errors and semantically-empty outputs are never cached
-(`put` rejects whitespace-only, `get` treats a stored whitespace-only entry as a
-miss), so the prettier-miss heisenbug can't poison it and cached hits remove the
-prettier-side flake from repeat runs entirely; the tsv/FFI side stays live. Writes
-are **atomic** (temp file + `rename`), so an interrupted run can't leave a
-TRUNCATED entry — which the empty guards can't catch and which every later run
-would then read as the oracle. A write that fails is counted, never thrown (the
-caller reads a throw as "prettier failed on this file"). The run
-reports `prettier cache: N hits / M misses`, plus `/ K writes FAILED` if any did.
-Scope: this tool + the conformance
-driver only — never the bench (it times prettier), never the fixture validator (live
-by design). `TSV_PRETTIER_CACHE=0` disables; `deno task bench:clean` wipes.
+**Prettier-output cache.** The format comparison's dominant cost is prettier over thousands of
+mostly-unchanged files, so its oracle calls go through a content-addressed cache
+(`lib/prettier_cache.ts`, `.cache/prettier/`), keyed on the source content + parser/filepath
+routing + the full options + the canonical-5 pins (incl. svelte, the plugin's peer) +
+`PRETTIER_DEBUG` + a schema constant — a hit is exactly equivalent to a live run.
+
+- **Success-only**: errors and semantically-empty outputs are never cached (`put` rejects
+  whitespace-only, `get` treats a stored whitespace-only entry as a miss), so the prettier-miss
+  heisenbug can't poison it, and hits remove the prettier-side flake from repeat runs; the tsv/FFI
+  side stays live.
+- **Atomic writes** (temp file + `rename`), so an interrupted run can't leave a TRUNCATED entry —
+  which the empty guards can't catch and every later run would read as the oracle. A failed write
+  is counted, never thrown (the caller reads a throw as "prettier failed on this file"); the run
+  reports `prettier cache: N hits / M misses`, plus `/ K writes FAILED` if any did.
+- **Scope**: this tool + the conformance driver only — never the bench (it times prettier), never
+  the fixture validator (live by design). `TSV_PRETTIER_CACHE=0` disables; `deno task bench:clean`
+  wipes.
 
 Output shape (counts illustrative — read them live):
 
@@ -340,26 +313,26 @@ deno task corpus:compare:parse ../corpora/collections/zzz --filter typescript --
 deno task corpus:compare:parse --all --json 2>/dev/null > report.json
 deno task corpus:compare:parse:run --all                # skip rebuild (freshness-guarded)
 deno task corpus:compare:parse tests/fixtures --fixtures # each fixture's parse-pinned documents (a `conformance` leg)
-
-# The WIRE-INJECTION audit: same comparison, MANUFACTURED inputs (lib/wire_inject.ts), each
-# variant graded against its own base file so a deliberate divergence fixture contributes
-# nothing. TWO families: `ws` widens whitespace inside Svelte tag/block heads (graded on both
-# arms, where the `loc` tolerance rows get most of their exercise); `terminators` injects a
-# lone CR / U+2028 / U+2029 anywhere — the spellings on which ECMAScript's terminators and
-# `\n` disagree, so the `loc` differences a terminator adds fall in the `two_line_classes`
-# row (the other rows fire there too, on the base file's own shapes) and the family grades
-# the SPAN arm (plus the definition check) on inputs no fixture and no real repo can reach.
-# They differ in COVERAGE because they differ in site density: ws is a CENSUS
-# (--inject-limit 0, every head site); terminators, document-wide, is a strided SAMPLE. Only a
-# census is gradeable — a sample's stride divisor is the file's own site count, so a fixture
-# edit redraws it (measured: one unrelated one-line edit retired 12 of terminators' 194
-# finding signatures with every bug intact). ws is green; terminators is ⚠️ RED BY DESIGN, a
-# discovery tool like compile:fuzz.
-# Full reference: ../../docs/audits.md §Wire-Injection
 deno task wire:audit
 deno task wire:audit:terminators
 deno task corpus:compare:parse <path> --filter svelte --inject --inject-terminators --inject-limit 6
 ```
+
+**The wire-injection audit** (`wire:audit*`; full reference ../../docs/audits.md §Wire-Injection)
+runs the same comparison over MANUFACTURED inputs (`lib/wire_inject.ts`), each variant graded
+against its own base file, so a deliberate divergence fixture contributes nothing. Two families:
+
+- **`ws`** widens whitespace inside Svelte tag/block heads, graded on both arms (where the `loc`
+  tolerance rows get most of their exercise). A CENSUS (`--inject-limit 0`, every head site); green.
+- **`terminators`** injects a lone CR / U+2028 / U+2029 anywhere — the spellings on which
+  ECMAScript's terminators and `\n` disagree, so the `loc` differences a terminator adds fall in
+  the `two_line_classes` row (the other rows fire there too, on the base file's own shapes) — and
+  grades the SPAN arm (plus the definition check) on inputs no fixture and no real repo can reach.
+  Document-wide, so a strided SAMPLE; ⚠️ RED BY DESIGN, a discovery tool like `compile:fuzz`.
+
+Only a census is gradeable: a sample's stride divisor is the file's own site count, so a fixture
+edit redraws it (measured: one unrelated one-line edit retired 12 of terminators' 194 finding
+signatures with every bug intact).
 
 Method: ASTs are **raw-diffed with no pre-diff normalization**; diffs are classified
 against the documented divergences (`docs/conformance_svelte.md`) at the reporting
@@ -379,69 +352,66 @@ dedicated tool for those.
 **Two arms, one run.** Every file is graded twice, and the two arms never blend their
 tables.
 
-- **The loc arm** grades tsv's loc-bearing wire (the Rust emitter, via `tsv_debug`). First the **definition check**: tsv's
-  `loc` must deep-equal the shipped `crates/tsv_wasm/npm/locations.js` reconstruction of
-  its own span-only wire (`lib/loc_cross_grade.ts`, the same check `deno task check:loc`
-  runs over the fixture tree) — a violation is a tsv bug and fails every run, controls
-  included. Then the oracle comparison, where `loc` has its own rules (`diff_asts`): each
-  half (`loc.start`, `loc.end`) is graded only where both sides' offset at that half agrees
-  (a span difference is graded at the span, and the other half still grades); a tsv `loc`
-  on an object the oracle gives none is the definition's **superset**, accepted for Svelte
-  and CSS (`parseCss` emits no `loc`) only for the object kinds `LOC_SUPERSET_KEYS` pins —
-  Svelte's reader-built node types by `type`, the acorn-shaped nodes Svelte builds itself
-  by shape (`BindDirective.expression:Identifier`, whose braced acorn-parsed spelling
-  `bind:value={foo}` keys apart and is never pinned), attached comments by list — so an
-  oracle that drops `loc` from a node it used to carry fails rather than reading as
-  superset; the pin is a "may only contain" set, since no single run meets every kind. A
-  superset `loc` is a difference for TypeScript. And a differing line or column is a
-  finding unless one of the **tolerance rows** claims it (`lib/loc_tolerance.ts`,
-  Svelte only — TypeScript `loc` is exact against acorn). The rows are Svelte's own `loc`
-  departures from the definition, each cataloged in `docs/conformance_svelte.md` and each
-  recognized by structure — a block-binding slot, the `_ as ` window before its colon, a
-  lone terminator ahead of the position, the `<script>` program, the typed destructure's
-  `end`, the `{#each}` expression — and by a value Svelte's model gives: exactly for
-  `destructure_column`, `annotation_swallow`, `program_at_tag` and `typed_destructure_end`;
-  for `each_as_stale_loc` the end of the `as` type its acorn read swallowed; for
-  `two_line_classes` the exact count inside a `<script>` and a band in a template island (a
-  line one off inside the band is the deliberate residual). Every row also requires tsv's own value to be the
-  definition's, and each is mutation-tested in `lib/loc_tolerance_test.ts` (a `test:deno`
-  leg). A tolerated row neither fills the per-file diff cap nor stores an entry: it is
-  counted, per row (files and sites), in the summary and in `--json` as `loc_arm.rows`,
-  beside `loc_arm.superset` / `loc_arm.superset_kinds`, `loc_arm.span_skipped` (halves) and
-  the definition check's `checked` / `violations`. An unclassified `loc` difference is an
-  undocumented group and fails the run — a bug until a named row claims it.
+- **The loc arm** grades tsv's loc-bearing wire (the Rust emitter, via `tsv_debug`):
+  1. **The definition check**: tsv's `loc` must deep-equal the shipped
+     `crates/tsv_wasm/npm/locations.js` reconstruction of its own span-only wire
+     (`lib/loc_cross_grade.ts`, the check `deno task check:loc` runs over the fixture tree).
+     A violation is a tsv bug and fails every run, controls included.
+  2. **The oracle comparison**, where `loc` has its own rules (`diff_asts`):
+     - Each half (`loc.start`, `loc.end`) is graded only where both sides' offset at that half
+       agrees (a span difference is graded at the span, and the other half still grades).
+     - A tsv `loc` on an object the oracle gives none is the definition's **superset**, accepted
+       for Svelte and CSS (`parseCss` emits no `loc`) only for the object kinds
+       `LOC_SUPERSET_KEYS` pins — Svelte's reader-built node types by `type`, the acorn-shaped
+       nodes Svelte builds itself by shape (`BindDirective.expression:Identifier`, whose braced
+       acorn-parsed spelling `bind:value={foo}` keys apart and is never pinned), attached
+       comments by list — so an oracle that drops `loc` from a node it used to carry fails
+       rather than reading as superset. The pin is a "may only contain" set, since no single run
+       meets every kind. For TypeScript a superset `loc` is a difference.
+     - A differing line or column is a finding unless a **tolerance row** claims it
+       (`lib/loc_tolerance.ts`, Svelte only — TypeScript `loc` is exact against acorn). The rows
+       are Svelte's own `loc` departures from the definition, each cataloged in
+       `docs/conformance_svelte.md` and recognized by structure — a block-binding slot, the
+       `_ as ` window before its colon, a lone terminator ahead of the position, the `<script>`
+       program, the typed destructure's `end`, the `{#each}` expression — and by a value
+       Svelte's model gives: exactly for `destructure_column`, `annotation_swallow`,
+       `program_at_tag` and `typed_destructure_end`; for `each_as_stale_loc` the end of the `as`
+       type its acorn read swallowed; for `two_line_classes` the exact count inside a
+       `<script>` and a band in a template island (a line one off inside the band is the
+       deliberate residual). Every row also requires tsv's own value to be the definition's,
+       and each is mutation-tested in `lib/loc_tolerance_test.ts` (a `test:deno` leg).
 
-  ⚠️ **`--fixtures`' `fixture_declared_divergence` reaches the whole document.** A
-  `_svelte_divergence` fixture's input whose two parses still equal its committed
-  `expected_ours.json` / `expected_svelte.json` has EVERY span difference classified as
-  declared — equivalent to excluding those fixtures from span grading while still grading
-  their `loc`. A divergence baked into `expected_ours.json` therefore stays invisible here,
-  as it does to `fixtures:validate`, which compares tsv against that same pin.
-- **The span-only arm** grades tsv's shipped span-only wire (the FFI's parse export) in
-  every language: per file, it is deep-diffed against the oracle's output with every `loc`
-  and `name_loc` key removed — the definition `tests/loc_definition.rs` encodes, and the whole
-  of what that wire drops (the `character` field Svelte writes lives inside one of those).
-  It reuses the diff engine and `DOCUMENTED_MATCHERS` unchanged, so a span difference the
-  loc arm excuses is excused identically; an undocumented span-only group fails the run,
-  and so does a file the two tsv wires give different verdicts on (one parser behind two
-  writers). It prints its own table and lands in `--json` as `span_only` (`stats`,
-  `groups`, `verdict_mismatches`). It diffs exactly the files the loc arm compares, in the
-  same per-file pass, so its `compared` equals that arm's by construction. A span-wire panic rides the shared
-  panic gate beside the loc arm's — a file whose loc wire throws a plain rejection while the
-  span wire panics would otherwise read as both-errored and be skipped. Under `--inject*`
-  it runs too, its controls subtracted from its variants like the loc arm's.
+  A tolerated row neither fills the per-file diff cap nor stores an entry: it is counted per row
+  (files and sites) in the summary and in `--json` as `loc_arm.rows`, beside `loc_arm.superset` /
+  `loc_arm.superset_kinds`, `loc_arm.span_skipped` (halves) and the definition check's `checked` /
+  `violations`. An unclassified `loc` difference is an undocumented group and fails the run — a
+  bug until a named row claims it.
+- **The span-only arm** grades tsv's shipped span-only wire (the FFI's parse export) in every
+  language: per file, deep-diffed against the oracle's output with every `loc` and `name_loc` key
+  removed — the definition `tests/loc_definition.rs` encodes, and the whole of what that wire drops
+  (the `character` field Svelte writes lives inside one of those). It reuses the diff engine and
+  `DOCUMENTED_MATCHERS` unchanged, so a span difference the loc arm excuses is excused identically.
+  An undocumented span-only group fails the run, and so does a file the two tsv wires give
+  different verdicts on (one parser behind two writers). Own table; `--json` key `span_only`
+  (`stats`, `groups`, `verdict_mismatches`). It diffs exactly the files the loc arm compares, in the
+  same per-file pass, so its `compared` equals that arm's by construction. A span-wire panic rides
+  the shared panic gate beside the loc arm's — a file whose loc wire throws a plain rejection while
+  the span wire panics would otherwise read as both-errored and be skipped. Under `--inject*` it
+  runs too, its controls subtracted from its variants like the loc arm's.
 
-**`--fixtures`: a fixture tree as the root.** `corpus:compare:parse tests/fixtures
---fixtures` (a `deno task conformance` leg) grades each fixture's parse-pinned documents
-and nothing else — its `input.*` at its `goal` marker's goal, plus the variants an
-`expected_<stem>.json` pins, the documents an oracle verdict is committed for (narrower than
-`check:loc`, which needs no oracle and also grades every format variant tsv parses) — so
-the oracle comparison reaches the `loc` rows the fixtures hold and real code rarely does. A `_svelte_divergence`
-input whose two parses still equal its committed `expected_ours.json` /
-`expected_svelte.json` has its span differences classified `fixture_declared_divergence`
-(the pair `fixtures:validate` grades); its `loc` and `name_loc` are graded like any other
-file's, and the moment either parse drifts from its pin every difference grades. Takes
-neither `--all` nor `--inject*`.
+**`--fixtures`: a fixture tree as the root.** `corpus:compare:parse tests/fixtures --fixtures` (a
+`deno task conformance` leg) grades each fixture's parse-pinned documents and nothing else — its
+`input.*` at its `goal` marker's goal, plus the variants an `expected_<stem>.json` pins, the
+documents an oracle verdict is committed for (narrower than `check:loc`, which needs no oracle and
+also grades every format variant tsv parses) — so the oracle comparison reaches the `loc` rows the
+fixtures hold and real code rarely does. Takes neither `--all` nor `--inject*`.
+
+⚠️ **`fixture_declared_divergence` reaches the whole document.** A `_svelte_divergence` input whose
+two parses still equal its committed `expected_ours.json` / `expected_svelte.json` (the pair
+`fixtures:validate` grades) has EVERY span difference classified `fixture_declared_divergence` —
+equivalent to excluding those fixtures from span grading while still grading their `loc` and
+`name_loc`. The moment either parse drifts from its pin, every difference grades; until then a
+divergence baked into `expected_ours.json` stays invisible here, as it does to `fixtures:validate`.
 
 The documented-divergence matchers live in `lib/parse_divergences.ts`
 (`DOCUMENTED_MATCHERS`, each naming its `docs/conformance_svelte.md` section — a
@@ -459,16 +429,14 @@ new group is intentional, add a matcher AND catalog it in
 
 ## Parse-Conformance Gates
 
-Three gates run tsv's parsers against an upstream suite. All three share one shape —
-**verdict parity** (enforced) plus **AST-shape** deep-diff (report-only, via the
-SHARED engine `corpus_compare_parse.ts` grades with: `lib/parse_diff.ts`'s `diff_asts` +
-`lib/parse_divergences.ts`'s `DOCUMENTED_MATCHERS`, both node-modules-free and unit-tested
-in `test:deno`). The shape half grades
-tsv's shipped span-only wire against the oracle with its `loc` / `name_loc` stripped
-(`lib/span_only.ts`), as `corpus:compare:parse`'s span-only arm does; `loc` is that
-tool's loc arm's to grade. All accept `-v`,
-`--json`, and a subtree path; each has a `:run` variant that skips the FFI rebuild
-(freshness-guarded).
+Three gates run tsv's parsers against an upstream suite, sharing one shape: **verdict parity**
+(enforced) plus an **AST-shape** deep-diff (report-only), through the engine
+`corpus_compare_parse.ts` grades with (`lib/parse_diff.ts`'s `diff_asts` +
+`lib/parse_divergences.ts`'s `DOCUMENTED_MATCHERS`, both node-modules-free and unit-tested in
+`test:deno`). The shape half grades tsv's shipped span-only wire against the oracle with its
+`loc` / `name_loc` stripped (`lib/span_only.ts`), as `corpus:compare:parse`'s span-only arm
+does; `loc` is that tool's loc arm's to grade. All accept `-v`, `--json`, and a subtree path;
+each has a freshness-guarded `:run` variant that skips the FFI rebuild.
 
 ```bash
 deno task conformance:svelte-fixtures   # builds the corpus FFI, then runs
@@ -480,10 +448,9 @@ deno task conformance:svelte-fixtures:run ../svelte/packages/svelte/tests/parser
 ```
 
 **Verdict parity buckets over-rejections** (tsv rejects what the oracle accepts)
-into `SANCTIONED` (tsv diverges *deliberately*; the shared list is
-`lib/parse_sanctions.ts`), `KNOWN_GAPS` (tsv wrong; a tracked drop-in gap that must
-only shrink, an in-file allowlist per gate), and `unexpected` (a NEW gap — **exits
-1**). `over_acceptance` (tsv accepts, the oracle rejects) is a deferred early-error:
+into `SANCTIONED` (tsv diverges *deliberately*; shared list `lib/parse_sanctions.ts`),
+`KNOWN_GAPS` (tsv wrong; a tracked drop-in gap that must only shrink, an in-file allowlist per
+gate), and `unexpected` (a NEW gap — **exits 1**). `over_acceptance` (tsv accepts, the oracle rejects) is a deferred early-error:
 reported, not gated. Green at baseline = every gap is sanctioned or tracked.
 
 **Shared gate hygiene** (`lib/fixtures_gate.ts`, the svelte + ts fixtures gates).
@@ -528,7 +495,7 @@ that half does **not** gate yet.
 ### `conformance:ts-fixtures`
 
 tsv's TypeScript parser vs **acorn-typescript's own test suite**
-(`../acorn-typescript/test`, ~200 adversarial `input.ts` fixtures). tsv is a drop-in
+(`../acorn-typescript/test`, adversarial `input.ts` fixtures). tsv is a drop-in
 for acorn + acorn-typescript, so that parser's own regression corpus is the natural
 TS edge-case oracle: the shape real-world code can't reach. Entry:
 `diagnostics/ts_fixtures_compare.ts`.
@@ -540,8 +507,8 @@ Sanctions here are deprecated syntax tsv declines (e.g. import assertions `asser
 {…}`) or input its own grammar rejects (`TS_FIXTURE_SANCTIONS`). Strict about
 setup: a missing checkout (0 scanned) **FAILS** — a run that graded nothing must not
 read as a pass; the tolerance point for machines without it is publish Step 3b's
-preflight. Unlike the Svelte tree's backlog this corpus is near-clean, so promoting
-AST-shape to a gate once the undocumented-group count hits 0 is a natural follow-up.
+preflight. Unlike the Svelte tree's backlog this corpus is near-clean, so its AST-shape half can
+become a gate once its undocumented groups reach zero.
 
 ### `conformance:ts-repo`
 
@@ -552,8 +519,8 @@ using **tsc's OWN baselines as the validity oracle**: a
 rejects, no `TS1xxx` = tsc accepts. Entry: `diagnostics/ts_repo_compare.ts`. **The
 full model — the oracle, the bucket ladder, the four ledgers and their categories,
 the reading rules, and the triage loop — is
-[docs/conformance_tsc.md](../../docs/conformance_tsc.md).** What follows is what an
-operator of the aggregate needs.
+[docs/conformance_tsc.md](../../docs/conformance_tsc.md);** what follows is the operator's
+view.
 
 tsc is authoritative because acorn-ts (tsv's *shape* target) is itself over-lenient;
 grading against tsc auto-resolves those leniency cases to reject-parity (no
@@ -584,23 +551,21 @@ are deliberately NOT legs — `tsv_check` is experimental and may never ship, so
 gates stay on-demand (../../docs/typechecker.md).
 
 `deno task conformance` builds the corpus FFI (and `build:check`'s `tsv_debug`, the loc arm's
-loc-wire server) once and runs every leg in **ONE
-process** (`conformance.ts`): the canonical oracle modules (prettier, the svelte
-plugin, svelte/compiler, acorn, acorn-ts) load once via the module cache instead of
-once per leg (`render:audit`, the lone non-JS leg, is a `cargo` subprocess — which
-is why the task carries `--allow-run=cargo`), each leg gets a timing line, and
-failure semantics match a `&&` chain exactly (every leg exits the process on a
-finding — fail-fast). The driver takes no arguments; the per-leg tasks remain the
-scoped/triage entries.
+loc-wire server) once and runs every leg in **ONE process** (`conformance.ts`): the canonical
+oracle modules (prettier, the svelte plugin, svelte/compiler, acorn, acorn-ts) load once via the
+module cache, each leg gets a timing line, and failure semantics match a `&&` chain exactly
+(every leg exits the process on a finding — fail-fast). `render:audit`, the lone non-JS leg, is a
+`cargo` subprocess (hence the task's `--allow-run=cargo`). The driver takes no arguments; the
+per-leg tasks remain the scoped/triage entries.
 
 `deno task conformance:all` runs the pure-Rust **test262 positive gate** FIRST, THEN
-the aggregate — so a positive-parse regression trips the ~1-min gate before the
+the aggregate — so a positive-parse regression trips the quick gate before the
 multi-minute FFI legs run. That superset is what publish **Step 3b** runs (skipped by
 `--no-check`), after preflighting the oracles + `node_modules`: a missing one **FAILS
 a `--wetrun`**, warn-and-skips a dry-run, and any skip is re-warned in the final
 summary. The gates themselves fail closed on a missing checkout (0 scanned = FAIL),
 so a manual `deno task conformance` can't green-skip a leg. `corpus:compare:format`
-there gates on **SAFETY** (data loss) — the ~8% intentional style divergences are
+there gates on **SAFETY** (data loss) — the intentional style divergences are
 non-blocking WARNs, and every SAFETY finding is self-verified in-run (the native
 format is re-run and must reproduce byte-identically; nondeterminism surfaces as a
 loud per-file error instead — see [§Known Issues](#known-issues)). Both corpus tools
@@ -608,23 +573,22 @@ also fail (exit 1) on a run that compared nothing: an empty scope (`No files fou
 or an every-file-errored / every-file-parse-fail-skipped run is a systemic failure —
 sidecar/FFI down or a wrong corpus — never a pass.
 
-**A caught panic hard-fails both corpus tools, on every run** (not just `--all`, and
-never inside a bucket). These tools build tsv with `--profile corpus` (`panic =
-"unwind"`) precisely so a crash is caught and reported per file rather than killing
-the run — but the SHIPPED artifacts are `panic = "abort"` and take the host process
-down on that same input, so the caught panic would land in the run's mildest bucket
-while describing the release's harshest failure. Ungated it reads as one more
-`errors` WARN at exit 0 in `corpus:compare:format`, and as a dimmed `parse-fail
-skipped` line in `corpus:compare:parse` — where only `--all`'s exact
-`CORPUS_PARSE_TSV_ERRORS_PIN` notices, and then as "a new over-rejection". The gate is `gate_on_panics` in `lib/compare_cli.ts` (each tool
-passes the failures that could be tsv's; the classification is shared, so the two
-can't answer this question differently) over `is_native_panic_error` in
-`lib/divergence/panic_errors.ts`, matched against the message's FIRST LINE so a
-rejection's source code frame can never fabricate the verdict; only tsv can produce
-those shapes, since the oracle on the other side is JS. Classification runs BEFORE
-`check_expected_error` — those patterns key on file *content*, so a panic on a file
-that also happens to hold SCSS would otherwise file as an expected error and vanish
-from the report entirely.
+**A caught panic hard-fails both corpus tools, on every run** (not just `--all`, and never inside
+a bucket). These tools build with `--profile corpus` (`panic = "unwind"`) precisely so a crash is
+reported per file rather than killing the run — but the SHIPPED artifacts are `panic = "abort"`
+and take the host process down on that same input, so the caught panic would land in the run's
+mildest bucket while describing the release's harshest failure. Ungated it reads as one more
+`errors` WARN at exit 0 in `corpus:compare:format`, and as a dimmed `parse-fail skipped` line in
+`corpus:compare:parse` — where only `--all`'s exact `CORPUS_PARSE_TSV_ERRORS_PIN` notices, and
+then as "a new over-rejection".
+
+The gate is `gate_on_panics` in `lib/compare_cli.ts` (each tool passes the failures that could be
+tsv's; the classification is shared, so the two can't disagree) over `is_native_panic_error` in
+`lib/divergence/panic_errors.ts`, matched against the message's FIRST LINE so a rejection's
+source code frame can never fabricate the verdict; only tsv can produce those shapes, since the
+oracle on the other side is JS. Classification runs BEFORE `check_expected_error` — those
+patterns key on file *content*, so a panic on a file that also holds SCSS would otherwise file as
+an expected error and vanish from the report.
 
 ## Divergence Detection
 
@@ -646,45 +610,42 @@ operational summary.
   unexplained), `unknown` (needs investigation), `SAFETY` (data loss).
 
 ```bash
-# Detection audit: runs every pattern against every documented fixture's committed
-# prettier forms. Coverage is COMPUTED, not read out of the fixtures[] arrays (those
-# are explicit assertions, gated by test:deno, and drift from what the detectors
-# actually see). Exits 1 on a genuine gap; listing drift is bookkeeping.
 deno task divergence:audit [--json]
-
-# Deno test suite — the divergence detectors, gated by `deno task check`. Pattern
-# positive/negative overmatch-rejection cases, safety differential cases, and a
-# behavioral fixture-coverage audit driving each detector against its own committed
-# fixtures (input == ours, output_prettier == prettier), failing if a pattern stops
-# claiming a hunk in a fixture it lists. Dependency-free (`node:assert` + relative
-# imports), so CI runs them on a clean checkout with no `bench:install` — which is
-# why they're in the core `check` gate.
 deno task test:deno
-
-# The canonical-oracle test (NOT gated — needs prettier/svelte, so run after
-# `bench:install`): asserts the prettier baseline formats with a filepath, so `.ts`
-# single-type-param arrows stay `<T>` and `.svelte` ones get `<T,>`, and the `.js` →
-# babel / `.ts` → typescript parser routing holds.
 deno task test:deno:canonical
-
-# Typechecks the JS/TS the repo owns — this harness, `scripts/`, and the tsv_debug
-# Deno sidecar — which `deno task typecheck` (cargo) does not see. Takes DIRECTORIES,
-# so a new subdirectory is covered the day it appears. NOT gated, for the same reason
-# as the line above: the harness imports npm by bare specifier, and CI's `check` job
-# installs no node_modules. Run it after a harness, scripts, or sidecar change.
-#
-# The node-modules-free part of the harness IS gated, and mostly for free: `deno check`
-# walks transitive imports, so `typecheck:scripts` already covers the loader/guard core
-# through scripts/'s own graph (check_artifact_freshness, ffi, napi, tsv_artifacts,
-# runtime, types, reject_probe, locations_probe, and — through check_loc.ts — loc_wire_client)
-# and `test:deno` covers gate_counts. `typecheck:bench-core` names the orphans nothing else
-# reaches — `lib/wasm.ts`, `lib/harvest_stamp.ts`, `lib/fixture_documents.ts`,
-# `lib/error_text.ts` and `compose_reports.ts`. It is deliberately NOT the maximal checkable set: the impl
-# wrappers also check on a bare checkout, but only because their npm imports are
-# dynamic, and gating them would impose that import style on modules whose job is
-# loading npm (deno.json `//typecheck:bench-core`).
 deno task typecheck:js
 ```
+
+- **`divergence:audit`** runs every pattern against every documented fixture's committed prettier
+  forms. Coverage is COMPUTED, not read out of the `fixtures[]` arrays (those are explicit
+  assertions, gated by `test:deno`, and drift from what the detectors actually see). Exits 1 on a
+  genuine gap; listing drift is bookkeeping.
+- **`test:deno`** — the divergence detectors' suite, gated by `deno task check`: pattern
+  positive/negative overmatch-rejection cases, safety differential cases, and a behavioral
+  fixture-coverage audit driving each detector against its own committed fixtures
+  (input == ours, output_prettier == prettier), failing if a pattern stops claiming a hunk in a
+  fixture it lists. Dependency-free (`node:assert` + relative imports), so CI runs it on a clean
+  checkout with no `bench:install` — why it's in the core `check` gate.
+- **`test:deno:canonical`** — the canonical-oracle test, NOT gated (needs prettier/svelte; run
+  after `bench:install`): asserts the prettier baseline formats with a filepath, so `.ts`
+  single-type-param arrows stay `<T>` and `.svelte` ones get `<T,>`, and the `.js` → babel /
+  `.ts` → typescript parser routing holds.
+- **`typecheck:js`** typechecks the JS/TS the repo owns — this harness, `scripts/`, and the
+  tsv_debug Deno sidecar — which `deno task typecheck` (cargo) does not see. Takes DIRECTORIES, so
+  a new subdirectory is covered the day it appears. NOT gated, for the same reason: the harness
+  imports npm by bare specifier, and CI's `check` job installs no node_modules. Run it after a
+  harness, scripts, or sidecar change.
+
+  The node-modules-free part of the harness IS gated, mostly for free: `deno check` walks
+  transitive imports, so `typecheck:scripts` already covers the loader/guard core through
+  scripts/'s own graph (check_artifact_freshness, ffi, napi, tsv_artifacts, runtime, types,
+  reject_probe, locations_probe, and — through check_loc.ts — loc_wire_client), and `test:deno`
+  covers gate_counts. `typecheck:bench-core` names the orphans nothing else reaches —
+  `lib/wasm.ts`, `lib/harvest_stamp.ts`, `lib/fixture_documents.ts`, `lib/error_text.ts` and
+  `compose_reports.ts`. It is deliberately NOT the maximal checkable set: the impl wrappers also
+  check on a bare checkout, but only because their npm imports are dynamic, and gating them would
+  impose that import style on modules whose job is loading npm (deno.json
+  `//typecheck:bench-core`).
 
 "Documented" = every `*_prettier_divergence`-suffixed fixture linked from the
 `conformance_prettier*.md` family in any of its three anchor formats (table rows,
@@ -717,142 +678,134 @@ mirrors the live set and can only shrink.
 ```bash
 deno task bench:install   # one-time: install harness npm deps
 
-# Run benchmarks (builds the runtime's artifacts automatically).
 deno task bench           # full refresh = bench:perf + bench:conformance + a closing bench:compose
-#                           # (bench:perf composes too, but before bench:conformance rewrites the report
-#                           #  whose vintage the combined one carries — deno.json `//bench`)
 deno task bench:perf      # perf surface: build:bench ONCE, then the three :run legs + compose
 deno task bench:deno      # Deno only (no node/bun needed)
 deno task bench:node      # Node only
 deno task bench:bun       # Bun only (executes the Node artifacts — N-API + nodejs-target WASM)
 deno task bench:compose   # fold whatever report.{deno,node,bun}.json exist → report.{json,md}
-#   ^ each standalone leg builds the WHOLE artifact set (`build:bench`), not just the half it
-#     executes: every report carries the same tsv size rows (deno.json `//bench:deno`); a `:run`
-#     leg warns when a size-only artifact is stale (§Artifact Freshness Guard)
 
 deno task bench:conformance      # bench:pins:suites + build:bench + the coverage run
 deno task bench:conformance:run  # skip harvest + rebuild (freshness-guarded)
 
-# Run without rebuilding — guarded against stale artifacts (§Artifact Freshness Guard)
-deno task bench:deno:run   # also :node:run / :bun:run
-
-# Flags (shown for :deno:run; same for the others)
-deno task bench:deno:run -- --json           # JSON output (CI/tooling)
-deno task bench:deno:run -- --markdown       # Markdown tables
-deno task bench:deno:run -- --verbose        # per-file skip detail (paths + errors)
-deno task bench:deno:run -- --save-report    # force-overwrite the committed report on a
-                                             # limited/filtered run (full runs overwrite anyway;
-                                             # the timestamped pair is always written)
+deno task bench:deno:run   # skip the rebuild (freshness-guarded); also :node:run / :bun:run
+deno task bench:deno:run -- --json              # JSON output (CI/tooling)
+deno task bench:deno:run -- --markdown          # Markdown tables
+deno task bench:deno:run -- --verbose           # per-file skip detail (paths + errors)
+deno task bench:deno:run -- --save-report       # force-overwrite the committed report on a limited/filtered run
 deno task bench:deno:run -- --save-baseline     # save current results as baseline
 deno task bench:deno:run -- --compare-baseline  # compare against saved baseline
 
-# Wipe local-only bench state (gitignored): baseline.json, timestamped results
-# pairs, and the harvest caches. Preserves the committed report.* files (the glob is
-# anchored on a leading digit — timestamped files start with a year).
-deno task bench:clean
-
-# Environment variables (any runtime's :run)
-BENCH_LIMIT=5           # files per language (default: all)
-BENCH_FILTER=zzz        # path pattern (default: none)
-BENCH_DURATION=10000    # ms per benchmark (default: 5000; conformance mode: 15000)
-BENCH_WARMUP=10         # warmup iteration FLOOR (default: 3); every row also warms for at least
-BENCH_WARMUP_MS=2000    # this many ms (default: 5000), sized from its own pre-flight sweep — a fixed
-                        # count left fast rows still tiering inside the measured window (negative
-                        # drift on every runtime), and JSC keeps tiering for seconds, so 1 s was not
-                        # enough for bun. There is no slow-task tier any more: one protocol per row
-                        # on every runtime (floor 8 — 16 on the canonical rows — 5 s budget, warmup ≥ 5 s)
-BENCH_MODE=union        # per-impl iteration (default: intersection)
-BENCH_CORPUS=conformance  # corpus/surface selector (default: perf)
-BENCH_STALE_OK=1        # run despite stale artifacts (default: off)
-BENCH_COVERAGE_ONLY=1   # coverage-only run, no timed phase (what bench:conformance:run sets)
-BENCH_FORCED_ASYNC=1    # add the tsv-forced-async control row (diagnostic; default: off)
-BENCH_GC=1              # call globalThis.gc() between iterations (default: off — not a
-                        # uniform bias; see docs/benchmarks.md)
-BENCH_ALLOW_MISSING=1   # tolerate a partial corpus
+deno task bench:clean     # wipe local-only (gitignored) bench state
 ```
 
-`deno task bench` regenerates EVERY committed artifact the site consumes, reusing
-the node artifacts the perf half just built for the coverage run. It FAILS FAST if
-node or bun isn't installed — `bench:runtimes` preflights `bench:perf`, rather than
-discovering the miss only after the legs ahead of it have run (by which point two of the
-three siblings have been regenerated and `bench:compose` skipped, leaving the
-committed combined report stale against fresh siblings). ⚠️ Its node arm asks what
-the binary IS, not whether the name resolves: `deno task` prepends its node-compat
-shim (`~/.cache/deno/node_compat_bin/node` → the deno binary) to PATH, so `which
-node` succeeds inside every deno task on a machine with no node — and that shim RUNS
-the harness, where `current_runtime()` reports `deno` and `bench:node` overwrites
-`report.deno.*` rather than producing a node sibling. `globalThis.Deno` is the tell
-the shim cannot hide. Deno is
-the only hard dependency, so without node and/or bun run the per-runtime tasks you
-DO have — each writes its own sibling and `bench:compose` folds whatever exists.
+- Every bench task builds the runtime's artifacts first; `:run` skips that, guarded against stale
+  artifacts (§Artifact Freshness Guard). Each standalone leg builds the WHOLE artifact set
+  (`build:bench`), not just the half it executes — every report carries the same tsv size rows
+  (deno.json `//bench:deno`); a `:run` leg warns when a size-only artifact is stale.
+- `bench` closes with its own `bench:compose`: `bench:perf` composes too, but before
+  `bench:conformance` rewrites the report whose vintage the combined one carries (deno.json
+  `//bench`).
+- Flags are shown for `:deno:run`, same for the others. Full runs overwrite the committed report
+  anyway (`--save-report` is for limited runs); the timestamped pair is always written.
+- `bench:clean` wipes `baseline.json`, the timestamped results pairs, and the harvest caches,
+  preserving the committed `report.*` files (the glob is anchored on a leading digit —
+  timestamped files start with a year).
 
-**Conformance measurement** is per-tool PARSE COVERAGE over the fixtures-only
-`conformance` view → `report.conformance.node.{json,md}`. Two things are specific to
-this surface. **`tsc` is a row here and only here** (`lib/tsc.ts`): the language's
-own parser is a verdict, not a speed, so putting it in the published throughput
-tables would misread it — flipping it on for perf is a one-word change at its
-registration site. And the report carries a **per-source coverage table** under each
-group's aggregate line, because the aggregate blends corpora that answer different
-questions: on the tsc corpus `tsc` is the ORACLE (100% by construction — the harvest
-keeps exactly what it accepts), the way `svelte/compiler` is on the Svelte set,
-while on test262 and the prettier suites it is an independent parser. Read the
-source rows; the aggregate is a summary, not the finding. **Coverage-only +
-node-only by design** (`BENCH_COVERAGE_ONLY=1`): coverage is a pre-flight product,
-so the timed phase is skipped, and it's runtime-invariant (same parser engine — the
-site folds a tool's native/wasm variants into one per-engine row), so one node run
-is the whole surface. Entries carry null timing; no throughput/comparison sections;
-baseline save/compare are no-ops. Skipping the timed phase reclaims a fixed floor of
-full-corpus sweeps per row (the warmup floor plus the measured one) that no consumer reads. The timed
-parse-throughput over this adversarial corpus has no consumer, so no task produces
-it; to investigate ad-hoc run `BENCH_CORPUS=conformance node benches/js/bench.ts`
-(coverage flag unset) — it overwrites `report.conformance.node.*`, so re-run
-`bench:conformance:run` after to restore the committed report.
+Environment variables (any runtime's `:run`):
+
+| Variable | Effect (default) |
+| --- | --- |
+| `BENCH_LIMIT=5` | files per language (all) |
+| `BENCH_FILTER=zzz` | path pattern (none) |
+| `BENCH_DURATION=10000` | ms per benchmark (5000; conformance mode 15000) |
+| `BENCH_WARMUP=10` | warmup iteration FLOOR (3) |
+| `BENCH_WARMUP_MS=2000` | every row also warms at least this many ms (5000), sized from its own pre-flight sweep |
+| `BENCH_MODE=union` | per-impl iteration (intersection) |
+| `BENCH_CORPUS=conformance` | corpus/surface selector (perf) |
+| `BENCH_STALE_OK=1` | run despite stale artifacts (off) |
+| `BENCH_COVERAGE_ONLY=1` | coverage-only run, no timed phase (what `bench:conformance:run` sets) |
+| `BENCH_FORCED_ASYNC=1` | add the tsv-forced-async control row (diagnostic; off) |
+| `BENCH_GC=1` | call `globalThis.gc()` between iterations (off — not a uniform bias; see docs/benchmarks.md) |
+| `BENCH_ALLOW_MISSING=1` | tolerate a partial corpus |
+
+Warmup is time-floored because a fixed count left fast rows still tiering inside the measured
+window (negative drift on every runtime), and JSC keeps tiering for seconds, so 1 s was not enough
+for bun. One protocol per row on every runtime, no slow-task tier: floor 8 iterations (16 on the
+canonical rows), 5 s budget, warmup ≥ 5 s.
+
+`deno task bench` regenerates EVERY committed artifact the site consumes, reusing the node
+artifacts the perf half just built for the coverage run. It FAILS FAST if node or bun isn't
+installed — `bench:runtimes` preflights `bench:perf` — rather than discovering the miss after two
+of the three siblings were regenerated and `bench:compose` skipped, leaving the committed combined
+report stale against fresh siblings. ⚠️ Its node arm asks what the binary IS, not whether the
+name resolves: `deno task` prepends its node-compat shim (`~/.cache/deno/node_compat_bin/node` →
+the deno binary) to PATH, so `which node` succeeds inside every deno task on a machine with no
+node — and that shim RUNS the harness, where `current_runtime()` reports `deno` and `bench:node`
+overwrites `report.deno.*` rather than producing a node sibling. `globalThis.Deno` is the tell the
+shim cannot hide. Deno is the only hard dependency, so without node and/or bun run the
+per-runtime tasks you DO have — each writes its own sibling and `bench:compose` folds whatever
+exists.
+
+**Conformance measurement** is per-tool PARSE COVERAGE over the fixtures-only `conformance` view →
+`report.conformance.node.{json,md}`. Specific to this surface:
+
+- **`tsc` is a row here and only here** (`lib/tsc.ts`): the language's own parser is a verdict,
+  not a speed, so the published throughput tables would misread it (flipping it on for perf is a
+  one-word change at its registration site).
+- A **per-source coverage table** sits under each group's aggregate line, because the aggregate
+  blends corpora answering different questions: on the tsc corpus `tsc` is the ORACLE (100% by
+  construction — the harvest keeps exactly what it accepts), as `svelte/compiler` is on the Svelte
+  set, while on test262 and the prettier suites it is an independent parser. Read the source rows;
+  the aggregate is a summary, not the finding.
+- **Coverage-only + node-only by design** (`BENCH_COVERAGE_ONLY=1`): coverage is a pre-flight
+  product, so the timed phase is skipped (reclaiming a fixed floor of full-corpus sweeps per row —
+  the warmup floor plus the measured one — that no consumer reads), and it's runtime-invariant
+  (same parser engine; the site folds a tool's native/wasm variants into one per-engine row), so
+  one node run is the whole surface. Entries carry null timing; no throughput/comparison sections;
+  baseline save/compare are no-ops.
+
+The timed parse-throughput over this adversarial corpus has no consumer, so no task produces it;
+to investigate, run `BENCH_CORPUS=conformance node benches/js/bench.ts` (coverage flag unset) — it
+overwrites `report.conformance.node.*`, so re-run `bench:conformance:run` after.
 
 ### Harvests
 
 ```bash
 deno task bench:harvest            # everything = :suites + :svelte-styles
-deno task bench:pins:suites        # the conformance-view group: the five SUITE caches + the CSS reject
-                                   # pin; the pin-freshness preflight
+deno task bench:pins:suites        # the conformance-view group (five SUITE caches + the CSS reject pin); the pin-freshness preflight
 deno task bench:harvest:wpt        # ../wpt/css <style> blocks (outside <script>) → .cache/wpt_css
 deno task bench:harvest:test262    # graded positives → .cache/test262_files.json (runs cargo)
 deno task bench:harvest:ts-repo    # tsc-corpus valid + rejects lists → .cache/ts_repo_{files,rejects}.json
-deno task bench:harvest:svelte-rejects  # svelte/compiler-rejected Svelte files
-                                        # → .cache/svelte_parse_rejects.json
-deno task bench:harvest:prettier-jsx    # Prettier .js fixtures its babel parser reads as JSX
-                                        # → .cache/prettier_jsx_files.json
+deno task bench:harvest:svelte-rejects  # svelte/compiler-rejected Svelte files → .cache/svelte_parse_rejects.json
+deno task bench:harvest:prettier-jsx    # Prettier .js fixtures its babel parser reads as JSX → .cache/prettier_jsx_files.json
 deno task css:over-acceptance:pin  # CSS_REJECTS_PIN alone (oracle only, no build) — no cache, just the stamp
-deno task bench:harvest:svelte-styles   # perf-view .svelte <style> blocks, concatenated per
-                                        # snapshot collection → .cache/svelte_styles/<collection>.css
+deno task bench:harvest:svelte-styles   # perf-view .svelte <style> blocks per snapshot collection → .cache/svelte_styles/<collection>.css
 ```
 
 Idempotent; warn-and-skip when the source checkout is absent. The suite legs are
-FRESHNESS-STAMPED (`lib/harvest_stamp.ts` — every stamp is listed in its
-`HARVEST_STAMPS` table, which the scripts read their paths from and `deno task doctor`
-walks): a grade whose stamped inputs — the source checkout COMMIT(s) + the pinned
-count + oracle pins — are unchanged skips instantly (the test262 leg saves a ~1 min
-release-mode grade; the ts-repo leg stamps the tsc VERSION too, since tsc is its
-oracle and a bump can move a file between its two lists with the checkout unchanged);
-pass `--force` after changing harvest/grading LOGIC, which the stamp can't see.
-`svelte-styles` is stamped too, on the `../corpora` snapshot's `collections/` tree id
-(not its commit — a tooling commit there moves no corpus byte), its exact block pin
-(`SVELTE_STYLES_BLOCKS_PIN`), and the perf view's entry list (a collection joining a
-perf tier changes what the harvest reads with no checkout moving, and did: 278 → 401
-blocks): an unchanged triple skips the walk, and a moved count fails before writing like
-every other harvest.
+FRESHNESS-STAMPED (`lib/harvest_stamp.ts` — every stamp is listed in its `HARVEST_STAMPS` table,
+which the scripts read their paths from and `deno task doctor` walks): a grade whose stamped
+inputs — the source checkout COMMIT(s) + the pinned count + oracle pins — are unchanged skips
+instantly (the test262 leg saves a release-mode grade; the ts-repo leg stamps the tsc VERSION too,
+since tsc is its oracle and a bump can move a file between its two lists with the checkout
+unchanged); pass `--force` after changing harvest/grading LOGIC, which the stamp can't see.
+`svelte-styles` is stamped too, on the `../corpora` snapshot's `collections/` tree id (not its
+commit — a tooling commit there moves no corpus byte), its exact block pin
+(`SVELTE_STYLES_BLOCKS_PIN`), and the perf view's entry list (a collection joining a perf tier
+changes what the harvest reads with no checkout moving): an unchanged triple skips the walk, and a
+moved count fails before writing like every other harvest.
 
 **Two groups, because the corpus VIEWS decide who needs which cache.**
-`bench:pins:suites` is the conformance-view group: the five suite caches
-(`suite`-tier, or an exclusion list over one — so they act in the CONFORMANCE view and nowhere else) plus
-`css:over-acceptance:pin`, which harvests nothing — nothing consumes the CSS reject
-list, so it is rebuilt live — but grades `CSS_REJECTS_PIN` over the same view and
-stamps the same way. `WPT_CSS_HARVEST_PIN` is stamped beside them but cannot
+`bench:pins:suites` is the conformance-view group: the five suite caches (`suite`-tier, or an
+exclusion list over one — so they act in the CONFORMANCE view and nowhere else) plus
+`css:over-acceptance:pin`, which harvests nothing (nothing consumes the CSS reject list, so it is
+rebuilt live) but grades `CSS_REJECTS_PIN` over the same view and stamps the same way. `WPT_CSS_HARVEST_PIN` is stamped beside them but cannot
 stand in for `../wpt`'s commit: it is a file COUNT, and an edit to an existing wpt
 test moves the CSS this pin grades without moving it.
 
-`bench:harvest:svelte-styles` produces a `real`-tier entry, so it appears in the
-PERF and GATES views and never in the conformance one. Each caller
-therefore takes one group: `bench:perf` chains the styles harvest alone (its own view
+`bench:harvest:svelte-styles` produces a `real`-tier entry, so it appears in the PERF and GATES
+views and never in the conformance one. Each caller therefore takes one group: `bench:perf` chains the styles harvest alone (its own view
 holds it), `bench:conformance` chains the suites alone (its holds those), and `deno
 task conformance` — whose corpus legs read the `gates` view — chains the suites as
 its PIN-FRESHNESS preflight and the styles harvest later, immediately ahead of those
@@ -869,50 +822,50 @@ which takes the `{ complete_for: <language> }` missing-entry policy: an absent e
 that could hold that language refuses the load — **`optional` ones included**, since
 `optional` says only that an ordinary run may proceed without it — while one that
 cannot hold it warns and is skipped. The helper owns the `--if-present` answer too:
-an absent entry, and nothing else, comes back `null` for the leg to warn-skip. That is what lets the svelte-rejects leg harvest its full 142 on a machine
-with no wpt/test262 caches (css/js — no Svelte) and still refuse, warn-skippably, when
-`../prettier-plugin-svelte` is gone. Spelling the tolerance as a plain "allow
+an absent entry, and nothing else, comes back `null` for the leg to warn-skip. That is what lets
+the svelte-rejects leg harvest its full set on a machine with no wpt/test262 caches (css/js — no
+Svelte) and still refuse, warn-skippably, when `../prettier-plugin-svelte` is gone. Spelling the tolerance as a plain "allow
 missing" instead is the bug this shape exists to prevent: the leg then grades a
 short corpus and reports it as `pinned count mismatch … re-pin in gate_counts.ts`,
 which is the one diagnosis that is never right for an absent input. Reach for that
 helper, not a bare `CorpusLoader`, whenever the number coming out is compared to a
 constant. A pin that is a claim about SOME of the view's entries names them (`only`,
 the prettier-jsx harvest: the Prettier JS suite alone) — the loader then walks and
-refuses over those entries and no others, so the grade neither reads the ~80k files
-its count ignores nor fails on a harvest cache it never consults.
+refuses over those entries and no others, so the grade neither reads the many files its count
+ignores nor fails on a harvest cache it never consults.
 
 **A stamp records every checkout its grade READS, not the one it is named after.**
 Both reject pins are measured over THREE, and neither list is guessable from the
 name: `CSS_REJECTS_PIN` over `../svelte` + `../prettier` + `../wpt`, and
 `SVELTE_REJECTS_PIN` over `../svelte` + `../prettier` + `../prettier-plugin-svelte`
-— both prettier suites ship `.html`, which the loader reads as Svelte, and they
-contribute 40 and 7 of its 142 rejects. A contributor left out is the whole failure
-mode: its pull leaves the stamp reading fresh over a corpus that moved under it,
+— both prettier suites ship `.html`, which the loader reads as Svelte, and both contribute
+rejects. A contributor left out is the whole failure mode: its pull leaves the stamp reading fresh over a corpus that moved under it,
 and `GATE_CHECKOUT_IDS.pins` then records a provenance the grade doesn't have.
 `gate_counts_test.ts` grades that each pin names AT LEAST one checkout, which
 structurally cannot see a missing second — so the stamp's `checkouts` table
-(`lib/harvest_stamp.ts`) and that `pins` list are kept in agreement by hand. And a
-checkout is not the only kind of input: every stamped grade that loads a corpus VIEW also
-stamps that view's ENTRY LIST (`corpus_view_paths`) — the styles harvest the perf view's,
-the svelte-rejects and prettier-jsx harvests and the CSS reject pin the conformance view's — because an
-entry joining or leaving the corpus entries changes what the grade reads while every
-checkout stays put; a stamp keyed on checkouts alone would skip that re-harvest and leave
-the cache short under a green stamp (it did once: two collections joining the `real` tier
-moved the styles count 278 → 401 with no checkout moving). Each of those grades stamps
-one more input no checkout records: a fingerprint of the loader's per-file FILTERS
-(`corpus_filter_fingerprint` — `lib/prettier_fixtures.ts` + `lib/corpus.ts` by source
-text), because a filter change moves what the view yields with every checkout and the
-entry list unmoved (the Prettier validity filter moved `CSS_REJECTS_PIN` 229 → 207 that
-way, and only the coverage run's own grade of the count saw it; an exclusion or
-extension edit in `lib/corpus.ts` would move the perf view the same way). The entry list's ORDER is part
-of the stamp, so `corpus_entries()` keeps it stable — table order, then manifest order —
-and a tier that lands in no perf view (`third_party`) leaves the perf stamp untouched.
+(`lib/harvest_stamp.ts`) and that `pins` list are kept in agreement by hand.
+
+A checkout is not the only kind of input. Every stamped grade that loads a corpus VIEW also
+stamps:
+
+- that view's **ENTRY LIST** (`corpus_view_paths`) — the styles harvest the perf view's, the
+  svelte-rejects and prettier-jsx harvests and the CSS reject pin the conformance view's — because
+  an entry joining or leaving changes what the grade reads while every checkout stays put; a stamp
+  keyed on checkouts alone would skip that re-harvest and leave the cache short under a green
+  stamp. The list's ORDER is part of the stamp, so `corpus_entries()` keeps it stable — table
+  order, then manifest order — and a tier that lands in no perf view (`third_party`) leaves the
+  perf stamp untouched.
+- a fingerprint of the loader's per-file **FILTERS** (`corpus_filter_fingerprint` —
+  `lib/prettier_fixtures.ts` + `lib/corpus.ts` by source text), because a filter change moves what
+  the view yields with every checkout and the entry list unmoved (a Prettier validity-filter change
+  moved `CSS_REJECTS_PIN` that way; an exclusion or extension edit in `lib/corpus.ts` would move
+  the perf view the same way).
 
 **Why the preflight exists.** Those count pins are re-derived by no other cadence —
 `deno task check` re-derives no pin; its two sibling-checkout legs (`roundtrip:audit:prettier`,
 `discovery:audit`) grade properties, not counts — and a checkout that moves between
-upstream RELEASES gives `pins:audit` no version to fail on, which is exactly how
-they once went stale unnoticed (the two suite-only checkouts, `../wpt` and
+upstream RELEASES gives `pins:audit` no version to fail on, so they could go stale unnoticed
+(the two suite-only checkouts, `../wpt` and
 `../test262`, are in `GATE_CHECKOUT_IDS` for the same reason, so
 `pins:audit:checkouts` names them when they move). The stamps are what make the leg
 cost under a second when nothing has moved. Two of the pins have a second grader:
@@ -931,233 +884,219 @@ pinned count to trip after a source pull
 
 Each runtime saves to `benches/js/results/` as timestamped files plus a committed
 `report.<runtime>.{json,md}` pair. The conformance surface writes
-`report.conformance.node.{json,md}` instead — a separate committed surface that
-never clobbers the perf reports and is invisible to `bench:compose` (which globs the
-exact perf filenames). To publish to tsv.fuz.dev, run `npm run update-benchmarks` in
-`../tsv.fuz.dev` — its copy list names these files exactly, so renaming a report
-artifact means updating that script in the same change. Its
-`src/routes/docs/benchmarks/benchmark_data.ts` likewise MIRRORS the JSON shape
-below, field for field and version note for version note, so a new top-level field
-here is a change there too — it declares them optional and degrades on an older
-report, which is what makes the drift silent rather than loud.
+`report.conformance.node.{json,md}` instead — a separate committed surface that never clobbers the
+perf reports and is invisible to `bench:compose` (which globs the exact perf filenames). To
+publish to tsv.fuz.dev, run `npm run update-benchmarks` in `../tsv.fuz.dev` — its copy list names
+these files exactly, so renaming a report artifact means updating that script in the same change.
+Its `src/routes/docs/benchmarks/benchmark_data.ts` likewise MIRRORS the JSON shape below, field for
+field and version note for version note, so a new top-level field here is a change there too — it
+declares them optional and degrades on an older report, which makes the drift silent rather than
+loud.
 
-The report JSON (per-runtime schema `version: 20`, `bench.ts` `REPORT_SCHEMA_VERSION` —
-a committed report says which version wrote it, and lags the schema until the next
-refresh; the combined compose report carries its own version; coverage-only runs add
-`coverage_by_source`) carries, beyond
-timing stats: top-level
-`runtime`; a `machine` block (`cpu_model` + `os`/`arch` + `runtime_version` — the
-numbers are machine-relative, so this travels with them; excludes hostname and
-volatile fields so it doesn't churn); `corpus_kind` (`perf` | `conformance`);
-per-language `corpus` totals; `corpus_sources` (per-entry loaded file counts + a
-`by_language` split summing to `files` — the composition disclosure — each with its
-upstream `repo` link); `corpus_snapshot` (the `fuzdev/corpora` commit every real-code
-source was read from, absent on conformance-only runs); `versions`;
-and `binary_sizes` (each with `gzip_bytes`). Each `entries[]` row adds `runtime`,
-`files_processed`/`files_total` (per-impl preflight coverage — the `Coverage:` line),
-`files_iterated` (the timed set — the `Files (intersection):` count) and, from
-`version` 15, `files_iterated_digest` (a hash of that set's sorted paths — what
-`compose_reports.ts` compares across runtimes, since equal counts never proved equal
-sets), the RAW-timing stability readings `cv_raw` / `drift` / `raw_sample_size` /
-`outlier_ratio` beside the cleaned `cv` (a row whose cost moved WHILE it was measured
-— biome's wasm heap leaked ~117 MB per TS sweep and tipped Node into a slower regime
-past ~1 GB, before the per-sweep reset below — has its second mode deleted or blended
-by the MAD cleaner, so `cv` can read quiet over a mean that is neither mode; `drift` is
-the median of the second half of the timings against the first's and sees it — its
-SIGN is the mechanism, negative still warming up, positive degrading), and the
-protocol the row ran under (`warmup_iterations` / `min_iterations` — warmup is sized
-by time, ≥ `BENCH_WARMUP_MS` from the row's pre-flight sweep, so a fast row no longer
-enters its window still tiering; there is no timing-keyed slow-task tier — the one
-per-row floor difference is the canonical rows' `CANONICAL_MIN_ITERATIONS` of 16,
-keyed on the row name so it is the same protocol on every runtime), and, from
-`version` 18, `settled_heap_bytes` — the JS heap (`heapUsed`) the row's warmup began
-from, read straight after the inter-task collection. It is a diagnostic: JSC schedules
-its next collection in proportion to the live heap, so an allocation-heavy pure-JS row
-(prettier, postcss) under bun runs up to ~15% faster from a larger settled heap; V8 rows
-do not move with it. It is a CONTROL rather than the explanation: those bun rows sit at
-one of two levels ~10–14% apart across runs, each with a quiet `cv`, while this field
-reproduces to the MB — so equal readings rule the heap out, and the two levels remain
-unexplained run-to-run variance that the per-run stability checks cannot see (read a bun
-pure-JS cell as ±15%). Compare it first when one bun row reads differently in two runs —
-across runs of ONE runtime only: JSC's `heapUsed` counts the memory its heap answers for (wasm
-linear memories, buffers) and V8's does not, so the same harness reads ~1–1.5 GB under
-bun and ~140 MB under node/deno. **One impl is reset
-between sweeps**: biome's `Workspace.openFile` retains ~4.5 B of wasm linear memory
-per source byte on every call and `closeFile` frees nothing (a genuine upstream leak,
-not a cache), and linear memory never shrinks, so `lib/biome.ts` re-instantiates the
-module once the sweeps it has run have grown its memory by more than 16 MiB
-(`RESET_GROWTH_BYTES`) — offered in the untimed slots (the per-task
-`setup` beside the major GC every task gets, after each warmup sweep, and
-`on_iteration` between two timed sweeps) at ~10 ms a swap, 0% of any timing — so the
-svelte (+30 MB a sweep) and TypeScript (+117 MB) rows start EVERY sweep on a fresh
-instance, the css row (+4 MB) every ~4, and a millisecond-sweep `BENCH_LIMIT` row
-almost never (a 70 MB instantiation per millisecond sweep out-churns the collector; a
-probe read a 40x slowdown that way when the swap was unconditional). Growth rather
-than a size, because a grown heap's cost is runtime-dependent: on V8 it is a STEP
-(sweep time flat to at least 974 MB on node, bare and inside the bench's process alike;
-Node's external memory past ~1 GB is where it triples), on JSC a SLOPE that only the
-bench's process shows — bun's svelte row is flat in a bare process (857 ms to a 974 MB
-heap, cv 1.0%) but after the group's prettier-class tasks have run it climbs ~0.4–1.2 ms
-per MB of buffer and falls back at each reset, so the earlier 320 MB size budget put a
-sawtooth inside the window (1217 ms at cv 8.6%, drift past ±5% either way depending on
-where the resets landed — the `format/svelte/biome-wasm` row §Unstable Rows flagged
-under bun, with the TypeScript row's cv 3–4% the same shape under the threshold) where a
-reset before every sweep reads 1046 ms at cv 1.4% in the same context, for a fresh
-instance's first-sweep price of a few percent, paid on every runtime alike.
-`diagnostics/biome_heap_probe.ts` holds the measurement; `lib/biome.ts`'s
-`RESET_GROWTH_BYTES` the rule. Such a row also WARMS in its
-`setup` (the library warming 0 times and the row carrying the harness's count),
-because the library's warmup loop has no between-sweeps hook to offer the reset in.
-That is the honest footing: every in-process impl starts each sweep from a settled
-heap, and biome's is the one a GC cannot settle. §Unstable Rows trips on cleaned cv ≥ 10%,
-|drift| ≥ 5%, or raw cv ≥ 10% on a row under 30 raw samples (with hundreds of samples
-the raw cv is dominated by isolated GC pauses the cleaner rightly removes — one 80 ms
-pause among 600 × 8 ms sweeps reads 35% — so there the median drift is the detector,
-not the raw cv). ⚠ A longer `BENCH_DURATION` is NOT the answer to an unstable row:
-a drifting row's mean keeps moving with n, and at most sample counts the cleaner
-erases the disclosure entirely — re-run the runtime, and read the raw fields.
+**The report JSON** (per-runtime schema version `bench.ts` `REPORT_SCHEMA_VERSION` — a committed
+report says which version wrote it, and lags the schema until the next refresh; the combined
+compose report carries its own version; coverage-only runs add `coverage_by_source`) carries,
+beyond timing stats:
 
-**Null timing is not exclusive to a coverage-only report:** a coverage-only ROW
-(`rsvelte-fmt`) carries null stats inside an otherwise fully-timed perf report, and
-is identifiable by `files_iterated: null` — it was timed on nothing, rather than
-timed on the group's intersection. A consumer that reads `entries[]` as speeds must
-skip a row with null `ops_per_second`, not treat it as a zero. Top-level
-`suppressed_noise` records silenced third-party stderr crashes as `{pattern:
-count}`; top-level `omissions` (perf surface, intersection mode, timed runs — from
-`version` 16, absent elsewhere) records, per timed
-group, what the intersection LEFT OUT — files and BYTES against the group's totals,
-and each row's failures by `PerfOmitCategory` — because a file any timed row fails
-leaves EVERY row's timed set, and a file count understates it (a harvested
-per-collection stylesheet is ONE file); a group nothing failed is
-listed with zeroes, and the `.md` prints the same fact as an **Omitted from every
-row's timed set** line under the group. Each parse `entries[]` row also carries a
-`payload` tier (`report.ts` `PayloadTier`: `drop_in`, `drop_in_superset` — the
-`+reconstruct` rows on Svelte and CSS, a `loc` on every positioned object where the
-oracle's is sparser — `span_only`, `own_shape`, `none`; keyed on the row IN ITS GROUP'S
-LANGUAGE, since `svelte/compiler` is a `loc`-bearing oracle on Svelte and a `loc`-free
-one on CSS; a registry-checked table like `DISPLAY_ORDER`: a parse row untiered in a
-language it is registered in warns at init and publishes `null`), so a consumer
-building an `Nx` from two rows of a group can say whether their products match;
-top-level `output_digest_ungraded` records files a byte-graded row
-ACCEPTED whose output the byte-parity check could not digest, as `{"<group>/<row>":
-count}` — the one known cause is a pathologically deep AST overflowing V8's
-recursive `JSON.stringify` (tsc's `binderBinaryExpressionStress.ts`), and it is the
-one field that records a measurement the run could NOT make, so a growing count is
-the byte check quietly covering less; top-level `variant_parity` records any
-same-engine pair (two bindings, or one binding under two options) whose
-pre-flight accept sets disagreed (`[]` when healthy — a non-empty list in a
-committed report is a binding-boundary bug surfacing in the diff, EXCEPT the one
-pair pinned at two engine versions on purpose, `oxc-parser` ↔ `oxc-parser-wasm`
-(§Known Issues), whose entry can be an engine change and says so); top-level
-`unavailable` records each optional impl that failed to init, as `{impl, reason,
-rows}` — the ⚠ init line's label, the load error's first line, and the ROW names its
-absence removed from this surface (`[]` on a full machine; under Bun the one known
-per-runtime load failure lands there as `Biome → [biome-wasm]`, §Cross-Runtime). The
-three answer escalating
-questions about the same surface — noise silenced, a row behaving wrongly, a row
-NOT THERE — and the last is the one a table can't ask, since an impl that stops
-loading takes its column out of every table and the ⚠ init line lives only in the
-run's output.
+- top-level `runtime`; a `machine` block (`cpu_model` + `os`/`arch` + `runtime_version` — the
+  numbers are machine-relative, so this travels with them; excludes hostname and volatile fields
+  so it doesn't churn); `corpus_kind` (`perf` | `conformance`); per-language `corpus` totals;
+  `corpus_sources` (per-entry loaded file counts + a `by_language` split summing to `files` — the
+  composition disclosure — each with its upstream `repo` link); `corpus_snapshot` (the
+  `fuzdev/corpora` commit every real-code source was read from, absent on conformance-only runs);
+  `versions`; and `binary_sizes` (each with `gzip_bytes`).
+- per `entries[]` row: `runtime`; `files_processed`/`files_total` (per-impl preflight coverage —
+  the `Coverage:` line); `files_iterated` (the timed set — the `Files (intersection):` count) and,
+  from `version` 15, `files_iterated_digest` (a hash of that set's sorted paths — what
+  `compose_reports.ts` compares across runtimes, since equal counts never proved equal sets); the
+  RAW-timing stability readings `cv_raw` / `drift` / `raw_sample_size` / `outlier_ratio` beside the
+  cleaned `cv`; the protocol the row ran under (`warmup_iterations` / `min_iterations`); and, from
+  `version` 18, `settled_heap_bytes`.
 
-**Three impls can never appear there, because they are REQUIRED**: `canonical`
-(the oracle) and tsv's own `native` + `wasm`. A load failure in any of them throws
-out of `init_implementations` (`init_required`) instead of joining `unavailable`,
-and their slots are correspondingly non-`undefined` in `ImplementationSet` — a
-broken tree, not a machine coming up short. Before that, a wasm bundle that was
-present but wouldn't load published a report with every `tsv-wasm-*` row silently
-gone behind one ⚠ line, and five diagnostics each hand-rolled their own
-`if (!impls.native) throw`. Note the division of labour with the freshness guard:
-`check_artifact_freshness` makes a MISSING artifact fatal, a present-yet-unloadable
-one surfaces only here. The expected-`unavailable` set is never tsv on any runtime, so
-nothing legitimate is refused.
+**Why the raw readings.** A row whose cost moved WHILE it was measured (biome's wasm heap leak,
+below, once tipped Node into a slower regime mid-row) has its second mode deleted or blended by the
+MAD cleaner, so `cv` can read quiet over a mean that is neither mode; `drift` — the median of the
+second half of the timings against the first's — sees it, and its SIGN is the mechanism (negative
+still warming up, positive degrading). Warmup is sized by time (≥ `BENCH_WARMUP_MS` from the row's
+pre-flight sweep), so a fast row doesn't enter its window still tiering; there is no timing-keyed
+slow-task tier — the one per-row floor difference is the canonical rows'
+`CANONICAL_MIN_ITERATIONS` of 16, keyed on the row name so it is the same protocol on every
+runtime.
 
-**`rows` is the joinable half, and the reason it exists.** Every other identity the
-report publishes is a row name (`entries[].name`, `variant_parity.impl`/`.sibling`,
-`report.ts`'s `DISPLAY_ORDER`), so a consumer asking "is this blank cell a load
-failure?" holds a row name — which the init LABEL matches for no impl whose label
-differs from its row (`Biome` vs `biome-wasm`), and cannot match at all where one
-impl backs several rows (`native` backs four; `oxc` backs `oxc-parser` and `oxfmt`).
-`rows` is DERIVED, never mapped: `init_implementations` keeps each failed impl's
-constructed-but-uninitialized instance in `complete`, and `get_defined_rows` asks
-the one task registry against that set (sound because the gates it evaluates —
-`parse_languages`/`format_languages`, `format`/`parse_internal` — are
-construction-time facts, not init state). It is SURFACE-scoped for the same reason
-the disclosures are: a `tsc` failure costs the perf surface no row, a `yuku` failure
-costs the conformance surface none, and an empty `rows` says exactly that — the
-machine is short while the tables are whole. The composer folds these into
-`unavailable_by_runtime[].rows`.
-Top-level `binary_sizes_absent` names the artifacts the size table reached for and
-did not find — that table is the one section whose COMPOSITION varies by machine
-(a row exists only for a built artifact), so a tsv variant listed there usually
-just means its optional build task wasn't run, while a third-party label means its
-package shipped nothing where `binary_sizes.ts` looked, and a `js bundle` label
-means `deno bundle` failed or was unreachable (`lib/canonical_bundles.ts`).
-`report.<runtime>.md` renders coverage/iterated as prose; the per-entry numbers,
-`suppressed_noise`, `variant_parity`, `unavailable`, and `binary_sizes_absent` are
-JSON-only.
+**`settled_heap_bytes`** is the JS heap (`heapUsed`) the row's warmup began from, read straight
+after the inter-task collection — a diagnostic. JSC schedules its next collection in proportion to
+the live heap, so an allocation-heavy pure-JS row (prettier, postcss) under bun runs up to ~15%
+faster from a larger settled heap; V8 rows do not move with it. It is a CONTROL rather than the
+explanation: those bun rows sit at one of two levels ~10–14% apart across runs, each with a quiet
+`cv`, while this field reproduces to the MB — so equal readings rule the heap out, and the two
+levels remain run-to-run variance the per-run stability checks cannot see (read a bun pure-JS cell
+as ±15%). Compare it first when one bun row reads differently in two runs — across runs of ONE
+runtime only: JSC's `heapUsed` counts the memory its heap answers for (wasm linear memories,
+buffers) and V8's does not, so the same harness reads ~1–1.5 GB under bun and ~140 MB under
+node/deno.
 
-The conformance report's **Excluded here:** / **Added here:** disclosures are
-authored prose whose CLAIM is checked: `surface_disclosure_lines` (bench.ts) throws
-if the table says a row is excluded and this surface registers it, or vice versa.
-The policy itself lives at the `corpus_kind` conditions in `lib/implementations.ts`,
-so the check is what keeps the published sentence from outliving the code —
-re-enabling yuku's N-API row after an upstream fix fails the run until the
-disclosure is updated. It asks the task REGISTRY (`get_defined_rows`), not the
-rows a run measured, and asks it at init: a corpus filter can empty a whole group,
-and grading that as policy drift failed partial runs at report time, after their
-work and with nothing written. The registry is asked the **availability-independent**
-question (`impls.complete`) — asked of the live set instead, an `excluded` claim
-passes vacuously whenever the impl merely failed to load, so a re-enabled row on a
-machine whose binding didn't install would publish the stale sentence with the guard
-silent. One absence is exempt — an **added** row whose impl
-never initialized is this machine coming up short (already in `unavailable`), so the
-run warns and drops that line instead of failing.
+**One impl is reset between sweeps.** biome's `Workspace.openFile` retains ~4.5 B of wasm linear
+memory per source byte on every call and `closeFile` frees nothing (a genuine upstream leak, not a
+cache), and linear memory never shrinks, so `lib/biome.ts` re-instantiates the module once the
+sweeps it has run have grown its memory by more than 16 MiB (`RESET_GROWTH_BYTES`), offered in the
+untimed slots (the per-task `setup` beside the major GC every task gets, after each warmup sweep,
+and `on_iteration` between two timed sweeps) at ~10 ms a swap, 0% of any timing. So the svelte
+(+30 MB a sweep) and TypeScript (+117 MB) rows start EVERY sweep on a fresh instance, the css row
+(+4 MB) every ~4, and a millisecond-sweep `BENCH_LIMIT` row almost never (a 70 MB instantiation per
+millisecond sweep out-churns the collector; a probe read a 40x slowdown when the swap was
+unconditional).
+
+- **Growth rather than a size**, because a grown heap's cost is runtime-dependent. On V8 it is a
+  STEP (sweep time flat to at least 974 MB on node, bare and inside the bench's process alike;
+  Node's external memory past ~1 GB is where it triples). On JSC it is a SLOPE only the bench's
+  process shows: bun's svelte row is flat in a bare process (857 ms to a 974 MB heap, cv 1.0%), but
+  after the group's prettier-class tasks have run it climbs ~0.4–1.2 ms per MB of buffer and falls
+  back at each reset, so a 320 MB size budget put a sawtooth inside the window (1217 ms at cv 8.6%,
+  drift past ±5% either way depending on where the resets landed; the TypeScript row's cv 3–4% the
+  same shape under the threshold) where a reset before every sweep reads 1046 ms at cv 1.4% in the
+  same context, for a fresh instance's first-sweep price of a few percent, paid on every runtime
+  alike. `diagnostics/biome_heap_probe.ts` holds the measurement; `lib/biome.ts`'s
+  `RESET_GROWTH_BYTES` the rule.
+- Such a row also WARMS in its `setup` (the library warming 0 times and the row carrying the
+  harness's count), because the library's warmup loop has no between-sweeps hook to offer the
+  reset in. That is the honest footing: every in-process impl starts each sweep from a settled
+  heap, and biome's is the one a GC cannot settle.
+
+**§Unstable Rows** trips on cleaned cv ≥ 10%, |drift| ≥ 5%, or raw cv ≥ 10% on a row under 30 raw
+samples (with hundreds of samples the raw cv is dominated by isolated GC pauses the cleaner rightly
+removes — one 80 ms pause among 600 × 8 ms sweeps reads 35% — so there the median drift is the
+detector, not the raw cv). ⚠ A longer `BENCH_DURATION` is NOT the answer to an unstable row: a
+drifting row's mean keeps moving with n, and at most sample counts the cleaner erases the
+disclosure entirely — re-run the runtime, and read the raw fields.
+
+**Null timing is not exclusive to a coverage-only report:** a coverage-only ROW (`rsvelte-fmt`)
+carries null stats inside an otherwise fully-timed perf report, identifiable by
+`files_iterated: null` — timed on nothing, rather than on the group's intersection. A consumer
+reading `entries[]` as speeds must skip a row with null `ops_per_second`, not treat it as a zero.
+
+**Further fields:**
+
+- top-level `suppressed_noise` — silenced third-party stderr crashes, as `{pattern: count}`.
+- top-level `omissions` (perf surface, intersection mode, timed runs — from `version` 16, absent
+  elsewhere) — per timed group, what the intersection LEFT OUT: files and BYTES against the group's
+  totals, and each row's failures by `PerfOmitCategory`. A file any timed row fails leaves EVERY
+  row's timed set, and a file count understates it (a harvested per-collection stylesheet is ONE
+  file); a group nothing failed is listed with zeroes, and the `.md` prints the same fact as an
+  **Omitted from every row's timed set** line under the group.
+- per parse `entries[]` row, a `payload` tier (`report.ts` `PayloadTier`: `drop_in`,
+  `drop_in_superset` — the `+reconstruct` rows on Svelte and CSS, a `loc` on every positioned
+  object where the oracle's is sparser — `span_only`, `own_shape`, `none`), so a consumer building
+  an `Nx` from two rows of a group can say whether their products match. Keyed on the row IN ITS
+  GROUP'S LANGUAGE, since `svelte/compiler` is a `loc`-bearing oracle on Svelte and a `loc`-free one
+  on CSS; a registry-checked table like `DISPLAY_ORDER` (a parse row untiered in a language it is
+  registered in warns at init and publishes `null`).
+- top-level `output_digest_ungraded` — files a byte-graded row ACCEPTED whose output the
+  byte-parity check could not digest, as `{"<group>/<row>": count}`. The one known cause is a
+  pathologically deep AST overflowing V8's recursive `JSON.stringify` (tsc's
+  `binderBinaryExpressionStress.ts`); it is the one field recording a measurement the run could NOT
+  make, so a growing count is the byte check quietly covering less.
+- top-level `variant_parity` — any same-engine pair (two bindings, or one binding under two
+  options) whose pre-flight accept sets disagreed. `[]` when healthy: a non-empty list in a
+  committed report is a binding-boundary bug surfacing in the diff, EXCEPT the one pair pinned at
+  two engine versions on purpose, `oxc-parser` ↔ `oxc-parser-wasm` (§Known Issues), whose entry can
+  be an engine change and says so.
+- top-level `unavailable` — each optional impl that failed to init, as `{impl, reason, rows}`: the
+  ⚠ init line's label, the load error's first line, and the ROW names its absence removed from this
+  surface (`[]` on a full machine).
+
+`suppressed_noise`, `variant_parity` and `unavailable` answer escalating questions about the same
+surface — noise silenced, a row behaving wrongly, a row NOT THERE — and the last is the one a table
+can't ask, since an impl that stops loading takes its column out of every table and the ⚠ init line
+lives only in the run's output.
+
+**Three impls can never appear in `unavailable`, because they are REQUIRED**: `canonical` (the
+oracle) and tsv's own `native` + `wasm`. A load failure in any of them throws out of
+`init_implementations` (`init_required`) instead, and their slots are correspondingly
+non-`undefined` in `ImplementationSet` — a broken tree, not a machine coming up short (otherwise a
+present-but-unloadable wasm bundle would publish with every `tsv-wasm-*` row silently gone behind
+one ⚠ line). The division of labour with the freshness guard: `check_artifact_freshness` makes a
+MISSING artifact fatal; a present-yet-unloadable one surfaces only here. The expected-`unavailable`
+set is never tsv on any runtime, so nothing legitimate is refused.
+
+**`rows` is the joinable half, and the reason it exists.** Every other identity the report
+publishes is a row name (`entries[].name`, `variant_parity.impl`/`.sibling`, `report.ts`'s
+`DISPLAY_ORDER`), so a consumer asking "is this blank cell a load failure?" holds a row name —
+which the init LABEL matches for no impl whose label differs from its row (`Biome` vs
+`biome-wasm`), and cannot match at all where one impl backs several rows (`native` backs four;
+`oxc` backs `oxc-parser` and `oxfmt`). `rows` is DERIVED, never mapped: `init_implementations`
+keeps each failed impl's constructed-but-uninitialized instance in `complete`, and
+`get_defined_rows` asks the one task registry against that set (sound because the gates it
+evaluates — `parse_languages`/`format_languages`, `format`/`parse_internal` — are construction-time
+facts, not init state). It is SURFACE-scoped for the same reason the disclosures are: a `tsc`
+failure costs the perf surface no row, a `yuku` failure costs the conformance surface none, and an
+empty `rows` says exactly that — the machine is short while the tables are whole. The composer
+folds these into `unavailable_by_runtime[].rows`.
+
+Top-level `binary_sizes_absent` names the artifacts the size table reached for and did not find —
+the one section whose COMPOSITION varies by machine (a row exists only for a built artifact). A tsv
+variant listed there usually just means its optional build task wasn't run; a third-party label
+means its package shipped nothing where `binary_sizes.ts` looked; a `js bundle` label means
+`deno bundle` failed or was unreachable (`lib/canonical_bundles.ts`). `report.<runtime>.md`
+renders coverage/iterated as prose; the per-entry numbers, `suppressed_noise`, `variant_parity`,
+`unavailable`, and `binary_sizes_absent` are JSON-only.
+
+The conformance report's **Excluded here:** / **Added here:** disclosures are authored prose whose
+CLAIM is checked: `surface_disclosure_lines` (bench.ts) throws if the table says a row is excluded
+and this surface registers it, or vice versa. The policy itself lives at the `corpus_kind`
+conditions in `lib/implementations.ts`, so the check keeps the published sentence from outliving
+the code — re-enabling yuku's N-API row after an upstream fix fails the run until the disclosure is
+updated.
+
+- It asks the task REGISTRY (`get_defined_rows`), not the rows a run measured, and asks it at init:
+  a corpus filter can empty a whole group, and grading that as policy drift would fail partial runs
+  at report time, after their work and with nothing written.
+- The registry is asked the **availability-independent** question (`impls.complete`): asked of the
+  live set instead, an `excluded` claim passes vacuously whenever the impl merely failed to load,
+  so a re-enabled row on a machine whose binding didn't install would publish the stale sentence
+  with the guard silent.
+- One absence is exempt — an **added** row whose impl never initialized is this machine coming up
+  short (already in `unavailable`), so the run warns and drops that line instead of failing.
 
 **Three more registry-checked claims, all warnings.** `report.ts` holds three checked
-hand-maintained lists that a new impl has to reach, and each is asked the same
-availability-independent question at init (`get_defined_rows`), one direction only
-(a listed row absent from a surface is not drift — each surface registers its own
-subset): `DISPLAY_ORDER`, where an unlisted row sorts silently to the end of every
-table (`rows_missing_from_display_order`); `COMPARISON_SECTIONS` — the
-Comparisons tables' per-tier opponent lists — where an unlisted row gets no
-comparison cell at all (`rows_missing_from_comparisons`, cleared by an entry in
-`COMPARISON_EXCLUSIONS` for a row that belongs in none); and `PARSE_PAYLOAD_TIERS`,
-where a PARSE row untiered in one of its languages publishes `payload: null` there
-(`rows_missing_from_payload_tiers`). All three WARN rather than
-throw: an absent row understates a table, where a stale `SURFACE_DISCLOSURES`
-sentence asserts something false. The comparison guard exists because its drift is
-the quietest of them — a missing cell looks like nothing — and `swc`,
-`postcss`, `rsvelte-parse` and `malva-wasm` were each registered, preflighted and
-timed at full coverage while appearing in no comparison. A section's opponents each
-carry their own fairness note, rendered iff that opponent produced a cell, so the
-prose can't drift from the table either.
+hand-maintained lists a new impl has to reach, each asked the same availability-independent
+question at init (`get_defined_rows`), one direction only (a listed row absent from a surface is
+not drift — each surface registers its own subset):
 
-A **fourth** row list in the same module is deliberately unchecked: the curated
-payload-matched lines in `generate_summary_report` (`tsv-json-no-locations` vs
-`oxc-parser`, and the rest). Its membership is an ARGUMENT — this tsv wire and
-that opponent emit the same product — not a completeness claim: most rows have no
-payload-matched partner and never will, so a guard there could only be a warning
-nobody clears. A new impl still has to be considered against it; `swc` and `postcss`
-were, and are absent on purpose (docs/benchmarks.md §Fairness caveats).
+- `DISPLAY_ORDER` — an unlisted row sorts silently to the end of every table
+  (`rows_missing_from_display_order`).
+- `COMPARISON_SECTIONS` — the Comparisons tables' per-tier opponent lists; an unlisted row gets no
+  comparison cell at all (`rows_missing_from_comparisons`, cleared by an entry in
+  `COMPARISON_EXCLUSIONS` for a row that belongs in none). Its drift is the quietest — a missing
+  cell looks like nothing; rows have been registered, preflighted and timed at full coverage while
+  appearing in no comparison. A section's opponents each carry their own fairness note, rendered
+  iff that opponent produced a cell, so the prose can't drift from the table either.
+- `PARSE_PAYLOAD_TIERS` — a PARSE row untiered in one of its languages publishes `payload: null`
+  there (`rows_missing_from_payload_tiers`).
+
+All three WARN rather than throw: an absent row understates a table, where a stale
+`SURFACE_DISCLOSURES` sentence asserts something false.
+
+A **fourth** row list in the same module is deliberately unchecked: the curated payload-matched
+lines in `generate_summary_report` (`tsv-json-no-locations` vs `oxc-parser`, and the rest). Its
+membership is an ARGUMENT — this tsv wire and that opponent emit the same product — not a
+completeness claim: most rows have no payload-matched partner and never will, so a guard there
+could only be a warning nobody clears. A new impl still has to be considered against it; `swc` and
+`postcss` were, and are absent on purpose (docs/benchmarks.md §Fairness caveats).
 
 ## Artifact Freshness Guard
 
 The rebuild-skipping tasks (`bench:{deno,node,bun}:run`, `bench:conformance:run`,
-`corpus:compare:{format,parse}:run`,
-`conformance:{svelte-fixtures,ts-fixtures,ts-repo}:run`, and `smoke`) skip the
-rebuild so you can iterate on the
-harness without paying the wasm-pack cost — at the risk of silently measuring a
-binary older than current source (a CSS run once reported `146/183` against a stale
-`.so` that should have been `155/183`). `lib/check_artifact_freshness.ts` guards
-this: before a run touches the executed artifacts (the runtime's native binding +
-WASM bundle — Deno: FFI + `pkg/all/deno`; Node: N-API + `pkg/all/nodejs`, the pair
-`check_executed_artifacts` composes for bench and smoke alike; the corpus tools run
-no WASM, so they guard `native_artifact_check()` alone), it
-compares their mtimes against the crate sources feeding them (plus the workspace
-`Cargo.lock`, so dependency bumps trip it too) and **aborts (exit 1)** if any is
-stale or missing. The build-first tasks rebuild first, so they pass for free.
-`BENCH_STALE_OK=1` downgrades a _stale_ artifact to a `⚠` warning (a _missing_ one
-stays fatal); see the module doc for why stale is a hard error by default.
+`corpus:compare:{format,parse}:run`, `conformance:{svelte-fixtures,ts-fixtures,ts-repo}:run`, and
+`smoke`) let you iterate on the harness without paying the wasm-pack cost — at the risk of silently
+measuring a binary older than current source. `lib/check_artifact_freshness.ts` guards this:
+before a run touches the executed artifacts (the runtime's native binding + WASM bundle — Deno:
+FFI + `pkg/all/deno`; Node: N-API + `pkg/all/nodejs`, the pair `check_executed_artifacts` composes
+for bench and smoke alike; the corpus tools run no WASM, so they guard `native_artifact_check()`
+alone), it compares their mtimes against the crate sources feeding them (plus the workspace
+`Cargo.lock`, so dependency bumps trip it too) and **aborts (exit 1)** if any is stale or missing.
+The build-first tasks rebuild first, so they pass for free. `BENCH_STALE_OK=1` downgrades a
+_stale_ artifact to a `⚠` warning (a _missing_ one stays fatal); see the module doc for why stale
+is a hard error by default.
 
 **Behind the override: the span-only wire is probed at init.** An mtime can only
 say an artifact is old, not what it does, and a stale binding whose `parse_<lang>` still
@@ -1186,15 +1125,14 @@ difference rather than a spelling.
 
 **The staged-package sibling: the npm test `:run` tasks abort too.**
 `test:npm[:parse|:all]:run` and `test:napi:npm:run` skip their builds for the same
-harness-iteration reason and carry the same trap — the incident was a pre-fix
-`tsv_cli` binary sitting staged in `crates/tsv_napi/pkg`, which `test:napi:npm:run`
-would have green-tested silently. `scripts/check_staged_freshness.ts` (imported at
-the top of both test suites) compares each staged artifact's mtime directly against
-the SOURCES that feed it — crate sources for the wasm bundle / addon / CLI binary,
-the patcher + staging scripts for generated entries, the shared `cli.js` /
-`locations.js` for the copies — which catches both lags at once (a `target/` build
-behind the sources, and a staged copy behind the build). Same `BENCH_STALE_OK=1`
-escape hatch, missing always fatal; the build-first tasks pass for free.
+harness-iteration reason and carry the same trap (a pre-fix `tsv_cli` binary staged in
+`crates/tsv_napi/pkg` would be green-tested silently). `scripts/check_staged_freshness.ts`
+(imported at the top of both test suites) compares each staged artifact's mtime directly against
+the SOURCES that feed it — crate sources for the wasm bundle / addon / CLI binary, the patcher +
+staging scripts for generated entries, the shared `cli.js` / `locations.js` for the copies — which
+catches both lags at once (a `target/` build behind the sources, and a staged copy behind the
+build). Same `BENCH_STALE_OK=1` escape hatch, missing always fatal; the build-first tasks pass for
+free.
 
 **The build-side sibling: fresh builds SKIP.** The four wasm-pack bench build tasks
 (`build:wasm:deno`, `build:wasm:parse:deno`, `build:wasm:all:deno`,
@@ -1222,244 +1160,214 @@ BENCH_STALE_OK=1 deno task bench:deno:run        # deliberately measure the curr
 
 ## Smoke Test
 
-`deno task smoke` runs a fast sanity check on every formatter and parser (trivial
-fixed inputs, non-throwing + non-empty + idempotent), exiting non-zero on any
-failure. Use it to catch "implementation totally broken" before running the full
-bench; `corpus_compare_format` is still the real correctness gate. Runtime-neutral
-like the bench — `smoke` (Deno), `smoke:node`, `smoke:bun` each load that runtime's
-own native + WASM artifacts, so an impl-load break is caught per runtime (it's how
-the Bun biome-load issue surfaced). Like the `:run` tasks it skips the rebuild and
-is freshness-guarded (rebuild with `deno task build:bench`, or `BENCH_STALE_OK=1`).
+`deno task smoke` runs a fast sanity check on every formatter and parser (trivial fixed inputs,
+non-throwing + non-empty + idempotent), exiting non-zero on any failure — to catch "implementation
+totally broken" before the full bench; `corpus_compare_format` is still the real correctness gate.
+Runtime-neutral like the bench — `smoke` (Deno), `smoke:node`, `smoke:bun` each load that
+runtime's own native + WASM artifacts, so an impl-load break is caught per runtime. Like the `:run`
+tasks it skips the rebuild and is freshness-guarded (rebuild with `deno task build:bench`, or
+`BENCH_STALE_OK=1`).
 
 ## Corpus
 
-One tagged entry list (`lib/corpus.ts` `corpus_entries()`, paths relative to the
-project root). Every entry is `{path|files_from, tier, extensions?, skip?,
-optional?}` with a tier of `real`, `framework`, `third_party`, `live`,
-`prettier_fixture`, or `suite`, and each consumer selects a **view**. The snapshot
-tiers' entries are DERIVED: `COLLECTION_TIERS` places each `../corpora` collection in a
-tier by name, and its entries are one per `subpath` the snapshot's own `manifest.json`
-names for it — so an upstream's layout is spelled once, in the recipe (language-tools
-alone has six subpaths), and the `live` working trees derive the same way. Extensions: `.svelte`, the JS/TS family
-`tsv format` discovers (`.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cjs`, all parsed as TypeScript),
-`.css`, `.html` (treated as Svelte; only loaded by entries that opt in). The loader's
-family is `tsv format`'s on purpose: a file the product formats is a file the gates grade
-(the prettier JS/TS suites contribute five `.mjs`/`.cjs`/`.mts`/`.cts` files that way; the
-snapshot holds none yet).
+One tagged entry list (`lib/corpus.ts` `corpus_entries()`, paths relative to the project root).
+Every entry is `{path|files_from, tier, extensions?, skip?, optional?}` with a tier of `real`,
+`framework`, `third_party`, `live`, `prettier_fixture`, or `suite`, and each consumer selects a
+**view**. The snapshot tiers' entries are DERIVED: `COLLECTION_TIERS` places each `../corpora`
+collection in a tier by name, and its entries are one per `subpath` the snapshot's own
+`manifest.json` names for it — so an upstream's layout is spelled once, in the recipe — and the
+`live` working trees derive the same way. Extensions: `.svelte`, the JS/TS family `tsv format`
+discovers (`.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cjs`, all parsed as TypeScript), `.css`, `.html`
+(treated as Svelte; only loaded by entries that opt in). The loader's family is `tsv format`'s on
+purpose: a file the product formats is a file the gates grade (the prettier JS/TS suites
+contribute `.mjs`/`.cjs`/`.mts`/`.cts` files that way).
 
-**The real code is a pinned snapshot.** `real` + `framework` + `third_party` read the
-`../corpora` checkout (`fuzdev/corpora`): one collection per upstream repo — the
-author's dev repos (zzz, fuz\_\*, gro, the personal sites), the framework source (kit,
-svelte, the svelte.dev subpaths) and six third-party Svelte libraries and tools
-(flowbite-svelte, layerchart, layercake, svelte-ux, svelte-maplibre, language-tools) —
-every collection vendored at a commit its
-`manifest.json` names, the whole `collections/` tree pinned by its git tree id in
-`GATE_CHECKOUT_IDS['../corpora']` (verified by `pins:audit:checkouts` — the tree, not
-the commit, so a tooling or doc commit in the snapshot repo moves no pin here). So every
-tier a bench or gate view holds is version-pinned, **every count pin gates over the
-whole view**, and the report carries the one commit that reproduces the corpus
-(`corpus_snapshot`) beside each source's upstream link. Before the snapshot the `real`
-tier was the live working trees, whose churn made an aggregate pin a re-pin treadmill
-(re-pinned 3× in 2 days, and the pin commit couldn't reproduce its own number) — that
-split is gone. The working trees survive as the `live` tier, in the `robustness` view
-only and only as a diff against the snapshot (below). **SAFETY (content loss) gates over every file.**
+**The real code is a pinned snapshot.** `real` + `framework` + `third_party` read the `../corpora`
+checkout (`fuzdev/corpora`): one collection per upstream repo — the author's dev repos (zzz,
+fuz\_\*, gro, the personal sites), the framework source (kit, svelte, the svelte.dev subpaths) and
+the third-party Svelte libraries and tools (flowbite-svelte, layerchart, layercake, svelte-ux,
+svelte-maplibre, language-tools) — every collection vendored at a commit its `manifest.json`
+names, the whole `collections/` tree pinned by its git tree id in `GATE_CHECKOUT_IDS['../corpora']`
+(verified by `pins:audit:checkouts` — the tree, not the commit, so a tooling or doc commit in the
+snapshot repo moves no pin here). So every tier a bench or gate view holds is version-pinned,
+**every count pin gates over the whole view**, and the report carries the one commit that
+reproduces the corpus (`corpus_snapshot`) beside each source's upstream link. The working trees,
+whose churn would make an aggregate pin a re-pin treadmill, survive as the `live` tier, in the
+`robustness` view only and only as a diff against the snapshot (below). **SAFETY (content loss)
+gates over every file.**
 
-- **`perf`** (~3,650 files) — `real` + `framework`, all real code: application &
-  library source (the fuz.dev repos' `src/` — zzz, the fuz ecosystem, gro,
-  svelte-docinfo, tsv.fuz.dev — plus the author's public SvelteKit sites and apps:
-  ryanatkn.com, webdevladder.net, earbetter, cosmicplayground) plus
-  upstream framework source (kit, svelte, and the svelte.dev subpaths), all from the
-  snapshot's collections — and NOT the `third_party` tier the gates read (flowbite-svelte,
-  layerchart, layercake, svelte-ux, svelte-maplibre, language-tools: two thirds of the
-  snapshot's `.svelte`), because the throughput headline is ecosystem + framework code
-  by design — flowbite alone would be over 40% of this view's `.svelte` files — and the
-  every-in-scope-tool-processes-every-file invariant below is unmeasured over them. `.d.ts`
-  files are IN scope (the product formats them; declaration-heavy shapes carry real
-  divergence signal), and the curated entries skip the `/build/`+`/dist/`
-  build-output pruning (a `build/` segment inside a reviewed `src/` tree is real
-  source, e.g. kit's `src/exports/vite/build/`; `DirectoryLoader`'s arbitrary-path
-  scans still prune both). The CSS set additionally carries the `svelte_styles`
-  per-collection concats harvested from those collections' `<style>` blocks. Nothing is pruned
-  at load time: the snapshot's manifest already leaves each upstream's test-fixture
-  subtrees behind, and `*.test.ts` files stay — tests are real code. This is what `deno task bench`
-  measures, so throughput reflects real code, not formatter edge-case suites. **This
-  framing is the source of truth for the public benchmark page's "What's measured"
-  prose — keep them in sync.** Because it's code that ships, every in-scope tool must
-  process every file: after the perf pre-flight, `bench.ts` HARD-FAILS on any
-  per-file failure not excused by `lib/perf_omit.ts` (`PERF_OMITS` — kept minimal,
-  each entry typed by why the tool fails: a rival's own limit on declaration-file
-  syntax (acorn-typescript has no `.d.ts` mode), syntax it does not implement (biome's
-  experimental HTML path on real Svelte), the bench's synthetic `file.ts` name, a
-  harvest artifact — and never a failure of tsv's own, which `perf_omit_test.ts` pins
-  by the rows an entry can reach as well as by its label). A silent skip would let
-  coverage quietly erode; that invariant is what makes the perf/conformance split
-  meaningful. The list is a **RATCHET**, graded in both directions: a full-corpus
-  run also fails on an entry that excused NOTHING, the same ledger-freshness
-  discipline `lib/fixtures_gate.ts` applies to its sanction / known-gap lists — so
-  a tolerance can't outlive the failure it was written for. The entries must also
-  be **DISJOINT**, checked on any run (not just a full one) because the overlap is
-  OBSERVED rather than inferred: a failure two entries both claim fails, since
-  neither is then the entry that describes it. That check is what makes the
-  staleness direction trustworthy — a first-match reading credits only the earlier
-  of an overlapping pair, and the shadowed entry then reports as stale while its
-  failure is live, the inverse of what happened (every match is credited, so the
-  misreport is unreachable either way). Structural disjointness is not checkable at
-  all: both predicates are substring tests, so for any two entries some string
-  contains both fragments. An entry can still be written too BROADLY without
-  reaching another's failure, which nothing catches: it stays used on its original
-  failure and goes on absorbing whatever arrives beneath it, so keeping each `path`
-  narrow enough to name one file stays the author's job.
-  Staleness is asked only where the run could have exercised the entry, along two
-  axes — the FILES (`BENCH_LIMIT` / `BENCH_FILTER` / `BENCH_ALLOW_MISSING` withhold
-  the very files an entry is about, so only a full run grades that half) and the
-  TASK (every alternative impl is optional, and one that fails to load registers no
-  task at all, so on that machine its entries are unasked rather than stale).
-- **`gates`** (~9,300 files) — `real` + `framework` + `third_party` + `prettier_fixture`:
-  the perf tiers, plus the six third-party collections (flowbite-svelte, layerchart,
-  layercake, svelte-ux, svelte-maplibre, language-tools — prettier-shaped code whose
-  `known` divergences the ecosystem repos never carry, the breadth a correctness gate
-  wants and a throughput headline does not), plus Prettier's
-  `tests/format/{typescript,js,css,html}` suites and
-  prettier-plugin-svelte's `test/` (`.html` treated as Svelte, files with a companion
-  `options.json` skipped) — deliberately tricky edge cases. Every file comes from a
-  pinned checkout, so the count pins gate over the whole view. The
-  correctness gates (`corpus:compare:*` `--all`, `skip_triage`, `wasm_json_probe`)
-  keep this scope, since their sanction lists and documented-divergence coverage were
-  reviewed against it. The `CorpusLoader` view is required at every construction
-  site — the view decides what a number or gate verdict means, so there's no implicit
-  default to inherit by accident.
-- **`conformance`** — the hard parse cases only: the `prettier_fixture` suites (less
-  what Prettier's own harness marks invalid — see the validity filter below) + the
-  parse-conformance `suite` entries — Svelte's compiler tests (with the gate-aligned
-  skips: `_`-prefixed segments, `migrate/`, `output.svelte` snapshots), the wpt-css
-  harvest cache, the test262 graded-positive path list (a `files_from` entry), and
-  the **tsc-corpus** valid list (another `files_from`, from `harvest_ts_repo.ts`).
-  Deliberately **excludes the `real` perf tier**, so the conformance coverage surface
-  and the perf corpus are mutually exclusive: perf is the "every in-scope tool must
-  fully process it" corpus, conformance is where sub-100% coverage is the metric.
-  This is what `deno task bench:conformance` measures.
+- **`perf`** — `real` + `framework`, all real code: application & library source (the fuz.dev
+  repos' `src/` — zzz, the fuz ecosystem, gro, svelte-docinfo, tsv.fuz.dev — plus the author's
+  public SvelteKit sites and apps: ryanatkn.com, webdevladder.net, earbetter, cosmicplayground)
+  plus upstream framework source (kit, svelte, and the svelte.dev subpaths), all from the
+  snapshot's collections. NOT the `third_party` tier the gates read (two thirds of the snapshot's
+  `.svelte`): the throughput headline is ecosystem + framework code by design — flowbite alone
+  would be over 40% of this view's `.svelte` files — and the every-file invariant below is
+  unmeasured over them. `.d.ts` files are IN scope (the product formats them; declaration-heavy
+  shapes carry real divergence signal), and the curated entries skip the `/build/`+`/dist/`
+  build-output pruning (a `build/` segment inside a reviewed `src/` tree is real source, e.g.
+  kit's `src/exports/vite/build/`; `DirectoryLoader`'s arbitrary-path scans still prune both). The
+  CSS set additionally carries the `svelte_styles` per-collection concats harvested from those
+  collections' `<style>` blocks. Nothing is pruned at load time: the snapshot's manifest already
+  leaves each upstream's test-fixture subtrees behind, and `*.test.ts` files stay — tests are real
+  code. This is what `deno task bench` measures. **This framing is the source of truth for the
+  public benchmark page's "What's measured" prose — keep them in sync.**
 
-  **The tsc corpus (`ts_repo_files.json`) is the TypeScript-specific set.** Without
-  it the `parse/typescript` group is ~95% test262 — ECMAScript — with prettier's ~800
-  format fixtures as its only TS, so a TS parse gap moved the headline by tenths of a
-  point. `../typescript/tests/cases/{conformance,compiler}` is the language's own
-  corpus, and it is already a release-required, commit-pinned checkout here (the
-  `conformance:ts-repo` gate reads its baselines). Its **validity filter is tsc
-  itself** — the `typescript` npm package's parser plus tsc's `.errors.txt`
-  baselines, both required to call a file well-formed — which keeps the filter
-  tool-neutral the way test262's own metadata does for that entry. Unlike test262 it
-  is NOT goal-tagged — tsc's module-vs-script reading is semantic and never gates
-  syntax, so handing it to parsers that take `sourceType` as a grammar switch costs
-  tsv 640 files it and tsc both accept to win back 25. Full rules, the measurement,
-  and why the two validity readings must AGREE: `harvest_ts_repo.ts`.
+  **Every in-scope tool must process every file**, because it's code that ships: after the perf
+  pre-flight, `bench.ts` HARD-FAILS on any per-file failure not excused by `lib/perf_omit.ts`
+  (`PERF_OMITS` — kept minimal, each entry typed by why the tool fails: a rival's own limit on
+  declaration-file syntax (acorn-typescript has no `.d.ts` mode), syntax it does not implement
+  (biome's experimental HTML path on real Svelte), the bench's synthetic `file.ts` name, a harvest
+  artifact — and never a failure of tsv's own, which `perf_omit_test.ts` pins by the rows an entry
+  can reach as well as by its label). A silent skip would let coverage quietly erode; that
+  invariant is what makes the perf/conformance split meaningful.
+
+  - The list is a **RATCHET**, graded in both directions: a full-corpus run also fails on an entry
+    that excused NOTHING, the ledger-freshness discipline `lib/fixtures_gate.ts` applies to its
+    sanction / known-gap lists — so a tolerance can't outlive the failure it was written for.
+  - The entries must be **DISJOINT**, checked on any run (not just a full one) because the overlap
+    is OBSERVED rather than inferred: a failure two entries both claim fails, since neither is then
+    the entry that describes it. That check makes the staleness direction trustworthy — a
+    first-match reading credits only the earlier of an overlapping pair, and the shadowed entry then
+    reports as stale while its failure is live (every match is credited, so the misreport is
+    unreachable either way). Structural disjointness is not checkable at all: both predicates are
+    substring tests, so for any two entries some string contains both fragments. An entry written
+    too BROADLY without reaching another's failure is caught by nothing: it stays used on its
+    original failure and goes on absorbing whatever arrives beneath it, so keeping each `path`
+    narrow enough to name one file stays the author's job.
+  - Staleness is asked only where the run could have exercised the entry, along two axes — the
+    FILES (`BENCH_LIMIT` / `BENCH_FILTER` / `BENCH_ALLOW_MISSING` withhold the very files an entry
+    is about, so only a full run grades that half) and the TASK (every alternative impl is
+    optional, and one that fails to load registers no task at all, so on that machine its entries
+    are unasked rather than stale).
+- **`gates`** — `real` + `framework` + `third_party` + `prettier_fixture`: the perf tiers, plus the
+  `third_party` collections (prettier-shaped code whose `known` divergences the ecosystem repos
+  never carry — the breadth a correctness gate wants and a throughput headline does not), plus
+  Prettier's `tests/format/{typescript,js,css,html}` suites and prettier-plugin-svelte's `test/`
+  (`.html` treated as Svelte, files with a companion `options.json` skipped) — deliberately tricky
+  edge cases. Every file comes from a pinned checkout, so the count pins gate over the whole view.
+  The correctness gates (`corpus:compare:*` `--all`, `skip_triage`, `wasm_json_probe`) keep this
+  scope, since their sanction lists and documented-divergence coverage were reviewed against it.
+  The `CorpusLoader` view is required at every construction site — the view decides what a number
+  or gate verdict means, so there's no implicit default to inherit by accident.
+- **`conformance`** — the hard parse cases only: the `prettier_fixture` suites (less what
+  Prettier's own harness marks invalid — the validity filter below) + the parse-conformance `suite`
+  entries — Svelte's compiler tests (with the gate-aligned skips: `_`-prefixed segments,
+  `migrate/`, `output.svelte` snapshots), the wpt-css harvest cache, the test262 graded-positive
+  path list (a `files_from` entry), and the **tsc-corpus** valid list (another `files_from`, from
+  `harvest_ts_repo.ts`). Deliberately **excludes the `real` perf tier**, so the conformance
+  coverage surface and the perf corpus are mutually exclusive: perf is the "every in-scope tool
+  must fully process it" corpus, conformance is where sub-100% coverage is the metric. This is what
+  `deno task bench:conformance` measures.
+
+  **The tsc corpus (`ts_repo_files.json`) is the TypeScript-specific set.** Without it the
+  `parse/typescript` group is ~95% test262 — ECMAScript — with prettier's format fixtures as its
+  only TS, so a TS parse gap moved the headline by tenths of a point.
+  `../typescript/tests/cases/{conformance,compiler}` is the language's own corpus, and already a
+  release-required, commit-pinned checkout here (the `conformance:ts-repo` gate reads its
+  baselines). Its **validity filter is tsc itself** — the `typescript` npm package's parser plus
+  tsc's `.errors.txt` baselines, both required to call a file well-formed — which keeps the filter
+  tool-neutral the way test262's own metadata does for that entry. Unlike test262 it is NOT
+  goal-tagged — tsc's module-vs-script reading is semantic and never gates syntax, so handing it to
+  parsers that take `sourceType` as a grammar switch costs tsv 640 files it and tsc both accept to
+  win back 25. Full rules, the measurement, and why the two validity readings must AGREE:
+  `harvest_ts_repo.ts`.
 
   **Prettier-suite validity filter (conformance view only).** Prettier's
-  `tests/format/{typescript,js,css,html}` are formatter fixtures, and the raw walk
-  carries three kinds of file no parser can accept: the runner's own markers
-  (`<<<PRETTIER_RANGE_START>>>` in every `range/` fixture, `<|>` in the cursor
-  ones — stripped by Prettier before formatting, so the bytes on disk are valid for
-  nothing), front matter (`css/yaml/`, a Prettier feature over the host language),
-  and the fixtures Prettier itself records as rejected by every standards parser
-  it verifies against — Babel-only proposals (`do/`, `pipeline-operator/`,
-  `discard-binding/`, …) and deliberate error cases, declared per file in each
-  directory's `format.test.js` `errors` option. Counted raw, the JS suite read as
-  77–85% across the whole field, with the real gaps buried in the deltas. So the
-  conformance view drops all three, reading Prettier's own verdicts rather than
-  any parser's (`lib/prettier_fixtures.ts`: the markers by content, front matter
-  by Prettier's own `getFrontMatter` rule — an opening AND a closing fence, and
-  only in the CSS and HTML suites, the languages whose parsers lift it — and
-  the verdicts by evaluating the spec files: Prettier's `get-parsers.js` implicit
-  verify parsers, `shouldThrowOnFormat` and `isErrorTest` mirrored, a declared
-  error counted even for a parser the directory never runs, and a spec the reader
-  can't bind fails the load rather than grading as "no verdict"). It also drops
-  the spec files themselves, which Prettier's own `getFiles` never treats as
-  fixtures — harness JS, one file in five of the raw walk, and in the CSS and
-  TypeScript suites the only JS-language files there were, lifting every
-  parser's rate alike. A fixture that some spec-grammar parser (typescript, acorn,
-  espree, meriyah, oxc, oxc-ts, css) is expected to accept stays — Prettier's
-  line, not ecma262's, since oxc and meriyah take some stage-3 syntax — and
-  Prettier verifies with lenient parser options (acorn's `allowReturnOutsideFunction`,
-  babel's `allowNewTargetOutsideFunction`, …), so a few kept JS fixtures are no strict
-  ECMAScript (the known three are named in `prettier_fixtures.ts`). Two more
-  readings are Prettier's own rather than any parser's. **JSX in a
-  `.js` fixture is out of SCOPE**, not invalid: Prettier's parsers all take it, but
-  every parser on the coverage surface runs in TypeScript mode, where all of them
-  reject it alike, so the 39 files Prettier's babel parser reads as JSX carried no
-  signal and leave the way the `jsx/` suite and the compiler's `.tsx` cases do
-  (`bench:harvest:prettier-jsx` → `.cache/prettier_jsx_files.json`, an exclusion
-  cache consumed like the svelte-rejects one, pinned by `PRETTIER_JSX_PIN`). And
-  the JS and TypeScript suites are read at the GOAL their runner reads them,
-  approximately: Prettier's acorn / espree / meriyah / oxc parsers, and its
-  typescript / oxc-ts ones, try `sourceType: "module"` then `"commonjs"` (babel
-  reads module-only, leniently), so both entries' `conformance` reading sets
-  `runner_goal`: the preflight retries a module-goal reject at Script, the nearest
-  goal every parser here takes (`SourceFile.goal_fallback`), and a file whose
-  extension names its goal (`.mjs` / `.mts` module, `.cjs` / `.cts` commonjs) is
-  read at that goal alone, as Prettier's parsers read it (`read_at_runner_goal`).
-  A sloppy-only fixture (`with`, a legacy octal, `let` as a name) then counts for every goal-taking parser as it already did for `tsc`,
-  which has no goal input. The retry can only add files (a tool the goal does not
-  reach rejects twice), and each per-source cell reports how many it added
-  (`script_only`, "N at script" in the markdown), so a module-goal-only shortfall
-  stays visible. The `gates` view keeps the raw suites — its sanction lists were
-  reviewed against them.
+  `tests/format/{typescript,js,css,html}` are formatter fixtures, and the raw walk carries three
+  kinds of file no parser can accept: the runner's own markers (`<<<PRETTIER_RANGE_START>>>` in
+  every `range/` fixture, `<|>` in the cursor ones — stripped by Prettier before formatting, so the
+  bytes on disk are valid for nothing), front matter (`css/yaml/`, a Prettier feature over the host
+  language), and the fixtures Prettier itself records as rejected by every standards parser it
+  verifies against — Babel-only proposals (`do/`, `pipeline-operator/`, `discard-binding/`, …) and
+  deliberate error cases, declared per file in each directory's `format.test.js` `errors` option.
+  Counted raw, the JS suite read as 77–85% across the whole field, with the real gaps buried in the
+  deltas. So the conformance view drops all three, reading Prettier's own verdicts rather than any
+  parser's (`lib/prettier_fixtures.ts`): the markers by content; front matter by Prettier's own
+  `getFrontMatter` rule — an opening AND a closing fence, and only in the CSS and HTML suites, the
+  languages whose parsers lift it; and the verdicts by evaluating the spec files — Prettier's
+  `get-parsers.js` implicit verify parsers, `shouldThrowOnFormat` and `isErrorTest` mirrored, a
+  declared error counted even for a parser the directory never runs, and a spec the reader can't
+  bind fails the load rather than grading as "no verdict". It also drops the spec files
+  themselves, which Prettier's own `getFiles` never treats as fixtures — harness JS, and in the CSS
+  and TypeScript suites the only JS-language files there were, lifting every parser's rate alike. A
+  fixture that some spec-grammar parser (typescript, acorn, espree, meriyah, oxc, oxc-ts, css) is
+  expected to accept stays — Prettier's line, not ecma262's, since oxc and meriyah take some
+  stage-3 syntax — and Prettier verifies with lenient parser options (acorn's
+  `allowReturnOutsideFunction`, babel's `allowNewTargetOutsideFunction`, …), so a few kept JS
+  fixtures are no strict ECMAScript (named in `prettier_fixtures.ts`). Two more readings are
+  Prettier's own rather than any parser's:
 
-  **Canonical-reject exclusion (Svelte only, conformance view only).** The suite
-  bundles deliberately-invalid fixtures (svelte's own `compiler-errors/`, `loose-*`
-  error-tolerant fixtures, preprocess inputs) plus non-Svelte HTML (prettier's
-  `tests/format/html`), so a raw parse-**coverage** number scores those intentional
-  rejects as failures — and makes tsv's *higher* coverage read as superiority when
-  it's really tsv's deferred-early-error *permissiveness*. So the conformance view
-  excludes the Svelte files `svelte/compiler` rejects (the
-  `svelte_parse_rejects.json` cache, loaded by `CorpusLoader` only when `view ===
-  'conformance'`). Coverage then measures fidelity on *valid* Svelte:
-  svelte/compiler → 100% (it's the oracle), tsv → 100% (the svelte-fixtures gate's
-  `KNOWN_GAPS` is empty; a new drop-in gap would read as sub-100% here and get
-  tracked there). **Svelte only** — svelte/compiler is the parser tsv is a strict
-  drop-in *for*; `acorn-typescript` **trails** modern TS/JS (its rejects include
-  valid code tsv correctly parses) and `parseCss` is lenient, so neither is a
-  validity oracle and TS/CSS get no reject cache. The cache is machine-local +
-  regenerable (gitignored). The LOADER fails open on an absent cache (the
-  un-filtered corpus, disclosed in the load log) — most of its graders are untouched
-  by it — but the coverage run that publishes refuses: an absent cache unless
-  `BENCH_ALLOW_MISSING=1`, and a cache whose size is not its exact pin always
-  (`enforce_exclusion_caches`, both caches alike). The report records each applied
-  cache's size, `null` when absent (`exclusion_caches`). The **`gates` view is untouched**, so `corpus:compare:*` /
-  `skip_triage` still see the error fixtures they need.
-- **`robustness`** — the WHOLE snapshot + the `svelte_styles` cache + the **live diff**,
-  for the real-code robustness sweeps (`audit:corpus`, `idempotency:sweep`). The snapshot
-  is read as one ROOT (`corpus_snapshot_dir`: every collection `../corpora` vendors,
-  placed in a tier or not — a sweep grades an invariant, not a pinned count, so a
-  collection waiting on its triage is swept before it is placed, and one seed beats
-  thirty subpaths); the cache is the one `real` entry outside
-  that root. The live diff is the files of the `real` repos' working trees (`../zzz/src`,
-  …, one tree per manifest subpath) whose bytes differ from, or are absent in, their
-  collection, minus the manifest's
-  `exclude` prefixes and minus what git ignores there (`git ls-files -o -i
-  --exclude-standard` per tree: a `*.local.ts` scratch file is absent from a git-object
-  snapshot by construction, not new code). `TIERS_BY_VIEW.robustness` still declares
-  `real` + `framework` + `third_party` + `live`: the tiers contribute only what lies
-  outside the root (the cache) and the diff, and the `live` seat is what makes the loader
-  refuse the view whole and `corpus_present_dirs_for_tiers` refuse it as directories. Two directory seeds plus
-  the live file list (`corpus_robustness_seeds`) — so the ARG_MAX exposure of handing
-  files as argv is the diff's alone, ~1 KB today; nothing here is counted or pinned, and
-  the `live` entries are `optional` (whichever repos this machine has cloned). The working
-  trees are where new syntax shows up before any snapshot refresh does, and a content-loss
-  or panic finding is a bug wherever it occurs — but a file the snapshot already holds
-  byte-for-byte has already been swept, so the tier is a diff: measured a day after
-  vendoring, the whole trees were 3,102 files for 22 that differed (455 of the rest
-  fixtures the manifest excludes), an 81% surcharge per leg.
+  - **JSX in a `.js` fixture is out of SCOPE**, not invalid: Prettier's parsers all take it, but
+    every parser on the coverage surface runs in TypeScript mode, where all of them reject it
+    alike, so the files Prettier's babel parser reads as JSX carry no signal and leave the way the
+    `jsx/` suite and the compiler's `.tsx` cases do (`bench:harvest:prettier-jsx` →
+    `.cache/prettier_jsx_files.json`, an exclusion cache consumed like the svelte-rejects one,
+    pinned by `PRETTIER_JSX_PIN`).
+  - **The JS and TypeScript suites are read at the GOAL their runner reads them**, approximately:
+    Prettier's acorn / espree / meriyah / oxc parsers, and its typescript / oxc-ts ones, try
+    `sourceType: "module"` then `"commonjs"` (babel reads module-only, leniently), so both entries'
+    `conformance` reading sets `runner_goal`: the preflight retries a module-goal reject at Script,
+    the nearest goal every parser here takes (`SourceFile.goal_fallback`), and a file whose
+    extension names its goal (`.mjs` / `.mts` module, `.cjs` / `.cts` commonjs) is read at that goal
+    alone, as Prettier's parsers read it (`read_at_runner_goal`). A sloppy-only fixture (`with`, a
+    legacy octal, `let` as a name) then counts for every goal-taking parser as it already did for
+    `tsc`, which has no goal input. The retry can only add files (a tool the goal does not reach
+    rejects twice), and each per-source cell reports how many it added (`script_only`, "N at
+    script" in the markdown), so a module-goal-only shortfall stays visible.
 
-**Missing entries fail fast** — the loader checks every entry up front and throws
-listing the missing paths, so a partial checkout can't silently shrink a perf number
-or let a correctness gate pass while grading less than it claims. The only
-exceptions: the four derived harvest caches are `optional` (warn-and-skip —
-wpt/test262/ts-repo because their source checkouts are legitimately
-machine-dependent, matching those harvests' `--if-present` posture; svelte_styles
-because it's generated from the always-required snapshot and just may not have been
-harvested yet), so are the `live` working trees, and `BENCH_ALLOW_MISSING=1` opts the
-bench into a partial corpus explicitly.
-Reports carry `corpus_sources` so any tolerated gap is disclosed rather than
-invisible.
+  The `gates` view keeps the raw suites — its sanction lists were reviewed against them.
+
+  **Canonical-reject exclusion (Svelte only, conformance view only).** The suite bundles
+  deliberately-invalid fixtures (svelte's own `compiler-errors/`, `loose-*` error-tolerant
+  fixtures, preprocess inputs) plus non-Svelte HTML (prettier's `tests/format/html`), so a raw
+  parse-**coverage** number scores those intentional rejects as failures — and makes tsv's
+  *higher* coverage read as superiority when it's really tsv's deferred-early-error
+  *permissiveness*. So the conformance view excludes the Svelte files `svelte/compiler` rejects
+  (the `svelte_parse_rejects.json` cache, loaded by `CorpusLoader` only when
+  `view === 'conformance'`). Coverage then measures fidelity on *valid* Svelte: svelte/compiler →
+  100% (it's the oracle), tsv → 100% (the svelte-fixtures gate's `KNOWN_GAPS` is empty; a new
+  drop-in gap would read as sub-100% here and get tracked there). **Svelte only** —
+  svelte/compiler is the parser tsv is a strict drop-in *for*; `acorn-typescript` **trails**
+  modern TS/JS (its rejects include valid code tsv correctly parses) and `parseCss` is lenient, so
+  neither is a validity oracle and TS/CSS get no reject cache. The cache is machine-local +
+  regenerable (gitignored). The LOADER fails open on an absent cache (the un-filtered corpus,
+  disclosed in the load log) — most of its graders are untouched by it — but the coverage run that
+  publishes refuses: an absent cache unless `BENCH_ALLOW_MISSING=1`, and a cache whose size is not
+  its exact pin always (`enforce_exclusion_caches`, both caches alike). The report records each
+  applied cache's size, `null` when absent (`exclusion_caches`). The **`gates` view is untouched**,
+  so `corpus:compare:*` / `skip_triage` still see the error fixtures they need.
+- **`robustness`** — the WHOLE snapshot + the `svelte_styles` cache + the **live diff**, for the
+  real-code robustness sweeps (`audit:corpus`, `idempotency:sweep`). Nothing here is counted or
+  pinned.
+  - The snapshot is read as one ROOT (`corpus_snapshot_dir`: every collection `../corpora`
+    vendors, placed in a tier or not — a sweep grades an invariant, not a pinned count, so a
+    collection waiting on its triage is swept before it is placed, and one seed beats one per
+    subpath); the cache is the one `real` entry outside that root.
+  - The live diff is the files of the `real` repos' working trees (`../zzz/src`, …, one tree per
+    manifest subpath) whose bytes differ from, or are absent in, their collection, minus the
+    manifest's `exclude` prefixes and minus what git ignores there (`git ls-files -o -i
+    --exclude-standard` per tree: a `*.local.ts` scratch file is absent from a git-object snapshot
+    by construction, not new code). The working trees are where new syntax shows up before any
+    snapshot refresh does, and a content-loss or panic finding is a bug wherever it occurs — but a
+    file the snapshot already holds byte-for-byte has already been swept, so the tier is a diff
+    (measured a day after vendoring: the whole trees were 3,102 files for 22 that differed, 455 of
+    the rest fixtures the manifest excludes — an 81% surcharge per leg).
+  - `TIERS_BY_VIEW.robustness` still declares `real` + `framework` + `third_party` + `live`: the
+    tiers contribute only what lies outside the root (the cache) and the diff, and the `live` seat
+    is what makes the loader refuse the view whole and `corpus_present_dirs_for_tiers` refuse it as
+    directories. Two directory seeds plus the live file list (`corpus_robustness_seeds`) — so the
+    ARG_MAX exposure of handing files as argv is the diff's alone (small); the `live` entries are
+    `optional` (whichever repos this machine has cloned).
+
+**Missing entries fail fast** — the loader checks every entry up front and throws listing the
+missing paths, so a partial checkout can't silently shrink a perf number or let a correctness gate
+pass while grading less than it claims. The exceptions: the derived harvest caches are `optional`
+(warn-and-skip — wpt/test262/ts-repo because their source checkouts are legitimately
+machine-dependent, matching those harvests' `--if-present` posture; svelte_styles because it's
+generated from the always-required snapshot and just may not have been harvested yet), so are the
+`live` working trees, and `BENCH_ALLOW_MISSING=1` opts the bench into a partial corpus explicitly.
+Reports carry `corpus_sources` so any tolerated gap is disclosed rather than invisible.
 
 Which absence is fatal is `MissingEntryPolicy`, picked per construction site rather
 than left to a boolean, because there are three answers and not two: `'fail'` (the
@@ -1630,8 +1538,8 @@ Two surfaces summarize what was skipped: the **effective corpus report** (per-be
 coverage rate, e.g. `⚠ biome 500/660 files (76%)`) and the **skipped files report**
 (per-language FILES and file+error COMBINATIONS, plus per-benchmark counts, always
 shown). Those two columns sit far apart — a file four impls reject in four different
-words is one file and four combinations, roughly a 2x spread on the conformance
-corpus — so each is named rather than one standing in for the other. A coverage-only
+words is one file and four combinations — so each is named rather than one standing in for the
+other. A coverage-only
 run (`BENCH_COVERAGE_ONLY=1`) retitles the first `COVERAGE` and prints every group,
 skips or not: with no timed phase it is the run's whole terminal result, and the
 spread across impls is the measurement there rather than a fairness caveat on it.
@@ -1642,9 +1550,8 @@ size so rare / impl-specific failures land at the top, and the `Failed in:` line
 collapses to `all tsv variants` when the failure set is exactly the tsv rows the run
 registered in that language's groups (derived from the task tracking — which rows exist
 varies by surface). All labels use display names (`tsv-json-no-locations`, `acorn-typescript`) rather than
-internal trackingKeys. If an impl fails on many files (e.g. WASM panics corrupting
-internal state), the coverage report and skip counts make it visible without
-`--verbose`.
+internal trackingKeys. An impl failing on many files (e.g. WASM panics corrupting internal
+state) shows in the coverage report and skip counts without `--verbose`.
 
 ## Known Issues
 
@@ -1662,17 +1569,15 @@ internal state), the coverage report and skip counts make it visible without
   2. **A prettier empty-output miss would mask a violation** (never fabricate one —
      an empty `prettier` inflates `prettier_excess`, which only cancels `ours`'s
      deltas). The in-process prettier (`lib/canonical.ts` — a separate host from the
-     `tsv_debug` Rust sidecar) can intermittently return empty output under load;
-     guarded three ways: `corpus_compare_format.ts` errors on semantically-empty
-     prettier output for non-empty source; the prettier cache neither stores nor
-     returns semantically-empty entries; and the Rust sidecar's `run_prettier`
-     returns a hard `DenoError::EmptyOutput` instead of `Ok("")`; and the bench
-     itself (`bench.ts` `empty_output_error` / `assert_output_present`, every format
-     row) records an empty output for a non-empty input as a skip in pre-flight and
-     throws in the timed loop — before it, an empty return during a timed sweep
-     silently dropped that file's cost from prettier's sweep, the denominator of
-     every published `Nx`. Deliberately **no retry** anywhere: a flaky oracle must
-     stay loud.
+     `tsv_debug` Rust sidecar) can intermittently return empty output under load. Guards:
+     `corpus_compare_format.ts` errors on semantically-empty prettier output for non-empty
+     source; the prettier cache neither stores nor returns semantically-empty entries; the Rust
+     sidecar's `run_prettier` returns a hard `DenoError::EmptyOutput` instead of `Ok("")`; and
+     the bench itself (`bench.ts` `empty_output_error` / `assert_output_present`, every format
+     row) records an empty output for a non-empty input as a skip in pre-flight and throws in
+     the timed loop — otherwise an empty return during a timed sweep would silently drop that
+     file's cost from prettier's sweep, the denominator of every published `Nx`. Deliberately
+     **no retry** anywhere: a flaky oracle must stay loud.
 
   **Triage:** a SAFETY finding reproduces by construction (two in-run native runs
   agreed), so treat it as real; confirm root cause with the **native CLI** (`tsv
@@ -1706,24 +1611,22 @@ internal state), the coverage report and skip counts make it visible without
   `language/identifiers/part-unicode-*-{,class-}escaped.js` are exactly this shape,
   so the conformance corpus kills the whole run mid-preflight; the perf corpus has no
   such identifiers. A skip list is not a workaround: **which** files of that family
-  fault is heap-layout dependent (a sweep skipping the 17 observed crashers faulted
-  on an 18th that had survived it), so the screen is neither cacheable nor
-  reproducible. Hence the row — not the files — is dropped on that surface
+  fault is heap-layout dependent (a sweep skipping every observed crasher faulted on another
+  that had survived it), so the screen is neither cacheable nor reproducible. Hence the row — not the files — is dropped on that surface
   (`get_benchmark_tasks`, keyed on `BenchmarkTaskOptions.corpus_kind`), disclosed in
   the conformance report's `**Excluded here:**` line — a disclosure whose claim is
   CHECKED against the registry (§Report files), so re-adding the row without
-  updating the table fails the run. Revisit on a yuku bump: re-add the row and run
-  `deno task bench:conformance`. The fault survives at the pinned version — the
-  `repeat(74)`/`repeat(75)` boundary above reproduces exactly as written — so the
-  exclusion still earns its place; re-probe rather than assume on the next bump.
+  updating the table fails the run. The fault survives at the pinned version (the
+  `repeat(74)`/`repeat(75)` boundary reproduces as written); on a yuku bump, re-probe rather
+  than assume — re-add the row and run `deno task bench:conformance`.
 - **The oxc WASI binding's `errors` getter is CONSUME-ONCE.** On
   `@oxc-parser/binding-wasm32-wasi`, the first access to `result.errors` returns the
   real error array; every later access returns `[]` (the native `oxc-parser` package
   caches, so only the WASI path behaves this way). Any double-access check
   (`result.errors && result.errors.length`) therefore never fires — invalid input
   silently yields an empty `Program` (`end: 0` inside the `{node, fixes}` wrapper)
-  and counts as parsed, which once fabricated a 100% `oxc-parser-wasm`
-  conformance-coverage row while native oxc-parser correctly rejected 245 files.
+  and counts as parsed — a fabricated 100% `oxc-parser-wasm` conformance-coverage row while
+  native oxc-parser correctly rejects.
   Rule: read getter-backed napi-WASI result fields **once into a local**
   (`lib/oxc_wasm.ts` does; `lib/oxc.ts` mirrors the form defensively). Two guards
   exist: the single-read pattern at the wrappers, and `bench.ts`'s
@@ -1745,9 +1648,9 @@ internal state), the coverage report and skip counts make it visible without
   in `package.json`'s `//oxc-wasi` note the binding fails to load under both Deno
   and Node (`this.bridge.setLastError is not a function`: it declares an alpha
   `@emnapi/core` that npm installs NESTED, while the hoisted `@napi-rs/wasm-runtime`
-  it also imports resolves the hoisted 1.x, so the two halves disagree). Same shape
-  as the two per-runtime load failures above but on the VERSION axis, and equally
-  silent in the TABLES: an unloadable impl is absent, not fatal, so the row simply
+  it also imports resolves the hoisted 1.x, so the two halves disagree). Same shape as the
+  per-runtime load splits in §Cross-Runtime but on the VERSION axis, and equally silent in the
+  TABLES: an unloadable impl is absent, not fatal, so the row simply
   leaves both surfaces — only `unavailable` records the cause. Probe the CANDIDATE
   binding before raising that pin (../../docs/benchmarks.md §Updating dependencies
   carries the commands — a bare import resolves the INSTALLED binding and so always
@@ -1806,19 +1709,16 @@ root (corpus/artifact paths are CWD-relative). The usual permission set is
 and fresh** — the runtime's native binding *and* its `pkg/all/<target>` WASM bundle —
 because those two plus `canonical` are REQUIRED and a load failure in any of them throws
 (§Report files), and because `init_implementations` runs the executed-artifact
-freshness guard itself (§Artifact Freshness Guard): a stale native library does not
-fail with a message when `Deno.dlopen` loads it — `skip_triage` segfaulted at init on
-a twelve-day-old `libtsv_ffi.so` with nothing naming the cause — so a stale one now
-aborts with the rebuild hint (`BENCH_STALE_OK=1` downgrades it). That includes the
-ones that measure only the native path
-(`skip_triage`), where an
-unbuilt bundle otherwise fails a run that would never have touched it, with a WASM
-error naming nothing the script is about: `deno task build:ffi && deno task
-build:wasm:all:deno` first (it reads the `release` FFI, not `corpus`). The
-two with `deno task` entries — `css:over-acceptance` and `ts-repo:over-acceptance`
-— build what they need themselves.
+freshness guard itself (§Artifact Freshness Guard): a stale native library does not fail with
+a message when `Deno.dlopen` loads it (it can segfault at init with nothing naming the cause),
+so a stale one aborts with the rebuild hint (`BENCH_STALE_OK=1` downgrades it). That includes
+the ones that measure only the native path (`skip_triage`), where an unbuilt bundle otherwise
+fails a run that would never have touched it, with a WASM error naming nothing the script is
+about: `deno task build:ffi && deno task build:wasm:all:deno` first (it reads the `release`
+FFI, not `corpus`). The two with `deno task` entries — `css:over-acceptance` and
+`ts-repo:over-acceptance` — build what they need themselves.
 
-Seven live here but are documented above: the parse-conformance gates
+Documented above, though they live here: the parse-conformance gates
 (`svelte_fixtures_compare.ts`, `ts_fixtures_compare.ts`, `ts_repo_compare.ts` →
 [§Parse-Conformance Gates](#parse-conformance-gates)) and the harvests
 (`wpt_css_harvest.ts`, `svelte_reject_harvest.ts`, `prettier_jsx_harvest.ts`,

@@ -14,7 +14,7 @@ Build/usage commands live in [../../CLAUDE.md §JS Bindings](../../CLAUDE.md#js-
 
 ## Local build & CI
 
-A single-platform local build (`deno task build:napi` → `cargo build -p tsv_napi --profile napi`) drives the **Node and Bun** benchmark runners (`benches/js/lib/napi.ts` loads the built cdylib from `target/napi/` directly via `process.dlopen` — no `.node` rename). CI builds and boundary-tests the addon per OS (the `platforms` job runs `deno task test:napi` + `deno task test:napi:npm` on macOS + Windows; the `artifacts` job runs `deno task test:napi:npm` on Linux — the only PR runner that reaches `platform.js`'s `is_musl()` branch). The cross-platform publish is the tag-triggered matrix workflow (see §The npm packages, **Release**), decoupled from the WASM releases — never bolted onto the single-machine `deno task publish`. The native set is expected to eventually **subsume** the WASM path as tsv's primary native distribution.
+A single-platform local build (`deno task build:napi` → `cargo build -p tsv_napi --profile napi`) drives the **Node and Bun** benchmark runners (`benches/js/lib/napi.ts` loads the built cdylib from `target/napi/` directly via `process.dlopen` — no `.node` rename). CI builds and boundary-tests the addon per OS (the `platforms` job runs `deno task test:napi` + `deno task test:napi:npm` on macOS + Windows; the `artifacts` job runs `deno task test:napi:npm` on Linux — the only PR runner that reaches `platform.js`'s `is_musl()` branch). The cross-platform publish is the tag-triggered matrix workflow (see §Release), decoupled from the WASM releases — never bolted onto the single-machine `deno task publish`. The native set is expected to eventually **subsume** the WASM path as tsv's primary native distribution.
 
 ## Features
 
@@ -176,30 +176,29 @@ can never resolve a sibling-installed native platform package by accident.
 
 Tests: `deno task test:napi:npm` stages a temp `node_modules` and drives the
 packaged shape under Node (its `:run` then chains `deno task test:bun napi`, the
-parse-failure table under Bun) — loader resolution (by BARE SPECIFIER: the ESM walk
-of the `exports` map from a cwd inside the staging, and the CommonJS
-`require.resolve` walk of the same map, plus the encapsulation — a file the map
-does not name stays unreachable), the options surface with exact error strings,
-that the hand-written `index.d.ts` re-exports exactly the option and error types the
-facade's declarations declare (`facade_type_names`),
-the export-set diff against `@fuzdev/tsv-wasm` when that package is staged and
-fresh, package.json coherence (pins, selection fields, `files` on both
-packages, the executable bit on the CLI binary, the
-loader-`SUPPORTED`-vs-optionalDependencies agreement), the
-unsupported-platform error, and the `tsv` bin: that `bin.js` really
-dispatches to the binary (argh's help output — a discriminator the JS mirror
-never prints), that it forwards exit codes, stdout/stderr, and stdin, that
-`--version` through the bin matches the staged package version (a
-binary↔package lockstep gate — a stale binary staged into a fresh package
-fails it), and that `npm pack` would ship the binary in the tarball — the
-package.json check covers the `files` declaration and the file on disk, this
-covers what npm actually packs — executable where a mode exists (npm packs
-the on-disk mode). Then the degraded paths: binary removed → `cli.js`,
-present-but-unrunnable → warn + `cli.js`, child killed by a signal →
-re-raised (SIGTERM), or reported as 128 + its number where a re-raise would not
-end the dispatcher (SIGUSR1, which would start Node's inspector instead). The last two are posix-only by nature, not by omission: the
-fallback branch keys on any spawn error, so a Windows staging would re-enter
-an already-proven branch, and signal death has no Windows analogue.
+parse-failure table under Bun):
+
+- **Loader resolution by BARE SPECIFIER** — the ESM walk of the `exports` map from a cwd
+  inside the staging and the CommonJS `require.resolve` walk of the same map, plus the
+  encapsulation (a file the map does not name stays unreachable).
+- **The surface** — the options surface with exact error strings; the hand-written
+  `index.d.ts` re-exporting exactly the option and error types the facade's declarations
+  declare (`facade_type_names`); the export-set diff against `@fuzdev/tsv-wasm` when that
+  package is staged and fresh; the unsupported-platform error.
+- **package.json coherence** — pins, selection fields, `files` on both packages, the
+  executable bit on the CLI binary, loader-`SUPPORTED` vs optionalDependencies.
+- **The `tsv` bin** — `bin.js` really dispatches to the binary (argh's help output, a
+  discriminator the JS mirror never prints); it forwards exit codes, stdout/stderr and
+  stdin; `--version` through the bin matches the staged package version (a binary↔package
+  lockstep gate — a stale binary staged into a fresh package fails it); and `npm pack`
+  ships the binary in the tarball, executable where a mode exists (the package.json check
+  covers the `files` declaration and the file on disk, this covers what npm actually packs).
+- **Degraded paths** — binary removed → `cli.js`; present-but-unrunnable → warn + `cli.js`;
+  child killed by a signal → re-raised (SIGTERM), or reported as 128 + its number where a
+  re-raise would not end the dispatcher (SIGUSR1, which would start Node's inspector
+  instead). The last two are posix-only by nature: the fallback branch keys on any spawn
+  error, so a Windows staging would re-enter an already-proven branch, and signal death has
+  no Windows analogue.
 
 The loader's declarations are graded by `deno task typecheck:packages napi` (also part of
 a bare `typecheck:packages` run while the loader is staged): the staged package installed
@@ -262,44 +261,95 @@ the table's standing third consumer beside `scripts/test_npm.ts`'s wasm CLI
 run and the native `tests/discovery_parity.rs`). Runs per OS in CI (the
 `platforms` job on macOS + Windows, the `artifacts` job on Linux).
 
-**Release**: `.github/workflows/release_napi.yml`, triggered by the v\* tag
-`scripts/publish.ts` pushes, by `workflow_dispatch` (dry-run by default — the
-pre-tag rehearsal; `dry_run=false` is the recovery path for a failed tag run,
-dispatched **on the tag** so the tag↔version assertion still applies — it keys
-on the ref; a `dry_run=false` dispatch off a branch is refused before any
-target builds, so a branch dispatch can only rehearse),
-and by a weekly cron that builds and gates the whole matrix as a
-forced dry-run, so a container/runner breakage surfaces within a week.
-Per target: container-pinned builds of **both** shipped binaries — the addon
-(`napi` profile) and the `tsv_cli` binary (plain `release`: abort + LTO, the
-same artifact the hyperfine benches measure; a standalone process owns its
-own crash, so the addon's unwind rationale doesn't apply) — gnu rows in
-almalinux:8 → glibc 2.28 floor, measured by the workflow's floor gate over
-both artifacts; musl in rust:alpine with `-crt-static` off, both gated
-GLIBC-free. Then per-artifact size bounds
-(`scripts/validate_napi_artifact.ts`, one anchored band per binary — also graded on
-every PR over the Linux host build, by `check.yml`'s `artifacts` job) and the
-npm-shape test over the real artifacts (node:alpine for musl). The publish
-job gathers all six, stages the loader (`--loader-only`), and runs
-`scripts/publish_napi.ts` — completeness (addon + CLI binary per platform)
-and version-lockstep checks, re-arming the CLI binaries' executable bit
-(artifact transport drops file modes — without it every posix `npx tsv`
-would EACCES), platforms-then-loader order, idempotent skip-if-published —
-except under `--dry-run`, which skips nothing and runs `npm publish --dry-run`
-over every package, reading npm's already-published refusal as a pass, so the
-dispatch and cron rehearsals really pack the set between releases.
-A real publish then runs the `release` job, which creates the GitHub Release
-for the tag — CHANGELOG section as the body, each platform package's native
-`tsv` binary (re-fetched from npm, so the asset is what npm serves) plus a
-`SHA256SUMS` as the assets, every asset with a build provenance attestation
-(`gh attestation verify <file> -R fuzdev/tsv`).
-See the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
+### Release
+
+The set publishes **only** through `.github/workflows/release_napi.yml`, **never**
+`scripts/publish.ts` (whose single machine can build only its own triple); the WASM
+release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
+
+- **Triggers.** The v\* tag `scripts/publish.ts` pushes; `workflow_dispatch`, a dry-run
+  rehearsal by default whose `dry_run=false` is the recovery path for a failed tag run —
+  dispatched **on the tag**, since the tag↔version assertion and the `release` job key on
+  the ref (a `dry_run=false` dispatch off a branch is refused before any target builds, so
+  a branch dispatch can only rehearse); and a weekly cron that builds and gates the whole
+  matrix as a forced dry-run, so a container/runner breakage surfaces within a week.
+- **Per target**: container-pinned builds of **both** shipped binaries — the addon (`napi`
+  profile) and the `tsv_cli` binary (plain `release`: abort + LTO, un-PGO'd, the same
+  artifact the hyperfine benches measure — PGO stays a deliberate future re-baseline; a
+  standalone process owns its own crash, so the addon's unwind rationale doesn't apply).
+  The gnu rows build in almalinux:8 → glibc 2.28 floor (Node's own binary floor), measured
+  by the workflow's floor gate over both artifacts; musl in rust:alpine with `-crt-static`
+  off, both gated GLIBC-free; `darwin-x64` cross-compiles on the arm64 mac runner and is
+  tested under Rosetta 2 (above). Then per-artifact size bounds (`deno task validate:napi`
+  → `scripts/validate_napi_artifact.ts`, one tight anchored band per binary — also graded on
+  every PR over the Linux host build by `check.yml`'s `artifacts` job) and the npm-shape
+  test over the real artifacts (node:alpine for musl).
+- **Publish job**: gathers all six, stages the loader (`--loader-only`), and runs
+  `scripts/publish_napi.ts` — completeness (addon + CLI binary per platform) and
+  version-lockstep checks, re-arming the CLI binaries' executable bit (artifact transport
+  drops file modes — without it every posix `npx tsv` would EACCES), platforms-then-loader
+  order, idempotent skip-if-published. Under `--dry-run` it skips nothing and runs
+  `npm publish --dry-run` over every package, reading npm's already-published refusal as a
+  pass, so the dispatch and cron rehearsals really pack the set between releases. Locally,
+  `deno task publish:napi --dry-run` (no `--` separator: deno task forwards it literally and
+  the script's `parseArgs` rejects it) proves staging + the refusal logic, then **stops at
+  the partial-set refusal by design** — local staging holds only the host platform; the
+  full-set rehearsal is the `workflow_dispatch` dry run.
+- **Auth**: a granular `NPM_TOKEN` secret from the bootstrap releases (trusted publishing
+  is configurable only on packages that already exist on the registry); switching to npm
+  trusted publishing (OIDC) is the pending follow-up.
+- **GitHub Release** (the `release` job, after a real publish only — the tag push or a
+  `dry_run=false` dispatch on the tag, never the cron or a dry run). Body: `CHANGELOG.md`'s
+  stamped `## <version>` section (`scripts/release_notes.ts`; preview with
+  `deno task release:notes v<version>`). Assets: each platform package's native `tsv`
+  binary (`tsv-<triple>`, `tsv-win32-x64.exe`) + a `SHA256SUMS`, pulled back **from the
+  registry** (`scripts/release_assets.ts`; `deno task release:assets v<version> --out <dir>`),
+  so an asset is byte-identical to what npm serves even on a recovery re-run where the
+  matrix rebuilds while the publish step skips live versions; its registry reads retry for
+  a bounded window, since a just-published version can lag the read path. Every asset, the
+  checksum file included, gets a Sigstore build provenance attestation
+  (`actions/attest-build-provenance`, ahead of the Release so a failed attestation fails
+  before anything is public; `gh attestation verify <file> -R fuzdev/tsv`). The first create
+  attaches the assets in the same call, so a Release is never public without them; on a
+  re-run an existing Release keeps its notes, the assets re-upload with `--clobber`, and
+  the attestation is made again. The job holds the workflow's only `contents: write` and
+  `attestations: write`, and no npm token.
 
 ## Marshalling & errors
 
 napi-rs marshals the JS string into a Rust `String` and the returned `String` back out — **no raw pointers, no manual free** (unlike `tsv_ffi`). Engine errors are returned as `napi::Result::Err(napi::Error)`, which napi-rs converts to a **thrown JS error** — there is no status out-param to read (the FFI shape); a throw just propagates.
 
-**A parse failure is thrown with its point on it.** Each export is two halves: the engine work, in a per-language module (`svelte_engine` / `typescript_engine` / `css_engine`, generated by `lang_bindings!`), returning a crate-private `Failure` — `Plain(message)` for a refusal or the size cap, `Syntax { message, point }` for a located `ParseError` (`point` the `WirePoint` `ParseError::wire_point` returns) — and the `#[napi]` wrapper, which takes the `Env` napi-rs injects (not a JS argument, so the arity is unchanged) and builds the thrown value (`engine_error`): a plain JS `Error` carrying the message, and for a `Syntax` own enumerable integer `start`, `line` and `column` properties. `Env::create_error` builds the object; the own enumerable `code: 'GenericFailure'` it sets is deleted, so a plain error has no own keys and a located one exactly the point's three — what `tsv_wasm` throws, since a plain error passes through the facade as the same object and a package swap must not change it; each point property is deleted and then `Object::set` (a plain set over Bun's own non-enumerable `line` / `column`, which every Bun `Error` carries, would keep them non-enumerable, and the facade requires enumerable); and `napi::Error::from(Unknown)` holds it by reference, so napi-rs throws that very object. The npm facade's `call_engine` (`crates/tsv_wasm/npm/api.js`) reads those three names to rethrow the published `SyntaxError` — the contract `tsv_wasm`'s hand-declared `Error` binding meets too. The split exists because the in-crate tests cannot construct an `Env`: they drive the engine halves and assert the `Failure` directly; `scripts/test_napi.ts` asserts the thrown object's properties across the real boundary, under Node, where the delete is a no-op; `deno task test:bun napi` runs the parse-failure table over the staged loader under Bun, which is what fails without it — a local gate only, chained by `test:napi:npm[:run]` on a machine with bun; no publish runs it. A format's parse reads the CR-folded text, so its engine half (`tsv_arena`'s `parse_format!`) parses through the language's `parse_folded` (`FoldedSource::parse_with`), which maps the error back onto the caller's source before its point is taken; `format_svelte`'s refusal of a lone CR inside an in-tag `//` comment (`tsv_svelte::parse_folded`) is a positionless `ParseError::refusal`, so it travels as `Failure::Plain`.
+**A parse failure is thrown with its point on it.** Each export is two halves:
+
+- **The engine work**, in a per-language module (`svelte_engine` / `typescript_engine` /
+  `css_engine`, generated by `lang_bindings!`), returning a crate-private `Failure` —
+  `Plain(message)` for a refusal or the size cap, `Syntax { message, point }` for a located
+  `ParseError` (`point` the `WirePoint` `ParseError::wire_point` returns).
+- **The `#[napi]` wrapper**, which takes the `Env` napi-rs injects (not a JS argument, so
+  the arity is unchanged) and builds the thrown value (`engine_error`): a plain JS `Error`
+  carrying the message, and for a `Syntax` own enumerable integer `start`, `line` and
+  `column` properties. `Env::create_error` builds the object; the own enumerable
+  `code: 'GenericFailure'` it sets is deleted, so a plain error has no own keys and a
+  located one exactly the point's three — what `tsv_wasm` throws, since a plain error passes
+  through the facade as the same object and a package swap must not change it. Each point
+  property is deleted and then `Object::set` (a plain set over Bun's own non-enumerable
+  `line` / `column`, which every Bun `Error` carries, would keep them non-enumerable, and
+  the facade requires enumerable); `napi::Error::from(Unknown)` holds it by reference, so
+  napi-rs throws that very object.
+
+The npm facade's `call_engine` (`crates/tsv_wasm/npm/api.js`) reads those three names to
+rethrow the published `SyntaxError` — the contract `tsv_wasm`'s hand-declared `Error`
+binding meets too. The split exists because the in-crate tests cannot construct an `Env`:
+they drive the engine halves and assert the `Failure` directly; `scripts/test_napi.ts`
+asserts the thrown object's properties across the real boundary under Node, where the
+delete is a no-op; `deno task test:bun napi` runs the parse-failure table over the staged
+loader under Bun, which is what fails without it — a local gate only, chained by
+`test:napi:npm[:run]` on a machine with bun; no publish runs it. A format's parse reads the
+CR-folded text, so its engine half (`tsv_arena`'s `parse_format!`) parses through the
+language's `parse_folded` (`FoldedSource::parse_with`), which maps the error back onto the
+caller's source before its point is taken; `format_svelte`'s refusal of a lone CR inside an
+in-tag `//` comment (`tsv_svelte::parse_folded`) is a positionless `ParseError::refusal`,
+so it travels as `Failure::Plain`.
 
 **Panic contract:** a Rust panic — always a tsv bug — surfaces as a **thrown JS error**, never a host abort. Two halves, both required (unwind alone enables the catch, it does not perform it): every export carries `#[napi(catch_unwind)]`, and the addon builds with the workspace **`napi` profile** (`release` + `panic = "unwind"`; `panic` can't be set per-package, and flipping `[profile.release]` would perturb the size-bounded WASM bundles and the abort-profile FFI/CLI artifacts). Bench, `test:napi`, and publish all use the same profile, so the measured artifact is the shipped one (`target/napi/`). After a caught panic the per-thread arenas stay usable — `tsv_arena`'s take/park protocol leaves the thread-local slot empty while a call runs, so unwind and abort converge on the same state. **Stack overflow is not catchable** and still aborts the host. The contract is proven end to end by `scripts/test_napi.ts` via the test-only `panic_probe` feature's `__panic_probe` export (panics inside `with_ast_arena`; the test asserts a thrown error twice, then correct parse + format output — the arena recovery at the real boundary). Published builds never enable the feature; the test skips when the export is absent.
 

@@ -7,11 +7,10 @@
 
 ## Position & invariants
 
-- **Experimental, and it may never ship.** This is a research crate, not a
-  committed product surface. Nothing tsv publishes depends on it, its
-  conformance gates are on-demand only (not in `deno task check`, not in
-  `deno task conformance`, not release-gating — see ../../docs/typechecker.md),
-  and the bet is allowed to come out negative.
+- **Experimental, and it may never ship.** A research crate, not a committed
+  product surface: its conformance gates are on-demand only (not in
+  `deno task check`, not in `deno task conformance`, not release-gating — see
+  ../../docs/typechecker.md), and the bet is allowed to come out negative.
 - **Zero cost to shipped artifacts.** No format/parse artifact links this
   crate — `tsv_cli`/`tsv_ffi`/`tsv_wasm`/`tsv_napi` never reference it; the
   only consumer is `tsv_debug` (the conformance harness). Verify with
@@ -78,8 +77,7 @@
     (TS2451/2300/2567/2528 with per-prior-declaration related info),
     internal-name mangling (incl. private `#` names), the dual local/export
     collapse (documented at the site; revisited at multi-file). A
-    directory-module split by concern: `mod.rs`
-    (the `SymbolBinder` struct, its lifecycle — `new`/`bind_program`/`finish`
+    directory-module split by concern: `mod.rs` (the `SymbolBinder` struct, its lifecycle — `new`/`bind_program`/`finish`
     — the table/symbol/atom primitives every descendant shares, the
     member-key resolver, the functions-first statement-list driver
     (`bind_statement_list`), and the scope helpers
@@ -109,13 +107,10 @@
     flow-node/container/statement-list driver, `statements.rs` and
     `expressions.rs` each contribute an `impl FlowBuilder` block of per-node
     visitors, and `predicates.rs` holds the pure AST predicates the walk
-    dispatches on), and `tests/` (a directory-module split mirroring
-    `build/`'s own: `mod.rs` holds the shared fixtures/helpers plus the
-    flow-node/container/label-pool tests that exercise `build/mod.rs` itself,
-    `statements.rs` and `expressions.rs` cover the tests for their `build/`
-    namesakes, and `predicates.rs` covers `build/predicates.rs`). The
-    per-file control-flow graph
-    (`build_flow`) is a faithful port of tsgo's binder flow construction
+    dispatches on), and `tests/` (mirroring `build/`: each file tests its
+    `build/` namesake, `mod.rs` also holding the shared fixtures/helpers). The
+    per-file control-flow graph (`build_flow`) is a faithful port of tsgo's
+    binder flow construction
     (`bind`/`bindContainer`/`bindChildren` + the per-statement flow shapers).
     A `FlowGraph` in SoA form (`u16` `FlowFlags`, kind-discriminated
     `subject`/`antecedent`, length-prefixed pool runs, switch/reduce payload
@@ -138,12 +133,11 @@
     (pinned by `method_and_value_resolve_distinctly`); the kind disambiguates,
     and no same-kind collisions exist.
 
-  **Borrow-only discipline**: visitors take
-  `&'arena` references and never clone AST nodes — the AST derives `Clone`,
-  and one accidental `.clone()` silently mints differently-addressed copies
-  that break the address map; nothing type-level enforces this, so it is a
-  reviewed convention — enforced by `tests/clone_discipline.rs`, which fails on
-  any clone-shaped call in `src/` that isn't in its reviewed non-AST allow-list
+  **Borrow-only discipline**: visitors take `&'arena` references and never
+  clone AST nodes — the AST derives `Clone`, and one accidental `.clone()`
+  silently mints differently-addressed copies that break the address map.
+  Nothing type-level prevents it, so `tests/clone_discipline.rs` does: it fails
+  on any clone-shaped call in `src/` outside its reviewed non-AST allow-list
   (and on any allow-list entry gone stale).
 - `check/` — the post-bind **syntactic** check pass (`check_file_members`), a
   standalone `CheckWalk` over `&Program` that never consults the binder's
@@ -180,7 +174,7 @@
   unit-tested per comparator leg.
 - `ids.rs` — `NodeId` / `FlowNodeId` (`NonZeroU32`, 1-based; `Option`
   niche-packs to 4 bytes) and `FileId` newtypes.
-- `options.rs` — the checker's option surface (tsv_check's first): `Tristate`
+- `options.rs` — the checker's option surface: `Tristate`
   (`Unknown`/`False`/`True`, mirroring `core.Tristate`, default `Unknown`) and
   `CheckOptions { allow_unreachable_code, allow_unused_labels,
   preserve_const_enums }`, threaded into `check_bound`. Default everywhere
@@ -192,8 +186,7 @@
   wire writer). The address map, symbol tables and flow-label scratch are
   integer-keyed; the atom interner and merge globals key on **names (`str`)**,
   so unlike the printer/writer tables they exercise the hasher's byte path.
-  ⚠️ Its contract is the
-  constraint to preserve: **substituting it for SipHash is behavior-preserving
+  ⚠️ Its contract is the constraint to preserve: **substituting it for SipHash is behavior-preserving
   only while every consumer stays order-free.** Every table here honors that —
   the atom interner, the address map, the symbol tables, the merge globals and
   the duplicate-member state machine are used through
@@ -205,8 +198,7 @@
   pool layout would make the hasher observable — the canonical
   `compare_diagnostics` sort is the backstop, not a license. `tsv_lang`'s
   integer methods widen to a 64-bit word (so integer keys are
-  target-independent regardless) and its byte
-  path folds native-endian words rather than little-endian ones — a difference
+  target-independent regardless) and its byte path folds native-endian words rather than little-endian ones — a difference
   only a big-endian target could observe, and one no output depends on, since
   hashes never leave the process. (Where tsgo reaches for xxh3-128 —
   variable-arity list hashing — the Fx fold is tsv's dep-free substitute.)
@@ -228,9 +220,8 @@ The caller owns the arena (the same contract as `tsv_ts::parse`); the
 result is fully owned — nothing borrows out. For lib-aware checking:
 `bind_program` (parse+bind+flow once, variant-independent, fully owned) →
 `check_bound(&bound, Some(&lib_base), &options)`; `bind_lib` produces a cacheable
-`LibFile`; `check_program_with_lib` is the one-shot form. `CheckOptions` (the two
-unreachable/unused-label tri-states + `preserve_const_enums`) is `default()` for
-every non-conformance caller.
+`LibFile`; `check_program_with_lib` is the one-shot form. `CheckOptions` is
+`default()` for every non-conformance caller.
 
 ## Which tool answers which question
 

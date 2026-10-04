@@ -11,66 +11,68 @@ real move in a number is a deliberate, visible edit.
 ## Where the numbers live
 
 - **`benches/js/lib/gate_counts.ts`** — every Deno-side count, one per consumer:
-  the fixtures gates (`scanned` + `both_accept` + `over_acceptance`), ts-repo
-  (`scanned` + `accept_parity` + `over_acceptance_parser` + `over_acceptance_checker`
-  — the two over-acceptance halves pin the WIDENING axis the first two structurally
-  cannot see, since they fix only how many tsc-VALID files tsv accepts and leave the
-  split of the rest free, and the halves are split by tsc's LIVE parser rather than
-  by the `TS1xxx` code range; plus `units_scanned` + `units_accept_parity` for the
-  `@filename` multi-file units, a population the single-file counts cannot see —
-  [conformance_tsc.md](conformance_tsc.md); the fixtures gates carry an
-  over-acceptance pin for the same reason, a new over-acceptance there coming out of
-  `parity` and moving neither of their other two),
-  `corpus:compare:parse --all` (EXACT per-language `compared`
-  + EXACT per-language tsv-side parse-failure counts), `corpus:compare:format
-  --all` (minimum per-language `match` + EXACT per-language `unknown`/`partial`
-  counts — the un-triaged divergence backlog is pinned, so a new unexplained
-  divergence fails until fixed/cataloged and a shrink is re-pinned to record the
-  win), and the six harvests (wpt block count, test262 positive count, the
-  ts-repo corpus + rejects counts, svelte-rejects count, prettier-jsx count,
-  svelte-styles block count — all exact; the last one over the `../corpora`
-  snapshot's perf view), plus
-  the CSS reject count `diagnostics/css_over_acceptance.ts` grades over — derived
-  live from pinned inputs rather than harvested, and the one pin whose list filters
-  nothing (see `CSS_REJECTS_PIN`), but stamped and graded on the harvests' cadence
-  all the same (`css:over-acceptance:pin`). The
-  ts-repo pair is graded by tsc itself, so its harvest stamps the **tsc version**
-  alongside the checkout commit — a tsc bump can move a file between the two lists
-  with the corpus unchanged.
+  - **ts-repo**: `scanned` + `accept_parity` + `over_acceptance_parser` +
+    `over_acceptance_checker`, plus `units_scanned` + `units_accept_parity` for the
+    `@filename` multi-file units, a population the single-file counts cannot see
+    ([conformance_tsc.md](conformance_tsc.md)). The two over-acceptance halves pin the
+    WIDENING axis the first two structurally cannot see — those fix only how many
+    tsc-VALID files tsv accepts and leave the split of the rest free — and are split by
+    tsc's LIVE parser rather than by the `TS1xxx` code range.
+  - **the fixtures gates**: `scanned` + `both_accept` + `over_acceptance`, the last for
+    the same reason — a new over-acceptance comes out of `parity` and moves neither of
+    the other two.
+  - **`corpus:compare:parse --all`**: EXACT per-language `compared` + EXACT per-language
+    tsv-side parse-failure counts.
+  - **`corpus:compare:format --all`**: minimum per-language `match` + EXACT per-language
+    `unknown`/`partial` counts — the un-triaged divergence backlog is pinned, so a new
+    unexplained divergence fails until fixed/cataloged and a shrink is re-pinned to
+    record the win.
+  - **the six harvests**, all exact: wpt block count, test262 positive count, the
+    ts-repo corpus + rejects counts, svelte-rejects count, prettier-jsx count,
+    svelte-styles block count (the last over the `../corpora` snapshot's perf view). The
+    ts-repo pair is graded by tsc itself, so its harvest stamps the **tsc version**
+    alongside the checkout commit — a tsc bump can move a file between the two lists
+    with the corpus unchanged.
+  - **the CSS reject count** `diagnostics/css_over_acceptance.ts` grades over — derived
+    live from pinned inputs rather than harvested, and the one pin whose list filters
+    nothing (see `CSS_REJECTS_PIN`), but stamped and graded on the harvests' cadence
+    all the same (`css:over-acceptance:pin`).
 
-  **The suite-derived pins have exactly one cadence.** Every count above that is
-  measured over a sibling checkout (the five suite harvests' plus the CSS reject
-  count) is re-derived by `deno task bench:pins:suites` and by nothing in `deno task
-  check`, whose two sibling-checkout legs (`roundtrip:audit:prettier`, `discovery:audit`) re-derive no pin — so a checkout that moves leaves the pin
-  describing the previous corpus with every committed-tree gate green until that
-  group runs. (The svelte-styles block count is the one sibling-measured pin outside
-  that group: the same stamp-and-fail-before-writing posture, re-derived by `deno task
-  bench:harvest:svelte-styles`, which `conformance` chains later beside the corpus
-  legs that read its cache.) Two things make that safe rather than merely documented: the group is
-  a preflight of `deno task conformance` (so a release cannot ship the old number),
-  and each leg is freshness-stamped on the checkout's git OBJECT — its HEAD commit,
-  or for the `../corpora` snapshot its `collections/` tree id — **every** checkout it
-  reads, which for the two reject pins is three apiece and neither list is the one
-  the pin is named after (CSS: `../svelte`, `../prettier`, `../wpt`; Svelte:
-  `../svelte`, `../prettier`, `../prettier-plugin-svelte`, since both prettier
-  suites' `.html` is Svelte-language corpus) — so
-  a move between upstream releases, where `pins:audit`'s version check sees nothing,
-  still re-grades. A contributor left out of a stamp is the whole failure: its pull
-  leaves the stamp reading fresh over a corpus that moved under it. A count pin is
-  never a substitute for a commit in a stamp either: an
-  edit to an existing suite file moves the corpus without moving the count. Nor is
-  a checkout a substitute for the loader's own filters: the grades over the
-  conformance view stamp a fingerprint of the filter modules too
-  (`corpus_filter_fingerprint`), since a validity filter that drops or re-admits a
-  file moves the count with nothing else moving. Two of
-  the pins are also re-DERIVED a second time on their own surface (three more get
-  a weaker cache-staleness check: `TS_REPO_REJECTS_PIN` from
-  `ts_repo_over_acceptance.ts`, and `SVELTE_REJECTS_PIN` / `PRETTIER_JSX_PIN` from
-  the conformance coverage run, which refuses to publish over an exclusion cache
-  whose size is not its pin — `bench.ts` `enforce_exclusion_caches`):
-  `TEST262_POSITIVES_PIN` by `conformance:test262` (its Rust twin) and
-  `CSS_REJECTS_PIN` by the conformance coverage run (`bench:conformance`), whose
-  oracle row's `parse/css` skips are the reject set. `deno task doctor` reports a
+  **The suite-derived pins have exactly one cadence.** Every count above measured over
+  a sibling checkout (the five suite harvests' plus the CSS reject count) is re-derived
+  by `deno task bench:pins:suites` and by nothing in `deno task check`, whose two
+  sibling-checkout legs (`roundtrip:audit:prettier`, `discovery:audit`) re-derive no
+  pin — so a checkout that moves leaves the pin describing the previous corpus with
+  every committed-tree gate green until that group runs. (The svelte-styles block count
+  is the one sibling-measured pin outside that group: the same
+  stamp-and-fail-before-writing posture, re-derived by `deno task
+  bench:harvest:svelte-styles`, which `conformance` chains later beside the corpus legs
+  that read its cache.)
+
+  Two things make that safe rather than merely documented: the group is a preflight of
+  `deno task conformance` (so a release cannot ship the old number), and each leg is
+  freshness-stamped on the git OBJECT — its HEAD commit, or for the `../corpora`
+  snapshot its `collections/` tree id — of **every** checkout it reads. For the two
+  reject pins that is three apiece, neither list the one the pin is named after (CSS:
+  `../svelte`, `../prettier`, `../wpt`; Svelte: `../svelte`, `../prettier`,
+  `../prettier-plugin-svelte`, since both prettier suites' `.html` is Svelte-language
+  corpus) — so a move between upstream releases, where `pins:audit`'s version check
+  sees nothing, still re-grades. A contributor left out of a stamp is the whole
+  failure: its pull leaves the stamp reading fresh over a corpus that moved under it.
+
+  A count pin is never a substitute for a commit in a stamp either: an edit to an
+  existing suite file moves the corpus without moving the count. Nor is a checkout a
+  substitute for the loader's own filters: the grades over the conformance view stamp a
+  fingerprint of the filter modules too (`corpus_filter_fingerprint`), since a validity
+  filter that drops or re-admits a file moves the count with nothing else moving.
+
+  Two pins are re-DERIVED a second time on their own surface: `TEST262_POSITIVES_PIN`
+  by `conformance:test262` (its Rust twin) and `CSS_REJECTS_PIN` by the conformance
+  coverage run (`bench:conformance`), whose oracle row's `parse/css` skips are the
+  reject set. Three more get a weaker cache-staleness check: `TS_REPO_REJECTS_PIN` from
+  `ts_repo_over_acceptance.ts`, and `SVELTE_REJECTS_PIN` / `PRETTIER_JSX_PIN` from the
+  conformance coverage run, which refuses to publish over an exclusion cache whose size
+  is not its pin (`bench.ts` `enforce_exclusion_caches`). `deno task doctor` reports a
   stamp whose recorded checkout id is behind its checkout.
 - **Rust-side counts are consts** — grep `REGRESSION PIN`. test262 (discovered +
   graded-manifest + the `--gate` positive count, `POSITIVE_PASSED_PIN`), `fixtures_validate`
@@ -87,9 +89,8 @@ real move in a number is a deliberate, visible edit.
   it carries structural slack — the `.svelte` subset sits above the corpus-wide
   pin, and a Svelte-only discovery collapse smaller than that slack would pass; a
   razor-scoped pin is the tightening if that ever bites.) That is the **default-corpus**
-  layer; under it sits `check_graded_nonzero` (same module), which every
-  corpus-walking audit calls unconditionally on its own graded count and which
-  therefore needs no pin at all.
+  layer; under it sits `check_graded_nonzero` (same module), which every corpus-walking
+  audit calls unconditionally on its own graded count, so it needs no pin.
 - **`tsc_conformance`** (the largest set) splits its pins by what they mean, and
   gates the ON-DEMAND experimental-typechecker tasks, not a release leg. The
   drifting tsv-side counts (denominators, parse-divergence census, family
@@ -123,8 +124,8 @@ real move in a number is a deliberate, visible edit.
      genuine growth minimums — fixture counts only grow with reviewed additions,
      and shrinkage is the discovery regression the pin guards.
 - **Failure-bucket pins** (exact `!==`): the `corpus:compare:* --all` triage
-  buckets and `compared`. All of them hold over the whole `gates` view (deterministic
-  on aligned checkouts). A rise fails until triaged (fix it, add a divergence
+  buckets and `compared`, all over the whole `gates` view (deterministic on aligned
+  checkouts). A rise fails until triaged (fix it, add a divergence
   detector/sanction, or consciously re-pin a legitimately-unsupported new file); a
   drop also fails, so a fixed divergence ratchets the pin DOWN deliberately. A
   snapshot refresh moves all of them at once and is re-pinned as one deliberate
@@ -137,9 +138,8 @@ Pins apply only to FULL runs (default suite root, `--all`, default harvest sourc
 subtree and filtered runs legitimately grade a slice. Harvest pins fail **before**
 writing, so a wrong cache never replaces a good one — except the wpt harvest, which writes
 first and REMOVES the whole cache on a pin miss, so loaders see absent rather than
-wrong-sized. CI runs only the committed-tree pins (`check.yml` is a
-clean checkout — no sibling clones); the rest are dev-machine gates at
-conformance/publish cadence.
+wrong-sized. CI runs only the committed-tree pins (`check.yml` is a clean checkout — no
+sibling clones); the rest are dev-machine gates at conformance/publish cadence.
 
 ## Update ritual
 
@@ -173,16 +173,17 @@ precondition for the entry, not a note to leave in it.
 
 ⚠️ **A staged-tree corpus A/B is blind to the suite files `.prettierignore` hides.**
 `tsv format --list` honors `.gitignore` / `.prettierignore` and the prettier repo ignores
-its own test fixtures, so a rig enumerating with `--list` sees ~8,500 files where the
-`gates` view holds ~9,305 — an A/B reading ZERO movers there is not evidence the gate
+its own test fixtures, so a rig enumerating with `--list` sees hundreds fewer files than
+the `gates` view holds — an A/B reading ZERO movers there is not evidence the gate
 passes. Enumerate the suites with `find`, or diff the `--all --json` bucket lists.
 
-When a checkout moves, re-record its **id** (its HEAD commit; for `../corpora`, the `collections/` tree id) in `GATE_CHECKOUT_IDS` in the
-same change (`git -C ../<repo> rev-parse --short HEAD`; for the snapshot,
+When a checkout moves, re-record its **id** (its HEAD commit; for `../corpora`, the
+`collections/` tree id) in `GATE_CHECKOUT_IDS` in the same change
+(`git -C ../<repo> rev-parse --short HEAD`; for the snapshot,
 `git -C ../corpora rev-parse --short HEAD:collections`) — that struct is the single
-provenance record for what a pin was measured against (upstream version files only
-bump at release) — and run `deno task bench:pins:suites` there too, so the
-suite-derived pins move with it. Each entry's `pins` list is graded by
+provenance record for what a pin was measured against (upstream version files only bump
+at release) — and run `deno task bench:pins:suites` there too, so the suite-derived pins
+move with it. Each entry's `pins` list is graded by
 `benches/js/lib/gate_counts_test.ts` (in `test:deno`): every exported pin must be
 named by some checkout (or by the test's `UNTRACKED_PINS`, with a reason), and every
 name must exist — a new pin cannot land without its provenance, and a rename cannot
@@ -215,9 +216,9 @@ one deliberate corpus refresh — the checkout ids (the `../corpora` snapshot's
 They guard different granularities. Checkout alignment
 ([`pins:audit:checkouts`](audits.md#checkout-alignment-audit-pinsauditcheckouts))
 compares `package.json` versions — but an upstream repo's version only bumps at
-release, so commits landing between releases change the SUITE without changing the
-version. A pull inside that window — a handful of test inputs added at the same
-declared version — moves what is graded, and only the count pin can see it.
+release, so commits between releases change the SUITE without changing the version. A
+pull inside that window — test inputs added at the same declared version — moves what
+is graded, and only the count pin can see it.
 Conversely the count pins can't tell one release from another if the counts happen
 to coincide. Version alignment catches release-level skew; count pins catch
 commit-level suite drift within a version window.

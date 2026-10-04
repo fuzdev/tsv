@@ -1,12 +1,8 @@
 # Fixture Content Naming Conventions
 
-**Fixture naming should clarify what's being tested.**
+**Fixture naming should clarify what's being tested** — **descriptive names** when they explain the test case (escape sequences, edge cases, spec compliance), **generic names** for structural/formatting tests where semantics don't matter. Consult this when creating new fixtures.
 
-Use **descriptive names** when they explain the test case (escape sequences, edge cases, spec compliance). Use **generic names** for structural/formatting tests where semantics don't matter.
-
-Consult this when creating new fixtures.
-
-**Terminology**: a `prettier_variant_*` file is a form prettier keeps stable but our formatter normalizes to input; a `variant_*` file is a form both formatters keep stable that is distinct from input; a `divergent_variant_*` file is a form prettier keeps stable but our formatter rewrites to a *third* stable form (distinct from both the form and input). See ./conformance_prettier.md for the full catalog.
+**Terminology** — each is a form prettier keeps stable, named by what our formatter does with it: a `prettier_variant_*` it normalizes to input; a `variant_*` (distinct from input) it also keeps stable; a `divergent_variant_*` it rewrites to a *third* stable form (distinct from both the form and input). See ./conformance_prettier.md for the full catalog.
 
 ---
 
@@ -214,7 +210,7 @@ When multiple text nodes exist, preserve EACH node's word count independently:
    - **Test data**: Preserve escape sequences, entities, unicode characters exactly as written
    - **Still generic**: Markup structure uses generic names (`.class1`, `data-attr`, `Comp`)
 
-9. **Use comments when testing multiple cases in one file**: Comments help organize and clarify distinct test cases within a single fixture. When a fixture tests several variations of a feature, use comments to label each case:
+9. **Use comments when testing multiple cases in one file** — label each distinct case:
    ```typescript
    // Numeric literals
    type Num = 1;
@@ -225,7 +221,7 @@ When multiple text nodes exist, preserve EACH node's word count independently:
    ```
    - **When in doubt, add a comment** - clarity is more valuable than minimalism
    - Comments are especially helpful in `long` fixtures to explain what exceeds print width
-   - **Describe the formatting, not our bugs.** Comments should say what the correct output IS (e.g., "array expands to multi-line"), not how our formatter differs (e.g., ~~"we break after ="~~). Fixtures define correct behavior — they shouldn't reference our implementation's shortcomings.
+   - **Describe the formatting, not our bugs.** Comments should say what the correct output IS (e.g., "array expands to multi-line"), not how our formatter differs (e.g., ~~"we break after ="~~) — fixtures define correct behavior, not our implementation's shortcomings.
 
 ---
 
@@ -297,10 +293,9 @@ Variant name — purpose (example):
 
 #### `_compact` and `_spaces` are directional opposites (gated)
 
-The two are a matched pair of opposite claims about the same input, and the pair
-is the point: `_compact` **removes** whitespace the formatter normalizes away,
-`_spaces` **adds** whitespace the formatter normalizes away, so between them a
-fixture is squeezed from both sides. Write both where the input supports both.
+The two are a matched pair of opposite claims about the same input:
+`_compact` **removes** whitespace the formatter normalizes away, `_spaces` **adds** it,
+so between them a fixture is squeezed from both sides. Write both where the input supports both.
 
 The N rules prove only that a variant *lands on* input; they never ask which
 direction it travelled from. `deno task variants:audit` asks exactly that, by
@@ -339,9 +334,9 @@ the audit's scope by construction — that is the sanctioned escape hatch, not a
 evasion. `unformatted_unicode_spaces` is qualified for the same reason: it
 substitutes U+00A0 for a space rather than changing whitespace volume at all.
 
-⚠️ **Adding boundary whitespace can dissolve an `_ours_` claim.** Several
-`unformatted_ours_spaces` variants only diverged from prettier because their
-element-content boundary was welded; spacing that boundary makes prettier
+⚠️ **Adding boundary whitespace can dissolve an `_ours_` claim.** An
+`unformatted_ours_spaces` variant may diverge from prettier only because its
+element-content boundary is welded; spacing that boundary makes prettier
 normalize to input too, so N6 fails and the file must become a plain
 `unformatted_spaces` (allowed wherever the directory has no `output_prettier.*`
 — S9). That is a *strengthening*: the fixture gains a both-formatter
@@ -382,19 +377,9 @@ Quirk name — description (example):
 - `prettier_variant_missing_space` — Missing required space (`@media screen and(min-width:768px)`)
 - `prettier_variant_bom` — BOM preserved (for BOM fixtures) (File starts with UTF-8 BOM)
 
-**For testing our normalization** (`unformatted_ours_*.*`):
+**Naming convention** (`prettier_variant_*`): the suffix describes WHAT is quirky (not just "variant1"), specifically (`parens_spaces`, not just `spaces`), matching the pattern consistently across fixtures.
 
-- Use `unformatted_ours_*` naming in `_prettier_divergence` directories
-- Extension must match input file (`.svelte`, `.ts`, `.css`, `.svelte.ts`)
-- Our formatter must normalize these to input (N5)
-- Prettier must NOT normalize these to input (N6 verifies the `_ours` designation)
-
-**Naming convention**:
-
-- Prefix: `prettier_variant_`
-- Suffix: Describes WHAT is quirky (not just "variant1")
-- Be specific: `parens_spaces` not just `spaces`
-- Match pattern consistently across fixtures
+**For testing our normalization** (`unformatted_ours_*.*`) — only in `_prettier_divergence` directories, extension matching the input file: our formatter must normalize these to input (N5), and prettier must NOT (N6 verifies the `_ours` designation).
 
 **For documenting prettier's unstable intermediate output** (`prettier_intermediate_*.*` / `prettier_intermediate_to_variant_*.*` / `prettier_intermediate_to_divergent_variant_*.*`):
 
@@ -531,11 +516,7 @@ transform: translateX(100px) translateY(200px) rotate(45deg);
 
 ### Data Patterns
 
-**Moderate repetition**:
-
-- Use enough zeros/ones to be obviously generic/long
-- Not visually overwhelming
-- Examples: `'f0000000'`, `rgba(0, 0, 0, 0.8)`, `0.0000000001`
+**Moderate repetition** — enough zeros/ones to be obviously generic/long, not visually overwhelming: `'f0000000'`, `rgba(0, 0, 0, 0.8)`, `0.0000000001`.
 
 **JS/TypeScript padding patterns** for reaching exact line-width boundaries:
 
@@ -582,7 +563,6 @@ const user = fetchUserData(userId, sessionToken);
 
 - Hex for simple colors: `#000`, `#111`, `#222`
 - RGB for functions: `rgb(0, 0, 0)`, `rgb(1, 1, 1)`
-- Use whatever makes the test clearest
 
 ### Required Comments
 
@@ -663,16 +643,11 @@ All inline at ≤100 effective width; at >100 effective:
 
 **Testing nested elements:**
 
-Test at multiple indent levels to verify indent-aware wrapping:
-
-- Indent Level 0 — Tabs 0, Visual Width 0, Content to hit 101: 101 chars
-- Indent Level 1 — Tabs 1, Visual Width 2, Content to hit 101: 99 chars
-- Indent Level 2 — Tabs 2, Visual Width 4, Content to hit 101: 97 chars
-- Indent Level 3 — Tabs 3, Visual Width 6, Content to hit 101: 95 chars
+Test at multiple indent levels to verify indent-aware wrapping. Each tab is 2 visual chars, so the content that hits 101 is 101 / 99 / 97 / 95 chars at indent levels 0 / 1 / 2 / 3.
 
 **Verification:**
 
-**Do not estimate line widths manually** — they are often wrong (tabs = 2 visual chars, off-by-one errors are common). `fixture_init` shows line widths automatically. Use `--force` to iterate until widths are correct. For specific lines:
+**Do not estimate line widths manually** — they are often wrong (tabs = 2 visual chars, off-by-one errors are common). `fixture_init` shows line widths; iterate with `--force` until they are correct. For specific lines:
 
 ```bash
 cargo run -p tsv_debug line_width FILE --line 5   # specific line with preview
@@ -683,9 +658,7 @@ cargo run -p tsv_debug compare FILE               # compare with prettier
 
 When multiple `long` fixtures test the same feature:
 
-- **Merge into one** with multiple test cases
-- Example: `function_gradient_wrapping` + `function_gradient_wrapping_long` → `function_gradient_long`
-- Keep all test cases, add clear comments for each
+- **Merge into one**, keeping every test case with a clear comment each — e.g. `function_gradient_wrapping` + `function_gradient_wrapping_long` → `function_gradient_long`
 
 **Example of consolidated fixture:**
 

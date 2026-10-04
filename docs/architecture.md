@@ -4,13 +4,11 @@ Design decisions and technical rationale for tsv.
 
 ## Core Philosophy
 
-tsv is a **multi-tool foundation** for Svelte/TypeScript/CSS—formatter, parser, and future linter/LSP. JSON serialization for testing compatibility is secondary to efficient internal manipulation.
+tsv is a **multi-tool foundation** for Svelte/TypeScript/CSS—formatter, parser, and future linter/LSP. Efficient internal manipulation comes first, JSON compatibility second — the inverse of the typical approach, where JSON compatibility drives AST design.
 
-This inverts the typical approach where JSON compatibility drives AST design.
+**Optimal artifacts (invariant).** Runtime speed _and_ compiled code size are first-class, non-negotiable goals for **every** shipped artifact. The format-only `@fuzdev/tsv-format-wasm`, first-shipped and most-developed, is the current yardstick but holds no long-term primacy; `@fuzdev/tsv-parse-wasm`, the CLI, and the native N-API binding count just as much. The architecture serves this directly: concrete types end-to-end (no `dyn` dispatch), per-language crates that WASM tree-shakes independently, and unneeded layers excluded at the link level — the printers from parse-only builds, the convert layer from format-only builds (see §"Closed Scope, Open Convention"). Heavier infrastructure for future tools—incremental reparse, red-green/CST layers for LSP—must be added as later, feature-gated layers that don't regress this, not as weight in the initial artifacts (see §"Red-Green Trees (Deferred)").
 
-**Optimal artifacts (invariant).** Runtime speed _and_ compiled code size are first-class, non-negotiable goals for **every** shipped artifact. The format-only `@fuzdev/tsv-format-wasm` is the current yardstick—it's the most-developed and first-shipped artifact—but it holds no long-term primacy; `@fuzdev/tsv-parse-wasm`, the CLI, and the native N-API binding count just as much as they mature. The architecture serves this directly: concrete types end-to-end (no `dyn` dispatch), per-language crates that WASM tree-shakes independently, and unneeded layers excluded at the link level — the printers from parse-only builds, the convert layer from format-only builds (see §"Closed Scope, Open Convention"). Heavier infrastructure for future tools—incremental reparse, red-green/CST layers for LSP—must be added as later, feature-gated layers that don't regress this, not as weight in the initial artifacts (see §"Red-Green Trees (Deferred)").
-
-**Safety constraint**: `unsafe_code = "forbid"` at the workspace level — no unsafe Rust in core crates. Only the two native binding crates relax it, each to the weakest level that compiles: `tsv_ffi` to `"allow"`, since the crate *is* the C ABI boundary and hand-writes the raw-pointer work; `tsv_napi` to `"deny"`, because it hand-writes no unsafe at all and `#[napi]`'s generated items carry their own `#[allow(unsafe_code)]` — enough to override `deny`, so every other site in that crate stays a compile error. (Neither can inherit `forbid`, which no inner `allow` may override; `tests/lint_parity.rs` pins both relaxations and guards the hand-mirrored tables against drift.) Combined with a deliberately small dependency set (authoritative list: `[workspace.dependencies]` in the root `Cargo.toml`, whose externals are the twelve library/binding crates — the `napi`/`napi-derive`/`napi-build` trio being the N-API carve-out — plus the CLI/debug-only `argh`/`tokio`/`futures-util`; the wasm32-only `talc` allocator lives in `tsv_wasm`'s own manifest; purpose table in [CLAUDE.md § Rust Crates](../CLAUDE.md#rust-crates-minimal-deps)), the attack surface and audit burden stay minimal.
+**Safety constraint**: `unsafe_code = "forbid"` at the workspace level — no unsafe Rust in core crates. Only the two native binding crates relax it, each to the weakest level that compiles: `tsv_ffi` to `"allow"` (the crate *is* the C ABI boundary and hand-writes the raw-pointer work); `tsv_napi` to `"deny"` (it hand-writes no unsafe, and `#[napi]`'s generated items carry their own `#[allow(unsafe_code)]`, which overrides `deny`, so every other site in the crate stays a compile error). Neither can inherit `forbid`, which no inner `allow` may override; `tests/lint_parity.rs` pins both relaxations and guards the hand-mirrored tables against drift. A deliberately small dependency set keeps the attack surface and audit burden minimal (authoritative list: `[workspace.dependencies]` in the root `Cargo.toml` — the library/binding externals, the `napi`/`napi-derive`/`napi-build` trio being the N-API carve-out, plus the CLI/debug-only `argh`/`tokio`/`futures-util`; the wasm32-only `talc` allocator lives in `tsv_wasm`'s own manifest; purpose table in [CLAUDE.md § Rust Crates](../CLAUDE.md#rust-crates-minimal-deps)).
 
 ## Two-AST Design
 
@@ -47,7 +45,7 @@ Each language crate separates these cleanly:
 
 TypeScript uses directories (`internal/`, `convert/`) due to complexity. CSS and Svelte use a single `internal.rs` for AST types and a directory for conversion.
 
-Worked example — the internal node is clean and semantic; the writer emits the wire JSON straight from it, applying the canonical quirks (here, `raw` reconstructed from source) with no intermediate typed tree:
+Worked example — the writer emits the wire JSON straight from the clean, semantic internal node, applying the canonical quirks (here, `raw` reconstructed from source):
 
 ```rust
 // Internal - clean and semantic
@@ -95,15 +93,15 @@ tsv/
 ```
 
 `tsv_html` and `tsv_ignore` are independent zero-`tsv_*`-dep leaves (pure
-functions). `tsv_discover` is a thin policy layer whose only `tsv_*` dep is
-`tsv_ignore` — it owns the build-output heuristic + safety-net pruning *decision*
-(the matcher stays a pure gitignore(5) matcher). Both are consumed by `tsv_cli`
-directly and by `tsv_wasm` and `tsv_napi` under their `format` features (the
-matcher exposed as the `IgnoreStack` class, the policy as that class's verdict
-methods), so the CLI, the WASM CLI, the native npm package, and the VS Code
-extension all share one discovery matcher *and* one prune decision. `tsv_discover` is file-*scope* policy — the one sanctioned config
-carve-out — not a language abstraction (no `Language` trait, registry, or
-dispatch), so it doesn't bear on the closed-scope/open-convention stance below.
+functions). `tsv_discover`, a thin policy layer over `tsv_ignore` alone, owns the
+build-output heuristic + safety-net pruning *decision* (the matcher stays a pure
+gitignore(5) matcher). Both are consumed by `tsv_cli` directly and by `tsv_wasm` and
+`tsv_napi` under their `format` features (the matcher as the `IgnoreStack` class, the
+policy as its verdict methods), so the CLI, the WASM CLI, the native npm package, and
+the VS Code extension share one matcher *and* one prune decision. `tsv_discover` is
+file-*scope* policy — the one sanctioned config carve-out — not a language abstraction
+(no `Language` trait, registry, or dispatch), so it doesn't bear on the
+closed-scope/open-convention stance below.
 
 ### Dependency Graph
 
@@ -143,7 +141,7 @@ dispatch), so it doesn't bear on the closed-scope/open-convention stance below.
 
 **Clean API Boundaries** — Each language exports `parse()`, `format()`, and `convert_ast_json_bytes()` / `convert_ast_json_string()` (the span-only wire every binding ships; `convert_ast_json_bytes_with_locations` adds `loc`; no shipped crate reads the wire back — `tsv_debug::json` is the one reader). tsv_ts and tsv_css also provide embedding APIs (`parse_embedded`, expression formatting, `build_*_doc`) used by tsv_svelte for nested language support.
 
-**Scalability** — Easy to add new crates (`tsv_ffi`, `tsv_wasm`, `tsv_napi`, `tsv_arena`, `tsv_ignore` + `tsv_discover`, and the experimental `tsv_check` / `tsv_svelte_compile` — which may never ship — are all crate additions; `tsv_linter`/`tsv_lsp`/`tsv_md` planned).
+**Scalability** — New capabilities land as crate additions (`tsv_ffi`, `tsv_wasm`, `tsv_napi`, `tsv_arena`, `tsv_ignore` + `tsv_discover`, the experimental, may-never-ship `tsv_check` / `tsv_svelte_compile`; `tsv_linter`/`tsv_lsp`/`tsv_md` planned).
 
 ### Closed Scope, Open Convention
 
@@ -161,47 +159,46 @@ pub fn convert_ast_json_bytes_with_locations(ast: &InternalAst, source: &str) ->
 ```
 
 `convert_ast_json_bytes` (the span-only wire) and
-`convert_ast_json_bytes_with_locations` (the same wire plus `loc`) are the **sole emission
-paths** — every JSON form derives from one of them, the CLI's `--pretty`
-included (a linear re-indent of their bytes, never a read). In every language
-each is a **writer-mode conversion**
-(`ast/convert/write*`) that emits the wire JSON directly during a single
-walk of the *internal* AST — no typed public tree is ever materialized —
-with byte→UTF-16 offset translation fused into the walk via `WirePositions`
-(final char-space positions emitted directly; ASCII sources are byte-space
-passthrough). The output is valid UTF-8 by construction, and returning bytes
-lets byte-oriented boundaries skip the O(output) UTF-8 validation a `String`
-requires (the wire is several times the source); `convert_ast_json_string`
-is the span-only bytes plus that one validation, for `&str` boundaries (what the
-WASM binding's `JSON.parse` and the N-API strings take). No language crate reads the wire
-back: the one `Value` consumer is `tsv_debug` (the fixture gate, the audits),
-whose `json` module reads these bytes with serde_json's recursion limit off —
-the default of 128 levels refused ~60 nested arrays or ~40 nested objects the
-writer emits without trouble. The span-only wire is the `_with_locations` one
-minus every line/column object — the per-node `loc`, plus Svelte's `name_loc` — so
-only `start`/`end` offsets remain. It is the one every binding ships (`tsv_ffi`,
-`tsv_napi`, `tsv_wasm`) and `tsv parse`'s default; the `loc`-bearing form ships
-through no binding — it is `tsv parse --locations`'s, `tsv_debug`'s, and the oracle
-comparison's. Line/column is a pure function of an offset
-plus source, so the packages derive it consumer-side rather than shipping it: every
-package that parses carries the derivation as a pure-JS `reconstruct_locations` helper,
-which its `parse_*(source, {locations: true})` runs. Each writer is a faithful emission of the acorn /
-`parseCss` quirk catalog; the fixture suite gates the span-only wire against
-the canonical parser's `expected.json` (its output with `loc` / `name_loc`
-stripped) on every fixture (including the multibyte
-and template-comment ones that exercise the fused offset translation and
-island-scoped comment attach). tsv_svelte's template-expression comments
-(outside `<script>`) fuse via an island-scoped attach that runs **online**,
-off the writer's own node opens and closes (`tsv_ts`'s `CommentAttach`):
-acorn assigns a node's leading comments at node entry and its trailing ones
-after its children, which are exactly the two moments the writer already has,
-and the wire emits both lists at the close — so there is no second pass, no
-recorded tree, and no per-node map. `leadingComments` / `trailingComments`
-serialize in place, and the walk's child-visit order is acorn's *by
-construction*, since it IS the emitted field order. `<script>` content, block patterns,
-`{@const}`/`{const}`/`{let}` declarations, and `<svelte:options>` fuse the
-same way, and embedded `<style>` children fuse via `tsv_css`'s
-`write_css_children`.
+`convert_ast_json_bytes_with_locations` (the same plus `loc`) are the **sole emission
+paths** — every JSON form derives from one of them, the CLI's `--pretty` included (a
+linear re-indent of their bytes, never a read). In every language each is a
+**writer-mode conversion** (`ast/convert/write*`): one walk of the *internal* AST emits
+the wire JSON directly — no typed public tree is ever materialized — with byte→UTF-16
+offset translation fused in via `WirePositions` (final char-space positions emitted
+directly; ASCII sources pass through byte-space). The output is valid UTF-8 by
+construction, and returning bytes lets byte-oriented boundaries skip the O(output)
+UTF-8 validation a `String` requires (the wire is several times the source);
+`convert_ast_json_string` is the span-only bytes plus that one validation, for `&str`
+boundaries (the WASM binding's `JSON.parse`, the N-API strings).
+
+No language crate reads the wire back: the one `Value` consumer is `tsv_debug` (the
+fixture gate, the audits), whose `json` module reads these bytes with serde_json's
+recursion limit off — the default of 128 levels refused ~60 nested arrays or ~40 nested
+objects the writer emits without trouble.
+
+The span-only wire is the `_with_locations` one minus every line/column object — the
+per-node `loc`, plus Svelte's `name_loc` — leaving only `start`/`end` offsets. Every
+binding ships it (`tsv_ffi`, `tsv_napi`, `tsv_wasm`), and it is `tsv parse`'s default;
+the `loc`-bearing form ships through no binding — it is `tsv parse --locations`'s,
+`tsv_debug`'s, and the oracle comparison's. Line/column is a pure function of offset
+plus source, so the packages derive it consumer-side: every package that parses carries
+a pure-JS `reconstruct_locations` helper, run by its
+`parse_*(source, {locations: true})`.
+
+Each writer is a faithful emission of the acorn / `parseCss` quirk catalog; the fixture
+suite gates the span-only wire against the canonical parser's `expected.json` (its
+output with `loc` / `name_loc` stripped) on every fixture, the multibyte and
+template-comment ones exercising the fused offset translation and island-scoped
+comment attach. tsv_svelte's template-expression comments (outside `<script>`) fuse via
+that island-scoped attach, run **online** off the writer's own node opens and closes
+(`tsv_ts`'s `CommentAttach`): acorn assigns a node's leading comments at node entry and
+its trailing ones after its children — exactly the two moments the writer already has —
+and the wire emits both lists at the close, so there is no second pass, no recorded
+tree, and no per-node map. `leadingComments` / `trailingComments` serialize in place,
+and the walk's child-visit order is acorn's *by construction*, since it IS the emitted
+field order. `<script>` content, block patterns, `{@const}`/`{const}`/`{let}`
+declarations, and `<svelte:options>` fuse the same way; embedded `<style>` children fuse
+via `tsv_css`'s `write_css_children`.
 
 There is **no central `Language` trait, no plugin registry, no
 language-set enum**. Each language crate (`tsv_ts`, `tsv_css`,
@@ -224,9 +221,8 @@ This shape gives both:
   `my_org/tsv_html_parse` crate following the same shape, and any
   downstream _Rust_ consumer can `use my_org_tsv_html_parse::parse`
   without central buy-in. The tsv crates are MIT-licensed and will
-  eventually publish to crates.io, making this story concrete:
-  third-party `tsv_*` crates can sit alongside the official ones in
-  the Rust ecosystem.
+  eventually publish to crates.io, where third-party `tsv_*` crates
+  can sit alongside the official ones.
 
   **Caveat**: this property holds at the Rust crate level, not the
   binary level. Users of the published `tsv` CLI or the npm packages
@@ -250,7 +246,7 @@ This shape gives both:
 
 None of these are needed. The CLI dispatches by file extension with a
 `match`; the WASM crate instantiates concrete per-language exports via
-a macro. The set of supported languages is a _scope_ decision (lived
+a macro. The supported-language set is a _scope_ decision (living
 in those two dispatch sites), not a structural one — adding a
 tsv-shaped crate to the workspace later requires no edits to existing
 language crates.
@@ -262,22 +258,20 @@ artifacts for user ergonomics independent of the Rust workspace shape.
 #### Cargo feature surface
 
 `tsv_ts`, `tsv_css`, and `tsv_svelte` each expose a default-on `convert`
-feature that gates `pub mod convert` (the writer) and the span-only
+feature gating `pub mod convert` (the writer) and the span-only
 `convert_ast_json_bytes` / `convert_ast_json_string` free functions, and an
-opt-in `locations` feature (implying `convert`) that adds the loc-bearing
-`convert_ast_json_bytes_with_locations` — the line table it needs exists only
-under `tsv_lang`'s `locations`, so a build without it carries no `loc` writer
-at all. `tsv_cli` (`tsv parse --locations`) and `tsv_debug` enable it; no
-binding does. The format-only WASM
-build (`@fuzdev/tsv-format-wasm`) declares its language deps with
-`default-features = false` so the convert layer is excluded at link
-time; the parse-capable builds (`@fuzdev/tsv-parse-wasm` and the full
-`@fuzdev/tsv-wasm`) opt in via the `tsv_wasm/parse` feature, which
-forwards to each language crate's `convert`. The parse-only build
-conversely omits the `tsv_wasm/format` feature, so the `format_*`
-exports and the printers behind them drop at link time. `tsv_ffi`
-carries the same `format`/`parse` feature pair (default both), so the
-native C FFI binding tree-shakes identically — the benchmark builds
+opt-in `locations` feature (implying `convert`) adding the loc-bearing
+`convert_ast_json_bytes_with_locations` — its line table exists only under
+`tsv_lang`'s `locations`, so a build without it carries no `loc` writer at all.
+`tsv_cli` (`tsv parse --locations`) and `tsv_debug` enable it; no binding does. The
+format-only WASM build (`@fuzdev/tsv-format-wasm`) declares its language deps
+`default-features = false`, excluding the convert layer at link time; the
+parse-capable builds (`@fuzdev/tsv-parse-wasm` and the full `@fuzdev/tsv-wasm`) opt
+in via `tsv_wasm/parse`, which forwards to each language crate's `convert`.
+Conversely the parse-only build omits `tsv_wasm/format`, so the `format_*` exports
+and the printers behind them drop at link time. `tsv_ffi` carries the same
+`format`/`parse` pair (default both), so the native C FFI binding tree-shakes
+identically — the benchmark builds
 format-only and parse-only `libtsv_ffi` variants to size them
 scope-matched against `oxfmt` and `oxc-parser`. Third-party
 Rust consumers that only need parse/format can follow the same pattern:
@@ -314,7 +308,7 @@ See [crates/tsv_lang/CLAUDE.md](../crates/tsv_lang/CLAUDE.md) for detailed modul
 
 The doc builder is the formatting engine — the majority of tsv_lang by code volume. Language printers express layout as doc trees; the shared renderer handles width-aware breaking. This means the layout algorithm (group breaking, fill packing, look-ahead fitting) is written once and shared across all three languages.
 
-Printers account for roughly half of language crate code. This is inherent to formatting — layout decisions (when to break, how to indent, where to attach comments, how to handle chains/assignment/ternaries) outnumber parsing decisions. It is not a sign of insufficient sharing; the shared doc builder already factors out the rendering algorithm.
+Printers are most of the language crates' code — inherent to formatting, where layout decisions (when to break, how to indent, where to attach comments, how to handle chains/assignment/ternaries) outnumber parsing decisions, and not a sign of insufficient sharing (see [Sharing Analysis](#sharing-analysis)).
 
 Printer-private analysis functions (parenthesis requirements, expression complexity classification, byte-scanning utilities) were evaluated for extraction to tsv_lang and rejected — most encode layout decisions rather than general AST analysis; see [What Not to Extract](#what-not-to-extract).
 
@@ -332,24 +326,12 @@ What's shared through tsv_lang vs reimplemented per language, and why:
 - Doc builder (shared: Yes, should-be: Yes) — Core formatting engine — the largest tsv_lang module, single renderer everywhere
 - Comment model (shared: Yes, should-be: Yes) — Detached model with O(log n) lookup, classification, batch helpers
 - Width / indent (shared: Yes, should-be: Yes) — Hardcoded as `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` consts in `tsv_lang::config`
-- EmbedContext (shared: Yes, should-be: Yes) — Embedding state (base_indent_offset, first_line_offset, suffix_width, mode, jsdoc_cast_cannot_hang, root_sequence_indents, printer_owns_line)
+- EmbedContext (shared: Yes, should-be: Yes) — Per-input embedding state for nested formatting (fields: [CLAUDE.md §Internal Configuration](../CLAUDE.md#internal-configuration-rust-library-only))
 - String formatting (shared: Yes, should-be: Yes) — Quote selection, escape swapping, visual width
 - Error types (shared: Yes, should-be: Yes) — ParseError with context enrichment
 - Position tracking (shared: Yes, should-be: Yes) — Span (u32), LocationTracker
 
-**Code distribution** (from `cargo run -p tsv_debug metrics`):
-
-```
-foundation (tsv_lang + tsv_arena + tsv_html + tsv_ignore + tsv_discover): ~9% of codebase
-languages (tsv_ts + tsv_css + tsv_svelte): ~52%
-compiler (tsv_svelte_compile): ~12%
-experimental checker (tsv_check): ~5%
-tooling (tsv_cli + tsv_debug + bindings): ~22%
-
-printer % of language code: ~63%
-```
-
-The 7% foundation / 49% language split (the experimental compiler/checker and dev tooling counted separately) reflects genuine domain complexity, not missing extraction opportunities. The doc builder already factors out the rendering algorithm (the expensive shared part); what remains language-specific is the _formatting decisions_ themselves — when to break, how to indent, where to attach comments — which differ fundamentally between TypeScript, CSS, and Svelte.
+**Code distribution** (`metrics` groups foundation = `tsv_lang` + `tsv_arena` + `tsv_html` + `tsv_ignore` + `tsv_discover` and languages = `tsv_ts` + `tsv_css` + `tsv_svelte`, counting the experimental compiler/checker and the tooling separately): a small foundation share against a language share several times larger reflects genuine domain complexity, not missing extraction opportunities. The doc builder already factors out the rendering algorithm (the expensive shared part); what remains language-specific is the _formatting decisions_ themselves — when to break, how to indent, where to attach comments — which differ fundamentally between TypeScript, CSS, and Svelte.
 
 ### What Not to Extract
 
@@ -365,7 +347,7 @@ The `doc` module implements a declarative document builder inspired by prettier'
 
 ### Core Types (Arena-Based)
 
-Doc nodes are allocated in a contiguous `DocArena`. Each node is referenced by a `DocId` (a `u32` index), and child lists use `ChildRange` (start index + length). This eliminates per-node heap allocation and recursive `Drop` traversal. This fits the doc tree specifically: it's built once, rendered once, and dropped wholesale, so `DocId` indices are the natural access pattern. The AST is also bump-arena-allocated but uses **`&'arena` references, not `DocId` indices** — it's traversed repeatedly, so direct pointer access beats index lookups — see [Nested AST](#nested-ast-bump-arena-not-flatindexed).
+Doc nodes live in a contiguous `DocArena`, referenced by `DocId` (a `u32` index), with child lists as `ChildRange` (start index + length) — no per-node heap allocation, no recursive `Drop` traversal. Indices suit the doc tree specifically: it's built once, rendered once, and dropped wholesale. The AST is also bump-arena-allocated but uses **`&'arena` references, not `DocId` indices** — it's traversed repeatedly, so direct pointer access beats index lookups — see [Nested AST](#nested-ast-bump-arena-not-flatindexed).
 
 ```rust
 pub enum DocNode {
@@ -407,13 +389,19 @@ pub enum DocText {
 }
 ```
 
-**These four variants are `DocNode`'s niche, and the packing is charged back at every `match`.** `DocNode::Text(DocText)` is the variant a `DocNode` niche-packs into — which is what fits a `DocNode` in 24 B — so `DocText`'s four sub-tags own `DocNode` discriminant values 0..=3, and a switch over the node kind cannot index its jump table until it has folded those four back into one arm (four ALU ops per visit). The cost is invisible to a profile board, because it lives inside the single source line a board attributes to "the dispatch"; only a disassembly shows it. Two walks peel it off by probing their commonest kinds with `if let` ahead of the dispatch, because the `Text` test *is* the fold — so it vanishes and the residual switch is dense: the render loop probes `Concat` then `Text`, and the fits walk probes `Text` (which also retires that walk's memo round-trip for a leaf text, whose width is in the node already). Together: cycles −2.09% / wall −1.82% on the largest real corpus, against a second-draw code-layout null of −0.04% / +0.06%, at `instructions:u` −0.29%. The two are levers of different kind — the render loop's is a cycles lever with a near-flat instruction channel, because what comes off the critical path is a jump-table load feeding an indirect jump; the fits walk's is an instruction lever. ⚠️ The peel is **not** a rewrite to apply at every `match` over a `DocNode`: **it pays only where the peeled kind is the fold's own range.** The same edit in `DocArena::subtree_layout_fill` — whose commonest kind is the container, whose tag sits *above* the fold, so the fold is computed anyway and the probe merely tests the folded index — measured +0.19% instructions / +0.95% cycles and was rejected. ⭐ **And the ORDER of the variants below `Text` is load-bearing for a second, independent reason.** The fused layout walk's inline memo probe answers a run of kinds itself rather than entering its outlined `#[cold]` fill — a leaf `Text`, a `MultilineText`, a `Line`, a pre-broken `Group`, and the kinds that forward one child's value verbatim (`Indent`, `Dedent`, `Align`, `AlignRoot`, a plain `Group`) — and those are declared as a contiguous run immediately above `Text`'s niche range, so the probe separates "answer here" from "call the fill" with `tag < 4` plus one further unsigned compare. A `Concat`, which is 96% of what still reaches the fill, falls through both on direct branches. Peeling the same idea over a set with a HOLE in it (adding `IndentIfBreak` and `GatedState`, whose tags sit above `IfBreak`'s) makes LLVM lower the set to a jump table, and the fall-through then pays an indirect jump on every container: the same lever measures −0.173% that way against −0.377% with the contiguous set.
+**These four variants are `DocNode`'s niche, and the packing is charged back at every `match`.** `DocNode::Text(DocText)` is the variant a `DocNode` niche-packs into — which is what fits a `DocNode` in 24 B — so `DocText`'s four sub-tags own `DocNode` discriminant values 0..=3, and a switch over the node kind cannot index its jump table until it has folded those four back into one arm (four ALU ops per visit). A profile board cannot see the cost — it lives inside the single source line a board attributes to "the dispatch"; only a disassembly shows it. Two walks peel it off by probing their commonest kinds with `if let` ahead of the dispatch: the `Text` test *is* the fold, so it vanishes and the residual switch is dense. The render loop probes `Concat` then `Text`; the fits walk probes `Text` (also retiring that walk's memo round-trip for a leaf text, whose width is in the node already). Together: cycles −2.09% / wall −1.82% on the largest real corpus, against a second-draw code-layout null of −0.04% / +0.06%, at `instructions:u` −0.29%. The levers differ in kind — the render loop's is a cycles lever with a near-flat instruction channel (what leaves the critical path is a jump-table load feeding an indirect jump); the fits walk's is an instruction lever.
 
-The `u16` is a cached visual width with a single flag bit (`TEXT_WIDTH_NEWLINE_FLAG`): clear, the slot is the single-line width; set, the text holds a newline and the low fifteen bits are its **first** line's width, which the fits walk charges to the current line before treating the newline as ending it (the same reading `MultilineText::first_width` gets). `Pooled`, `SourceSpan`/`VerbatimSpan`, and `Static` text always precompute at build — a real width, or the flagged first-line width — so `fits()` answers from the node alone (never borrowing the pool, and never needing the document source; for `Pooled` only the render loop reads the bytes, through one pool borrow hoisted per render) and `render_text`'s column advance skips its per-text byte scan. For `Static` the precompute is amortized through the arena's direct-mapped static width cache — measured once per *unique* string per arena (the address is a link-time constant, so the slot hash folds per `text()` call site), never per node (both the per-node eager measure and an inline-pointer→table-index narrowing were measured losses). There is **no exception** — name slices precompute too. Deferring a name's width did not avoid the scan, it only moved it into `render_text`'s column advance (which every emitted name reaches) and the fits path's own on-demand measure, and names are ~15% of all doc nodes; measuring them at build instead is `instructions:u` −0.8…−1.2% across corpora, and exactly 0.000% on pure CSS, which emits none. Because the policy has no exception the deferral mechanism is **gone rather than dormant**: no "not computed" sentinel, no on-demand measure in the fits path, and so no `source` parameter anywhere in the fits walk — which is what lets that walk fuse with the build-time forced-break walk into a single memoized pass (`DocArena::subtree_layout_fill`).
+⚠️ The peel is **not** a rewrite to apply at every `match` over a `DocNode`: **it pays only where the peeled kind is the fold's own range.** The same edit in `DocArena::subtree_layout_fill` — whose commonest kind is the container, tagged *above* the fold, so the fold is computed anyway and the probe merely tests the folded index — measured +0.19% instructions / +0.95% cycles and was rejected.
+
+⭐ **And the ORDER of the variants below `Text` is load-bearing for a second, independent reason.** The fused layout walk's inline memo probe answers a run of kinds itself rather than entering its outlined `#[cold]` fill — a leaf `Text`, a `MultilineText`, a `Line`, a pre-broken `Group`, and the kinds that forward one child's value verbatim (`Indent`, `Dedent`, `Align`, `AlignRoot`, a plain `Group`) — and those are declared as a contiguous run immediately above `Text`'s niche range, so the probe separates "answer here" from "call the fill" with `tag < 4` plus one further unsigned compare. A `Concat`, which is 96% of what still reaches the fill, falls through both on direct branches. Peeling over a set with a HOLE in it (adding `IndentIfBreak` and `GatedState`, whose tags sit above `IfBreak`'s) makes LLVM lower the set to a jump table, so the fall-through pays an indirect jump on every container: −0.173% that way against −0.377% with the contiguous set.
+
+The `u16` is a cached visual width with a single flag bit (`TEXT_WIDTH_NEWLINE_FLAG`): clear, the slot is the single-line width; set, the text holds a newline and the low fifteen bits are its **first** line's width, which the fits walk charges to the current line before treating the newline as ending it (the same reading `MultilineText::first_width` gets). `Pooled`, `SourceSpan`/`VerbatimSpan`, and `Static` text always precompute at build — a real width, or the flagged first-line width — so `fits()` answers from the node alone (never borrowing the pool, and never needing the document source; for `Pooled` only the render loop reads the bytes, through one pool borrow hoisted per render) and `render_text`'s column advance skips its per-text byte scan. For `Static` the precompute is amortized through the arena's direct-mapped static width cache — measured once per *unique* string per arena (the address is a link-time constant, so the slot hash folds per `text()` call site), never per node (both the per-node eager measure and an inline-pointer→table-index narrowing were measured losses). There is **no exception** — name slices precompute too: deferring a name's width doesn't avoid the scan, only moves it into `render_text`'s column advance (which every emitted name reaches) and the fits path's on-demand measure, and names are ~15% of all doc nodes; measuring them at build is `instructions:u` −0.8…−1.2% across corpora (exactly 0.000% on pure CSS, which emits none). Because the policy has no exception the deferral mechanism is **gone rather than dormant**: no "not computed" sentinel, no on-demand measure in the fits path, and so no `source` parameter anywhere in the fits walk — which is what lets that walk fuse with the build-time forced-break walk into a single memoized pass (`DocArena::subtree_layout_fill`).
 
 The precompute itself (`pooled_text_width`) is a **search, not a sum**: a plain one-column ASCII slice's width *is* its byte count, so one word-at-a-time pass (`printing::next_width_relevant`) asks only for the first byte that could make the answer anything else — a `\t`, a `\n`, or a non-ASCII byte — and finding none has finished the measurement, with nothing accumulated on the way. Just under 99% of slices never leave that scan; a hit goes to a cold arm that resumes the same scan per tab, answers the newline question ahead of the width one, and hands a non-ASCII slice whole to the grapheme walk. **The correctness of this arithmetic is guarded by an exhaustive equivalence test beside the function and by nothing else**: a width only changes the output once it crosses the print width, so an error on a rare byte leaves every formatted file byte-identical and passes the fixture suite and any size of corpus diff. See [`crates/tsv_lang/CLAUDE.md`](../crates/tsv_lang/CLAUDE.md) and [`docs/performance.md`](performance.md#a-corpus-cannot-grade-arithmetic).
 
-`Pooled` stores its bytes in the arena-owned text pool (a `String` on `DocArena`, indexed by `PoolSpan { start, len }`), and `MultilineText` bodies live there too — so `DocNode` carries **no drop glue** (`const`-asserted via `needs_drop`), and `DocArena::reset()`/drop free the node store without walking every node to run destructors on the <1% of nodes that would otherwise own `String`s. A printer with a ready-made slice passes it to `text_pooled(&str)`; one that must *assemble* the text streams it through `DocArena::pool_writer()` instead of building a transient `String` — the returned `PoolTextWriter` owns a scratch buffer parked on the arena (capacity retained across uses and `reset()`), holds no pool borrow while open (interleaved arena calls stay correct by construction), and its consume-on-finish `finish_text()`/`finish_multiline_text()` moves the bytes into the pool atomically. `SourceSpan` defers text resolution to print time, keyed on a source span: it stores a `Span` into the document `source` and resolves to the verbatim slice at print time (against the `source` threaded through the render entry points), so unmodified text — comments, template chunks, already-canonical literals (TS numbers/strings, CSS dimensions), Svelte markup text — emits with **no `String` allocation** and **no lifetime on `DocArena`** (the lifetime-free alternative to borrowing `&'src str` into the doc tree, which would forfeit the cross-file arena `reset()` reuse).
+`Pooled` stores its bytes in the arena-owned text pool (a `String` on `DocArena`, indexed by `PoolSpan { start, len }`), and `MultilineText` bodies live there too — so `DocNode` carries **no drop glue** (`const`-asserted via `needs_drop`), and `DocArena::reset()`/drop free the node store without walking every node to run destructors on the <1% of nodes that would otherwise own `String`s. A printer with a ready-made slice passes it to `text_pooled(&str)`; one that must *assemble* the text streams it through `DocArena::pool_writer()` instead of building a transient `String` — the returned `PoolTextWriter` owns a scratch buffer parked on the arena (capacity retained across uses and `reset()`), holds no pool borrow while open (interleaved arena calls stay correct by construction), and its consume-on-finish `finish_text()`/`finish_multiline_text()` moves the bytes into the pool atomically.
+
+`SourceSpan` stores a `Span` into the document `source` and resolves it to the verbatim slice at print time (against the `source` threaded through the render entry points), so unmodified text — comments, template chunks, already-canonical literals (TS numbers/strings, CSS dimensions), Svelte markup text — emits with **no `String` allocation** and **no lifetime on `DocArena`** (the lifetime-free alternative to borrowing `&'src str` into the doc tree, which would forfeit the cross-file arena `reset()` reuse).
 
 ## Parser Architecture
 
@@ -606,25 +594,23 @@ elements, mapped-type values) indent their continuations correctly.
 ### Line terminators: `parse` takes the author's bytes, `format` folds first
 
 `parse` never rewrites its input — its offsets are a drop-in contract with acorn /
-Svelte / `parseCss` over the bytes on disk. Every **parse-then-format** entry point, by
-contrast, folds `<CR>` and `<CR><LF>` to `<LF>` *before* it parses
+Svelte / `parseCss` over the bytes on disk. Every **parse-then-format** entry point
+instead folds `<CR>` and `<CR><LF>` to `<LF>` *before* parsing
 (`tsv_lang::printing::normalize_carriage_returns`, called from each language crate's
 `format_str`, the CLI's `format_source`, each binding's format export, and
-`tsv_svelte_compile`'s `canonicalize_js`, each of which parses the folded document through
-its language's `parse_folded`). tsv's output is therefore
-LF-only, including inside the regions it copies verbatim — a frozen embedded body, a
-`format-ignore` region, a multi-line comment, a template literal. The fold returns a
-`FoldedSource`: the folded text with the line verdict its one pass took over it (is every
-terminator left a `\n`?), which each crate's `format_folded_in` hands the printer's line
-table — so a document that folds pays one whole-source pass, not the fold's and then the
-printer's.
+`tsv_svelte_compile`'s `canonicalize_js`, each then parsing the folded document through
+its language's `parse_folded`), so tsv's output is LF-only, even inside the regions it
+copies verbatim — a frozen embedded body, a `format-ignore` region, a multi-line
+comment, a template literal. The fold returns a `FoldedSource`: the folded text plus
+the line verdict its one pass took (is every terminator left a `\n`?), which each
+crate's `format_folded_in` hands the printer's line table — so a folding document pays
+one whole-source pass, not the fold's and then the printer's.
 
 Ahead of the parse is the only place the question can be answered once. The printers ask
 *where are the lines?* in several places that split on `'\n'` alone — `Comment::multiline`
 at parse, `is_indentable_block_comment` at doc-build, and the
 per-line emitters under them — and a fold applied to the finished string leaves all of them
-disagreeing with the output about where the lines are, so the same document formats two
-ways on two passes. It is also where prettier folds (`normalizeEndOfLine`, in
+disagreeing with the output, so the same document formats two ways on two passes. It is also where prettier folds (`normalizeEndOfLine`, in
 `normalizeInputAndOptions`), and where the languages themselves do: HTML preprocesses its
 input stream so that "there are never any U+000D CR characters in the input to the
 tokenization stage", CSS Syntax §3.3 filters `<CR>` / `<FF>` / `<CR><LF>` to one `<LF>`,
@@ -696,8 +682,9 @@ The writers take the line table as `Option<&LocationTracker>` inside
 `tsv_lang::WirePositions`, built at **write** time, once per document and only when `loc` is
 requested — the span-only wire builds the byte→UTF-16 map alone, and no parse path builds a
 line table at all. The table exists only under `tsv_lang`'s `locations` cargo feature, which
-no binding enables, so the bindings — which ship the span-only wire alone — carry no `loc`
-writer: without it every `loc` emitter is dead code the optimizer removes. The fixtures pin the span-only wire; the definition itself is graded by
+no binding enables, so in the bindings every `loc` emitter is dead code the optimizer
+removes ([Cargo feature surface](#cargo-feature-surface)). The fixtures pin the
+span-only wire; the definition itself is graded by
 `tests/loc_definition.rs`, an independent reference over every fixture input plus the
 terminator, BOM and astral inputs no fixture can hold. The shipped JS reconstruction
 (`crates/tsv_wasm/npm/locations.js`) implements the same definition over the span-only wire,
@@ -762,14 +749,13 @@ A handful of verbatim leaves whose *enclosing* span is larger than the leaf (an
 at-rule name after `@`, a declaration property, an `@import` `supports()` name, a
 Svelte directive name inside `prefix:name|mods`) are still stored as `&'arena str`
 rather than a dedicated leaf span — a benign, low-frequency exception, not a stored
-raw cache of the printed text. The CSS **function** name inside `name(args)` used to
-be one and is now a `CssValue::Function::name_span`: the copy was the smaller half of
-what it cost. A printer that must *prove* a stored text is the head of its span pays a
-guard on every ask — measured twice as a wash against the copy itself — where a parser
-that simply records the span makes both disappear. It also settled a correctness
-question the `&str` had been hiding: two producers stored a *decoded* name into a field
-documented verbatim, so an escape-spelled `@import \6c ayer(` printed `layer(`. A span
-cannot carry a decoded text, so the shape forbids the bug. **When a leaf on this list
+raw cache of the printed text. The CSS **function** name inside `name(args)` is
+instead a span (`CssValue::Function::name_span`), because the copy was the smaller
+half of the cost: a printer that must *prove* a stored text is the head of its span
+pays a guard on every ask — measured twice as a wash against the copy itself — where a
+parser that records the span makes both disappear. A span also cannot carry a decoded
+text, which forbids a bug the `&str` hid: two producers stored a *decoded* name into a
+field documented verbatim, so an escape-spelled `@import \6c ayer(` printed `layer(`. **When a leaf on this list
 looks like a redundant copy, price the guard its absence would cost the printer, and
 check every producer stores the verbatim bytes.**
 
@@ -858,25 +844,37 @@ an emit-keyed gate is blind to every owned comment it guards
 - **Pro**: Simple AST, no duplication, memory efficient, matches prettier's model
 - **Con**: Printers must manually track `prev_end` positions; edge cases require careful span math
 
-Higher-level comment attachment helpers were evaluated for extraction to tsv_lang. The current primitives (binary search + classification) are the right abstraction. Per-printer comment handling is language-specific — each language has different rules for where comments attach relative to node types. Re-evaluate if genuine duplication emerges across multiple tools.
+Higher-level comment attachment helpers were evaluated for extraction to tsv_lang and rejected: the primitives (binary search + classification) are the right abstraction, and per-printer handling is language-specific — each language attaches comments differently relative to its node types. Re-evaluate if genuine duplication emerges across tools.
 
 ### Format-Ignore Directives
 
-A `format-ignore` / `prettier-ignore` comment suppresses formatting of the construct that follows it (single directive), or — in Svelte templates — a `format-ignore-start` … `format-ignore-end` pair suppresses a range. Recognition is a thin string-level layer over this detached model: `tsv_lang::is_format_ignore_directive` (and `is_format_ignore_range_start` / `_end`) match the trimmed comment text and are the single source of truth for the directive set. Recognition alone doesn't honor: in TS a directive freezes only when it is **alone on its line** (the placement floor, `directive_alone_on_line` — any other placement is an ordinary comment; see [directives.md §Placement](./directives.md#placement)). Each printer checks the gap before a node for a recognized, placement-qualified directive and emits the node's raw source span (`span.extract(source)`) instead of a formatted doc. In a Svelte template the frozen span is that span less the one run that is not the construct: the parser folds a text node's own edge whitespace into it, and those runs are *separators* the printer still owns, so the trailing one is dropped wherever the boundary after it is the printer's to emit (`Printer::format_ignore_frozen_span`). The gap in FRONT of a frozen node is the author's and is printed exactly once — never doubled with a break the slice already carries, never invented where they glued the directive to the node (a break there injects a rendered space), never eaten where they wrote one (deleting it removes a rendered space). See [conformance_prettier_ignore.md](./conformance_prettier_ignore.md#format-ignore-directive). The tsv-native `format-ignore` family is canonical; the `prettier-ignore` family is honored as a compatibility alias for prettier-authored code. See [directives.md](./directives.md) and [conformance_prettier_ignore.md §Format-ignore directive](./conformance_prettier_ignore.md#format-ignore-directive).
+A `format-ignore` / `prettier-ignore` comment suppresses formatting of the construct that follows it (single directive), or — in Svelte templates — a `format-ignore-start` … `format-ignore-end` pair suppresses a range. Recognition is a thin string-level layer over this detached model: `tsv_lang::is_format_ignore_directive` (and `is_format_ignore_range_start` / `_end`) match the trimmed comment text and are the single source of truth for the directive set. Recognition alone doesn't honor: in TS a directive freezes only when it is **alone on its line** (the placement floor, `directive_alone_on_line` — any other placement is an ordinary comment; see [directives.md §Placement](./directives.md#placement)). Each printer checks the gap before a node for a recognized, placement-qualified directive and emits the node's raw source span (`span.extract(source)`) instead of a formatted doc. In a Svelte template the frozen span is that span less the one run that is not the construct: the parser folds a text node's own edge whitespace into it, and those runs are *separators* the printer still owns, so the trailing one is dropped wherever the boundary after it is the printer's to emit (`Printer::format_ignore_frozen_span`). The gap in FRONT of a frozen node is the author's and is printed exactly once — never doubled with a break the slice already carries, never invented where they glued the directive to the node (a break there injects a rendered space), never eaten where they wrote one (deleting it removes a rendered space). The tsv-native `format-ignore` family is canonical; the `prettier-ignore` family is honored as a compatibility alias for prettier-authored code. See [directives.md](./directives.md) and [conformance_prettier_ignore.md §Format-ignore directive](./conformance_prettier_ignore.md#format-ignore-directive).
 
 ## Allocation & Memory
 
 Native tsv runs on the system allocator — no `#[global_allocator]`, no alternative-allocator dependency. The one exception is WebAssembly: `tsv_wasm` sets a wasm32-gated `#[global_allocator]` to [talc](https://github.com/SFBdragon/talc) (its `WasmGrowAndExtend` source), replacing std's default dlmalloc — the WASM format path is allocation-bound enough that the allocator itself was a measured wall, and the extend source holds the long-lived instance's linear-memory high-water at dlmalloc parity. The performance posture is otherwise structural: each layer avoids allocation by design rather than allocating faster.
 
-**Lexing — spans, not strings.** Tokens store `u32` byte offsets (`start`, `end`) into the source, never slices or copies — `Token` is a small POD (16 B; tsv_svelte's 12 B) that a byte cursor over the source emits. The exception is deliberate: a string literal's decoded value is materialized only when it actually contains escape sequences, decoded into a **reused scratch buffer held out-of-band on the lexer** (`Lexer::decode_scratch`, borrowed via `decoded_str` and copied into the AST arena at receipt) so no per-literal `String` allocates and the per-token `Token` stays pointer-free. Comments are spans too — the token carries a `content_start` and the `Comment` node a `content_span`, recovered from source on demand and never copied. On the parser's hot path (`advance`, plus the CSS and Svelte lookaheads) the lexers write the token in place into the parser's slot (`next_token_into`) rather than returning it, since a by-value `Result<Token, ParseError>` return goes through a stack slot the parser would reload and re-scatter; every other TS and CSS caller takes it by value (`next_token`), and the Svelte lexer has no by-value form.
+**Lexing — spans, not strings.** Tokens store `u32` byte offsets (`start`, `end`) into the source, never slices or copies — `Token` is a small POD (16 B; tsv_svelte's 12 B) that a byte cursor over the source emits. The exception is deliberate: a string literal's decoded value is materialized only when it actually contains escape sequences, decoded into a **reused scratch buffer held out-of-band on the lexer** (`Lexer::decode_scratch`, borrowed via `decoded_str` and copied into the AST arena at receipt) so no per-literal `String` allocates and the per-token `Token` stays pointer-free. Comments are spans too — the token carries a `content_start` and the `Comment` node a `content_span`, recovered from source on demand and never copied. On the parser's hot path (`advance`, plus the CSS and Svelte lookaheads) the lexers write the token in place into the parser's slot (`next_token_into`) rather than returning a by-value `Result<Token, ParseError>` through a stack slot the parser would reload and re-scatter; other TS and CSS callers take it by value (`next_token`); the Svelte lexer has no by-value form.
 
 **Internal AST — bump-arena nested ownership, span-identity names, no raw text.** Nodes are allocated in a per-parse bump arena: recursive children are `&'arena T` and child collections `&'arena [T]` (not `Box`/`Vec`), with small children kept inline by value (see [Nested AST](#nested-ast-bump-arena-not-flatindexed) for the layout rationale). Identifier names are span-identity — an `IdentName` records the raw name-token length and the name is re-sliced from source; only the rare `\u`-escaped (or oversized) name carries its decoded form as an `&'arena str`. Svelte element/attribute names are span-identity too (`source[name_span]`, `.trim()` for the padded-`{ shorthand }` edge), so there is no shared symbol table anywhere. Raw source text is never duplicated into the AST — printers re-slice via `span.extract(source)`; the few deliberate stored-raw caches are cataloged in [Source-Based Printing](#source-based-printing). What remains as owned data is genuinely decoded: string-literal values (only when escaped) and the like, arena-allocated as `&'arena str`.
 
 **Svelte template nodes — contiguous storage.** Fragment children are an `&'arena [FragmentNode]` slice of enum values rather than boxed nodes, keeping siblings contiguous in arena memory for the printer's traversal loops.
 
-**Doc building — the doc arena.** All doc nodes live in a contiguous `DocArena` (two flat `Vec`s: nodes and child lists, plus the text pool and an inline direct-mapped static cache), referenced by `u32` `DocId`s — no per-node heap allocation, no drop glue (`DocNode` is trivially droppable, `const`-asserted). Static text is **interned per document**: repeated `text(",")` calls return one shared `DocId` instead of allocating per call — sound because statics are position-free at render, nodes are append-only, and no consumer keys on an interned node's identity (the identity-keyed tables — the keyed-group map, the swallow/comment side-sets — key only on nodes that are never interned). The hottest statics (the punctuation that is three quarters of a run's `text()` calls) and the stateless singleton nodes — `empty()`, the four `Line` kinds, `LineSuffixBoundary`, `BreakParent`, `FlushBreak`, the flow-probe sentinel — form a **prelude** seeded at fixed ids ahead of every document (by the constructors and `reset()`), so a literal `text(",")` or a `line()` folds to a constant with no lookup — and a delimiter or operator a builder *receives* is passed as a `DocId` built at the caller, since a `&'static str` parameter reaches `text()` as a runtime value and pays the prelude's switch at every call; a `Line` node carries no mode or indent (both are supplied per visit by the enclosing render command), the layout analog of "statics are position-free", so every `line()` in a document is one node. Every other static goes through the static cache, which maps a `&'static str`'s address to both its precomputed visual width and the current document's node for it. The single-shot `format()` path pre-sizes one arena from source length (~2 nodes per source byte, text pool at source/8; `DocArena::with_source_size_hint`) and drops it after rendering; multi-file drivers (the CLI dir-walk worker, the FFI/NAPI/WASM bindings) instead reuse one arena across calls via `DocArena::reset()` — clearing the node/child/text-pool/memo stores while retaining capacity (the static cache's width halves deliberately survive: they key on `'static` string addresses; the interned node halves are invalidated in O(1) by the reset's generation bump), the doc-IR analogue of the per-call AST `Bump::reset()` reuse — and the printers borrow `&DocArena` so the caller owns the reusable one (`format_in` is the borrowed-arena entry point). The builders' transient parts-lists are pooled the same way: wide-list builders (statement / object / array / parameter / specifier lists) draw a `DocBuf` from a recursion-safe arena free-list (`pooled_docbuf()`) rather than allocating a fresh `SmallVec` per call, so a document's many list-assembly spills collapse into a handful of long-lived reused buffers — byte-identical, allocation only. Parts produced one at a time go through `DocArena::concat_iter`, which pulls three before opening any buffer — most assemblies hold one or two parts, and a one-part concat is its part — so the common case builds no buffer at all (byte-identical too: the parts are pulled in the order a `collect` would have built them). Embedded languages build doc nodes into the host file's arena rather than nesting their own. Identifier text never enters the doc tree: names emit as `DocText::SourceSpan` spans resolved at print time (see [DocText](#doctext-static-pooled-sourcespan-verbatimspan)); verbatim source text (comments, template chunks, Svelte markup text) is `SourceSpan` too, while a format-ignored JavaScript-level frozen slice emits as the layout-opaque `VerbatimSpan` (a frozen Svelte template node stays `SourceSpan`: prettier-plugin-svelte joins its lines with `literalline`, a break every enclosing group sees) — and built text a printer actually constructs is copied once into the arena text pool (`Pooled`, assembled piecewise via `DocArena::pool_writer()` when no ready-made slice exists), so nodes themselves never own strings.
+**Doc building — the doc arena.** All doc nodes live in a contiguous `DocArena` (two flat `Vec`s: nodes and child lists, plus the text pool and an inline direct-mapped static cache), referenced by `u32` `DocId`s — no per-node heap allocation, no drop glue (`DocNode` is trivially droppable, `const`-asserted). Static text is **interned per document**: repeated `text(",")` calls return one shared `DocId` instead of allocating per call — sound because statics are position-free at render, nodes are append-only, and no consumer keys on an interned node's identity (the identity-keyed tables — the keyed-group map, the swallow/comment side-sets — key only on nodes that are never interned).
 
-**Rendering — pre-sized output, stack-allocated scratch.** The per-render output `String` is reserved from arena node count (`DocArena::estimated_output_capacity`, clamped against pathological initial sizes), and the hot per-piece render-and-write seams (the TS/CSS printers' `write_arena_doc`, the Svelte printer's `render_doc_immediate` and `<script>`/`<style>` block renders) render through the `*_into` entry points into an arena-parked scratch buffer (`DocArena::take_render_scratch` / `park_render_scratch` — the render analog of `pool_writer()`'s parked scratch: one warm buffer per file instead of an alloc/free per rendered piece, with a fresh-fallback empty default so nested renders stay correct). `OutputBuffer` pre-allocates from source length for the Svelte printer's direct writes. The CSS printer skips the render altogether for a piece that fits the rest of its line: `arena_try_print_flat_into` writes the doc's texts straight onto the printer's buffer in one width-charging walk and refuses anything it cannot prove the renderer prints identically, so only a piece that wraps takes the scratch path (the argument is the module doc of `tsv_lang`'s `doc/arena_render_flat.rs`). The `fits()` lookahead and the render loop's own work-list both run on `SmallVec` stacks — the render command stack and its pending line-suffix buffer stay inline for the common small sub-render (the renderers run once per CSS declaration/value and per Svelte template expression, so each would otherwise allocate a fresh `Vec` from empty), and each top-level render additionally borrows the arena-pooled pair (`borrow_render_commands_scratch` / `borrow_line_suffix_scratch`) so their spill capacity warms once per arena instead of re-allocating per rendered piece (sub-renders keep their own inline locals and never take that borrow) — the render's keyed-group map is an arena-parked `Vec` of `(DocId, broke)` entries (`DocArena::keyed_group_modes` — one entry per keyed group INSTANCE, keyed on the group's own node, which a `GroupId` names, as prettier's id is a per-group `Symbol`; appended in resolution order and searched newest-first by the reader, which sits close behind its group; no per-render `HashMap`, and its capacity warms once per arena; the top-level render clears it on entry, and every fill-item and line-suffix sub-render nested in that render shares it, as prettier's one `groupModeMap` is shared), and comment-classification buckets are `SmallVec`s sized for the common 0-2 comments case.
+The hottest statics (the punctuation that is three quarters of a run's `text()` calls) and the stateless singleton nodes — `empty()`, the four `Line` kinds, `LineSuffixBoundary`, `BreakParent`, `FlushBreak`, the flow-probe sentinel — form a **prelude** seeded at fixed ids ahead of every document (by the constructors and `reset()`), so a literal `text(",")` or a `line()` folds to a constant with no lookup. A delimiter or operator a builder *receives* is therefore passed as a `DocId` built at the caller: a `&'static str` parameter reaches `text()` as a runtime value and pays the prelude's switch at every call. A `Line` node carries no mode or indent (the enclosing render command supplies both per visit) — the layout analog of "statics are position-free" — so every `line()` in a document is one node. Every other static goes through the static cache, mapping a `&'static str`'s address to its precomputed visual width and the current document's node for it.
+
+The single-shot `format()` path pre-sizes one arena from source length (~2 nodes per source byte, text pool at source/8; `DocArena::with_source_size_hint`) and drops it after rendering. Multi-file drivers (the CLI dir-walk worker, the FFI/NAPI/WASM bindings) instead reuse one arena across calls via `DocArena::reset()` — the doc-IR analogue of the per-call AST `Bump::reset()` — clearing the node/child/text-pool/memo stores while retaining capacity (the static cache's width halves deliberately survive, keyed on `'static` string addresses; its interned node halves are invalidated in O(1) by the reset's generation bump). The printers borrow `&DocArena` so the caller owns the reusable one (`format_in` is the borrowed-arena entry point).
+
+The builders' transient parts-lists are pooled the same way: wide-list builders (statement / object / array / parameter / specifier lists) draw a `DocBuf` from a recursion-safe arena free-list (`pooled_docbuf()`) instead of a fresh `SmallVec` per call, collapsing a document's many list-assembly spills into a handful of long-lived reused buffers (byte-identical; allocation only). Parts produced one at a time go through `DocArena::concat_iter`, which pulls three before opening any buffer — most assemblies hold one or two parts, and a one-part concat is its part — so the common case builds no buffer (byte-identical too: parts are pulled in the order a `collect` would build them).
+
+Embedded languages build doc nodes into the host file's arena rather than nesting their own. Identifier text never enters the doc tree: names emit as `DocText::SourceSpan` spans resolved at print time (see [DocText](#doctext-static-pooled-sourcespan-verbatimspan)); verbatim source text (comments, template chunks, Svelte markup text) is `SourceSpan` too, while a format-ignored JavaScript-level frozen slice emits as the layout-opaque `VerbatimSpan` (a frozen Svelte template node stays `SourceSpan`: prettier-plugin-svelte joins its lines with `literalline`, a break every enclosing group sees) — and built text a printer actually constructs is copied once into the arena text pool (`Pooled`, assembled piecewise via `DocArena::pool_writer()` when no ready-made slice exists), so nodes themselves never own strings.
+
+**Rendering — pre-sized output, stack-allocated scratch.** The per-render output `String` is reserved from arena node count (`DocArena::estimated_output_capacity`, clamped against pathological initial sizes), and the hot per-piece render-and-write seams (the TS/CSS printers' `write_arena_doc`, the Svelte printer's `render_doc_immediate` and `<script>`/`<style>` block renders) render through the `*_into` entry points into an arena-parked scratch buffer (`DocArena::take_render_scratch` / `park_render_scratch` — the render analog of `pool_writer()`'s parked scratch: one warm buffer per file instead of an alloc/free per rendered piece, with a fresh-fallback empty default so nested renders stay correct). `OutputBuffer` pre-allocates from source length for the Svelte printer's direct writes.
+
+The CSS printer skips the render altogether for a piece that fits the rest of its line: `arena_try_print_flat_into` writes the doc's texts straight onto the printer's buffer in one width-charging walk and refuses anything it cannot prove the renderer prints identically, so only a piece that wraps takes the scratch path (the argument is the module doc of `tsv_lang`'s `doc/arena_render_flat.rs`).
+
+The `fits()` lookahead and the render loop's own work-list both run on `SmallVec` stacks — the render command stack and its pending line-suffix buffer stay inline for the common small sub-render (the renderers run once per CSS declaration/value and per Svelte template expression, so each would otherwise allocate a fresh `Vec` from empty), and each top-level render additionally borrows the arena-pooled pair (`borrow_render_commands_scratch` / `borrow_line_suffix_scratch`) so their spill capacity warms once per arena instead of re-allocating per rendered piece (sub-renders keep their own inline locals and never take that borrow) — the render's keyed-group map is an arena-parked `Vec` of `(DocId, broke)` entries (`DocArena::keyed_group_modes` — one entry per keyed group INSTANCE, keyed on the group's own node, which a `GroupId` names, as prettier's id is a per-group `Symbol`; appended in resolution order and searched newest-first by the reader, which sits close behind its group; no per-render `HashMap`, and its capacity warms once per arena; the top-level render clears it on entry, and every fill-item and line-suffix sub-render nested in that render shares it, as prettier's one `groupModeMap` is shared), and comment-classification buckets are `SmallVec`s sized for the common 0-2 comments case.
 
 **Lazy work over eager caching.** Line/column positions are computed only when `loc` is asked for — the error path, and the opt-in loc wire behind the `locations` cargo feature — via O(log n) binary search over line-start offsets (`LocationTracker`); the span-only wire every binding emits builds no line table. Error context (the point and the excerpted line) is computed only on the error path. Svelte `Text::data()` decodes entities only when entities are present, borrowing `raw` otherwise.
 
@@ -989,9 +987,8 @@ and the extra pointer-chases that size-minimization adds on hot traversal paths 
 more than the cache-density they buy. (The arena allocation itself is the win; the
 node *layout* favors traversal locality over byte size.)
 
-**The deliberate exceptions are two density rules, and both are worth stating
-precisely, because an enum's width is the ELEMENT width of everything that holds
-one.** An `Expression` slot is paid on every element of every `&[Expression]`; a
+**The deliberate exceptions are two density rules, because an enum's width is the
+ELEMENT width of everything that holds one.** An `Expression` slot is paid on every element of every `&[Expression]`; a
 `Statement` slot on every element of every statement slice and every
 `?`-propagation copy out of the parser. So a variant wide enough to set its enum's
 size on its own taxes the whole tree, while a pointer chase is paid only where that
@@ -1044,10 +1041,9 @@ and paid).
 **The second rule needs no rarity, because it adds no allocation at all: an inline
 slot whose value the producer already arena-allocated is a COPY OUT of the arena, not
 the place the node lives.** The expression parser threads `&'arena Expression`
-all the way up its Pratt ladder, so a container field spelled
-`Expression` by value made the parser copy 72 B *out* of the node's own allocation
-into the container's slot — while an `&'arena Expression` field simply keeps the
-allocation the parser already made. Naming the slot by reference therefore *removes*
+all the way up its Pratt ladder, so a by-value `Expression` container field copies
+72 B *out* of the node's own allocation into the container's slot, while an
+`&'arena Expression` field keeps the allocation the parser already made — *removing*
 work on 100% of the traffic instead of adding it. The two list-element containers
 whose own width was two such slots take it:
 
@@ -1099,15 +1095,13 @@ They are boxed anyway, because a boxed head's construction copies the same bytes
 the arena that it would otherwise have moved into the enum, so the cost is one bump
 pointer and the return is 24 bytes off *every other* statement slot. That takes
 `Statement` to **72 B**; the next-widest inline variant is `TryStatement`, which is
-where the ladder stops. The trade is settled by measurement, not by the rarity
-argument, and it is the only place in any of the three enums where that argument does
-not apply.
+where the ladder stops. The trade is settled by measurement, not by rarity — the
+only place in the three enums where rarity is not the argument.
 
 `Statement` is a header over its variant, as `Expression` is —
 `struct Statement { span, kind: StatementKind }` (`StatementKind` 64 B, set by
-`TryStatement` at 56) — so reading a statement's span is a field load rather than a
-dispatch over the variants. A variant struct carries no span of its own unless some node
-also holds that type outside a `Statement` (`VariableDeclaration`, `BlockStatement`,
+`TryStatement` at 56) — with the same span rule: a variant struct carries no span of
+its own unless some node also holds that type outside a `Statement` (`VariableDeclaration`, `BlockStatement`,
 `FunctionDeclaration`, `TSDeclareFunction`, `ClassDeclaration`,
 `TSInterfaceDeclaration`, `TSModuleDeclaration`); those are wrapped only through the
 `Statement::from_*` constructors, which take the header's span from the node's own. Both
@@ -1122,26 +1116,24 @@ measurement rather than by argument; measured, the parse-side copies removed and
 5× narrower slice element dominate it.
 
 The fat inline nodes carry no by-value-return penalty in the **expression**
-recursion, either: each node is built in the arena and threaded up the recursive
+recursion either: each node is built in the arena and threaded up the recursive
 descent **by reference** (every `parse_*` on the expression ladder returns an
-`&'arena Expression`, not the node), so the recursion moves pointers regardless of
-node size. The return is kept to two scalars end to end: with `ParseError` boxing its
+`&'arena Expression`), so the recursion moves pointers regardless of node size. The
+return stays two scalars end to end: with `ParseError` boxing its
 own payload, `Result<&Expression, ParseError>` is two words, which x86-64 returns in
 two registers. Nothing rides beside the reference — a paren-stripped operand's
-paren-inclusive extent is not a field but the tokens its parse consumed (it starts at
-the token current when the parse begins and ends at the previous token's end when it
-returns), because even a narrow `{&Expression, u32, u32}` is a three-field aggregate
-that comes back through an sret stack slot. (wasm32 returns every `Result` through a
-slot either way.) What the reference buys is the *caller's frame* as much as the
-return: an arm that holds a node by value reserves its bytes at every recursion level,
-whichever arm the dispatcher takes, so the choice sets nesting depth rather than
-throughput — the per-construct ceilings are in
-[cli.md §Recursion Depth](./cli.md#recursion-depth). The two
-concerns are decoupled — node *layout* is tuned for the format traversal, while the
-parse-time recursion cost is paid in pointer moves — so the *parse recursion* is
-never the reason to box a fat inline variant. The density rule above is; and because
-the enums sit on the expression and statement cycles, shrinking them moves the
-nesting ceilings too, as a side effect rather than as the goal.
+paren-inclusive extent is not a field but the tokens its parse consumed (from the
+token current when the parse begins to the previous token's end when it returns),
+because even a narrow `{&Expression, u32, u32}` is a three-field aggregate returned
+through an sret stack slot. (wasm32 returns every `Result` through a slot either way.)
+The reference buys the *caller's frame* as much as the return: an arm holding a node by
+value reserves its bytes at every recursion level, whichever arm the dispatcher takes,
+so the choice sets nesting depth rather than throughput — the per-construct ceilings
+are in [cli.md §Recursion Depth](./cli.md#recursion-depth). Node *layout* is tuned for
+the format traversal while parse-time recursion is paid in pointer moves, so the
+*parse recursion* is never the reason to box a fat inline variant — the density rule
+above is; and because the enums sit on the expression and statement cycles, shrinking
+them moves the nesting ceilings too, as a side effect rather than the goal.
 
 **Rationale vs flat/indexed:** Flat/indexed layouts (index arrays, à la Zig's
 `MultiArrayList`) were benchmarked early in development and were slower —
@@ -1155,8 +1147,7 @@ because it is traversed repeatedly.
 
 **Still open (separate axis):** re-run the **flat/indexed structure** comparison
 on the mature codebase — an independent question from allocation strategy (the
-early prototype conflated the two). Bump allocation for the nested model is
-the implemented design.
+early prototype conflated the two).
 
 ### Red-Green Trees (Deferred)
 

@@ -62,8 +62,8 @@ cargo run -p tsv_debug compare ../corpora/collections/zzz/src/path/to/file.svelt
 deno task corpus:compare:format:run ../corpora/collections/zzz --explain --exit-on-first
 ```
 
-Read `docs/conformance_prettier.md` plus the catalog for the language you're triaging (its
-§Catalogs table indexes them) and compare the diff against documented divergences.
+Compare the diff against the documented divergences (the frame plus the language's catalog —
+[First Step](#first-step-load-conformance-doc)).
 
 **Step 3: Classify — one of three outcomes:**
 
@@ -71,7 +71,7 @@ Read `docs/conformance_prettier.md` plus the catalog for the language you're tri
 
 **A) Already detected as known** → Move to next file
 
-The divergence detector already identifies this pattern. Nothing to do.
+The divergence detector already identifies this pattern.
 
 ---
 
@@ -198,10 +198,8 @@ deno task corpus:compare:format:run --all --json 2>/dev/null
 > live; only the formatter output is gated on the rebuild.
 
 > **Safety is differential vs prettier**: the SAFETY count reports only data loss
-> OUR output incurs _beyond_ what prettier does. Shared normalizations (redundant
-> leading-`|` removal, number normalization, CSS keyword lowercasing) are not
-> flagged even though they drop the source character count, because prettier
-> performs them too. A flagged SAFETY file is genuine over-normalization or
+> OUR output incurs _beyond_ what prettier does, so a normalization prettier performs
+> too is never flagged. A flagged SAFETY file is genuine over-normalization or
 > dropped content relative to prettier — see
 > [divergence_detector.md](./divergence_detector.md#differential-against-prettier-false-positive-guard).
 
@@ -233,7 +231,7 @@ The default output shows unified diffs for all unexplained differences (prettier
 
 ### Triage All Unexplained Diffs
 
-The default output shows every unexplained diff — partial file hunks and full unknown file diffs:
+The default output ([Examine Diffs](#examine-diffs)) is the triage view:
 
 ```bash
 # All unexplained diffs at once (recommended starting point)
@@ -263,7 +261,7 @@ cat docs/conformance_prettier.md docs/conformance_prettier_svelte.md
 find tests/fixtures -name "*prettier_divergence*" -type d
 ```
 
-The default output shows unexplained diffs and which patterns explain the explained hunks. Focus on files classified as `unknown` or `partial` — those are where real bugs live.
+The default output also names the pattern behind each explained hunk. Focus on files classified as `unknown` or `partial` — those are where real bugs live.
 
 **If the difference is detected as "known":** Not a bug. Move to the next file.
 
@@ -420,10 +418,10 @@ Two readings of that second run are corpus-specific:
 
 **Do not proceed to implementation without user approval.**
 
-There are two ways to satisfy this gate:
+Two ways satisfy it:
 
-1. **Plan-mode approval**: If the user approved a plan that includes the fixture path, content, and fix strategy, approval is already satisfied. Proceed directly to Phase 5.
-2. **Interactive approval**: If discovering issues during corpus comparison (no pre-approved plan), STOP and present the fixture to the user:
+1. **Plan-mode approval**: the user approved a plan that includes the fixture path, content, and fix strategy — proceed directly to Phase 5.
+2. **Interactive approval**: discovering issues during corpus comparison (no pre-approved plan) — STOP and present the fixture to the user:
    - Show the fixture location and structure
    - Explain what behavior it tests
    - Wait for explicit approval before fixing code
@@ -516,13 +514,13 @@ Full algorithm, character sets, and how to read a violation:
 ### Corpus Compare Options
 
 ```bash
-deno task corpus:compare:format --all [options]       # the gates corpus view (~9,300 files)
+deno task corpus:compare:format --all [options]       # the gates corpus view
 deno task corpus:compare:format <path> [options]      # Scans <path> recursively
 deno task corpus:compare:format:run <path> [options]  # Skip FFI build (faster iteration)
 
 Options:
-  --all             Compare the gates corpus view (~9,300 files: the ../corpora snapshot + the
-                    prettier fixture suites — see benches/js/CLAUDE.md §Corpus)
+  --all             Compare the gates corpus view (the ../corpora snapshot + the prettier
+                    fixture suites — see benches/js/CLAUDE.md §Corpus)
   --filter <lang>   Only compare files of this language (svelte, typescript, css)
   --limit <n>       Limit to first n files per language
   --verbose         Show each file as it's processed

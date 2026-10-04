@@ -25,110 +25,92 @@ project-wide conventions.
   - `compile(source, &CompileOptions) -> Result<CompileOutput, CompileError>` —
     parses the component and runs the server transform. Generated JS prints
     through `format_canonical`, so it is canonical-form by construction
-    (`canonicalize_js(output.js)` is a fixed point). The control-flow blocks
-    `{#if}`/`{#each}`/`{#await}`/`{#key}`, `{@const}`, `{#snippet}`/`{@render}`,
-    and **static component invocations** (`<Foo … />` →
-    `Foo($$renderer, {…props})` / `$.spread_props`, with default-slot children as
-    the implicit `children` snippet prop and `{#snippet}` children as named
-    snippet props; dynamic/member components, named slots, `bind:`/`--css-var`/
-    directives refuse) are covered (see the transform_server block emitters
-    below). Shapes
-    the transform does not cover yet — client generation, dev mode,
-    instance-script exports in every *value* form (the oracle compiles
-    `export const`/`function`/`{a}` via `$.bind_props`, not implemented; rejects
-    `export default`/`export let` — a *type-only* export erases away and
-    compiles), `generics`, a `lang` other than `"ts"`/`"js"`/`""` (the oracle's
-    TypeScript flag tests `lang === 'ts'` exactly, so `lang="typescript"` is
-    plain JS to it — tsv refuses rather than guess), TypeScript in a document
-    with no `ts` flag (tsv's parser is TS-permissive where the oracle
-    parse-errors — an over-acceptance), a comment
-    inside an erased TypeScript region, the refuse-don't-erase TypeScript set
-    (`enum` incl. `declare enum`, a value `namespace`, a constructor parameter
-    property, a decorator, an `accessor` field, an `abstract` *property*, a
-    bodiless class method, a class index signature (a shape the oracle *crashes*
-    on), a dotted `namespace A.B`, `import =`/`export =`/`export
-    as namespace` — the import/export three are shapes the oracle mis-compiles into invalid
-    JS), top-level `$:` legacy reactive
-    statements (invalid in runes mode — a nested `$` label or a plain label is
-    ordinary JS and clones through), `svelte/internal*` imports and
-    `beforeUpdate`/`afterUpdate` imports from `svelte` (the oracle's runes-mode
-    import rules), `{@debug}`, the deliberately-refused legacy attribute directives
-    (a legacy `on:` directive and `let:` — a runes-only fence, not a gap) — an element `{...spread}` (alone, or
-    co-present with `class:` / `style:` / `bind:` / the no-op drop family) is
-    **emitted** as the fused
-    `$.attributes(object, css_hash, classes, styles, flags)` call
-    (`element.rs::emit_spread_attributes`): the whole attribute set becomes the
-    object (plain attributes → `key: value` properties, a `bind:` core kind →
-    its synthesized `value`/`checked` property at the bind's slot, event handlers /
-    `defaultValue` dropped, spreads → `...expr`), the scope hash rides the
-    `css_hash` argument (not concatenated into the class value as in the
-    non-spread path; a static-class token OR a `class:` directive name scopes),
-    the `class:` directives ride the `classes` argument (the oracle's
-    `b.init(name, expr)` — identifier keys, case-preserved, with the
-    object-shorthand collapse — `attribute_class_style::build_spread_class_object`), the
-    `style:` directives ride the `styles` argument (a **FLAT** object, **no**
-    `|important` partitioning — the divergence from the non-spread
-    `$.attr_style` array — `attribute_class_style::build_spread_style_object`), and a foreign element /
-    a custom element / `<input>` set the `flags` argument (`3` / `2` / `4`)
-    (trailing absent args elide, interior ones become `void 0`); a spread
-    co-present with a legacy `on:`/`let:` refuses (`Refusal::RunesOnlyFence`),
-    and a spread on a `<select>` (the `$$renderer.select`
-    trap) or on a load-error element refuses (`SpreadOnSelect` /
-    `SpreadOnLoadErrorElement`) — a `class:` / `style:`
-    directive on a **regular element without a spread** is
-    instead **emitted** as the fused `$.attr_class(base, hash, {…})` /
-    `$.attr_style(base, {…})` call (`element.rs` /
-    `attribute_class_style.rs`), and a `bind:` **core kind** on a regular element without a
-    spread is
-    **handled** by `attribute_bind::emit_bind_directive` (`bind:this` omits;
-    `bind:value`/`bind:checked`/`bind:group` on `<input>` synthesize a
-    `$.attr(...)` for a `$state`-rooted target; every other `bind:` refuses via
-    `Refusal::BindDirective { name }`) — both the inline and spread `bind:` paths
-    share one `attribute_bind::resolve_bind_directive` validity fork; the no-op drop
-    family (`use:`/`transition:`/`in:`/`out:`/
-    `animate:`/`{@attach}`) is instead **dropped** on a regular element, its
-    expression still guarded (a stray rune / `await` refuses) and still walked for
-    scope analysis, except a `use:` on a load-error element, which refuses because
-    the oracle adds `onload`/`onerror` capture attributes there —
-    top-level `await`,
-    `<option>` / populated `<select>`/`<optgroup>` (the oracle emits closure
-    calls / `<!>` anchors there), template-expression comments, and every
-    `$`-prefixed identifier reference or call outside the sanctioned rewrites
-    below (a store **read** — `$name` whose `$`-stripped base is a binding — in a
-    template OR script position is sanctioned, emitting `$.store_get`; a store
-    **write** `$name = v` / **update** `$name++` in a script or dropped-handler
-    position is sanctioned too, emitting `$.store_set` / `$.update_store` — see
-    `store_rewrite.rs`; a store **member** write (`$obj.x = 5` → `$.store_mutate`),
-    a store **destructuring** write (`[$count] = …` → an IIFE), and a subscription
-    whose base is bound in a nested scope (`store_invalid_scoped_subscription`)
-    still refuse) — return `CompileError::Unsupported` with a
-    clear description, never
-    guessed output. Within the supported blocks, nested `{#each}` (the nested
-    emission path is unvalidated — the unique-name orders themselves ARE modelled),
-    a root-level `{@const}`, a destructured `{@const}`, a
-    `{@const}` shadowing a `$derived` binding, a member/call rooted at a
-    prop/import that is also shadowed in a nested scope (`needs_context`
-    classification ambiguous), and a leading comment glued to the `<script>` line
-    also refuse. Carried script comments alongside a template block, a component
-    invocation, an expression-valued attribute, `{#snippet}`/`{@render}`, or
-    hoisted imports **compile** — those emitters write template-region spans only,
-    which no script-comment window reaches — and so do comments alongside the script
-    rune rewrites, whose mints are zero-width fictional nodes at host positions.
-    The output is **self-validated by reparse** before it returns: generated JS
-    that `tsv_ts` rejects surfaces as `CompileError::CorruptOutput` (a compiler
-    bug — a divergent shape slipped every guard), never a silently invalid
-    module. Always on — the reparse costs ~13% of the compile itself (release,
-    measured over the fixture corpus; single-digit microseconds per component).
-    Reach: it catches output the parser *rejects* (nested `export`, mis-built
-    syntax). Output that parses as TypeScript (a passed-through annotation) is
-    NOT a parse rejection — that class is caught by the second, independent
-    self-check: `erase` is re-run over the finished program, and its
+    (`canonicalize_js(output.js)` is a fixed point).
+    - **Covered** (the `transform_server` block emitters below): the control-flow
+      blocks `{#if}`/`{#each}`/`{#await}`/`{#key}`, `{@const}`, `{#snippet}`/`{@render}`,
+      and **static component invocations** (`<Foo … />` →
+      `Foo($$renderer, {…props})` / `$.spread_props`, default-slot children as the
+      implicit `children` snippet prop, `{#snippet}` children as named snippet props;
+      dynamic/member components, named slots, `bind:`/`--css-var`/directives refuse).
+    - **On a regular element** (detail under `element.rs` and the attribute emitters):
+      an element `{...spread}` — alone, or co-present with `class:` / `style:` /
+      `bind:` / the no-op drop family — emits as one fused
+      `$.attributes(object, css_hash, classes, styles, flags)` call
+      (`element.rs::emit_spread_attributes`; its `styles` object is **FLAT**, **no**
+      `|important` partitioning, unlike the non-spread `$.attr_style` array), refusing
+      beside a legacy `on:`/`let:` (`Refusal::RunesOnlyFence`), on a `<select>` (the
+      `$$renderer.select` trap) or on a load-error element (`SpreadOnSelect` /
+      `SpreadOnLoadErrorElement`). Without a spread, `class:` / `style:` emit as the
+      fused `$.attr_class(base, hash, {…})` / `$.attr_style(base, {…})` call
+      (`attribute_class_style.rs`), and a `bind:` **core kind** goes through
+      `attribute_bind::emit_bind_directive` (`bind:this` omits;
+      `bind:value`/`bind:checked`/`bind:group` on `<input>` synthesize a `$.attr(...)`
+      for a `$state`-rooted target; every other `bind:` refuses via
+      `Refusal::BindDirective { name }`) — the inline and spread `bind:` paths share
+      one `attribute_bind::resolve_bind_directive` validity fork. The no-op drop family
+      (`use:`/`transition:`/`in:`/`out:`/`animate:`/`{@attach}`) is **dropped**, its
+      expression still guarded (a stray rune / `await` refuses) and still walked for
+      scope analysis, except a `use:` on a load-error element, which refuses because
+      the oracle adds `onload`/`onerror` capture attributes there.
+    - **Refused** — `CompileError::Unsupported` with a clear description, never
+      guessed output:
+      - client generation, dev mode, `generics`, top-level `await`;
+      - instance-script exports in every *value* form (the oracle compiles
+        `export const`/`function`/`{a}` via `$.bind_props`, not implemented; it rejects
+        `export default`/`export let`; a *type-only* export erases away and compiles);
+      - a `lang` other than `"ts"`/`"js"`/`""` (the oracle's TypeScript flag tests
+        `lang === 'ts'` exactly, so `lang="typescript"` is plain JS to it — tsv refuses
+        rather than guess), and TypeScript in a document with no `ts` flag (tsv's
+        parser is TS-permissive where the oracle parse-errors — an over-acceptance);
+      - a comment inside an erased TypeScript region, and the refuse-don't-erase
+        TypeScript set: `enum` incl. `declare enum`, a value `namespace`, a constructor
+        parameter property, a decorator, an `accessor` field, an `abstract` *property*,
+        a bodiless class method, a class index signature (a shape the oracle *crashes*
+        on), a dotted `namespace A.B`, and `import =`/`export =`/`export as namespace`
+        (shapes the oracle mis-compiles into invalid JS);
+      - top-level `$:` legacy reactive statements (invalid in runes mode — a nested `$`
+        label or a plain label is ordinary JS and clones through);
+      - `svelte/internal*` imports and `beforeUpdate`/`afterUpdate` imports from
+        `svelte` (the oracle's runes-mode import rules);
+      - `{@debug}`, and the deliberately-refused legacy attribute directives (a legacy
+        `on:` directive and `let:` — a runes-only fence, not a gap);
+      - `<option>` / populated `<select>`/`<optgroup>` (the oracle emits closure calls /
+        `<!>` anchors there), and template-expression comments;
+      - every `$`-prefixed identifier reference or call outside the sanctioned
+        rewrites. A store **read** (`$name` whose `$`-stripped base is a binding) in a
+        template OR script position is sanctioned, emitting `$.store_get`, as is a
+        store **write** `$name = v` / **update** `$name++` in a script or
+        dropped-handler position, emitting `$.store_set` / `$.update_store`
+        (`store_rewrite.rs`). A store **member** write (`$obj.x = 5` →
+        `$.store_mutate`), a store **destructuring** write (`[$count] = …` → an IIFE),
+        and a subscription whose base is bound in a nested scope
+        (`store_invalid_scoped_subscription`) still refuse;
+      - within the supported blocks: nested `{#each}` (the nested emission path is
+        unvalidated — the unique-name orders themselves ARE modelled), a root-level
+        `{@const}`, a destructured `{@const}`, a `{@const}` shadowing a `$derived`
+        binding, a member/call rooted at a prop/import also shadowed in a nested
+        scope (`needs_context` classification ambiguous), and a leading comment glued
+        to the `<script>` line.
+
+    Carried script comments alongside a template block, a component invocation, an
+    expression-valued attribute, `{#snippet}`/`{@render}`, or hoisted imports
+    **compile** — those emitters write template-region spans only, which no
+    script-comment window reaches — as do comments alongside the script rune
+    rewrites, whose mints are zero-width fictional nodes at host positions.
+
+    The output is **self-validated by reparse** before it returns: generated JS that
+    `tsv_ts` rejects surfaces as `CompileError::CorruptOutput` (a compiler bug — a
+    divergent shape slipped every guard), never a silently invalid module. Always on
+    — the reparse costs ~13% of the compile itself (release, measured over the
+    fixture corpus; single-digit microseconds per component). It catches output the
+    parser *rejects* (nested `export`, mis-built syntax), but not output that parses
+    as TypeScript (a passed-through annotation): that class is caught by the second,
+    independent self-check — `erase` re-run over the finished program, whose
     `None`-means-unchanged contract makes "no change" a *proof* that no
-    TypeScript-only node survived (`CompileError::TypeErasureLeak` otherwise).
-    Both halves of the erasure — the script `Program` and each template
-    expression at its borrow point — run before it, so **any** survivor is a
-    compiler bug; it is what makes a missed borrow point loud rather than
-    silent.
+    TypeScript-only node survived (`CompileError::TypeErasureLeak` otherwise). Both
+    halves of the erasure — the script `Program` and each template expression at its
+    borrow point — run before it, so **any** survivor is a compiler bug; it is what
+    makes a missed borrow point loud rather than silent.
   - `canonicalize_js(source) -> Result<String, CanonicalizeError>` — the
     canonicalizer (below). Lives here because the compiler's own output
     idempotence checks and the oracle comparison both consume it.
@@ -232,7 +214,7 @@ project-wide conventions.
   nothing is allocated; a rebuilt node shallow-clones (children are `&'arena T`,
   so pointers move, never subtrees). The `Statement` and `Expression` matches are
   **exhaustive, no catch-all** — a new AST variant fails compilation here rather
-  than silently passing TypeScript through, and `TSType`'s 23 variants are never
+  than silently passing TypeScript through, and `TSType`'s variants are never
   visited (they hang off the dropped `Option` fields). That exhaustiveness plus
   the `None` contract is the whole safety argument: re-running the eraser over the
   *finished* program and getting no change PROVES no TypeScript survived — the one
@@ -284,81 +266,88 @@ project-wide conventions.
   `is_inspect_call` (the latter matching a bare `$inspect(args)` or a single
   `$inspect(args).with(cb)`) that the script rewrite's drops key on.
 - `rune_guard.rs` — the rune refusal walk plus the collection passes riding the
-  same exhaustive traversal: refuses any `$`-prefixed identifier reference or
-  `$`-rooted call outside the sanctioned rewrites — the sanctioned set
-  includes a `$bindable(fallback?)` default at a top-level `$props()` property, a
-  statement-position `$inspect(…)`, the `$state.snapshot(x)` and `$props.id()`
-  declarator inits, a template-position `$state.snapshot(x)` (→ `$.snapshot`,
-  `template_value.rs`), and a **store access** (`$name` where the `$`-stripped base is a
-  binding and not a rune — a bare reference OR a call/new **callee root** `$fn()` /
-  `$obj.m()` / `new $C()`, via `store_read_exemption` shared by the identifier,
-  call, and new arms), which the guard EXEMPTS in a script or dropped
-  position when the caller opts in via `WalkCtx::allow_store_reads` (a
-  template-position store read is exempted by `template_value.rs`'s walk before it
-  reaches the guard) — the store rewrite (`store_rewrite.rs`) or a dropped-region
-  drop handles it. So the guard exempts those positions while still refusing every
-  other `$bindable`/`$inspect`/`$state.snapshot`/`$props.id` (value/template
-  positions, nested defaults, a wrong-arity or second `.with`, `$inspect.trace`, a
-  nested-scope / optional-chained rune, …), a store read reaching the
-  **template-value** or **pattern** guard (an unsupported wrapper position, where
-  the caller passes no store exemption), a **shadowed** store base in a
-  dropped-region position (`store_invalid_scoped_subscription`), and a
-  `$name` whose base is not a binding (the oracle's `global_reference_invalid`) —
-  refuses a derived-binding
-  read no rewrite turns into `d()` — a pattern default, a read under an
-  unsupported wrapper, or an escaped-identifier read whose decoded name is a
-  `$derived` binding; a **script-position** read is EXEMPT when the caller opts in
-  (`allow_derived_reads`, the script-body guards — the read is rewritten by
-  `store_rewrite`), while a **write** to a derived binding (`d = v` / `d++`, out of
-  scope — the oracle lowers it to `d(v)` / `$.update_derived(d)`) refuses on every
-  path. Also refuses top-level `await`, and collects
-  assignment/update roots (`updated`) and nested-scope declarations (shadow
-  candidates) for the evaluator. Exhaustive matches on purpose — new AST
-  variants fail compilation here instead of silently skipping the guard.
+  same exhaustive traversal. It refuses any `$`-prefixed identifier reference or
+  `$`-rooted call outside the sanctioned rewrites. **Sanctioned** (exempt):
+  - a `$bindable(fallback?)` default at a top-level `$props()` property, a
+    statement-position `$inspect(…)`, the `$state.snapshot(x)` and `$props.id()`
+    declarator inits, and a template-position `$state.snapshot(x)` (→ `$.snapshot`,
+    `template_value.rs`);
+  - a **store access** (`$name` where the `$`-stripped base is a binding and not a
+    rune — a bare reference OR a call/new **callee root** `$fn()` / `$obj.m()` /
+    `new $C()`, via `store_read_exemption` shared by the identifier, call, and new
+    arms), exempt in a script or dropped position when the caller opts in via
+    `WalkCtx::allow_store_reads` — the store rewrite (`store_rewrite.rs`) or a
+    dropped-region drop handles it (a template-position store read is exempted by
+    `template_value.rs`'s walk before it reaches the guard);
+  - a **script-position** `$derived` read, when the caller opts in
+    (`allow_derived_reads`, the script-body guards — the read is rewritten by
+    `store_rewrite`).
+
+  **Refused**: every other `$bindable`/`$inspect`/`$state.snapshot`/`$props.id`
+  (value/template positions, nested defaults, a wrong-arity or second `.with`,
+  `$inspect.trace`, a nested-scope / optional-chained rune, …); a store read
+  reaching the **template-value** or **pattern** guard (an unsupported wrapper
+  position, where the caller passes no store exemption); a **shadowed** store base
+  in a dropped-region position (`store_invalid_scoped_subscription`); a `$name`
+  whose base is not a binding (the oracle's `global_reference_invalid`); a
+  derived-binding read no rewrite turns into `d()` (a pattern default, a read under
+  an unsupported wrapper, or an escaped-identifier read whose decoded name is a
+  `$derived` binding); a **write** to a derived binding (`d = v` / `d++`, out of
+  scope — the oracle lowers it to `d(v)` / `$.update_derived(d)`), on every path;
+  and top-level `await`. It also collects assignment/update roots (`updated`) and
+  nested-scope declarations (shadow candidates) for the evaluator. Exhaustive
+  matches on purpose — new AST variants fail compilation here instead of silently
+  skipping the guard.
 - `needs_context.rs` — the `needs_context` analysis (ports Svelte's phase-2
   accumulation): does the component require the
   `$$renderer.component(($$renderer) => …)` wrapper? Walks the whole un-folded
   instance + template AST (exhaustive matches) and sets the flag on any `new`
   expression, or a member/call whose root (`is_safe_identifier`) is not a plain
   identifier or is a prop/import binding — a plain local, a global, and rune
-  bindings stay safe. This same walk hosts the oracle's `props_illegal_name`
-  **reference-site** rule (`MemberExpression.js:11-16`): a
-  `rest_prop.$$…` member access refuses (`Refusal::PropsIllegalName`, shared with
-  the declare-site in `script_props.rs`) — a plain-Identifier object bound to a
-  `$props()` rest_prop (the whole-object `let props = $props()` or the rest element
-  of `let { a, ...rest } = $props()`; the collector reads the instance body only,
-  since a module `$props()` refuses upstream) and an Identifier property starting
-  with `$$`. The check matches the oracle's condition EXACTLY, with **no** `computed`
-  gate: a computed identifier key (`rest[$$slots]`) matches (its property is an
-  Identifier) and the oracle rejects it — and `$$slots` is exempt from tsv's own
-  `$$`-ref rule (`rune_guard.rs`, the legit sanitize_slots ref), so a `!computed`
-  gate here would leak it as an over-acceptance; a computed STRING key
-  (`rest['$$slots']`) is excluded on its own because its property is a Literal, not
-  an Identifier (the oracle also compiles it). It rides the analyze-phase walk
-  everywhere — script, template, snippet bodies, dropped handlers, dropped
-  `{:catch}`. Placed at the top of the `MemberExpression` arm, first-wins. A member/call rooted at a prop/import that is *also* bound
-  in a nested scope is ambiguous for this name-based port and refuses, as does one
-  rooted at an escaped identifier (classification not ported). The same walk also
-  hosts the oracle's `invalid_arguments_usage` **reference-site** rule
+  bindings stay safe. A member/call rooted at a prop/import that is *also* bound in
+  a nested scope is ambiguous for this name-based port and refuses, as does one
+  rooted at an escaped identifier (classification not ported). Descends into
+  `{#snippet}` bodies (a function-like subtree — a `new`/prop-rooted access there
+  still fires the flag) and `{@render}` arguments.
+
+  The same walk hosts the oracle's `props_illegal_name` **reference-site** rule
+  (`MemberExpression.js:11-16`): a `rest_prop.$$…` member access refuses
+  (`Refusal::PropsIllegalName`, shared with the declare-site in `script_props.rs`) —
+  a plain-Identifier object bound to a `$props()` rest_prop (the whole-object
+  `let props = $props()` or the rest element of `let { a, ...rest } = $props()`; the
+  collector reads the instance body only, since a module `$props()` refuses
+  upstream) and an Identifier property starting with `$$`. The check matches the
+  oracle's condition EXACTLY, with **no** `computed` gate: a computed identifier key
+  (`rest[$$slots]`) matches (its property is an Identifier) and the oracle rejects
+  it — and `$$slots` is exempt from tsv's own `$$`-ref rule (`rune_guard.rs`, the
+  legit sanitize_slots ref), so a `!computed` gate here would leak it as an
+  over-acceptance; a computed STRING key (`rest['$$slots']`) is excluded on its own
+  because its property is a Literal, not an Identifier (the oracle also compiles
+  it). It rides the analyze-phase walk everywhere — script, template, snippet
+  bodies, dropped handlers, dropped `{:catch}`. Placed at the top of the
+  `MemberExpression` arm, first-wins.
+
+  It also hosts the oracle's `invalid_arguments_usage` **reference-site** rule
   (`Identifier.js:27-32`): a reference to `arguments` with no
   `FunctionDeclaration`/`FunctionExpression` ancestor refuses
   (`Refusal::InvalidArgumentsUsage`) — an **arrow**, a `{#snippet}` body, a class
   field initializer, and a static block do NOT count as such an ancestor. It keys on
   a `nonarrow_fn_depth` field **distinct from `fn_depth`** (which ALSO counts arrows,
-  static blocks, and snippet bodies): the depth is bumped only at the three non-arrow
-  function sites (`walk_function_expression`, the `StatementKind::FunctionDeclaration` and
-  `ExportDefaultValue::FunctionDeclaration` arms), BEFORE the params walk (so a
-  function parameter default is inside the function while an arrow's is not), and the
-  reference test is `nonarrow_fn_depth == 0`. `is_reference` semantics are free from
-  the walk (a member property / object key is visited only when `computed`, excluding
-  `foo.arguments` / `{ arguments: 1 }`). Descends
-  into `{#snippet}` bodies (a function-like subtree — a `new`/prop-rooted access
-  there still fires the flag) and `{@render}` arguments. Also computes
-  `uses_stores` in the same whole-component walk — the oracle's analysis-driven
-  store-subscription gate: any valid `$name` store reference *anywhere* (read or
-  write, emitted or dropped — an event handler, `{:catch}`) sets it, so the
-  `var $$store_subs;` / `$.unsubscribe_stores(…)` injection fires for a store used
-  only in a dropped handler too. It is decided here, NOT at emission time.
+  static blocks, and snippet bodies): the depth is bumped only at the three
+  non-arrow function sites (`walk_function_expression`, the
+  `StatementKind::FunctionDeclaration` and `ExportDefaultValue::FunctionDeclaration`
+  arms), BEFORE the params walk (so a function parameter default is inside the
+  function while an arrow's is not), and the reference test is
+  `nonarrow_fn_depth == 0`. `is_reference` semantics are free from the walk (a
+  member property / object key is visited only when `computed`, excluding
+  `foo.arguments` / `{ arguments: 1 }`).
+
+  It also computes `uses_stores` — the oracle's analysis-driven store-subscription
+  gate: any valid `$name` store reference *anywhere* (read or write, emitted or
+  dropped — an event handler, `{:catch}`) sets it, so the `var $$store_subs;` /
+  `$.unsubscribe_stores(…)` injection fires for a store used only in a dropped
+  handler too. It is decided here, NOT at emission time.
+
   Because this is the one walk that reaches **every** assignment, update and `bind:`
   in the component — both scripts, the template, and the dropped regions — it also
   hosts the port of the oracle's `validate_assignment` family
@@ -401,7 +390,7 @@ project-wide conventions.
   declares a class name `'let'`, not `const`. A missing `const` form is not: a `switch`
   therefore gets ONE scope shared by all its cases (the oracle's `SwitchStatement:
   create_block_scope`) and a block's `const` declarations hoist into scope before its
-  statements are walked (the oracle's scope pre-pass), closing two over-acceptances. The
+  statements are walked (the oracle's scope pre-pass). The
   hoist is deliberately `const`-only — hoisting a rule-free binding could only remove a
   refusal. The other unsafe direction is a binding OUTLIVING its scope, which would
   suppress a genuine refusal; the stack's truncation forecloses it.
@@ -464,8 +453,7 @@ project-wide conventions.
   collects every snippet name (render-callee classification, generated-name
   collisions).
 - `attr_refs.rs` — the **shared template traversals**, so no analysis hand-writes
-  its own walk and drifts (which is how the component-spread arm once existed in
-  one and not the other). Three levels:
+  its own walk and drifts. Three levels:
   - the element-attribute pair — `each_attribute_expression`, the emitted-path
     view (everything not refused at emission: plain values, a `{...spread}` on
     **either** element kind (a component's `$.spread_props` array element and a
@@ -512,6 +500,7 @@ project-wide conventions.
     descends a deliberately *different* node set (wider than emitted at
     `<svelte:boundary>` and `{:catch}`, narrower at the fenced special elements)
     while threading an ancestor `path` and `Owner` per frame.
+
   The SSR output **drops** four regions without visiting them — the `{#each}`
   key, the `{#key}` expression, an event-handler attribute, and the whole
   `{:catch}` branch — so no emission refusal can fire inside them. But the oracle
@@ -553,7 +542,7 @@ project-wide conventions.
   (`slot_snippet_conflict`, `2-analyze/index.js:862`). `$$slots` is not fenced, so
   closing it means porting the oracle's whole-component validation rather than
   widening the presence match — tracked in `../../docs/checklist_svelte_compiler.md`.
-  Its former sibling, a dropped `{#snippet}` + `export { … }` of it from a module
+  A sibling case, a dropped `{#snippet}` + `export { … }` of it from a module
   script, is closed in `validate.rs` — and the rule is narrower than that phrasing:
   the error needs a snippet the oracle cannot HOIST, which a dropped one never is,
   while a top-level `{#snippet s()}` beside `export { s }` compiles on both sides.
@@ -571,7 +560,7 @@ project-wide conventions.
   `{:catch}`: a rule whose inputs are not emission state belongs here, not at an
   emitter.
 
-  Plus the five **snippet declaration/export** rules, from two oracle sites. Three ride
+  Plus the **snippet declaration/export** rules. Three ride
   the same walk: `declaration_duplicate`'s `Scope.declare` call site
   (`phases/scope.js:684-691`) as a per-**fragment** duplicate-snippet-name check — the
   scope is the fragment, not the component, so `<div>{#snippet a}…{/snippet}</div>`
@@ -679,6 +668,7 @@ project-wide conventions.
   The script store rewrite (`store_rewrite.rs`) runs over the instance body between
   the rune-rewrite loop and `EmitEnv` construction, using the `store_names` /
   `store_shadowed` sets frozen there.
+
 The **script side** is eight modules, split along the line a second transform
 would need: four are target-independent (the oracle decides them before it
 chooses what to emit — `script_ts_gate`, `script_decls`, `script_bindings`,
@@ -782,15 +772,15 @@ pipeline order.
     is ECMAScript's** — a static block is `static`, then trivia, then `{`, and its
     token always sits inside a statement's span, so the only way to miss one is to
     mis-classify the trivia. It therefore matches with
-    `text_class::is_js_whitespace`, never Rust's `char::is_whitespace`: the two
-    differ at `U+FEFF` (ECMAScript `WhiteSpace`, but not the Unicode `White_Space`
-    property), and `static\u{FEFF}{ … }` was invisible to the fence, compiling the
-    rune where the oracle emits a store read. Over-reporting stays harmless
+    `text_class::is_js_whitespace`, never Rust's `char::is_whitespace` (they differ
+    at `U+FEFF` — see `text_class.rs`): a Rust-classed fence missed
+    `static\u{FEFF}{ … }`, compiling the rune where the oracle emits a store read.
+    Over-reporting stays harmless
     (`static` in a comment or string, a `/` that is division, a `U+0085` that JS
     would reject anyway) — measured at zero, no `.svelte` file
     under the compile-corpus roots contains a static block;
   - the `$stem` REFERENCE test, a whole-document, boundary-checked source scan
-    rather than an AST walk: tsv recognizes a rune at half a dozen scattered sites
+    rather than an AST walk: tsv recognizes a rune at scattered sites
     and a per-site check can miss one (an under-refusal = a MISMATCH), while one
     scan cannot. Its cost is over-refusing a document that merely mentions `$state`
     in a comment, a string, template text, or as a member/property NAME
@@ -836,15 +826,16 @@ pipeline order.
   also still refuse —
   template-expression comments, a comment in a rune call region the carry can't
   place (`CommentInRewrittenRuneRegion`: past a trailing comma, or inside an empty
-  `$props()` call). The rune rewrites that used to mint **script-region** spans a
-  comment window would sweep now place every synthetic node zero-width at a host
-  position — `$props.id()`'s and `$$slots`'s prepended declarations at the body
+  `$props()` call). The rune rewrites mint no **script-region** span a comment
+  window would sweep: every synthetic node sits zero-width at a host position —
+  `$props.id()`'s and `$$slots`'s prepended declarations at the body
   block's start, the injected `$$slots`/`$$events` pattern properties at the rest
   element, an argument-less `$state()` / `$bindable()`'s `void 0` at the call's end
   (`Builder::void_zero_at`, spelled through the identifier name channel because a
-  numeric literal prints its own source slice). `$derived(e)`'s `$.derived(() => e)` thunk no longer is one: it anchors on the
-  borrowed body (`Builder::thunk_on_body`, no `params_start`), so the argument's
-  comments fall to the `$.derived(…)` call windows and the body, once each. The rest of a rune call's dropped syntax is
+  numeric literal prints its own source slice), and `$derived(e)`'s
+  `$.derived(() => e)` thunk anchors on the borrowed body (`Builder::thunk_on_body`,
+  no `params_start`), so the argument's comments fall to the `$.derived(…)` call
+  windows and the body, once each. The rest of a rune call's dropped syntax is
   NOT a refusal region — the oracle writes those comments beside the kept argument,
   and so does the carry. A comment esrap prints TWICE refuses too
   (`CommentReflushedIntoBlock`): its `body()` flushes a comment starting on a
@@ -876,50 +867,46 @@ pipeline order.
   erased-region comment, format-ignore), mirroring the instance-side rules. Full
   condition + fixtures: `../../docs/checklist_svelte_compiler.md` §The other half.
 - `script_rewrite.rs` — the per-statement rune rewrites
-  (`rewrite_script_statement`). Oracle phase 3, **server**: `$props()` →
-  `$$props` (span-stolen),
-  `$state(v)`/`$state.raw(v)` → `v` (`void 0` argument-less), `$derived(e)` →
-  `$.derived(() => e)` — but the oracle's `b.thunk` runs `unthunk`, which
-  collapses the arrow when its body is a call on a bare identifier whose
-  arguments match its (empty) parameter list, so an argument-less call passes
-  straight through (`$derived(get_library())` → `$.derived(get_library)`) —
-  `$derived.by(f)` → `$.derived(f)`, statement-position
-  `$effect`/`$effect.pre` dropped (forcing the wrapper) — statement-position
-  `$inspect(args)` / `$inspect(args).with(cb)` (recognized by
-  `analyze.rs::is_inspect_call`) also dropped, but WITHOUT forcing the wrapper
-  (no `has_effects`): its arguments and `.with` callback are still guard-walked
-  (a comment inside carries — the oracle keeps it, as for `$effect`) — a
-  `$props.id()` declarator SKIPPED (the transform hoists `const <name> =
-  $.props_id($$renderer)` to the component body's first statement, forcing no
-  wrapper; duplicate / non-identifier target / carried comment refuse) — a
-  `$state.snapshot(x)` declarator UNWRAPPED to its argument `x` (like `$state`;
-  both via `classify_rune_init`, which refuses an optional-chained init) — though
-  UNLIKE `$state`, the snapshot binding stays UNKNOWN to the static evaluator, so a
-  template read never folds (`$.escape(s)`). The unwrap is the emission form, not the
-  evaluation form: the oracle evaluates a rune declarator through its argument for
-  `$state` / `$state.raw` / `$derived` only, and every other rune — `$state.snapshot`
-  included — falls to its `default` arm and yields UNKNOWN
-  (`phases/scope.js:469-503`). That holds however the argument itself evaluates — a
-  plain `let` argument does not fold either — a
-  **top-level class declaration** rewritten by `rewrite_class_state_fields`: each
-  DIRECT non-static, non-computed `$state(v)`/`$state.raw(v)` field UNWRAPPED to `v`
-  (a no-arg `field = $state()` → a BARE field, value dropped, NOT `void 0` — the
-  divergence from the argless declarator), every other member (a `$derived`/static/
-  computed rune field, a method body, a nested class/class expression) taking the
-  normal refusing guard walk (`walk_class_member_guarded`) so the guard-exempt set
-  equals the unwrap set — reach-matched by construction, no undefined-`$state` MISMATCH;
-  a field whose WHOLE argument is a LONE reactive-binding identifier
-  (`$state($count)` / `$state(d)`) REFUSES (`ClassFieldStateReactiveArg`,
-  `is_lone_reactive_binding`) — the oracle keeps that lone store/`$derived` read BARE
-  in the field, but the store rewrite descends into class bodies unconditionally and
-  would rewrite the kept argument to `$.store_get(…)`/`d()`, so a compound
-  (`$state($count + 1)`) or plain-var argument compiles while the lone case is a safe
-  over-refusal — a
-  multi-declarator top-level declaration
-  splitting into one declaration per declarator, source order (the oracle's
-  shape; nested declarations and for-heads stay joined; comments alongside a
-  multi-declarator refuse — the oracle re-anchors them inside the split). A
-  **destructured** (non-identifier) target of any state/derived rune —
+  (`rewrite_script_statement`). Oracle phase 3, **server**:
+  - `$props()` → `$$props` (span-stolen);
+  - `$state(v)`/`$state.raw(v)` → `v` (`void 0` argument-less);
+  - `$derived(e)` → `$.derived(() => e)` — but the oracle's `b.thunk` runs `unthunk`,
+    which collapses the arrow when its body is a call on a bare identifier whose
+    arguments match its (empty) parameter list, so an argument-less call passes
+    straight through (`$derived(get_library())` → `$.derived(get_library)`);
+    `$derived.by(f)` → `$.derived(f)`;
+  - statement-position `$effect`/`$effect.pre` dropped (forcing the wrapper);
+    statement-position `$inspect(args)` / `$inspect(args).with(cb)` (recognized by
+    `analyze.rs::is_inspect_call`) also dropped, but WITHOUT forcing the wrapper (no
+    `has_effects`): its arguments and `.with` callback are still guard-walked (a
+    comment inside carries — the oracle keeps it, as for `$effect`);
+  - a `$props.id()` declarator SKIPPED (the transform hoists `const <name> =
+    $.props_id($$renderer)` to the component body's first statement, forcing no
+    wrapper; duplicate / non-identifier target / carried comment refuse);
+  - a `$state.snapshot(x)` declarator UNWRAPPED to its argument `x` (like `$state`;
+    both via `classify_rune_init`, which refuses an optional-chained init) — though
+    UNLIKE `$state`, the snapshot binding stays UNKNOWN to the static evaluator, so a
+    template read never folds (`$.escape(s)`; why: `script_bindings.rs` above);
+  - a **top-level class declaration** rewritten by `rewrite_class_state_fields`: each
+    DIRECT non-static, non-computed `$state(v)`/`$state.raw(v)` field UNWRAPPED to `v`
+    (a no-arg `field = $state()` → a BARE field, value dropped, NOT `void 0` — the
+    divergence from the argless declarator), every other member (a `$derived`/static/
+    computed rune field, a method body, a nested class/class expression) taking the
+    normal refusing guard walk (`walk_class_member_guarded`) so the guard-exempt set
+    equals the unwrap set — reach-matched by construction, no undefined-`$state`
+    MISMATCH; a field whose WHOLE argument is a LONE reactive-binding identifier
+    (`$state($count)` / `$state(d)`) REFUSES (`ClassFieldStateReactiveArg`,
+    `is_lone_reactive_binding`) — the oracle keeps that lone store/`$derived` read
+    BARE in the field, but the store rewrite descends into class bodies
+    unconditionally and would rewrite the kept argument to `$.store_get(…)`/`d()`, so
+    a compound (`$state($count + 1)`) or plain-var argument compiles while the lone
+    case is a safe over-refusal;
+  - a multi-declarator top-level declaration splitting into one declaration per
+    declarator, source order (the oracle's shape; nested declarations and for-heads
+    stay joined; comments alongside a multi-declarator refuse — the oracle re-anchors
+    them inside the split).
+
+  A **destructured** (non-identifier) target of any state/derived rune —
   `$state`/`$state.raw`/`$state.snapshot`/`$derived`/`$derived.by` — instead
   dispatches to the shared 1→N lowering in `destructure.rs`
   (`expand_destructured_state` / `expand_destructured_derived`): the oracle's
@@ -974,6 +961,7 @@ pipeline order.
   references `$$slots` the injected sanitize_slots const owns that name, so the
   destructured prop deconflicts by renaming (`$$slots: $$slots_` — the oracle's
   always-`_`-suffix rule; `$$events` never renames).
+
 The **fragment walk and its shared primitives** are five modules. Unlike the
 script side, they cannot split along a target-independence line — the whole
 emission layer is server codegen — so the organizing principle is **role in the
@@ -1006,10 +994,9 @@ independent. They are listed here in dependency order, walk first.
   interpolation expressions, flushed into a `$$renderer.push(…)` statement. A pure
   leaf: it imports only `build.rs`, and the orchestrator plus every per-node
   emitter imports it, making it the most depended-on module in the emission layer.
-  (Deliberately stated as that invariant rather than as a consumer list — an
-  enumerated list here went stale at each of the emitter splits, since every new
-  emitter module inherits the dependency.)
-- `template_value.rs` — the **item-6 template-value substitution walk**
+  (Stated as an invariant, not a consumer list: every new emitter module inherits
+  the dependency.)
+- `template_value.rs` — the **template-value substitution walk**
   (`wrap_value_expr` / `wrap_single` over the `rewrite_template_value` core), the
   single home every template value position routes through. It rewrites every read
   of a
@@ -1045,15 +1032,12 @@ independent. They are listed here in dependency order, walk first.
   `guard_dropped_presence` / `dropped_presence_refusal`, whose two-axis membership
   argument is detailed under `attr_refs.rs` above), and `guard_inert_special_element`
   (`<svelte:window>`/`<svelte:body>`/`<svelte:document>` — emitted as NOTHING, yet
-  fully phase-2 validated). An emitter never visits a dropped region, so nothing it
-  does can refuse what sits there; the oracle decides TypeScript at parse time and
-  rune placement at analysis time, both before it chooses what to emit, so a dropped
-  region still needs refusal-equivalent walking. The scoping rule — "refuse where
-  the construct can affect the result", deliberately narrower than "a fence refuses
-  everywhere" — lives in one exhaustive match rather than at each caller, because
-  both directions are dangerous: refusing too little is an over-acceptance the
-  corpus cannot see, refusing too much turns correct output into refusals for
-  nothing.
+  fully phase-2 validated). Why a dropped region still needs refusal-equivalent
+  walking, and the scoping rule ("refuse where the construct can affect the
+  result"), are under `attr_refs.rs` above; the rule lives in one exhaustive match
+  rather than at each caller because both directions are dangerous: refusing too
+  little is an over-acceptance the corpus cannot see, refusing too much turns
+  correct output into refusals for nothing.
 - `special_element_kind.rs` — the macro-generated special-element
   handled-or-refused table: a label constant per refused kind, the
   `SPECIAL_ELEMENT_REFUSAL_KINDS` list, and the `special_element_refusal_kind`
@@ -1063,7 +1047,7 @@ independent. They are listed here in dependency order, walk first.
   co-blockers), `refusal_buckets.rs`'s `is_deliberate_fence`, and `dropped.rs`
   (`SPECIAL_ELEMENT_SLOT`). It is a macro because only
   the mapping is checked by exhaustiveness: a hand-written list beside it keeps
-  compiling when a sixth kind appears, silently dropping that kind's key from the
+  compiling when a new kind appears, silently dropping that kind's key from the
   census's declared buckets and quietly skewing its exposure accounting.
 
 The **block-level emitters** are two modules, riding the walk and primitives
@@ -1074,60 +1058,60 @@ Both recurse back into `fragment.rs` through `emit_child_body`.
 - `blocks.rs` — **control-flow blocks** split the single template into
   multiple `$$renderer.push(…)` statements, each block emitting its own
   statements between flushes and merging its closer/opener into the adjacent
-  template: `{#if}` is a flat `if … else if … else` chain with per-branch
-  anchors (`<!--[N-->`, terminal `<!--[-1-->`, synthesized when `{:else}` is absent)
-  and a merge-forward `<!--]-->` closer. A branch anchor — and an `{:else}`
-  fallback's `<!--[!-->` — folds into the branch's first push when that push is a
-  template literal, and is otherwise a single-quote-string push of its own
-  (`fold_block_marker`, the oracle's `prepend_block_marker`);
-  `{#each}` is `const each_array = $.ensure_array_like(expr)` + a `for` loop
-  binding `let CTX = each_array[IDX]` (both `each_array`/`$$index` names
-  advance once per each block but in **different orders**, so they are allocated by
-  different passes: the oracle mints `each_array` in the transform
-  (`state.scope.root.unique`, pre-order — so emission order IS its order, and a
-  dropped `{:catch}` consumes none), and `$$index` in the **scope-creation** pass,
-  *after* recursing into body + fallback — post-order, over dropped regions too. The
-  latter is therefore assigned upfront by `assign_each_index_names` and only looked
-  up at emission; sharing one emission-order counter mis-numbers every document
-  where one `{#each}` contains another or one sits in a `{:catch}`. `$$length` is
-  fixed), the opener
-  `<!--[-->` merging backward without `{:else}` or, with it, `each_array`
-  hoisting before an `if (each_array.length !== 0) { … } else { … }` whose
-  openers are string pushes; `{#await}` is a 4-arg
-  `$.await($$renderer, expr, () => {pending}, (value?) => {then})` (empty
-  `() => {}` fallbacks; `{:catch}` dropped) + a merge-forward closer; `{#key}`
-  is a `<!---->` marker, a bare `{ … }` block, and a closing `<!---->` (key
-  expression guard-walked then dropped, like an each key);
-  **`<svelte:boundary>`** (`emit_boundary`) is an ISOLATED `<!--[-->` push, a bare
-  `{ … }` block of children, and an isolated `<!--]-->` push — isolated because a
-  fresh `BodyBuilder` flushes before each statement, so unlike `{#key}`'s marker the
-  anchors never merge into an adjacent sibling's template. A `failed` snippet moves
-  those three statements inside `$$renderer.boundary({ failed }, ($$renderer) => …)`
-  and wraps that call and the snippet's `function` declaration in a `{ … }` block of
-  their own, so sibling boundaries' `failed` functions never share a scope; a `pending` snippet's
-  body REPLACES them under the `<!--[!-->` opener while the children are still
-  compiled into a DISCARDED builder — load-bearing, not wasteful, since the oracle
-  visits that fragment unconditionally and its `{#each}` consumes an `each_array`
-  name. ⚠️ Emission is `failed`-first but VISIT order is children → `pending` →
-  `failed`, and the generated names follow the visit order, so building children
-  before the snippet functions is what keeps the two straight. The attribute set is
-  validated against the oracle's closed `onerror`/`failed`/`pending` list (six
-  distinct over-acceptances otherwise); `onerror` drops but is guard-walked, and the
-  `failed=`/`pending=` attribute FORMS refuse. ⚠️ Emitting rather than refusing a
-  boundary makes three **general** validation over-acceptances
-  REACHABLE through one — a `<svelte:head>`/`<svelte:options>` inside it
-  (`svelte_meta_invalid_placement`), a duplicate `onerror` (`attribute_duplicate`),
-  and a duplicate snippet name (`declaration_duplicate`). Each reproduces identically
-  with no boundary in the document, so the answer is always the oracle's
-  own document-wide rule, never a boundary-scoped refusal — and all close
-  exactly there (the placement one in the **parser**, where the oracle raises it,
-  the other two in `validate.rs`); see
-  `../../docs/checklist_svelte_compiler.md`. `{@const}` hoists a
-  `const` declaration to the top of its branch body and enters the evaluator's
-  innermost block-scope overlay so later reads fold. Each/await locals and the
-  `{:then}` value mask to UNKNOWN in that overlay; a block body that shadows a
-  `$derived` name refuses. `<svelte:head>` emits `$.head(hash, $$renderer,
-  ($$renderer) => { … })`.
+  template:
+  - `{#if}` is a flat `if … else if … else` chain with per-branch
+    anchors (`<!--[N-->`, terminal `<!--[-1-->`, synthesized when `{:else}` is absent)
+    and a merge-forward `<!--]-->` closer. A branch anchor — and an `{:else}`
+    fallback's `<!--[!-->` — folds into the branch's first push when that push is a
+    template literal, and is otherwise a single-quote-string push of its own
+    (`fold_block_marker`, the oracle's `prepend_block_marker`).
+  - `{#each}` is `const each_array = $.ensure_array_like(expr)` + a `for` loop
+    binding `let CTX = each_array[IDX]`, the opener `<!--[-->` merging backward
+    without `{:else}` or, with it, `each_array` hoisting before an
+    `if (each_array.length !== 0) { … } else { … }` whose openers are string pushes.
+    The `each_array`/`$$index` names both advance once per each block but in
+    **different orders**, so they are allocated by different passes: the oracle mints
+    `each_array` in the transform (`state.scope.root.unique`, pre-order — so emission
+    order IS its order, and a dropped `{:catch}` consumes none), and `$$index` in the
+    **scope-creation** pass, *after* recursing into body + fallback — post-order, over
+    dropped regions too. The latter is therefore assigned upfront by
+    `assign_each_index_names` and only looked up at emission; sharing one
+    emission-order counter mis-numbers every document where one `{#each}` contains
+    another or one sits in a `{:catch}`. `$$length` is fixed.
+  - `{#await}` is a 4-arg
+    `$.await($$renderer, expr, () => {pending}, (value?) => {then})` (empty
+    `() => {}` fallbacks; `{:catch}` dropped) + a merge-forward closer.
+  - `{#key}` is a `<!---->` marker, a bare `{ … }` block, and a closing `<!---->` (key
+    expression guard-walked then dropped, like an each key).
+  - **`<svelte:boundary>`** (`emit_boundary`) is an ISOLATED `<!--[-->` push, a bare
+    `{ … }` block of children, and an isolated `<!--]-->` push — isolated because a
+    fresh `BodyBuilder` flushes before each statement, so unlike `{#key}`'s marker the
+    anchors never merge into an adjacent sibling's template. A `failed` snippet moves
+    those three statements inside `$$renderer.boundary({ failed }, ($$renderer) => …)`
+    and wraps that call and the snippet's `function` declaration in a `{ … }` block of
+    their own, so sibling boundaries' `failed` functions never share a scope; a
+    `pending` snippet's body REPLACES them under the `<!--[!-->` opener while the
+    children are still compiled into a DISCARDED builder — load-bearing, not wasteful,
+    since the oracle visits that fragment unconditionally and its `{#each}` consumes
+    an `each_array` name. ⚠️ Emission is `failed`-first but VISIT order is children →
+    `pending` → `failed`, and the generated names follow the visit order, so building
+    children before the snippet functions is what keeps the two straight. The
+    attribute set is validated against the oracle's closed `onerror`/`failed`/`pending`
+    list (anything else is an over-acceptance); `onerror` drops but is guard-walked,
+    and the `failed=`/`pending=` attribute FORMS refuse. ⚠️ Emitting rather than
+    refusing a boundary makes three **general** validation over-acceptances
+    REACHABLE through one — a `<svelte:head>`/`<svelte:options>` inside it
+    (`svelte_meta_invalid_placement`), a duplicate `onerror` (`attribute_duplicate`),
+    and a duplicate snippet name (`declaration_duplicate`). Each reproduces
+    identically with no boundary in the document, so the answer is always the
+    oracle's own document-wide rule, never a boundary-scoped refusal — and all close
+    exactly there (the placement one in the **parser**, where the oracle raises it,
+    the other two in `validate.rs`); see `../../docs/checklist_svelte_compiler.md`.
+  - `{@const}` hoists a `const` declaration to the top of its branch body and enters
+    the evaluator's innermost block-scope overlay so later reads fold. Each/await
+    locals and the `{:then}` value mask to UNKNOWN in that overlay; a block body that
+    shadows a `$derived` name refuses.
+  - `<svelte:head>` emits `$.head(hash, $$renderer, ($$renderer) => { … })`.
 - `snippet_emit.rs` — **snippets/render**: a `{#snippet}` becomes a
   `function name($$renderer, ...params) { … }` — hoisted to true module scope
   (its own program between imports and export) when `snippet.rs` deems it
@@ -1138,6 +1122,7 @@ Both recurse back into `fragment.rs` through `emit_child_body`.
   unless the enclosing block's sole trimmed child is this render with a
   non-dynamic (local-snippet) callee — the `is_standalone` flag, inherited by
   element children.
+
 The **element emitters** are two modules. `<svelte:element>` deliberately stays
 WITH regular elements rather than forming a third: the attribute machinery is
 shared between the two hosts "so they never drift", and splitting them apart would
@@ -1217,11 +1202,13 @@ functions by host.
 The **attribute emitters** are three modules, split by what an attribute *is*
 rather than by where it is emitted (each covers both the inline and spread paths,
 so the shared validity forks stay whole). The dependency is one-way, with
-`attribute` the base: `attribute_class_style` borrows five value-shaping helpers
-(four hosted there; `is_js_identifier` lives in `text_class.rs`), `attribute_bind` borrows exactly one of those five (`escape_html_attr`)
-and calls `attribute_class_style` not at all, and neither is depended on back.
-There is deliberately no `attribute_common.rs` — it would add a module for five
-small functions and obscure that both halves genuinely depend on the base.
+`attribute` the base: `attribute_class_style` borrows its value-shaping helpers
+(`collapse_attr_whitespace`, `preceded_by_quote`, `class_needs_clsx`,
+`escape_html_attr`, plus `text_class.rs`'s `is_js_identifier`), `attribute_bind`
+borrows only `escape_html_attr` and calls `attribute_class_style` not at all, and
+neither is depended on back. There is deliberately no `attribute_common.rs` — it
+would add a module for a handful of small functions and obscure that both halves
+genuinely depend on the base.
 
 - `attribute.rs` — plain attribute emission: dynamic and mixed attributes →
   `$.attr(name, expr[, true])` with
@@ -1247,13 +1234,9 @@ small functions and obscure that both halves genuinely depend on the base.
   `build_spread_object_property` — one `key: value` object property from a plain
   attribute (key lowercased, `shorthand` on a same-named identifier value), `None`
   for a dropped attribute (a single-expression event handler — still guarded — and
-  `defaultValue`/`defaultChecked`). Hosts four of the five helpers the class/style half
-  shares — `collapse_attr_whitespace`, `preceded_by_quote`, `class_needs_clsx`,
-  and `escape_html_attr` (the fifth, `is_js_identifier`, lives in
-  `text_class.rs`) — `escape_html_attr` the attribute-position sibling of
-  the fragment walk's text escape (`[&"<]` vs `[&<]` — a `"` is content in text
-  and a delimiter here). `escape_html_attr` is the only one `attribute_bind`
-  takes as well, and so the only edge from this module to both siblings.
+  `defaultValue`/`defaultChecked`). Also hosts the shared helpers named above;
+  `escape_html_attr` is the attribute-position sibling of the fragment walk's text
+  escape (`[&"<]` vs `[&<]` — a `"` is content in text and a delimiter here).
 - `attribute_class_style.rs` — the `class:` / `style:` directive builders, on
   both the inline and spread paths. Single home of the class-vs-style asymmetry,
   which is easy to collapse by mistake and wrong in both directions: `class`
@@ -1299,8 +1282,7 @@ small functions and obscure that both halves genuinely depend on the base.
   early `continue` *before* it visits the target, so a copy that drifted would
   either emit output the oracle omits or refuse a bind it accepts.
   `emit_bind_directive` — a `bind:` **core kind** on a regular element, emitted
-  inline at its source slot (delegating to `resolve_bind_directive`, the validity
-  fork the spread `build_bind_object_property` shares so the two never drift):
+  inline at its source slot via `resolve_bind_directive`:
   `bind:this` omits (any variable, any element — no
   `$state` gate), but only for a valid bind target (an Identifier/member chain or a
   `{get, set}` pair); a non-lvalue target (a call/literal/logical) refuses
@@ -1361,8 +1343,7 @@ classes, this one enumerates scoping candidates.
   decides what to emit, so a selector matching only dropped boundary content is still
   KEPT and still scoped. Safe because `element_scope` is a span lookup at emission, so
   a marked-but-unemitted element contributes nothing. Everywhere else the census leaf
-  set equals the emitted set — keeping the single-compound match byte-identical to
-  the pre-census emission-fused result. A boundary OWNER is transparent to the
+  set equals the emitted set. A boundary OWNER is transparent to the
   ancestor walk and opaque to the upward sibling walk (`Owner::Boundary`, exactly
   `Owner::Head`'s pair of answers — the oracle's `is_block` set holds neither), so
   `div > p` across a boundary matches while `b + p` across one does not.
@@ -1381,63 +1362,69 @@ classes, this one enumerates scoping candidates.
   replacing a bare `*`) — author whitespace preserved, not reprinted — with a
   per-`ComplexSelector` specificity bump (the first scoped compound a plain
   `.svelte-tsvhash`, each later one a zero-specificity `:where(.svelte-tsvhash)`,
-  reset per comma `ComplexSelector`). **Supported**: the four combinators
-  (descendant / child / `+` / `~`, including block-descent and the `{#each}`
-  wrap-around); basic `:global` (leading `:global(<compound>) .y`, trailing
-  `:global(<compound>)`, a fully-global `:global(<compound>)`, and the bare
-  `:global` combinator `div :global.x` → `div.x`); a non-`@keyframes` **group
-  at-rule** (`@media`/`@supports`/`@container`/`@layer`/`@scope`/…), which
-  `analyze_atrule` recurses into and scopes the inner rules the ordinary way (the
-  oracle's generic `next()` recursion, arbitrarily deep — the prelude is never
-  scoped; a statement / descriptor-only at-rule scopes nothing and the splicer
-  copies it through verbatim); and **`@keyframes`** — the oracle's
-  `is_keyframes_node` handling (`css-analyze.js:52-63` / `css/index.js:82-124`): a
-  separate collection pre-pass gathers every keyframes prelude not starting with
-  `-global-` (at any nesting depth, descending even into keyframes blocks), then
-  `analyze_atrule` name-prefixes the at-rule (`@keyframes foo` → `@keyframes
-  svelte-tsvhash-foo`, or REMOVES a `-global-` prefix) WITHOUT descending (its inner
-  step rules are never scoped, its declarations never rewritten, nothing inside
-  refuses), and every `animation` / `animation-name` declaration value token matching a
-  collected name gains the same `svelte-tsvhash-` prefix (`scan_animation_declaration`,
-  a raw-property compare + boundary-scan mirroring the oracle byte-for-byte, including
-  the glued-garbage and empty-prelude edges). These ride the same `Edit` stream as the
-  selector splices, merged before the sort (`ScopeInfo::keyframes_edits`; the regions
-  are disjoint). The transform never descends, but the oracle's separate phase-2 PRUNE
-  walk (`css-prune.js`) does: it matches each step rule's selectors against every element
-  the ordinary backward way, and a matched element gains the hash. `analyze_keyframes_steps`
-  collects those step selectors into a SEPARATE list (`ScopeInfo::step_selectors`) — built
-  through the SAME `build_selector` machinery as ordinary rules with `keyframe_step = true`,
-  which skips a `Percentage`/`Nth` simple selector within its compound
-  (`css-prune.js:509`), so a percentage-only compound has an empty predicate list and
-  matches ANY element (the fallthrough — `0%`/`50%`/`100%` scope the whole component)
-  while `0%.c` narrows PER-SIMPLE to `class="c"` and a `from` step is the type selector
-  `from` (scoping a `<from>` element). `match_scope` matches them into `scoped_elements`
-  ONLY — steps are never spliced (kept out of `ScopeInfo::selectors`, so they contribute
-  no `global_strip` removal / specificity bump / `unused_selectors` entry — their source
-  stays verbatim), never pruned for no match (no `CssSelectorNoMatch`), and an empty step
-  (`from {}`) never hits the empty-rule refusal. A build failure on a step, or a nested
-  rule/at-rule inside a step (or an at-rule directly in the keyframes block), refuses
-  (`CssNestedRule` / the shape's own reason — safe over-refusals, corpus-absent). Step
-  matching runs for a `-global-` keyframes and one `@media`-nested too (the prune walk is
-  name-blind). Keyframes is discriminated case-SENSITIVELY, so `@KEYFRAMES` recurses as a
-  group at-rule and its `from`/`to` refuse via `CssSelectorNoMatch`.
-  A **dynamic or mixed attribute value** (`class={x?'a':'b'}`, `class={['a', c&&'b']}`,
-  `class="pre-{x}"`, `data-x={0}`) is matched by porting the oracle's
-  `get_possible_values` bounded static-eval (`css/utils.js`) + the multi-chunk
-  combination loop (`css-prune.js:747-818`) in `attribute_matches`: the candidate
-  values are enumerated and each tested. An `UNKNOWN` chunk (a plain identifier /
-  member / call / template / non-`class` array-object / `&&`-with-unknown-left, …)
-  assume-matches; an un-stringifiable literal inside an otherwise-enumerable set
-  (BigInt, regex, non-integer / out-of-safe-range number, escaped object key) refuses
-  the whole compile (`CssDynamicAttributeMatch` — a safe over-refusal, never a dropped
-  value that would under-match). **Refused**: `:global{}`
-  global blocks (nested rules), `:is`/`:where`/`:has`/`:not`, `:root`/`:host`, nesting,
-  the `||` column combinator, a snippet/render-crossing combinator path
-  (`CssCombinatorSelector` — the site-resolution product isn't built, a safe
-  over-refusal), empty rules (`CssEmptyRule`), an un-stringifiable dynamic attribute
-  value (`CssDynamicAttributeMatch`, above), a non-ASCII case-insensitive operand
-  (`CssCaseInsensitiveNonAscii`), and a chain matching no element
-  (`CssSelectorNoMatch`).
+  reset per comma `ComplexSelector`). **Supported**:
+  - the four combinators (descendant / child / `+` / `~`, including block-descent and
+    the `{#each}` wrap-around);
+  - basic `:global` (leading `:global(<compound>) .y`, trailing
+    `:global(<compound>)`, a fully-global `:global(<compound>)`, and the bare
+    `:global` combinator `div :global.x` → `div.x`);
+  - a non-`@keyframes` **group at-rule** (`@media`/`@supports`/`@container`/`@layer`/
+    `@scope`/…), which `analyze_atrule` recurses into and scopes the inner rules the
+    ordinary way (the oracle's generic `next()` recursion, arbitrarily deep — the
+    prelude is never scoped; a statement / descriptor-only at-rule scopes nothing and
+    the splicer copies it through verbatim);
+  - **`@keyframes`** — the oracle's `is_keyframes_node` handling
+    (`css-analyze.js:52-63` / `css/index.js:82-124`): a separate collection pre-pass
+    gathers every keyframes prelude not starting with `-global-` (at any nesting
+    depth, descending even into keyframes blocks), then `analyze_atrule`
+    name-prefixes the at-rule (`@keyframes foo` → `@keyframes svelte-tsvhash-foo`, or
+    REMOVES a `-global-` prefix) WITHOUT descending (its inner step rules are never
+    scoped, its declarations never rewritten, nothing inside refuses), and every
+    `animation` / `animation-name` declaration value token matching a collected name
+    gains the same `svelte-tsvhash-` prefix (`scan_animation_declaration`, a
+    raw-property compare + boundary-scan mirroring the oracle byte-for-byte,
+    including the glued-garbage and empty-prelude edges). These ride the same `Edit`
+    stream as the selector splices, merged before the sort
+    (`ScopeInfo::keyframes_edits`; the regions are disjoint). The transform never
+    descends, but the oracle's separate phase-2 PRUNE walk (`css-prune.js`) does: it
+    matches each step rule's selectors against every element the ordinary backward
+    way, and a matched element gains the hash. `analyze_keyframes_steps` collects
+    those step selectors into a SEPARATE list (`ScopeInfo::step_selectors`) — built
+    through the SAME `build_selector` machinery as ordinary rules with
+    `keyframe_step = true`, which skips a `Percentage`/`Nth` simple selector within
+    its compound (`css-prune.js:509`), so a percentage-only compound has an empty
+    predicate list and matches ANY element (the fallthrough — `0%`/`50%`/`100%` scope
+    the whole component) while `0%.c` narrows PER-SIMPLE to `class="c"` and a `from`
+    step is the type selector `from` (scoping a `<from>` element). `match_scope`
+    matches them into `scoped_elements` ONLY — steps are never spliced (kept out of
+    `ScopeInfo::selectors`, so they contribute no `global_strip` removal /
+    specificity bump / `unused_selectors` entry — their source stays verbatim), never
+    pruned for no match (no `CssSelectorNoMatch`), and an empty step (`from {}`)
+    never hits the empty-rule refusal. A build failure on a step, or a nested
+    rule/at-rule inside a step (or an at-rule directly in the keyframes block),
+    refuses (`CssNestedRule` / the shape's own reason — safe over-refusals,
+    corpus-absent). Step matching runs for a `-global-` keyframes and one
+    `@media`-nested too (the prune walk is name-blind). Keyframes is discriminated
+    case-SENSITIVELY, so `@KEYFRAMES` recurses as a group at-rule and its `from`/`to`
+    refuse via `CssSelectorNoMatch`;
+  - a **dynamic or mixed attribute value** (`class={x?'a':'b'}`,
+    `class={['a', c&&'b']}`, `class="pre-{x}"`, `data-x={0}`), matched by porting the
+    oracle's `get_possible_values` bounded static-eval (`css/utils.js`) + the
+    multi-chunk combination loop (`css-prune.js:747-818`) in `attribute_matches`: the
+    candidate values are enumerated and each tested. An `UNKNOWN` chunk (a plain
+    identifier / member / call / template / non-`class` array-object /
+    `&&`-with-unknown-left, …) assume-matches; an un-stringifiable literal inside an
+    otherwise-enumerable set (BigInt, regex, non-integer / out-of-safe-range number,
+    escaped object key) refuses the whole compile (`CssDynamicAttributeMatch` — a
+    safe over-refusal, never a dropped value that would under-match).
+
+  **Refused**: `:global{}` global blocks (nested rules), `:is`/`:where`/`:has`/`:not`,
+  `:root`/`:host`, nesting, the `||` column combinator, a snippet/render-crossing
+  combinator path (`CssCombinatorSelector` — the site-resolution product isn't
+  built, a safe over-refusal), empty rules (`CssEmptyRule`), an un-stringifiable
+  dynamic attribute value (`CssDynamicAttributeMatch`, above), a non-ASCII
+  case-insensitive operand (`CssCaseInsensitiveNonAscii`), and a chain matching no
+  element (`CssSelectorNoMatch`).
 
 Types: `CompileOptions { generate: Generate, dev: bool }` (default: `Server`,
 non-dev), `CompileOutput { js, css, warnings }`, `CompileWarning { code, message }`

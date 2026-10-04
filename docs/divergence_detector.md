@@ -91,18 +91,19 @@ deno task corpus:compare:format ../some-project
 deno task corpus:compare:format ../some-project --explain         # Show which patterns matched
 deno task corpus:compare:format --all --audit-patterns               # Per-pattern coverage with samples
 
-# Audit: runs every pattern against every documented fixture's committed prettier
-# forms and reports which are actually DETECTED, plus the `fixtures[]` listing
-# drift as separate bookkeeping. Exits 1 on a genuine detection gap.
 deno task divergence:audit        # Human-readable report
 deno task divergence:audit --json # Machine-readable JSON
 
-# Pattern tests: synthetic positive/negative (overmatch-rejection) unit tests PLUS
-# a behavioral fixture-coverage audit that drives each detector against its own
-# committed fixtures (input == ours, output_prettier == prettier) and fails if a
-# pattern stops claiming a hunk in a fixture it lists. Runs read-only.
-deno task test:deno
+deno task test:deno               # pattern tests
 ```
+
+`divergence:audit` runs every pattern against every documented fixture's committed prettier
+forms and reports which are actually DETECTED, plus the `fixtures[]` listing drift as separate
+bookkeeping; it exits 1 on a genuine detection gap. `test:deno` runs the synthetic
+positive/negative (overmatch-rejection) unit tests PLUS a read-only behavioral
+fixture-coverage audit that drives each detector against its own committed fixtures (input ==
+ours, output_prettier == prettier) and fails if a pattern stops claiming a hunk in a fixture
+it lists.
 
 ## Traceability
 
@@ -125,10 +126,9 @@ fixture with an unexplained hunk left over is reported **partial**, never folded
 the fully-explained ones. A binary detected/undetected metric would re-introduce, one
 level up, precisely the masking that hunk-aware detection exists to prevent.
 
-It does **not** read the answer out of the `fixtures[]`
-arrays: those are a hand-maintained mirror of a computable fact, and the two diverge badly
-— most detected fixtures are simply unlisted. That drift produces mislistings and stale
-paths, so listing gaps are reported as
+It does **not** read the answer out of the `fixtures[]` arrays: those are a hand-maintained
+mirror of a computable fact, and the two diverge badly — most detected fixtures are simply
+unlisted. That drift produces mislistings and stale paths, so listing gaps are reported as
 bookkeeping, below the detection headline, and only a genuine gap (a fixture pinning a
 prettier form that no pattern explains) exits 1.
 
@@ -155,18 +155,18 @@ The audit's report **is** the work-list — these numbers move as detectors are 
 so read them live (`deno task divergence:audit`) rather than trusting the counts here.
 Four buckets, in rough priority order:
 
-1. **Undetected (~50)** — a documented divergence pinning a prettier form that no
+1. **Undetected** — a documented divergence pinning a prettier form that no
    pattern explains at all. The headline gap.
 
    A triage of this bucket found **none of it uncovered by design**: the two
    deliberate exclusions named above don't reach it (the `chain-expression` files
    are prettier's own suite, so they land in the corpus `unknown` bucket, not here;
    the preserve-a-dropped-comment family is `comment_preserved`'s). Every entry is a
-   real gap. What remains clusters as: ~8 "prettier drops content tsv keeps"
-   (dropped directive modifiers, a dropped `catch error`, a dropped `a:` destructure
-   rename — several are prettier *correctness* bugs worth a look on their own terms),
-   which need `may_alter_char_frequency` and so carry a much higher bar; ~6 CSS
-   escape-opacity cases (prettier inserts a space after a `\`), detectable but risky
+   real gap. What remains clusters as: "prettier drops content tsv keeps" (dropped
+   directive modifiers, a dropped `catch error`, a dropped `a:` destructure rename —
+   several are prettier *correctness* bugs worth a look on their own terms), which need
+   `may_alter_char_frequency` and so carry a much higher bar; CSS escape-opacity cases
+   (prettier inserts a space after a `\`), detectable but risky
    because escape opacity is a recurring **tsv** bug class and a detector there could
    mask the next one; and a long tail of one-off CSS value/at-rule forms, width
    cases, and comment-relocation residue.
@@ -180,7 +180,7 @@ Four buckets, in rough priority order:
    either the section grows a bullet covering the author-broken case or these stay
    undetected; widening the detector ahead of that decision would put it out of step
    with the rule it cites.
-2. **Partial (~25)** — a pattern explains the divergence but leaves an adjacent hunk
+2. **Partial** — a pattern explains the divergence but leaves an adjacent hunk
    unclaimed. Not a mystery, and quieter than it sounds: typically the diff splits one
    logical change across hunk boundaries (a dangling `) {` line), or the detector claims
    *some* instances of a repeated divergence but not all — `css/selectors/combinators/
@@ -188,13 +188,12 @@ Four buckets, in rough priority order:
    claims three. **These are worth closing, and demonstrably**: the corpus classifies by
    the same rule, so a partial fixture is a real file landing in the pinned `partial`
    bucket instead of `known`. Widening `comment_position` to split prettier's *merged*
-   trailing-line-comment form (`a // c1 // c2`) closed 6 fixture partials and moved one
+   trailing-line-comment form (`a // c1 // c2`) closed fixture partials and moved one
    real corpus file (`js/for-of/comments.js`) partial→known, ratcheting
    `CORPUS_FORMAT_PARTIAL_PIN` down.
 
-   The dominant remaining shape was **indentation**, and it turned out not to be
-   leftover reflow at all: for those fixtures the indent shift *is* the whole
-   divergence — the sanctioned [§Uniform Forced-Continuation
+   The **indentation** shape is not leftover reflow: for those fixtures the indent
+   shift *is* the whole divergence — the sanctioned [§Uniform Forced-Continuation
    Indent](conformance_prettier.md#uniform-forced-continuation-indent) rule, where a
    line comment forces a construct's tail onto a continuation line that tsv indents one
    level and prettier keeps flush. `forced_continuation_indent` covers it across the
@@ -204,25 +203,26 @@ Four buckets, in rough priority order:
    on the next line, a contextual keyword is not a declaration at all — Svelte's parser
    and prettier both reject `interface`/`namespace`/`module` there, and all four tools
    read `type` as an expression statement — so those cannot produce the divergence.
-   It stays safe to apply broadly because it is
-   keyed on the construct head *above* the hunk carrying the comment that forced the
-   break: an ordinary indentation defect has no such comment and is never claimed, so
-   the detector cannot mask the tsv defect class it most resembles.
-   Of the remainder, the **13 that some pattern also LISTS** are ratcheted by
+   It stays safe to apply broadly because it is keyed on the construct head *above* the
+   hunk carrying the comment that forced the break: an ordinary indentation defect has no
+   such comment and is never claimed, so the detector cannot mask the tsv defect class it
+   most resembles.
+
+   Of the remainder, the ones **some pattern also LISTS** are ratcheted by
    `KNOWN_PARTIAL` in `fixture_coverage_test.ts` — a listed fixture going partial fails
    the gate, and an entry that stops firing fails too, so the list mirrors the live set
    and can only shrink.
-3. **Ungradeable (~15)** — the fixture pins no prettier form at all, so detection is
+3. **Ungradeable** — the fixture pins no prettier form at all, so detection is
    unanswerable. Not a detector gap: either the fixture gains a witness file, or it stays
    honestly unmeasurable.
-4. **Explained but unlisted (~291)** — pure bookkeeping. The detector sees them; no
+4. **Explained but unlisted** — pure bookkeeping. The detector sees them; no
    `fixtures[]` array says so. Listing one buys an explicit per-pattern assertion (the
    gated test) at the cost of a hand-maintained entry that can drift, so this is
    deliberately **not** a backlog to burn down — list a fixture when you want that
    specific assertion pinned, not to make a number go up.
 
 Note that a pattern detecting no *documented* fixture is not thereby dead —
-`empty_statement_removal` detects none yet fires on 3 corpus files, so check
+`empty_statement_removal` detects none yet fires on corpus files, so check
 `--audit-patterns` (the corpus-side view) before concluding. A pattern dead by every
 measure (0 corpus files, 0 committed fixture pairs, 0 documented) is deleted, not kept as
 a placeholder.
@@ -252,9 +252,8 @@ language/feature pattern claims a hunk before the broad `fill_101_boundary` /
 `patterns.ts` is the source of truth for the full list and each pattern's
 `conformance_sections` / `fixtures`; `deno task divergence:audit` prints, per pattern,
 both the `listed` count (its `fixtures[]` entries) and the measured `detects` count, plus
-overall detection. A pattern with `detects 0` explains no *documented* divergence — which
-does not by itself make it dead, since it may fire only on corpus code
-(`--audit-patterns` is the corpus-side view). Each pattern's `detect()` returns
+overall detection (a `detects 0` pattern is not thereby dead — see
+[Pending work](#pending-work)). Each pattern's `detect()` returns
 `hunk_indices` identifying which specific hunks it explains.
 
 ## Safety Checks
@@ -295,10 +294,10 @@ real_added[c] = max(0, ours_added[c] − prettier_added[c])
 ```
 
 A violation survives only when our output drops/adds a character that prettier
-preserves. This subsumes the older `ours !== prettier` guard (when
-`ours === prettier`, every delta matches prettier's and the real set is empty)
-and — unlike that all-or-nothing guard — correctly isolates a real loss in a
-file that _also_ contains an unrelated shared normalization.
+preserves. This subsumes an `ours !== prettier` guard (when `ours === prettier`,
+every delta matches prettier's and the real set is empty) and, unlike that
+all-or-nothing guard, isolates a real loss in a file that _also_ contains an
+unrelated shared normalization.
 
 The algorithm lives only in `lib/divergence/safety.ts`; it runs in-process on
 strings already in the Deno heap (source, FFI output, prettier output), so it
@@ -324,7 +323,7 @@ count-only guard files a real over-width line as the sanctioned print-width dive
 That laundering has no other instrument: `width:audit` is the only gate that measures a
 column and it runs over `tests/fixtures` alone, so real-code over-width is visible only
 here. `ours_holds_print_width` (strict) and `ours_spent_every_break` (below) are that
-half, and `long_line_rewrapped` bundles it for the five long-line patterns.
+half, and `long_line_rewrapped` bundles it for the long-line patterns.
 
 **The forced overrun.** "Ours holds 100 everywhere" is too strong on its own, because
 [§Print Width Philosophy](./conformance_prettier.md#print-width-philosophy) sanctions a
@@ -365,8 +364,7 @@ declined from one it never had*. What makes it usable here is that it whitelists
 that are atomic under any layout (one CSS component value; a bare word) instead of trying
 to read the seam, and that every unsure case answers "seam". Two known narrowings live
 with it: a hunk straddling a `</style>` boundary takes the CSS regime for all its lines
-(`is_in_css_context` keys on the hunk's first line — pre-existing, shared with seven other
-detectors), and a comment tsv split across lines reads as a seam on each of them.
+(`is_in_css_context` keys on the hunk's first line, shared with other detectors), and a comment tsv split across lines reads as a seam on each of them.
 
 **Every long-line pattern routes through the helper.** `short_expr_100` hand-rolled the
 count arm alone (`{#if}` in prettier's 101–110 band, `added_lines.length >

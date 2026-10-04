@@ -36,7 +36,7 @@ Consumers:
 - `tsv_debug` — `conformance_audit`'s repo walk builds an `IgnoreStack` to honor
   `.gitignore` while checking Markdown links.
 
-The `#[wasm_bindgen]` wrapper lives in `tsv_wasm`, not here; this crate stays
+The binding wrappers live in `tsv_wasm` / `tsv_napi`, not here; this crate stays
 binding-agnostic.
 
 **Matcher, not policy.** This crate answers only "does *this rule set* ignore
@@ -44,12 +44,12 @@ this path." tsv's discovery *policy* — the build-output heuristic, the
 always-pruned safety nets, the formattable-extension check, the heuristic-shadow
 warning — lives one layer up in [`tsv_discover`](../tsv_discover/CLAUDE.md), which
 builds on `IgnoreStack` (consuming `is_ignored_leaf` / `is_reincluded` /
-`negation_under` / `has_gitignore_layers` / `gitignore_anchors`, and `is_ignored` /
-`exclusion` / `tsv_exclusion` — the ancestor-walking answer and its witnesses — with `tsv_layer_source` and
-`split_segments`, to bound and warn about a path an argument named). Keeping that policy out of here is deliberate: `IgnoreStack`
-stays a pure gitignore(5) matcher, reusable beyond tsv's own discovery rules, and
-the three surfaces share the prune *decision* through `tsv_discover` rather than
-re-deriving it from these primitives.
+`negation_under` / `has_gitignore_layers` / `gitignore_anchors`, plus `is_ignored` /
+`exclusion` / `tsv_exclusion` — the ancestor-walking answer and its witnesses — with
+`tsv_layer_source` and `split_segments` to bound and warn about a path an argument
+named). Deliberately: `IgnoreStack` stays a pure gitignore(5) matcher, reusable beyond
+tsv's own discovery rules, and the three surfaces share the prune *decision* through
+`tsv_discover` rather than re-deriving it from these primitives.
 
 ## Public API
 
@@ -79,12 +79,10 @@ holds two parallel per-directory layer stacks (`.gitignore` and tsv):
   query, and `exclusion` with its witness dropped — one prefix walk
   (`first_excluded_prefix`) serves both.
 - `IgnoreStack::is_ignored_leaf(path, is_dir)` — like `is_ignored` but evaluates
-  only `path`'s **own** last-match, **no ancestor walk**. Equivalent to
-  `is_ignored` *only when every ancestor is already known not-ignored* — which
-  tsv's discovery guarantees (it prunes ignored dirs before descending and gates
-  the root with the full ancestor-walking answer, `is_ignored`), letting it skip the O(depth) re-walk per entry
-  (the matcher dominates discovery; this roughly halves its self-time on a deep
-  tree). A sharp contract — see Known edges.
+  only `path`'s **own** last-match, **no ancestor walk**, so discovery skips the
+  O(depth) re-walk per entry (the matcher dominates discovery; this roughly halves
+  its self-time on a deep tree). Equivalent to `is_ignored` *only when every
+  ancestor is already known not-ignored* — a sharp contract, see Known edges.
 - `IgnoreStack::is_reincluded(path, is_dir)` — the per-path `!`-negation polarity
   (no ancestor prune), so a caller's heuristic can defer to an explicit re-include.
 - `IgnoreStack::negation_under(prefix) -> Option<Negation>` — every **tsv-layer**
@@ -165,8 +163,7 @@ the file only so a diagnostic can name it.
   (shallow→deep), last match winning. So a deeper file overrides a shallower one,
   the tsv layer overrides any `.gitignore`, and the parent-prune holds across
   files. Gitignore-only behavior is byte-for-byte `git check-ignore` (the test
-  table is pinned against it), less the known edges below. `IgnoreRules` stays the single-root primitive each
-  layer is built from.
+  table is pinned against it), less the known edges below.
 - **Case-sensitive** — always, matching prettier's `ignore` and git on a
   case-sensitive filesystem. See the case-insensitivity edge below.
 
@@ -175,22 +172,21 @@ the file only so a diagnostic can name it.
 - **Case-insensitive filesystems** — matching is always case-sensitive, but git
   auto-sets `core.ignorecase=true` on macOS/Windows, so `git check-ignore` there
   matches case-insensitively (`build/` ignores a `Build/` directory) while tsv
-  does not. So the "byte-for-byte `git check-ignore`" parity holds only on
-  case-sensitive filesystems. Deliberate: honoring `core.ignorecase` would mean
-  reading machine-local git config, which breaks the reproducibility that keeps
+  does not, so `git check-ignore` parity holds only on case-sensitive
+  filesystems. Deliberate: honoring `core.ignorecase` would mean reading
+  machine-local git config, breaking the reproducibility that keeps
   `tsv format --check` giving the same answer everywhere. Rare in practice
   (ignore patterns almost always match the on-disk casing).
 
 - **`.git/info/exclude` and `core.excludesFile` are not read** — discovery consults
   only `.gitignore` files (plus tsv's `.formatignore`/`.prettierignore`), never git's
-  other two ignore sources: per-repo `.git/info/exclude` and the global
-  `core.excludesFile` (`~/.config/git/ignore`). So `git check-ignore` can ignore a file
-  tsv formats. Deliberate, same reproducibility reason as the case bullet — both are
+  other two ignore sources, per-repo `.git/info/exclude` and the global
+  `core.excludesFile` (`~/.config/git/ignore`), so `git check-ignore` can ignore a file
+  tsv formats. Deliberate, for the case bullet's reproducibility reason: both are
   uncommitted/local (a clean CI checkout lacks them), so honoring them would make
-  `tsv format --check` disagree across machines. The "byte-for-byte `git check-ignore`"
-  parity is thus scoped to repos whose only ignore source is committed `.gitignore`
-  files; the `git_oracle` runs with `core.excludesFile=/dev/null` on a fresh repo, so it
-  holds there. That suite needs a `git` binary and FAILS without one rather than passing
+  `tsv format --check` disagree across machines. Parity is thus scoped to repos whose
+  only ignore source is committed `.gitignore` files — where the `git_oracle` runs
+  (`core.excludesFile=/dev/null` on a fresh repo). That suite needs a `git` binary and FAILS without one rather than passing
   empty — `TSV_GIT_ORACLE_SKIP=1` is the explicit opt-out for a host with no git.
 
 - **Multibyte granularity** — glob metacharacters (`?`, `*`, `[...]`) match per
@@ -202,8 +198,8 @@ the file only so a diagnostic can name it.
   won't span the 2-byte `é`); for an astral char it diverges from both (`a?.ts`
   ignores `a😀.ts` only for tsv — one code point vs two UTF-16 units). Code-point
   granularity is the saner unit and the common case (BMP) tracks prettier, so this
-  is a deliberate divergence, not a bug; the "byte-for-byte `git check-ignore`"
-  parity is thus scoped to ASCII segments (the `git_oracle` and unit tests are
+  is a deliberate divergence, not a bug; `git check-ignore` parity is thus scoped
+  to ASCII segments (the `git_oracle` and unit tests are
   ASCII, with `glob_is_code_point_granular` pinning the multibyte behavior). Rare
   in practice — `?`/classes over multibyte names are unusual, and `*` is unaffected.
   The same edge covers a name that is **not** UTF-8: the CLIs hand the matcher its
@@ -253,7 +249,6 @@ the file only so a diagnostic can name it.
   walkers gate the initial `root` with the full ancestor-walking answer
   (`is_ignored`, so `tsv format build/sub` under a gitignored `build/` still finds
   nothing — the gate catches it, and warns; the per-entry walk below uses the
-  cheaper leaf query). It exists purely for
-  that hot path — never call it on an arbitrary path whose ancestors haven't been
-  cleared. Pinned by `stack_is_ignored_leaf_skips_the_ancestor_prune` and the
+  cheaper leaf query). It exists purely for that hot path — never call it on an
+  arbitrary path whose ancestors haven't been cleared. Pinned by `stack_is_ignored_leaf_skips_the_ancestor_prune` and the
   `fully_ignored_target_is_empty` discovery scenario.

@@ -2,9 +2,9 @@
 
 > HTML element classification, whitespace rules, and character entity decoding — pure functions, no AST.
 
-Language-level utilities for HTML. Not a parser — operates on tag-name
-`&str` slices. Designed to be reusable across future tools (linter,
-LSP, compiler), not just the formatter. See the root
+Language-level HTML utilities over tag-name `&str` slices — not a parser.
+Reusable across future tools (linter, LSP, compiler), not just the
+formatter. See the root
 [CLAUDE.md §Language-Level concerns (classification)](../../CLAUDE.md#language-level-concerns-classification).
 
 ## Architecture Position
@@ -60,10 +60,10 @@ not here. This crate stays AST-agnostic.
   (the WHATWG HTML
   [named character references list](https://html.spec.whatwg.org/entities.json),
   name → the characters it stands for) and emits a `phf::Map` at
-  `$OUT_DIR/entities_map.rs`, `include!`d by `entities.rs`. ~2,231
-  entries, zero runtime init cost. The value is a `&'static str` because
-  93 names stand for two code points — Svelte's own table keeps only the
-  first, which is one of the decoder's cataloged corrections.
+  `$OUT_DIR/entities_map.rs`, `include!`d by `entities.rs` — zero runtime
+  init cost. The value is a `&'static str` because some names stand for two
+  code points — Svelte's own table keeps only the first, which is one of the
+  decoder's cataloged corrections.
 - **Pure `&str` API**: classification predicates take tag names, not
-  AST nodes or a parser's name representation. Keeps this crate
-  independent of any particular parser's representation.
+  AST nodes or a parser's name representation, so the crate stays
+  independent of any particular parser.

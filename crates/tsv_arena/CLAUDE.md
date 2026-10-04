@@ -6,9 +6,9 @@
 
 The bindings (`tsv_ffi`, `tsv_napi`, `tsv_wasm`) are invoked once per file in tight loops (formatters, editor save hooks, benchmarks). A fresh arena allocated and freed per call churns the allocator's heap high-water on *every* call — measurable through a host FFI / N-API / WASM layer even when the engine work is unchanged. `tsv_arena` keeps **one arena per thread** and `reset()`s it between calls (rewind the bump pointer, retain the largest chunk), so a warm thread does no per-call malloc/free.
 
-It's a crate, not duplicated inline, because the bindings would otherwise hand-sync it. The helpers are tiny but encode a subtle soundness contract (nothing borrowed may outlive the next call's `reset()`); a single home keeps that contract from drifting.
+It's a crate rather than inline copies the bindings would hand-sync: the helpers are tiny but encode a subtle soundness contract (nothing borrowed may outlive the next call's `reset()`); a single home keeps that contract from drifting.
 
-**The same argument, a second time, is why the goal macros are here too.** Each binding spells the parse goal in its host's idiom — a `u32` code, a trailing optional string — but *which languages have a goal axis at all* is one fact, and three copies of it agree only until one is edited. So the crate's scope is the bindings' shared substrate, not arenas specifically; the name is older than the second half.
+**The same argument is why the goal macros are here too.** Each binding spells the parse goal in its host's idiom — a `u32` code, a trailing optional string — but *which languages have a goal axis at all* is one fact, and three copies of it agree only until one is edited. So the crate's scope is the bindings' shared substrate, not arenas specifically; the name predates the second half.
 
 **Not in `tsv_lang`:** the foundation crate deliberately doesn't depend on `bumpalo` (the AST `Bump` is passed *into* the language crates), and a thread-local hot-loop reuse policy is a binding concern, not a language primitive — putting it there would invert the layering.
 
@@ -31,13 +31,13 @@ Plus the goal-axis macros and the export bodies built on them, `#[macro_export]`
 Plus one type and one function:
 
 - `Family { Parse, Format }` — which export family a call belongs to: what an unset source type means (a parse reads it as `Module`, a format as none named), and the noun a refusal names (`Family::noun`). `tsv_ffi`'s `ffi_source_type` reads it to accept the unspecified code from the format exports alone; the two string-axis bindings pass it to `decode_source_type`.
-- `decode_source_type(source_type, allowed, family, from_source_type)` — the two string-axis bindings' shared decoder (`napi_source_type`, and `wasm_source_type` past its own not-a-string arm): unset stays unset, a source type on a goalless language and a value naming neither goal are refused, worded once for both (the npm facade restates the words in JS). A plain function generic over the goal type, the language crate's spelling table passed in, so this crate still depends on no language crate. `tsv_ffi` spells the axis as a code and keeps its own `ffi_source_type`.
+- `decode_source_type(source_type, allowed, family, from_source_type)` — the two string-axis bindings' shared decoder (`napi_source_type`, and `wasm_source_type` past its own not-a-string arm): unset stays unset, a source type on a goalless language and a value naming neither goal are refused, worded once for both (the npm facade restates the words in JS). A plain function generic over the goal type, the language crate's spelling table passed in, so this crate still depends on no language crate.
 
 The load-bearing property is that **one `$goalness` tag drives every macro**: a language with no axis *rejects* a set goal rather than ignoring it, and the macro that picks the parse call and the macro that licenses the refusal can't come to disagree about which languages those are. Each binding still owns its own `lang_bindings!` (three different export signatures); the C FFI words its own refusals, and the two string-axis bindings share `decode_source_type`'s.
 
 ## Abort safety: take and park
 
-Each helper **takes** its arena out of the thread-local for the call and **parks** it back after — it never holds a `RefCell` borrow guard across `f`. This is the load-bearing decision in the crate; the argument (a WASM trap runs no `Drop` but leaves the instance callable, so a held guard bricks every later call) is in the `src/lib.rs` module docs, along with the two consequences — a panicking call loses its warm arena, and re-entrancy became a fresh-fallback rather than a panic.
+Each helper **takes** its arena out of the thread-local for the call and **parks** it back after — it never holds a `RefCell` borrow guard across `f`. This is the load-bearing decision in the crate; the argument (a WASM trap runs no `Drop` but leaves the instance callable, so a held guard bricks every later call) is in the `src/lib.rs` module docs, along with the two consequences — a panicking call loses its warm arena, and re-entrancy gets a fresh fallback rather than a panic.
 
 What the module docs don't carry, because it is evidence rather than rationale:
 
@@ -52,6 +52,6 @@ The **workspace dependency entry is `default-features = false`**, so a binding g
 
 ## Consumers
 
-`tsv_ffi`, `tsv_napi`, and `tsv_wasm`. Each maps its `format` feature to `tsv_arena/format`, and builds every export body inside its `lang_bindings!` macro from the same `parse_convert!` / `parse_internal!` / `parse_format!` set over one `goal_allowed!` tag — the parse exports running `with_ast_arena` through the first two, the format export through `parse_format!`, which runs both arena helpers. What stays the binding's own is its host's idiom: decoding the source type and building the error it reports.
+`tsv_ffi`, `tsv_napi`, and `tsv_wasm`. Each maps its `format` feature to `tsv_arena/format` and builds every export body inside its `lang_bindings!` from the same `parse_convert!` / `parse_internal!` / `parse_format!` set over one `goal_allowed!` tag — the parse exports reach `with_ast_arena` through the first two, the format export both arena helpers through `parse_format!`. What stays the binding's own is its host's idiom: decoding the source type and building the error it reports.
 
 For the two **native** bindings the win is heap-churn through the host FFI/N-API layer. For **`tsv_wasm`** it's the per-call `Bump`/`DocArena` allocation in the sandbox (the documented WASM-format allocation-count lever) — measured at a **byte-identical ~2% warm format speedup** (svelte ~3%) on the zzz corpus via `benches/js/diagnostics/wasm_format_probe.ts`, with a negligible cold single-shot cost (one un-pre-sized first allocation; even `npm/cli.js` is warm after its first file) and +0.08% bundle size.

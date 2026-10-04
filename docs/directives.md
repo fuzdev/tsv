@@ -1,12 +1,12 @@
 # Directives
 
-tsv honors in-source comments that suppress formatting for a piece of code. The
-directives are recognized in every language tsv formats — TypeScript (`<script>`
+tsv honors in-source comments that suppress formatting for a piece of code, in
+every language it formats — TypeScript (`<script>`
 and the JS/TS family: `.ts` / `.svelte.ts` / `.mts` / `.cts` / `.js` / `.mjs` /
 `.cjs`), CSS (`<style>` and `.css`), and Svelte templates.
 
-Like everything else in tsv, the directives are **not configurable**: they are
-always active and cannot be turned off.
+Like everything else in tsv, the directives are **not configurable** — always
+active.
 
 ## `format-ignore`
 
@@ -14,20 +14,19 @@ Put a `format-ignore` comment immediately before a construct to emit it verbatim
 instead of formatting it. The marked construct keeps its original spacing, line
 breaks, and alignment; everything else in the file is formatted normally.
 
-"Verbatim" is verbatim about the frozen construct, not about the file's line
-terminators: a format run folds every `<CR>` in its input to `<LF>` before it
-parses (the same fold, in the same place, that prettier and the HTML and CSS
-tokenizers do), so a frozen region in a CRLF file comes out LF-terminated like
-the rest of it. (The one lone `<CR>` the fold cannot take is refused instead — see
+"Verbatim" covers the frozen construct, not the file's line terminators: a format
+run folds every `<CR>` to `<LF>` before it parses (the same fold, in the same place,
+prettier and the HTML and CSS tokenizers do), so a frozen region in a CRLF file comes
+out LF-terminated like the rest. (The one lone `<CR>` the fold cannot take is refused instead — see
 [cli.md §Parse errors](./cli.md#parse-errors).)
 
-It is also verbatim about the construct, not about where the construct ends up.
-A frozen Svelte template text that the section reorder moves to the very end of
-the file — a `<script>` or `<svelte:options>` followed it, and no `<style>`
-follows the template — would lose a trailing non-breaking space, U+FEFF, form
-feed or other character that Svelte's parser trims from the end of a file and
-renders anywhere else. That one character is written as a character reference
-(`&#xA0;`), which renders the same. Nothing else inside the region moves.
+Nor is it verbatim about where the construct ends up. A frozen Svelte template text
+that the section reorder moves to the very end of the file (a `<script>` or
+`<svelte:options>` followed it, and no `<style>` follows the template) would lose a
+trailing non-breaking space, U+FEFF, form feed or other character Svelte's parser trims
+from the end of a file but renders anywhere else, so that one character is written as a
+character reference (`&#xA0;`), which renders the same. Nothing else inside the region
+moves.
 
 ```svelte
 <script lang="ts">
@@ -68,12 +67,11 @@ exceptions:
 
 A Svelte `<script>` or `<style>` body is its own document to this rule, as it is to
 prettier, which formats the body as its own text: the tag ahead of it on the physical line
-does not count, so a directive the author glued to the tag (`<script>// format-ignore`)
-opens a line and freezes the statement below it, at the top level and nested in markup
-alike. Likewise only spaces or tabs between a directive and the start of a file leave it
-alone on its line — but not a leading byte-order mark, which still counts as text ahead of the
-directive, so in a file that begins `\uFEFF// prettier-ignore` the directive is inert (prettier
-honors it).
+does not count, so a directive glued to the tag (`<script>// format-ignore`) opens a line
+and freezes the statement below it, at the top level and nested in markup alike. Likewise
+only spaces or tabs between a directive and the start of a file leave it alone on its
+line — a leading byte-order mark still counts as text ahead of it, so in a file that begins
+`\uFEFF// prettier-ignore` the directive is inert (prettier honors it).
 
 The formatter keeps an honored directive alone on its line: a comment written ahead of it
 never glues onto it, even where only a comma stood between them
@@ -90,8 +88,7 @@ all between it and the node it freezes stays welded to it, on both sides: there
 is no whitespace there to re-spell, so breaking would inject a rendered space
 the source does not have. An authored gap is kept for the same reason — inline
 it survives as the one space it renders as. The gap in front of a frozen node is
-the author's: the formatter prints it once, never invents one, and never eats
-one.
+the author's: printed once, never invented, never eaten.
 
 A frozen template node whose bytes span lines is content that renders over
 several lines, so the element or block holding it lays out over several lines
@@ -180,8 +177,8 @@ function fn()
 }
 ```
 
-Such a gap only exists when a line comment already pushed the `:` onto its own
-line, so this is a rare shape in practice.
+Such a gap exists only when a line comment already pushed the `:` onto its own
+line — a rare shape.
 
 ### On parameter lists
 
@@ -397,8 +394,8 @@ A position that RE-SYNTHESIZES nothing because it already prints the pair keeps
 the slice INSIDE it: a chain base whose pair is required owns that pair's leading
 gap, so a directive written there is emitted from inside the parens the chain
 prints anyway (`(⏎// format-ignore⏎a   ?.b⏎).k`), where the reparse reads it in
-the same place. Skipping that emitter instead DROPPED the directive — the freeze
-arm prints only the base's own doc, so nothing ran the pair's gap lookup.
+the same place. Skipping that emitter would DROP the directive — the freeze arm
+prints only the base's own doc, so nothing would run the pair's gap lookup.
 
 ### On assignment-family value heads
 
@@ -640,11 +637,11 @@ an element are treated as ordinary comments.
 ## `prettier-ignore` compatibility
 
 For compatibility with prettier-authored code, tsv also honors the
-`prettier-ignore` family — `prettier-ignore`, `prettier-ignore-start`, and
-`prettier-ignore-end` — identically. `format-ignore` is the canonical tsv
-spelling; `prettier-ignore` is kept so existing codebases keep working unchanged.
-The two spellings are honored identically at every honored position — which
-positions are honored is decided by [placement](#placement), never by spelling.
+`prettier-ignore` family (`prettier-ignore`, `prettier-ignore-start`,
+`prettier-ignore-end`). `format-ignore` is the canonical tsv spelling;
+`prettier-ignore` is kept so existing codebases keep working unchanged. The two
+spellings are honored identically — which positions are honored is decided by
+[placement](#placement), never by spelling.
 
 ## See also
 
