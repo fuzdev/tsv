@@ -8,14 +8,16 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
 - `cli::TopLevel` holds a top-level `--version` switch plus the `Subcommand` enum; `main.rs` parses argv and dispatches, answering a bare `--version` itself ahead of argh (`cli::is_bare_version`) since the subcommand argh requires is not one, so a bare `tsv` gets argh's own required-subcommand error
 - argh has no struct-flattening attribute, so the shared input fields (`--content`, `--stdin`, `--parser`, file path) are declared per command and assembled into `cli::input::InputArgs` for resolution
 
-**Adding Commands**: Create `src/cli/commands/newcmd.rs` with a `FromArgs` struct and a `run()` method, add a variant to `Subcommand` in `cli/mod.rs`.
+**Adding Commands**: Create `src/cli/commands/newcmd.rs` with a `FromArgs` struct and a `run()` method, declare it in `cli/commands/mod.rs`, and add a variant to `Subcommand` plus its `TopLevel::run` arm in `cli/mod.rs`.
 
 ## Shared Infrastructure
 
-`tsv_cli` exports CLI infrastructure as a library, reused by `tsv_debug` for consistent UX:
+`tsv_cli` exports CLI infrastructure as a library, reused by `tsv_debug` and the integration tests for consistent UX:
 
 - Input handling (file, `--content`, `--stdin`) — `cli/input.rs`
-- File/directory discovery with extension filter, gitignore-aware ignore evaluation (hierarchical `.gitignore`/`.formatignore`/`.prettierignore`), and the non-git heuristic fallback — `cli/discover.rs`
+- File/directory discovery with extension filter, gitignore-aware ignore evaluation (hierarchical `.gitignore`/`.formatignore`/`.prettierignore`), and the build-output heuristic fallback where no `.gitignore` is in scope (the per-entry verdicts from `tsv_discover`) — `cli/discover.rs`
+- The in-process parse+format entry point (`format_source`) — `cli/format_source.rs`
+- The thread stack reservation and the `--jobs` ceiling (`STACK_SIZE`, `sized_thread`, `clamp_worker_count`) — `cli/stack.rs`
 - The `--pretty` re-indenter (tab-indented form of the compact wire, no deserializer) — `json_utils.rs`
 
 ## Binary Structure
@@ -312,7 +314,7 @@ multiplies that node's size by its arm count, at every level, forever. This is w
 `parse_*` on the type ladder a bare `TSType`: a node builder either boxes into the arena at
 its own tail (`alloc_expr` for expressions, `Parser::alloc` for types, leaving
 the caller an 8-byte reference) or returns its own concrete node struct — an
-`ObjectExpression` is 32 B, and the dispatcher arm that wraps one back into an
+`ObjectExpression` is 24 B, and the dispatcher arm that wraps one back into an
 `Expression` builds a temporary the compiler merges with its sibling arms' rather than a
 return slot it cannot. The printer answers the same pressure with the same move on its own
 side: the chain entry points fill a caller-owned `ChainNodeVec` rather than returning one,
@@ -335,7 +337,7 @@ Rarity is what makes those free — each is ≤0.2% of statements, a
 classic `for (;;)` is 0.05–0.22%, and the five expression variants together are ~3% of
 expressions, of which the two widest are ~0.02% — while the width is paid on every
 element of every slice and on every `?`-propagation copy. `Expression`'s ladder stops
-where rarity does: the next-widest is `CallExpression` at 64 B and it is 14–21% of
+where rarity does: the next-widest is `CallExpression` at 56 B and it is 14–21% of
 expressions.
 
 The second is a **slot borrow**, which needs no rarity argument at all, because the

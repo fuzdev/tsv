@@ -4,7 +4,7 @@
 
 ## Status
 
-**Experimental, in development, may never ship.** `tsv_check` is a research crate: a
+`tsv_check` is a research crate: a
 TypeScript binder and checker written from scratch in Rust, targeting exact TS7/tsgo
 error conformance. The semantic phases land family by family; the pipeline skeleton
 (parse → lower+bind → check → sort/dedup) is real, most of the type engine is not.
@@ -90,16 +90,18 @@ cargo run -p tsv_debug tsc_conformance index                     # the corpus-IN
 deno task conformance:tsc-roundtrip                              # roundtrip, as a deno task
 deno task conformance:tsc-check                                  # run + writes benches/js/results/report.tsc-conformance.{json,md}
 deno task conformance:tsc-check:update                           # re-pin the count snapshot + refresh the report (full runs only; refuses a red run)
-# Common options: --path <typescript-go> (default ../typescript-go), --json; --verbose on roundtrip/index only.
-# roundtrip: filter by path substring (skips the pins). run: triage filters --test <substr> /
-#   --code <n> / --variant k=v / --family {dup,flow,all} skip the pins (invariant gates still
-#   hold); --emit-manifest <path>, --report <path> (full-run only), --update (full-run only).
-# check-test: --variant k=v (one variant); --dump-flow dumps the first unit's control-flow
-#   graph as Graphviz DOT instead of the diagnostic diff.
 ```
 
+Options: `--path <typescript-go>` (default `../typescript-go`) and `--json` everywhere; `--verbose`
+on `roundtrip`/`index` only. `roundtrip` filters by path substring (skipping the pins). `run`'s
+triage filters `--test <substr>` / `--code <n>` / `--variant k=v` / `--family {dup,flow,all}` skip
+the pins (invariant gates still hold); it also takes `--emit-manifest <path>`, `--report <path>`
+and `--update` (both full-run only). `check-test` takes `--variant k=v` (one variant) and
+`--dump-flow`, which dumps the first unit's control-flow graph as Graphviz DOT instead of the
+diagnostic diff.
+
 **`roundtrip`** proves the `.errors.txt` parser + renderer port in one move: parse every
-baseline, re-render it, byte-compare. The 14 ANSI `pretty=true` baselines take their own
+baseline, re-render it, byte-compare. The ANSI `pretty=true` baselines take their own
 colored model but stay in the denominator, so round-trip is 100%.
 
 **`index`** proves three gates against the on-disk baselines: the baseline join, the
@@ -113,8 +115,7 @@ duplicate-conflict family (TS2300/2451/2567/2528 + merge-path codes) and the flo
 classified by deferred cause (`merge` / `lib` / `deferred_late_bound` / `deferred_cfa` /
 `other`, the last a HARD zero — any unclassified miss is a cascade or construction bug).
 It also publishes the parse-divergence census, runs each test `catch_unwind`-wrapped on a
-generous-stack worker (a tracked parser crash would live in the pinned, currently empty `CRASH_EXCLUSIONS`
-ledger), and drops per-test `.diff` artifacts under `target/tsc_conformance/diffs/` on
+generous-stack worker (a tracked parser crash would live in the pinned `CRASH_EXCLUSIONS` ledger), and drops per-test `.diff` artifacts under `target/tsc_conformance/diffs/` on
 failure.
 
 The committed `benches/js/results/report.tsc-conformance.{json,md}` is regenerated only

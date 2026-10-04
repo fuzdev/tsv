@@ -173,7 +173,7 @@ Full reference — flags, the ratchet, reading a finding, triage + re-pin workfl
 ```bash
 cargo run --profile corpus -p tsv_debug --features audits gap_audit   # tests/fixtures
 cargo run --profile corpus -p tsv_debug --features audits gap_audit ../corpora/collections/zzz/src
-# Also: --json, --jobs N, --limit N, --payload <one>, --all-bytes, --update
+# Also: --json, --report, --by-node, --rank, --since <json>, --top N, --jobs N, --limit N, --payload <one>, --all-bytes, --update
 ```
 
 Injects a comment into EVERY gap and re-runs the print-once ledger — the DISCOVERY arm
@@ -385,7 +385,7 @@ both need the canonical parser, so they are conformance-tier at best. Standing f
   enumeration also bounds the class: the three remaining both-ends trims that feed a sub-parse
   (the `{#each}` binding's, the `{:then}`/`{:catch}` region's, the `{@const}` binding's) are
   unreachable, each guarded by an explicit rejection of the trailing comment that canonical
-  rejects too. `Parser::parse_ts_expression` states the rule for its callers, and the extents
+  rejects too. `SvelteParser::parse_ts_expression` states the rule for its callers, and the extents
   of every head — the trimmed ones and the agreeing neighbours, in one wire — are pinned by
   [head_final_line_comment_extent](../tests/fixtures/svelte/syntax/comments/head_final_line_comment_extent/),
   whose `prettier-ignore` is what makes the trigger format-stable enough to be a fixture at
@@ -509,11 +509,11 @@ bug; the file shrinking is the goal. Currently EMPTY (born green).
 2. **Empty block body** — a kept-but-empty block section prints in block form, and the empty body between opener and terminator is a blank line (`{:catch error}{/await}` → `{:catch error}⏎⏎{/await}`). Sanctioned by [`empty_branch_collapse`](../tests/fixtures/svelte/blocks/empty_branch_collapse_prettier_divergence/) and [`empty_catch_multiline`](../tests/fixtures/svelte/blocks/await/empty_catch_multiline_prettier_divergence/), whose READMEs state it.
 3. **Empty frozen verbatim body** — rule 2 one construct over. A body in a language tsv does not format at that position is copied out between the two delimiter lines the geometry requires, so a whitespace-only body leaves those lines with nothing between them (`<template lang="pug">⏎</template>` → `<template lang="pug">⏎⏎</template>`). Prettier's `preformattedBody` emits it identically. **All three tags reach it**, because the freeze is one rule asked at every position that has a body — a foreign `<template>`, pinned by [`template_foreign_lang_body`](../tests/fixtures/svelte/elements/template_foreign_lang_body/); a foreign `<script>`, pinned by [`nested_script_style_whitespace_only`](../tests/fixtures/svelte/elements/nested_script_style_whitespace_only/); and a foreign `<style>`, pinned by [`style_foreign_lang_nested`](../tests/fixtures/svelte/elements/style_foreign_lang_nested_prettier_divergence/). See [conformance_prettier_svelte.md §Foreign-language embedded bodies](conformance_prettier_svelte.md#svelte-foreign-language-embedded-bodies).
 
-   **Known blind spot: the carve-out is keyed on the tag, not the lang.** The line shapes it matches strip attributes, so `<script lang="coffee">` and a plain `<script>` are one token — the sanction exempts a *formattable* body's blank too. What keeps that from being a hole is the printer, not the carve-out: a formattable body cannot reach the shape (empty → `<tag></tag>` with no newlines; whitespace-only → the single delimiter break, adjacent lines with no run between), so a blank there could only have been authored, and an authored one is already in the input count. That premise is pinned by the fixture above; if it ever breaks, the arm goes quiet on the two commonest tags in the corpus rather than failing.
+   **Known blind spot: the carve-out is keyed on the tag, not the lang.** The line shapes it matches strip attributes, so `<script lang="coffee">` and a plain `<script>` are one token — the sanction exempts a *formattable* body's blank too. What keeps that from being a hole is the printer, not the carve-out: a formattable body cannot reach the shape (empty → `<tag></tag>` with no newlines; whitespace-only → the single delimiter break, adjacent lines with no run between), so a blank there could only have been authored, and an authored one is already in the input count. That premise is pinned by `nested_script_style_whitespace_only` above; if it ever breaks, the arm goes quiet on the two commonest tags in the corpus rather than failing.
 
 **A section's leading comment run is rule 1 one step removed.** Comments travel with the section, so a glued `<div>block1</div>⏎<!-- comment -->⏎<style>` puts the section's **leading comment** where the tag would be, and the bracketing shape reads `</div` ⇢ `<!--` — a blank prettier emits too. The audit reads forward from the run (`leads_section`): one or more full-line comments (multi-line ones and blank lines between them allowed) ending at a `<script>` / `<style>` / `<svelte:options>` line excuse the run, and the seam blank *between* two comments of that run is the same run read from its middle. Anything else between the comments and the tag — content, or text on a comment's closing line — refuses, which is what keeps this narrower than "a blank before some comment" (a widening refused because it blinded the audit to a whole class of real fabrications). Exercised by the `svelte/script/ordering` variants that author a comment glued to the last template node.
 
-**A section's region-end trail is the same rule from the other side.** A `#endregion` written directly below a section travels with it and prints below it, so the section seam's blank follows the trail instead of the closing tag and the run reads `<!--` ⇢ the template. The audit reads back from the run (`trails_section`): a full-line comment (multi-line allowed) that is a region-end marker (`tsv_lang::is_region_end_marker`, the formatter's own spelling), with nothing but blank lines between it and a `</script>` / `</style>` / `<svelte:options>` line, excuses the run. Any other comment there refuses — an ordinary comment below a section stays in the template, so a blank after it would be invented — and so does a comment below ordinary content. Surfaced by the `svelte/script/ordering/lifted_run_region_trails` variants, whose sections are written between template nodes with their trails glued to the next one.
+**A section's region-end trail is the same rule from the other side.** A `#endregion` written directly below a section travels with it and prints below it, so the section seam's blank follows the trail instead of the closing tag and the run reads `<!--` ⇢ the template. The audit reads back from the run (`trails_section`): a full-line comment (multi-line allowed) that is a region-end marker (`tsv_lang::is_region_end_marker`, the formatter's own spelling), with nothing but blank lines between it and a `</script>` / `</style>` / `<svelte:options>` line, excuses the run. Any other comment there refuses — an ordinary comment below a section stays in the template, so a blank after it would be invented — and so does a comment below ordinary content. Surfaced by the `svelte/script/ordering/lifted_run_region_trails_prettier_divergence` variants, whose sections are written between template nodes with their trails glued to the next one.
 
 **Blind spots.**
 
@@ -610,7 +610,7 @@ read as a green gate.
 
 **A third component, `inner`, keeps a weld out of the fattest shapes.** The two ends put a whole comment and two comments *welded onto one line* in the same bucket: `<!-- a -->` and `<!-- a --><!-- b -->` both open `<!--` and end `-->`. That matters because the fattest shape is exactly that one — measured over `tests/fixtures`, `<!--…-->` carries nearly half the over-width lines, and **every one of them is a single whole comment**. So its members are all *forced* overruns (tsv never rewraps a comment interior), and a weld is the only bug the silhouette could ever hide — the same class the trailing-run comment emitters have produced before, and one the ledger, census, F1 and round-trip are all blind to. `inner` records whether a `-->` or `*/` closes before the line does (`-` when none), rendered spliced (`head…-->…tail`). It costs **one** shape over `tests/fixtures`: the `IDENT…WORD` lines that were mid-line comment glue split off from the ordinary ones, and `<!--…WORD` becomes `<!--…-->…WORD` outright. Neither marker can occur inside the comment it closes, so a whole comment never reads as a weld.
 
-⚠️ **What a non-`-` `inner` means over real code is NOT what it means over `tests/fixtures`.** Over `tests/fixtures` the only interior closers are the two `-->` weld shapes just described (`<!--…-->…WORD` and `IDENT…-->…WORD`) — no JSDoc-cast or string-interior kind occurs there. Over real code (`../svelte/packages/svelte/src` + `../zzz/src`: 1,255 overruns, 91 shapes) they mint 13 shapes / 24 lines, and reading every one of those lines splits them two ways:
+⚠️ **What a non-`-` `inner` means over real code is NOT what it means over `tests/fixtures`.** Over `tests/fixtures` the interior closers are the two `-->` weld shapes just described (`<!--…-->…WORD` and `IDENT…-->…WORD`) plus two genuine interior comments — a `<!-- prettier-ignore -->` inside a `<pre>` (`<pre…-->…>`) and a block comment in a CSS at-rule prelude (`@…*/…WORD`) — and no JSDoc-cast or string-interior kind occurs there. Over real code (`../svelte/packages/svelte/src` + `../zzz/src`: 1,255 overruns, 91 shapes) they mint 13 shapes / 24 lines, and reading every one of those lines splits them two ways:
 
 - **9 shapes / 13 lines are minted by a genuine interior comment that is not a weld** — overwhelmingly the JSDoc cast (`… /** @type {T} */ (expr) …`), which really does close a block comment mid-line. `inner` is reporting the truth; it just isn't reporting a bug.
 - **4 shapes / 11 lines are the mirror false positive** — a `-->` or `*/` inside a *string*, *template*, *regex*, or the text of a `//` comment, read as interior with no comment involved. Only one of the four is the template-literal case (Svelte's migrator building `<!-- @migration-task … -->` text); string literals, regex literals and comment text produce it too.
@@ -624,7 +624,7 @@ So the triage note in the snapshot header holds — a new `inner` shape is a **q
 **Blind spots.**
 
 - **Not a bug list.** A pinned shape is a *kind of line that exists*, not a defect. Triage a new one against §Print Width Philosophy before pinning it; the sanctioned overruns are real and numerous (hundreds of lines over `tests/fixtures`, dominated by fixture prose headers a formatter never rewraps).
-- **Shape collision — the residual blind spot, and it is NOT closable by a fourth key component.** A width bug whose line happens to open, close inside, and end like an existing pinned shape passes. The key is a silhouette, not a proof: it catches new *kinds*, and a same-kind regression needs a fixture. The risk is concentrated — the fattest shape holds 45% of the lines and the top three hold 65%. `inner` (above) drains the specific bug class the fattest ones could hide; what remains is a *breakable* line — one with a real seam tsv failed to take — landing on a pinned silhouette. No further component separates that, because **nothing in the finished text distinguishes a seam tsv declined from one it never had** — a property of the artifact being measured, not a gap in the key, so no silhouette engineering reaches it. The rejected render-time hook (above) tried to read the seam instead of the text, and is blind for its own, worse reason.
+- **Shape collision — the residual blind spot, and it is NOT closable by a fourth key component.** A width bug whose line happens to open, close inside, and end like an existing pinned shape passes. The key is a silhouette, not a proof: it catches new *kinds*, and a same-kind regression needs a fixture. The risk is concentrated — the fattest shape holds nearly half the lines and the top three close to two-thirds. `inner` (above) drains the specific bug class the fattest ones could hide; what remains is a *breakable* line — one with a real seam tsv failed to take — landing on a pinned silhouette. No further component separates that, because **nothing in the finished text distinguishes a seam tsv declined from one it never had** — a property of the artifact being measured, not a gap in the key, so no silhouette engineering reaches it. The rejected render-time hook (above) tried to read the seam instead of the text, and is blind for its own, worse reason.
 
   Worked example, from triaging this audit over real code: tsv granted the flat test-call layout to `test('<long name>', (a, b) => { … })` and broke the callback's *parameter list* to chase the width, where prettier keeps the parameters flat — and to two 3-argument shapes prettier's `isTestCall` excludes outright, where prettier breaks every argument out and holds 100 (see [conformance_prettier.md §Print Width Philosophy](./conformance_prettier.md#print-width-philosophy)). Those emitted an over-width line ending in `(`, whose shape is `svelte IDENT…(` — **already pinned**, so the ratchet stayed green on all of it. That is the blind spot behaving exactly as described, and the only thing that reached it was a fixture with a parameterized callback: `test_functions`, the fixture that pins this layout, uses only parameterless ones, so the two cases are held by [test_functions_params](../tests/fixtures/typescript/expressions/calls/test_functions_params/) and [test_functions_timeout](../tests/fixtures/typescript/expressions/calls/test_functions_timeout/) instead.
 
@@ -633,7 +633,7 @@ So the triage note in the snapshot header holds — a new `inner` shape is a **q
 
 ## Ignore-Directive Honoring Audit (`ignore:audit`)
 
-The mechanized discovery of unhonored `// prettier-ignore` / `format-ignore` positions (Arm A of the systematic ignore-honoring gap). Recognition is centralized (`tsv_lang::is_format_ignore_directive`), but *consumption* is a per-node opt-in the printer makes at scattered sites — any position without one silently reformats an ignored construct, which prettier-authored code does not expect. This audit turns the guess-list of suspected positions into a computed ledger, the way `comments:audit` structurally guards the per-site `owned_by_node` model rather than trusting each site by inspection. Design rationale lives in the `ignore_audit` module docs.
+The mechanized discovery of unhonored `// prettier-ignore` / `format-ignore` positions. Recognition is centralized (`tsv_lang::is_format_ignore_directive`), but *consumption* is a per-node opt-in the printer makes at scattered sites — any position without one silently reformats an ignored construct, which prettier-authored code does not expect. This audit turns the guess-list of suspected positions into a computed ledger, the way `comments:audit` structurally guards the per-site `owned_by_node` model rather than trusting each site by inspection. Design rationale lives in the `ignore_audit` module docs.
 
 ```bash
 cargo run --profile corpus -p tsv_debug --features audits ignore_audit   # tests/fixtures
@@ -696,7 +696,7 @@ template `<!-- prettier-ignore -->` are a follow-up — the template one has the
 uncovered surface, because there the gap between the directive and the node it freezes is
 itself whitespace the printer emits, so getting it wrong is render-visible rather than a layout
 choice (conformance_prettier_ignore.md §Format-ignore directive). Whitespace-perturbation only
-(a quote/paren-only reformat is invisible — Arm B's remit); only format fixed points injected.
+(a quote/paren-only reformat is invisible — curated fixtures backstop those positions); only format fixed points injected.
 
 `deno task ignore:audit:update` regenerates the snapshot after adding a printer opt-in (a now-honored position goes stale → drop its line) or fixing a misbinding, over-freeze, or relocation transient; it refuses a narrowed run.
 
@@ -731,15 +731,17 @@ the doc-node count grows faster than ~depth^3:
 - **Svelte** — elements, {#if}, {#each}, {#await}, the sibling-`>` dangle, glued inline-element
   runs and element→block dangles nested behind block-holding wrappers (each compact and
   authored-multiline), {#snippet}, {#key};
-- **TS** — member chains, ternaries, conditional types, nested calls, and the expand-last arrow
-  family: plain, multi-arg, `new`, chain, object-body, conditional-body, `function`, and
-  curried, the last in untyped / typed / `new` / chain / object-TERMINAL spellings, the
-  object-terminal one again in single-argument, multi-argument and chain forms.
+- **TS** — member chains, ternaries (bare and as a call argument), conditional types, nested
+  calls, nested assignments, arrays of callbacks, and the expand-last arrow family: plain,
+  multi-arg, `new`, chain, object-body, conditional-body, `function`, a comment between `=>` and
+  the body (own-line before an object, block or call body; glued and broken after before an
+  object), and curried, the last in untyped / typed / `new` / chain / object-TERMINAL spellings,
+  the object-terminal one again in single-argument, multi-argument and chain forms.
 
 An axis earns its place by REACHING a builder no other axis does; the curried axes came from
 real 2^depth regressions that the family as it then stood could not see. Deterministic, pure
-Rust, no Deno; exits 1 on any super-linear case. Gated in `deno task check` via the
-`fanout:audit` task.
+Rust, no Deno; exits 1 on any construct growing past that ~depth^3 bound (or past the
+doc-node cap). Gated in `deno task check` via the `fanout:audit` task.
 
 **What it is blind to.** The audit measures how the doc-node count *grows with depth*, so it
 sees only violations that **compound**. Two shapes escape it:
@@ -752,8 +754,7 @@ sees only violations that **compound**. Two shapes escape it:
 - **Breadth.** A quadratic over a flat sibling sequence (`[..i].iter().any(…)` inside a child
   loop) is likewise structurally invisible — it grows with sibling count, not nesting.
 
-Both are guarded by review and grep, not by this audit. The known open instance of the first is
-a parenthesized binary chain base; see the `chain/printing.rs` note in the perf queue.
+Both are guarded by review and grep, not by this audit.
 
 ## Raw-Find Scan Audit (`scan:audit`)
 
@@ -889,7 +890,7 @@ flag). It sees only inputs the corpus holds, and only the format path: `parse` w
 equality is not graded. And a divergence both engines share, from prettier, is the
 conformance gates' business, not this one.
 
-**Gating.** CI's `artifacts` job, immediately after the N-API step — the first point at
+**Gating.** CI's `artifacts` job, after the N-API steps — the first point at
 which both artifacts exist (`build:packages` made the wasm one, the N-API step's
 `cargo build -p tsv_cli --release` the native one). Deliberately **not** in `deno task check`,
 which builds no packages — nor on the publish path: `scripts/publish.ts` runs
@@ -1117,7 +1118,7 @@ does not list fails the run (tsv started rejecting a prettier output it parsed, 
 fixture's prettier output is invalid and needs listing), and a listed document the run walked
 that tsv now parses fails as stale (a run over a narrowed root grades the entries under it). Not graded at
 all, each by a declaration: `input_invalid_*` (it must fail both parsers) and a
-`tsv_rejects.txt` fixture's input. A language that grades no document fails the run.
+`tsv_rejects.txt` fixture's input. Over the whole tree a language that grades no document fails the run; a narrowed root need only grade something.
 
 **Blind spots.**
 
@@ -1262,7 +1263,7 @@ upstream publishes — drift to decide about, not a broken build.
 
 ```bash
 # the same script's other mode (--checkouts). `--allow-run=git` is load-bearing:
-# without it every checkout reads as absent and the drift half is silently inert.
+# without it the drift half cannot run (the audit reports it unchecked).
 deno task pins:audit:checkouts
 ```
 
@@ -1357,8 +1358,8 @@ non-idempotent fill 2-cycle was green on fixtures while failing on ../zzz).
 ⚠️ **That file-level rule is a constraint on FIXTURE DESIGN, and this is the only gate that
 states it.** The walk takes every `.svelte` under tests/fixtures whose own format is claimed
 stable — `output_prettier.*` included — so a `_prettier_divergence` whose prettier form tsv
-does NOT hold stable fails `deno task check` HERE, several gates after `fixtures:validate`
-reported the fixture green (`fixtures:validate` grades `output_prettier` by F2 alone: it is
+does NOT hold stable fails `deno task check` HERE, while `fixtures:validate` (and the
+`fixtures_tests` that `check`'s later `cargo test` leg runs) reports the fixture green (`fixtures:validate` grades `output_prettier` by F2 alone: it is
 prettier's output of `input`, and carries no tsv claim). It bites when prettier's form is
 *mangled* rather than merely different, since tsv often re-mangles it: prettier deletes the
 separator in `@supports (a: x\#FFF 0.5px)` → `x\#FFF0.5px`, and tsv formats THAT to
@@ -1486,7 +1487,7 @@ parens that re-associate it one level (`a op b op c` -> `a op (b op c)`), and fo
 relational `<`…`>` chain each of its two shells, then requires the twin to format back to the
 base, byte for byte. Pure Rust, no sidecar — one format per site; defaults to tests/fixtures;
 exits 1 on any finding; ~1.4 s over tests/fixtures. `--dump-dir DIR` writes a byte-exact repro
-per finding (base / variant / ftry / ftry2 + note.txt, the same four files
+per finding (base / variant / ftry / ftry2 + note.txt, the same set
 `authoring_audit --dump-dir` writes) — the seed a fixture is made from without re-deriving the splice by hand.
 
 **The splices.** The LOGICAL mutation is a pure two-character insertion, and each of its three
@@ -1634,7 +1635,7 @@ kinds, zero false positives; on the fixed tree it reports **0** across 45,905 gr
 **What only it can see.** A fused element+tail measurement at an inline-sibling wrap is an F1
 break at every width where the wrapped element lays its own content out block-style — and no
 other gate can see it, because the strayed pass is reachable only at widths no fixture happens
-to sit at; the sweep reaches it past `--width 17` (`inline_sibling_drop_tail_wide_long` pins the
+to sit at; the sweep reaches it past `--width 17` (`inline_sibling_drop_tail_wide_long_prettier_divergence` pins the
 razor). Green over both the fixture tree and real code, and gated in `deno task check` (~2 s at
 the default width on a 12-core box — by far the heaviest as-authored walk, and the one the
 shared sweep's worker pool buys the most: ~14.6 s at `--jobs 1`).
@@ -1892,7 +1893,7 @@ then, over external corpora).
 cargo run -p tsv_debug fuzz                                    # 2000 iters over tests/fixtures
 cargo run -p tsv_debug fuzz --seed 7 --iterations 20000 --evolve --minimize --dump-dir /tmp/fz  # discovery
 cargo run -p tsv_debug fuzz --iterations 0 ../corpora/collections/zzz/src       # pristine pass only = an F1 sweep
-# Also: --max-mutations N, --limit N, --max-findings N (HARD only), --slow-budget-ms N, --strict, --json
+# Also: --max-mutations N, --limit N, --max-findings N (HARD only), --slow-budget-ms N, --strict, --no-render, --json
 ```
 
 A dep-free seeded mutational fuzzer (the coverage-trifecta fuzzing leg): a SplitMix64 PRNG +

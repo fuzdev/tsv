@@ -272,7 +272,7 @@ and selects the prettier parser):
 
 ### Standard Variant Names
 
-Both patterns follow the same content conventions:
+The `unformatted_*` and `unformatted_ours_*` patterns follow the same content conventions:
 
 Variant name — purpose (example):
 
@@ -406,7 +406,7 @@ await_new_operand_own_line_block_comment_prettier_divergence/
 All three prettier-stable-form kinds are prettier-idempotent and differ only in what
 our formatter does (the Terminology note at the top of this doc). Suffixes describe the form, e.g. `variant_compact`, `variant_wrapped`,
 `divergent_variant_own_line` (heritage keyword own-line form), `divergent_variant_spaces`
-(a blank-line form). Validation: rules N9/N11 + C3b/C3c in ./fixture_overview.md;
+(a spacing form). Validation: rules N9/N11 + C3b/C3c in ./fixture_overview.md;
 README.md required.
 
 **Variant parse pins** — `expected_<stem>.json`, named by the sibling variant it pins
@@ -414,8 +414,9 @@ README.md required.
 parser's AST of that variant, which tsv's parse must reproduce (P4; S24 requires the
 variant). Never hand-written — `deno task fixtures:update:parsed` regenerates it, and an
 empty file of that name is how one is created. Reach for it only when the parse fact lives
-in a form `input.*` cannot hold under F1 (the in-tree case is a leading BOM with nothing
-load-bearing behind it, which the format side strips); an ordinary parse claim belongs on
+in a form `input.*` cannot hold under F1 (the in-tree cases are a leading BOM with nothing
+load-bearing behind it, which the format side strips, and a newline inside Svelte's `_ as `
+annotation window, which tsv's formatter always joins up); an ordinary parse claim belongs on
 the input.
 
 **No-oracle marker files** — three fixed filenames (not variant patterns), all rare;
@@ -436,7 +437,7 @@ F5/S18, F6/S19, F7/S20:
   trimmed content is the expected **tsv**-error substring. Hand-author `input.*`
   (prettier is not consulted), then `deno task fixtures:update:parsed` generates
   `expected_svelte.json` (failing loudly if the canonical parser rejects — the
-  divergence would be dead). Catalog in ./conformance_svelte.md §TypeScript Corrections.
+  divergence would be dead). Catalog in the matching ./conformance_svelte.md §Corrections Catalog section (§TypeScript Corrections for a script parse).
 
 ---
 

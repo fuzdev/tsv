@@ -44,7 +44,7 @@
 > a mandate: a fixture may be `.ts` on purpose to cover the standalone `tsv_ts`/acorn path (whose
 > `expected.json` pins a different AST than Svelte's). Those are listed in the audit's
 > `INTENTIONAL_TS` allowlist and reported as _intentional_, so _convertible_ names only fixtures
-> genuinely free to move (e.g. `syntax/comments/jsdoc_type_cast_ts_prettier_divergence` is the
+> genuinely free to move (e.g. `typescript/syntax/comments/jsdoc_type_cast_ts_prettier_divergence` is the
 > standalone-TS proof that the JSDoc-cast paren divergence holds in TS contexts). Add an entry there
 > when a fixture's `.ts`-ness is load-bearing.
 
@@ -304,6 +304,7 @@ In each example `input.svelte` is the canonical form the variants normalize to.
   - Directories with subdirectories (and no input file) are **containers** (intermediate nodes)
   - A directory cannot have both (mixed)
   - A directory cannot have neither (orphan)
+  - A container holds no files but an optional README.md — a fixture file left beside the subdirectories belongs to no fixture, so nothing would grade it
 
 **Structural validations (S)** - File structure checks:
 
@@ -321,6 +322,7 @@ In each example `input.svelte` is the canonical form the variants normalize to.
    - `variant_*.*` files (dual-stable forms), OR
    - `divergent_variant_*.*` files (divergent-variant forms), OR
    - `unformatted_ours_*.*` files (testing our formatter only), OR
+   - `unformatted_prettier_*.*` files (prettier's normalization to `output_prettier.*`), OR
    - `prettier_intermediate_*.*`, `prettier_intermediate_to_variant_*.*`, or `prettier_intermediate_to_divergent_variant_*.*` files (multi-pass convergence), OR
    - `prettier_nonconvergent.txt` (prettier never reaches a fixed point), OR
    - `prettier_rejects.txt` (prettier throws on the input)
@@ -421,7 +423,7 @@ pass here. That is a separate gate —
   - `prettier(unformatted_ours_X) == prettier_intermediate_to_variant_X` (matches first-pass output)
   - `prettier(prettier_intermediate_to_variant_X) != prettier_intermediate_to_variant_X` (verifies it's unstable)
   - `prettier(prettier_intermediate_to_variant_X) ∈ {variant_*, prettier_variant_*}` (converges to a documented variant, not input)
-- **N7c**: `prettier_intermediate_to_divergent_variant_*.*` captures prettier's unstable first-pass output when it converges to a documented `divergent_variant_*` — the target N7 (→ `input`) and N7b (→ `variant_*`/`prettier_variant_*`) can't accept, completing the intermediate-convergence family across all three prettier-stable-form kinds. Arises when prettier's unstable first pass on an `unformatted_ours_*` shell settles on a **prettier-stable form our formatter rewrites to a third form** (pinned by `types/mapped_bracket_colon_line_comment_prettier_divergence`'s `prettier_intermediate_to_divergent_variant_own_line`):
+- **N7c**: `prettier_intermediate_to_divergent_variant_*.*` captures prettier's unstable first-pass output when it converges to a documented `divergent_variant_*` — the target N7 (→ `input`) and N7b (→ `variant_*`/`prettier_variant_*`) can't accept, completing the intermediate-convergence family across all three prettier-stable-form kinds. Arises when prettier's unstable first pass on an `unformatted_ours_*` shell settles on a **prettier-stable form our formatter rewrites to a third form** (pinned by `typescript/types/union_single_member_head_line_comment_prettier_divergence`'s `prettier_intermediate_to_divergent_variant_pipe`):
   - `prettier(unformatted_ours_X) == prettier_intermediate_to_divergent_variant_X` (matches first-pass output)
   - `prettier(prettier_intermediate_to_divergent_variant_X) != prettier_intermediate_to_divergent_variant_X` (verifies it's unstable)
   - `prettier(prettier_intermediate_to_divergent_variant_X) ∈ {divergent_variant_*}` (converges to a documented divergent_variant, not input or a variant)
@@ -569,7 +571,7 @@ Test failing?
 │     document normally) or throws a different message (update the marker substring)
 │
 └─ Normalization (unformatted_* doesn't normalize)
-   └─ Check prettier: cargo run -p tsv_debug format_prettier unformatted_X.svelte | diff - input.svelte
+   └─ Check prettier: cargo run -p tsv_debug format_prettier unformatted_X.svelte --no-line-widths | diff - input.svelte
       ├─ Prettier preserves → Use `deno task fixtures:audit` to classify
       │  ├─ Ours normalizes to input → prettier_variant_*
       │  ├─ Ours keeps stable (not input) → variant_*
@@ -610,7 +612,7 @@ cat tests/fixtures/typescript/statements/if/basic/expected.json | jq '.'
 
 # Official parsers for comparison
 cargo run -p tsv_debug canonical_parse tests/fixtures/svelte/blocks/each/basic/input.svelte --parser svelte
-cargo run -p tsv_debug canonical_parse tests/fixtures/typescript/statements/if/basic/input.svelte --parser typescript
+cargo run -p tsv_debug canonical_parse tests/fixtures/typescript/syntax/comments/hashbang/input.ts
 ```
 
 ### Common Failure Modes
@@ -633,7 +635,7 @@ Prettier doesn't normalize the variant to the baseline — **usually a prettier 
 
 ```bash
 # Step 1: Check what prettier does with the variant
-cargo run -p tsv_debug format_prettier tests/fixtures/css/at_rules/container_spacing_prettier_divergence/unformatted_ours_compact.svelte 2>/dev/null > /tmp/prettier_variant.svelte
+cargo run -p tsv_debug format_prettier tests/fixtures/css/at_rules/container_spacing_prettier_divergence/unformatted_ours_compact.svelte --no-line-widths 2>/dev/null > /tmp/prettier_variant.svelte
 
 # Step 2: Compare with input.svelte
 diff tests/fixtures/css/at_rules/container_spacing_prettier_divergence/input.svelte /tmp/prettier_variant.svelte
@@ -643,7 +645,7 @@ diff tests/fixtures/css/at_rules/container_spacing_prettier_divergence/input.sve
 
 ```bash
 # Step 3: Check if prettier is idempotent with the variant
-cargo run -p tsv_debug format_prettier /tmp/prettier_variant.svelte 2>/dev/null > /tmp/prettier_variant2.svelte
+cargo run -p tsv_debug format_prettier /tmp/prettier_variant.svelte --no-line-widths 2>/dev/null > /tmp/prettier_variant2.svelte
 diff /tmp/prettier_variant.svelte /tmp/prettier_variant2.svelte
 ```
 
@@ -707,17 +709,17 @@ cargo run -p tsv_debug line_width tests/fixtures/css/values/functions/gradient_l
 
 # Output shows:
 # Line 1: 7 chars (0 tabs = 0, content = 7) ✓
-# Line 4: 101 chars (3 tabs = 6, content = 95) ✗ EXCEEDS printWidth (100)
-# Line 5: 100 chars (3 tabs = 6, content = 94) ⚠️ EXACTLY printWidth (100)
+# Line 4: 101 chars (3 tabs = 6, content = 95) ✗ EXCEEDS print_width (100)
+# Line 5: 100 chars (3 tabs = 6, content = 94) ⚠️ EXACTLY print_width (100)
 # ...
-# Summary: 3/35 lines exceed printWidth (100)
+# Summary: 3/35 lines exceed print_width (100)
 ```
 
 **Measure specific line:**
 
 ```bash
 cargo run -p tsv_debug line_width input.svelte --line 4
-# Line 4: 101 chars (3 tabs = 6, content = 95) ✗ EXCEEDS printWidth (100)
+# Line 4: 101 chars (3 tabs = 6, content = 95) ✗ EXCEEDS print_width (100)
 #   			clip-path: polygon(...);
 ```
 
@@ -874,7 +876,7 @@ per-kind checks are the S/C/F/N rules in [All Validation Rules](#all-validation-
 3. **Normalization divergence** (`prettier(input) == input`) — `input.*` + `unformatted_ours_*.*` + README only.
 4. **Unstable intermediate** (prettier requires two passes) — add `prettier_intermediate_*.*`: `unformatted_ours_X` → prettier → `prettier_intermediate_X` (unstable) → prettier → `input` (stable). Our formatter reaches the stable form in one pass.
    - **4b** — `prettier_intermediate_to_variant_*.*` when prettier's second pass lands on a documented `variant_*`/`prettier_variant_*` instead of `input` (the D → C → B chain; requires the convergence target to exist in the fixture).
-   - **4c** — `prettier_intermediate_to_divergent_variant_*.*` when prettier's second pass lands on a documented `divergent_variant_*` (the target N7/N7b can't accept — see N7c; requires a `divergent_variant_*` sibling). Pinned by `types/mapped_bracket_colon_line_comment_prettier_divergence` (`…_own_line`).
+   - **4c** — `prettier_intermediate_to_divergent_variant_*.*` when prettier's second pass lands on a documented `divergent_variant_*` (the target N7/N7b can't accept — see N7c; requires a `divergent_variant_*` sibling). Pinned by `typescript/types/union_single_member_head_line_comment_prettier_divergence` (`…_pipe`).
 5. **Testing prettier's normalization to its own output** — `unformatted_prettier_*.*` (requires `output_prettier.*`): `prettier(file) == output_prettier.*`; our formatter is not applied to these.
 6. **Dual-stable forms** — `variant_*.*`: both formatters keep the file stable; neither normalizes it to `input`.
 7. **Divergent-variant forms** — `divergent_variant_*.*`: prettier keeps the form stable; ours rewrites it to a *third* stable form, so three stable forms coexist.
@@ -1045,7 +1047,7 @@ contextual_keywords/async_await_as_identifiers/
 
 Combine multiple patterns when testing edge cases with both parser and formatter quirks (e.g., CSS comments where both Svelte and Prettier have quirks).
 
-**Example:** `css/tokens/comments/in_property_value_before_colon_prettier_divergence/` uses all patterns - see [Prettier Variant System](#example-css-comment-whitespace) above.
+**Example:** `css/tokens/comments/in_property_value_before_colon_prettier_divergence/` combines `output_prettier.*`, `prettier_variant_*` and `unformatted_ours_*` - see [Prettier Variant System](#example-css-comment-whitespace) above.
 
 Every pattern's validations are the rules in
 [All Validation Rules](#all-validation-rules); structure validation is always enforced.
@@ -1059,11 +1061,13 @@ Every pattern's validations are the rules in
 - **`fixtures_update_parsed`** - Updates parser expectations
   - Generates `expected.json` from the input type's canonical parser — Svelte's parser, acorn-typescript at the fixture's goal, or `parseCss` (default) — with every `loc` / `name_loc` stripped (the span-only wire)
   - Generates `expected_ours.json` + `expected_svelte.json` when divergence exists (`expected_svelte.json` takes the error marker only when the canonical parser rejects; a sidecar failure fails the fixture and writes nothing)
+  - Regenerates every variant parse pin (`expected_<stem>.json`, P4) a fixture holds
   - Generates `expected_svelte.json` alone for a `tsv_rejects.txt` fixture (canonical parser only — tsv emits no AST; fails loudly if the canonical parser rejects, i.e. the divergence is dead)
 
 - **`fixtures_update_formatted`** - Updates formatter outputs
   - Generates `output_prettier.*` when prettier differs from input
   - Auto-deletes `output_prettier.*` if identical to input
+  - Generates/updates/removes the `prettier_intermediate*_*` files and the audit signatures (`audit_signature.txt`, `audit_signature_<suffix>.txt`)
 
 - **`fixtures_update`** - Updates everything: calls both `fixtures_update_parsed` and `fixtures_update_formatted`
 

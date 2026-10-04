@@ -91,7 +91,7 @@ Future features (unknown order):
     - includes an experimental first-party typechecker `tsv_check` (which may never ship)
   - Svelte compiler (experimental partial implementation, may never ship -
     see [rsvelte](https://github.com/baseballyama/rsvelte))
-  - bundling is out of scope 
+  - bundling is out of scope
   - [discussion](https://github.com/fuzdev/tsv/discussions) welcome
 
 ## Install
@@ -140,8 +140,8 @@ and package READMEs for the full API and CLI flags:
 
 ## Design
 
-tsv's goal is to be an optimal, focused toolchain for TypeScript/JS, CSS, and Svelte.
-(with planned JSON/HTML)
+tsv's goal is to be an optimal, focused toolchain for TypeScript/JS, CSS, and Svelte
+(with planned JSON/HTML).
 
 - reduce complexity within the defined scope
   - supports Web+TS+Svelte - but no JSX/SCSS/etc
@@ -202,7 +202,6 @@ Each artifact includes only what it uses: the parse build excludes the printers,
 the format build excludes the JSON-AST conversion layer, and a future TypeScript/JS-only
 build would exclude Svelte and CSS (lang-specific builds aren't published yet) -
 see [docs/architecture.md](docs/architecture.md).
-
 
 ## Docs
 

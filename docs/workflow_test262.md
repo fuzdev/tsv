@@ -80,7 +80,7 @@ DISCOVER → CATEGORIZE → CHECK FIXTURES → CREATE FIXTURE (if missing) → I
 ### Run test262 with Filters
 
 ```bash
-# Full suite (slow, ~50k tests)
+# Full suite (slow)
 cargo run -p tsv_debug test262
 
 # Filter by directory (recommended for focused work)
@@ -237,7 +237,7 @@ deno task fixtures:validate [pattern]
 
 The fixture **should fail** at this point. This is correct - it defines the target behavior.
 
-### 4.6 ★ GET USER APPROVAL ★
+### 4.4 ★ GET USER APPROVAL ★
 
 **STOP HERE. Do not proceed without approval.**
 
@@ -298,10 +298,11 @@ with the new counts.
 
 ```bash
 deno task check                # the standing gate suite (no test262 leg)
-deno task conformance:test262  # the test262 release gate: `test262 --gate`, enforcing
-                               # POSITIVE_PASSED_PIN — a fixed positive-parse count, so a
-                               # fix that moves it also re-pins the count in test262.rs
+deno task conformance:test262  # the test262 release gate: `test262 --gate`
 ```
+
+The release gate enforces `POSITIVE_PASSED_PIN`, a fixed positive-parse count — a fix that moves
+it also re-pins the count in `test262.rs`.
 
 ---
 
@@ -331,25 +332,16 @@ deno task check
 
 ### Never Do These
 
-1. **Fix parser before fixture exists**
-   - Fixtures define correct behavior
-   - Without a fixture, no specification
-
-2. **Modify expected.json to make tests pass**
-   - expected.json comes from canonical parser
-   - If tests fail, fix our parser
-
-3. **Try to fix multiple unrelated failures at once**
-   - Each pattern needs focused attention
-   - Mixing fixes makes debugging harder
-
-4. **Skip the approval gate**
-   - User approval ensures fixture is correct
-   - Catching errors early saves rework
-
-5. **Add AnnexB features without discussion**
-   - Annex B is out of scope by design — tsv is not a web browser host
-   - Adding it is a major scope change (core sloppy mode is already parsed)
+1. **Fix parser before fixture exists** — fixtures define correct behavior; without one there's
+   no specification.
+2. **Modify expected.json to make tests pass** — it comes from the canonical parser; if tests
+   fail, fix our parser.
+3. **Try to fix multiple unrelated failures at once** — each pattern needs focused attention;
+   mixing fixes makes debugging harder.
+4. **Skip the approval gate** — user approval confirms the fixture is correct, and catching errors
+   early saves rework.
+5. **Add AnnexB features without discussion** — Annex B is out of scope by design (tsv is not a
+   web browser host); adding it is a major scope change (core sloppy mode is already parsed).
 
 ### Red Flags
 

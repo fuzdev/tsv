@@ -125,8 +125,8 @@ comment *contents*, which answers the ledger's question and not this one. And it
 bystander axis**: the tracker reports a property of an output *line*, not of a registered
 comment, so every finding keys at its injection site.
 
-Most shapes fire on the `line` payload alone — the injected `//` is the swallower. A handful
-carry the block payloads too: there the injection merely reflowed the file and a comment the
+A swallow usually fires on the `line` payload alone — the injected `//` is the swallower. One
+can carry the block payloads too: there the injection merely reflowed the file and a comment the
 *author* wrote does the swallowing, which is the same bug reached from further away.
 
 Cost: arming the check adds roughly **+10% CPU** (measured over `tests/fixtures`: ~146 s →
@@ -142,7 +142,7 @@ An `UNREPARSEABLE` shape is **pinned and graded exactly like a drop** — same f
 same two failure modes — and a holding run names its share on its own line, like the swallow's.
 It is the one kind where the whole **output** is dead rather than one comment lost: the
 injected comment is printed exactly once (the ledger balances) and eats nothing on its line
-(no swallow), yet what the formatter wrote no longer parses. The shapes it finds are of two
+(no swallow), yet what the formatter wrote no longer parses. The shapes it has found, each since fixed, are of two
 kinds. A **printer** shape emits invalid text: a multi-line block moved across a stripped
 paren into a `[no LineTerminator here]` slot (`yield (/* a⏎b */x)` → `yield /* a⏎b */ x`,
 and the same before `=>`, a non-null `!`, a tuple `?`, a conditional type's `extends`), two
@@ -176,7 +176,7 @@ is the verify pass's `OUTPUT-UNPARSEABLE` cause on a ledger shape's kept example
 sees only an output dead *beside* a drop, this kind every dead output.
 
 Cost: one bare parse per accepted injection, measured over `tests/fixtures` against a baseline
-binary built from the same tree without the detector (2026-09-13, 12-core box, quiet):
+binary built from the same tree without the detector (12-core box, quiet):
 32.0 s → 37.1 s wall, 336 s → 388 s user — about **+16%**.
 
 ### A panic is never pinned

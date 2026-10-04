@@ -283,12 +283,12 @@ crates (the open-convention stance):
 
 - **`tsv_cli`** (`cli/discover.rs`) — the FS walk, format-root resolution, and
   ignore-file reading stay there; the decisions come from here:
-  - `discover_into`'s upfront argument validation: `unsupported_extension_error`
+  - the upfront argument validation both entry points share (`classify_args`): `unsupported_extension_error`
     rejects a named file tsv doesn't format (alongside the not-a-file-or-directory
     check, so the run fails before anything is written).
   - `collect_recursive`: matches `classify_dir`'s `DirVerdict` and, on
     `PruneWithWarning`, pushes `shadow_warning`'s text into the
-    `Discovered::warnings` channel; uses `should_format_file` for the file branch;
+    `Diagnostics::warnings` channel; uses `should_format_file` for the file branch;
     pushes any `prettierignore_shadowed_warning` per directory and, at the target
     root only, any `prettierignore_outside_repo_warning` into the same channel.
   - Every path it names itself — the `--list`/changed-path lines
@@ -304,7 +304,7 @@ crates (the open-convention stance):
     `shadow_warning(dir, loose_root?)`, `unsupported_extension_error(path)`, and the
     sibling pair `prettierignore_outside_repo_warning(dir, in_repo, has_prettierignore, has_formatignore)`
     / `prettierignore_shadowed_warning(…)` (same arguments)
-  - `gitignore_symlink_warning(path) -> string`
+  - `gitignore_symlink_warning(path) -> string`, `unresolvable_root_error(root) -> string`
 
   The string-tag encoding
   (rather than a wasm-bindgen enum or a returned struct) needs no
@@ -314,7 +314,7 @@ crates (the open-convention stance):
   `should_format_file` and every warning producer above (`shadow_warning`,
   both `.prettierignore` ones, `gitignore_symlink_warning`,
   `excluded_argument_warning`), plus the per-argument `unsupported_extension_error`
-  (through a throwaway stack — the receiver is unused, an argument check running
+  and `unresolvable_root_error` (through a throwaway stack — the receiver is unused, an argument check running
   before any matcher exists), and keeps no policy *decision* of its own (the literal extension list does appear in its help/error text, hand-mirrored from the native CLI — the decision stays here). `quote_path` is the one text rule it restates by hand (its own `quote_path`), for the paths it names itself — the `--list`/changed-path lines, `error:` lines, its traversal and argument errors — since the binding's warnings arrive quoted already.
 - **VS Code extension** (`vscode-extension-tsv-format`) — assembles an
   `IgnoreStack` per open document and calls `is_ignored(rel, false) ||
@@ -322,7 +322,7 @@ crates (the open-convention stance):
   to the shared prune policy — it never reconstructs the heuristic walk in TS.
 - **`tsv_debug`** — reuses `FORMATTABLE_EXTENSIONS`, `is_safety_net`, and
   `HEURISTIC_DIRS` in its audit seed resolution and corpus walkers
-  (`profile.rs`), so the audits scan exactly the file set the formatter would.
+  (`profile.rs`; `conformance_audit`'s Markdown-link walk takes `is_safety_net` too), so the audits scan exactly the file set the formatter would.
 
 ## Behavior is pinned, not asserted
 

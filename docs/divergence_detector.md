@@ -63,8 +63,9 @@ a pattern that has not answered the question cannot excuse content loss, and a n
 is safe by omission. Declaring it is a promise that the pattern's own `detect` carries a
 content-preservation proof; the current set is `bom_strip` (byte-exact BOM prefix test),
 `self_closing_nonvoid` (matching tag names on both sides), `comment_preserved` (the comment
-text must appear in ours), and `css_scss_directive_number` (identical non-numeric skeleton
-*plus* equal numeric-token counts, so a number may be re-spelled but never dropped). A
+text must appear in ours), `css_scss_directive_number` (identical non-numeric skeleton
+*plus* equal numeric-token counts, so a number may be re-spelled but never dropped), and
+`css_line_comment_freeze` (the same skeleton-and-count proof). A
 pattern that legitimately changes char counts without declaring it surfaces loudly as a
 SAFETY failure the first time it fires — which is the intended way to discover one.
 

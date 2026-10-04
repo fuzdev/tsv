@@ -383,7 +383,7 @@ export function generate_summary_report(
 		// will, so "every registered row appears or is excused" is not the
 		// invariant. An impl added to the harness still has to be considered here;
 		// `swc` and `postcss` were, and are absent on purpose (docs/benchmarks.md
-		// §Fairness caveats states why for each).
+		// §Alternative implementations states why for each).
 		//
 		// - The span-only pairs: tsv's span-only wire against the span-only default
 		//   ASTs oxc and yuku emit (yuku pads `decorators`/`typeAnnotation`/`optional`

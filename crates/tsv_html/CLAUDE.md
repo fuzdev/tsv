@@ -12,7 +12,7 @@ formatter. See the root
 Zero dependencies on other `tsv_*` crates (only `phf` at runtime;
 `serde_json` at build time — see `Cargo.toml`).
 Current consumers: `tsv_svelte` (its tokenizer, its parser — the element's `TagFacts` and
-implicit tag closing — and its printer), `tsv_svelte_compile`, and `tsv_debug`'s render/authoring audits.
+implicit tag closing — and its printer), `tsv_svelte_compile`, and `tsv_debug`'s whitespace-aware audits (render normalization, authoring, blank, razor).
 
 The printer-adapter layer — methods that resolve span-identity names and
 call into this crate — lives in `tsv_svelte/src/printer/classification/`,

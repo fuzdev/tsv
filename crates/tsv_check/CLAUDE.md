@@ -213,7 +213,7 @@ let result: CheckResult = check_program(&units, &arena, &CheckOptions::default()
 // result.suggestions — suggestion-category diagnostics (default-option TS7027/8),
 //                      a SEPARATE sink the parity/expect-clean grading never reads
 // result.files[i].parse — ParseReport::Parsed(ParsedFacts) | Rejected
-// result.parse_rejected — the short-circuit fired
+// result.parse_rejected — some unit parse-rejected (reported; suppresses nothing)
 ```
 
 The caller owns the arena (the same contract as `tsv_ts::parse`); the

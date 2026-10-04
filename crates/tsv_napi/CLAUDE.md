@@ -60,8 +60,8 @@ Staged by `deno task build:napi:packages` (`scripts/build_napi_packages.ts`)
 into `crates/tsv_napi/pkg/` (gitignored):
 
 - **`pkg/napi/` — `@fuzdev/tsv`**, the loader: `npm/index.js` +
-  `npm/index.d.ts` + `npm/platform.js` (triple detection, shared by the next
-  two) + `npm/bin.js` (the `tsv` bin — a dispatcher, see below) +
+  `npm/index.d.ts` + `npm/platform.js` (triple detection, shared by `index.js`
+  and `bin.js`) + `npm/bin.js` (the `tsv` bin — a dispatcher, see below) +
   `npm/README.md` + the facade with its parse half (`api.js` / `api_parse.js`,
   `locations.js`, the declarations — `facade_format.d.ts` / `facade_parse.d.ts`,
   named apart from the modules they sit beside, `syntax_error.d.ts`, `locations.d.ts`
@@ -121,7 +121,7 @@ absent exports are the four WASM lifecycle ones — `init()`/`init_sync()`
 (nothing to initialize), `wasm_module` (no compiled module), and
 `reinstantiate()` (no instance to poison; a native overflow is a process-fatal
 SIGSEGV) — whose absence is itself the engine signal `cli.js` keys on, plus
-`IgnoreStack`'s `free()` and its `[Symbol.dispose]` alias, which a GC-managed
+`IgnoreStack`'s `free()` (with the glue's internal `__destroy_into_raw` behind it) and its `[Symbol.dispose]` alias, which a GC-managed
 native object has no handle to need. That is the whole delta, and it is checked
 as a SET rather than as prose: `scripts/test_napi_npm.ts` diffs the two
 packages' export names, their `exports` subpaths (the wasm `./worker` is the lifecycle's
@@ -280,8 +280,8 @@ release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
   The gnu rows build in almalinux:8 → glibc 2.28 floor (Node's own binary floor), measured
   by the workflow's floor gate over both artifacts; musl in rust:alpine with `-crt-static`
   off, both gated GLIBC-free; `darwin-x64` cross-compiles on the arm64 mac runner and is
-  tested under Rosetta 2 (above). Then per-artifact size bounds (`deno task validate:napi`
-  → `scripts/validate_napi_artifact.ts`, one tight anchored band per binary — also graded on
+  tested under Rosetta 2 (above). Then per-artifact size bounds (`scripts/validate_napi_artifact.ts --triple <t>`, the script behind `deno task validate:napi`;
+  one tight anchored band per binary — also graded on
   every PR over the Linux host build by `check.yml`'s `artifacts` job) and the npm-shape
   test over the real artifacts (node:alpine for musl).
 - **Publish job**: gathers all six, stages the loader (`--loader-only`), and runs

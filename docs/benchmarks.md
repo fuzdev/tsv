@@ -15,10 +15,10 @@ Things the published numbers measure that aren't quite what they look like.
 - **Single-threaded, per-file (universal).** The harness times one file at a
   time, sequentially (`await`ed in order, no `Promise.all` over files), so the
   numbers are per-file single-core latency, not multi-core batch throughput.
-  Per-file compute is single-threaded for every impl: tsv (FFI + WASM) pulls in
+  Per-file compute is single-threaded for every impl: tsv (FFI, N-API + WASM) pulls in
   no threading crate (`rayon`/`num_cpus`/`threadpool`/`crossbeam` absent from
   every `Cargo.toml`; the workspace's `tokio` is dev/debug-only, outside the
-  shipped `tsv_ffi`/`tsv_wasm` chain); prettier, `svelte/compiler`, and
+  shipped `tsv_ffi`/`tsv_napi`/`tsv_wasm` chain); prettier, `svelte/compiler`, and
   `oxc-parser.parseSync` are single-threaded JS. The lone nuance is `oxfmt`,
   whose programmatic `format` is an async napi call that may run the native work
   off the JS thread (its `tinypool` dep is CLI-only — `dist/cli.js` — not in the
@@ -31,7 +31,7 @@ Things the published numbers measure that aren't quite what they look like.
   "produce the same bytes," and no two of these tools emit identical output.
   Every formatter IS configured to the same layout targets as far as its options
   allow — printWidth/lineWidth 100, tabs, single quotes, no trailing commas:
-  prettier (`canonical.ts` `PRETTIER_OPTIONS`), oxfmt (`oxc.ts` `format_async`),
+  prettier (`canonical.ts` `PRETTIER_OPTIONS`), oxfmt (`oxc.ts` `OXFMT_OPTIONS`),
   biome (`biome.ts` `applyConfiguration`), dprint (`dprint.ts` `setConfig`;
   `quoteStyle: preferSingle` is the faithful analogue of prettier's
   `singleQuote: true`, which likewise switches quotes to avoid escaping, and
@@ -53,10 +53,11 @@ Things the published numbers measure that aren't quite what they look like.
   `getConfigDiagnostics()`, while biome's `applyConfiguration` and oxfmt's per-call
   options bag accept an unknown key with no throw and no diagnostic (verified —
   biome then falls back to width 80 + double quotes + trailing commas, oxfmt to
-  spaces + double quotes + trailing commas), so those two are checked behaviorally:
-  `init` formats a probe source whose output differs under each pinned option and
+  spaces + double quotes + trailing commas), so the check is behavioral, and every formatter
+  row runs it (a clean dprint/malva diagnostic list proves a key recognized, not its
+  value landed): `init` formats a probe source whose output differs under each pinned option and
   reads the answer back (`lib/format_config_probe.ts` — one probe set and one grader
-  for both tools, so they can't drift on what "landed" means). **Per LANGUAGE**, not
+  for every tool, so they can't drift on what "landed" means). **Per LANGUAGE**, not
   per tool: biome's config is a stack of per-language sections
   (`javascript`/`css`/`html`), each feeding a different row, so a TypeScript-only
   probe would prove one section and leave the CSS and svelte rows free to un-pin
@@ -85,8 +86,8 @@ Things the published numbers measure that aren't quite what they look like.
   output-shape difference, not pure engine speed — and nothing here verifies
   output validity, so a formatter emitting subtly wrong output fast would "win."
 - **The format headline is cross-tier (native Rust vs JIT JS).** The `format`
-  baseline is `prettier` (JS) and the flagship `tsv` row is the native FFI binary
-  (AOT Rust) — a fair "what you get replacing prettier with tsv" number, not a
+  baseline is `prettier` (JS) and the flagship `tsv` row is the native binary
+  (AOT Rust — FFI under Deno, the N-API addon under Node/Bun) — a fair "what you get replacing prettier with tsv" number, not a
   language-neutral algorithm comparison. The same-tier reads are WASM-vs-WASM
   (`tsv-wasm` vs `biome-wasm` vs `dprint-wasm` vs `oxc-parser-wasm`) and
   native-vs-native (`tsv` vs `oxfmt`/`oxc-parser`); compare within a tier before
@@ -175,7 +176,7 @@ Things the published numbers measure that aren't quite what they look like.
   harvest's per-file `module` flag → `module`, else **sloppy** `script` — strict only
   via the file's own `"use strict"` prologue): tsv routes through its bindings' goal
   axis (FFI a `u32` code, N-API a trailing source-type
-  string, WASM the `sourceType` parse option), acorn takes `sourceType: goal`, oxc an
+  string, WASM the same trailing string), acorn takes `sourceType: goal`, oxc an
   explicit `sourceType` — so a script-goal `await`-identifier test is scored valid
   against every tool rather than counted as a module-goal failure. Only the
   conformance-coverage preflight is goal-aware — the perf surface has no test262. The tsc corpus deliberately
@@ -217,11 +218,11 @@ Things the published numbers measure that aren't quite what they look like.
   (c) Task return values are discarded uniformly for all impls; the FFI/WASM/async
   boundaries block dead-code elimination, so no impl's work is optimized away.
 - **`tsv-wasm` is measured on the full build.** The WASM bench loads
-  `pkg/all/deno` (the default both-features artifact, ~2.7 MB — what
+  `pkg/all/deno` (`pkg/all/nodejs` under Node/Bun; the default both-features artifact, ~2.7 MB — what
   `@fuzdev/tsv-wasm` ships) for _both_ parse and format, while subset consumers
   ship the smaller `@fuzdev/tsv-format-wasm` (~2.5 MB, no convert layer) or
   `@fuzdev/tsv-parse-wasm` (~1.0 MB, no printers). Same story natively: the perf
-  row loads the full `libtsv_ffi`, while the Binary Sizes table also lists the
+  row loads the full `libtsv_ffi` (the full N-API addon under Node/Bun), while the Binary Sizes table also lists the
   `tsv format (ffi)` / `tsv parse (ffi)` subset builds (no perf rows of their own
   — they exist only to size scope-matched against `oxfmt` and `oxc-parser`).
 - **Intersection-corpus iteration (default).** Within each group every impl is
@@ -392,8 +393,9 @@ Things the published numbers measure that aren't quite what they look like.
   objects per node — and the `+reconstruct` rows below price it. Three further
   non-obvious points:
   - **The WASI binding (`oxc-parser-wasm`) does _not_ wrap**, so `.program` is
-    the raw unparsed JSON _string_ — `lib/oxc_wasm.ts` `JSON.parse`s it so the
-    row materializes like the others; without that the row would skip the parse and
+    the raw unparsed JSON _string_ — `lib/oxc_wasm.ts` runs it through the native
+    package's own deserializer (`src-js/wrap.js` `jsonParseAst`) so the row
+    materializes the same AST; without that the row would skip the parse and
     look artificially fast, even beating native oxc.
   - **Regex literals cost the opponents a `RegExp` compile the tsv rows skip.**
     `oxc-parser` and `yuku-parser` both set a regex `Literal`'s `value` to a real
@@ -520,8 +522,8 @@ Things the published numbers measure that aren't quite what they look like.
 
 ## Implementations
 
-Versions are read automatically from `benches/js/package.json` `dependencies` at
-runtime (`lib/versions.ts`).
+Versions are read automatically from `benches/js/package.json` `dependencies` (and
+`force_installed`) at runtime (`lib/versions.ts`).
 
 ### Canonical (JS baseline)
 
@@ -621,7 +623,8 @@ prettier. Load-bearing on two axes:
   Svelte. Config is asserted to LAND: dprint reports an unrecognized key as a
   diagnostic rather than throwing, so `lib/dprint.ts` fails init if
   `getConfigDiagnostics()` is non-empty — else a renamed key would silently leave an
-  option at its default and skew the row.
+  option at its default and skew the row — and, since a recognized key is not a
+  landed value, it also runs the shared behavioral probe.
 - **yuku-parser (NAPI) / @yuku-parser/wasm (WASM)** — a JS/TS parser written in
   Zig; **TypeScript, JS only** — no Svelte, no CSS, no formatter, so it contributes
   two rows to `parse/typescript` and nothing else. One engine behind two bindings,
@@ -796,11 +799,10 @@ in `deno.json`).
 - **Main** (`oxc-parser`): JS wrapper with platform detection; contains
   `src-js/wasm.js` for direct WASM usage. `NAPI_RS_FORCE_WASI` forces WASM.
 - **Native bindings** (`@oxc-parser/binding-{platform}`): one `.node` file per
-  platform, listed as `optionalDependencies` of main (beside the wasi build
-  below).
-- **WASM binding** (`@oxc-parser/binding-wasm32-wasi`): official WASI build, also
-  an optional dependency of main — it ships alongside native, not as a separate
-  product. Depends on `@napi-rs/wasm-runtime` → `@emnapi/runtime`, `@emnapi/core`,
+  platform, listed as `optionalDependencies` of main.
+- **WASM binding** (`@oxc-parser/binding-wasm32-wasi`): official WASI build,
+  published alongside native at each oxc-parser version (not a separate product) but
+  no longer listed among main's `optionalDependencies` — hence the force-fetch below. Depends on `@napi-rs/wasm-runtime` → `@emnapi/runtime`, `@emnapi/core`,
   `@tybys/wasm-util`. (`@oxc-parser/wasm` exists on npm but is **deprecated**.)
   Its default CJS entry uses `node:wasi`, which only Node implements far enough to
   instantiate (Deno ships none; Bun's `WASI` has no `initialize`), so
@@ -997,7 +999,7 @@ The `deno task smoke` step above is the backstop: it names every impl that faile
 to load (`Unavailable (N) — no rows to check`) and qualifies its pass count with
 the shortfall, so a silently-dropped row shows up there instead of as a smaller
 table nobody diffed. It smokes the **Deno** loader only, though, and each runtime
-loads its own binding (`smoke:node`, `smoke:bun`, once `deno task bench` below has
+loads its own binding (`smoke:node`, `smoke:bun`, once the block's `deno task bench` step has
 built their artifacts) — a break confined to another runtime surfaces a step later,
 as an `unavailable` entry in that runtime's report plus the ⚠ the bench prints when
 it publishes one short of an impl. The oxc wasi break above is

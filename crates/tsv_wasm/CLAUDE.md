@@ -703,14 +703,14 @@ the `all` builds use the default features (both).
 | npm    | `pkg/format/npm/`  | `pkg/parse/npm/`  | `pkg/all/npm/`  | `build:npm:format` / `build:npm:parse` / `build:npm:all`            |
 | nodejs | —                  | —                 | `pkg/all/nodejs/` | — / — / `build:wasm:all:nodejs` (bench-only)                      |
 
-The `pkg/all/deno` build feeds the benches and sidecar (it has every export); the deno builds —
+The `pkg/all/deno` build feeds the Deno benches (it has every export); the deno builds —
 subsets and `all` — are size-tracked by `binary_sizes.ts`. The `npm` builds are the published
 artifacts: a wasm-pack `web`-target build patched by `scripts/patch_npm_package.ts` into the
 multi-entry package shape (Node auto-init entry, guarded browser entry, conditional `exports`,
 metadata, README, the `reinstantiate` glue hook — plus `cli.js` and the `tsv` bin for the `all`
 variant). The npm package itself covers Node/browser/bundler consumers, so there is no
 standalone `web`-target build beyond it; the `nodejs`-target `pkg/all/nodejs/` build exists
-solely to feed the Node bench runner (`build:bench:node`).
+solely to feed the Node and Bun bench runners (`build:bench:node`).
 
 `deno task test:npm[:parse|:all]` builds the package, runs Node tests against it (the `all`
 variant adds CLI subprocess tests), then the parse-failure table under Bun

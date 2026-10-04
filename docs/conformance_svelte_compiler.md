@@ -74,8 +74,8 @@ re-triage it as a compiler bug.
 
 ### Module-script comment teleported into the instance script
 
-The oracle prints the transformed program with **esrap**
-(`packages/svelte/src/compiler/phases/3-transform/index.js:4`), which binds a comment to
+The oracle prints the transformed program with **esrap**'s `print`
+(imported in `packages/svelte/src/compiler/phases/3-transform/index.js`), which binds a comment to
 the next-following printed node **by source offset**. A `<script module>` placed *after*
 `<script>` puts its comments at offsets that immediately precede an instance-script or
 template expression — so the comment is re-attached across the module→instance boundary
@@ -134,7 +134,7 @@ parity-side mirror are pinned as unit tests
 
 A class **expression** id is the one `$`-prefixed binding name the oracle accepts — it
 declares no binding for it, so `dollar_prefix_invalid`
-(`phases/2-analyze/visitors/shared/utils.js:278`) never fires. Its later passes then
+(`phases/2-analyze/visitors/shared/utils.js`) never fires. Its later passes then
 treat the id as an ordinary name, and both of them get it wrong. Verified against the
 pinned compiler:
 
@@ -161,8 +161,8 @@ arm in `rune_guard.rs` and pinned by
 spelling: an **escaped** id (`const C = class \u0024Foo {};`) reaches the refusal
 through `dollar_identifier_name` → `identifier_name`, which returns `None` whenever
 `escaped_name` is set, so tsv **compiles** it while the oracle emits the same
-ungrammatical `class $.store_get(…) {}` (probe-verified). That is not one of the six
-escaped binding over-acceptances the escaped-identifier residual covers (those six
+ungrammatical `class $.store_get(…) {}` (probe-verified). That is not one of the
+escaped binding over-acceptances the escaped-identifier residual covers (those
 decode via `Identifier::name` and refuse); here the oracle *accepts* a
 class-expression id, so slipping past the refusal is parity on the rule — it lands on
 this oracle defect instead. Refusing the unescaped spelling is a

@@ -42,7 +42,7 @@ catalog entry.
 - Comments between `::part()` names — Rejected (`css_expected_identifier`); a comment in an interior gap (`::part(a /* c */ b)`) reads as whitespace and splits the identifier run in Svelte's scanner, while tsv accepts it as inter-token trivia (CSS Syntax 3) and normalizes the gap to a single space (prettier freezes it — a `_prettier_divergence`, see [conformance_prettier_css.md §CSS: Comments](conformance_prettier_css.md#css-comments)). The edge positions (before/after the run) are accepted by parseCss — see [part_comment](../tests/fixtures/css/selectors/pseudo_element/part_comment_prettier_divergence/) — [part_interior_comment](../tests/fixtures/css/selectors/pseudo_element/part_interior_comment_svelte_prettier_divergence/)
 - Consecutive combinators (`> > .a`, `+ ~ .d`, glued `>>.a`) — parseCss **collapses** a run of combinators to its last: its `read_selector` never emits an empty relative selector, so on the second combinator it drops the earlier anchorless one. tsv **preserves** every authored combinator, emitting an empty-compound `RelativeSelector` per anchorless one (`+ ~ .d` → `[+, []]` then `[~, [.d]]`), so `expected_ours.json` carries relative selectors `expected_svelte.json` drops. The collapse is a lossy recovery tsv declines — the dropped combinator is authorship the future diagnostics layer needs, and in a relative context it silently *validates* the invalid selector (`:has(+ ~ .d)` → `:has(~ .d)`). Prettier also collapses (or freezes a glued run), so this is a `_prettier_divergence` too (see [conformance_prettier_css.md §CSS: Selectors](conformance_prettier_css.md#css-selectors)); a *trailing* combinator (`.a > > {}`) still rejects in both — [consecutive_combinator](../tests/fixtures/css/selectors/consecutive_combinator_svelte_prettier_divergence/)
 - Comments inside an attribute selector — Rejected (`css_expected_identifier`); its reader does not tokenize comments in any interior gap. Per [css-syntax-3 §4](https://drafts.csswg.org/css-syntax/#consume-comment) a comment produces no token and selectors-4's `<attribute-selector>` is a token-level production, so tsv accepts one at every juncture (after `[`, either side of the matcher, either side of the `i`/`s` flag, before `]`) and normalizes the gap to single-space separation — glued to the brackets, and glued outright in the two whitespace-forbidden regions (a `<wq-name>`'s or an `<attr-matcher>`'s components). Prettier freezes any comment-bearing selector, so this is a `_prettier_divergence` too (see [conformance_prettier_css.md §CSS: Comments](conformance_prettier_css.md#css-comments)) — [interior_comment](../tests/fixtures/css/selectors/attribute/interior_comment_svelte_prettier_divergence/)
-- Comments between a selector's **sigil** and the name it introduces (`./* c */cls`, `:/* c */hover`, `::/* c */before`, `:/* c */:before`) — Rejected (`css_expected_identifier`); tsv accepts. selectors-4's *white space is forbidden* list names exactly these junctures ("Between **any** of the components of a `<type-selector>` or a `<class-selector>`", "Between the ':'s, or between the ':' and `<ident-token>` or `<function-token>`"), and a comment is not a `<whitespace-token>` — so it is admitted where a space is not, and stays **glued**, the same rule as the `<wq-name>` separator above. tsv's compiler refuses these (`refuse_if_comment`), so the parser's acceptance adds no over-acceptance. Prettier's freeze agrees on every glued form; only the pseudo-name case fold diverges, so this is a `_prettier_divergence` too (see [conformance_prettier_css.md §CSS: Comments](conformance_prettier_css.md#css-comments)) — [sigil_comment](../tests/fixtures/css/selectors/sigil_comment_svelte_prettier_divergence/)
+- Comments between a selector's **sigil** and the name it introduces (`./* c */cls`, `:/* c */hover`, `::/* c */before`, `:/* c */:before`) — Rejected (`css_expected_identifier`); tsv accepts. selectors-4's *white space is forbidden* list names exactly these junctures ("Between **any** of the components of a `<type-selector>` or a `<class-selector>`", "Between the ':'s, or between the ':' and `<ident-token>` or `<function-token>`"), and a comment is not a `<whitespace-token>` — so it is admitted where a space is not, and stays **glued**, the same rule as the `<wq-name>` separator below. tsv's compiler refuses these (`refuse_if_comment`), so the parser's acceptance adds no over-acceptance. Prettier's freeze agrees on every glued form; only the pseudo-name case fold diverges, so this is a `_prettier_divergence` too (see [conformance_prettier_css.md §CSS: Comments](conformance_prettier_css.md#css-comments)) — [sigil_comment](../tests/fixtures/css/selectors/sigil_comment_svelte_prettier_divergence/)
 - Comments splitting a `<wq-name>` namespace separator (`svg/* c */|rect`, `svg|/* c */rect`, and the `*|` / `|` prefix forms) — Rejected (`css_expected_identifier`); tsv accepts, per the spec. The comment stays **glued**: selectors-4 forbids white space "between any of the components of a `<wq-name>`" (tsv rejects `svg |rect` too), and a comment is not a `<whitespace-token>` — the same rule that keeps `.a/* c */.b` a compound. Prettier's freeze lands on the same output, so the single-comment forms have no prettier divergence; a glued **run** does (it relocates the `{`) — [separator_comment](../tests/fixtures/css/selectors/namespace/separator_comment_svelte_divergence/), [separator_comment_run](../tests/fixtures/css/selectors/namespace/separator_comment_run_svelte_prettier_divergence/)
 - Attribute namespaces `[ns|attr]` — Not supported — [namespace](../tests/fixtures/css/selectors/attribute/namespace_svelte_divergence/)
 - An escaped `|` in an attribute selector's namespace prefix (`[a\|b|attr]`) — Rejected with the rest of the attribute-namespace family; tsv accepts, reading the escape's payload as prefix *content* (css-syntax-3 §4.3.7) and taking the **next** `|` as the `<wq-name>` separator. The prefix is emitted verbatim and half-decoded on the wire, like every other selector name. Prettier loses content here (a `_prettier_divergence`, see [conformance_prettier_css.md §CSS: Selectors](conformance_prettier_css.md#css-selectors)) — [namespace_escaped_prefix](../tests/fixtures/css/selectors/attribute/namespace_escaped_prefix_svelte_prettier_divergence/)
@@ -279,14 +279,14 @@ Where the two goals conflict on conformant input, Svelte-parity wins for now.
   value with `read_value`, so *any* character that is neither JS-`\s` nor the delimiter is
   content: canonical accepts `%top`, `!top`, `(top`, `1top`, `+top` and `<NEL>top` as property
   names. tsv reads an identifier token there, so it either **silently truncates** the prefix
-  (`%top`, `!top`, `(top` all reach the wire as `top` — content loss the wire cannot show) or
-  **rejects** (`1top`, `+top`, `<NEL>top`). Closing it means giving the property and value
+  (`%top`, `!top`, `(top`, `<NEL>top` all reach the wire as `top` — content loss the wire cannot show) or
+  **rejects** (`1top`, `+top`). Closing it means giving the property and value
   positions their own raw readers rather than the shared identifier token. (The property's
   *end* is not part of this gap: `read_until`'s JS `\s` is what a boundary run is to the
-  parser's skip, so `color <NBSP>: red` is the property `color` on both sides — §Boundary
-  whitespace above.) Pinned as a ratchet by
+  parser's skip, so `color <NBSP>: red` is the property `color` on both sides — the boundary-whitespace rule
+  above.) Pinned as a ratchet by
   [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs), whose `<NEL>` case is
-  the one member this family shares with the whitespace class below.
+  the one member this family shares with the whitespace class above.
 
 - **Current behavior is hard-fail; recovery is the target, not the design.**
   Today tsv **errors on the first invalid construct**, which aborts the whole
@@ -331,7 +331,7 @@ Where the two goals conflict on conformant input, Svelte-parity wins for now.
   no compound between them — `> > .a`, `+ ~ .d`, glued `>>.a`) is a separate matter:
   parseCss *collapses* the run (dropping all but the last combinator), while tsv
   **preserves** every authored combinator — a deliberate `_svelte_prettier_divergence`
-  cataloged in [§CSS Corrections](#css-corrections) below. Distinct from the
+  cataloged in [§CSS Corrections](#css-corrections) above. Distinct from the
   grammar-invalid tokens/values in the bullet below, which tsv still rejects. Fixture:
   [css/selectors/leading_combinator](../tests/fixtures/css/selectors/leading_combinator/input.svelte).
 - **The "Svelte over-accepts" cases are not a tsv correctness win.** Svelte
@@ -386,7 +386,7 @@ inputs, so the corpus AST differential is the regression oracle.
   read `contents ?? [] as section` as an as-expression, then unwraps it —
   patching the expression's `end` _offset_ back to `contents ?? []` but leaving
   `loc.end` at the as-expression's end (the column after `section`). tsv's
-  `loc` agrees with the corrected offset. The matcher is scoped to EachBlock
+  `loc` agrees with the corrected offset. The row is scoped to EachBlock
   `expression.loc.end` entries whose oracle point names the end of the swallowed
   `as` type — past the `as` keyword, at or before the binding's end, on a token
   boundary; offsets and `loc.start` are never absorbed, so a real loc bug still
@@ -583,7 +583,7 @@ it, tsv accepts it (and defers any error), because tsv is first a formatter and 
 format everything well-formed. So a "correction" below is tsv matching **tsc/spec**
 (and prettier), not acorn.
 
-Svelte ❌ / Prettier ✅ / tsv ✅ in every case below:
+Svelte ❌ / Prettier ✅ / tsv ✅ is the common case below; an entry that departs from it says so:
 
 - `using` declarations (Explicit Resource Management — a finished/Stage 4 proposal, not ES2024; see [checklist_typescript.md](./checklist_typescript.md#explicit-resource-management)) — [basic](../tests/fixtures/typescript/typescript_specific/using/basic_svelte_divergence/)
 - `await using` declarations — [await](../tests/fixtures/typescript/typescript_specific/using/await_svelte_divergence/); with a comment inside the keyword (`await /* c */ using`), which tsv preserves where prettier relocates it past `using` — [await_keyword_comment](../tests/fixtures/typescript/typescript_specific/using/await_keyword_comment_svelte_prettier_divergence/)
@@ -701,7 +701,7 @@ caller's grammar: `{@const}` reports `Expected token =`, and the block heads rep
 component it rejects every block-binding annotation, a plain `x: T` included, with
 `expected_token`. tsv accepts a plain annotation there, a separate over-acceptance tracked under
 [§TypeScript-mode gating](#typescript-mode-gating-tracked-over-acceptance), and rejects these
-tails in both. Four `tsv_rejects.txt` fixtures across three contexts:
+tails in both. The `tsv_rejects.txt` fixtures:
 [const_annotation_expression_tail](../tests/fixtures/svelte/tags/const/const_annotation_expression_tail_svelte_divergence/)
 (an `as` chain in `{@const}`),
 [typed_value_expression_tail](../tests/fixtures/svelte/blocks/await/typed_value_expression_tail_svelte_divergence/)
@@ -767,7 +767,7 @@ The head is an `IdentifierReference` in the full sense, though, so it takes the 
 
 **`using` keyword-name comments**: tsv **accepts** a comment between `using` and the binding name (`using /* c */ x = fn()`) and round-trips it, which is correct — per ecma262 §sec-comments a comment "behave[s] like white space and [is] discarded", so any two tokens may be separated by one. A comment *containing a line terminator* is the exception the same clause names: it counts as a `LineTerminator`, which the `[no LineTerminator here]` in `await [no LT] using` and `using [no LT] BindingIdentifier` then demotes — so `await /* c⏎ */ using x = fn()` correctly fails to read as a declaration. acorn's verdict is not comparable here: it rejects `using` / `await using` outright (see the list above), so it never reaches the comment question.
 
-**`using` line-break demotion, and where it lands**: the same two `[no LineTerminator here]` restrictions have opposite *consequences* by position. In a **statement** the demotion is graceful — ASI splits `using⏎x = 1` into two statements (an expression statement and an assignment), and likewise `await using⏎x = 1` — but a **for head** has no ASI, so the demoted `using` / `await using` expression leaves a head no `of` can continue and the whole file is a syntax error. Both are pinned by [line_break_demotion](../tests/fixtures/typescript/typescript_specific/using/line_break_demotion/): the statement forms as the fixture's `unformatted_line_break` variant (prettier restores the `;`, so the trigger cannot live in `input.*`), the head forms as seven `input_invalid_*` files covering each gap under a raw break and under a comment-borne one.
+**`using` line-break demotion, and where it lands**: the same two `[no LineTerminator here]` restrictions have opposite *consequences* by position. In a **statement** the demotion is graceful — ASI splits `using⏎x = 1` into two statements (an expression statement and an assignment), and likewise `await using⏎x = 1` — but a **for head** has no ASI, so the demoted `using` / `await using` expression leaves a head no `of` can continue and the whole file is a syntax error. Both are pinned by [line_break_demotion](../tests/fixtures/typescript/typescript_specific/using/line_break_demotion/): the statement forms as the fixture's `unformatted_line_break` variant (prettier restores the `;`, so the trigger cannot live in `input.*`), the head forms as `input_invalid_*` files covering each gap under a raw break and under a comment-borne one, beside one more for the statement `await⏎using x = 1` (the gap tsc reads differently, below).
 
 **tsc is the outlier at the `await`→`using` gap, and tsv does not follow it.** tsc enforces the second restriction only (`nextTokenIsUsingKeywordThenBindingIdentifierOrStartOfObjectDestructuringOnSameLine` checks `hasPrecedingLineBreak` before the *binding* and never before `using`), so it — and prettier's `typescript` parser with it — reads `await⏎using x = 1` and `for await (await⏎using x of items)` as declarations. Babel (`babel-ts`) and oxc reject both, matching the grammar the cover production `await [no LT] using` exists to disambiguate; tsv rejects too. This is a **slip, not a choice**: the same predicate spells the restriction for one gap and drops it for the other. It is the one place in the `using` family where tsv is deliberately stricter than tsc.
 
@@ -775,25 +775,20 @@ The head is an `IdentifierReference` in the full sense, though, so it takes the 
 
 **A bare angle-bracket assertion as the left operand of `**`** is the opposite split, and tsv **rejects** it (a `tsv_rejects.txt` over-rejection against acorn). tsc parses `<T>x ** 2` as `(<T>x) ** 2` and rejects it in the parser — `A type assertion expression is not allowed in the left-hand side of an exponentiation expression.`, the assertion twin of TS17006 — so prettier throws on it. acorn-typescript accepts it as a DIFFERENT tree, `<T>(x ** 2)`: its assertion operand is a `parseMaybeUnary`, which consumes the `**`. The error is unconditional and local, and the two parsers that read the construct do not agree on its tree, so tsv rejects at the same seam as the bare unary rather than build either one. Both parenthesized spellings parse alike everywhere, and the printer keeps `(<T>x) ** 2`'s pair ([conformance_prettier_ts.md §TypeScript](./conformance_prettier_ts.md#typescript)) — [exponentiation_type_assertion_bare](../tests/fixtures/typescript/expressions/exponentiation_type_assertion_bare_svelte_divergence/).
 
-The rejection is the one case here that **cannot be pinned**. The `expected_svelte.json` = `{"error": "failed to parse"}` sentinel every fixture above uses attaches to `input.*`, and an `input.*` must be a formatting fixed point (F1) — `x as number ** 2` is not one, since both formatters normalize it to `(x as number) ** 2`. The source form can therefore only live in an `unformatted_*` variant, and the validator runs the canonical parser over `input.*` and `input_invalid_*` only, never over variants. So [as_satisfies_exponentiation](../tests/fixtures/typescript/expressions/as_satisfies_exponentiation/) is a *regular* fixture: it pins the parse shape and the paren insertion (both operand sides — a cast on the right needs parens too, since `as` otherwise binds looser and takes the whole exponentiation), and its `unformatted_no_parens` variant carries the source form. That variant formats at all only because prettier-plugin-svelte re-parses `<script>` content with prettier's own TypeScript parser rather than with Svelte's — Svelte's parser sees the fixture's parenthesized `input.svelte` and is happy.
+The cast operand's rejection (`x as number ** 2`) is the one case here that **cannot be pinned**. The `expected_svelte.json` = `{"error": "failed to parse"}` sentinel every fixture above uses attaches to `input.*`, and an `input.*` must be a formatting fixed point (F1) — `x as number ** 2` is not one, since both formatters normalize it to `(x as number) ** 2`. The source form can therefore only live in an `unformatted_*` variant, and the validator runs the canonical parser over `input.*` and `input_invalid_*` only, never over variants. So [as_satisfies_exponentiation](../tests/fixtures/typescript/expressions/as_satisfies_exponentiation/) is a *regular* fixture: it pins the parse shape and the paren insertion (both operand sides — a cast on the right needs parens too, since `as` otherwise binds looser and takes the whole exponentiation), and its `unformatted_no_parens` variant carries the source form. That variant formats at all only because prettier-plugin-svelte re-parses `<script>` content with prettier's own TypeScript parser rather than with Svelte's — Svelte's parser sees the fixture's parenthesized `input.svelte` and is happy.
 
 **Brand check with no binding class**: `#x in y` is the sole production in which a private name stands as an operand rather than as part of a member access or a declaration (`RelationalExpression : PrivateIdentifier in ShiftExpression`), and it is in the grammar unconditionally. ⚠️ What confines it is **binding, not containment**, and it is not a local question: `AllPrivateIdentifiersValid` is threaded from the *Script*/*Module* early error down the whole tree carrying a list of names, extended at each `ClassBody` by that body's `PrivateBoundIdentifiers`, and the `in` case returns false unless the list already holds the name — so `class C { m(y) { return #nope in y } }` is a syntax error too, and the Script rule even carries a direct-eval carve-out that re-runs it against the *caller's* private environment. No reading of that is answerable from the production's own context, which is the bucket tsv defers rather than answering in the parser (see [§Strictness](../CLAUDE.md#strictness-module-strict-script-by-directive)). The oracles split on the same line: **tsc's parser accepts** (TS18016 comes from `checkGrammarPrivateIdentifierExpression` in `checker.ts`, the checker's grammar pass — ⚠️ the same code *also* has a `parser.ts` raise site for a private name where an ordinary identifier was expected, so the code alone says nothing about which pass rejected) and **prettier formats it** byte-identically to tsv, reaching a `<script>` through its own TypeScript parser; **acorn rejects** both forms, tracking the binding rule in the parser (`Unexpected token` with no class in sight, `Private field '#x' must be declared in an enclosing class` inside one). tsv follows tsc and prettier — [private_brand_check_unbound](../tests/fixtures/typescript/expressions/private_brand_check_unbound_svelte_divergence/). ⚠️ The **claim is wider than the fixture**: the acceptance belongs to the expression parser, so it is reachable from every expression position, template ones included — `<div {...#x in y}></div>` and a sequence's `{/* c */ #x in y}`. Both are fixed points, so both are pinned, from the canonical side alone: prettier reaches the *template* through Svelte's parser and rejects them, so there is no formatter to check a format claim against and each is an `expected_ours.json` + parse-failure `expected_svelte.json` + `prettier_rejects.txt` fixture — [brand_check_unbound](../tests/fixtures/svelte/expressions/brand_check_unbound_svelte_prettier_divergence/). Not to be confused with a `{#…}` **marker**: in RCDATA content or an attribute value that is a block written where only a sequence belongs, and tsv rejects it with Svelte's own wording — at the separated spelling too, which is why `{ #x in y}` is a placement error rather than a third over-acceptance (see [checklist_svelte.md §Expression Tags](./checklist_svelte.md#expression-tags)). A comment lead is not a marker: `{/* c */ #x in y}` leaves the interior an expression, which is the surviving case above.
 
 **Async generic arrow param decorator**: a parameter decorator is invalid on an arrow function in every form, and prettier rejects all four spellings — `(@dec a) => a`, `<T>(@dec a) => a`, `async (@dec a) => a`, `async <T>(@dec a) => a`. tsv rejects all four too, uniformly. ⚠️ **tsc's parser is not what draws that line**: it raises a *parse* diagnostic only on the two non-generic forms (TS1109 `Expression expected.`) and accepts both generic forms outright — `parseDiagnostics` and the syntactic pass are empty on each. The familiar `Decorators are not valid here` is **TS1206, a semantic diagnostic** from the checker's grammar pass, which is why prettier (which runs those checks) surfaces it where tsc's parser does not; a TS1xxx code is not by itself evidence of a parser rejection. So tsv's rejection rests on prettier plus the kind of error TS1206 is — *unconditional-local*, invalid in every context, the bucket tsv rejects rather than defers (see [§Strictness](../CLAUDE.md#strictness-module-strict-script-by-directive)). What needs a fixture is acorn's split: it rejects three forms (`Leading decorators must be attached to a class declaration` on the non-generic ones, `Unexpected token` on the plain generic one) and accepts `async <T>(@dec a) => a` alone, because that form takes a separate path through its arrow parsing where the decorator check every other arrow form applies is never reached. Because the canonical parser accepts, this is pinned from the other side, by a `tsv_rejects.txt` fixture: [async_generic/param_decorator](../tests/fixtures/typescript/expressions/arrow/async_generic/param_decorator_svelte_divergence/); the drop-in rejections it contrasts with are the `input_invalid_*` cases in [decorators/parameter_arrow](../tests/fixtures/typescript/typescript_specific/decorators/parameter_arrow/). **Upstream candidate**: acorn-typescript — the async-generic arrow path should reject a parameter decorator like every other arrow form does.
 
-**Import-phase proposals (forward-looking, ungated).** tsv accepts the TC39
+**Import-phase proposals (forward-looking).** tsv accepts the TC39
 import-phase syntax — `import defer * as ns from '…'` / `import source x from '…'`
 and the dynamic `import.defer(…)` / `import.source(…)` — and emits a `phase` field
 (`'defer'` / `'source'`) on the `ImportDeclaration` / `ImportExpression` wire node
-(declared in `crates/tsv_wasm/types/tsv_ast.d.ts`). Unlike every case above, this one
-is **un-fixturable** — and not because the canonical parsers reject it. A canonical
-rejection on its own is pinnable, via the `expected_svelte.json` = `{"error": "failed
-to parse"}` sentinel that every fixture above uses; what those fixtures still have, and
-import-phase does not, is a *second* oracle. **prettier** is no oracle here — it drops
-the `defer` keyword (silent content loss) and rejects `import source`, so there is no
-format claim to pin. With `expected_ours.json` self-generated and no formatter to check
-it against, the fixture would assert only that tsv agrees with tsv. The syntax is also
-not yet in the finished ECMAScript standard. The emitted `phase`
+(declared in `crates/tsv_wasm/types/tsv_ast.d.ts`). The syntax is not yet in the finished ECMAScript standard, and acorn-typescript
+rejects it; the fixtures that pin it, and which oracle each still has (prettier keeps
+`import defer`'s phase and throws on `import source`), are under
+[§Import-phase proposals](#import-phase-proposals). The emitted `phase`
 shape mirrors the TC39 proposals' AST; because there is no oracle, it is a deliberate
 extension rather than a drop-in guarantee, and **if acorn-typescript later implements
 import-phase with a different shape, tsv should re-align to it**. Emitted from
@@ -938,9 +933,7 @@ tsc/prettier and diverging from acorn's recovery. Since acorn accepts, that half
 can't be an `input_invalid_*` fixture, so it is pinned by the
 [type_args/line_break](../tests/fixtures/typescript/types/type_args/line_break_svelte_divergence/)
 `tsv_rejects.txt` fixture. A **`TSImportType`'s qualifier** is one more site the
-same guard covers (`import('./a').B` ⏎ `<string>`) — it read its arguments
-directly rather than through the shared rule, so it welded where every sibling
-split; pinned by
+same guard covers (`import('./a').B` ⏎ `<string>`); pinned by
 [type_args/import_type_line_break](../tests/fixtures/typescript/types/type_args/import_type_line_break_svelte_divergence/).
 The **expression** type-argument sites carry no such rule and stay accepted
 (`f` ⏎ `<T>()`, `new C` ⏎ `<T>()`, and a heritage `extends B` ⏎ `<T>`, which tsc
@@ -1031,7 +1024,7 @@ and formats them. Position is the only defect here — `for (let a: number; ;)` 
 
 acorn-typescript accepts, building the declarator it builds for a variable
 statement (`definite: true` with the annotation). tsv rejects instead: building that
-tree has its printer **drop the `!`** on the way out
+tree would have its printer **drop the `!`** on the way out
 (`for (let a!: number; ;)` → `for (let a: number; ;)`) — a silent deletion of
 authored source whose output re-parses as a different program, which is the
 faithful-reprint floor failing rather than a layout choice. tsv rejects
@@ -1295,7 +1288,7 @@ nothing in this family is documented-only. `import defer`'s comment handling is 
 the rest of the syntax could be too.
 
 The parser is additionally graded by the
-test262 suite — ~396 graded files, all passing; see
+test262 suite, its import-phase files all passing; see
 [conformance_test262.md](./conformance_test262.md). Prettier throws on `import source`
 (and preserves `import defer`'s phase), so the remaining *printer* round-trips are
 covered by `tests/import_phase.rs`; the prettier side is cataloged in
@@ -1326,7 +1319,7 @@ follows tsc. The matcher keys on acorn's tell — a non-static, value-less field
 `static` whose span ends at its key (no `;`, which a written `static;` has) with a line
 break before the next member; a written `static static` ⏎ is a *static* field of that
 shape — and excuses that class body's members from it on, which the
-pairing renumbers. **Upstream candidate**: acorn class-field ASI for bare `static`.
+pairing renumbers. **Upstream candidate**: acorn-typescript class-field ASI for bare `static`.
 
 **extends instantiation line-break shape**
 (`extends_instantiation_linebreak`): with type arguments on the heritage and a
@@ -1439,7 +1432,7 @@ All corrections exist because of upstream bugs. If fixed upstream, tsv would rem
 - Class-member `static` line break — `parseClassElement` folds `static` into the `tsParseModifiers` loop, whose uniform `tsTokenCanFollowModifier` → `!hasPrecedingLineBreak()` guard imposes a restriction ecma262's `ClassElement` does not have, so `class C { static⏎c = 3 }` ASI-splits into two members where tsc, prettier and plain acorn all read one static field. The `parseClassElement` it overrides already reads it right
 - `export default abstract` line break — `isAbstractClass`'s `this.lookahead().type === tt._class` omits the line-break test tsc's `nextTokenIsClassKeywordOnSameLine` makes, so `export default abstract⏎class Base {}` welds into one exported abstract class and the line terminator vanishes; its `async` neighbour in the same `parseExportDefaultDeclaration` already honours the restriction
 
-(No **acorn core** candidates. The `v`-flag regex is not one: acorn supports the `v` flag and its
+(The `v`-flag regex is not an **acorn core** candidate: acorn supports the `v` flag and its
 set operations, and correctly rejects the one construct
 [unicode_sets_advanced](../tests/fixtures/typescript/expressions/literals/regex/unicode_sets_advanced_svelte_divergence/)
 exercises — `/[a-z--[aeiou]]/v` is invalid ECMAScript, which V8 throws on too. That fixture is not
@@ -1527,7 +1520,7 @@ Implementation oddities in Svelte's parser that tsv replicates for AST compatibi
 - Comment-before-colon in declaration value — `crates/tsv_css/src/ast/convert/mod.rs`
 - Block-comment stripping in declaration value — `strip_css_comments` in `crates/tsv_css/src/ast/convert/mod.rs`
 - Block-comment stripping in at-rule prelude — `strip_css_comments` in `crates/tsv_css/src/ast/convert/mod.rs`
-- :dir()/:lang()/::highlight() identifier wrapping — `crates/tsv_css/src/ast/convert/mod.rs`
+- :dir()/:lang()/::highlight() identifier wrapping — `classify_pseudo_args` in `crates/tsv_css/src/parser/pseudo.rs`
 - ::part() ident run re-projected onto parseCss's selector-list arg shape — `write_part_args` in `crates/tsv_css/src/ast/convert/write.rs` (the projection synthesizes descendant-combinator `TypeSelector` chains only, which is what binds it to the parser's ident-run model — see [§CSS Parser Scope & Error Model](#css-parser-scope--error-model))
 - Selector-name half-decoding (class/id/type, pseudo-class/element, **and** attribute names) — `raw_selector_name` in `crates/tsv_css/src/ast/convert/mod.rs`
 - HTML comment (CDO/CDC) `<!-- ... -->` swallow at statement/selector-list boundaries — `skip_html_comment_markers` in `crates/tsv_css/src/parser/mod.rs`
@@ -1647,7 +1640,7 @@ occurrence, and any occurrence inside an element, is unaffected either way.
 
 The class question generalizes past this site: `tsv_svelte`'s
 [`whitespace.rs`](../crates/tsv_svelte/src/whitespace.rs) module doc carries the crate's rule
-and the other four sites where the same reach was the whole bug.
+and the other sites where the same reach was the whole bug.
 
 ---
 

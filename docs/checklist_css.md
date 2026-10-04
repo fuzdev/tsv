@@ -6,7 +6,7 @@ Comprehensive reference for CSS language features supported by tsv's parser and 
 
 Effectively all CSS features from stable W3C specifications are supported.
 Early-draft features are covered under [Future Work](#future-work) — nearly all of them
-already parse via generic handling; only two constructs are rejected outright.
+already parse via generic handling; only the constructs under [Not Parsed](#not-parsed) are rejected outright.
 
 **Scope & goals.** The north star is full **CSS-spec compliance**; the near-term,
 enforced goal is **matching Svelte's `parseCss`** (the AST canonical). SCSS/Sass,
@@ -55,7 +55,7 @@ Foundation for all CSS parsing. Spec: `css-syntax-3`
 - Delim tokens (single characters)
 - Colon, semicolon, comma tokens
 - Block tokens (`{`, `}`, `[`, `]`, `(`, `)`)
-- CDO/CDC tokens - SKIP: deprecated 1990s legacy, Svelte doesn't support
+- CDO/CDC (`<!--`, `-->`) — not tokens: like `parseCss`, a `<!--` … `-->` span is read as one comment-like span and discarded, contents included (the spec's two no-op tokens are not modeled; see [conformance_svelte.md §CSS Compat Behaviors](conformance_svelte.md#css-compat-behaviors))
 
 ### Comments
 
@@ -78,7 +78,7 @@ Foundation for all CSS parsing. Spec: `css-syntax-3`
   its first line is charged to the line it starts on, so one that reaches column 100 stays
   and one column more drops it, and the word after it is placed from its last line — even
   when the first line overruns the fresh line too, where the fill renders the comment in place
-  rather than isolating the tail (`space_separated_multiline_comment_first_line_long`); a
+  rather than isolating the tail (`space_separated_multiline_comment_first_line_long_prettier_divergence`); a
   leading comment whose first line overruns drops like any wide first item. Prettier's
   differences — the `;` overage, the leading run it glues to the first word and overruns
   with, and a multi-line comment it measures as one run of text — are cataloged in
@@ -528,8 +528,9 @@ Specs: `css-color-3`, `css-color-4`, `css-color-5` (Level 5 is widely shipped)
   `and`/`or` boundaries, the FIRST segment always on the at-rule's line however wide (a long
   feature value, a multi-line comment whose first line overruns): the fill's head is glued to
   the name, so no fresh-line drop can strand the name's space as trailing whitespace
-  (`prelude_first_segment_long_prettier_divergence`; the wrap itself is `media_long` /
-  `supports_long` / `container_long`)
+  (`prelude_first_segment_long_prettier_divergence`; the wrap itself is
+  `media_long_prettier_divergence` / `supports_long_prettier_divergence` /
+  `container_long_prettier_divergence`)
 - `@media` range syntax (`width >= 768px`)
 - `@supports` (feature queries)
 - `@supports selector()`
@@ -705,9 +706,9 @@ Spec: `css-grid-1`
   re-rowed by both formatters). Prettier never wraps a grid value
   ([grid_template_wrap_long](../tests/fixtures/css/declarations/grid_template_wrap_long_prettier_divergence/))
 - ⚠️ A newline *inside* line names (`[a⏎b] 1fr`): prettier's value tokenizer makes `[a` and
-  `b]` two nodes, so its grid rule breaks between them and keeps `1fr` beside `b]`; tsv holds
-  the bracket as one member and normalizes it to `[a b]` (as both formatters do off the grid
-  properties). Rare, unpinned
+  `b]` two nodes, so its grid rule breaks between them and keeps `1fr` beside `b]`; tsv breaks
+  the same way (off the grid properties both formatters normalize the bracket to `[a b]`). Rare,
+  unpinned
 
 ### Easing Functions
 

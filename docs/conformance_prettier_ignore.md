@@ -8,7 +8,7 @@ decision framework live in [conformance_prettier.md](./conformance_prettier.md).
 
 A comment can suppress formatting of the construct that follows it. tsv honors its own tool-neutral `format-ignore` family — `<!-- format-ignore -->`, `// format-ignore`, `/* format-ignore */`, and — at the top level of a Svelte template only — the range markers `format-ignore-start` / `format-ignore-end` — **in addition to** prettier's `prettier-ignore` family, which tsv keeps for compatibility with prettier-authored code (corpus files use it). Recognition is centralized in `tsv_lang::is_format_ignore_directive` and the two range predicates, shared across the TypeScript, CSS, and Svelte printers.
 
-For a whole-construct freeze the `prettier-ignore` family matches prettier (both emit the construct raw), so those need no divergence fixture of their own; the type-member *list* positions are where tsv follows its own rule (cataloged in **On type-member lists** below, where tsv freezes the first member of an intersection rather than the whole node, preserves the directive's authored position, holds the list's per-line layout, or stays inert to a trailing directive). The `format-ignore` family is tsv-native: prettier doesn't recognize it, so prettier reformats the construct while tsv preserves it — that difference is the divergence. Most fixtures pair the spellings in one input: a `prettier-ignore`d construct (preserved by both tools, so unchanged in `output_prettier`) sits beside a `format-ignore`d one (reformatted only by prettier), making the `format-ignore` construct the sole divergence and doubling as a prettier-compatibility check. The `basic` (template node) and `js_css` (embedded `<script>` + `<style>`) Svelte fixtures carry this control, as do both standalone fixtures.
+For a whole-construct freeze the `prettier-ignore` family matches prettier (both emit the construct raw), so those need no divergence fixture of their own; the type-member *list* positions are where tsv follows its own rule (cataloged in **On type-member lists** below, where tsv freezes the first member of an intersection rather than the whole node, preserves the directive's authored position, holds the list's per-line layout, or stays inert to a trailing directive). The `format-ignore` family is tsv-native: prettier doesn't recognize it, so prettier reformats the construct while tsv preserves it — that difference is the divergence. Most fixtures pair the spellings in one input: a `prettier-ignore`d construct (preserved by both tools, so unchanged in `output_prettier`) sits beside a `format-ignore`d one (reformatted only by prettier), making the `format-ignore` construct the sole divergence and doubling as a prettier-compatibility check. The `basic` (template node), `js_css` (embedded `<script>` + `<style>`) and `pre_content` (inside `<pre>`) Svelte fixtures carry this control, as do both standalone fixtures.
 
 - `format-ignore` in `<script>` / `<style>` — ◆design_choice — [js_css](../tests/fixtures/svelte/syntax/format_ignore/js_css_prettier_divergence/)
 - `format-ignore` template element — ◆design_choice — [basic](../tests/fixtures/svelte/syntax/format_ignore/basic_prettier_divergence/)
@@ -92,7 +92,7 @@ prettier, which keeps every spelling of this gap as authored in front of an inli
 ([directive_gap_glued](../tests/fixtures/svelte/syntax/prettier_ignore/directive_gap_glued/), a
 parity fixture). Nor is it deleted: an **inline** fragment keeps that gap as the one space it
 renders as, a collapsible `line` like every other inline sibling boundary — emitting nothing there
-was the mirror bug, a rendered space the source HAS. Which is why the gap is no longer gated on
+would be the mirror bug, a rendered space the source HAS. Which is why the gap is not gated on
 the container's multiline-ness at all; only its *spelling* is (a hardline where the fragment is
 block-style, a `line` where it is inline). One residual difference stays, in the block-style arm
 only: a **space** standing in its own whitespace node before a frozen element becomes a break
@@ -216,7 +216,7 @@ own-line line comment):
 A redundant paren around a frozen member
 is transparent (the inner node is frozen, the clarity paren re-synthesized outside the
 frozen slice; a fully redundant paren is dropped). This is the same behavior every
-existing honored list position already carries — an own-line directive between `{` and
+other honored list position carries — an own-line directive between `{` and
 the first class member freezes that member, not the body. The ordinary member-freeze
 fixtures `union_prettier_ignore_first_member` and
 `union_prettier_ignore_between_members` match prettier, as do the other member-list
@@ -291,7 +291,7 @@ more defensible:
   [trailing inert](../tests/fixtures/typescript/types/union_prettier_ignore_trailing_inert_prettier_divergence/),
   [tuple trailing inert](../tests/fixtures/typescript/types/tuple_prettier_ignore_trailing_inert_prettier_divergence/)
   (the tuple-family control for the same rule). The same inertness holds at the
-  pre-arc honored member emitters, where prettier's backward freeze keeps a perturbed
+  object-literal and type-member emitters, where prettier's backward freeze keeps a perturbed
   preceding member frozen while tsv formats both members —
   [object trailing inert](../tests/fixtures/typescript/expressions/objects/prettier_ignore_trailing_inert_prettier_divergence/),
   [type-member trailing inert](../tests/fixtures/typescript/types/type_members_prettier_ignore_trailing_inert_prettier_divergence/)
@@ -445,16 +445,16 @@ precede:
   claim ([§Comment relocation](./conformance_prettier_ts_comments.md#comment-relocation)'s
   leading-EDGE entries). Prettier relocates the directive out of the shell to trail the
   enclosing head and freezes from there — a placement inert under tsv's floor, and one
-  prettier's own second pass walks away from. Left unstripped the shell printed the run
+  prettier's own second pass walks away from. Left unstripped, the shell would print the run
   itself, with a bare `hardline` at its own indent and the directive glued to the head, which
-  is an F1 break at the conditional check and a silent loss of the freeze everywhere else —
+  would be an F1 break at the conditional check and a silent loss of the freeze everywhere else —
   [conditional check](../tests/fixtures/typescript/types/conditional_prettier_ignore_check_paren_interior_prettier_divergence/),
   and the `unformatted_ours_paren_interior` / `unformatted_ours_paren_shell` variants on each
   head's own fixture.
 
   Two positions answer differently, and for reasons of their own. The **array element** keeps
   its pair and emits the run inside it (the interior rule below), since a composite element
-  needs that pair anyway. And a **union's FIRST member** keeps today's answer: the union's own
+  needs that pair anyway. And a **union's FIRST member** keeps its own answer: the union's own
   sanctioned form puts the run after the `| ` it synthesizes, which is a separator-trailing
   placement the floor reads as INERT — so a freeze there would be lost on the second pass, and
   the directive is inert instead. Both are two-authoring residuals, not closed gaps.
@@ -599,7 +599,7 @@ part from it, and two are freeze questions:
   and the flat concat has no line of its own to put the directive's run on: it would land on
   the `(`'s line, inert, and the freeze would be gone on the second pass. Prettier hugs and
   stays frozen because it decides a directive by comment *attachment* rather than by
-  placement. All four call spellings agree, and with nothing glued to the backtick the
+  placement. Every call spelling agrees, and with nothing glued to the backtick the
   newline before it declines the hug anyway, so both tools expand —
   [template argument](../tests/fixtures/typescript/expressions/calls/template_arg_prettier_ignore_expands_prettier_divergence/)
 - The flat **test-call** layout, which is a comment-position question rather than a freeze
@@ -756,7 +756,7 @@ of it reformat. The two rules meet at a sequence's leading gap, where the direct
 verbatim slice, in a `for` clause, a `return`/`throw` operand and a Svelte value alike.
 That gap ends where the node begins: a directive written INSIDE the grouping shell the
 parser erased ahead of the first operand is inside the sequence's span, so it freezes that
-OPERAND (the leading-EDGE entry below), which in a `for` clause is also where the erased
+OPERAND (the erased-parens entry below), which in a `for` clause is also where the erased
 shell's ordinary comments are emitted from
 (`sequence/operands_prettier_ignore_member` covers the inter-operand half and matches
 prettier). Two node-level facts the slice carries are the same ones every value-side freeze
@@ -768,11 +768,11 @@ loses its grouping.
 A **glued** directive is inert here as everywhere — `for (/* prettier-ignore */ i = 0; …)`,
 `return /* prettier-ignore */ a + b`, `if (/* prettier-ignore */ a + b)` — where prettier honors
 the glued placement and freezes;
-each fixture's `prettier_variant_frozen` pins prettier's stable frozen form, which tsv
+the fixture's `prettier_variant_frozen` pins prettier's stable frozen form, which tsv
 normalizes ([clauses glued
 inert](../tests/fixtures/typescript/statements/for/clauses_prettier_ignore_glued_inert_prettier_divergence/)).
 
-tsv diverges at nine places:
+tsv diverges at the places below (the last two entries record agreements):
 
 - Directive written in an **empty `for` clause slot** — ◆comment_preservation — it stays in
   that slot, so it freezes nothing: the clause it would freeze is on the other side of the
@@ -1109,7 +1109,7 @@ two different answers — each of them the host's *unfrozen* answer, which is th
   covers the pair and so keeps the comment inside it. That last parting is a **tracked gap, not a
   sanctioned difference** — the frozen and unfrozen forms agree under tsv, but prettier's do not.
 
-tsv diverges at six places:
+tsv diverges at the places below:
 
 - **A frozen value's surviving shell** — ◆comment_preservation ◆prettier_bug — prettier
   **throws** on a comment in that gap (`Comment "c" was not printed`): its ignore path replaces
@@ -1177,7 +1177,8 @@ tsv diverges at six places:
 - **A directive inside the before-`=` continuation** — ◆comment_preservation — when a comment
   before the `=` drops `= value` to a continuation line, the `=`→value gap inside it keeps its
   own rule: an own-line directive still keeps its own line and still freezes. Prettier relocates
-  the before-`=` comment past the operator (the family divergence §Comment relocation already
+  the before-`=` comment past the operator (the family divergence
+  [§Comment relocation](./conformance_prettier_ts_comments.md#comment-relocation) already
   sanctions) and honors the freeze either way —
   [before-`=` value-head freeze](../tests/fixtures/typescript/declarations/variable/before_eq_comment_value_head_freeze_prettier_divergence/)
 - **Enum member value** — ◆comment_preservation — the one host of the family where prettier
@@ -1265,7 +1266,7 @@ there, which the fixtures' `unformatted_spaces` variants pin by perturbing the h
 slice — so the ordinary fixtures `statements/switch/case_prettier_ignore_head`,
 `statements/switch/consequent_prettier_ignore_head`,
 `statements/if/branch_prettier_ignore_head` and
-`statements/loops/body_prettier_ignore_head` **match**. tsv diverges at three heads:
+`statements/loops/body_prettier_ignore_head` **match**. tsv diverges at these heads:
 
 - **`catch` / `finally` clause** — ◆comment_preservation — prettier moves the directive inside
   the clause's block body and freezes the **first statement** there, so its `catch` binding
@@ -1305,7 +1306,7 @@ its `;` restored or the next statement's printed form re-binds the pair into one
 statement. Owning the *other* end too is what keeps it one rule rather than two: a terminator
 the author left detached from its statement — `const a  =  x⏎;`, the semicolon-free style's
 `;[…]` idiom, or a merely padded `break  ;` — is re-emitted glued, and both formatters agree at
-all ten kinds
+every kind
 ([detached terminator](../tests/fixtures/typescript/syntax/asi/prettier_ignore_semicolon_detached/)).
 
 A `;` a statement kind does **not** own is content, and freezes as authored on both formatters:

@@ -44,8 +44,8 @@ this path." tsv's discovery *policy* — the build-output heuristic, the
 always-pruned safety nets, the formattable-extension check, the heuristic-shadow
 warning — lives one layer up in [`tsv_discover`](../tsv_discover/CLAUDE.md), which
 builds on `IgnoreStack` (consuming `is_ignored_leaf` / `is_reincluded` /
-`negation_under` / `has_gitignore_layers` / `gitignore_anchors`, plus `is_ignored` /
-`exclusion` / `tsv_exclusion` — the ancestor-walking answer and its witnesses — with
+`negation_under` / `has_gitignore_layers` / `gitignore_anchors`, plus `exclusion` /
+`tsv_exclusion` / `gitignore_exclusion` — the ancestor-walking answer's witnesses — with
 `tsv_layer_source` and `split_segments` to bound and warn about a path an argument
 named). Deliberately: `IgnoreStack` stays a pure gitignore(5) matcher, reusable beyond
 tsv's own discovery rules, and the three surfaces share the prune *decision* through

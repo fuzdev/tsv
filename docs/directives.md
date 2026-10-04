@@ -443,7 +443,7 @@ frozen slice.
 ### On statement positions
 
 Statements follow the same rule. In a statement **list** — a `switch` body's
-cases, a case label's consequent statements, and (already) a program or block
+cases, a case label's consequent statements, and a program or block
 body — an own-line directive freezes the **following** statement or case:
 
 ```ts

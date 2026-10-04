@@ -113,7 +113,7 @@ EOF
 cargo run -p tsv_debug fixture_init tests/fixtures/.../name   # reformat existing input
 ```
 
-Options: `--parser typescript|css|svelte-ts` (default: svelte; `ts` and `svelte.ts` are accepted aliases), `--force` (overwrite existing), `--goal script|module`.
+Options: `--parser typescript|css|svelte-ts` (default: the existing input's type, else svelte; `ts` and `svelte.ts` are accepted aliases), `--force` (overwrite existing), `--goal script|module`.
 
 `--goal script` builds a **standalone-script** fixture: it writes the `goal` marker and
 generates `expected.json` from acorn at `sourceType: 'script'` (`await` an ordinary
@@ -261,7 +261,7 @@ cargo run -p tsv_debug canonical_parse tests/fixtures/.../input.svelte | head -8
 
 ### 2.3 Divergence Handling
 
-**The spec wins; adopting prettier's output is the default tie-breaker.** When the spec defines canonical behavior, follow it — even if prettier's output is itself valid CSS; otherwise adopt prettier's. Diverge only for a spec-defined canonical form prettier doesn't emit, documented prettier bugs, spec violations, or comment repositioning — never for preference. When prettier moves a comment to a different syntactic position, preserve the user's placement (see [conformance_prettier.md Comment Position Philosophy](./conformance_prettier.md#comment-position-philosophy)). See [fixture_overview.md Decision Framework](./fixture_overview.md#decision-framework).
+**The spec wins; adopting prettier's output is the default tie-breaker.** When the spec defines canonical behavior, follow it — even if prettier's output is itself valid CSS; otherwise adopt prettier's. Diverge for a spec-defined canonical form prettier doesn't emit, documented prettier bugs, spec violations, comment repositioning, or another defensible tsv-native choice (print width as a hard limit, a clearly better layout) sanctioned deliberately — never to hide a bug (see [conformance_prettier.md Decision Framework](./conformance_prettier.md#decision-framework)). When prettier moves a comment to a different syntactic position, preserve the user's placement (see [conformance_prettier.md Comment Position Philosophy](./conformance_prettier.md#comment-position-philosophy)). See [fixture_overview.md Decision Framework](./fixture_overview.md#decision-framework).
 
 **Creating a divergence fixture** (rare):
 
@@ -279,7 +279,7 @@ If prettier **never converges** on the input (each pass keeps changing the outpu
 
 If prettier **throws** on the input (a parse rejection or a printer crash — also no `output_prettier.*` possible), add a `prettier_rejects.txt` marker + README instead. The marker's trimmed content is the position-stripped expected-error substring; the validator live-verifies that prettier still errors with that message. The input must be valid by tsv's parse oracle (Svelte / acorn-typescript) and idempotent under tsv. Hand-author it — `fixture_init` runs prettier, which throws — then `deno task fixtures:update:parsed` for `expected.json`. See ./fixture_overview.md (rules F6/S19) and the catalog of in-tree cases in ./conformance_prettier_ts.md §"Prettier rejects valid input".
 
-If **tsv** rejects an input the **canonical parser accepts** (a deliberate, spec-stricter tsv over-rejection), it fits neither `input_invalid_*` (needs *both* parsers to reject) nor a plain fixture (needs tsv to parse+format). Add a `tsv_rejects.txt` marker to a `_svelte_divergence` dir instead: `input.*` + `tsv_rejects.txt` (the position-stripped expected **tsv**-error substring) + `expected_svelte.json` (the canonical AST) + README — no `expected.json` / `expected_ours.json`, no format-claim files, no prettier no-oracle markers. The validator live-verifies that tsv still rejects (with the substring) *and* the canonical parser still accepts and matches `expected_svelte.json` — a dead divergence (canonical rejects too) fails loudly. Prettier is never consulted (skip `fixture_init` / `output_prettier`): hand-author `input.*`, then `deno task fixtures:update:parsed` generates `expected_svelte.json` from the canonical parser (failing if it rejects). Catalog the divergence in ./conformance_svelte.md §TypeScript Corrections and back-link it from the README. See ./fixture_overview.md (rules F7/S20).
+If **tsv** rejects an input the **canonical parser accepts** (a deliberate, spec-stricter tsv over-rejection), it fits neither `input_invalid_*` (needs *both* parsers to reject) nor a plain fixture (needs tsv to parse+format). Add a `tsv_rejects.txt` marker to a `_svelte_divergence` dir instead: `input.*` + `tsv_rejects.txt` (the position-stripped expected **tsv**-error substring) + `expected_svelte.json` (the canonical AST) + README — no `expected.json` / `expected_ours.json`, no format-claim files, no prettier no-oracle markers. The validator live-verifies that tsv still rejects (with the substring) *and* the canonical parser still accepts and matches `expected_svelte.json` — a dead divergence (canonical rejects too) fails loudly. Prettier is never consulted (skip `fixture_init` / `output_prettier`): hand-author `input.*`, then `deno task fixtures:update:parsed` generates `expected_svelte.json` from the canonical parser (failing if it rejects). Catalog the divergence in the matching ./conformance_svelte.md §Corrections Catalog section (§TypeScript Corrections for a script parse) and back-link it from the README. See ./fixture_overview.md (rules F7/S20).
 
 ---
 
@@ -372,8 +372,8 @@ In `_prettier_divergence` directories: use `unformatted_ours_*.*` instead (norma
 
 ```bash
 # Both must produce output identical to input.svelte
-cargo run -p tsv_debug format_prettier .../unformatted_compact.svelte 2>/dev/null > /tmp/c.svelte
-cargo run -p tsv_debug format_prettier .../unformatted_spaces.svelte 2>/dev/null > /tmp/s.svelte
+cargo run -p tsv_debug format_prettier .../unformatted_compact.svelte --no-line-widths 2>/dev/null > /tmp/c.svelte
+cargo run -p tsv_debug format_prettier .../unformatted_spaces.svelte --no-line-widths 2>/dev/null > /tmp/s.svelte
 
 diff .../input.svelte /tmp/c.svelte && echo "✓ compact normalizes"
 diff .../input.svelte /tmp/s.svelte && echo "✓ spaces normalizes"
@@ -395,7 +395,7 @@ When the feature doesn't exist yet, `fixture_init` still works — prettier does
 deno task fixtures:validate --prettier-only [pattern]  # skips our formatter, validates prettier + canonical parser
 ```
 
-Formatter errors like `InvalidSyntax` are expected until implementation. The approval gate (step 4) still applies. To regenerate `expected.json` after upstream parser changes: `deno task fixtures:update:parsed [pattern]`
+Parser/formatter errors (`ParserError`, `FormatterError`) are expected until implementation. The approval gate (step 4) still applies. To regenerate `expected.json` after upstream parser changes: `deno task fixtures:update:parsed [pattern]`
 
 ---
 
@@ -445,7 +445,7 @@ if(a){expr;}else if(b){expr;}else{expr;}
 </script>
 EOF
 
-cargo run -p tsv_debug format_prettier tests/fixtures/typescript/statements/if/basic/unformatted_compact.svelte 2>/dev/null > /tmp/c.svelte
+cargo run -p tsv_debug format_prettier tests/fixtures/typescript/statements/if/basic/unformatted_compact.svelte --no-line-widths 2>/dev/null > /tmp/c.svelte
 diff tests/fixtures/typescript/statements/if/basic/input.svelte /tmp/c.svelte && echo "✓ normalizes"
 
 deno task fixtures:validate statements/if  # all checks pass
@@ -470,7 +470,7 @@ cargo run -p tsv_debug compare --content "<script>CODE</script>" --parser svelte
 cargo run -p tsv_debug compare --content "const x = 1" --parser typescript
 
 # Verify fixture matches prettier (manual check)
-cargo run -p tsv_debug format_prettier FILE 2>/dev/null > /tmp/p.svelte && diff FILE /tmp/p.svelte && echo "✓ MATCH"
+cargo run -p tsv_debug format_prettier FILE --no-line-widths 2>/dev/null > /tmp/p.svelte && diff FILE /tmp/p.svelte && echo "✓ MATCH"
 
 # Check our parser output
 cargo run -p tsv_cli parse FILE --pretty | head -50

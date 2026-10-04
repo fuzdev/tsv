@@ -114,7 +114,7 @@ after-element-fold drop itself lived) is never probed; that needs the template-g
 extension, and as-authored drops over real corpora need the blank census — both follow-ups.
 
 Every **policy** kind is **pinned** into the ratchet (NON-IDEMPOTENT, DROPPED, DOUBLE-PRINTED,
-UNREPARSEABLE, LEAF-CORRUPTION, BLANK-RUN) — deliberately unlike `fuzz` / `roundtrip_audit`, where
+UNREPARSEABLE, NODE-LOSS, LEAF-CORRUPTION, BLANK-RUN) — deliberately unlike `fuzz` / `roundtrip_audit`, where
 non-idempotency is an absolute never-pinnable gate: this audit is a ratchet over a live bug family,
 so its findings must be pinnable or the gate would hard-block `deno task check`.
 Two carve-outs:

@@ -8,7 +8,7 @@ tsv is a **multi-tool foundation** for Svelte/TypeScript/CSS—formatter, parser
 
 **Optimal artifacts (invariant).** Runtime speed _and_ compiled code size are first-class, non-negotiable goals for **every** shipped artifact. The format-only `@fuzdev/tsv-format-wasm`, first-shipped and most-developed, is the current yardstick but holds no long-term primacy; `@fuzdev/tsv-parse-wasm`, the CLI, and the native N-API binding count just as much. The architecture serves this directly: concrete types end-to-end (no `dyn` dispatch), per-language crates that WASM tree-shakes independently, and unneeded layers excluded at the link level — the printers from parse-only builds, the convert layer from format-only builds (see §"Closed Scope, Open Convention"). Heavier infrastructure for future tools—incremental reparse, red-green/CST layers for LSP—must be added as later, feature-gated layers that don't regress this, not as weight in the initial artifacts (see §"Red-Green Trees (Deferred)").
 
-**Safety constraint**: `unsafe_code = "forbid"` at the workspace level — no unsafe Rust in core crates. Only the two native binding crates relax it, each to the weakest level that compiles: `tsv_ffi` to `"allow"` (the crate *is* the C ABI boundary and hand-writes the raw-pointer work); `tsv_napi` to `"deny"` (it hand-writes no unsafe, and `#[napi]`'s generated items carry their own `#[allow(unsafe_code)]`, which overrides `deny`, so every other site in the crate stays a compile error). Neither can inherit `forbid`, which no inner `allow` may override; `tests/lint_parity.rs` pins both relaxations and guards the hand-mirrored tables against drift. A deliberately small dependency set keeps the attack surface and audit burden minimal (authoritative list: `[workspace.dependencies]` in the root `Cargo.toml` — the library/binding externals, the `napi`/`napi-derive`/`napi-build` trio being the N-API carve-out, plus the CLI/debug-only `argh`/`tokio`/`futures-util`; the wasm32-only `talc` allocator lives in `tsv_wasm`'s own manifest; purpose table in [CLAUDE.md § Rust Crates](../CLAUDE.md#rust-crates-minimal-deps)).
+**Safety constraint**: `unsafe_code = "forbid"` at the workspace level — no unsafe Rust in core crates. Only the two native binding crates relax it, each to the weakest level that compiles: `tsv_ffi` to `"allow"` (the crate *is* the C ABI boundary and hand-writes the raw-pointer work); `tsv_napi` to `"deny"` (it hand-writes no unsafe, and `#[napi]`'s generated items carry their own `#[allow(unsafe_code)]`, which overrides `deny`, so every other site in the crate stays a compile error). Neither can inherit `forbid`, which no inner `allow` may override; `tests/lint_parity.rs` pins both relaxations and guards the hand-mirrored tables against drift. A deliberately small dependency set keeps the attack surface and audit burden minimal (authoritative list: `[workspace.dependencies]` in the root `Cargo.toml` — the library/binding externals, the `napi`/`napi-derive`/`napi-build` trio being the N-API carve-out, plus the CLI/debug-only `argh`/`tokio`/`futures-util`/`serde`; the wasm32-only `talc` allocator lives in `tsv_wasm`'s own manifest; purpose table in [CLAUDE.md § Rust Crates](../CLAUDE.md#rust-crates-minimal-deps)).
 
 ## Two-AST Design
 
@@ -82,7 +82,7 @@ tsv/
 ├── tsv_ts       # TypeScript parser/formatter (standalone)
 ├── tsv_css      # CSS parser/formatter (standalone)
 ├── tsv_svelte   # Svelte parser/formatter (uses tsv_ts + tsv_css)
-├── tsv_svelte_compile # experimental Svelte→JS compiler + JS canonicalizer (uses tsv_svelte + tsv_ts + tsv_css + tsv_html; consumed only by tsv_debug)
+├── tsv_svelte_compile # experimental Svelte→JS compiler + JS canonicalizer (uses tsv_svelte + tsv_ts + tsv_css + tsv_html; consumed only by tsv_debug and the integration tests)
 ├── tsv_check    # experimental TypeScript binder/checker, may never ship (uses tsv_ts + tsv_lang; consumed only by tsv_debug)
 ├── tsv_cli      # Production CLI binary (pure Rust)
 ├── tsv_debug    # Dev utilities (uses embedded Deno sidecar for JS tools)
@@ -107,7 +107,7 @@ closed-scope/open-convention stance below.
 
 ```
    tsv_lang (foundation)          tsv_html          tsv_ignore
-        ↑                       (zero-dep leaf)    (zero-dep leaf)
+        ↑                       (no tsv_* deps)    (zero-dep leaf)
    ┌────┴────┐                       │                  ↑
  tsv_ts   tsv_css                    │             tsv_discover
    │         │                       │             (policy layer)
@@ -124,13 +124,13 @@ closed-scope/open-convention stance below.
                         so no shipped format/parse artifact links it)
             tsv_svelte_compile  (experimental Svelte→JS compiler + JS canonicalizer —
                         depends on tsv_lang + tsv_html + tsv_ts + tsv_css + tsv_svelte;
-                        consumed ONLY by tsv_debug, so no shipped artifact links it)
+                        consumed ONLY by tsv_debug and the integration tests, so no shipped artifact links it)
 
    tsv_cli, tsv_wasm, and tsv_napi also consume tsv_discover (→ tsv_ignore).
    tsv_ffi, tsv_napi, and tsv_wasm also consume tsv_arena — the shared
    binding substrate: per-thread reusable AST/doc arenas (→ bumpalo;
-   → tsv_lang under `format`) plus the goal-axis macros their exports
-   are generated over.
+   → tsv_lang under `format`) plus the goal-axis macros and the
+   parse/format export bodies built on them.
 ```
 
 ### Design Rationale
@@ -228,9 +228,9 @@ This shape gives both:
   binary level. Users of the published `tsv` CLI or the npm packages
   (the WASM trio and the native `@fuzdev/tsv`) would need to compose
   their own dispatch to wire in a third-party language — the CLI
-  matches on file extension over a fixed list, and the WASM
-  `lang_bindings!` macro instantiates exports for a fixed set of
-  language crates. Both are intentional: the binaries make scope
+  matches on file extension over a fixed list, and each binding's
+  `lang_bindings!` macro (`tsv_wasm`, `tsv_napi`, `tsv_ffi`) instantiates
+  exports for a fixed set of language crates. Both are intentional: the binaries make scope
   commitments that the Rust libraries do not.
 
 **Closing the platform at the Rust level** would mean adding any of:
@@ -245,9 +245,9 @@ This shape gives both:
   place to add a language.
 
 None of these are needed. The CLI dispatches by file extension with a
-`match`; the WASM crate instantiates concrete per-language exports via
+`match`; each binding crate instantiates concrete per-language exports via
 a macro. The supported-language set is a _scope_ decision (living
-in those two dispatch sites), not a structural one — adding a
+in those dispatch sites), not a structural one — adding a
 tsv-shaped crate to the workspace later requires no edits to existing
 language crates.
 
@@ -358,15 +358,19 @@ pub enum DocNode {
     Dedent(DocId),                              // Decrease indent
     AlignRoot { n, contents },                  // Absolute tab level (template-literal root reset)
     Align { n, contents },                      // Sub-tab align(n): literal spaces under useTabs
-    Group { contents, expanded_states, id, should_break },  // All-or-nothing breaking
-    IfBreak { break_doc, flat_doc },            // Conditional on parent
+    Group { contents, expanded_states, keyed, should_break },  // All-or-nothing breaking
+    IfBreak { break_doc, flat_doc, group_id },  // Conditional on parent (or a keyed group)
     IndentIfBreak { contents, group_id },  // Conditional indent
     Concat(ChildRange),                         // Sequence
     Fill(ChildRange),                           // Greedy line packing
     WithContext { doc, context },                // Rendering hints
     LineSuffix(DocId),                          // End-of-line content
     LineSuffixBoundary,                         // Flush pending suffixes
+    EmbedEnd { run_width, run_breaks, dedent_closer }, // End of an embedded document
     BreakParent,                                // Force parent group to break
+    FlushBreak,                                 // Break only the group a pending suffix flushes in
+    FlowProbeEnd,                               // Renderer-pushed sentinel (never built by a printer)
+    GatedState { probe, contents },             // Conditional-group state skipped when its probe fits
 }
 ```
 
@@ -431,8 +435,8 @@ statement/               — Statement parsing (variable, function, class, contr
 BP_COMMA: 0          // Sequence (lowest)
 BP_ASSIGNMENT: 1     // =, +=, ternary
 BP_YIELD: 1          // yield — same as assignment (yield takes AssignmentExpression per spec)
-BP_TS_TYPE_ASSERTION: 2  // as, satisfies
-// ... binary operators 5-28 ...
+// ... binary operators 7-28 ...
+BP_AS: 19            // as, satisfies — the relational tier (tsc's precedence)
 BP_UNARY: 29         // -, !, typeof (highest)
 ```
 
@@ -444,7 +448,7 @@ The `parse_expression_bp(min_bp)` loop handles multiple phases in precedence ord
 - **Generics vs comparison**: Check for type parameter markers after `<`, scan to closing `>`
 - **Type assertions**: `<T>expr` vs `a < b` — lookahead for type-like content between angles
 
-Parser state flags manage context sensitivity: `allow_in` (disables `in` operator in for-loop headers), `top_level_as_is_assertion` (Svelte `#each` binding context, where a top-level `as` is the block's separator rather than TypeScript's operator), `grouping_depth` (parenthesis nesting), `in_ambient_context` (`declare` blocks), `in_await` / `in_yield` (the `[Await]` / `[Yield]` grammar parameters, seeded from the goal and swapped at every function-like scope), and `strict` (seeded `Module ⟹ strict`, turned on — never off — by a `"use strict"` directive prologue or a class, and gating the three strict-mode production disallowances at the point a token becomes a node; see [CLAUDE.md §Strictness](../CLAUDE.md#strictness-module-strict-script-by-directive)). Every flag is saved and restored by its own combinator, never assigned bare, which is what lets `Parser::checkpoint` carry none of them.
+Parser state flags manage context sensitivity: `allow_in` (disables `in` operator in for-loop headers), `top_level_as_is_assertion` (Svelte `#each` binding context, where a top-level `as` is the block's separator rather than TypeScript's operator), `grouping_depth` (parenthesis nesting), `in_ambient_context` (`declare` blocks), `in_await` / `in_yield` (the `[Await]` / `[Yield]` grammar parameters, seeded from the goal and swapped at every function-like scope), and `strict` (seeded `Module ⟹ strict`, turned on — never off — by a `"use strict"` directive prologue or a class, and gating the three strict-mode production disallowances at the point a token becomes a node; see [CLAUDE.md §Strictness](../CLAUDE.md#strictness-module-strict-script-by-directive)). Every flag but `grouping_depth` (which the checkpoint carries, and `Parser::rewind` resets) is saved and restored by its own combinator, never assigned bare, which is what lets `Parser::checkpoint` carry none of the others.
 
 ### CSS (`tsv_css/src/parser/`)
 
@@ -452,7 +456,7 @@ Simpler recursive descent — no operator precedence needed:
 
 ```
 mod.rs           — CssParser struct, top-level stylesheet loop
-atrules.rs       — @media, @keyframes, @supports, etc.
+atrules/         — @media, @keyframes, @supports, etc.
 selectors.rs     — Selector parsing
 declarations.rs  — Rule bodies and property declarations
 attributes.rs    — Attribute selectors
@@ -473,6 +477,7 @@ fragment.rs        — Fragment and text parsing
 element.rs         — Element parsing
 attribute.rs       — Attribute and directive parsing
 block.rs           — Control flow blocks ({#if}, {#each}, {#await}, {#key})
+tag.rs             — Template tags ({@html}, {@const}, {@debug}, {@render}, {const}/{let})
 expression_tag.rs  — {expr} → tsv_ts::parse_expression_with_comments()
 script.rs          — <script> → tsv_ts::parse_embedded()
 style.rs           — <style> → tsv_css::parse_embedded()
@@ -528,7 +533,7 @@ selectors.rs            # Selector formatting
 declarations.rs         # Property/value formatting
 values.rs               # Value formatting
 atrules.rs              # @-rule formatting
-value_normalization.rs  # Semantic value normalization (numbers, colors, whitespace)
+value_normalization/    # Semantic value normalization (numbers, colors, whitespace)
 ```
 
 **Svelte** (`tsv_svelte/src/printer/`):
@@ -587,7 +592,7 @@ elements, mapped-type values) indent their continuations correctly.
 
 | Feature          | TypeScript                     | CSS                     | Svelte                |
 | ---------------- | ------------------------------ | ----------------------- | --------------------- |
-| String Interning | Yes (identifiers)              | No                      | Yes (via tsv_ts)      |
+| String Interning | No (span-identity names)       | No                      | No (span-identity)    |
 | Escape Handling  | Dedicated module (7 formats)   | Dedicated module (hex)  | Delegates to TS/CSS   |
 | Public API       | Core + broad embedding surface | Core + `parse_embedded` | Orchestrates TS + CSS |
 
@@ -874,7 +879,7 @@ Embedded languages build doc nodes into the host file's arena rather than nestin
 
 The CSS printer skips the render altogether for a piece that fits the rest of its line: `arena_try_print_flat_into` writes the doc's texts straight onto the printer's buffer in one width-charging walk and refuses anything it cannot prove the renderer prints identically, so only a piece that wraps takes the scratch path (the argument is the module doc of `tsv_lang`'s `doc/arena_render_flat.rs`).
 
-The `fits()` lookahead and the render loop's own work-list both run on `SmallVec` stacks — the render command stack and its pending line-suffix buffer stay inline for the common small sub-render (the renderers run once per CSS declaration/value and per Svelte template expression, so each would otherwise allocate a fresh `Vec` from empty), and each top-level render additionally borrows the arena-pooled pair (`borrow_render_commands_scratch` / `borrow_line_suffix_scratch`) so their spill capacity warms once per arena instead of re-allocating per rendered piece (sub-renders keep their own inline locals and never take that borrow) — the render's keyed-group map is an arena-parked `Vec` of `(DocId, broke)` entries (`DocArena::keyed_group_modes` — one entry per keyed group INSTANCE, keyed on the group's own node, which a `GroupId` names, as prettier's id is a per-group `Symbol`; appended in resolution order and searched newest-first by the reader, which sits close behind its group; no per-render `HashMap`, and its capacity warms once per arena; the top-level render clears it on entry, and every fill-item and line-suffix sub-render nested in that render shares it, as prettier's one `groupModeMap` is shared), and comment-classification buckets are `SmallVec`s sized for the common 0-2 comments case.
+The `fits()` lookahead runs on an inline `SmallVec` stack, and the render loop's pending line-suffix buffer stays inline for the common small sub-render (the renderers run once per CSS declaration/value and per Svelte template expression, so each would otherwise allocate from empty); the render command stack is a parked `Vec` instead — each top-level render borrows it with the pooled line-suffix buffer (`borrow_top_render_stack` / `borrow_line_suffix_scratch`), and each nested sub-render takes its own parked stack (`take_sub_render_stack`), so every render starts from warm capacity rather than growing a `Vec` from nothing — the render's keyed-group map is an arena-parked `Vec` of `(DocId, broke)` entries (`DocArena::keyed_group_modes` — one entry per keyed group INSTANCE, keyed on the group's own node, which a `GroupId` names, as prettier's id is a per-group `Symbol`; appended in resolution order and searched newest-first by the reader, which sits close behind its group; no per-render `HashMap`, and its capacity warms once per arena; the top-level render clears it on entry, and every fill-item and line-suffix sub-render nested in that render shares it, as prettier's one `groupModeMap` is shared), and comment-classification buckets are `SmallVec`s sized for the common 0-2 comments case.
 
 **Lazy work over eager caching.** Line/column positions are computed only when `loc` is asked for — the error path, and the opt-in loc wire behind the `locations` cargo feature — via O(log n) binary search over line-start offsets (`LocationTracker`); the span-only wire every binding emits builds no line table. Error context (the point and the excerpted line) is computed only on the error path. Svelte `Text::data()` decodes entities only when entities are present, borrowing `raw` otherwise.
 
@@ -1052,9 +1057,9 @@ whose own width was two such slots take it:
   `ObjectPatternProperty` 40 (its `RestElement` arm sets that one).
 - `VariableDeclarator` is **32 B**, not 160.
 - every `Expression`-holding `Statement` head takes it too: `ExpressionStatement`
-  88 → **24**, `IfStatement` / `SwitchStatement` / `SwitchCase` 96 → **32**,
-  `WhileStatement` / `DoWhileStatement` 88 → **24**, `ReturnStatement` /
-  `ThrowStatement` 80 → **16**. `CatchClause` is the one that does *not*: its `param`
+  88 → **16**, `IfStatement` / `SwitchStatement` 96 → **24** (`SwitchCase`, which keeps its
+  own span, **32**), `WhileStatement` / `DoWhileStatement` 88 → **16**, `ReturnStatement` /
+  `ThrowStatement` 80 → **8** (their spans now on `Statement`'s header). `CatchClause` is the one that does *not*: its `param`
   is built by the parser as an owned value rather than through the spine, so a
   reference there would add an allocation instead of removing a copy — and
   `CatchClause` is reached only through `Option<&CatchClause>`, so its width sets
@@ -1167,7 +1172,7 @@ Share parser and AST across tools; let each tool add its own layers:
 │  - Lexer (tsv_*/lexer/)                            │
 │  - Parser (tsv_*/parser/)                          │
 │  - Internal AST (tsv_*/ast/internal/)              │
-│  - Wire-JSON writer (tsv_*/ast/convert/write/)     │
+│  - Wire-JSON writer (tsv_*/ast/convert/write*)     │
 │  - Comment helpers (tsv_lang/comment)              │
 └─────────────────────────────────────────────────────┘
                          │
@@ -1211,7 +1216,7 @@ The closest Rust projects embody the alternative shapes, which makes the trade-o
 Issues that need architectural decisions before building future tools.
 
 - **Scope/symbol resolution** — The shipped ASTs are syntax-only; meaningful linting requires name resolution. The experimental `tsv_check` binder (`crates/tsv_check`, consumed only by `tsv_debug`) is the candidate answer, but nothing shipped links it. *(When: before linter.)*
-- **Error recovery** — Fail-fast parsers block LSP/linter (need partial ASTs from broken code); also required for full CSS-spec compliance — CSS Syntax 3 §5.5 recovery (drop the bad rule, keep parsing), see conformance_svelte.md §CSS Parser Scope. *(When: for full CSS-spec compliance (CSS) / before LSP/linter.)*
+- **Error recovery** — Fail-fast parsers block LSP/linter (need partial ASTs from broken code); also required for full CSS-spec compliance — CSS Syntax 3 §5.5 recovery (drop the bad rule, keep parsing), see conformance_svelte.md §CSS Parser Scope & Error Model. *(When: for full CSS-spec compliance (CSS) / before LSP/linter.)*
 - **Source maps** — A shipped compiler must map output positions to input; the experimental `tsv_svelte_compile` emits none. How do spans survive transforms? *(When: before the compiler ships.)*
 - **Cancellation** — LSP operations must be cancellable mid-parse. Current parser has no cancellation points. *(When: before LSP.)*
 

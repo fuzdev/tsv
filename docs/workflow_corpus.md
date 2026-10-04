@@ -20,7 +20,7 @@ it comes from a pinned checkout: the `../corpora` real-code snapshot plus the pr
 suites. A snapshot refresh is the one legitimate corpus move, re-pinned deliberately.
 
 Repeat runs are cheap: prettier outputs are served from a content-addressed
-cache (../benches/js/CLAUDE.md §Prettier-output cache), so the
+cache (../benches/js/CLAUDE.md §Corpus Comparison, "Prettier-output cache"), so the
 one-file-at-a-time loop below re-formats only files whose content changed.
 
 ## First Step: Load Conformance Doc
@@ -585,6 +585,6 @@ cargo run -p tsv_debug line_width FILE --line N
 ### Red Flags
 
 - "Let me just fix this one thing" — Missing fixture first
-- `output_prettier.svelte` in many fixtures — Not matching Prettier (bugs)
+- A new `output_prettier.svelte` with no cataloged reason — Not matching Prettier (a bug, not a divergence)
 - Fixtures with domain-specific names — Not following naming conventions
 - Tests passing after fixture changes — Modified fixture to hide bug

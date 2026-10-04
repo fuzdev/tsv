@@ -166,7 +166,7 @@ nothing fails the gate, so a fixed gap must leave its ledger the day it is fixed
     acorn accepts, `unformatted_*` variants that pin the reading as a formatting
     claim (the arrow-in-a-consequent family took that route; see
     [conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md#typescript-corrections)).
-    `for (using x = …;;)`, a string-named import specifier behind `type`, a type-only
+    A string-named import specifier behind `type`, a type-only
     default import whose binding is named `from`.
 
 ## Reading the numbers

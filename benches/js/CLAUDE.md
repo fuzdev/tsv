@@ -8,7 +8,7 @@ for statistical analysis.
 
 **Directory note:** the **runtime-neutral** JS harness — named `js`, not `deno`, because the
 same code runs under Deno, Node, and Bun ([Cross-Runtime](#cross-runtime-deno--node--bun)). The
-`corpus_compare_*` and `diagnostics/` entries stay Deno-idiomatic; `smoke` is portable.
+`corpus_compare_*` and `diagnostics/` entries stay Deno-idiomatic (`biome_heap_probe.ts` aside, a node/bun probe); `smoke` is portable.
 
 **Companion docs** — this file is the operational surface (what to run, what it
 grades); the reference halves live in `docs/`:
@@ -27,7 +27,7 @@ grades); the reference halves live in `docs/`:
 > two sibling-checkout legs (`roundtrip:audit:prettier`, `discovery:audit`) widen onto
 > `../prettier` / `../corpora` when present and loud-skip when not, so a bare clone passes. Every
 > other gate *requires* sibling checkouts (`../corpora`, `../svelte`, `../acorn-typescript`,
-> `../typescript`, `../prettier`, `../test262`, `../wpt`), so they run at dev/release cadence and
+> `../typescript`, `../prettier`, `../prettier-plugin-svelte`, `../test262`, `../wpt`), so they run at dev/release cadence and
 > CI runs only the committed-tree tier.
 
 | Gate | Composition | Corpus / oracle | Cadence |
@@ -38,7 +38,7 @@ grades); the reference halves live in `docs/`:
 | **`deno task idempotency:sweep`** | `tsv_debug fuzz --iterations 0` over the corpus dirs — F1 (`format(format(x)) == format(x)`) + no-panic + structural reparse on every file **as authored** | **`robustness`** view (the WHOLE `../corpora` snapshot — every collection it vendors, placed in a tier or not — + the `svelte_styles` cache + the live working trees' DIFF against the snapshot; absent dirs skipped with a warning) | after a printer change; conformance cadence |
 | **`deno task audit:corpus`** | the pure-Rust content-loss / robustness suite over **real code**: `roundtrip_audit --gate` · `comment_audit` · `swallow_audit` · `binding_audit --gate` (real code gating; prettier suites report-only) · `authoring_audit` · `paren_audit` (both real-code-only) · `census_audit` · `fabrication_audit` (both strict-zero off their default corpus) · `fuzz --iterations 0`. `width_audit` is NOT a leg — it has no zero to grade (../../docs/audits.md §The Corpus Bundle) | **`robustness`** view (the whole snapshot + the `svelte_styles` cache + the live diff) + the pinned `../prettier` format suites (absent working trees skipped; floor = the whole `../corpora` snapshot) | release; `scripts/publish.ts` **Step 3c**; conformance cadence |
 | **`deno task render:audit <paths>`** | `render_audit --gate` — per `.svelte` file, does `tsv format` change what it RENDERS? Compares the browser-visible render key of the source vs of `format(source)`. The corpus-scale arm of the fixture **R** rules. **Needs the Deno sidecar** (`svelte compile`), so it is deliberately not a leg of the pure-Rust `audit:corpus` — it rides `conformance` instead | standalone: any `.svelte` corpus, given explicitly. As a `conformance` leg: the WHOLE `../corpora` snapshot (every collection, placed in a tier or not — this leg pins no count, so it reads the root rather than the tiers' entries) + the `suite` checkout, both version-pinned, so a live working tree can't move a release verdict | release (in `conformance`); standalone after a printer change |
-| **Package / artifact gates** | `validate:artifacts` (wasm size bounds + Deno smoke) · `test:npm[:parse\|:all]:run` · `test:napi:npm:run` · `test:bun` · `typecheck:packages` (the staged packages' declarations, as a consumer compiles them) · `engines:audit` (wasm vs native byte parity) | the STAGED npm packages (`crates/tsv_wasm/pkg/*/npm`, `crates/tsv_napi/pkg/*`), plus both fixture trees and `../corpora` for `engines:audit` | release: `scripts/publish.ts` **Step 6** (all but `engines:audit`); every commit: CI's `artifacts` job (`validate:artifacts`, the Node package suites, the napi suite, `engines:audit` — not `test:bun` or `typecheck:packages`); `release_napi.yml` per target (the napi suite) — full reference: ../../docs/audits.md |
+| **Package / artifact gates** | `validate:artifacts` (wasm size bounds + Deno smoke) · `test:npm[:parse\|:all]:run` · `test:napi:npm:run` · `test:bun` · `typecheck:packages` (the staged packages' declarations, as a consumer compiles them) · `engines:audit` (wasm vs native byte parity) | the STAGED npm packages (`crates/tsv_wasm/pkg/*/npm`, `crates/tsv_napi/pkg/*`), plus both fixture trees and `../corpora` for `engines:audit` | release: `scripts/publish.ts` **Step 6** (all but `test:napi:npm:run` and `engines:audit`); every commit: CI's `artifacts` job (`validate:artifacts`, the Node package suites, the napi suite, `engines:audit` — not `test:bun` or `typecheck:packages`); `release_napi.yml` per target (the napi suite) — full reference: ../../docs/audits.md |
 
 **JS parser (test262) IS release-gated** — `conformance:test262` (`tsv_debug
 test262 --gate`) gates the exact test262 **positive-parse** count
@@ -124,14 +124,15 @@ delta on the same row is the detector.
     accused: with nothing recorded, an absent row can't be told from an unloadable impl.
 - **One bench body, runtime-detected.** `bench.ts` detects the runtime
   (`lib/runtime.ts` `current_runtime()`) and selects the runtime-specific artifacts.
-  No forked entry; `bench:node:run` is literally `node benches/js/bench.ts`.
+  No forked entry; `bench:node:run` is just `node benches/js/bench.ts` plus runtime flags (`--expose-gc`).
 - **Portable shared modules.** Shared/entry modules use `node:` builtins (Deno
   supports them) + `@fuzdev/fuz_util` helpers (`fs_search`, `fs_exists`,
   `spawn_out`, `to_file_path`) — **no `Deno.*`, no `@std/*`**. The only genuinely
   runtime-specific files are the native loader (`ffi.ts` `Deno.dlopen` vs `napi.ts`
   `process.dlopen`) and the WASM target the loader picks. The Deno-only entry points
-  (`corpus_compare_*`, `diagnostics/*`) stay Deno-idiomatic. The `deno test` suite is
-  the dependency-free divergence detectors (`node:assert` + relative imports).
+  (`corpus_compare_*`, `diagnostics/*` but the node/bun `biome_heap_probe.ts`) stay Deno-idiomatic. The
+  `deno test` suite (`test:deno`) is the node-modules-free core's: the divergence detectors plus
+  the other dependency-free `lib/` modules' tests (`node:assert` + relative imports).
 - **The native row differs by runtime, fairly.** Deno → FFI (`tsv_ffi`, via
   `Deno.dlopen`); Node/Bun → N-API (`tsv_napi`, via `process.dlopen`). Same engine,
   same per-thread arena reuse, different binding boundary.
@@ -144,7 +145,8 @@ delta on the same row is the detector.
 Deno via `"nodeModulesDir": "manual"` in `deno.json`, Node directly. No jsr or remote deps —
 everything imports npm packages by bare specifier or uses `node:` builtins — so `deno.json`
 carries only `nodeModulesDir: manual` + `lock: false` (npm integrity is `package-lock.json`'s
-job). `@types/node` is a types-only devDependency so `node:` builtins type-check under
+job) and an `exclude` (per-machine `*.local.*` scratch and the generated `.cache`, kept out of
+`typecheck:js`). `@types/node` is a types-only devDependency so `node:` builtins type-check under
 `deno check`.
 
 **Install with `deno task bench:install`** (`install_deps.ts`), always — a plain `npm install`
@@ -213,7 +215,7 @@ artifact they measure.
 `corpus:compare:format:run` sets `PRETTIER_DEBUG=1` so prettier-plugin-svelte's
 verbatim-on-error fallback (the whole `<script>` block echoed when the embedded formatter throws)
 surfaces as a per-file **error** with a code frame instead of fake-stable prettier output landing
-in `unknown` — the tsv_debug sidecar's posture; see `docs/conformance_prettier.md` §Triage caveat.
+in `unknown` — the tsv_debug sidecar's posture; see `docs/conformance_prettier.md` §Tooling (its triage caveat).
 
 **Prettier-output cache.** The format comparison's dominant cost is prettier over thousands of
 mostly-unchanged files, so its oracle calls go through a content-addressed cache
@@ -620,7 +622,7 @@ deno task typecheck:js
   forms. Coverage is COMPUTED, not read out of the `fixtures[]` arrays (those are explicit
   assertions, gated by `test:deno`, and drift from what the detectors actually see). Exits 1 on a
   genuine gap; listing drift is bookkeeping.
-- **`test:deno`** — the divergence detectors' suite, gated by `deno task check`: pattern
+- **`test:deno`** — the node-modules-free suite, gated by `deno task check`; for the divergence detectors: pattern
   positive/negative overmatch-rejection cases, safety differential cases, and a behavioral
   fixture-coverage audit driving each detector against its own committed fixtures
   (input == ours, output_prettier == prettier), failing if a pattern stops claiming a hunk in a
@@ -766,7 +768,7 @@ exists.
   baseline save/compare are no-ops.
 
 The timed parse-throughput over this adversarial corpus has no consumer, so no task produces it;
-to investigate, run `BENCH_CORPUS=conformance node benches/js/bench.ts` (coverage flag unset) — it
+to investigate, run `BENCH_CORPUS=conformance node --expose-gc benches/js/bench.ts` (coverage flag unset) — it
 overwrites `report.conformance.node.*`, so re-run `bench:conformance:run` after.
 
 ### Harvests
@@ -1139,7 +1141,7 @@ free.
 `build:wasm:all:nodejs`) ride `scripts/run_if_stale.ts`, which skips wasm-pack when
 the bundle's `.wasm` is already newer than every source feeding it
 (`lib/tsv_artifacts.ts`'s `CORE_CRATES` + `WASM_CRATES` — `tsv_wasm` plus the
-`tsv_ignore`/`tsv_discover` crates the bundle links but the FFI / N-API don't;
+`tsv_ignore`/`tsv_discover` crates behind its `IgnoreStack` export;
 imported, so the two sides can't drift; dev-tooling crates deliberately excluded so
 `tsv_debug` edits don't force wasm rebuilds — plus the workspace `Cargo.toml` +
 `Cargo.lock` and `deno.json`, so
@@ -1171,7 +1173,7 @@ tasks it skips the rebuild and is freshness-guarded (rebuild with `deno task bui
 ## Corpus
 
 One tagged entry list (`lib/corpus.ts` `corpus_entries()`, paths relative to the project root).
-Every entry is `{path|files_from, tier, extensions?, skip?, optional?}` with a tier of `real`,
+Every entry is `{path|files_from, tier, extensions?, skip?, conformance?, optional?, hint?}` with a tier of `real`,
 `framework`, `third_party`, `live`, `prettier_fixture`, or `suite`, and each consumer selects a
 **view**. The snapshot tiers' entries are DERIVED: `COLLECTION_TIERS` places each `../corpora`
 collection in a tier by name, and its entries are one per `subpath` the snapshot's own
@@ -1389,7 +1391,7 @@ benches/js/
 │                          # exact name is what oxfmt/rsvelte-fmt discover by walking up, so a
 │                          # real one here would reach into every oxfmt-backed row
 ├── package-lock.json      # npm lock (committed for reproducibility)
-├── deno.json              # nodeModulesDir: manual + lock: false (npm from package.json)
+├── deno.json              # nodeModulesDir: manual + lock: false + exclude (npm from package.json)
 ├── install_deps.ts        # `bench:install`: npm install + force-fetch the oxc wasi binding
 ├── harvest_test262.ts     # `bench:harvest:test262`: graded positives → .cache (Deno-only)
 ├── harvest_ts_repo.ts     # `bench:harvest:ts-repo`: the tsc corpus's valid + rejects lists →

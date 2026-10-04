@@ -80,9 +80,9 @@ Foundation for all parsing.
 - Line continuation (`\` at EOL)
 - Null character (`\0`)
 
-A **raw `LineTerminator` inside a string literal** is rejected (`Unterminated string
-literal`), as ECMA-262 §12.9.4.1 requires — `DoubleStringCharacter :: SourceCharacter but
-not one of " or \ or LineTerminator` — and as acorn and Svelte do; only a
+A **raw `LineTerminator` inside a string literal** other than `<LS>` / `<PS>` is rejected (`Unterminated string
+literal`), as ECMA-262 §sec-literals-string-literals requires — `DoubleStringCharacter :: SourceCharacter but
+not one of " or \ or LineTerminator`, beside which `<LS>` and `<PS>` are alternatives of their own — and as acorn and Svelte do; only a
 `LineContinuation` (a `\` immediately before the terminator) may span lines.
 
 ### Template Literals
@@ -165,7 +165,7 @@ written in the flags position) is not a flags production at all and is rejected,
 - Setter definitions (`{set x(v) {}}`)
 - Async methods (`{async method() {}}`)
 - Generator methods (`{*gen() {}}`)
-- `__proto__` property (Annex B)
+- `__proto__` property
 
 ### Member Expressions
 
@@ -578,13 +578,13 @@ Note: An ambient (`declare class`) member parses decorators exactly like a concr
   (`UnionLeadingGap::Parent`): the type predicate's `is` and a conditional's check type. A
   block the author *separated* from the member by a newline binds to the union and leaves the
   hug intact; the seam then hangs it on its own line — in tsv whether or not a leading pipe
-  was authored (prettier reads an own-line block AFTER an authored pipe as the member's, the
-  one open divergence in this family). Two glued shapes keep the hug in both formatters: a
+  was authored (prettier reads an own-line block AFTER an authored pipe as the member's — a
+  cataloged divergence, like the flush layout prettier gives a separated block at `:` / `=>`). Two glued shapes keep the hug in both formatters: a
   MULTI-LINE block ahead of the union's span (`: /* c⏎d */ { … } | null` — the union's, so it
   stays glued at the seam and, in a union that does not hug, ahead of the first pipe; after an
   authored pipe it is the member's like any other), and the sole member of a single-member
   union, which is its member (`union_hug_gap_block_comment` and its `_container` / `_cast` /
-  `_keyword` / `_leading_pipe` / `_multiline` siblings, `union_hug_gap_broke_after_block_comment`)
+  `_keyword` / `_leading_pipe` / `_multiline` siblings, `union_hug_gap_broke_after_block_comment_prettier_divergence`)
 
 ### Function Types
 
@@ -842,7 +842,7 @@ diagnostics layer. See [CLAUDE.md §Strictness](../CLAUDE.md#strictness-module-s
 Strictness and the *goal* (`Module` vs `Script`) are orthogonal, coupled only by
 Module ⟹ strict. tsv defaults to `Module` (Svelte hard-wires it); a `Script` goal is
 available (`parse_with_goal`, `--source-type script`), where `await` is an ordinary
-identifier and top-level `import`/`export` and `import.meta` are errors (a namespace body
+identifier and top-level `import`/`export`, `import.meta` and a top-level `for await` are errors (a namespace body
 keeps its `import`/`export`). See
 [conformance_test262.md](./conformance_test262.md#design-decision-module-strict-script-by-directive-annex-b-out).
 
@@ -894,7 +894,7 @@ Early errors that still parse (not yet enforced):
   module's binding), which is why the production accepts any `ModuleExportName` and the
   bar is an early error rather than a grammar rule
 - `delete` of a plain name (`delete x`)
-- An untagged template's `NotEscapeSequence` (`` `\08` ``, `` `\7` ``) — a rule of its own,
+- An untagged template's decimal-digit `NotEscapeSequence` (`` `\08` ``, `` `\7` ``; `` `\xg` `` / `` `\u` `` reject) — a rule of its own,
   mode-independent (the string-literal forms above are the strictness-keyed ones), and
   rejected by acorn at both goals
 - Invalid regular expressions — an unknown or repeated flag (`/a/qqq`, `/a/gg`), or a body the
@@ -930,7 +930,7 @@ Parse output matches acorn-typescript (the parser Svelte uses for `<script lang=
 
 **`<const T>` outside a class**: acorn-typescript takes `const` on a **class** type parameter (in any order beside `in`/`out`) but rejects the token on an interface or type alias, where tsc's parser accepts and defers to its TS1277 checker error. tsv accepts everywhere. See `typescript/typescript_specific/generics/const_type_param_interface_svelte_divergence/`.
 
-**Parameter decorators**: Parsed as syntax (legacy-TypeScript, predating the TC39 decorators proposal) and attached to the parameter's `decorators` — see `tests/fixtures/typescript/typescript_specific/decorators/parameter/`. tsv accepts decorators in every member position (class, method, field, accessor, auto-accessor) and on parameters in the positions acorn parses them (function/method/constructor/object-method/ambient params), while **rejecting** parameter decorators where acorn + tsc + prettier all reject — arrow parameters and type-member signatures (see the boundary note under §Decorators).
+**Parameter decorators**: Parsed as syntax (legacy-TypeScript, predating the TC39 decorators proposal) and attached to the parameter's `decorators` — see `tests/fixtures/typescript/typescript_specific/decorators/parameter/`. tsv accepts decorators in every member position (class, method, field, accessor, auto-accessor) and on parameters in the positions acorn parses them (function/method/constructor/object-method/ambient params), while **rejecting** parameter decorators where acorn + tsc + prettier all reject — arrow parameters and type-member signatures (see the boundary note under **Decorators** in [TypeScript Class Features](#typescript-class-features)).
 
 ---
 

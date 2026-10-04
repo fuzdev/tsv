@@ -59,7 +59,7 @@ Version bumps, publishing, and **`CHANGELOG.md`** are user-owned. Agents make th
 cargo check --workspace                # fast check (no codegen)
 deno task fixtures:validate <pattern>  # targeted fixture validation (preferred for fixture work)
 deno task dev                          # watch: check + test on change (requires `cargo install cargo-watch`)
-cargo test --workspace                 # ALL tests (~5-10s, includes all fixtures)
+cargo test --workspace                 # ALL tests (includes all fixtures)
 deno task check                        # full committed-tree gate: fmt, audits, typecheck, tests, clippy (benches/js/CLAUDE.md §Gate map)
 cargo run -p tsv_debug compare tests/fixtures/path/input.svelte  # diff with prettier
 cargo run -p tsv_debug ast_diff tests/fixtures/path/input.svelte # verify AST equivalence
@@ -75,7 +75,7 @@ cargo run -p tsv_debug ast_diff tests/fixtures/path/input.svelte # verify AST eq
 deno task build            # workspace dev build
 deno task build:release    # optimized build minus the binding crates (each builds alone so tsv_cli/tsv_debug features don't unify into them)
 deno task build:all        # release + ffi + build:packages + build:napi:packages (everything)
-deno task build:packages   # the 6 WASM bundles: 3 publishable npm packages + their 3 deno bundles (benches/sidecar); single source of truth for CI + publish.ts
+deno task build:packages   # the 6 WASM bundles: 3 publishable npm packages + their 3 deno bundles (benches); single source of truth for CI + publish.ts
 deno task build:bench      # what `bench`/`smoke` measure and EVERY bench leg builds (ffi×3 + 3 wasm:deno variants + napi + wasm:all:nodejs)
 deno task install-cli      # build the release CLI and install it to ~/.local/bin/tsv (the local daily driver)
 deno task clean            # clean build artifacts
@@ -126,7 +126,7 @@ deno task typecheck:scripts # deno check over scripts/ alone — node-modules-fr
 #                          the release scripts); excludes `scripts/doctor.ts`, whose corpus probe reaches node_modules
 deno task typecheck:bench-core # the node-modules-free bench modules scripts/'s import graph misses
 #                          (`lib/{wasm,harvest_stamp,fixture_documents,error_text}.ts` + `compose_reports.ts`); the rest
-#                          of that core rides `typecheck:scripts` or `test:deno`. Scope rationale: deno.json's `//` note
+#                          of that core rides `typecheck:scripts` or `test:deno`. Scope rationale: deno.json's `//` note; in `check`
 deno task test           # cargo test
 deno task test:deno      # deno tests over the node-modules-free bench core (divergence detectors, format-config probe,
 #                          span-only wire probe, gate_counts, perf-omit summary, Prettier-suite filter, loc tolerance
@@ -278,7 +278,7 @@ deno task build:napi                 # N-API addon (napi profile) → target/nap
 deno task build:napi:packages        # + staged npm packages (loader + host platform pkg) → crates/tsv_napi/pkg/
 deno task build:wasm:deno            # deno WASM (requires wasm-pack), format-only → pkg/format/deno/
 deno task build:wasm:parse:deno      # deno WASM, parse-only → pkg/parse/deno/
-deno task build:wasm:all:deno        # deno WASM, full (benches/sidecar) → pkg/all/deno/
+deno task build:wasm:all:deno        # deno WASM, full (benches) → pkg/all/deno/
 deno task build:npm:format           # publishable npm package → pkg/format/npm/ (also :parse; :all adds the tsv bin)
 
 # Or directly
@@ -307,7 +307,7 @@ Package shape: wasm-pack `web` target, then `scripts/patch_npm_package.ts` adds 
 
 `scripts/publish.ts` orchestrates the release: preflight → bump → check → conformance:all → audit:corpus (Step 3c) → build npm packages + deno bundles → verify → artifact validation (size bounds + Deno smoke + Node tests + `test:bun` over the three wasm packages + `typecheck:packages` over all four npm packages, the napi loader staged) → idempotent npm publish → git commit + tag + push, printing a wasm size summary. It stamps CHANGELOG.md's `## Unreleased` into the released version (which the tag's GitHub Release reads back); that section must be non-empty with a `<!-- bump: <level> -->` marker matching `--bump` (both required; a fresh empty `## Unreleased` is seeded on stamp; shared grammar: `scripts/changelog.ts`; agents never edit it — [Releases](#releases)). A failed wetrun resumes at **every** step, git finalize included — the retry sentinel is removed only once the push lands, so re-run `--wetrun` with no `--bump`: nothing publishes twice and the tag finishes.
 
-**Conformance gates (Step 3b)** — `deno task conformance:all` (see [Corpus Comparison](#corpus-comparison)); skipped by `--no-check`. Preflights the oracles (`../svelte`, `../acorn-typescript`, `../typescript`, `../test262` + the `benches/js` `node_modules` sidecar): a **`--wetrun` FAILS** when any is missing (releasing without gates requires the explicit `--no-check`); a dry-run warn-skips, re-warned in the final summary. `deno task doctor` checks the same ahead of time. Only the CSS-WPT harvest stays manual. A `corpus:compare:format` SAFETY hit is self-verified in-run (the native format re-runs and must reproduce byte-identically), so treat it as real; FFI nondeterminism surfaces as a loud `native format nondeterminism` per-file error instead (./benches/js/CLAUDE.md §Known Issues). A caught **panic** hard-fails either corpus tool on every run — a shipped artifact would abort the host, so it must never grade as one more per-file error.
+**Conformance gates (Step 3b)** — `deno task conformance:all` (see [Corpus Comparison](#corpus-comparison)); skipped by `--no-check`. Preflights the oracles (`../svelte`, `../acorn-typescript`, `../typescript`, `../test262`, `../prettier`, `../prettier-plugin-svelte`, the `../corpora` snapshot + the `benches/js` `node_modules` sidecar): a **`--wetrun` FAILS** when any is missing (releasing without gates requires the explicit `--no-check`); a dry-run warn-skips, re-warned in the final summary. `deno task doctor` checks the same ahead of time. Only the CSS-WPT harvest stays manual. A `corpus:compare:format` SAFETY hit is self-verified in-run (the native format re-runs and must reproduce byte-identically), so treat it as real; FFI nondeterminism surfaces as a loud `native format nondeterminism` per-file error instead (./benches/js/CLAUDE.md §Known Issues). A caught **panic** hard-fails either corpus tool on every run — a shipped artifact would abort the host, so it must never grade as one more per-file error.
 
 **Bun (Step 6)** — `deno task test:bun format parse all` (the only leg grading the engines' deletes of Bun's own `Error` `line`/`column`) over the three wasm packages. Bun is preflighted in Step 1 like Step 3b's oracles: a **`--wetrun` FAILS** without bun, before the bump (`--no-check` waives); with bun the leg runs `--require-bun`; without, a dry-run (or waived wetrun) warn-skips, re-warned in the summary. `deno task doctor` reports bun. The napi engine under Bun is graded only locally (`test:napi:npm[:run]` on a machine with bun), never by a publish.
 
@@ -326,11 +326,11 @@ deno task validate:artifacts             # tight wasm size bounds + Deno smoke o
 
 `scripts/validate_artifacts.ts` holds deliberately tight (~±8%) size bounds — a legitimate binary size change fails the publish until the constants are updated, keeping size moves visible and intentional.
 
-**TS type maintenance**: `crates/tsv_wasm/types/tsv_ast.d.ts` is hand-maintained — any change to the wire JSON a writer emits (`crates/tsv_*/src/ast/convert/write*`) must update it. `deno task check:ast-types` (in `check`) catches drift three ways: the curated `tsv parse --locations` samples still type (the live writer; the only typing of the `loc` fields, since committed files are span-only); every `type` discriminant the fixture corpus produces is declared or explicitly opaque; and a computed minimal cover of every gradable field slot (`ParentType.key -> ChildType`) in the committed `expected*.json` types against the `.d.ts` — grading it against the **canonical** wire, which composed with `fixtures_tests` (`tsv == expected.json`) covers every position tsv's span-only wire emits. Per-field checklist, the Svelte-built-node rule (a node Svelte constructs is not the acorn node of the same `type` — the tell is a missing `loc` in Svelte's own wire), and the comment-attachment rule: ./crates/tsv_wasm/CLAUDE.md §TS type maintenance.
+**TS type maintenance**: `crates/tsv_wasm/types/tsv_ast.d.ts` is hand-maintained — any change to the wire JSON a writer emits (`crates/tsv_*/src/ast/convert/write*`) must update it. `deno task check:ast-types` (in `check`) catches drift three ways: the curated `tsv parse --locations` samples still type (the live writer; the only typing of the `loc` fields, since committed files are span-only); every `type` discriminant the fixture corpus produces is declared or explicitly opaque; and a computed minimal cover of every gradable field slot (`ParentType.key -> ChildType`) in the committed `expected*.json` types against the `.d.ts` — grading it against the **canonical** wire, which composed with `fixtures_tests` (`tsv == expected.json`) covers every position tsv's span-only wire emits. Per-field checklist, the Svelte-built-node rule (a node Svelte constructs is not the acorn node of the same `type` — the tell is a missing `loc` in Svelte's own wire), and the comment-attachment rule: ./crates/tsv_wasm/CLAUDE.md §TS Type Maintenance.
 
 ### Corpus Comparison
 
-Compare formatting against Prettier, and parse output against the canonical parsers, on real code: the `../corpora` snapshot (`fuzdev/corpora` — the author's repos, kit/svelte/svelte.dev source and six third-party Svelte libraries, one collection per upstream, tiered by `benches/js/lib/corpus.ts` from the snapshot's manifest; the whole `collections/` tree is pinned by git tree id in `GATE_CHECKOUT_IDS`, so a tooling commit in the snapshot repo moves nothing). Full runs enforce **pinned expected counts** over the `gates` view: exact format `unknown`/`partial` and parse `compared`/tsv-failure counts, a `match` minimum, SAFETY over every file. A snapshot refresh is a deliberate re-pin (`benches/js/lib/gate_counts.ts`, ./docs/gate_counts.md).
+Compare formatting against Prettier, and parse output against the canonical parsers, on real code: the `../corpora` snapshot (`fuzdev/corpora` — the author's repos, the sveltejs repos (kit, svelte, svelte.dev, language-tools) and third-party Svelte libraries, one collection per upstream, tiered by `benches/js/lib/corpus.ts` from the snapshot's manifest; the whole `collections/` tree is pinned by git tree id in `GATE_CHECKOUT_IDS`, so a tooling commit in the snapshot repo moves nothing). Full runs enforce **pinned expected counts** over the `gates` view: exact format `unknown`/`partial` and parse `compared`/tsv-failure counts, a `match` minimum, SAFETY over every file. A snapshot refresh is a deliberate re-pin (`benches/js/lib/gate_counts.ts`, ./docs/gate_counts.md).
 
 ```bash
 deno task corpus:compare:format ../some-project  # one project, or --all for the gates corpus (../corpora + prettier suites)
@@ -507,7 +507,7 @@ tsv/
 │   ├── tsv_ffi/     # C FFI bindings (Deno's native path)
 │   ├── tsv_wasm/    # WASM bindings (the 3 published npm packages; bundles types/tsv_ast.d.ts + npm/locations.js; npm/cli.js is the tsv bin)
 │   └── tsv_napi/    # N-API bindings (Node/Bun native path; npm/ is the @fuzdev/tsv loader source)
-├── scripts/         # Publish orchestrator + changelog grammar, GitHub Release notes/assets, npm package patcher, Node artifact + N-API tests, AST type drift check
+├── scripts/         # Publish orchestrator + changelog grammar, GitHub Release notes/assets, npm package patcher, Node artifact + N-API tests, AST type drift check, the script-run gates (pins, discovery, `loc`, engine parity) + doctor
 ├── benches/js/      # Cross-runtime benchmark + conformance harness (Deno/Node/Bun)
 ├── tests/           # Integration tests (parser, formatter, CLI)
 │   ├── fixtures/    # Test fixtures organized by language/feature
@@ -571,7 +571,7 @@ TDD workflow: [Development Philosophy](#development-philosophy-test-driven-devel
 **Input File Types:**
 
 - `input.svelte` (preferred) — tests code embedded in Svelte context. ⚠️ For CSS it's the only path with an external canonical source (./docs/fixture_overview.md#why-svelte-is-the-default-canonical-source)
-- `input.ts` (rare) — only for byte-0 file-level features (hashbang, BOM) or constructs that format differently between contexts (JSDoc cast paren stripping). TS-only _syntax_ (`import =`, `export =`, types, decorators, `declare`) still uses `.svelte` with `lang="ts"`
+- `input.ts` (rare) — only for byte-0 file-level features (hashbang, BOM) or constructs prettier formats differently between contexts (arrow type parameters: `<T>` in `.ts`, `<T,>` in Svelte). TS-only _syntax_ (`import =`, `export =`, types, decorators, `declare`) still uses `.svelte` with `lang="ts"`
 - `input.css` (rare) — only for file-level CSS features (e.g., BOM at byte 0)
 - `input.svelte.ts` (runes) — Svelte rune modules (`$state`, `$derived`, etc.)
 
@@ -757,7 +757,7 @@ Cross-language coupling exists only where languages integrate — `tsv_svelte` d
 
 The **untagged template**'s `NotEscapeSequence` rule is mode-independent and not one of these; tsv defers it.
 
-**Annex B is out.** The web-compatibility grammar (HTML-like comments, labelled function declarations, `if (a) function f(){}` hoisting, `for (var x = 1 in o)`) is "normative but optional if the ECMAScript host is not a web browser" (ecma262 sec-web-compat); tsv, a formatter and parser rather than a browser host, takes that carve-out at both goals. One deferral: `if (a) function f(){}` parses because single-statement body positions don't enforce "a declaration is not a `Statement`" at all (`if (a) const x = 1;` parses too; a **labelled** item is the one position that enforces it) — the deferred-early-error stance below, not an Annex B relaxation; listed in [docs/checklist_typescript.md](docs/checklist_typescript.md) §Early errors that still parse.
+**Annex B is out.** The web-compatibility grammar (HTML-like comments, labelled function declarations, `if (a) function f(){}` hoisting, `for (var x = 1 in o)`) is "normative but optional if the ECMAScript host is not a web browser" (ecma262 sec-web-compat); tsv, a formatter and parser rather than a browser host, takes that carve-out at both goals. One deferral: `if (a) function f(){}` parses because single-statement body positions don't enforce "a declaration is not a `Statement`" at all (`if (a) const x = 1;` parses too; a **labelled** item is the one position that enforces it) — the deferred-early-error stance below, not an Annex B relaxation; listed in [docs/checklist_typescript.md](docs/checklist_typescript.md) §Strictness (its "Early errors that still parse" list).
 
 This is one instance of a broader stance: **the parser is deliberately permissive and defers static-semantic early-errors** (the above, plus the TypeScript ambient-context rules — a `declare` member body, initializer, decorator, etc.) to the diagnostics layer, so the formatter keeps formatting everything well-formed. The **correctness oracle for what's actually an error is tsc**, not acorn-typescript (matched only for AST *shape*). The accept-vs-reject test starts with prettier — a construct prettier can't parse, tsv rejects — but among those prettier formats, tsv defers only the **mode/context-dependent** early-errors and still rejects the **unconditional-local** ones (e.g. `get`/`set constructor`). See [crates/tsv_ts/CLAUDE.md §Architecture Position ("Sources of truth")](crates/tsv_ts/CLAUDE.md#architecture-position) and [docs/conformance_svelte.md §TypeScript Corrections](docs/conformance_svelte.md#typescript-corrections).
 
@@ -818,9 +818,9 @@ Comments live **separately from AST nodes**, in a flat `Comment` array at the ro
 
 ### Rust Crates (minimal deps)
 
-The shipped language/foundation crates' external deps (`tsv_cli` adds only `argh`; dev tooling adds `tokio`, `futures-util`, and `serde` with `derive`; `tsv_wasm` adds `wasm-bindgen`/`js-sys`):
+The shipped language/foundation crates' external deps (`tsv_cli` adds only `argh`; dev tooling adds `tokio`, `futures-util`, `serde` with `derive`, `similar` and `tempfile`; `tsv_wasm` adds `wasm-bindgen`/`js-sys`):
 
-- `serde_json` — wire-JSON emission (exact `f64` formatting; the oracle the hand string escaper is tested against), reached only through `tsv_lang`'s `json` feature; no shipped crate deserializes. The one reader, `tsv_debug::json` (fixture gate, audits, tests), enables `unbounded_depth` — the default 128-level recursion limit refused wires the parser emits fine. `serde` itself is a dev-tooling dep (`tsv_debug`'s `derive`); the language crates see it only transitively
+- `serde_json` — wire-JSON emission (exact `f64` formatting; the oracle the hand string escaper is tested against), reached through `tsv_lang`'s `json` feature (and directly by `tsv_ffi`, which serializes its `{"error": …}` payload with it); no shipped crate deserializes. The one reader, `tsv_debug::json` (fixture gate, audits, tests), enables `unbounded_depth` — the default 128-level recursion limit refused wires the parser emits fine. `serde` itself is a dev-tooling dep (`tsv_debug`'s `derive`); the language crates see it only transitively
 - `smallvec` — stack-allocated vectors (printers + `tsv_check`)
 - `thiserror` — error type derivation
 - `phf` — compile-time perfect hash maps (`tsv_html`'s entity table)

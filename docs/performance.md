@@ -791,8 +791,7 @@ census says which node kinds the fixture tree never exercises.
 The question a board cannot answer: **how often does this loop run, how long are
 its runs, and how often does this predicate return true?** A board row says where
 the samples land; only a counter says what the code did to earn them. This is the
-harness for that, and it exists because five separate sessions hand-rolled the
-same thing before it was promoted.
+harness for that.
 
 `tsv_lang::census` is `add(index, n)` / `hit(index)` / `hit_if(index, cond)` over
 64 static `AtomicU64` counters, plus `report()`, which `tsv_debug profile` and
@@ -873,8 +872,8 @@ callers have since moved to the `start`/`end` pair emitter,
 `JsonWriter::start_end`; the lesson is the cell, not the symbol.)
 
 So: when a board reads dry, ask which cell you took before concluding the
-surface is mined out. Taking another is one `board.sh` invocation with
-`BOARD_CMD` set.
+surface is mined out. Taking another is one more board over a different entry
+point or corpus.
 
 **And a cell has halves a scope rule can separate.** With parser-only levers
 out of scope, the CSS format cell (`profile` × `cssbig`) was the one format
@@ -1023,7 +1022,7 @@ doc — a caller can ask whether `format_string_literal` would change the quote 
 when it would not, emit the verbatim source literal with no allocation.
 `tsv_ts` does that (through the document-and-span form,
 `optimal_string_quote_in`, which answers the width question from the same pass);
-`tsv_css` never did, and seven of its sites allocate a `String` per string literal.
+`tsv_css` never did, and its sites allocate a `String` per string literal.
 That is this section's shape exactly, and it is not a lever: `format_string_literal`
 runs **4,299 times a pass** on a 638-file CSS corpus and only **294 (6.8%)** preserve
 the quote, because CSS sources are overwhelmingly double-quoted and tsv normalizes to
@@ -1207,9 +1206,9 @@ a result here:
 **A lever that makes a hot leaf smaller or simpler gets inlined at more call
 sites, and pays for itself in bytes at every one of them.** The instruction
 counter cannot see that, and neither can any gate in `deno task check` — the size
-bounds live in `scripts/validate_artifacts.ts` (the WASM bundles, at `deno task
-publish` Step 6) and `deno task validate:napi` (the native artifacts, in the
-tag-triggered release workflow), not in `check`.
+bounds live in `scripts/validate_artifacts.ts` (the WASM bundles) and `scripts/validate_napi_artifact.ts` (`deno task validate:napi`,
+the native artifacts) — graded in CI's `artifacts` job on every PR and again at release
+(`deno task publish` Step 6, the tag-triggered N-API workflow), not in `check`.
 
 The worked case: rewriting the wire writer's integer emitter to end in a
 fixed-width copy instead of a runtime-length one removed a libc `memmove` call
@@ -1269,7 +1268,7 @@ counter that matches what it *moves*:
 ⚠️ **The third row is a diagnosis, not a verdict.** A branch-miss reduction is no more a
 cycles claim than an instruction reduction is: a scan rewrite that removed **2.4% of the
 whole program's branch misses** — essentially the entire share of the function it touched —
-still lost 0.45 points of cycles (§And the converse, below). Read that counter to learn
+still lost 0.45 points of cycles (§And the converse: once a scan IS a word loop, below). Read that counter to learn
 whether the mechanism you believed in actually fired; grade on the one the change claims.
 
 The worked case is the direct sequel to the fixed-width-copy change described
@@ -1508,7 +1507,7 @@ the whole-run number.
 
 A negative control is normally one A/B pair on an entry point the change cannot
 reach, read on `instructions:u` to prove the work is identical — and, since
-`ab2.sh` prints it anyway, read on `cycles:u` to size that binary's code-layout
+the A/B reports it anyway, read on `cycles:u` to size that binary's code-layout
 draw (§[Reading `cycles:u`](#reading-cyclesu-the-offset-belongs-to-the-binary-and-it-is-code-layout)).
 
 Pointing the *entire* layout group at the control entry point costs one more
@@ -1526,7 +1525,7 @@ alike — looked comfortably fast.
 
 ### A cache keyed on an address makes `instructions:u` re-draw on every exec
 
-Retired user instructions are the arc's primary verdict because they are supposed
+Retired user instructions are the primary verdict because they are supposed
 to be a property of the *code*: same binary, same input, same count. That holds
 only while nothing the program does depends on **where** it was loaded. One thing
 does — [`DocArena`'s `static_cache`](../crates/tsv_lang/src/doc/arena.rs), a
@@ -1681,8 +1680,8 @@ So the decision is not binary. Read it as three questions in order:
 - **Is the callee's hot path a few loads behind cold edges?** If not (a byte
   scan, a loop), stop — `build_line_breaks_into` was a SWAR newline scan run once
   per document, ~1.2% of cycles and ~2% of retired instructions on a real-corpus
-  board, and its cost was work rather than call overhead (L87 later retired the
-  per-document run altogether by building the table on demand). ⚠️ That answers the
+  board, and its cost was work rather than call overhead (the per-document run was
+  later retired altogether by building the table on demand). ⚠️ That answers the
   *inlining* question only, and answering it is not the same as clearing the
   symbol. A scan whose cost is work is attacked by asking for less of it — see
   [§A candidate scan can ask a wider question than its
@@ -1748,7 +1747,7 @@ intent was a −0.4% win. `#[inline(always)]` on identical source: **−0.377%**
   **up 592 B**, and `nm --print-size` between the two profiling builds showed
   *exactly three* symbols changed: `has_blank_line_between` **262 B → 0, gone**,
   with `print_css_nodes` (+838 B) and `print_css_block_children` (+176 B)
-  absorbing it. That inlining event was **half the lever** — see the next section.
+  absorbing it. That inlining event was **half the lever** — see §A conjunct's cheap half may IMPLY its expensive half.
   An unexplained `.text` *fall* on an addition is an outlining event; an
   unexplained *rise* on a deletion is an inlining one; both are worth more than
   the source change that caused them.
@@ -1920,7 +1919,7 @@ a copy trades a call for a *wider but worse* instruction sequence.
 
 ### The cheapest measure is one an earlier phase already took
 
-Two sessions made the doc-text width measure about as cheap as a measure gets: a
+Two levers made the doc-text width measure about as cheap as a measure gets: a
 word-at-a-time search for the first byte whose width is not one column (§The
 width of a plain ASCII line IS its byte count), reading the host document's
 words so a short span never falls to a scalar tail (§A slice's scan is bounded
@@ -1953,7 +1952,7 @@ pass that predicts **−1.17%** before any build; the printer half measured
 ⭐⭐⭐⭐⭐ **Getting the answer from the lexer to the printer is a lever of its
 own, and its shape decided more than the scan did.** The printer half is the
 same in every row below; only the transport differs. Walked as a ladder
-(`rig/ladder.sh`, one binary a side, `instructions:u`, per-side spread ≤0.011%
+(one binary a side, `instructions:u`, per-side spread ≤0.011%
 on `profile` and 0.000% on `json_profile`, the parse-only entry point):
 
 | transport | `profile tsbig` | `sveltebig` | `cssbig` | `json_profile tsbig` | `.text` |
@@ -2002,7 +2001,7 @@ argument. What those two *can* do is price what they cannot null, and
 `json_profile` — at a 0.000% per-side spread — is the channel on which a
 transport's rungs resolve to 0.02 of a point.
 
-⚠️ **The attribute went the opposite way from the previous session's**, on a
+⚠️ **The attribute went the opposite way from `source_span`'s**, on a
 function one call away from it, and it was re-measured on the shipped
 transport rather than inherited from the one it was first read on. Pinning
 `source_span_plain` out of line **costs 0.240 points** and saves 4,240 B, where
@@ -2011,8 +2010,8 @@ allocation is small enough that inlining it into the name seam deletes a call
 483,358 times a pass. `source_span`'s own pin is now inert — it lost 75% of its
 call sites and LLVM outlines the remainder unprompted, byte-identically — and is
 kept as a pin against the split it once prevented, not as a win. **Re-measure
-an attribute on the shape that ships; never inherit one from the sibling the
-last session tuned, or from the rung it was first read on.**
+an attribute on the shape that ships; never inherit one from a sibling
+tuned earlier, or from the rung it was first read on.**
 
 ⚠️⚠️ **A wrong bit is a silent width error in both directions**, so the seam
 asserts both. Over-claiming measures a non-ASCII name as one column a byte,
@@ -2202,7 +2201,7 @@ walk.
   true of a length gate, false of a class test, since the new arm is entered only
   by a slice that actually holds one of those three bytes. Read what a refusal's
   premise was a property OF before inheriting it.
-- ✓ **It converts on cycles, which this arc's scan levers usually do not.** Sixteen
+- ✓ **It converts on cycles, which the scan levers here usually do not.** Sixteen
   binaries (base and candidate at eight layout draws each), five pooled
   replicates: `instructions:u` **−2.638%** with a per-replicate spread of 0.001
   points, `cycles:u` **−1.882%** and `task-clock` **−1.741%**, all 5/5 — against a
@@ -2210,7 +2209,7 @@ walk.
   of −0.001 / +0.122 / +0.094. The null is positive, so correcting makes the
   result larger, not smaller. The mechanism predicts the conversion: what is
   deleted is a per-byte dependent chain (a load, a width select, an accumulate)
-  the machine cannot hide behind anything, which is the arc's own standing test
+  the machine cannot hide behind anything, which is this doc's standing test
   for which instruction wins convert. The `json_profile` confinement control reads
   +0.001% / +0.050% / +0.015% on the same sixteen binaries — flat on the channel
   the verdict is stated in, not only on instructions.
@@ -2385,7 +2384,7 @@ add / inc / mov / cmp / jne
 ```
 
 Over **524,232** bytes in 16,495 runs a TypeScript format pass, that is **0.381%** of the
-run. ⚠️ It had been carried in the perf queue as "~0.25%" — the rate the *neighbouring*
+run. ⚠️ It had been carried as a lead at "~0.25%" — the rate the *neighbouring*
 fold cost. **A carried-forward lead's own number is worth one `objdump` before it is
 believed to be under the floor.**
 
@@ -2473,7 +2472,7 @@ comment named.
   calling either "SIMD" is wrong in mechanism even where it is right in verdict.
 - ⭐ On a long haystack the searcher's setup amortizes and this is all fine. On a
   scan re-entered per hop, or over a short slice, it is the entire cost — and the
-  arc's own `swar::next_byte_of` answers the same question at 12 instructions a word
+  repo's own `swar::next_byte_of` answers the same question at 12 instructions a word
   with no call and no setup.
 
 ### Where a peel's SET boundary lands decides the cost of the path it does NOT take
@@ -2556,7 +2555,7 @@ it as the iterator the call sites want; the comment builder skips even that and
 takes offsets directly, since it never wanted a `str` per line.
 
 - **The win scales with how comment-dense the document is, and it is not small:**
-  `instructions:u` −0.25 to −0.76% across the arc's corpora, **−7.4%** on a
+  `instructions:u` −0.25 to −0.76% across the board corpora, **−7.4%** on a
   documentation-heavy file set, **−23.5%** where the comment lines are short.
 - **The line-length axis is the one to check, and it comes back clean.** A
   hand-rolled one-word loop retires more per byte than `memchr`'s two-word body,
@@ -2680,7 +2679,7 @@ same question in one L1 load and **six** instructions, at the same branch count.
 That is a factor of two on whatever share the scan holds, and it is worth finding because
 the share can be large and invisible at the symbol level: CSS's string scan is inlined into
 the declaration-boundary walk and the value parser, so no board row is named for it. The
-per-**FILE** aggregate (`agg.py`) is what sees it — `lexer/strings.rs` **1.17%** of the wire
+per-**FILE** aggregate is what sees it — `lexer/strings.rs` **1.17%** of the wire
 run's instructions plus `parser/value/strings.rs` **1.06%**, neither of which owns a symbol.
 
 - **Two spellings of one grammar cost twice, and the second one is the cheaper place to
@@ -2736,7 +2735,7 @@ even at **3–4 content bytes** (`''` **+1.11%**, 16 bytes −2.25%, 64 bytes �
 comment at **~3** (`/**/` **+0.57%**, 120 bytes −12.45%). Real source is far past both — mean
 string body 17.3 bytes, mean block comment 259 across that corpus — so census the run length
 before adding a caller, and prefer the table where the *run* is short and the call frequent.
-For a test of a **single byte** the ranking inverts again; see the section after next.
+For a test of a **single byte** the ranking inverts again; see the next section.
 
 ⚠️⚠️ **Census that run length by BYTE MASS, not by run count — the two can point opposite
 ways.** The CSS string scan is the case: on a 638-file corpus its runs are
@@ -2871,7 +2870,7 @@ both surfaces; never predict one from the other, and never from a sibling lever.
 apparent instructions-per-cycle on the surface where it converts poorly exceeds the machine's
 issue width — 9.7 on the wire path here. A well-predicted throughput loop hiding under
 another phase's stalls gives back its instructions and not its cycles, which is the standing
-explanation for why this arc's scan levers keep reading a far larger instruction win than
+explanation for why the scan levers here keep reading a far larger instruction win than
 cycles win.
 
 ### A SORTED-TABLE search whose answer is a few bytes away is a scan — and the class belongs to the document, not the ask
@@ -2909,7 +2908,7 @@ shape, and the ladder had to find both:
   CR ahead of the parse, so nearly every table IS the set of `\n` positions, and the builder
   that fills the table sees each terminator's last byte as it pushes it: it returned that
   verdict, written only on its rare non-`\n` arms (the table and its verdict travel as one
-  `LineTable` value; since L87, below, the verdict is taken by its own pass and the table is
+  `LineTable` value; since the next section's lever, the verdict is taken by its own pass and the table is
   built on demand), and the scan is one needle with two constants. **Classify the
   document once, not the ask** — a document holding a bare `\r` or a U+2028 takes the search
   exactly as before.
@@ -2941,7 +2940,7 @@ the `_capped` layer's runtime cap with a `const CAP` generic — one instantiati
 form, which looks like the obviously cleaner spelling — gave back **0.077 points** of the
 lever on the TypeScript cell. And folding the module's six hand-written word-loop copies onto
 one closure-parameterized walker cost **+0.17%** on the CSS cell, where only two of those
-copies run, and gave back the whole L86 win on the TypeScript one — the extraction lesson of
+copies run, and gave back the whole win on the TypeScript one — the extraction lesson of
 §A slice's scan is bounded by the slice, a third time. The copies stay, each with its own
 compile-time class proof; a refactor that touches a hot function's spelling is a rung here,
 never tidying.
@@ -3003,23 +3002,23 @@ empty table that happens to answer "no terminator anywhere".
 
 On every entry point that formats a file — the CLI, the three bindings, each crate's
 `format_str` — the format path folds `<CR>` ahead of the parse (`normalize_carriage_returns`),
-and after L87 the printer's line table then took its verdict (`line_terminators_are_lf_only`)
+and the printer's line table then took its verdict (`line_terminators_are_lf_only`)
 over the same bytes: two whole-source passes, the first std's `memchr` for `\r` (18
 instructions per sixteen bytes, inlined into the CLI's format function) and the second the
 loose-needle loop (16 per sixteen). The loose needle is `\r`-or-non-ASCII already — the
 fold's own needle is inside it — so one pass states both: `classify_line_terminators` walks
-the loop L87 wrote and records, on the cold re-ask of a fired word, where the first `\r` is
+the verdict pass's loop and records, on the cold re-ask of a fired word, where the first `\r` is
 and whether a U+2028 / U+2029 is anywhere. The fold returns a `FoldedSource` — the folded
 text with the verdict over it — and each crate's `format_folded_in` builds its
 `LineBreaks::of_folded` on that instead of classifying again; `format_in` (the `profile`
 path, which never folds) classifies as before. The verdict is stated over the FOLDED text,
 which is exactly "no U+2028 / U+2029 anywhere" once every `\r` is a `\n`, and the fold moves
 neither. `instructions:u` **−0.603% / −0.582% / −0.686%** on the shipped CLI (tsbig / sveltebig /
-cssbig), **−0.000%** on both `profile` and `json` (neither folds — the controls are neutral
+cssbig), **−0.000%** on both `profile` and `json_profile` (neither folds — the controls are neutral
 by construction); cycles **−0.554% pooled over a twelve-binary layout group on the CLI entry point, 3/3 replicate signs (−0.585 / −0.879 / −0.194), against a null group at −0.173% (3/3: −0.190 / −0.322 / −0.008)**; instructions −0.600% 3/3; `.text` **+1,648 B**. Three things decided the shape:
 
-- ⭐⭐⭐ **The population census said the handoff question was moot.** `bytes_census.py
-  --class=cr` over the three board corpora: **zero** `\r` bytes in 3,999 files, and 8 of
+- ⭐⭐⭐ **The population census said the handoff question was moot.** A `\r` byte census
+  over the three board corpora: **zero** `\r` bytes in 3,999 files, and 8 of
   51,955 files in the byte-identity corpus (every one a deliberate line-terminator fixture).
   So the fold is a `memchr` that never fires, its handoff population is empty, and the lever
   is exactly "drop one pass": 8.5 instructions a word saved (17 → 8.5) over 1.52 M words =
@@ -3027,12 +3026,12 @@ by construction); cycles **−0.554% pooled over a twelve-binary layout group on
 - ⭐⭐⭐ **Inlined into the CLI's format function the loop cost 0.07 points.** The first rung
   let LLVM inline the pass into `format_source_in` (a 456-byte frame): 19
   instructions per sixteen bytes, three more than the standalone loop, from the caller's
-  register pressure. `#[inline(never)]` — the shape L87 chose for the verdict pass — reads
+  register pressure. `#[inline(never)]` — the shape the verdict pass already has — reads
   17 per sixteen and −0.603% against −0.534% (cssbig −0.686 against −0.617), and `.text` gives
   320 B back. An attribute is a rung; read it in `objdump` before the A/B and the A/B still.
 - ⭐⭐ **A `.text` move is priced symbol by symbol from two `profiling` builds.** +1,648 B
   did not close on paper (the pass is ~500 B); `nm -S` over the profiling profile's binaries
-  (`rig/symdiff.py`) closed it to 63 B: the outlined pass 513 + its cold word re-ask 260, the
+  closed it to 63 B: the outlined pass 513 + its cold word re-ask 260, the
   CLI's format function +726 taking the three `LineBreaks::of_folded` constructions inline,
   and the Svelte / TS bodies renamed into their shared functions (`format_root`,
   `format_program_in`) at ±14 / ±72. The release binary is stripped and cannot say this.
@@ -3091,8 +3090,8 @@ the machine was hiding; `.text` **−192 B** (2,887,061). Three things decided t
   count could say it — a `concat` inlined at 700 sites has no symbol of its own on any board.
 - ⭐⭐⭐ **An attribute rung won BOTH channels.** With the three-or-more tail inlined at every
   `concat_iter` instantiation the same tree read −1.374% and `.text` +7,888 B; `#[inline(never)]`
-  over a `dyn` iterator read −1.543% and −192 B. The rare arm sat in every caller's frame — L88's
-  lesson (a pass inlined into the CLI's format function) from the other side.
+  over a `dyn` iterator read −1.543% and −192 B. The rare arm sat in every caller's frame — the previous
+  section's lesson (a pass inlined into the CLI's format function) from the other side.
 - ⭐⭐ **A deletion rung named the surprise.** The push-built rung beat its paper price by half
   a point; dropping only the terminator gate gave 0.267 of it back: each of ~100 K bare `;` a
   pass had paid the outlined `push_gap_comments` — a `peekable` over the emit iterator, the
@@ -3127,8 +3126,8 @@ binding bools folded into `GapBinding`), and the returning wrappers keep a local
 caller emits later than it asks (the switch consequent builds the run ahead of the statement it
 follows). The dead parameter is gone; `build_member_with_semicolon_doc` pairs when nothing
 deferred; `append_signature_head_gap_comments` takes an `Option<DocId>` separator and the plain
-arrow signature — no `async`, no type parameters — IS its tail. A chain call's head is an
-`Option<DocId>` finished by `with_chain_head`, so each layout's own assembly is a literal
+arrow signature — no `async`, no type parameters — IS its tail. A chain call's head is a
+`ChainHead` of two optional parts, finished by `with_chain_head`, so each layout's own assembly is a literal
 `concat(&[…])` and the common tree is node-for-node the old one. A keyword's words are the
 kind's static slice; a buffer is assembled only under `declare`.
 
@@ -3188,7 +3187,7 @@ These aren't set up yet but may be useful for specific investigations:
 - **Criterion microbenchmarks** — statistical rigor for isolated hot functions
 - **Custom counters** — `fits()` call counts (when investigating algorithmic
   issues; doc-node counts are already covered by `arena_stats`, §7, and AST-node
-  populations by `ast_census`, §10 — reach for those before wiring a throwaway
+  populations by `ast_census`, §10, and ad-hoc counts by `tsv_lang::census`, §11 — reach for those before wiring a throwaway
   counter table into the parser)
 
 ## Baselines and tracking

@@ -48,20 +48,10 @@ above are the deferred early-error frontier — **reported, not gated** — so a
 
 **Feature filtering.** Tests whose `features:` frontmatter names a syntactic
 proposal tsv does not implement are skipped, not graded — scoring them as parse
-failures would measure scope, not a conformance gap. The set
-(`UNIMPLEMENTED_FEATURES` in `crates/tsv_debug/src/test262/frontmatter.rs`) is
-**currently empty**: tsv parses the import-phase proposals
-(`source-phase-imports` / `import.source(…)` and `import-defer` /
-`import.defer(…)`, ~396 graded files) rather than skipping them — a deliberate
-divergence from acorn, which rejects them (see
-[conformance_svelte.md](./conformance_svelte.md#import-phase-proposals)).
-See [Scope](#what-we-skip).
+failures would measure scope, not a conformance gap. See [What We Skip](#what-we-skip).
 
-**Positive parse conformance is 100%** across every run each test declares — a
-`module`-flagged test as a `Module`, a `noStrict` or `raw` test as a sloppy `Script`,
-an `onlyStrict` test as a `Script` behind the harness's `"use strict"` prefix, and a
-mode-unflagged test **both** ways, which it must pass in each (see [Strictness and the
-goal axis](#design-decision-module-strict-script-by-directive-annex-b-out)). _(Methodology for any future failure: parse each
+**Positive parse conformance is 100%** across every run each test declares (the run table in
+[Strictness and the goal axis](#design-decision-module-strict-script-by-directive-annex-b-out)). _(Methodology for any future failure: parse each
 `../test262/<path>` with `canonical_parse` and bucket on whether it yields an AST.)_
 
 **tsv's positive conformance exceeds the drop-in oracle** in several places —
@@ -178,7 +168,7 @@ spec's "an `ObjectLiteral`/`ArrayLiteral` for-in/of LHS must cover an
 targets like `for (a + b of y)` and `for ((a, b) of y)`. A still-open adjacent
 gap is the object rest _target_ shape — `({...[a]} = c)` / `const {...[a]} = c`
 (the spec forbids an `ArrayLiteral`/`ObjectLiteral` target on an object rest,
-and a `BindingRestProperty` must be a plain identifier) — is a separate
+and a `BindingRestProperty` must be a plain identifier) — a separate
 constraint left over-accepted.
 
 tsv also enforces the **`[no LineTerminator here]` restricted productions**: a
@@ -236,14 +226,9 @@ entity name (`A.B.C`): a string/number/empty reference (`import x = 'foo'`,
 
 - `negative.phase: runtime` - Requires execution
 - `negative.phase: resolution` - Requires module resolution
-- **Annex B** — a `flags: [noStrict]` test under `test/annexB/` (790 files). Annex B
-  is the web-browser-host layer, and the spec makes it optional for everyone else:
-  "The content of this annex is normative but optional if the ECMAScript host is not a
-  web browser" (ecma262, Annex B preamble). **tsv is not a web browser host** — it
-  parses the core grammar, in both its strict and its sloppy readings, and implements
-  none of the Annex B extensions (HTML-like comments, `for (var x = 1 in o)`, the
-  legacy `f() = g()` assignment target, block-level function hoisting). Those tests
-  measure a declared non-goal, so they are skipped rather than counted as failures.
+- **Annex B** — a `flags: [noStrict]` test under `test/annexB/` (790 files): the
+  web-browser-host layer, a declared non-goal for tsv, which is not a web browser host
+  ([Annex B is the one declared exclusion](#design-decision-module-strict-script-by-directive-annex-b-out)).
   The skip is keyed on `noStrict` **and** the subtree, never the subtree alone: the
   other ~296 files under `test/annexB/` are mostly `built-ins/` runtime library tests
   (`String.prototype.substr`, `escape`, the RegExp extensions) plus `language/` tests of
@@ -259,8 +244,10 @@ entity name (`A.B.C`): a string/number/empty reference (`import x = 'foo'`,
   unimplemented scope. The skip set lives in
   `crates/tsv_debug/src/test262/frontmatter.rs` (`UNIMPLEMENTED_FEATURES`) and is
   **currently empty** — tsv parses the import-phase proposals
-  (`source-phase-imports` / `source-phase-imports-module-source` / `import-defer`),
-  so their ~396 graded files count. Add a name here when tsv meets a new proposal it
+  (`source-phase-imports` / `source-phase-imports-module-source` / `import-defer`:
+  `import.source(…)`, `import.defer(…)`), so their files count — a deliberate divergence
+  from acorn, which rejects them (see
+  [conformance_svelte.md](./conformance_svelte.md#import-phase-proposals)). Add a name here when tsv meets a new proposal it
   doesn't parse; drop it once it lands.
 - `*_FIXTURE.js` files - Module dependencies, not standalone tests
 

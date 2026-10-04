@@ -81,7 +81,8 @@ so relaxing one can't silently ungate it.
 
 `HARNESS-ERROR` exists because pinnability is decided by *whose bug it is*, and only one
 harness failure is upstream's. The bucket that carries the oracle's throw also carries a
-tsv compiler self-check firing (`tsv-corrupt-output`, `tsv-type-erasure-leak` — each a
+tsv compiler self-check firing (`tsv-corrupt-output`, `tsv-type-erasure-leak`,
+`tsv-generated-name-missing` — each a
 compiler bug that fails its run everywhere else in this repo), a tsv parse over-rejection
 (`tsv-parse`), a canonicalizer failure (`canonicalize-ours`, `canonicalize-oracle`,
 `oracle-recanonicalize`, `oracle-non-idempotent`), and environment failures (`read`,

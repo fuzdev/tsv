@@ -4,8 +4,7 @@
 # `tsv format .` at the repo root would destroy them. They are regenerated with
 # `deno task fixtures:update` / `fixture_init`, never with `tsv format`.
 #
-# A directory arg can't step past this (`tsv format tests/fixtures` finds nothing);
-# only an explicitly named FILE bypasses the ignore files — see docs/cli.md
-# §Multi-File Formatting.
+# A directory arg can't step past this (`tsv format tests/fixtures` finds nothing),
+# and a file named under it is skipped too — see docs/cli.md §Multi-File Formatting.
 tests/fixtures/
 tests/fixtures_compile/

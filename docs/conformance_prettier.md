@@ -62,6 +62,7 @@ The fixture-pinned `◆prettier_bug` cases — where Prettier produces output th
 - Svelte destructuring rename-with-default key drop (`{ a: b = 1 }` → `{ b = 1 }`) — semantic change — [each](../tests/fixtures/svelte/blocks/each/destructure_rename_default_prettier_divergence/), [await](../tests/fixtures/svelte/blocks/await/destructure_rename_default_prettier_divergence/)
 - Svelte `{#each}` head ending on a parenthesized operand under `lang="ts"` (`{#each a || (b as A) as item}`) — prints the head from canonical's unwound `end`, which stops before the `)`, so the paren is lost → output fails to re-parse — [ts_head_paren_tail](../tests/fixtures/svelte/blocks/each/ts_head_paren_tail_svelte_prettier_divergence/)
 - `x?.#a` (optional chain to private field) — throws on valid input (pinned by `prettier_rejects.txt`) — [private_fields_optional_chain](../tests/fixtures/typescript/declarations/class/private_fields_optional_chain_prettier_divergence/)
+- `import source x from 'm'` — Prettier's TS printer throws (`'=' expected`; pinned by `prettier_rejects.txt`) — [source_phase](../tests/fixtures/typescript/modules/imports/source_phase_svelte_prettier_divergence/), [§Import-phase proposals](./conformance_prettier_ts.md#import-phase-proposals)
 - JSDoc cast + an enclosing paren — emits the paren *between* the comment and its `(`, so the cast re-binds to the wider expression; non-idempotent, and a **semantic** change (oxfmt and biome share the bug) — [jsdoc_type_cast_enclosing_parens](../tests/fixtures/typescript/syntax/comments/jsdoc_type_cast_enclosing_parens_prettier_divergence/)
 - Bundler annotation (`/* @__PURE__ */`) + an enclosing paren — same relocation, so the annotation ends up leading a paren instead of the call it marks and the call is no longer treated as side-effect-free; a **semantic** change, and unlike the cast prettier is *idempotent* on its own output, so nothing reveals it — [pure_annotation_enclosing_parens](../tests/fixtures/typescript/syntax/comments/pure_annotation_enclosing_parens_prettier_divergence/)
 - Multiline block comment before a postfix `++`/`--` — strips the grouping parens that held it (`(d /* m1⏎m2 */)++` → `d /* m1⏎m2 */++`), putting a line break in a `[no LineTerminator here]` gap → output fails to re-parse — [update_postfix_paren_line_comment](../tests/fixtures/typescript/expressions/unary/update_postfix_paren_line_comment_prettier_divergence/)
@@ -78,7 +79,6 @@ The fixture-pinned `◆prettier_bug` cases — where Prettier produces output th
 
 **Prose-only** (no `output_prettier.*` oracle — Prettier drops or throws, so the bug can't be pinned as a fixture):
 
-- `import source x from 'm'` — Prettier's TS printer throws (`'=' expected`) — [§Import-phase proposals](./conformance_prettier_ts.md#import-phase-proposals)
 - `{@const y = /** @type {T} */ (z)}` — Prettier emits invalid `(z}` then throws on its own output — [§JSDoc / paren semantics](./conformance_prettier_ts_comments.md#jsdoc--paren-semantics)
 
 ## Decision Framework
@@ -308,8 +308,7 @@ its tail:
   [Fn/ctor-type `=>`→return-type](./conformance_prettier_ts_comments.md#comment-relocation)
   entries.
 - **Value-arrow `=>`→body, and a curried chain's head→head gap** — the expression-level
-  spelling of the row above (`(e) => // c⏎\te.prop`), which the two `=>`s once answered
-  differently. The rule is the **gap's**, not the body's: object, block and ternary bodies
+  spelling of the entry above (`(e) => // c⏎\te.prop`). The rule is the **gap's**, not the body's: object, block and ternary bodies
   read the same, at both call-argument layouts. At the chain gap the `=>` lives in the
   *separator* between two heads, so the glued run rides the gap's tail rather than the
   following signature. ⚠️ **Line comments only** here: a multiline block the author glued
@@ -388,7 +387,7 @@ its tail:
   hoists it ahead of the node ([comments.md §The left-spine shell
   run](./comments.md#the-left-spine-shell-run-hoisted-outside-the-enclosing-group-and-one-definition-of-left-side))
   — so it lands in the same position the plain gap's run lands in and owes the same indent.
-  Reading the span start instead left every braced head answering one question two ways by
+  Reading the span start instead would leave every braced head answering one question two ways by
   authoring: flush for the shell spelling, indented for the paren-free one, with the
   unprefixed `{` additionally welding its comment to the delimiter (`{// c`). A shell whose
   pair is **retained** hoists nothing and is correctly outside the gap — its comment stays
@@ -444,7 +443,7 @@ Prettier preserves the break at some of these sites and reflows it at others, so
 deliberate divergence wherever prettier happens to preserve. The payoff is the same as the
 forced-continuation rule's: one answer regardless of which construct the comment sits in.
 
-Two comment shapes are **outside** this rule, because their break is not unforced layout —
+These comment shapes are **outside** this rule, because their break is not unforced layout —
 they hang the value, and the gate is the shared `comment_hangs_next`:
 
 - A **line** comment forces the break (`//` runs to end-of-line), so the value drops to a
@@ -540,7 +539,7 @@ The import/export header family takes the same rule, and the reason is **not** a
 comment-position question: `gap_comment_continuation_tail` must consult its gate rather than key
 the choice on line-vs-block alone, because `comment_hangs_next` — the shared keyword→value rule
 its `export default` / `export =` siblings use — says a single-line block collapses from *any*
-authored position. Routing the emitter through that gate is what makes all 19 header gaps
+authored position. Routing the emitter through that gate is what makes every header gap
 idempotent, `export * from` included (the one header gap that would otherwise preserve the break,
 for want of the same collapse). That is the family's rule: ask the gate,
 don't re-derive the answer at the call site — which is why the `await`→operand and
@@ -646,8 +645,8 @@ the authorings *and* lays the result out block-style where prettier dangles — 
 read as one entry.
 
 ⚠️ **The tags are not this section's index, and cannot cheaply become one.** They are used on the
-bullet-list catalogs and are largely absent from the prose-form ones — 65% of the Svelte
-catalog's divergence fixtures and 98% of the comment catalog's carry no `◆reason` at all, by the
+bullet-list catalogs and are largely absent from the prose-form ones — most of the Svelte
+catalog's divergence fixtures and nearly all of the comment catalog's carry no `◆reason` at all, by the
 same design the [Reasons tsv Differs](#reasons-tsv-differs) note already states for
 `◆comment_preservation`. So `grep ◆stable_quirk` finds the CSS instances and almost none of the
 Svelte ones — including the flagship
@@ -681,7 +680,7 @@ worked out.
 **A render-free licence licenses two incompatible actions, and only one may be taken.** Where the
 compiler deletes a run, *trimming* it and *breaking* it are both render-correct — and doing both
 is a period-2 cycle, not a compromise (`<svelte:body … />b` trims to the glued form, whose next
-pass re-breaks it; the fuzz gate caught exactly this). F1 forces the choice; it does not make it.
+pass re-breaks it). F1 forces the choice; it does not make it.
 The hoisted-node family is where that shows most sharply: a declaration tag and a `{#snippet}`
 spend the licence on the break and take their own line, while `{@debug}` and a `<title>` beside
 text spend it on the trim — [§Svelte: Inline content
@@ -836,9 +835,9 @@ the content-text half.
 
 The benefit: predictable output that respects the configured line length. The tradeoff: some constructs may break where Prettier would keep them inline.
 
-**"When possible" has two systematic exceptions.**
+**"When possible" has systematic exceptions.**
 
-*Whitespace-sensitive content.* Inside `<pre>` / `<textarea>` a line break *is* content, so print width yields to render semantics and an over-width line stands — those elements never reach the shared layout analysis (see [§Svelte: Inline content block-style](./conformance_prettier_svelte.md#svelte-inline-content-block-style)). Both formatters agree the *content* never re-wraps; the plain overflowing fill is pinned by [fill_tail_after_expr_pre](../tests/fixtures/svelte/elements/fill_tail_after_expr_pre_long/), whose two cases are the same overflowing fill in a `<pre>` and a `<textarea>`, and both formatters leave it intact. Where the over-width line carries a welded run with a tag in it, both find the one render-free break *inside tag syntax*: a closing tag whose content ends on a visible byte splits and dangles its `>` (`…<b>welded</b⏎\t>tail …`) to duck under printWidth — the whitespace-sensitive family's own delimiter rule (each delimiter reads its content edge; see [ws_sensitive_head_content_edges](../tests/fixtures/svelte/elements/ws_sensitive_head_content_edges/)), not the inline-content dangling tsv declines elsewhere. One end tag is exempt from that break: a nested `<script>` / `<style>`'s closing tag never splits, because Svelte ends a nested raw-text body at the first literal `</script>` / `</style>` — `</script⏎>` does not parse, and beside a second element of the same name it merges the two. The break moves to the element's opening `>` instead, when its body opens on a visible byte (on whitespace, neither delimiter moves and the line stands over-width) — [pre_raw_text_close_long](../tests/fixtures/svelte/elements/pre_raw_text_close_long_prettier_divergence/), cataloged in [conformance_prettier_svelte.md §Svelte: Elements](./conformance_prettier_svelte.md#svelte-elements). At exactly 100 columns the run stays intact and an authored dangle rejoins, on both formatters: [ws_sensitive_welded_dangle_long](../tests/fixtures/svelte/elements/ws_sensitive_welded_dangle_long/).
+*Whitespace-sensitive content.* Inside `<pre>` / `<textarea>` a line break *is* content, so print width yields to render semantics and an over-width line stands — those elements never reach the shared layout analysis (see [§Svelte: Inline content block-style](./conformance_prettier_svelte.md#svelte-inline-content-block-style)). Both formatters agree the *content* never re-wraps; the plain overflowing fill is pinned by [fill_tail_after_expr_pre_long](../tests/fixtures/svelte/elements/fill_tail_after_expr_pre_long/), whose two cases are the same overflowing fill in a `<pre>` and a `<textarea>`, and both formatters leave it intact. Where the over-width line carries a welded run with a tag in it, both find the one render-free break *inside tag syntax*: a closing tag whose content ends on a visible byte splits and dangles its `>` (`…<b>welded</b⏎\t>tail …`) to duck under printWidth — the whitespace-sensitive family's own delimiter rule (each delimiter reads its content edge; see [ws_sensitive_head_content_edges](../tests/fixtures/svelte/elements/ws_sensitive_head_content_edges/)), not the inline-content dangling tsv declines elsewhere. One end tag is exempt from that break: a nested `<script>` / `<style>`'s closing tag never splits, because Svelte ends a nested raw-text body at the first literal `</script>` / `</style>` — `</script⏎>` does not parse, and beside a second element of the same name it merges the two. The break moves to the element's opening `>` instead, when its body opens on a visible byte (on whitespace, neither delimiter moves and the line stands over-width) — [pre_raw_text_close_long](../tests/fixtures/svelte/elements/pre_raw_text_close_long_prettier_divergence/), cataloged in [conformance_prettier_svelte.md §Svelte: Elements](./conformance_prettier_svelte.md#svelte-elements). At exactly 100 columns the run stays intact and an authored dangle rejoins, on both formatters: [ws_sensitive_welded_dangle_long](../tests/fixtures/svelte/elements/ws_sensitive_welded_dangle_long/).
 
 *A `{tag}` welded to a preceding word* is an instance of the rule, not an exception. When a `{expr}` / `{@html}` / `{@render}` tag is glued to the end of a text word with no whitespace (`… tsv is ~{ratio}`), the word and its tag are the **smallest welded unit**: they share one fit check, and when the pair does not fit, tsv breaks at the whitespace boundary *before* the word — the pair travels to the fresh line together, holding ≤ 100. Prettier keeps the tag *outside* the text fill, so its fill never sees the tag's width and never breaks before the word it is welded to: the word stays put and the tag rides past printWidth after it — a cataloged divergence, pinned by [fill_glued_tag_travel_long](../tests/fixtures/svelte/elements/fill_glued_tag_travel_long_prettier_divergence/) (the exact 100/101 boundary, a spaced follower packing after the traveled pair, and a tag whose expression must break — the pair travels first and the expression breaks internally on the fresh line). Breaking *between* the word and the tag is never an option — the glued boundary is render-significant. A tag *separated* from the preceding word by whitespace breaks before the tag itself ([fill_break_before_expr_long](../tests/fixtures/svelte/elements/fill_break_before_expr_long_prettier_divergence/)): there the whitespace boundary sits *directly before the tag*, and tsv breaks it (its hard limit outranks prettier, which overflows to 101). That boundary measures the tag as a **whole flat unit**, so a spaced tag whose expression itself must break travels the same way: it starts on the fresh line — collapsing flat there when it fits, breaking internally there when even a full line cannot hold it — and never opens mid-line at the end of the text line (the wide-element drop's tag analog). Prettier's boundary measurement stops at the expression's first internal break, so it keeps such a tag on the text line and opens it mid-line — a stable form each fixture pins as a `prettier_variant_midline`, while prettier also keeps tsv's traveled form, making the divergence one of normalization. Pinned by [fill_spaced_tag_travel_long](../tests/fixtures/svelte/elements/fill_spaced_tag_travel_long_prettier_divergence/) (the exact 100/101 pack/travel boundary, plus travel-and-collapse and travel-then-break-internally), [fill_expr_travel_continuation_long](../tests/fixtures/svelte/elements/fill_expr_travel_continuation_long_prettier_divergence/) and [fill_expr_travel_middle_long](../tests/fixtures/svelte/elements/fill_expr_travel_middle_long_prettier_divergence/) (text and further tags flowing after the traveled tag), [fill_expr_travel_middle_before_long](../tests/fixtures/svelte/elements/fill_expr_travel_middle_before_long_prettier_divergence/) (a second wide tag mid-run after it, which takes the same boundary break — travelling whole and breaking internally on its own line), and [fill_expr_travel_boundary_long](../tests/fixtures/svelte/elements/fill_expr_travel_boundary_long_prettier_divergence/) (the continuation line's own width boundary). The rule is uniform over runs holding **multiple** breakable expression tags ([fill_multi_expr_travel_long](../tests/fixtures/svelte/elements/fill_multi_expr_travel_long_prettier_divergence/)): every welded unit shares one fit check, a unit that fits at its position stays flat, and the first that does not travels whole — no expression is torn open while a whitespace boundary could still absorb the overflow. Text *following* a leading tag packs under the same limit — the fill's leading `line` is measured together with the word it stands before, so a word joins the tag's line only while the line holds ≤ 100, where prettier packs one word past the limit ([fill_leading_tag_pack_long](../tests/fixtures/svelte/elements/fill_leading_tag_pack_long_prettier_divergence/), the pack decision's own 100/101 boundary; contrast [fill_leading_line](../tests/fixtures/svelte/elements/fill_leading_line/), where the tag line sits at exactly 100 and both formatters break the leading line). A tag welded *onward* — into an **inline** element or component, glued text, or another tag — extends the unit through the weld, and the whole unit travels the same way (see [§Svelte: Inline content block-style](./conformance_prettier_svelte.md#svelte-inline-content-block-style), [inline_break_before_glued_long](../tests/fixtures/svelte/elements/inline_break_before_glued_long_prettier_divergence/) and [inline_welded_run_travel_long](../tests/fixtures/svelte/elements/inline_welded_run_travel_long_prettier_divergence/)); a tag glued to a following **block** element does not extend it — the block detaches to its own line regardless (render-free at a block boundary), so the weld survives only in the source and the measured unit stays the word+tag pair (the block-follower cases in inline_break_before_glued_long).
 
@@ -857,8 +856,8 @@ Each catalog is self-contained and governed by the decision framework above.
 | doc | covers |
 | --- | --- |
 | [conformance_prettier_css.md](./conformance_prettier_css.md) | at-rules, selectors, values, layout, comments, CDO/CDC |
-| [conformance_prettier_svelte.md](./conformance_prettier_svelte.md) | elements, inline content block-style, attributes, blocks, destructuring, form feed |
-| [conformance_prettier_ts.md](./conformance_prettier_ts.md) | expressions, types, modules, template literals, prettier rejects, tsv rejects |
+| [conformance_prettier_svelte.md](./conformance_prettier_svelte.md) | elements, foreign-language embedded bodies, inline content block-style, attributes, blocks, root section ordering, destructuring, form feed |
+| [conformance_prettier_ts.md](./conformance_prettier_ts.md) | expressions, types, modules, import-phase proposals, template literals, prettier rejects, sloppy-script literals, tsv rejects, statement-position `let` |
 | [conformance_prettier_ts_comments.md](./conformance_prettier_ts_comments.md) | comment relocation, multi-word keywords, JSDoc / paren semantics, normalization |
 | [conformance_prettier_ignore.md](./conformance_prettier_ignore.md) | the `format-ignore` / `prettier-ignore` freeze rule, across all three languages |
 
@@ -918,7 +917,7 @@ deno task corpus:compare:format ../project --explain  # Single project (scans al
 **Divergence audit** (static check) verifies all documented divergences have registered detectors:
 
 ```bash
-deno task divergence:audit  # Cross-refs pattern fixture lists vs this doc (no runtime)
+deno task divergence:audit  # Cross-refs pattern fixture lists vs this doc family (no runtime)
 ```
 
 Every pattern in `benches/js/lib/divergence/patterns.ts` links to:

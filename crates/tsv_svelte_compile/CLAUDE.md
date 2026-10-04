@@ -311,7 +311,7 @@ project-wide conventions.
   still fires the flag) and `{@render}` arguments.
 
   The same walk hosts the oracle's `props_illegal_name` **reference-site** rule
-  (`MemberExpression.js:11-16`): a `rest_prop.$$…` member access refuses
+  (`MemberExpression.js`'s `MemberExpression` visitor): a `rest_prop.$$…` member access refuses
   (`Refusal::PropsIllegalName`, shared with the declare-site in `script_props.rs`) —
   a plain-Identifier object bound to a `$props()` rest_prop (the whole-object
   `let props = $props()` or the rest element of `let { a, ...rest } = $props()`; the
@@ -328,7 +328,7 @@ project-wide conventions.
   `MemberExpression` arm, first-wins.
 
   It also hosts the oracle's `invalid_arguments_usage` **reference-site** rule
-  (`Identifier.js:27-32`): a reference to `arguments` with no
+  (`Identifier.js`'s `Identifier` visitor): a reference to `arguments` with no
   `FunctionDeclaration`/`FunctionExpression` ancestor refuses
   (`Refusal::InvalidArgumentsUsage`) — an **arrow**, a `{#snippet}` body, a class
   field initializer, and a static block do NOT count as such an ancestor. It keys on
@@ -351,7 +351,7 @@ project-wide conventions.
   Because this is the one walk that reaches **every** assignment, update and `bind:`
   in the component — both scripts, the template, and the dropped regions — it also
   hosts the port of the oracle's `validate_assignment` family
-  (`phases/2-analyze/visitors/shared/utils.js:18`, itself one function reached from
+  (`phases/2-analyze/visitors/shared/utils.js`, itself one function reached from
   `AssignmentExpression`, `UpdateExpression` and `BindDirective` alike). One refusal,
   `Refusal::InvalidAssignmentTarget`, carries its three rules: `constant_assignment`
   (any `const`-declared binding in scope at the write — a top-level declarator or
@@ -539,7 +539,7 @@ project-wide conventions.
 
   ⚠️ ONE axis-2 hole is **open**, an over-acceptance, not corpus-reachable:
   `{$$slots.x}` in a dropped region + an emitted `{@render}`
-  (`slot_snippet_conflict`, `2-analyze/index.js:862`). `$$slots` is not fenced, so
+  (`slot_snippet_conflict`, `analyze_component` in `2-analyze/index.js`). `$$slots` is not fenced, so
   closing it means porting the oracle's whole-component validation rather than
   widening the presence match — tracked in `../../docs/checklist_svelte_compiler.md`.
   A sibling case, a dropped `{#snippet}` + `export { … }` of it from a module
@@ -562,27 +562,27 @@ project-wide conventions.
 
   Plus the **snippet declaration/export** rules. Three ride
   the same walk: `declaration_duplicate`'s `Scope.declare` call site
-  (`phases/scope.js:684-691`) as a per-**fragment** duplicate-snippet-name check — the
+  (`phases/scope.js`) as a per-**fragment** duplicate-snippet-name check — the
   scope is the fragment, not the component, so `<div>{#snippet a}…{/snippet}</div>`
   plus a root `{#snippet a}` is legal — and `snippet_shadowing_prop` /
-  `snippet_conflict` (`SnippetBlock.js:59`/`:77`), both checked from the snippet's
+  `snippet_conflict` (both in `SnippetBlock.js`'s `SnippetBlock` visitor), both checked from the snippet's
   PARENT because the oracle's `path.at(-2)` is exactly "the node whose fragment holds
   this snippet". ⚠️ The two parent sets deliberately DISAGREE: shadowing is `Component`
   only, conflict also takes `<svelte:component>`/`<svelte:self>` — do not harmonize
   them. Shadowing also does not fire at depth. Two more rules run LATER, from
   `analyze()`, because their inputs are analysis products: `validate_top_level_snippets`
-  (`declaration_duplicate` at `SnippetBlock.js:34` — a ROOT-fragment snippet whose name
+  (`declaration_duplicate` in `SnippetBlock`'s `is_top_level` branch — a ROOT-fragment snippet whose name
   the instance script declares) after the binding table, and `validate_module_exports`
-  (`snippet_invalid_export` / `export_undefined`, `index.js:823-836`) after the hoist
+  (`snippet_invalid_export` / `export_undefined`, `analyze_component` in `2-analyze/index.js`) after the hoist
   analysis. ⚠️ That last one checks **module scope FIRST, snippet names second**: a
   hoistable top-level snippet's binding is written INTO module scope
-  (`SnippetBlock.js:40-44`), so checking the snippet set first would reject every valid
+  (`SnippetBlock.js`'s `SnippetBlock` visitor, its `can_hoist` branch), so checking the snippet set first would reject every valid
   exported snippet. `validate_module_exports` ALSO carries `module_illegal_default_export`
-  (`ExportNamedDeclaration.js:14-23` — an `export { x as default }` specifier, identifier
+  (`ExportNamedDeclaration.js`'s `ExportNamedDeclaration` visitor — an `export { x as default }` specifier, identifier
   or string-literal, checked FIRST and NOT gated on `export.source`, unlike the snippet
   check); the `export default X` half is refused upstream in `analyze_module_script`.
 
-  Plus `each_key_without_as` (`EachBlock.js:26-34` — an `{#each}` with a `(key)` but no
+  Plus `each_key_without_as` (`EachBlock.js`'s `EachBlock` visitor — an `{#each}` with a `(key)` but no
   `as` clause, when keyed) via an `EachBlock` arm in the fragment walk.
 
   Plus the attribute rules of the oracle's single `validate_element` loop —
@@ -597,9 +597,9 @@ project-wide conventions.
   NOT element-only. `attribute_unquoted_sequence`
   (`refuse_unquoted_attribute_sequence` — an unquoted value of 2+ chunks like
   `href=/{path}`; the quote test is the oracle's last-chunk-end vs attribute-end
-  span comparison) is `validate_attribute`, called from `shared/element.js:43` AND
-  `shared/component.js:93` alike. And `attribute_invalid_sequence_expression` — a
-  component reaches it through its own visitor (`shared/component.js:174`), which
+  span comparison) is `validate_attribute`, called from `shared/element.js`'s `validate_element` AND
+  `shared/component.js`'s `visit_component` alike. And `attribute_invalid_sequence_expression` — a
+  component reaches it through its own visitor (`shared/component.js`'s `visit_component` → `disallow_unparenthesized_sequences`), which
   ALSO applies it to an `{@attach}` expression where the element half does not, so
   `<span {@attach a, b} />` compiles and `<Foo {@attach a, b} />` refuses. It
   therefore lives in a shared `refuse_unparenthesized_sequence` called from both
@@ -629,7 +629,7 @@ project-wide conventions.
   and the reset scan — including its custom-element short-circuit — is gated on
   `reset_by` being present, so only `dt`/`dd` reset.
 - `text_class.rs` — the **target** languages' lexical character classes
-  (`is_js_whitespace` / `js_trim` / `js_char_at` / `is_css_whitespace` / `is_js_identifier`), for the
+  (`is_js_whitespace` / `js_trim` / `js_char_at` / `is_css_whitespace` / `is_js_identifier`; `is_js_whitespace` is `tsv_lang`'s, re-exported), for the
   source scans that reason about text without tokenizing it. ⚠️ Rust's
   `char::is_whitespace` is the Unicode `White_Space` property, which differs from
   ECMAScript `WhiteSpace` in **both** directions — `U+FEFF` is JS whitespace but
@@ -714,7 +714,7 @@ pipeline order.
   statement list only a `var` reaches script scope — and its `porous` flag
   records whether a porous scope sat on the way up, because the oracle re-declares
   a hoisting `var` on the parent **without its initializer**
-  (`scope.js:673-681`), which `ScriptDeclaration::Declarator::initial_dropped`
+  (`scope.js`'s `Scope.declare`), which `ScriptDeclaration::Declarator::initial_dropped`
   carries to the consumer. A class body is deliberately **opaque** to it, and so
   is every expression position: a class **static block** is the one nested
   statement list that is not a scope at all in the oracle (`phases/scope.js` has
@@ -734,8 +734,9 @@ pipeline order.
   any transform emits. A `$state.snapshot` binding stays UNKNOWN to the evaluator
   even though the server unwraps it — the unwrap is the emission form, not the
   evaluation form: the oracle evaluates a rune declarator through its argument for
-  `$state` / `$state.raw` / `$derived` only, and every other rune falls to its
-  `default` arm and yields UNKNOWN (`phases/scope.js:469-503`), so a template read
+  `$state` / `$state.raw` / `$derived` (and `$derived.by` through an expression-bodied
+  arrow), while `$state.snapshot` falls to its `default` arm and yields UNKNOWN (the
+  rune table in `phases/scope.js`'s `Evaluation` constructor), so a template read
   never folds (`$.escape(s)`). That holds however the argument itself evaluates —
   a plain `let` argument does not fold either. The duplicate-`$props()` flag is
   per-SCRIPT state, scoped to one `analyze_script` call, mirroring the oracle's
@@ -752,7 +753,7 @@ pipeline order.
   deleted from `module.scope.references` before runes-mode inference — so the
   collision can flip the whole component out of runes mode. tsv models neither, so
   it refuses. The scope tested is the oracle's `instance.scope.get`, which walks
-  **up** into the module scope (`scope.js:748`; the instance scope's parent IS
+  **up** into the module scope (`Scope.get` in `scope.js`; the instance scope's parent IS
   `module.scope`) and never **down** — a function parameter, a block-scoped
   `let`, and a name bound in a nested function body are child scopes and keep
   compiling — plus the two nested forms that DO reach script scope, a hoisting
@@ -911,14 +912,14 @@ pipeline order.
   dispatches to the shared 1→N lowering in `destructure.rs`
   (`expand_destructured_state` / `expand_destructured_derived`): the oracle's
   `create_state_declarators` (state) and `$derived` branch
-  (`VariableDeclaration.js:229-247` / `:87-134`) over ONE `extract_paths`
+  (both in the server transform's `VariableDeclaration.js`, the branch inside its `VariableDeclaration` visitor) over ONE `extract_paths`
   extractor, differing only in leaf/array-intermediate wrapping
   (`Lowering{State,Derived}` — State projects RAW from a leading `let tmp = value`
   [`$$array` a plain `const`, bare `$$array[i]` reads]; Derived wraps each leaf in
   `$.derived(() => …)` and mints a `$$d`/`$$derived_array` derived read as a call).
   Every leaf registers (`script_bindings.rs::register_destructured_leaves`) with the
   rune's computed initial, so a destructured leaf FOLDS through the rune argument
-  exactly like an identifier target (`scope.js:1204-1213` — the oracle's over-fold
+  exactly like an identifier target (`create_scopes`'s `VariableDeclaration` visitor in `scope.js` — the oracle's over-fold
   to the *container* value included: `let d=$derived(5); let {a}=$state(d)` folds
   `{a}` to `5`). A carried script comment (`CommentsWithDestructured{State,Derived}`),
   a multi-declarator source, or an exotic (computed/string-literal/numeric/escaped)
@@ -941,8 +942,8 @@ pipeline order.
   $$events` injection immediately before it, and a non-destructured `let props =
   $props()` becomes `let { $$slots, $$events, ...props } = $$props` — a plain
   destructure without a rest gets no injection. An ObjectPattern is first
-  validated per-property in the oracle's `VariableDeclarator.js:97-110` source
-  order, first-wins (`e.*` throws): a **computed** key (`{ [x]: a }`) →
+  validated per-property in the oracle's source order
+  (`VariableDeclarator.js`'s `VariableDeclarator` visitor), first-wins (`e.*` throws): a **computed** key (`{ [x]: a }`) →
   `PropsInvalidPattern`, then a non-computed **`$$` Identifier key** →
   `PropsIllegalName`, then a **value** that (after stripping an `= default`) is
   not a plain Identifier — a nested pattern (`{ a: { b } }`) → `PropsInvalidPattern`.
@@ -1160,7 +1161,7 @@ functions by host.
   `bind:` directive inline at its source slot via `attribute_bind::emit_bind_directive`.
   A **`<svelte:element this={…}>`** compiles to a statement-level
   `$.element($$renderer, TAG, attrsFn?, childrenFn?)` call (`emit_svelte_element`,
-  routed from `fragment.rs` like a component): the TAG is the `'div'` literal
+  dispatched straight from `fragment.rs`, not through `emit_element`): the TAG is the `'div'` literal
   (`this="div"`, parser-collapsed for a mixed value) or the erased/derived-rewritten
   expression (`this={expr}`), and the attributes/children are rendered into
   parameterless closures over the enclosing `$$renderer`. The attribute machinery is
@@ -1331,7 +1332,7 @@ classes, this one enumerates scoping candidates.
   projecting both element types onto one leaf test; a `<svelte:element>` differs only
   in that a type selector matches it unconditionally (its runtime tag is unknown) and,
   as a possible sibling, it only PROBABLY exists (so it never triggers the `+`
-  adjacent early-stop and carries no slot check — `css-prune.js:1041`/`1215`).
+  adjacent early-stop and carries no slot check — `get_possible_element_siblings` / `loop_child` in `css-prune.js`).
   Descends every SSR-reachable fragment (element/component/`<svelte:element>`
   subtrees, `{#if}` / `{#each}` / all three `{#await}` arms — `{:catch}` included — /
   `{#key}` / `{#snippet}` bodies, `<svelte:head>`). Two descents deliberately exceed
@@ -1374,7 +1375,7 @@ classes, this one enumerates scoping candidates.
     prelude is never scoped; a statement / descriptor-only at-rule scopes nothing and
     the splicer copies it through verbatim);
   - **`@keyframes`** — the oracle's `is_keyframes_node` handling
-    (`css-analyze.js:52-63` / `css/index.js:82-124`): a separate collection pre-pass
+    (the `Atrule` visitor in `css-analyze.js` / the `Atrule` and `Declaration` visitors in `3-transform/css/index.js`): a separate collection pre-pass
     gathers every keyframes prelude not starting with `-global-` (at any nesting
     depth, descending even into keyframes blocks), then `analyze_atrule`
     name-prefixes the at-rule (`@keyframes foo` → `@keyframes svelte-tsvhash-foo`, or
@@ -1392,7 +1393,7 @@ classes, this one enumerates scoping candidates.
     those step selectors into a SEPARATE list (`ScopeInfo::step_selectors`) — built
     through the SAME `build_selector` machinery as ordinary rules with
     `keyframe_step = true`, which skips a `Percentage`/`Nth` simple selector within
-    its compound (`css-prune.js:509`), so a percentage-only compound has an empty
+    its compound (`relative_selector_might_apply_to_node` in `css-prune.js`), so a percentage-only compound has an empty
     predicate list and matches ANY element (the fallthrough — `0%`/`50%`/`100%` scope
     the whole component) while `0%.c` narrows PER-SIMPLE to `class="c"` and a `from`
     step is the type selector `from` (scoping a `<from>` element). `match_scope`
@@ -1410,7 +1411,7 @@ classes, this one enumerates scoping candidates.
   - a **dynamic or mixed attribute value** (`class={x?'a':'b'}`,
     `class={['a', c&&'b']}`, `class="pre-{x}"`, `data-x={0}`), matched by porting the
     oracle's `get_possible_values` bounded static-eval (`css/utils.js`) + the
-    multi-chunk combination loop (`css-prune.js:747-818`) in `attribute_matches`: the
+    multi-chunk combination loop (`css-prune.js`) in `attribute_matches`: the
     candidate values are enumerated and each tested. An `UNKNOWN` chunk (a plain
     identifier / member / call / template / non-`class` array-object /
     `&&`-with-unknown-left, …) assume-matches; an un-stringifiable literal inside an
