@@ -82,7 +82,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // tsc reject; there is no valid parse, so tsv rejects too rather than
             // silently splitting the run into separate signatures. Same class as
             // the class-field ASI check in `finish_property_member`.
-            if self.eat(TokenKind::Semicolon) || self.eat(TokenKind::Comma) {
+            if self.eat(TokenKind::Semicolon)? || self.eat(TokenKind::Comma)? {
                 element.extend_span_to(self.prev_token_end() as u32);
             } else if !self.can_insert_semicolon() {
                 return Err(self.error_expected("';'"));
@@ -195,7 +195,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse property/method name
         // Property key: identifier, keyword, string literal, number literal, or computed [expr]
         // Keywords are valid property names in type literals: { class: string }
-        let (computed, key) = if self.eat(TokenKind::BracketOpen) {
+        let (computed, key) = if self.eat(TokenKind::BracketOpen)? {
             (true, self.parse_computed_member_key()?)
         } else if self.current_is_identifier_or_keyword() {
             (
@@ -221,7 +221,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         };
 
         // Check for optional: ?
-        let optional = self.eat(TokenKind::Question);
+        let optional = self.eat(TokenKind::Question)?;
 
         // Check for method signature: `()` or `<T>()` or accessor signature
         // Also check for `<` to handle generic methods like `method<T>(x: T): T`

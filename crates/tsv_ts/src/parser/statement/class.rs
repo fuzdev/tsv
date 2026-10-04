@@ -557,7 +557,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let (super_class, super_type_parameters) = p.parse_optional_extends_clause()?;
 
             // Parse optional `implements` clause
-            let implements: &'arena [_] = if p.eat_contextual_keyword("implements") {
+            let implements: &'arena [_] = if p.eat_contextual_keyword("implements")? {
                 p.parse_interface_heritage_list()?.into_bump_slice()
             } else {
                 &[]
@@ -662,7 +662,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             while !matches!(p.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
                 // Stray semicolons are empty class members — acorn skips them,
                 // producing no node (prettier strips them on format).
-                if p.eat(TokenKind::Semicolon) {
+                if p.eat(TokenKind::Semicolon)? {
                     continue;
                 }
                 let member = p.parse_class_member()?;
@@ -695,14 +695,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// both; on `!` that discards a line terminator tsc treats as fatal, so tsv follows
     /// tsc over the shape target. Per ecma262 §sec-comments a block comment holding a
     /// line terminator IS one, so `a /*⏎*/ !: T` declines on the same rule.
-    pub(in crate::parser) fn parse_property_modifier(&mut self) -> PropertyModifier {
-        if self.eat(TokenKind::Question) {
+    pub(in crate::parser) fn parse_property_modifier(
+        &mut self,
+    ) -> Result<PropertyModifier, ParseError> {
+        Ok(if self.eat(TokenKind::Question)? {
             PropertyModifier::Optional
-        } else if !self.had_line_terminator && self.eat(TokenKind::Bang) {
+        } else if !self.had_line_terminator && self.eat(TokenKind::Bang)? {
             PropertyModifier::Definite
         } else {
             PropertyModifier::None
-        }
+        })
     }
 
     /// Consume the contextual keyword `kw` as a class-member modifier iff the
@@ -862,7 +864,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         };
 
         // Handle '*' for generator methods
-        let is_generator = self.eat(TokenKind::Star);
+        let is_generator = self.eat(TokenKind::Star)?;
 
         // Handle 'get' and 'set' contextual keywords for getters/setters
         let accessor_kind = if matches!(self.current_kind(), TokenKind::Identifier) {
@@ -989,7 +991,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Optional (`?`) / definite (`!`) marker, between the key and any type
         // parameters — methods read `?` as `optional`, properties keep the full modifier.
-        let modifier = self.parse_property_modifier();
+        let modifier = self.parse_property_modifier()?;
 
         // Parse type parameters (TypeScript generics): method<T>()
         let type_parameters = self.parse_optional_type_parameters()?;
@@ -1036,6 +1038,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// parameter list, optional return type, and body — or a bodiless signature
     /// for abstract methods and overload signatures (`;`/ASI-terminated, including
     /// ambient signatures).
+    ///
+    /// `inline(always)`, into its one caller: a frame of its own sits on the recursion
+    /// path of every class nested in a member body, lowering the nesting ceiling (the
+    /// same holds for `finish_property_member`).
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
     fn finish_method_member(
         &mut self,
         header: ClassMemberHeader<'arena>,
@@ -1179,7 +1187,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let body_end = return_type
                 .as_ref()
                 .map_or_else(|| self.prev_token_end() as u32, |rt| rt.span.end);
-            let end = if self.eat(TokenKind::Semicolon) {
+            let end = if self.eat(TokenKind::Semicolon)? {
                 self.prev_token_end() as u32
             } else {
                 body_end
@@ -1234,6 +1242,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Finish a property member (the non-`(` branch of `parse_class_member`):
     /// optional type annotation, optional initializer, and trailing semicolon.
+    ///
+    /// `inline(always)`, into its one caller: a frame of its own sits on the recursion
+    /// path of every class nested in a member body, lowering the nesting ceiling (the
+    /// same holds for `finish_method_member`).
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
     fn finish_property_member(
         &mut self,
         header: ClassMemberHeader<'arena>,
@@ -1277,7 +1291,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // (it does not inherit a `[+Await]` enclosing — `await` is not an
         // await-expression there, only an identifier under Script goal), unlike
         // a computed key, which inherits.
-        let value: Option<Expression<'arena>> = if self.eat(TokenKind::Equals) {
+        let value: Option<Expression<'arena>> = if self.eat(TokenKind::Equals)? {
             Some(self.with_fn_context(false, false, Self::parse_assignment_expression)?)
         } else {
             None
@@ -1304,7 +1318,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // a method with a body self-terminates and never reaches this branch. A
         // consumed `;` extends the span.
         let mut end = end;
-        if self.eat(TokenKind::Semicolon) {
+        if self.eat(TokenKind::Semicolon)? {
             end = self.prev_token_end() as u32;
         } else if !self.can_insert_semicolon() {
             return Err(self.error_expected("';'"));
@@ -1388,7 +1402,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // is rejected (acorn "Unexpected token" / tsc TS1005) — the class-body analog
         // of the type-member ASI rule.
         let mut end = value_type.as_ref().map_or(bracket_end, |t| t.span.end);
-        if self.eat(TokenKind::Semicolon) {
+        if self.eat(TokenKind::Semicolon)? {
             end = self.prev_token_end() as u32;
         } else if !self.can_insert_semicolon() {
             return Err(self.error_expected("';'"));

@@ -56,7 +56,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let prop_start = self.current_pos().0;
 
             // Check for spread: { ...obj }
-            if self.eat(TokenKind::DotDotDot) {
+            if self.eat(TokenKind::DotDotDot)? {
                 // Use assignment_expression because comma separates properties
                 let argument = self.parse_assignment_expression_ref()?;
                 // Use prev_token_end() to include the closing paren when the argument
@@ -98,7 +98,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 };
 
             // Check for generator method: `*gen() {}` or `async *gen() {}`
-            let is_generator = self.eat(TokenKind::Star);
+            let is_generator = self.eat(TokenKind::Star)?;
 
             // Check for getter/setter: `get x() {}` or `set x(v) {}`
             // These are contextual keywords - only treated as get/set when followed by a property name
@@ -242,7 +242,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     false,
                     true,
                 )
-            } else if self.eat(TokenKind::Colon) {
+            } else if self.eat(TokenKind::Colon)? {
                 // Use assignment_expression because comma separates properties
                 (
                     PropertyKind::Init,
@@ -266,7 +266,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         key.span().start_usize(),
                     ));
                 }
-                if self.eat(TokenKind::Equals) {
+                if self.eat(TokenKind::Equals)? {
                     // `{ a = 1 }`: parsed as an AssignmentExpression.
                     let default_value = self.parse_assignment_expression_ref()?;
                     // prev_token_end covers a parenthesized default's closing `)`
@@ -363,7 +363,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse elements (including elision/holes)
         loop {
             // Check for elision (hole): leading comma means empty slot
-            if self.eat(TokenKind::Comma) {
+            if self.eat(TokenKind::Comma)? {
                 elements.push(None); // hole
                 // Check if we hit the closing bracket (trailing comma after hole)
                 if self.check(&TokenKind::BracketClose) {
@@ -383,7 +383,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             elements.push(Some(elem));
 
             // Check for comma or closing bracket
-            if self.eat(TokenKind::Comma) {
+            if self.eat(TokenKind::Comma)? {
                 // Check for trailing comma
                 if self.check(&TokenKind::BracketClose) {
                     // A trailing comma after a final spread (`[...a,]`) is the

@@ -217,7 +217,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 span: Span::new(start as u32, end),
             });
 
-            if !self.eat(TokenKind::Comma) {
+            if !self.eat(TokenKind::Comma)? {
                 break;
             }
         }
@@ -432,7 +432,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance()?;
 
         // Check for generator: `declare function* g(): Iterator<T>;`
-        let is_generator = self.eat(TokenKind::Star);
+        let is_generator = self.eat(TokenKind::Star)?;
 
         // Parse function name. The shared `BindingIdentifier` channel, so an ambient
         // declaration takes the same names the concrete `function string() {}` form
@@ -533,7 +533,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // a bare `asserts`, or one heading a regular type (`asserts[]`,
         // `asserts<T>`, `asserts.Foo`), stays unconsumed and is parsed below as an
         // ordinary type reference.
-        let asserts = !plain_predicate && self.eat_type_predicate_asserts();
+        let asserts = !plain_predicate && self.eat_type_predicate_asserts()?;
 
         // The predicate subject is an identifier/keyword name or `this`
         // (`x is T`, `this is T`, `asserts x`, `asserts this`).
@@ -670,7 +670,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             members.push(self.parse_enum_member()?);
 
             // Consume comma if present (trailing comma is allowed)
-            if !self.eat(TokenKind::Comma) {
+            if !self.eat(TokenKind::Comma)? {
                 // No comma, break if not at closing brace
                 if !matches!(self.current_kind(), TokenKind::BraceClose) {
                     return Err(self.error_expected("',' or '}' in enum"));
@@ -730,7 +730,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse optional initializer: = value
         // Use assignment expression (not full expression) to stop at commas
-        let (initializer, end) = if self.eat(TokenKind::Equals) {
+        let (initializer, end) = if self.eat(TokenKind::Equals)? {
             let expr = self.parse_assignment_expression()?;
             // The member ends at the last token consumed, NOT at the initializer's
             // span: tsv drops a grouping paren rather than building a node for it,

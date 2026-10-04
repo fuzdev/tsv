@@ -21,7 +21,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance()?;
 
         // Check for optional marker: param? — a bare `?` extends the span.
-        let (optional, param_end) = self.eat_optional_marker(param_end);
+        let (optional, param_end) = self.eat_optional_marker(param_end)?;
 
         // Check for type annotation: param: type
         let (type_annotation, id_end) = if self.check(&TokenKind::Colon) {
@@ -46,14 +46,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         });
 
         // Check for default value: param = default
-        if self.eat(TokenKind::Equals) {
+        if self.eat(TokenKind::Equals)? {
             let default_value = self.parse_assignment_expression_ref()?;
             // prev_token_end covers a parenthesized default's closing `)`
             let assign_end = self.prev_token_end() as u32;
             param = Expression {
                 span: Span::new(param_start as u32, assign_end),
                 kind: ExpressionKind::AssignmentPattern(AssignmentPattern {
-                    left: self.alloc(param),
+                    // `Bump::alloc`, always inlined, not `Parser::alloc`: an outlined call
+                    // here grows this frame, which sits on the recursion path of every
+                    // parameter default nested in another
+                    left: self.arena.alloc(param),
                     right: default_value,
                     decorators: None,
                 }),
@@ -173,7 +176,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Optional marker `?` (parameter position only), between the pattern and
         // any type annotation; extends the span to the `?` end (matching acorn).
-        if allow_optional && self.eat(TokenKind::Question) {
+        if allow_optional && self.eat(TokenKind::Question)? {
             let q_end = self.prev_token_end() as u32;
             match &mut pattern.kind {
                 ExpressionKind::ArrayPattern(p) => {
@@ -220,7 +223,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         arg_end: u32,
     ) -> Result<(bool, Option<TSTypeAnnotation<'arena>>, u32), ParseError> {
-        let optional = self.eat(TokenKind::Question);
+        let optional = self.eat(TokenKind::Question)?;
         if self.check(&TokenKind::Colon) {
             let ta = self.parse_type_annotation()?;
             let end = ta.span.end;
@@ -413,7 +416,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         let pattern = self.parse_destructured_binding(true)?;
 
                         // Check for default value
-                        if self.eat(TokenKind::Equals) {
+                        if self.eat(TokenKind::Equals)? {
                             let pattern_start = pattern.span().start;
                             let default_value = self.parse_assignment_expression_ref()?;
                             // prev_token_end covers a parenthesized default's closing `)`

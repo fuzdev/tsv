@@ -621,7 +621,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance_inner()
     }
 
-    /// Advance without checking stored error first. Used by try_advance().
+    /// The token step of [`Parser::advance`], once no lexer error is held back.
     fn advance_inner(&mut self) -> Result<(), ParseError> {
         // Save previous token's end position for ASI span calculation
         self.prev_end = self.current.end as usize;
@@ -701,19 +701,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(())
     }
 
-    /// Try to advance, storing any error for later instead of returning it.
-    /// Returns true on success, false on error (with error stored in lexer_error).
-    /// Used by eat() and eat_contextual_keyword() which return bool.
-    fn try_advance(&mut self) -> bool {
-        match self.advance_inner() {
-            Ok(()) => true,
-            Err(err) => {
-                self.lexer_error = Some(err);
-                false
-            }
-        }
-    }
-
     // Helper methods for extract-then-advance pattern
 
     #[inline]
@@ -789,12 +776,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `prev_token_end` (so a `?` with no following type annotation still
     /// extends the identifier span); otherwise `end` passes through unchanged.
     #[inline]
-    pub(super) fn eat_optional_marker(&mut self, end: usize) -> (bool, usize) {
-        if self.eat(TokenKind::Question) {
+    pub(super) fn eat_optional_marker(&mut self, end: usize) -> Result<(bool, usize), ParseError> {
+        Ok(if self.eat(TokenKind::Question)? {
             (true, self.prev_token_end())
         } else {
             (false, end)
-        }
+        })
     }
 
     /// Get the raw end position (without base_offset) for lexer operations
@@ -2432,7 +2419,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Consume a token if it matches the given kind (optional token consumption)
     ///
-    /// Returns `true` if the token was consumed, `false` otherwise.
+    /// Returns `true` if the token was consumed, `false` otherwise. Consuming it lexes
+    /// the token after it, and a lexer error there is returned at once — acorn's timing,
+    /// where consuming a token reads the next. Held back instead, the error would read as
+    /// the optional token's absence — a stray `=` in `function f(a = '\x4') {}`.
     ///
     /// Useful for optional syntax elements like:
     /// - Trailing commas: `[1, 2, 3,]` - eat(Comma) at end
@@ -2441,23 +2431,32 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// # Example
     /// ```ignore
-    /// let has_init = if self.eat(TokenKind::Equals) {
+    /// let has_init = if self.eat(TokenKind::Equals)? {
     ///     Some(self.parse_expression()?)
     /// } else {
     ///     None
     /// };
     /// ```
-    pub(super) fn eat(&mut self, kind: TokenKind) -> bool {
-        self.check(&kind) && self.try_advance()
+    pub(super) fn eat(&mut self, kind: TokenKind) -> Result<bool, ParseError> {
+        if self.check(&kind) {
+            self.advance()?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     /// Consume a contextual keyword if present (identifier with specific value).
-    /// Returns true if consumed, false otherwise.
+    /// Returns true if consumed, false otherwise; a lexer error on the token after it is
+    /// returned, as [`Parser::eat`] returns one.
     #[inline]
-    pub(super) fn eat_contextual_keyword(&mut self, keyword: &str) -> bool {
-        matches!(self.current_kind(), TokenKind::Identifier)
-            && self.current_value() == keyword
-            && self.try_advance()
+    pub(super) fn eat_contextual_keyword(&mut self, keyword: &str) -> Result<bool, ParseError> {
+        if matches!(self.current_kind(), TokenKind::Identifier) && self.current_value() == keyword {
+            self.advance()?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     /// Check if the next (peek) token is a contextual keyword.
@@ -2497,12 +2496,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// terminator — the shape target is not the validity oracle, so tsv follows tsc.
     /// Per ecma262 §sec-comments a block comment holding a line terminator IS one, so
     /// `asserts /*⏎*/ a` declines on the same rule.
-    pub(super) fn eat_type_predicate_asserts(&mut self) -> bool {
-        matches!(self.current_kind(), TokenKind::Identifier)
+    pub(super) fn eat_type_predicate_asserts(&mut self) -> Result<bool, ParseError> {
+        if matches!(self.current_kind(), TokenKind::Identifier)
             && self.current_value() == "asserts"
             && self.peek_is_identifier_or_keyword()
             && !self.peek_preceded_by_line_terminator()
-            && self.try_advance()
+        {
+            self.advance()?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     /// Check if a semicolon can be inserted at the current position (ASI).
@@ -2536,16 +2540,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     pub(super) fn semicolon(&mut self) -> Result<(), ParseError> {
-        // Check for stored lexer error first (from failed eat/peek operations)
-        if let Some(err) = self.lexer_error.take() {
-            return Err(err);
-        }
-        if self.eat(TokenKind::Semicolon) {
+        if self.eat(TokenKind::Semicolon)? {
             return Ok(());
-        }
-        // Check again after eat() in case it stored an error
-        if let Some(err) = self.lexer_error.take() {
-            return Err(err);
         }
         if self.can_insert_semicolon() {
             return Ok(());

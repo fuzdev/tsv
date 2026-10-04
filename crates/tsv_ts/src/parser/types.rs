@@ -173,7 +173,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let mut types = self.bvec();
         types.push(first);
-        while self.eat(TokenKind::Pipe) {
+        while self.eat(TokenKind::Pipe)? {
             types.push(self.with_fn_type_disallowed(true, Self::parse_intersection_type)?);
         }
 
@@ -209,7 +209,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let mut types = self.bvec();
         types.push(first);
-        while self.eat(TokenKind::Ampersand) {
+        while self.eat(TokenKind::Ampersand)? {
             types.push(self.with_fn_type_disallowed(true, Self::parse_array_type)?);
         }
 
@@ -641,7 +641,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let argument = self.parse_string_literal()?;
 
         // Optional options object: `import('module', {with: {type: 'json'}})`
-        let options: Option<&'arena Expression<'arena>> = if self.eat(TokenKind::Comma) {
+        let options: Option<&'arena Expression<'arena>> = if self.eat(TokenKind::Comma)? {
             Some(self.parse_expression_ref()?)
         } else {
             None
@@ -651,7 +651,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::ParenClose)?;
 
         // Optional qualifier: .Foo or .Foo.Bar
-        let qualifier = if self.eat(TokenKind::Dot) {
+        let qualifier = if self.eat(TokenKind::Dot)? {
             Some(self.parse_type_entity_name()?)
         } else {
             None
@@ -773,7 +773,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             Span::new(id_start as u32, id_end as u32),
         ));
 
-        while self.eat(TokenKind::Dot) {
+        while self.eat(TokenKind::Dot)? {
             let right_name = if allow_reserved_words {
                 self.try_identifier_name()
             } else {
@@ -845,7 +845,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let mut params = self.bvec();
         if !self.check_greater_than_in_type() {
             params.push(self.parse_type()?);
-            while self.eat(TokenKind::Comma) {
+            while self.eat(TokenKind::Comma)? {
                 // Allow trailing comma - check for closing > before parsing another type
                 if self.check_greater_than_in_type() {
                     break;
@@ -1018,7 +1018,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let first = self.parse_function_type_param()?;
             let mut rest_seen = matches!(first.kind, ExpressionKind::RestElement(_));
             params.push(first);
-            while self.eat(TokenKind::Comma) {
+            while self.eat(TokenKind::Comma)? {
                 // A rest parameter must be last: nothing — not even a trailing
                 // comma — may follow it (see `parse_parameter_list`). In an
                 // ambient (`declare`) context acorn tolerates a single trailing
@@ -1103,7 +1103,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance()?;
 
         // Check for optional: param? — a bare `?` extends the span.
-        let (optional, id_end) = self.eat_optional_marker(id_end);
+        let (optional, id_end) = self.eat_optional_marker(id_end)?;
 
         // Check for type annotation: : T
         let type_annotation = self.parse_optional_type_annotation()?;
@@ -1198,7 +1198,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let param_end = constraint.span().end;
 
         // Check for optional `as` clause: `as NewKey`
-        let name_type = if self.eat(TokenKind::Keyword(KeywordKind::As)) {
+        let name_type = if self.eat(TokenKind::Keyword(KeywordKind::As))? {
             Some(self.parse_type()?)
         } else {
             None
@@ -1212,14 +1212,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse optional `:` and value type — the annotation may be absent
         // entirely (`{ [K in T] }`, `{ [K in T]+? }`), matching acorn.
-        let type_annotation = if self.eat(TokenKind::Colon) {
+        let type_annotation = if self.eat(TokenKind::Colon)? {
             Some(self.parse_type()?)
         } else {
             None
         };
 
         // Consume optional separator
-        self.eat(TokenKind::Semicolon);
+        self.eat(TokenKind::Semicolon)?;
 
         // Expect `}`
         let (_, end) = self.current_pos();
@@ -1246,23 +1246,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_mapped_type_readonly_modifier(
         &mut self,
     ) -> Result<Option<TSMappedTypeModifier>, ParseError> {
-        if self.eat(TokenKind::Minus) {
+        if self.eat(TokenKind::Minus)? {
             // `-readonly`
-            if self.eat_contextual_keyword("readonly") {
+            if self.eat_contextual_keyword("readonly")? {
                 return Ok(Some(TSMappedTypeModifier::Minus));
             }
             return Err(self.error_expected("'readonly' after '-' in mapped type"));
         }
 
-        if self.eat(TokenKind::Plus) {
+        if self.eat(TokenKind::Plus)? {
             // `+readonly`
-            if self.eat_contextual_keyword("readonly") {
+            if self.eat_contextual_keyword("readonly")? {
                 return Ok(Some(TSMappedTypeModifier::Plus));
             }
             return Err(self.error_expected("'readonly' after '+' in mapped type"));
         }
 
-        if self.eat_contextual_keyword("readonly") {
+        if self.eat_contextual_keyword("readonly")? {
             return Ok(Some(TSMappedTypeModifier::True));
         }
 
@@ -1276,23 +1276,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_mapped_type_optional_modifier(
         &mut self,
     ) -> Result<Option<TSMappedTypeModifier>, ParseError> {
-        if self.eat(TokenKind::Minus) {
+        if self.eat(TokenKind::Minus)? {
             // `-?`
-            if self.eat(TokenKind::Question) {
+            if self.eat(TokenKind::Question)? {
                 return Ok(Some(TSMappedTypeModifier::Minus));
             }
             return Err(self.error_expected("'?' after '-' in mapped type"));
         }
 
-        if self.eat(TokenKind::Plus) {
+        if self.eat(TokenKind::Plus)? {
             // `+?`
-            if self.eat(TokenKind::Question) {
+            if self.eat(TokenKind::Question)? {
                 return Ok(Some(TSMappedTypeModifier::Plus));
             }
             return Err(self.error_expected("'?' after '+' in mapped type"));
         }
 
-        if self.eat(TokenKind::Question) {
+        if self.eat(TokenKind::Question)? {
             return Ok(Some(TSMappedTypeModifier::True));
         }
 
@@ -1307,7 +1307,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let mut element_types = self.bvec();
         if !self.check(&TokenKind::BracketClose) {
             element_types.push(self.parse_tuple_element()?);
-            while self.eat(TokenKind::Comma) {
+            while self.eat(TokenKind::Comma)? {
                 if self.check(&TokenKind::BracketClose) {
                     break; // trailing comma
                 }
@@ -1329,7 +1329,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let elem_start = self.current_pos().0;
 
         // Check for rest element: `...T` or `...label: T`
-        if self.eat(TokenKind::DotDotDot) {
+        if self.eat(TokenKind::DotDotDot)? {
             let inner = self.parse_tuple_element_inner()?;
             let end = inner.span().end;
             return Ok(self.alloc(TSType::Rest(TSRestType {
@@ -1634,7 +1634,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let param = self.parse_type_parameter()?;
             params.push(param);
 
-            if !self.eat(TokenKind::Comma) {
+            if !self.eat(TokenKind::Comma)? {
                 break;
             }
             // Handle trailing comma
@@ -1752,7 +1752,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         };
 
         // Parse optional default: `= V`
-        let default = if self.eat(TokenKind::Equals) {
+        let default = if self.eat(TokenKind::Equals)? {
             let default_type = self.parse_type()?;
             end = default_type.span().end;
             Some(default_type)
@@ -1784,7 +1784,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let ts_type = self.parse_type()?;
             params.push(ts_type);
 
-            if !self.eat(TokenKind::Comma) {
+            if !self.eat(TokenKind::Comma)? {
                 break;
             }
             // Handle trailing comma

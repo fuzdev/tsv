@@ -21,7 +21,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // ASI Rule: If semicolon present or can insert semicolon, return has no argument.
         // This handles: `return\n1+2` → `return;` (then `1+2;` as separate statement)
         // The `1+2` becomes an unreachable expression statement.
-        if self.eat(TokenKind::Semicolon) || self.can_insert_semicolon() {
+        if self.eat(TokenKind::Semicolon)? || self.can_insert_semicolon() {
             let end = self.prev_token_end() as u32;
             return Ok(Statement {
                 span: Span::new(start as u32, end),
@@ -73,7 +73,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance()?;
 
         // Check for generator: function*
-        let is_generator = self.eat(TokenKind::Star);
+        let is_generator = self.eat(TokenKind::Star)?;
 
         // Parse function name (required for declarations)
         // Keywords like `object` and `async` can be function names; `await` is a
@@ -175,7 +175,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance()?;
 
         // Check for generator: function*
-        let is_generator = self.eat(TokenKind::Star);
+        let is_generator = self.eat(TokenKind::Star)?;
 
         // Parse function name (required for declarations, optional for export default)
         // Keywords like `object` and `async` can be function names; `await` is a
@@ -289,7 +289,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance()?;
 
         // Check for generator: function*
-        let is_generator = self.eat(TokenKind::Star);
+        let is_generator = self.eat(TokenKind::Star)?;
 
         // Parse the optional name in the function expression's own `[Await]`
         // context: a `FunctionExpression` name is `[~Await]` (non-async) /

@@ -96,7 +96,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let mut end = first.span.end;
         let mut declarations = self.bvec();
         declarations.push(first);
-        while self.eat(TokenKind::Comma) {
+        while self.eat(TokenKind::Comma)? {
             let declarator = self.parse_declarator(site)?;
             end = declarator.span.end;
             declarations.push(declarator);
@@ -136,7 +136,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Check for initializer
         // Use assignment_expression because comma separates declarators
-        let init: Option<&'arena Expression<'arena>> = if !self.eat(TokenKind::Equals) {
+        let init: Option<&'arena Expression<'arena>> = if !self.eat(TokenKind::Equals)? {
             None
         } else if site == DeclaratorSite::ForHead {
             Some(self.with_no_in(Self::parse_assignment_expression_ref)?)
@@ -208,7 +208,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // leaving `!` a stray token (acorn-typescript's `hasPrecedingLineBreak` guard).
         // Same rule as the arrow `=>` / conditional `extends` / predicate `is`.
         let marker_start = self.current_pos().0;
-        let definite = !self.had_line_terminator && self.eat(TokenKind::Bang);
+        let definite = !self.had_line_terminator && self.eat(TokenKind::Bang)?;
 
         // The position conjunct of the same guard. Rejecting rather than dropping the
         // token: the printer prints a binding through the plain expression path, which

@@ -241,6 +241,7 @@ fn synthetic_errors_report_their_points() {
     ];
     let mut cases = cases.to_vec();
     cases.extend_from_slice(ESCAPE_CASES);
+    cases.extend_from_slice(OPTIONAL_TOKEN_ESCAPE_CASES);
     let mut failures = Vec::new();
     for (language, source) in cases {
         let mut variants = vec![source.to_string()];
@@ -307,13 +308,83 @@ const ESCAPE_CASES: &[(Language, &str)] = &[
     ),
 ];
 
+/// Malformed escapes in the token right after an OPTIONAL one — a parameter default's `=`
+/// (every parameter form, and an arrow's or a `{#snippet}` head's list), a class field's,
+/// an enum member's, a type parameter default's, a binding pattern's and a for-head
+/// declarator's `=`, a property value's `:`, a second argument's `,`. The parser consumes
+/// such a token only when it is present, and consuming it lexes the token after it; that
+/// lexer error must not read as the optional token's absence, which reports a stray `=` /
+/// `:` / `,` in its place.
+const OPTIONAL_TOKEN_ESCAPE_CASES: &[(Language, &str)] = &[
+    (Language::TypeScript, "let a;\nfunction s(b = '\\x4') {}"),
+    (Language::TypeScript, "let a;\nlet f = (b = '\\x4') => 1;"),
+    (
+        Language::TypeScript,
+        "let a;\nclass C {\n\tm(b = '\\x4') {}\n}",
+    ),
+    (Language::TypeScript, "let a;\nfunction s([b] = '\\x4') {}"),
+    (Language::TypeScript, "let a;\nfunction s(b = '\\x4', c) {}"),
+    (Language::TypeScript, "let a;\nfunction s(b, c = '\\x4') {}"),
+    (
+        Language::TypeScript,
+        "let a;\nfunction s(b = '\\u{110000}') {}",
+    ),
+    (Language::TypeScript, "let a;\nfunction s(b: T = '\\x4') {}"),
+    (
+        Language::TypeScript,
+        "let a;\nclass C {\n\tconstructor(private b = '\\x4') {}\n}",
+    ),
+    (Language::TypeScript, "let a;\nclass C {\n\tb = '\\x4';\n}"),
+    (Language::TypeScript, "let a;\nenum E {\n\tB = '\\x4'\n}"),
+    (Language::TypeScript, "let a;\ntype T<B = '\\x4'> = B;"),
+    (Language::TypeScript, "let a;\nlet { b = '\\x4' } = a;"),
+    (Language::TypeScript, "let a;\nfor (let b = '\\x4'; ; ) {}"),
+    (Language::TypeScript, "let a;\nlet o = { b: '\\x4' };"),
+    (Language::TypeScript, "let a;\nimport('a', '\\x4');"),
+    (
+        Language::Svelte,
+        "<p>x</p>\n{#snippet s(b = '\\x4')}{/snippet}",
+    ),
+    (
+        Language::Svelte,
+        "<div>hi</div>\n<script>\n\tfunction s(b = '\\x4') {}\n</script>",
+    ),
+];
+
+/// A malformed escape reports the same error wherever its literal sits: each case's
+/// message is the one the same literal reports as a `let` initializer.
+#[test]
+fn an_escape_after_an_optional_token_reports_the_escape() {
+    let mut failures = Vec::new();
+    for &(language, source) in OPTIONAL_TOKEN_ESCAPE_CASES {
+        let backslash = source.find('\\').expect("an escape");
+        let open = source[..backslash].rfind('\'').expect("an opening quote");
+        let close = backslash + source[backslash..].find('\'').expect("a closing quote");
+        let control = format!("let s = {};", &source[open..=close]);
+        let message = |source: &str, language| {
+            parse_error(source, language).map(|error| {
+                let rendered = error.to_string();
+                rendered.lines().next().unwrap_or_default().to_string()
+            })
+        };
+        let want = message(&control, Language::TypeScript);
+        let found = message(source, language);
+        if want.is_none() || found != want {
+            failures.push(format!(
+                "{language:?} {source:?}: {found:?}, the `let` control {control:?}: {want:?}"
+            ));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
 /// Every malformed escape is reported at its own backslash — the first in the source —
 /// and its message excerpts the backslash's own line. (Its point and header are graded
 /// with the synthetic cases.)
 #[test]
 fn escape_errors_point_at_their_backslash() {
     let mut failures = Vec::new();
-    for &(language, source) in ESCAPE_CASES {
+    for &(language, source) in ESCAPE_CASES.iter().chain(OPTIONAL_TOKEN_ESCAPE_CASES) {
         let backslash = source.find('\\').expect("an escape");
         let Some(error) = parse_error(source, language) else {
             failures.push(format!("{language:?} {source:?}: parses"));

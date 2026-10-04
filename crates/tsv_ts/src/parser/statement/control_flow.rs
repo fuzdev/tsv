@@ -493,7 +493,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // `}`/EOF lookahead, so this never errors. Consume an explicit `;` if
         // present; otherwise insert one implicitly. Local to do-while, so the
         // shared `semicolon()` helper stays restricted.
-        self.eat(TokenKind::Semicolon);
+        self.eat(TokenKind::Semicolon)?;
         let end = self.prev_token_end() as u32;
 
         Ok(Statement {
@@ -646,7 +646,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance()?;
 
         // Parse optional parameter: (param) or (param: type) or ({destructuring}) or ({destructuring}: Type)
-        let param = if self.eat(TokenKind::ParenOpen) {
+        let param = if self.eat(TokenKind::ParenOpen)? {
             // A catch binding is a `BindingIdentifier` — a plain identifier, a
             // contextual type keyword (`catch (any)`), or `await` at Script
             // `[~Await]` (all covered by `try_binding_name`) — with an optional

@@ -779,7 +779,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // `yield ? b : c` are syntax errors. (Both parsers reject the yield form;
         // for the arrow form acorn over-leniently accepts it — a cataloged
         // `tsv_rejects` divergence, see conformance_svelte.md.)
-        if !leading_bare_head && min_bp <= BP_ASSIGNMENT && self.eat(TokenKind::Question) {
+        if !leading_bare_head && min_bp <= BP_ASSIGNMENT && self.eat(TokenKind::Question)? {
             // Parse consequent (then branch) - use BP_ASSIGNMENT to exclude comma operator
             // This ensures (a ? b : c, d) parses as ((a ? b : c), d) not (a ? b : (c, d))
             // The consequent is `AssignmentExpression[+In]` — `in` is always the
@@ -821,7 +821,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let mut expressions = self.bvec();
             expressions.push(left);
 
-            while self.eat(TokenKind::Comma) {
+            while self.eat(TokenKind::Comma)? {
                 // Parse next expression - use BP_ASSIGNMENT to stop before next comma
                 let next = self.parse_expression_bp(BP_ASSIGNMENT)?;
                 expressions.push(next);
@@ -2792,7 +2792,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // bumps `grouping_depth`) — `in` is a binary operator inside the arguments even
         // in a for-header init, matching call arguments (ecma262 `ArgumentList[+In]`).
         let (arguments, end): (&'arena [&'arena Expression<'arena>], u32) =
-            if self.eat(TokenKind::ParenOpen) {
+            if self.eat(TokenKind::ParenOpen)? {
                 let (args, paren_end) = self.parse_call_arguments()?;
                 (args.into_bump_slice(), paren_end as u32)
             } else {
@@ -3018,10 +3018,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // from acorn-typescript, which accepts 3+ args and rejects the trailing
         // comma. See docs/conformance_svelte.md.
         let mut options: Option<&'arena Expression<'arena>> = None;
-        if self.eat(TokenKind::Comma) && !self.check(&TokenKind::ParenClose) {
+        if self.eat(TokenKind::Comma)? && !self.check(&TokenKind::ParenClose) {
             self.reject_import_call_spread()?; // the options arg is likewise no spread
             options = Some(self.parse_assignment_expression_ref()?);
-            self.eat(TokenKind::Comma); // optional trailing comma after the options
+            self.eat(TokenKind::Comma)?; // optional trailing comma after the options
         }
 
         // Capture end position before consuming ')'
