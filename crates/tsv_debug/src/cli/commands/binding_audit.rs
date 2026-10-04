@@ -25,9 +25,11 @@
 //! subtree its token binds — in the input against the tsv-formatted output. Two
 //! facts make the comparison sound:
 //!
-//! - A **cast** stays invisible even under `preserve_parens` (its `JsdocCast`
-//!   node emits its bare inner), so the audit anchors *inside* the cast's `(`, on
-//!   the first real token, and compares the wrapped subtree.
+//! - A **cast**'s pair is a grouping pair to `preserve_parens` like any other (a
+//!   `ParenthesizedExpression`, as under acorn's `preserveParens`; the `JsdocCast`
+//!   node belongs to the paren-free parse), and its comment binds what the pair
+//!   wraps — so the audit anchors *inside* the cast's `(`, on the first real
+//!   token, and compares the wrapped subtree.
 //! - Under `preserve_parens` the ONLY structural delta formatting can introduce
 //!   is a clarity-paren add/remove (formatting is otherwise structure-preserving —
 //!   `roundtrip_audit` gates that). So the bound subtree's skeleton is compared

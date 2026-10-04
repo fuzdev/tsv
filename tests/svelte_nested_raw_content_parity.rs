@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! A `<script>` or `<style>` nested in Svelte markup formats its body exactly as the
 //! top-level section does, one indent level per enclosing container deeper.

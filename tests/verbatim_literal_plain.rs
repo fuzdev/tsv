@@ -1,5 +1,5 @@
 // `format_is_fixed_point` isn't a `#[test]`, so clippy.toml's allow-panic-in-tests doesn't reach it
-#![allow(clippy::panic)]
+#![expect(clippy::panic)]
 
 //! The verbatim-literal width claim, graded on inputs no corpus holds.
 //!

@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! An assignment's left side must be a `LeftHandSideExpression`
 //! (ecma262 §13.15: `AssignmentExpression : LeftHandSideExpression = AssignmentExpression`,

@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! An **own-line** block comment in a gap whose comment run is pinned to the anchor's
 //! line — the empty-statement body gap (`if (a)⏎/* c */⏎;`) and a labeled statement's

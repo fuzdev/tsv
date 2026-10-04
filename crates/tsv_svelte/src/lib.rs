@@ -118,6 +118,12 @@ fn refuse_lone_cr_in_tag_line_comment(source: &str, arena: &bumpalo::Bump) -> Re
 
 /// Format a Svelte AST back to source code
 ///
+/// `source` must hold **no carriage return**: the printers split lines on `\n` alone, so a
+/// `\r` would reach the output verbatim and the same document could format two ways on two
+/// passes. Parse a CR-folded text (`tsv_lang::printing::normalize_carriage_returns`, via
+/// [`parse_folded`]) and format it with [`format_folded_in`], or call [`format_str`], which
+/// does both. Debug builds assert it.
+///
 /// # Arguments
 ///
 /// * `root` - The Svelte AST to format
@@ -156,6 +162,8 @@ pub fn format_str(source: &str) -> Result<String> {
 }
 
 /// Format into a caller-provided doc arena.
+///
+/// The same precondition on `source` as [`fn@format`]: no carriage return.
 ///
 /// Identical output to [`fn@format`], but the doc IR is built into `arena` instead
 /// of a freshly allocated one, so a driver that formats many files can reuse one

@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! An inline element glued to text on both sides whose own attribute holds a `//` comment lays
 //! out its content **block-style**, like every other attribute that forces the opening tag to

@@ -34,8 +34,9 @@ Each `## Unreleased` section must be non-empty and carry a
   takes `{ast}`; the bare `loc_of` export is gone (use a locator's); `reconstruct_locations`
   reads the language off a parse's root — a `Root`, a `StyleSheetFile`, or a `Program` spanning
   the source — and throws on anything else passed without `{language}`
-- **breaking** feat: `locations.d.ts` renames `Loc` to `SourceLocation` and `LocationOptions` to
-  `ReconstructLocationsOptions`
+- **breaking** feat: the `Loc` type is gone for `SourceLocation` (with `Position`, the AST types'
+  own, at the package root); `LocationOptions` is `ReconstructLocationsOptions`, and
+  `create_locator` takes `LocatorOptions`
 - **breaking** feat: a parse or format of a source that does not parse throws a `SyntaxError`
   (typed `TsvSyntaxError`) with `start` — the UTF-16 offset, in the AST's coordinates — and
   `loc: {line, column}`; the message's `line:col` header follows the same definition, its
@@ -58,7 +59,8 @@ Each `## Unreleased` section must be non-empty and carry a
   markup
 - fix: in a Svelte template expression, comments around a JSDoc cast's parens or a grouping
   paren pair attach as Svelte's parser attaches them — a comment Svelte gives the discarded
-  paren, the cast's own `@type` comment included, is no longer attached to the inner expression
+  paren, the cast's own `@type` comment included, is no longer attached to the inner expression;
+  a `{#snippet}` parameter's JSDoc cast keeps its `ParenthesizedExpression`, as Svelte's does
 - fix: a Svelte multi-line block comment's `value` is dedented by its own line in the document,
   not by the text Svelte's reader handed acorn, so it can differ from Svelte's where a
   `<script>` prefix, block binding or `{#snippet}` head shares that line

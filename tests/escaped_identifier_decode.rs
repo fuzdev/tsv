@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! Wire-level decoding of `\u` unicode escapes in identifier NAME positions that
 //! the fixture pipeline can only exercise through the formatter. A fixture's

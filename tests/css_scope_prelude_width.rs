@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! The width boundary of an `@scope` clause where the text behind it is not the plain
 //! `) {` the fixture measures: each clause is fitted on its line through whatever follows

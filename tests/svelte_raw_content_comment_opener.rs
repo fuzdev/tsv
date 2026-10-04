@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! A `<!--` opening the content of a nested `<script>` / `<style>` or a `<textarea>` is
 //! content, not an HTML comment.

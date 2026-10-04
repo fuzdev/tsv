@@ -1,5 +1,5 @@
-// helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![expect(clippy::expect_used)]
+// helper fns here aren't `#[test]`, so clippy.toml's allow-expect/panic-in-tests don't reach them
+#![expect(clippy::expect_used, clippy::panic)]
 
 //! A lone `<CR>` inside a `//` comment written between an element's attributes is the one
 //! byte the format path's line-terminator fold cannot rewrite, so a Svelte format REFUSES
@@ -33,7 +33,9 @@ const REFUSAL: &str = "lone carriage return inside a '//' comment in a tag";
 /// The CLI's `format_source` error and the fused `tsv_svelte::format_str` error for
 /// `source` — two entry points that must agree, asserted here so each case states it once.
 fn svelte_format_error(source: &str) -> String {
-    let cli = format_source(source, ParserType::Svelte).expect_err("the format must refuse");
+    let cli = format_source(source, ParserType::Svelte)
+        .expect_err("the format must refuse")
+        .to_string();
     let fused = tsv_svelte::format_str(source)
         .expect_err("the fused format must refuse")
         .to_string();
@@ -43,9 +45,8 @@ fn svelte_format_error(source: &str) -> String {
 
 /// The format of `source` through both Svelte entry points, which must agree.
 fn svelte_format_ok(source: &str, label: &str) -> String {
-    let cli = format_source(source, ParserType::Svelte);
-    assert!(cli.is_ok(), "{label} must format: {cli:?}");
-    let cli = cli.expect("asserted Ok above");
+    let cli = format_source(source, ParserType::Svelte)
+        .unwrap_or_else(|e| panic!("{label} must format: {e}"));
     let fused = tsv_svelte::format_str(source).expect("the fused format must agree");
     assert_eq!(
         cli, fused,
@@ -171,13 +172,30 @@ fn a_lone_cr_anywhere_else_in_a_svelte_document_still_formats() {
 }
 
 #[test]
-fn typescript_and_css_never_take_the_refusal() {
+fn typescript_and_css_format_a_lone_cr_as_its_line_feed() {
     // Their line rule ends a `//` / a declaration at a lone `<CR>` already, so the fold is
-    // meaning-preserving there and no second parse runs.
-    let ts = "const a = 1; // c\rconst b = 2;\r";
-    assert!(format_source(ts, ParserType::TypeScript).is_ok());
-    assert!(tsv_ts::format_str(ts).is_ok());
-    let css = "a {\r\tcolor: red; /* c\rd */\r}\r";
-    assert!(format_source(css, ParserType::Css).is_ok());
-    assert!(tsv_css::format_str(css).is_ok());
+    // meaning-preserving there: a lone `<CR>` formats exactly as the `<LF>` it folds to,
+    // through both entry points — no refusal, and no second parse changing the answer.
+    for (parser, source) in [
+        (ParserType::TypeScript, "const a = 1; // c\rconst b = 2;\r"),
+        (ParserType::Css, "a {\r\tcolor: red; /* c\rd */\r}\r"),
+    ] {
+        let lf = source.replace('\r', "\n");
+        let format = |text: &str| {
+            let cli = format_source(text, parser)
+                .unwrap_or_else(|e| panic!("{parser:?} {text:?} must format: {e}"));
+            let fused = match parser {
+                ParserType::TypeScript => tsv_ts::format_str(text),
+                ParserType::Css => tsv_css::format_str(text),
+                ParserType::Svelte => tsv_svelte::format_str(text),
+            }
+            .unwrap_or_else(|e| panic!("{parser:?} {text:?} must format (fused): {e}"));
+            assert_eq!(
+                cli, fused,
+                "{parser:?}: the CLI and the fused entry point disagree"
+            );
+            cli
+        };
+        assert_eq!(format(source), format(&lf), "{parser:?}: {source:?}");
+    }
 }

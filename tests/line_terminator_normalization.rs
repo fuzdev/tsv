@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! Every parse-then-format entry point folds `<CR>` and `<CR><LF>` to `<LF>` **before** it
 //! parses, so a document formats to exactly what its `<LF>` twin formats to — byte for

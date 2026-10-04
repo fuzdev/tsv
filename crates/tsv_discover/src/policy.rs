@@ -55,6 +55,19 @@ pub enum DirVerdict {
     PruneWithWarning,
 }
 
+impl DirVerdict {
+    /// The verdict's string tag — `"descend"`, `"prune"` or `"prune_warn"` — the one
+    /// spelling the WASM and N-API `IgnoreStack.classify_dir` both return, so the JS CLI
+    /// (`npm/cli.js`) reads either package's engine with one set of string compares.
+    pub const fn as_tag(&self) -> &'static str {
+        match self {
+            DirVerdict::Descend => "descend",
+            DirVerdict::Prune => "prune",
+            DirVerdict::PruneWithWarning => "prune_warn",
+        }
+    }
+}
+
 /// Whether a file name has a [formattable extension](FORMATTABLE_EXTENSIONS)
 /// (the JS/TS family, `.svelte`, `.css` — compound forms like `.svelte.ts` are
 /// covered by the `.ts` match). Matches `Path::extension`, so a bare dotfile like
@@ -364,6 +377,15 @@ pub fn should_format_file(name: &str, child_rel: &str, stack: &IgnoreStack) -> b
 mod tests {
     use super::*;
     use crate::test_support::{stack_from, tsv_stack};
+
+    /// The tags both bindings' `classify_dir` return — `npm/cli.js` compares against these
+    /// literals, so a respelling here is a break there.
+    #[test]
+    fn dir_verdict_tags_are_the_bindings_spelling() {
+        assert_eq!(DirVerdict::Descend.as_tag(), "descend");
+        assert_eq!(DirVerdict::Prune.as_tag(), "prune");
+        assert_eq!(DirVerdict::PruneWithWarning.as_tag(), "prune_warn");
+    }
     use tsv_ignore::IgnoreStack;
 
     #[test]

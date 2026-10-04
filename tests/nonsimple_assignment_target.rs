@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! A *non-simple* assignment target — a call (`foo() = bar`), a literal
 //! (`1 >>= 2`), `this` (`this = x`), or any other non-`Reference` left — is not a

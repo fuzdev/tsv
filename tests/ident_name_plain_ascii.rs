@@ -1,5 +1,5 @@
 // `format_holds` isn't a `#[test]`, so clippy.toml's allow-panic-in-tests doesn't reach it
-#![allow(clippy::panic)]
+#![expect(clippy::panic)]
 
 //! The identifier name channel's `plain_ascii` flag, graded on inputs no corpus holds.
 //!

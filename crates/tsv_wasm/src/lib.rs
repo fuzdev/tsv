@@ -30,17 +30,16 @@ use wasm_bindgen::prelude::*;
 // next call's `reset()`, and both helpers park their arena outside the
 // thread-local while it is in use, so a trap here leaves a callable instance
 // (see `tsv_arena`'s §Abort safety — this is the target that made it necessary).
-// The goal-axis macros and the format export's body (`parse_format!`) come from
-// the same crate, so the three bindings share ONE definition of which languages have
-// a goal rather than three hand-synced copies.
-#[cfg(any(feature = "parse", feature = "format"))]
-use tsv_arena::goal_allowed;
-#[cfg(feature = "parse")]
-use tsv_arena::parse_ast;
+// The goal-axis macros and every export body (`parse_convert!`, `parse_internal!`,
+// `parse_format!`) come from the same crate, so the three bindings share ONE definition
+// of which languages have a goal and of what each export does, rather than three
+// hand-synced copies.
 #[cfg(feature = "format")]
 use tsv_arena::parse_format;
+#[cfg(any(feature = "parse", feature = "format"))]
+use tsv_arena::{Family, goal_allowed};
 #[cfg(feature = "parse")]
-use tsv_arena::with_ast_arena;
+use tsv_arena::{parse_convert, parse_internal};
 
 // The one parse-error type, shared by every language crate: each re-exports
 // `tsv_lang::ParseError` (and the `WirePoint` its `wire_point` returns), so the shared
@@ -153,17 +152,20 @@ fn parse_err(e: &ParseError) -> JsValue {
     error.into()
 }
 
-/// Hierarchical, git-faithful matcher for tsv's discovery ignore files,
-/// wrapping `tsv_ignore::IgnoreStack`. Built up by the caller from a repo's
-/// `.gitignore` files plus one tsv file per directory (`.formatignore`, or a
-/// `.prettierignore` where no sibling `.formatignore` shadows it), then queried
-/// per path — both for the raw
-/// ignore status (`is_ignored`) and for the shared `tsv_discover` discovery
-/// verdict (`classify_dir`/`should_format_file`). Exposed so the JS CLI
-/// (`npm/cli.js`) and the VS Code extension share the exact same matcher **and**
-/// prune decision as the native CLI — agreement by construction. Built only into
-/// the `format`-capable packages (`@fuzdev/tsv-format-wasm`, `@fuzdev/tsv-wasm`);
-/// the parse-only package omits it.
+/// The hierarchical, git-faithful matcher for tsv's discovery ignore files, wrapping
+/// `tsv_ignore::IgnoreStack`. Built up by the caller from a repo's `.gitignore` files plus
+/// one tsv file per directory (`.formatignore`, or a `.prettierignore` where no sibling
+/// `.formatignore` shadows it), pushed shallowest-first, then queried per path — for the
+/// raw ignore status (`is_ignored`) and for the discovery verdicts and warning strings it
+/// delegates to `tsv_discover` (`classify_dir`, `should_format_file`, `is_path_pruned`,
+/// `excluded_argument_warning`, …). Exposed so every JS surface (`npm/cli.js`, the VS Code
+/// extension) shares the exact same matcher **and** prune decision as the native CLI —
+/// agreement by construction. Format-capable builds only: discovery exists to feed the
+/// formatter.
+///
+/// The N-API twin (`tsv_napi`'s `IgnoreStack`) mirrors it — same method names, argument
+/// order and return shapes — so `npm/cli.js` drives either package's copy unchanged. Built
+/// only into `@fuzdev/tsv-format-wasm` and `@fuzdev/tsv-wasm`; the parse-only package omits it.
 #[cfg(feature = "format")]
 #[wasm_bindgen]
 pub struct IgnoreStack {
@@ -221,26 +223,22 @@ impl IgnoreStack {
     }
 
     /// The discovery verdict for one child **directory**, delegating to
-    /// `tsv_discover::classify_dir` — the safety-net / build-output-heuristic /
-    /// matcher decision shared with the native CLI. Returns `"descend"`,
-    /// `"prune"`, or `"prune_warn"`. `name` is the directory's final path
+    /// `tsv_discover::classify_dir` — the safety-net / build-output-heuristic / matcher
+    /// decision shared with the native CLI — as its tag (`DirVerdict::as_tag`):
+    /// `"descend"`, `"prune"`, or `"prune_warn"`. `name` is the directory's final path
     /// segment, `child_rel` its format-root-relative `/`-separated path, and
     /// `heuristic_active` is true while no `.gitignore` governs this level. On
     /// `"prune_warn"` the caller fetches the message via
     /// [`shadow_warning`](IgnoreStack::shadow_warning).
     ///
-    /// A string tag (rather than a wasm-bindgen enum or a returned struct) keeps
-    /// the package facade / `patch_npm_package.ts` unchanged and allocates no JS
-    /// object on the common descend path. The generated declaration names the three
-    /// tags (`unchecked_return_type`), as the N-API twin's hand-written one does, so
-    /// the two packages type-check interchangeably.
+    /// A string tag rather than an enum or a returned struct: it allocates no JS object on
+    /// the common descend path, and both packages' declarations name the three tags, so
+    /// the two type-check interchangeably.
     #[wasm_bindgen(unchecked_return_type = "'descend' | 'prune' | 'prune_warn'")]
     pub fn classify_dir(&self, name: &str, child_rel: &str, heuristic_active: bool) -> String {
-        match tsv_discover::classify_dir(name, child_rel, heuristic_active, &self.inner) {
-            tsv_discover::DirVerdict::Descend => "descend".to_string(),
-            tsv_discover::DirVerdict::Prune => "prune".to_string(),
-            tsv_discover::DirVerdict::PruneWithWarning => "prune_warn".to_string(),
-        }
+        tsv_discover::classify_dir(name, child_rel, heuristic_active, &self.inner)
+            .as_tag()
+            .to_string()
     }
 
     /// Whether a child **file** should be formatted (a formattable extension and
@@ -443,7 +441,7 @@ impl SourceTypeArg {
 fn wasm_source_type(
     source_type: SourceTypeArg,
     allowed: bool,
-    noun: &str,
+    family: Family,
 ) -> Result<Option<tsv_ts::Goal>, String> {
     let source_type = match source_type {
         SourceTypeArg::Unset => None,
@@ -463,7 +461,7 @@ fn wasm_source_type(
     tsv_arena::decode_source_type(
         source_type.as_deref(),
         allowed,
-        noun,
+        family,
         tsv_ts::Goal::from_source_type,
     )
 }
@@ -512,15 +510,17 @@ macro_rules! lang_bindings {
             let goal = wasm_source_type(
                 SourceTypeArg::read(&source_type),
                 goal_allowed!($goalness),
-                "parse",
+                Family::Parse,
             )
-            .map_err(err)?
-            .unwrap_or(tsv_ts::Goal::Module);
-            with_ast_arena(|arena| {
-                let ast =
-                    parse_ast!($goalness, $lang, source, goal, arena).map_err(|e| parse_err(&e))?;
-                Ok($lang::convert_ast_json_string(&ast, source))
-            })
+            .map_err(err)?;
+            parse_convert!(
+                $goalness,
+                $lang,
+                convert_ast_json_string,
+                source,
+                goal,
+                |e| parse_err(&e)
+            )
         }
 
         /// Parse only, no serialization — the benchmark coverage/throughput probe.
@@ -530,16 +530,10 @@ macro_rules! lang_bindings {
             let goal = wasm_source_type(
                 SourceTypeArg::read(&source_type),
                 goal_allowed!($goalness),
-                "parse",
+                Family::Parse,
             )
-            .map_err(err)?
-            .unwrap_or(tsv_ts::Goal::Module);
-            with_ast_arena(|arena| {
-                let ast =
-                    parse_ast!($goalness, $lang, source, goal, arena).map_err(|e| parse_err(&e))?;
-                std::hint::black_box(&ast);
-                Ok(())
-            })
+            .map_err(err)?;
+            parse_internal!($goalness, $lang, source, goal, |e| parse_err(&e))
         }
 
         /// Format source. The source type shapes only the parse the formatter runs;
@@ -550,7 +544,7 @@ macro_rules! lang_bindings {
             let goal = wasm_source_type(
                 SourceTypeArg::read(&source_type),
                 goal_allowed!($goalness),
-                "format",
+                Family::Format,
             )
             .map_err(err)?;
             parse_format!($goalness, $lang, source, goal, |e| parse_err(&e))
@@ -585,7 +579,7 @@ lang_bindings!(
 
 #[cfg(all(test, any(feature = "parse", feature = "format")))]
 mod tests {
-    use super::{SourceTypeArg, wasm_source_type};
+    use super::{Family, SourceTypeArg, wasm_source_type};
 
     fn text(value: &str) -> SourceTypeArg {
         SourceTypeArg::Text(value.to_owned())
@@ -597,26 +591,26 @@ mod tests {
     #[test]
     fn wasm_source_type_decodes_and_words_every_refusal() {
         assert_eq!(
-            wasm_source_type(SourceTypeArg::Unset, true, "parse"),
+            wasm_source_type(SourceTypeArg::Unset, true, Family::Parse),
             Ok(None)
         );
         assert_eq!(
-            wasm_source_type(SourceTypeArg::Unset, false, "format"),
+            wasm_source_type(SourceTypeArg::Unset, false, Family::Format),
             Ok(None)
         );
         assert_eq!(
-            wasm_source_type(text("script"), true, "parse"),
+            wasm_source_type(text("script"), true, Family::Parse),
             Ok(Some(tsv_ts::Goal::Script))
         );
         assert_eq!(
-            wasm_source_type(text("module"), true, "format"),
+            wasm_source_type(text("module"), true, Family::Format),
             Ok(Some(tsv_ts::Goal::Module))
         );
         // a goalless language refuses the axis, `"module"` included
-        for noun in ["parse", "format"] {
+        for (family, noun) in [(Family::Parse, "parse"), (Family::Format, "format")] {
             for value in ["script", "module"] {
                 assert_eq!(
-                    wasm_source_type(text(value), false, noun),
+                    wasm_source_type(text(value), false, family),
                     Err(format!(
                         "{noun} option 'sourceType' is only supported for TypeScript"
                     ))
@@ -624,12 +618,12 @@ mod tests {
             }
         }
         assert_eq!(
-            wasm_source_type(text("sloppy"), true, "parse"),
+            wasm_source_type(text("sloppy"), true, Family::Parse),
             Err("invalid sourceType 'sloppy' (expected 'script' or 'module')".to_owned())
         );
         // the empty string is a string — refused by value, as the facade refuses it
         assert_eq!(
-            wasm_source_type(text(""), true, "parse"),
+            wasm_source_type(text(""), true, Family::Parse),
             Err("invalid sourceType '' (expected 'script' or 'module')".to_owned())
         );
     }
@@ -650,7 +644,11 @@ mod tests {
         ] {
             for allowed in [true, false] {
                 assert_eq!(
-                    wasm_source_type(SourceTypeArg::Other(kind.to_owned()), allowed, "parse"),
+                    wasm_source_type(
+                        SourceTypeArg::Other(kind.to_owned()),
+                        allowed,
+                        Family::Parse
+                    ),
                     Err(format!(
                         "invalid sourceType: expected a string ('script' or 'module'), \
                          got {article} {kind}"

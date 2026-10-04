@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! A plain `function f() {}` inside a `declare namespace`/`module` body carries no
 //! `declare` keyword of its own, so it is an ordinary function *declaration with a

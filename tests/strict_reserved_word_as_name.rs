@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! The strict-mode-reserved words — `implements`, `interface`, `let`, `package`,
 //! `private`, `protected`, `public`, `static`, `yield` — are ordinary names as far

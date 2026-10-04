@@ -1307,6 +1307,10 @@ fn format_stylesheet(
     line_breaks: LineBreaks<'_>,
     arena: &DocArena,
 ) -> String {
+    debug_assert!(
+        !source.contains('\r'),
+        "a format entry point takes CR-folded text (`tsv_lang::printing::normalize_carriage_returns`)"
+    );
     // The print-once comment ledger's expectation for this stylesheet — detached comments
     // plus in-block `CssBlockChild::Comment` AST nodes (diagnostic; see
     // `tsv_lang::comment_ledger`).

@@ -36,17 +36,18 @@ use napi_derive::napi;
 use napi::bindgen_prelude::{Either, Undefined};
 // Per-thread reusable arenas live in the shared `tsv_arena` crate (used by both
 // native bindings — see its module docs for the reuse rationale + soundness).
-// The goal-axis macros and the format export's body (`parse_format!`) come from
-// the same crate, so the three bindings share ONE definition of which languages have
-// a goal rather than three hand-synced copies.
-#[cfg(any(feature = "parse", feature = "format"))]
-use tsv_arena::goal_allowed;
-#[cfg(feature = "parse")]
-use tsv_arena::parse_ast;
+// The goal-axis macros and every export body (`parse_convert!`, `parse_internal!`,
+// `parse_format!`) come from the same crate, so the three bindings share ONE definition
+// of which languages have a goal and of what each export does, rather than three
+// hand-synced copies.
 #[cfg(feature = "format")]
 use tsv_arena::parse_format;
-#[cfg(any(feature = "parse", feature = "panic_probe"))]
+#[cfg(feature = "panic_probe")]
 use tsv_arena::with_ast_arena;
+#[cfg(any(feature = "parse", feature = "format"))]
+use tsv_arena::{Family, goal_allowed};
+#[cfg(feature = "parse")]
+use tsv_arena::{parse_convert, parse_internal};
 
 // The one parse-error type, shared by every language crate: each re-exports
 // `tsv_lang::ParseError` (and the `WirePoint` its `wire_point` returns), so the shared
@@ -56,8 +57,8 @@ use tsv_arena::with_ast_arena;
 use tsv_ts::ParseError;
 use tsv_ts::WirePoint;
 
-/// Decode the optional `sourceType` argument (`"script"` / `"module"`); omitted
-/// or `undefined` stays **unset**.
+/// Decode the optional `sourceType` argument (`"script"` / `"module"`); omitted,
+/// `undefined` or `null` stays **unset** (napi-rs reads both as `None`).
 ///
 /// `allowed` is the language's goal axis ([`goal_allowed!`]). A source type
 /// against a language that has none is an **error**, not a silent Module: Svelte
@@ -74,15 +75,15 @@ use tsv_ts::WirePoint;
 fn napi_source_type(
     source_type: Option<String>,
     allowed: bool,
-    noun: &str,
+    family: Family,
 ) -> Result<Option<tsv_ts::Goal>, Failure> {
-    // `noun` names the export family (`parse` / `format`), as the npm facade's options
-    // reader and `tsv_wasm` spell it — this addon is published on its own
-    // (`@fuzdev/tsv-<triple>`), so it says the whole sentence itself
+    // the refusal names the export family, as the npm facade's options reader and
+    // `tsv_wasm` spell it — this addon is published on its own (`@fuzdev/tsv-<triple>`),
+    // so it says the whole sentence itself
     tsv_arena::decode_source_type(
         source_type.as_deref(),
         allowed,
-        noun,
+        family,
         tsv_ts::Goal::from_source_type,
     )
     .map_err(Failure::Plain)
@@ -127,65 +128,46 @@ impl Failure {
     /// the npm facade (`npm/api.js`) reads to rethrow it as the published `SyntaxError`, so
     /// these names are its contract, shared with `tsv_wasm`. Built on `env` and handed to
     /// napi-rs as a reference (`napi::Error::from(Unknown)`), so the object thrown is this
-    /// one. Were building it to fail, the message still throws, without the point.
+    /// one ([`engine_error`]). Were building it to fail, the message still throws, without
+    /// the point.
     fn into_napi(self, env: Env) -> napi::Error {
-        match self {
-            Failure::Plain(message) => napi::Error::from_reason(message),
-            Failure::Syntax { message, point } => match pointed_error(env, &message, point) {
-                Ok(error) => error,
-                Err(_) => napi::Error::from_reason(message),
-            },
-        }
+        let (message, point) = match self {
+            Failure::Plain(message) => (message, None),
+            Failure::Syntax { message, point } => (message, Some(point)),
+        };
+        engine_error(env, &message, point).unwrap_or_else(|_| napi::Error::from_reason(message))
     }
 }
 
-/// A JS `Error` carrying `message` and the three point properties, as a `napi::Error`
-/// that throws that very object.
+/// A JS `Error` carrying `message` — and, given a `point`, the three point properties — as
+/// a `napi::Error` that throws that very object.
 ///
-/// Each property is deleted before it is set, so all three are own ENUMERABLE data
+/// Its own keys are exactly what `tsv_wasm` throws: none for a plain error, the point's
+/// three for a located one. `Env::create_error` sets an own enumerable `code` (the status,
+/// `'GenericFailure'`) that a WASM engine's `Error` never carries, and a plain error
+/// passes through the facade as the same object, so the `code` is deleted — a package swap
+/// must not change what a caller's `Object.keys` reads.
+///
+/// Each point property is deleted before it is set, so all three are own ENUMERABLE data
 /// properties — what the facade requires of a point. Bun gives every `Error` its own
 /// non-enumerable `line` and `column` at construction, and a plain set writes through
 /// that property and keeps it non-enumerable; with nothing to delete (Node, Deno) the
 /// delete is a no-op.
-fn pointed_error(env: Env, message: &str, point: WirePoint) -> napi::Result<napi::Error> {
+fn engine_error(env: Env, message: &str, point: Option<WirePoint>) -> napi::Result<napi::Error> {
     let mut error = env.create_error(napi::Error::from_reason(message))?;
-    let WirePoint {
+    error.delete_named_property("code")?;
+    if let Some(WirePoint {
         start,
         line,
         column,
-    } = point;
-    for (name, value) in [("start", start), ("line", line), ("column", column)] {
-        error.delete_named_property(name)?;
-        error.set(name, value)?;
+    }) = point
+    {
+        for (name, value) in [("start", start), ("line", line), ("column", column)] {
+            error.delete_named_property(name)?;
+            error.set(name, value)?;
+        }
     }
     Ok(napi::Error::from(error.to_unknown()))
-}
-
-// Per-language compound-op helpers: parse the source into a per-thread AST arena
-// and run the conversion/format/no-op over it. Every language crate is
-// interner-free (identifier and element/attribute names are span-identity), so
-// these are uniform across svelte/typescript/css — no per-language arity split.
-#[cfg(feature = "parse")]
-macro_rules! parse_convert {
-    ($goalness:ident, $lang:ident, $source:expr, $goal:expr) => {
-        with_ast_arena(|arena| {
-            let ast = parse_ast!($goalness, $lang, $source, $goal, arena)
-                .map_err(|e| Failure::parse(&e))?;
-            Ok($lang::convert_ast_json_string(&ast, $source))
-        })
-    };
-}
-
-#[cfg(feature = "parse")]
-macro_rules! parse_internal {
-    ($goalness:ident, $lang:ident, $source:expr, $goal:expr) => {
-        with_ast_arena(|arena| {
-            let ast = parse_ast!($goalness, $lang, $source, $goal, arena)
-                .map_err(|e| Failure::parse(&e))?;
-            std::hint::black_box(&ast);
-            Ok(())
-        })
-    };
 }
 
 /// Generate `parse_<lang>_json` / `parse_internal_<lang>` / `format_<lang>` N-API
@@ -206,14 +188,15 @@ macro_rules! parse_internal {
 // shared npm facade's `call_engine`, `crates/tsv_wasm/npm/api.js`) calls every export
 // the same way — the source, then the decoded source type as a string or `undefined`.
 //
-// At Script goal `await` is an ordinary identifier and `import`/`export`/
-// `import.meta` are syntax errors. See `tsv parse --source-type` and
+// At Script goal `await` is an ordinary identifier — so a top-level `await` with an
+// operand is a syntax error — and so are top-level `import`/`export` declarations,
+// `import.meta` and a top-level `for await`. See `tsv parse --source-type` and
 // `tsv_ts::parse_with_goal`.
 //
 // `tsv_ffi` spells the same axis as a `u32` source-type code and `tsv_wasm` as the
-// same trailing optional string this addon takes; each binding's
-// own `lang_bindings!` reads the SAME `parse_ast!` / `goal_allowed!` pair out of
-// `tsv_arena`, so which languages have a goal axis is one fact in one place
+// same trailing optional string this addon takes; each binding's own
+// `lang_bindings!` builds its bodies from the SAME `tsv_arena` macros, over one
+// `goal_allowed!` tag, so which languages have a goal axis is one fact in one place
 // rather than three that agree today.
 macro_rules! lang_bindings {
     (
@@ -234,9 +217,15 @@ macro_rules! lang_bindings {
                 source: &str,
                 source_type: Option<String>,
             ) -> Result<String, Failure> {
-                let goal = napi_source_type(source_type, goal_allowed!($goalness), "parse")?
-                    .unwrap_or(tsv_ts::Goal::Module);
-                parse_convert!($goalness, $lang, source, goal)
+                let goal = napi_source_type(source_type, goal_allowed!($goalness), Family::Parse)?;
+                parse_convert!(
+                    $goalness,
+                    $lang,
+                    convert_ast_json_string,
+                    source,
+                    goal,
+                    |e| Failure::parse(&e)
+                )
             }
 
             /// Parse only, no conversion.
@@ -245,9 +234,8 @@ macro_rules! lang_bindings {
                 source: &str,
                 source_type: Option<String>,
             ) -> Result<(), Failure> {
-                let goal = napi_source_type(source_type, goal_allowed!($goalness), "parse")?
-                    .unwrap_or(tsv_ts::Goal::Module);
-                parse_internal!($goalness, $lang, source, goal)
+                let goal = napi_source_type(source_type, goal_allowed!($goalness), Family::Parse)?;
+                parse_internal!($goalness, $lang, source, goal, |e| Failure::parse(&e))
             }
 
             /// The formatted source.
@@ -256,7 +244,7 @@ macro_rules! lang_bindings {
                 source: &str,
                 source_type: Option<String>,
             ) -> Result<String, Failure> {
-                let goal = napi_source_type(source_type, goal_allowed!($goalness), "format")?;
+                let goal = napi_source_type(source_type, goal_allowed!($goalness), Family::Format)?;
                 parse_format!($goalness, $lang, source, goal, |e| Failure::parse(&e))
             }
         }
@@ -350,14 +338,20 @@ lang_bindings!(
 // package that swaps for the other must not change which of the two a caller
 // sees. `Undefined` is napi-rs's `()`, so the none arm allocates nothing.
 
-/// The gitignore-aware matcher stack, mirroring `tsv_wasm`'s `IgnoreStack`.
+/// The hierarchical, git-faithful matcher for tsv's discovery ignore files, wrapping
+/// `tsv_ignore::IgnoreStack`. Built up by the caller from a repo's `.gitignore` files plus
+/// one tsv file per directory (`.formatignore`, or a `.prettierignore` where no sibling
+/// `.formatignore` shadows it), pushed shallowest-first, then queried per path — for the
+/// raw ignore status (`is_ignored`) and for the discovery verdicts and warning strings it
+/// delegates to `tsv_discover` (`classify_dir`, `should_format_file`, `is_path_pruned`,
+/// `excluded_argument_warning`, …). Exposed so every JS surface (`npm/cli.js`, the VS Code
+/// extension) shares the exact same matcher **and** prune decision as the native CLI —
+/// agreement by construction. Format-capable builds only: discovery exists to feed the
+/// formatter.
 ///
-/// Holds `.gitignore` and tsv (`.formatignore` / `.prettierignore`) layers
-/// pushed shallowest-first, answers the per-path ignore status
-/// (`is_ignored`), and delegates the discovery verdicts (`classify_dir`,
-/// `should_format_file`, `is_path_pruned`, `excluded_argument_warning`) plus the shared
-/// warning strings to
-/// `tsv_discover`.
+/// The twin of `tsv_wasm`'s `IgnoreStack` — same method names, argument order and return
+/// shapes — so `npm/cli.js`, which imports its engine from `./index.js`, drives either
+/// package's copy unchanged.
 #[cfg(feature = "format")]
 #[napi]
 pub struct IgnoreStack {
@@ -422,22 +416,23 @@ impl IgnoreStack {
         self.inner.is_ignored(&path, is_dir)
     }
 
-    /// The discovery verdict for one child **directory**: `"descend"`,
-    /// `"prune"`, or `"prune_warn"`. `name` is the directory's final path
+    /// The discovery verdict for one child **directory**, delegating to
+    /// `tsv_discover::classify_dir` — the safety-net / build-output-heuristic / matcher
+    /// decision shared with the native CLI — as its tag (`DirVerdict::as_tag`):
+    /// `"descend"`, `"prune"`, or `"prune_warn"`. `name` is the directory's final path
     /// segment, `child_rel` its format-root-relative `/`-separated path, and
     /// `heuristic_active` is true while no `.gitignore` governs this level. On
     /// `"prune_warn"` the caller fetches the message via
     /// [`shadow_warning`](IgnoreStack::shadow_warning).
     ///
-    /// A string tag rather than an enum or a struct — same as the wasm side,
-    /// and it allocates no JS object on the common descend path.
+    /// A string tag rather than an enum or a returned struct: it allocates no JS object on
+    /// the common descend path, and both packages' declarations name the three tags, so
+    /// the two type-check interchangeably.
     #[napi(js_name = "classify_dir", catch_unwind)]
     pub fn classify_dir(&self, name: String, child_rel: String, heuristic_active: bool) -> String {
-        match tsv_discover::classify_dir(&name, &child_rel, heuristic_active, &self.inner) {
-            tsv_discover::DirVerdict::Descend => "descend".to_string(),
-            tsv_discover::DirVerdict::Prune => "prune".to_string(),
-            tsv_discover::DirVerdict::PruneWithWarning => "prune_warn".to_string(),
-        }
+        tsv_discover::classify_dir(&name, &child_rel, heuristic_active, &self.inner)
+            .as_tag()
+            .to_string()
     }
 
     /// Whether a child **file** should be formatted (a formattable extension and

@@ -153,7 +153,7 @@ enum ParseErrorKind {
     // Constructed only by `ensure_source_fits`, which every public parse entry point
     // calls before touching the source — that guard is what makes `Token`/`Span`'s
     // `u32` offsets sound (see `tsv_ts/src/lexer/token.rs`).
-    #[error("File too large: {size} bytes (maximum: {max} bytes / 4GB)")]
+    #[error("File too large: {size} bytes (maximum: {max} bytes / 4 GiB)")]
     FileTooLarge { size: usize, max: usize },
     // Constructed only by `ParseError::refusal`. Positionless on purpose, though its text
     // names a position: see that constructor.
@@ -315,7 +315,18 @@ impl ParseError {
         self.0.kind.located().map(|(position, _)| *position)
     }
 
-    /// Source exceeds the 4 GB cap the `u32` span offsets assume.
+    /// Whether this is a **syntax error** — the source is malformed at a point — rather
+    /// than one of the positionless kinds: a source over the `u32` cap, or a
+    /// [`ParseError::refusal`] of a source that parses. The one question every surface
+    /// asks before choosing its channel: the CLI's `Parse error:` prefix, a binding's
+    /// thrown error with its point on it. A whole-document parse entry point fills every
+    /// syntax error's context, so on its errors this is exactly
+    /// `wire_point().is_some()` — what a binding reads when it needs the point itself.
+    pub fn is_syntax_error(&self) -> bool {
+        self.0.kind.located().is_some()
+    }
+
+    /// Source exceeds the 4 GiB − 1 cap the `u32` span offsets assume.
     fn file_too_large(size: usize, max: usize) -> Self {
         ParseError::new(ParseErrorKind::FileTooLarge { size, max })
     }
@@ -603,7 +614,7 @@ mod tests {
         );
         assert_eq!(
             ParseError::file_too_large(5, 4).to_string(),
-            "File too large: 5 bytes (maximum: 4 bytes / 4GB)"
+            "File too large: 5 bytes (maximum: 4 bytes / 4 GiB)"
         );
 
         // `with_context` on the context-free variant is a no-op, not a panic, and it has
@@ -611,7 +622,7 @@ mod tests {
         let too_large = ParseError::file_too_large(5, 4).with_context(source, ECMA);
         assert_eq!(
             too_large.to_string(),
-            "File too large: 5 bytes (maximum: 4 bytes / 4GB)"
+            "File too large: 5 bytes (maximum: 4 bytes / 4 GiB)"
         );
         assert_eq!(too_large.wire_point(), None);
         // Nor does a located error no context has been filled for.

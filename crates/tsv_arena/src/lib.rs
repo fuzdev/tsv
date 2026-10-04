@@ -5,8 +5,10 @@
 //! would otherwise hand-sync them, and each encodes a contract too subtle to
 //! keep three copies of honest (see the crate's CLAUDE.md §Why this crate
 //! exists). The arenas are the bulk of it and are described below; the goal
-//! macros ([`parse_ast!`], [`goal_allowed!`], and the format path's `parse_format!`) and
-//! the string-axis decoder ([`decode_source_type`]) sit at the bottom of this file.
+//! macros ([`parse_ast!`], [`parse_ast_for_format!`], [`goal_allowed!`]), the export
+//! bodies built on them ([`parse_convert!`], [`parse_internal!`], and the format path's
+//! `parse_format!`), the export [`Family`] and the string-axis decoder
+//! ([`decode_source_type`]) sit at the bottom of this file.
 //!
 //! # The arenas
 //!
@@ -151,18 +153,44 @@ pub fn with_doc_arena<R>(f: impl FnOnce(&tsv_lang::doc::arena::DocArena) -> R) -
 // shared substrate goes rather than in any one of them (see the crate's
 // CLAUDE.md §Why this crate exists).
 
+/// Which export family a binding call belongs to — the one fact that decides what an
+/// **unset** source type means (a parse reads it as `Module`, a format as "none named",
+/// the module-then-script fallback), and the noun every source-type refusal names.
+///
+/// One type for all three bindings' decoders: `tsv_ffi`'s `ffi_source_type` reads it to
+/// decide whether its unspecified code is accepted (format only), and the two string-axis
+/// bindings pass it through [`decode_source_type`] for the refusal's wording.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Family {
+    /// `parse_*` / `parse_*_json` / `parse_internal_*` — a wire whose
+    /// `Program.sourceType` one settled grammar must produce.
+    Parse,
+    /// `format_*` — whose source type shapes only the parse the formatter runs.
+    Format,
+}
+
+impl Family {
+    /// The family's name as the refusals spell it: `parse` / `format`.
+    pub const fn noun(self) -> &'static str {
+        match self {
+            Family::Parse => "parse",
+            Family::Format => "format",
+        }
+    }
+}
+
 /// Decode a string-spelled source type — `tsv_wasm` and `tsv_napi`'s trailing optional
 /// argument — into the language's goal; `None` (omitted, `undefined`, `null`) stays
-/// **unset**, and what that means is the caller's (a parse reads it as `Module`, a
+/// **unset**, and what that means is the `family`'s (a parse reads it as `Module`, a
 /// format as "none named").
 ///
 /// `allowed` is the language's goal axis ([`goal_allowed!`]): a source type named on a
 /// language with none (Svelte hard-wires `Module`; CSS has no goal) is refused rather
 /// than ignored, `"module"` included, so a caller cannot believe it selected a goal that
-/// was silently dropped. `noun` names the export family (`parse` / `format`). A value
-/// naming neither goal is refused with the value echoed. `from_source_type` is the
-/// language crate's own spelling table (`tsv_ts::Goal::from_source_type`), passed in so
-/// this crate depends on no language crate.
+/// was silently dropped; the refusal names the export `family`. A value naming neither
+/// goal is refused with the value echoed. `from_source_type` is the language crate's own
+/// spelling table (`tsv_ts::Goal::from_source_type`), passed in so this crate depends on
+/// no language crate.
 ///
 /// One spelling of both refusals for the two string-axis bindings — the npm facade both
 /// package sets publish through (`crates/tsv_wasm/npm/api.js`) restates them by hand in
@@ -178,7 +206,7 @@ pub fn with_doc_arena<R>(f: impl FnOnce(&tsv_lang::doc::arena::DocArena) -> R) -
 pub fn decode_source_type<G>(
     source_type: Option<&str>,
     allowed: bool,
-    noun: &str,
+    family: Family,
     from_source_type: impl FnOnce(&str) -> Option<G>,
 ) -> Result<Option<G>, String> {
     let Some(source_type) = source_type else {
@@ -186,7 +214,8 @@ pub fn decode_source_type<G>(
     };
     if !allowed {
         return Err(format!(
-            "{noun} option 'sourceType' is only supported for TypeScript"
+            "{} option 'sourceType' is only supported for TypeScript",
+            family.noun()
         ));
     }
     from_source_type(source_type).map(Some).ok_or_else(|| {
@@ -218,6 +247,63 @@ macro_rules! parse_ast {
         // expansion.
         let _ = $goal;
         $lang::parse($source, $arena)
+    }};
+}
+
+/// A binding's whole **parse** export body: parse `$source` through [`parse_ast!`] into the
+/// per-thread AST arena and convert it with the language's `$convert` writer
+/// (`convert_ast_json_bytes` for the C FFI, `convert_ast_json_string` for the two JS
+/// bindings), a parse error mapped through `$map_err`, the binding's own error type.
+///
+/// `$goal` is the binding's decoded `Option` goal, and an unset one is read here as the
+/// grammar's default, `Module` (`Goal::default()`): a parse has no fallback to run, since
+/// its wire carries `Program.sourceType`, a claim one settled grammar has to produce.
+/// The parse reads the caller's own bytes — no line-terminator fold, unlike
+/// `parse_format!` — because the wire's offsets are a drop-in contract over them.
+///
+/// Expands to `Result<_, _>` inside the caller's context, so the caller's `?`-conversion
+/// rules apply; `$lang` resolves in the caller's scope, as in [`parse_ast!`].
+///
+/// ```ignore
+/// parse_convert!(goal, tsv_ts, convert_ast_json_string, source, goal, |e| e.to_string())
+/// ```
+#[macro_export]
+macro_rules! parse_convert {
+    ($goalness:ident, $lang:ident, $convert:ident, $source:expr, $goal:expr, $map_err:expr) => {{
+        let source = $source;
+        let goal = $goal.unwrap_or_default();
+        $crate::with_ast_arena(|arena| {
+            let ast =
+                $crate::parse_ast!($goalness, $lang, source, goal, arena).map_err($map_err)?;
+            Ok($lang::$convert(&ast, source))
+        })
+    }};
+}
+
+/// [`parse_convert!`] without the convert: the benchmark-only `parse_internal_*` body,
+/// which parses and throws the AST away so the timing isolates the parse from the
+/// convert/serialize layers. Expands to `Result<(), _>`; the goal reads as
+/// [`parse_convert!`]'s does.
+///
+/// `black_box(&ast)` sits *inside* the arena closure on purpose — that is the only scope
+/// where the AST still exists, so nothing further out can stand in for it. Drop it and
+/// the whole parse becomes dead code the optimizer may delete, leaving a benchmark that
+/// got faster by measuring nothing.
+///
+/// ```ignore
+/// parse_internal!(goal, tsv_ts, source, goal, |e| e.to_string())
+/// ```
+#[macro_export]
+macro_rules! parse_internal {
+    ($goalness:ident, $lang:ident, $source:expr, $goal:expr, $map_err:expr) => {{
+        let source = $source;
+        let goal = $goal.unwrap_or_default();
+        $crate::with_ast_arena(|arena| {
+            let ast =
+                $crate::parse_ast!($goalness, $lang, source, goal, arena).map_err($map_err)?;
+            ::std::hint::black_box(&ast);
+            Ok(())
+        })
     }};
 }
 
@@ -505,6 +591,79 @@ mod tests {
         );
     }
 
+    /// A language whose parse can fail, for the export-body macros: its goal type is `&str`,
+    /// whose `Default` (`""`) stands in for `Goal::Module`.
+    mod fake_fallible_lang {
+        pub fn parse(source: &str, arena: &bumpalo::Bump) -> Result<String, String> {
+            parse_with_goal(source, "goalless", arena)
+        }
+        pub fn parse_with_goal(
+            source: &str,
+            goal: &str,
+            _arena: &bumpalo::Bump,
+        ) -> Result<String, String> {
+            if source == "bad" {
+                Err(format!("bad source at {goal:?}"))
+            } else {
+                Ok(format!("ast({source}, {goal:?})"))
+            }
+        }
+        pub fn convert(ast: &String, source: &str) -> String {
+            format!("convert({ast}, {source})")
+        }
+    }
+
+    #[test]
+    fn parse_convert_parses_converts_and_maps_the_error() {
+        let run = |source: &str, goal: Option<&str>| -> Result<String, String> {
+            parse_convert!(
+                goal,
+                fake_fallible_lang,
+                convert,
+                source,
+                goal,
+                |e| format!("mapped {e}")
+            )
+        };
+        assert_eq!(
+            run("src", Some("script")),
+            Ok(r#"convert(ast(src, "script"), src)"#.to_owned()),
+            "a named goal threads through"
+        );
+        assert_eq!(
+            run("src", None),
+            Ok(r#"convert(ast(src, ""), src)"#.to_owned()),
+            "an unset goal reads as the goal type's default (`Goal::Module`)"
+        );
+        assert_eq!(
+            run("bad", None),
+            Err(r#"mapped bad source at """#.to_owned()),
+            "a parse error goes through `$map_err`"
+        );
+        let goalless: Result<String, String> = parse_convert!(
+            nogoal,
+            fake_fallible_lang,
+            convert,
+            "src",
+            None::<&str>,
+            |e| e
+        );
+        assert_eq!(
+            goalless,
+            Ok(r#"convert(ast(src, "goalless"), src)"#.to_owned()),
+            "`nogoal` takes the goalless entry point"
+        );
+    }
+
+    #[test]
+    fn parse_internal_parses_and_returns_nothing() {
+        let run = |source: &str| -> Result<(), String> {
+            parse_internal!(goal, fake_fallible_lang, source, None::<&str>, |e| e)
+        };
+        assert_eq!(run("src"), Ok(()));
+        assert_eq!(run("bad"), Err(r#"bad source at """#.to_owned()));
+    }
+
     #[test]
     fn decode_source_type_decodes_and_words_every_refusal() {
         let from = |s: &str| match s {
@@ -512,21 +671,28 @@ mod tests {
             "script" => Some("S"),
             _ => None,
         };
-        assert_eq!(decode_source_type(None, true, "parse", from), Ok(None));
-        assert_eq!(decode_source_type(None, false, "format", from), Ok(None));
         assert_eq!(
-            decode_source_type(Some("script"), true, "parse", from),
+            decode_source_type(None, true, Family::Parse, from),
+            Ok(None)
+        );
+        assert_eq!(
+            decode_source_type(None, false, Family::Format, from),
+            Ok(None)
+        );
+        assert_eq!(
+            decode_source_type(Some("script"), true, Family::Parse, from),
             Ok(Some("S"))
         );
         assert_eq!(
-            decode_source_type(Some("module"), true, "format", from),
+            decode_source_type(Some("module"), true, Family::Format, from),
             Ok(Some("M"))
         );
         // a goalless language refuses the axis, `"module"` included, ahead of the value
-        for noun in ["parse", "format"] {
+        for (family, noun) in [(Family::Parse, "parse"), (Family::Format, "format")] {
+            assert_eq!(family.noun(), noun);
             for value in ["script", "module", "sloppy"] {
                 assert_eq!(
-                    decode_source_type(Some(value), false, noun, from),
+                    decode_source_type(Some(value), false, family, from),
                     Err(format!(
                         "{noun} option 'sourceType' is only supported for TypeScript"
                     ))
@@ -534,12 +700,12 @@ mod tests {
             }
         }
         assert_eq!(
-            decode_source_type(Some("sloppy"), true, "parse", from),
+            decode_source_type(Some("sloppy"), true, Family::Parse, from),
             Err("invalid sourceType 'sloppy' (expected 'script' or 'module')".to_owned())
         );
         // the empty string is a string — refused by value
         assert_eq!(
-            decode_source_type(Some(""), true, "parse", from),
+            decode_source_type(Some(""), true, Family::Parse, from),
             Err("invalid sourceType '' (expected 'script' or 'module')".to_owned())
         );
     }

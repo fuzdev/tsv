@@ -25,11 +25,12 @@
 
 use bumpalo::Bump;
 use std::path::Path;
+use tsv_debug::fixtures;
 use tsv_lang::ParseError;
 
 #[path = "support/utf16_lines.rs"]
 mod utf16_lines;
-use utf16_lines::{LineRule, line_column, line_starts};
+use utf16_lines::{line_column, line_starts, wire_rule, wire_text};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Language {
@@ -46,15 +47,8 @@ fn reference_point(source: &str, position: usize, language: Language) -> (u32, u
     while !source.is_char_boundary(position) {
         position -= 1;
     }
-    let bom = if language != Language::TypeScript && source.starts_with('\u{feff}') {
-        '\u{feff}'.len_utf8()
-    } else {
-        0
-    };
-    let rule = match language {
-        Language::TypeScript => LineRule::Ecmascript,
-        Language::Svelte | Language::Css => LineRule::Lf,
-    };
+    let (rule, elide_bom) = wire_rule(language == Language::TypeScript);
+    let bom = source.len() - wire_text(source, elide_bom).len();
     let units: Vec<u16> = source[bom..].encode_utf16().collect();
     let offset = source[bom..position.max(bom)].encode_utf16().count();
     let (line, column) = line_column(&line_starts(&units, rule), offset);
@@ -177,26 +171,19 @@ fn grade(source: &str, language: Language, at: Option<At>) -> Option<Vec<String>
     Some(out)
 }
 
-fn invalid_inputs(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
-    for entry in std::fs::read_dir(dir).expect("read a fixture directory") {
-        let path = entry.expect("a directory entry").path();
-        if path.is_dir() {
-            invalid_inputs(&path, out);
-        } else if path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .is_some_and(|name| name.starts_with("input_invalid_"))
-        {
-            out.push(path);
-        }
-    }
-}
-
 #[test]
 fn every_invalid_fixture_reports_its_point() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
-    let mut paths = Vec::new();
-    invalid_inputs(&root, &mut paths);
+    let mut paths: Vec<_> = fixtures::walk_fixtures(&root)
+        .expect("walk the fixture tree")
+        .iter()
+        .flat_map(|fixture| {
+            fixtures::FixtureFiles::scan(fixture)
+                .input_invalid
+                .into_iter()
+                .map(|name| fixture.path.join(name))
+        })
+        .collect();
     paths.sort();
     // per language: TypeScript, Svelte, CSS
     let mut graded = [0usize; 3];
@@ -613,11 +600,8 @@ fn the_point_of_every_wire_position_is_its_loc() {
         };
         let wire: serde_json::Value = serde_json::from_slice(&wire).expect("the wire is JSON");
         // the byte each UTF-16 offset of the text the wire indexes sits at
-        let elided = if language != Language::TypeScript && source.starts_with('\u{feff}') {
-            '\u{feff}'.len_utf8()
-        } else {
-            0
-        };
+        let elided =
+            source.len() - wire_text(source, wire_rule(language == Language::TypeScript).1).len();
         let mut byte_of = Vec::new();
         for (i, ch) in source[elided..].char_indices() {
             byte_of.extend(std::iter::repeat_n(elided + i, ch.len_utf16()));

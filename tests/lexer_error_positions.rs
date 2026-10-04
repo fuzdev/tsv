@@ -28,6 +28,10 @@
 
 use bumpalo::Bump;
 
+#[path = "support/utf16_lines.rs"]
+mod utf16_lines;
+use utf16_lines::{line_column, line_starts, wire_rule, wire_text};
+
 /// The rendered error's `(line, column, source line)`, read back off the caret form.
 ///
 /// A positionless render carries no located line at all, so this panics rather than
@@ -70,16 +74,28 @@ fn css_error(source: &str) -> (usize, usize, String) {
     location(&err.to_string())
 }
 
-/// `(line, column)` of `needle`'s first byte, both 1-indexed — where the caret belongs.
-/// The column counts UTF-16 units, as the error header does; lines break at LF alone,
-/// the one terminator these cases hold.
+/// `(line, column)` of `needle`'s first byte in a Svelte or CSS document, both 1-indexed —
+/// where the caret belongs: the error header's point (its column UTF-16 units, under the
+/// document's line rule), read off the shared reference.
 fn token_at(source: &str, needle: &str) -> (usize, usize) {
-    let at = source.find(needle).expect("the needle is in the source");
-    let line_start = source[..at].rfind('\n').map_or(0, |i| i + 1);
-    (
-        source[..at].matches('\n').count() + 1,
-        source[line_start..at].encode_utf16().count() + 1,
-    )
+    token_at_under(source, needle, false)
+}
+
+/// [`token_at`] in a TypeScript document.
+fn ts_token_at(source: &str, needle: &str) -> (usize, usize) {
+    token_at_under(source, needle, true)
+}
+
+fn token_at_under(source: &str, needle: &str, typescript: bool) -> (usize, usize) {
+    let (rule, elide_bom) = wire_rule(typescript);
+    let text = wire_text(source, elide_bom);
+    let at = text.find(needle).expect("the needle is in the source");
+    let units: Vec<u16> = text.encode_utf16().collect();
+    let (line, column) = line_column(
+        &line_starts(&units, rule),
+        text[..at].encode_utf16().count(),
+    );
+    (line, column + 1)
 }
 
 /// The line the caret must point at, for the readable half of an assertion.
@@ -226,7 +242,7 @@ fn css_declaration_value_error_reports_its_own_line() {
 #[test]
 fn standalone_lexer_errors_are_unchanged() {
     let ts = "const a = 1;\nconst b = 2;\nconst s = \"bad;\n";
-    let (line, column) = token_at(ts, "\"bad");
+    let (line, column) = ts_token_at(ts, "\"bad");
     assert_eq!(ts_error(ts), (line, column, line_text(ts, line)));
 
     let css = "/* unterminated\n";

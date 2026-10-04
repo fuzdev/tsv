@@ -45,7 +45,8 @@ one symbol table.
 
 `source_type` is the parse goal — `0` = Module, `1` = Script, `2` = unspecified;
 any other code is an error, never a silent default. At Script goal `await` is an
-ordinary identifier and `import`/`export`/`import.meta` are syntax errors. Code `2`
+ordinary identifier — so a top-level `await` with an operand is a syntax error — and so
+are top-level `import`/`export` declarations, `import.meta` and a top-level `for await`. Code `2`
 says the caller named **no** source type, and is accepted by the **format exports
 only**, on every language: a formatter answers it with the module grammar retried as
 a script (`tsv_ts::parse_with_goal_or_fallback` — see
@@ -57,10 +58,10 @@ no goal axis, so a caller passing `1` there asked for something that cannot be
 honored and is told — the same stance `tsv_wasm`'s flat exports and the npm facade's
 options reader take (see [../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Format
 Options). `tsv_napi` and `tsv_wasm` spell the axis as a trailing optional
-`sourceType` string; each binding has its own `lang_bindings!`, but all three read the
-**same** `parse_ast!` / `goal_allowed!` pair out of [`tsv_arena`](../tsv_arena/), so
-which languages have a goal axis is one fact in one place and coverage is identical by
-construction.
+`sourceType` string; each binding has its own `lang_bindings!`, but all three build their
+bodies from the **same** [`tsv_arena`](../tsv_arena/) macros (`parse_convert!` /
+`parse_internal!` / `parse_format!`, over one `goal_allowed!` tag), so which languages
+have a goal axis is one fact in one place and coverage is identical by construction.
 
 ## Memory & Safety Contract
 
@@ -72,7 +73,7 @@ construction.
 
 ## Files
 
-- `src/lib.rs` — All bindings: the `lang_bindings!` macro (over the shared `parse_ast!` / `goal_allowed!` goal axis, with `ffi_source_type` decoding the `u32` code, and `parse_format!` carrying the format path's `Option<Goal>`), the three `lang_bindings!` invocations, the `TSV_STATUS_*` constants, source-extraction helpers, `tsv_free`, and a `#[cfg(test)]` module. The reusable arenas and the goal macros are imported from `tsv_arena` (`with_ast_arena` where a parse export or a test calls it directly, and `parse_format!` under the `format` feature, which runs both arena helpers itself)
+- `src/lib.rs` — All bindings: the `lang_bindings!` macro (its bodies the shared `tsv_arena` macros — `parse_convert!` / `parse_internal!` for the parse exports, `parse_format!` carrying the format path's `Option<Goal>` — with `ffi_source_type` decoding the `u32` code per `tsv_arena::Family`), the three `lang_bindings!` invocations, the `TSV_STATUS_*` constants, source-extraction helpers, `tsv_free`, and a `#[cfg(test)]` module. `with_ast_arena` is imported only by the tests; every export reaches the arenas through the macros
 - `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "allow"` (FFI requires it); deps include `tsv_arena` (`format` → `tsv_arena/format`)
 
 The in-crate test module drives every entry point in-process (real

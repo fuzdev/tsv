@@ -319,6 +319,12 @@ pub fn is_jsdoc_type_cast_comment(content: &str) -> bool {
 
 /// Format a TypeScript AST back to source code
 ///
+/// `source` must hold **no carriage return**: the printers split lines on `\n` alone, so a
+/// `\r` would reach the output verbatim and the same document could format two ways on two
+/// passes. Parse a CR-folded text (`tsv_lang::printing::normalize_carriage_returns`, via
+/// [`parse_folded`]) and format it with [`format_folded_in`], or call [`format_str`], which
+/// does both. Debug builds assert it.
+///
 /// # Arguments
 ///
 /// * `program` - The TypeScript AST to format
@@ -366,6 +372,8 @@ pub fn format_str(source: &str) -> Result<String> {
 
 /// Format into a caller-provided doc arena.
 ///
+/// The same precondition on `source` as [`fn@format`]: no carriage return.
+///
 /// Identical output to [`fn@format`], but the doc IR is built into `arena` instead
 /// of a freshly allocated one, so a driver that formats many files can reuse one
 /// arena across them (`arena.reset()` between files retains the buffers). Nothing
@@ -412,6 +420,11 @@ fn format_document_in(
 
 /// Format a program with newline-derived authoring intent **erased** — the
 /// intent-erased *canonical* reprint.
+///
+/// Unlike [`fn@format`], `source` is not required to be CR-free (no debug check): its one
+/// consumer, the Svelte compiler's server output, formats a buffer that can carry the
+/// component's own line endings. A CR there is NOT folded — a comment or template text
+/// holding one reprints it as written.
 ///
 /// [`fn@format`] deliberately preserves authoring intent: an object literal, import
 /// list, or call whose source carried a newline after the opening delimiter stays
@@ -471,6 +484,12 @@ fn format_program_in(
     arena: &DocArena,
     canonical: bool,
 ) -> String {
+    // The intent-preserving entry points read lines off `source` with `\n` alone, so they
+    // take CR-folded text; the canonical reprint erases those reads and is exempt.
+    debug_assert!(
+        canonical || !source.contains('\r'),
+        "a format entry point takes CR-folded text (`tsv_lang::printing::normalize_carriage_returns`)"
+    );
     let inputs = PrinterInputs::for_document(source, comments, line_breaks.table());
     // This printer IS the document — a break after any doc it builds is its own, so an
     // emitter may defer a `//` to the end of a line.

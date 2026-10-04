@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! The instantiation followers the fixture path cannot carry on the bare side, each
 //! blocked by what a PARSER makes of that spelling rather than by prettier.

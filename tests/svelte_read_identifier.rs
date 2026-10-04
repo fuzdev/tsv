@@ -1,6 +1,3 @@
-// helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
-
 //! Svelte's `read_identifier` (`1-parse/index.js:243`) has two halves — the ECMAScript
 //! identifier **character class** and the **reserved-word** rejection — and it backs
 //! **six** positions. Both halves are swept over all six here, because both have drifted

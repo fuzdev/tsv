@@ -17,9 +17,6 @@
 //!
 //! Pure string parsing (section header → next `[`), no TOML dependency.
 
-// Test harness: unwrap/expect/panic on setup failure is the desired behavior.
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;

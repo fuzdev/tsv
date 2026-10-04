@@ -692,7 +692,7 @@ fn copy_short(dst: &mut [u8; SHORT_FRAGMENT_MAX], src: &[u8]) {
     }
 }
 
-/// [`JsonWriter::string_value_raw`]'s window: the `,"value":"` key (10), the
+/// [`JsonWriter::try_string_value_raw`]'s window: the `,"value":"` key (10), the
 /// value, the `","raw":"` key (9), an escaped opening quote (2), the value
 /// again, an escaped closing quote and the string's own (3) — every byte the
 /// widest admitted token writes. Each of the two [`copy_short`]s is handed a
@@ -702,12 +702,12 @@ const STRING_VALUE_RAW_WINDOW: usize = 96;
 const _: () =
     assert!(10 + SHORT_FRAGMENT_MAX + 9 + 2 + SHORT_FRAGMENT_MAX + 3 <= STRING_VALUE_RAW_WINDOW);
 
-/// The most digits [`JsonWriter::number_value_raw`] admits. Fifteen nines are
+/// The most digits [`JsonWriter::try_number_value_raw`] admits. Fifteen nines are
 /// below 2^53, so every admitted token is an integer an `f64` holds exactly.
 const PLAIN_DECIMAL_MAX_DIGITS: usize = 15;
 const _: () = assert!(10u64.pow(PLAIN_DECIMAL_MAX_DIGITS as u32) <= 1 << 53);
 
-/// [`JsonWriter::number_value_raw`]'s window. What it writes is narrow — the
+/// [`JsonWriter::try_number_value_raw`]'s window. What it writes is narrow — the
 /// `,"value":` key (9), the digits, the `,"raw":"` key (8), the digits again
 /// and a quote — but each [`copy_short`] is handed a whole
 /// [`SHORT_FRAGMENT_MAX`] chunk at its offset, and it is the second chunk,
@@ -1317,9 +1317,10 @@ impl JsonWriter {
     ///
     /// `inline(never)`: one shared body, a leaf on its common path — the grow
     /// leaves by tail call, as [`JsonWriter::string_escape_free_led`]'s does.
+    #[must_use = "`false` means nothing was written: the caller still owes both fields"]
     #[expect(clippy::expect_used)]
     #[inline(never)]
-    pub fn string_value_raw(&mut self, token: &[u8]) -> bool {
+    pub fn try_string_value_raw(&mut self, token: &[u8]) -> bool {
         const VALUE_KEY: &[u8; 10] = b",\"value\":\"";
         const RAW_KEY: &[u8; 9] = b"\",\"raw\":\"";
         let [quote, v @ .., close] = token else {
@@ -1335,7 +1336,7 @@ impl JsonWriter {
         }
         let base = self.buf.len();
         if self.buf.capacity() - base < STRING_VALUE_RAW_WINDOW {
-            return self.string_value_raw_grow(token);
+            return self.try_string_value_raw_grow(token);
         }
         self.buf.extend_from_slice(&[0; STRING_VALUE_RAW_WINDOW]);
         let window = self
@@ -1376,14 +1377,14 @@ impl JsonWriter {
         true
     }
 
-    /// [`JsonWriter::string_value_raw`] with the buffer too full for its
+    /// [`JsonWriter::try_string_value_raw`] with the buffer too full for its
     /// window: grow it, then write. Out of line and whole, so the common path
     /// makes no call.
     #[cold]
     #[inline(never)]
-    fn string_value_raw_grow(&mut self, token: &[u8]) -> bool {
+    fn try_string_value_raw_grow(&mut self, token: &[u8]) -> bool {
         self.buf.reserve(STRING_VALUE_RAW_WINDOW);
-        self.string_value_raw(token)
+        self.try_string_value_raw(token)
     }
 
     /// A numeric literal's two fields, `,"value":N,"raw":"N"`, as one window
@@ -1397,10 +1398,11 @@ impl JsonWriter {
     /// longer run of digits — and the caller writes the two fields in full.
     ///
     /// `inline(never)`, and a leaf on its common path, as
-    /// [`JsonWriter::string_value_raw`] is.
+    /// [`JsonWriter::try_string_value_raw`] is.
+    #[must_use = "`false` means nothing was written: the caller still owes both fields"]
     #[expect(clippy::expect_used)]
     #[inline(never)]
-    pub fn number_value_raw(&mut self, token: &[u8]) -> bool {
+    pub fn try_number_value_raw(&mut self, token: &[u8]) -> bool {
         const VALUE_KEY: &[u8; 9] = b",\"value\":";
         const RAW_KEY: &[u8; 8] = b",\"raw\":\"";
         let n = token.len();
@@ -1413,7 +1415,7 @@ impl JsonWriter {
         }
         let base = self.buf.len();
         if self.buf.capacity() - base < NUMBER_VALUE_RAW_WINDOW {
-            return self.number_value_raw_grow(token);
+            return self.try_number_value_raw_grow(token);
         }
         self.buf.extend_from_slice(&[0; NUMBER_VALUE_RAW_WINDOW]);
         let window = self
@@ -1445,13 +1447,13 @@ impl JsonWriter {
         true
     }
 
-    /// [`JsonWriter::number_value_raw`] with the buffer too full for its
+    /// [`JsonWriter::try_number_value_raw`] with the buffer too full for its
     /// window: grow it, then write.
     #[cold]
     #[inline(never)]
-    fn number_value_raw_grow(&mut self, token: &[u8]) -> bool {
+    fn try_number_value_raw_grow(&mut self, token: &[u8]) -> bool {
         self.buf.reserve(NUMBER_VALUE_RAW_WINDOW);
-        self.number_value_raw(token)
+        self.try_number_value_raw(token)
     }
 
     /// A dynamic string value the **caller** guarantees needs no escape,
@@ -2576,14 +2578,14 @@ mod tests {
         grade(b",\"abcdefghij\":", &clean);
     }
 
-    /// [`JsonWriter::string_value_raw`] against the four appends it stands for
+    /// [`JsonWriter::try_string_value_raw`] against the four appends it stands for
     /// — `raw` key, `string` value, `raw` key, `string` token — for both quote
     /// kinds over the whole escape-parity case set and every length across the
     /// inline width, into a buffer that must grow for the window and one that
     /// need not. A refusal must leave the buffer untouched, and must happen
     /// exactly when the stated conditions say, so neither arm can be dead.
     #[test]
-    fn string_value_raw_matches_two_string_calls() {
+    fn try_string_value_raw_matches_two_string_calls() {
         let mut values: Vec<String> = escape_cases();
         for len in 0..=SHORT_FRAGMENT_MAX + 3 {
             values.push("a".repeat(len));
@@ -2606,7 +2608,7 @@ mod tests {
                     let front = "{".repeat(prefix);
                     let mut ours = JsonWriter::with_capacity(cap);
                     ours.raw(&front);
-                    let wrote = ours.string_value_raw(token.as_bytes());
+                    let wrote = ours.try_string_value_raw(token.as_bytes());
                     assert_eq!(wrote, admitted, "wrong arm for {token:?}");
                     if !wrote {
                         assert_eq!(
@@ -2629,7 +2631,7 @@ mod tests {
                     assert_eq!(
                         String::from_utf8(ours.into_bytes()).expect("UTF-8"),
                         String::from_utf8(theirs.into_bytes()).expect("UTF-8"),
-                        "string_value_raw broke on {token:?}"
+                        "try_string_value_raw broke on {token:?}"
                     );
                 }
             }
@@ -2638,18 +2640,18 @@ mod tests {
         // Not a token of one quote kind at both ends: refused whole.
         for token in ["", "'", "\"", "'a\"", "\"a'", "`a`", "ab", "'a", "a'"] {
             let mut ours = JsonWriter::with_capacity(256);
-            assert!(!ours.string_value_raw(token.as_bytes()), "{token:?}");
+            assert!(!ours.try_string_value_raw(token.as_bytes()), "{token:?}");
             assert!(ours.as_bytes().is_empty(), "a refusal wrote: {token:?}");
         }
     }
 
-    /// [`JsonWriter::number_value_raw`] against the appends it stands for — the
+    /// [`JsonWriter::try_number_value_raw`] against the appends it stands for — the
     /// value through [`JsonWriter::i64`], the raw text through
     /// [`JsonWriter::string`] — at every admitted width, with the widest token
     /// written at the very end of its window, and refusing every token that is
     /// not its own value's digits.
     #[test]
-    fn number_value_raw_matches_the_integer_and_string_appends() {
+    fn try_number_value_raw_matches_the_integer_and_string_appends() {
         let mut admitted: Vec<String> = (0..=120u64).map(|n| n.to_string()).collect();
         for digits in 1..=PLAIN_DECIMAL_MAX_DIGITS {
             admitted.push("9".repeat(digits));
@@ -2662,7 +2664,10 @@ mod tests {
                 let front = "[".repeat(prefix);
                 let mut ours = JsonWriter::with_capacity(cap);
                 ours.raw(&front);
-                assert!(ours.number_value_raw(token.as_bytes()), "refused {token}");
+                assert!(
+                    ours.try_number_value_raw(token.as_bytes()),
+                    "refused {token}"
+                );
                 ours.raw("}");
                 let mut theirs = JsonWriter::with_capacity(0);
                 theirs.raw(&front);
@@ -2674,7 +2679,7 @@ mod tests {
                 assert_eq!(
                     String::from_utf8(ours.into_bytes()).expect("ASCII"),
                     String::from_utf8(theirs.into_bytes()).expect("ASCII"),
-                    "number_value_raw broke on {token}"
+                    "try_number_value_raw broke on {token}"
                 );
                 // The value an `f64` reads from the token prints as the token.
                 assert_eq!(
@@ -2713,7 +2718,7 @@ mod tests {
             let mut ours = JsonWriter::with_capacity(256);
             ours.raw("[");
             assert!(
-                !ours.number_value_raw(token.as_bytes()),
+                !ours.try_number_value_raw(token.as_bytes()),
                 "admitted {token:?}"
             );
             assert_eq!(ours.as_bytes(), b"[", "a refusal wrote: {token:?}");

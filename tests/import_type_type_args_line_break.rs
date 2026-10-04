@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! A type-argument list binds to the type before it only when no line terminator
 //! intervenes — tsc guards `parseTypeArgumentsOfTypeReference` with

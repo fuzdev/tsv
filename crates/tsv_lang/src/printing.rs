@@ -949,8 +949,9 @@ impl<'s> LineBreaks<'s> {
         }
     }
 
-    /// [`Self::new`] with a fresh scratch — the one-document callers.
-    pub fn of(source: &'s str) -> Self {
+    /// [`Self::new`] with a fresh scratch — the tests' one-document form.
+    #[cfg(test)]
+    pub(crate) fn of(source: &'s str) -> Self {
         Self::new(source, Vec::new())
     }
 
@@ -1532,56 +1533,18 @@ fn has_newline_between_scan_capped(
     }
 }
 
-/// Whether every entry of a line-break table is a `\n` byte of `bytes` — the condition
-/// under which the table is exactly the set of `\n` positions, so a one-needle scan of
-/// the bytes answers what the table answers. The builder reports it for free
-/// ([`build_line_breaks_into`]); this is the reference the test grades that report
-/// against. A `\r\n` qualifies (its recorded byte IS the `\n`); a bare `\r` or a
-/// U+2028 / U+2029 does not.
-pub fn line_breaks_are_lf_only(bytes: &[u8], line_breaks: &[u32]) -> bool {
-    line_breaks
-        .iter()
-        .all(|&p| bytes.get(p as usize) == Some(&b'\n'))
-}
-
-/// Build a line breaks table from source code.
-///
-/// Scans the source string and records the byte offset of each newline character.
-/// Only records `\n` (LF) as the canonical newline - `\r\n` (CRLF) is handled by
-/// recording the `\n` position.
-///
-/// # Arguments
-///
-/// * `source` - The source text
-///
-/// # Returns
-///
-/// A vector of byte offsets where newlines occur.
-///
-/// # Examples
-///
-/// ```
-/// use tsv_lang::printing::build_line_breaks;
-///
-/// let source = "foo\nbar\nbaz";
-/// let breaks = build_line_breaks(source);
-/// assert_eq!(breaks, vec![3, 7]);
-/// ```
-pub fn build_line_breaks(source: &str) -> Vec<u32> {
-    let mut breaks = Vec::new();
-    build_line_breaks_into(source, &mut breaks);
-    breaks
-}
-
-/// Like [`build_line_breaks`], filling a caller-provided (empty) table — the fill behind
-/// [`LineBreaks::breaks`], into the arena-parked scratch (`DocArena::take_line_breaks_scratch`),
-/// which runs only when a line question falls back to the table.
+/// Build a line-break table into a caller-provided (empty) one: the byte offset of each
+/// line terminator's LAST byte — every ECMAScript terminator (`\n`, a bare `\r`, U+2028,
+/// U+2029), a `\r\n` recorded at its `\n`. The fill behind [`LineBreaks::breaks`], into
+/// the arena-parked scratch (`DocArena::take_line_breaks_scratch`), which runs only when a
+/// line question falls back to the table.
 ///
 /// Returns whether the table is **LF-only** — every recorded byte is a `\n`, so the
 /// table is exactly the set of `\n` positions. The document's verdict is taken ahead of
 /// any table by [`line_terminators_are_lf_only`]; this is the builder's own re-derivation
 /// of it, on the branch it already takes per line, graded against it wherever the table
-/// is built ([`line_breaks_are_lf_only`] is the same fact read off the finished table).
+/// is built (the tests' `line_breaks_are_lf_only` reads the same fact off the finished
+/// table).
 pub fn build_line_breaks_into(source: &str, breaks: &mut Vec<u32>) -> bool {
     // Pre-size to ~one newline per 32 bytes (average code lines run ~25–40
     // bytes), so typical files fill in one allocation instead of the doubling
@@ -2505,6 +2468,24 @@ fn is_emoji_modifier(c: char) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// [`build_line_breaks_into`] into a fresh table — the tests' one-document form.
+    fn build_line_breaks(source: &str) -> Vec<u32> {
+        let mut breaks = Vec::new();
+        build_line_breaks_into(source, &mut breaks);
+        breaks
+    }
+
+    /// Whether every entry of a line-break table is a `\n` byte of `bytes` — the condition
+    /// under which the table is exactly the set of `\n` positions, so a one-needle scan of
+    /// the bytes answers what the table answers. The reference the builder's own LF-only
+    /// report ([`build_line_breaks_into`]'s return) is graded against. A `\r\n` qualifies
+    /// (its recorded byte IS the `\n`); a bare `\r` or a U+2028 / U+2029 does not.
+    fn line_breaks_are_lf_only(bytes: &[u8], line_breaks: &[u32]) -> bool {
+        line_breaks
+            .iter()
+            .all(|&p| bytes.get(p as usize) == Some(&b'\n'))
+    }
 
     #[test]
     fn encode_leading_zwnbsp_writes_one_bom_ahead_of_content() {

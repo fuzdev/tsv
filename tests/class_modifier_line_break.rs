@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! Node-type pins for the `[no LineTerminator here]` restriction on a class
 //! modifier keyword — which keywords carry one and which do not.

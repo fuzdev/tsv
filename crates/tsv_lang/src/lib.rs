@@ -9,17 +9,19 @@
 //!   `LocationMapper` - the line/column view a `loc` emitter reads from them
 //! - `ParseError` - error types and result aliases
 //! - `OutputBuffer` - shared printer output utilities
-//! - `config` - hardcoded formatter settings (`PRINT_WIDTH` / `TAB_WIDTH` / `INDENT`)
+//! - `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` - hardcoded formatter settings, and
+//!   `EmbedContext` / `LayoutMode` - the per-input embedding state
 //! - `Comment` - shared comment type
 //! - `census` - opt-in perf census counters (`census` feature)
 //! - `comment_ledger` - print-once comment ledger (`comment_check` feature)
 //! - `doc` - document builder primitives for prettier-compatible formatting
-//! - `escapes` - escape sequence utilities for printers
 //! - `printing` - shared printing utilities for printers
-//! - `sizing` - sizing heuristics for public-AST JSON / arena buffers and the
-//!   wire writer's line-start table
-//! - `json_writer` - shared wire-JSON emission substrate (`json` feature)
-//! - `hash` - dep-free multiply-xor hasher for the integer-keyed side tables
+//! - `source_scan` - trivia-aware source scanning between AST nodes
+//! - `estimated_json_capacity` / `estimated_ast_arena_capacity` - pre-size heuristics
+//!   for the wire-JSON output buffer and the parse-time bump arena
+//! - `JsonWriter` - shared wire-JSON emission substrate (`json` feature)
+//! - `FxHasher` / `FxHashMap` / `FxHashSet` - dep-free multiply-xor hasher for the
+//!   side tables
 //! - `swar` - word-at-a-time byte-search kernels shared by the line scans, the
 //!   wire-JSON escape prescan, and the lexers' token-body scans
 

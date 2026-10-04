@@ -1,7 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
-// the TS object-type literals (`{x:1}`) are source-under-test, not format placeholders
-#![allow(clippy::literal_string_with_formatting_args)]
+#![expect(clippy::expect_used)]
 
 //! A format-ignore directive alone on its line INSIDE a redundant paren shell
 //! (`type P = (⏎// prettier-ignore⏎{x:  1});`) is the paren's INTERIOR gap honoring:

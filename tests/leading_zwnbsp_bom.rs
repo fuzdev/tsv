@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! A Svelte or CSS document whose formatted output **begins with a U+FEFF that is content**
 //! is written with a byte-order mark ahead of it. A UTF-8 decode strips exactly one leading

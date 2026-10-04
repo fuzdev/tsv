@@ -150,12 +150,12 @@ pub fn skeletons_equal(a: &Value, b: &Value, render: bool) -> bool {
     skeleton_eq(a, b, render, false, false)
 }
 
-/// The keys [`skeletons_equal`] drops: [`remove_positions`]' three positions, then
+/// The keys [`skeletons_equal`] drops: [`remove_positions`]' four positions, then
 /// [`structural_skeleton`]'s own three metadata bags.
 fn skeleton_skips_key(key: &str) -> bool {
     matches!(
         key,
-        "start" | "end" | "loc" | "extra" | "leadingComments" | "trailingComments"
+        "start" | "end" | "loc" | "name_loc" | "extra" | "leadingComments" | "trailingComments"
     )
 }
 

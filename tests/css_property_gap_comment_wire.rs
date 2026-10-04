@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! A comment in a declaration's **property→colon gap** is one comment however it
 //! is spaced: `color/* c */: blue` and `color /* c */ : blue` differ only in

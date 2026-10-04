@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! The postfix optional `?` of a tuple element is a `[no LineTerminator here]`
 //! position: tsc runs its whole postfix suffix loop — `?`, `!` and `[` alike — under

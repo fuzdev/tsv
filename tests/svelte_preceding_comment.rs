@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! The gap between a leading HTML comment and a lifted `<script>` / `<style>`, which decides
 //! whether the comment reaches that root. Svelte answers it in `1-parse/state/element.js`, by

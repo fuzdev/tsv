@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! A multi-line, non-`*`-aligned block comment leading a `for(…)` init clause is
 //! preserved **verbatim** — its interior lines keep their authored columns, with no

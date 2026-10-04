@@ -3,7 +3,7 @@
 // grades, and a reworded message would move both sides together. Their `{:then}`-shaped
 // braces read as format specs to clippy, so the lint is off for the file rather than the
 // literals being reshaped around it.
-#![allow(clippy::literal_string_with_formatting_args)]
+#![expect(clippy::literal_string_with_formatting_args)]
 
 //! A block continuation may fill its slot once, and the slot's **wording** is the part no
 //! fixture can hold.

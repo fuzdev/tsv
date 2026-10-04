@@ -23,8 +23,8 @@
 //! substring of the argument error that must fail the run upfront with nothing
 //! discovered.
 
-// Test harness: unwrap/expect/panic on setup failure is the desired behavior.
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+// Test harness: unwrap/panic on setup failure is the desired behavior.
+#![expect(clippy::unwrap_used, clippy::panic)]
 
 use serde_json::Value;
 use std::fs;

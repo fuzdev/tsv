@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! Type-only import/export specifier disambiguation: a leading contextual `type`
 //! may be the type-only modifier (`{ type A }`) or the imported/local name itself

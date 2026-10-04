@@ -143,7 +143,8 @@ async fn compare_round_trip(
     let ast1 = parse_to_value(content, parser_type).await?;
 
     // Format
-    let formatted = format_source_with_source_type(content, parser_type, goal)?;
+    let formatted =
+        format_source_with_source_type(content, parser_type, goal).map_err(|e| e.to_string())?;
 
     // Parse formatted
     let ast2 = parse_to_value(&formatted, parser_type).await?;

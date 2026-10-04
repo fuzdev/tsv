@@ -820,7 +820,7 @@ pub(crate) struct LocationTracker {
     /// Byte offset of each line's first byte, ascending, `[0]` always present.
     ///
     /// `u32`, not `usize`: a source offset is already `u32`-bounded (`Span`,
-    /// and the 4 GB file-size limit `ParseError::FileTooLarge` enforces), so
+    /// and the 4 GiB file-size limit `ParseError::FileTooLarge` enforces), so
     /// the wide element bought nothing and cost the search half its cache
     /// residency. The searches hold their needle in `u32` too, so nothing
     /// widens per probe.
@@ -998,7 +998,7 @@ impl LocationTracker {
     /// The search needle: `offset` narrowed to the table's element width.
     ///
     /// Total, not a debug-only assumption. Every line start fits `u32` (the
-    /// 4 GB file-size limit), so an `offset` past `u32::MAX` is at or after
+    /// 4 GiB file-size limit), so an `offset` past `u32::MAX` is at or after
     /// every line start and saturating to `u32::MAX` selects the same last
     /// line the un-narrowed compare would.
     #[inline]

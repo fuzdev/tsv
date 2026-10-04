@@ -1,8 +1,9 @@
 //! The independent line reference the wire-coordinate tests grade `tsv_lang` against: a
 //! line-start scan over a document's UTF-16 code units, sharing nothing with `tsv_lang`'s
-//! line table or `WireCoordinates::point`. Each test that grades a position includes it by
-//! `#[path]` (`error_coordinates.rs`, `loc_definition.rs`), so the reference has one
-//! definition rather than one per test.
+//! line table or `WireCoordinates::point`. Every test that grades a line or a column
+//! includes it by `#[path]` (`error_coordinates.rs`, `lexer_error_positions.rs`, and through
+//! `support/loc_wire.rs` `loc_definition.rs` and `comment_dedent_document_line.rs`), so the
+//! reference has one definition rather than one per test.
 
 /// Which characters end a line in a document.
 #[derive(Clone, Copy, Debug)]
@@ -11,6 +12,28 @@ pub enum LineRule {
     Ecmascript,
     /// LF alone — a Svelte document and everything in it, and a CSS document.
     Lf,
+}
+
+/// How a language's wire reads a document, as `(line rule, elides a leading BOM)`: a
+/// TypeScript document takes ECMAScript's terminators and counts a BOM (acorn reads it as
+/// whitespace); a Svelte document — everything embedded in it included — and a CSS one take
+/// LF alone and elide a BOM, as Svelte's `parse` and `parseCss` strip it before parsing.
+pub const fn wire_rule(typescript: bool) -> (LineRule, bool) {
+    if typescript {
+        (LineRule::Ecmascript, false)
+    } else {
+        (LineRule::Lf, true)
+    }
+}
+
+/// The text a wire's offsets index: `source` behind its leading BOM when the wire elides
+/// one ([`wire_rule`]), `source` itself otherwise.
+pub fn wire_text(source: &str, elide_bom: bool) -> &str {
+    if elide_bom {
+        source.strip_prefix('\u{feff}').unwrap_or(source)
+    } else {
+        source
+    }
 }
 
 /// The unit offset each line of `units` starts at, line 1's (0) first.

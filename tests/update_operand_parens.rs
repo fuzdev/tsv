@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! The paren pair around an UPDATE operator's operand, on the inputs no fixture can
 //! carry: `(a * b)++` keeps it, `(f())++` strips it, the instantiation rule is

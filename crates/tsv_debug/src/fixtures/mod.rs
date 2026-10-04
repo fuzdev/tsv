@@ -27,14 +27,16 @@ use std::fs;
 use std::path::Path;
 use tsv_cli::cli::format_source::format_source_with_source_type;
 
-/// Recursively remove every position — `start`, `end` and `loc` — from JSON for AST
-/// comparison. Not [`strip_locations`], which removes the line/column objects alone.
+/// Recursively remove every position — `start`, `end`, `loc` and `name_loc` — from JSON
+/// for AST comparison. Not [`strip_locations`], which removes the line/column objects
+/// alone. `shift_remove`, as there: a `swap_remove` would reorder the keys left behind.
 pub fn remove_positions(mut value: serde_json::Value) -> serde_json::Value {
     match &mut value {
         serde_json::Value::Object(map) => {
-            map.remove("start");
-            map.remove("end");
-            map.remove("loc");
+            map.shift_remove("start");
+            map.shift_remove("end");
+            map.shift_remove("loc");
+            map.shift_remove("name_loc");
             for v in map.values_mut() {
                 *v = remove_positions(std::mem::take(v));
             }

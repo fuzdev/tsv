@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! A `<!-- prettier-ignore -->` directly above a hoisted `<script>` / `<style>` freezes that
 //! section even when both sit inside a `format-ignore` range.

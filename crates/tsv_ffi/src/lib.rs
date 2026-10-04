@@ -43,25 +43,24 @@
 //! - `out_status` points to a valid `u32` location for writing the status
 //! - The returned pointer is freed exactly once via `tsv_free`
 
-#![allow(unsafe_code)]
-
 use std::panic;
 use std::slice;
 
 // Per-thread reusable arenas live in the shared `tsv_arena` crate (used by both
 // native bindings — see its module docs for the reuse rationale + soundness;
 // the FFI path additionally relies on `reset()` recovering cleanly after a
-// `catch_unwind`-caught panic). The goal-axis macros and the format export's
-// body (`parse_format!`) come from the same crate, so the three bindings share ONE
-// definition of which languages have a goal rather than three hand-synced copies.
-#[cfg(any(feature = "parse", feature = "format"))]
-use tsv_arena::goal_allowed;
-#[cfg(feature = "parse")]
-use tsv_arena::parse_ast;
+// `catch_unwind`-caught panic). The goal-axis macros and every export body
+// (`parse_convert!`, `parse_internal!`, `parse_format!`) come from the same crate, so
+// the three bindings share ONE definition of which languages have a goal and of what
+// each export does, rather than three hand-synced copies.
 #[cfg(feature = "format")]
 use tsv_arena::parse_format;
-#[cfg(any(feature = "parse", test))]
+#[cfg(test)]
 use tsv_arena::with_ast_arena;
+#[cfg(any(feature = "parse", feature = "format"))]
+use tsv_arena::{Family, goal_allowed};
+#[cfg(feature = "parse")]
+use tsv_arena::{parse_convert, parse_internal};
 
 /// `*out_status` for a call that produced its payload: the returned bytes are the
 /// wire JSON, the formatted source, or (for `tsv_parse_internal_*`) empty.
@@ -231,19 +230,19 @@ pub const SOURCE_TYPE_UNSPECIFIED: u32 = 2;
 /// caller of `tsv_parse_css` must name *some* code, parse refuses `2`, and `0` is the
 /// only neutral spelling left; a Svelte or CSS caller is not agreeing to a goal by
 /// passing it, only filling the slot. Code `2` — the caller named none — is accepted
-/// on **every** language but only on
-/// the format exports (`unspecified`): a formatter answers it with the
-/// module-then-script fallback, and one with no goal axis has nothing to answer at
-/// all, while a parse export's wire carries a `Program.sourceType` that one settled
-/// grammar has to produce. Any unrecognized code is an error whatever the language,
+/// on **every** language but only from the format exports ([`Family::Format`]): a
+/// formatter answers it with the module-then-script fallback, and one with no goal axis
+/// has nothing to answer at all, while a parse export's wire carries a
+/// `Program.sourceType` that one settled grammar has to produce. Any unrecognized code is an error whatever the language,
 /// and the expectation it names is that call's own — a goalless or parse-side caller
 /// is never told that a code the arm above it refuses would have worked.
 #[cfg(any(feature = "parse", feature = "format"))]
 fn ffi_source_type(
     source_type: u32,
     allowed: bool,
-    unspecified: bool,
+    family: Family,
 ) -> Result<Option<tsv_ts::Goal>, String> {
+    let unspecified = family == Family::Format;
     match source_type {
         SOURCE_TYPE_MODULE => Ok(Some(tsv_ts::Goal::Module)),
         SOURCE_TYPE_SCRIPT if allowed => Ok(Some(tsv_ts::Goal::Script)),
@@ -268,40 +267,6 @@ fn ffi_source_type(
     }
 }
 
-// Per-language compound-op helpers: parse the source into a per-thread AST arena
-// and run the conversion/format/no-op over it. Every language crate is
-// interner-free (identifier and element/attribute names are span-identity), so
-// these are uniform across svelte/typescript/css — no per-language arity split.
-#[cfg(feature = "parse")]
-macro_rules! parse_convert {
-    ($goalness:ident, $lang:ident, $source:expr, $goal:expr) => {
-        with_ast_arena(|arena| {
-            let ast =
-                parse_ast!($goalness, $lang, $source, $goal, arena).map_err(|e| e.to_string())?;
-            Ok($lang::convert_ast_json_bytes(&ast, $source))
-        })
-    };
-}
-
-// Benchmark-only: parse and throw the AST away, so the timing isolates the parse
-// from the convert/serialize layers. Success renders as an empty payload.
-//
-// `black_box(&ast)` sits *inside* the arena closure on purpose — that is the only
-// scope where the AST still exists, so nothing further out can stand in for it.
-// Drop it and the whole parse becomes dead code the optimizer may delete, leaving
-// a benchmark that got faster by measuring nothing.
-#[cfg(feature = "parse")]
-macro_rules! parse_internal {
-    ($goalness:ident, $lang:ident, $source:expr, $goal:expr) => {
-        with_ast_arena(|arena| {
-            let ast =
-                parse_ast!($goalness, $lang, $source, $goal, arena).map_err(|e| e.to_string())?;
-            std::hint::black_box(&ast);
-            Ok(Vec::new())
-        })
-    };
-}
-
 /// Generate `tsv_parse_<lang>` / `tsv_parse_internal_<lang>` / `tsv_format_<lang>`
 /// C FFI functions for one language module.
 ///
@@ -315,15 +280,16 @@ macro_rules! parse_internal {
 // accepted, never the arity: an FFI host writes one call shape and one symbol
 // table, and there is no goalless twin to drift from its goal-aware sibling.
 //
-// At Script goal `await` is an ordinary identifier and `import`/`export`/
-// `import.meta` are syntax errors. See `tsv parse --source-type` /
+// At Script goal `await` is an ordinary identifier — so a top-level `await` with an
+// operand is a syntax error — and so are top-level `import`/`export` declarations,
+// `import.meta` and a top-level `for await`. See `tsv parse --source-type` /
 // `tsv format --source-type` and `tsv_ts::parse_with_goal`.
 //
 // `tsv_wasm` and `tsv_napi` spell the same axis as a trailing optional string (the
 // npm facade over both turns it into a `{sourceType}` bag); each binding's own
-// `lang_bindings!` reads the SAME `parse_ast!` /
-// `goal_allowed!` pair out of `tsv_arena`, so which languages have a goal axis
-// is one fact in one place rather than three that agree today. See
+// `lang_bindings!` builds its bodies from the SAME `tsv_arena` macros, over one
+// `goal_allowed!` tag, so which languages have a goal axis is one fact in one place
+// rather than three that agree today. See
 // `crates/tsv_wasm/CLAUDE.md` §Format Options.
 macro_rules! lang_bindings {
     (
@@ -350,13 +316,19 @@ macro_rules! lang_bindings {
         ) -> *mut u8 {
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, out_status, |source| {
-                    // `false`: a parse export refuses the unspecified code — the wire's
+                    // a parse export refuses the unspecified code — the wire's
                     // `Program.sourceType` is a claim one settled grammar must produce —
-                    // so the `Option` is always `Some` here and the `unwrap_or` only
-                    // names the default the decoder already applied.
-                    let goal = ffi_source_type(source_type, goal_allowed!($goalness), false)?
-                        .unwrap_or(tsv_ts::Goal::Module);
-                    parse_convert!($goalness, $lang, source, goal)
+                    // so the goal is always set here
+                    let goal =
+                        ffi_source_type(source_type, goal_allowed!($goalness), Family::Parse)?;
+                    parse_convert!(
+                        $goalness,
+                        $lang,
+                        convert_ast_json_bytes,
+                        source,
+                        goal,
+                        |e| e.to_string()
+                    )
                 })
             }
         }
@@ -378,9 +350,11 @@ macro_rules! lang_bindings {
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, out_status, |source| {
                     // parse export: the unspecified code is refused (see the first arm)
-                    let goal = ffi_source_type(source_type, goal_allowed!($goalness), false)?
-                        .unwrap_or(tsv_ts::Goal::Module);
-                    parse_internal!($goalness, $lang, source, goal)
+                    let goal =
+                        ffi_source_type(source_type, goal_allowed!($goalness), Family::Parse)?;
+                    // success renders as an empty payload
+                    parse_internal!($goalness, $lang, source, goal, |e| e.to_string())
+                        .map(|()| Vec::<u8>::new())
                 })
             }
         }
@@ -401,9 +375,10 @@ macro_rules! lang_bindings {
         ) -> *mut u8 {
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, out_status, |source| {
-                    // `true`: only a formatter can answer the unspecified code, with the
-                    // module grammar retried as a script.
-                    let goal = ffi_source_type(source_type, goal_allowed!($goalness), true)?;
+                    // only a formatter can answer the unspecified code, with the module
+                    // grammar retried as a script
+                    let goal =
+                        ffi_source_type(source_type, goal_allowed!($goalness), Family::Format)?;
                     parse_format!($goalness, $lang, source, goal, |e| e.to_string())
                 })
             }

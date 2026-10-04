@@ -119,21 +119,24 @@ fn collect_file(
     named_specs: &mut Vec<usize>,
     comment_lines: &mut Vec<usize>,
 ) -> Result<(), ()> {
-    let source = std::fs::read_to_string(path).map_err(|_| ())?;
+    let read = std::fs::read_to_string(path).map_err(|_| ())?;
+    // the text the shipped format path parses and prints: carriage returns folded
+    let folded = tsv_lang::printing::normalize_carriage_returns(&read);
+    let source = folded.text();
     let arena = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
 
     match parser {
         ParserType::TypeScript => {
-            let ast = tsv_ts::parse(&source, &arena).map_err(|_| ())?;
+            let ast = tsv_ts::parse(source, &arena).map_err(|_| ())?;
             collect_imports(ast.body, named_specs);
-            collect_comments(ast.comments, &source, comment_lines);
+            collect_comments(ast.comments, source, comment_lines);
             // Run the real printer so the armed buffer_stats hooks sample the
             // actual chain/comment buffer populations. Output is discarded.
             #[cfg(feature = "buffer_stats")]
-            drop(tsv_ts::format(&ast, &source));
+            drop(tsv_ts::format(&ast, source));
         }
         ParserType::Svelte => {
-            let root = tsv_svelte::parse(&source, &arena).map_err(|_| ())?;
+            let root = tsv_svelte::parse(source, &arena).map_err(|_| ())?;
             // The instance/module `<script>` programs feed the same import
             // printer; `Root.comments` unifies every script + `{expr}` comment
             // (the exact population `render.rs` renders).
@@ -143,9 +146,9 @@ fn collect_file(
             if let Some(script) = root.module {
                 collect_imports(script.content.body, named_specs);
             }
-            collect_comments(&root.comments, &source, comment_lines);
+            collect_comments(&root.comments, source, comment_lines);
             #[cfg(feature = "buffer_stats")]
-            drop(tsv_svelte::format(&root, &source));
+            drop(tsv_svelte::format(&root, source));
         }
         ParserType::Css => {}
     }

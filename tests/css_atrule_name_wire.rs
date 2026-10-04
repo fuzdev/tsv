@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! An at-rule's wire `name` is half-decoded the way every selector name is, because
 //! `parseCss` reads both with the same `read_identifier`: a hex escape decodes to its

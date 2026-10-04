@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! Node-type pins for a parenthesized arrow's return type inside a conditional's
 //! consequent — tsc's `allowReturnTypeInArrowFunction` rule, which tsv follows

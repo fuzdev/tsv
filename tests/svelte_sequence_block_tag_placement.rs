@@ -33,7 +33,7 @@
 // grades, and a reworded message would move both sides together. Their `{#if}`-shaped braces
 // read as format specs to clippy, so the lint is off for the file rather than the literals
 // being reshaped around it.
-#![allow(clippy::literal_string_with_formatting_args)]
+#![expect(clippy::literal_string_with_formatting_args)]
 
 fn parse_error(source: &str) -> Option<String> {
     let arena = bumpalo::Bump::new();

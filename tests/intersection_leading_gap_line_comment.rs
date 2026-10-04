@@ -1,7 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
-// the TS object-type literals (`{x:1}`) are source-under-test, not format placeholders
-#![allow(clippy::literal_string_with_formatting_args)]
+#![expect(clippy::expect_used)]
 
 //! A line comment in an intersection's leading-`&` gap (`=⏎& ⏎// c⏎{x:1} & b`) must be
 //! PRESERVED — the intersection's leading-gap comment extraction is block-only, and no

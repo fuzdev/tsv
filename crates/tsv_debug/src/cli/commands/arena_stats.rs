@@ -223,23 +223,20 @@ fn run_reuse(files: &[std::path::PathBuf], list_errors: bool) -> Result<(), CliE
         // just avoids an `expect`/`unwrap` on the hot path).
         let Some(a) = arena.as_ref() else { continue };
         let bump = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
+        // the shipped format path: fold, parse the folded text, format it
+        let folded = tsv_lang::printing::normalize_carriage_returns(&source);
         let formatted = match parser {
-            ParserType::TypeScript => tsv_ts::parse(&source, &bump)
-                .map(|ast| {
-                    let _ = tsv_ts::format_in(&ast, &source, a);
-                })
-                .map_err(|e| format!("{e}")),
-            ParserType::Svelte => tsv_svelte::parse(&source, &bump)
-                .map(|ast| {
-                    let _ = tsv_svelte::format_in(&ast, &source, a);
-                })
-                .map_err(|e| format!("{e}")),
-            ParserType::Css => tsv_css::parse(&source, &bump)
-                .map(|ast| {
-                    let _ = tsv_css::format_in(&ast, &source, a);
-                })
-                .map_err(|e| format!("{e}")),
-        };
+            ParserType::TypeScript => tsv_ts::parse_folded(&folded, None, &bump).map(|ast| {
+                let _ = tsv_ts::format_folded_in(&ast, &folded, a);
+            }),
+            ParserType::Svelte => tsv_svelte::parse_folded(&folded, &bump).map(|ast| {
+                let _ = tsv_svelte::format_folded_in(&ast, &folded, a);
+            }),
+            ParserType::Css => tsv_css::parse_folded(&folded, &bump).map(|ast| {
+                let _ = tsv_css::format_folded_in(&ast, &folded, a);
+            }),
+        }
+        .map_err(|e| format!("{e}"));
         if let Err(e) = formatted {
             parse_errors += 1;
             if list_errors {
@@ -306,18 +303,21 @@ fn collect_file(source: &str, parser: ParserType, stats: &mut Stats) -> Result<(
     let bump = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
     let arena = DocArena::for_source(source);
 
+    // the shipped format path: fold, parse the folded text, format it
+    let folded = tsv_lang::printing::normalize_carriage_returns(source);
+    let parse_error = |e: tsv_lang::ParseError| format!("{e}");
     let output = match parser {
         ParserType::TypeScript => {
-            let ast = tsv_ts::parse(source, &bump).map_err(|e| format!("{e}"))?;
-            tsv_ts::format_in(&ast, source, &arena)
+            let ast = tsv_ts::parse_folded(&folded, None, &bump).map_err(parse_error)?;
+            tsv_ts::format_folded_in(&ast, &folded, &arena)
         }
         ParserType::Svelte => {
-            let ast = tsv_svelte::parse(source, &bump).map_err(|e| format!("{e}"))?;
-            tsv_svelte::format_in(&ast, source, &arena)
+            let ast = tsv_svelte::parse_folded(&folded, &bump).map_err(parse_error)?;
+            tsv_svelte::format_folded_in(&ast, &folded, &arena)
         }
         ParserType::Css => {
-            let ast = tsv_css::parse(source, &bump).map_err(|e| format!("{e}"))?;
-            tsv_css::format_in(&ast, source, &arena)
+            let ast = tsv_css::parse_folded(&folded, &bump).map_err(parse_error)?;
+            tsv_css::format_folded_in(&ast, &folded, &arena)
         }
     };
     stats.output_bytes += output.len() as u64;

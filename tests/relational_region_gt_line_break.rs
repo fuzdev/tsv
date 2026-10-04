@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! Where an open `<` region BEGINS and ENDS — the lifetime half of the rule that a lone `>`
 //! which may close a type-argument region never ends a line

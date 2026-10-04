@@ -1,7 +1,7 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 // the TS object-type literals (`{x:1}`) are source-under-test, not format placeholders
-#![allow(clippy::literal_string_with_formatting_args)]
+#![expect(clippy::literal_string_with_formatting_args)]
 
 //! An own-line block comment glued forward to a union member (`a |⏎/* c */ {x:1} | b`)
 //! must reach the stable own-line broken form in ONE pass — the comment stays own-line

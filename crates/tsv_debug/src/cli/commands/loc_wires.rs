@@ -5,7 +5,8 @@
 //! reconstructs it in JS from the span-only wire plus the source. Neither carries a
 //! hand-written expectation, so each is the other's drift check — and since the fixtures
 //! pin the span-only wire, the cross-grade is the only `deno task check` leg that grades
-//! `loc` at all.
+//! the JS reconstruction (`tests/loc_definition.rs` grades the Rust loc wire against an
+//! independent reference).
 //!
 //! This command is the Rust half of that leg (`deno task check:loc`,
 //! `scripts/check_loc.ts`): one process that parses every fixture document once and streams
@@ -225,9 +226,12 @@ fn record(path: &Path, input_type: InputType, goal: tsv_ts::Goal) -> Result<Vec<
 }
 
 /// `s` as a JSON string literal.
+#[expect(
+    clippy::expect_used,
+    reason = "serializing a `str` cannot fail, and an empty fallback would be invalid JSON"
+)]
 fn json_string(s: &str) -> String {
-    // serializing a `str` cannot fail
-    serde_json::to_string(s).unwrap_or_default()
+    serde_json::to_string(s).expect("a `str` always serializes")
 }
 
 /// One `--stdin` request (module doc).

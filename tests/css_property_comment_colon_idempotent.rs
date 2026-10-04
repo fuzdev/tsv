@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! A CSS declaration whose **property name carries a block comment**
 //! (`color /* c */ : value`) takes tsv's normalized separator — single spaces

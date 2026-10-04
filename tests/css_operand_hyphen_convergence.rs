@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! Every authoring of a `-` that stands where an **operand** is expected reaches one
 //! form in one pass — the F1 invariant, which the whitespace around such a `-` must not

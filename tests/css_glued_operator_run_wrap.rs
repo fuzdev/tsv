@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! Where a value wraps around a run whose operators the author left **glued**
 //! (`1px+2px`, `fn(a)-webkit-x`, `100%-var(…)`, `1px+-(2px)`), and that every form it

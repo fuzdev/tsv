@@ -187,12 +187,16 @@ fn profile_compile_file(
         let _ = compile(&source, &options);
         compile_times.push(t0.elapsed());
 
+        // the shipped format path, phased as the `profile` command phases it: the fold in
+        // the parse column, then the folded text's parse and format
         let t1 = Instant::now();
-        let ast = tsv_svelte::parse(&source, arena).map_err(|e| format!("parse error: {e}"))?;
+        let folded = tsv_lang::printing::normalize_carriage_returns(&source);
+        let ast =
+            tsv_svelte::parse_folded(&folded, arena).map_err(|e| format!("parse error: {e}"))?;
         parse_times.push(t1.elapsed());
 
         let t2 = Instant::now();
-        let _ = tsv_svelte::format_in(&ast, &source, doc_arena);
+        let _ = tsv_svelte::format_folded_in(&ast, &folded, doc_arena);
         format_times.push(t2.elapsed());
 
         // Reference-row arena teardown outside the timed regions, mirroring

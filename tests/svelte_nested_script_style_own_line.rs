@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! A nested `<script>` / `<style>` with a body keeps its own line wherever that line is
 //! render-free, and keeps its glue everywhere else.

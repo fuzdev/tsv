@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used, clippy::panic)]
+#![expect(clippy::expect_used, clippy::panic)]
 
 //! A Svelte block binding's `TSTypeAnnotation` starts where the **binding** ends, not at the
 //! colon — and the two are the same position only when nothing separates them.

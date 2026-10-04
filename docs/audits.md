@@ -233,10 +233,10 @@ already **written**: committed fixtures and real repos. Nothing manufactured an 
 and graded the resulting *wire*.
 
 A hand-rolled scan can therefore be confidently wrong about a spelling no document
-contains. Both block-annotation bugs lived exactly there: where a `: T` annotation's own parse
-was anchored was wrong for any spelling that put whitespace between a binding and its
-colon — invisible to every fixture and every real repo, because everyone writes `x: T`. The comparison catches
-both the instant such an input exists; this audit makes them exist.
+contains: where a `: T` annotation's own parse is anchored, say, is wrong for any spelling
+that puts whitespace between a binding and its colon if the scan assumed `x: T` — invisible
+to every fixture and every real repo, because everyone writes `x: T`. The comparison
+catches it the instant such an input exists; this audit makes such inputs exist.
 
 **What it perturbs — two families, because there are two kinds of claim to break.**
 
@@ -316,12 +316,11 @@ A census has no divisor and no such motion — the same edit moved the `ws` cens
 only add sites. So the rule is: **census ⇒ gradeable; sample ⇒ discovery only.** Making
 `ws` a census was not merely a stability win, either — the sampled form found 3
 undocumented files where the census found **25** (7 signature groups vs 19), which is 8x
-its own findings hidden. That reading is kept because it is the evidence; it has since
-been worked down to zero, the comment-extent bug having accounted for 15 of the 25 and all
-but 4 of the groups, and the dedent finding below for the rest.
+its own findings hidden. That reading is kept because it is the evidence; `ws` is green
+(the standing findings are below).
 
 **Each variant is graded against its own base file.** A divergence the base already had
-is not the injection's doing, and `tests/fixtures` deliberately contains ~91
+is not the injection's doing, and `tests/fixtures` deliberately contains many
 `_svelte_divergence` fixtures whose whole purpose is to differ from canonical. The base
 files are controls and are dropped; only the delta is reported. Subtraction is by diff
 *signature*, since an injection shifts every offset after it.
@@ -360,10 +359,10 @@ files are controls and are dropped; only the delta is reported. Subtraction is b
 work list, not a regression gate; **`ws` is green** (below). Neither is in `deno task check`:
 both need the canonical parser, so they are conformance-tier at best. Standing findings:
 
-- **`ws`** (census: **0 files**) — the family is CLEAN, and both of its findings asked a
-  sub-parse the same question: **which SOURCE did that parse actually see?**
+- **`ws`** (census: **0 files**) — the family is CLEAN, and its one standing finding asked a
+  sub-parse the question: **which SOURCE did that parse actually see?**
 
-  The second is **the acorn comment DEDENT** (injected variants of the `{@const}` and
+  It is **the acorn comment DEDENT** (injected variants of the `{@const}` and
   `{#each}` binding bases): a sanctioned divergence, so those variants are excused, not fixed.
   Svelte's `onComment` strips the comment line's own indentation from every line of a
   multiline block comment's `value` (`1-parse/acorn.js`), but it measures that line in the string its reader handed acorn, and

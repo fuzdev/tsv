@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! A multi-item comma-separated declaration value that carries a comment at the
 //! list's **top level** breaks one-per-line — the same, in one pass, for every

@@ -329,6 +329,13 @@ fn profile_bind_once(
 
 /// Run one parse + format iteration, return (parse_duration, format_duration).
 ///
+/// The shipped format path, phase for phase (`tsv_cli`'s `format_source_in`, the bindings'
+/// `parse_format!`): fold the source's carriage returns, parse the folded text through the
+/// language's `parse_folded` (TypeScript with no source type named: the module grammar,
+/// retried as a script), and format it with `format_folded_in`. The fold is timed in the
+/// parse column — it runs ahead of the parse, and its pass takes the document's line
+/// verdict the format then reads instead of walking the source again.
+///
 /// Arenas are caller-owned and reset between iterations (see `profile_file`);
 /// setup/teardown stays outside both timed regions.
 fn profile_once(
@@ -337,39 +344,33 @@ fn profile_once(
     arena: &bumpalo::Bump,
     doc_arena: &tsv_lang::doc::arena::DocArena,
 ) -> Result<(Duration, Duration), String> {
+    let parse_error = |e: tsv_lang::ParseError| format!("parse error: {e}");
+    let t0 = Instant::now();
+    let folded = tsv_lang::printing::normalize_carriage_returns(source);
     match parser_type {
         ParserType::TypeScript => {
-            let t0 = Instant::now();
-            let ast = tsv_ts::parse(source, arena).map_err(|e| format!("parse error: {e}"))?;
+            let ast = tsv_ts::parse_folded(&folded, None, arena).map_err(parse_error)?;
             let parse_dur = t0.elapsed();
 
             let t1 = Instant::now();
-            let _ = tsv_ts::format_in(&ast, source, doc_arena);
-            let format_dur = t1.elapsed();
-
-            Ok((parse_dur, format_dur))
+            let _ = tsv_ts::format_folded_in(&ast, &folded, doc_arena);
+            Ok((parse_dur, t1.elapsed()))
         }
         ParserType::Svelte => {
-            let t0 = Instant::now();
-            let ast = tsv_svelte::parse(source, arena).map_err(|e| format!("parse error: {e}"))?;
+            let ast = tsv_svelte::parse_folded(&folded, arena).map_err(parse_error)?;
             let parse_dur = t0.elapsed();
 
             let t1 = Instant::now();
-            let _ = tsv_svelte::format_in(&ast, source, doc_arena);
-            let format_dur = t1.elapsed();
-
-            Ok((parse_dur, format_dur))
+            let _ = tsv_svelte::format_folded_in(&ast, &folded, doc_arena);
+            Ok((parse_dur, t1.elapsed()))
         }
         ParserType::Css => {
-            let t0 = Instant::now();
-            let ast = tsv_css::parse(source, arena).map_err(|e| format!("parse error: {e}"))?;
+            let ast = tsv_css::parse_folded(&folded, arena).map_err(parse_error)?;
             let parse_dur = t0.elapsed();
 
             let t1 = Instant::now();
-            let _ = tsv_css::format_in(&ast, source, doc_arena);
-            let format_dur = t1.elapsed();
-
-            Ok((parse_dur, format_dur))
+            let _ = tsv_css::format_folded_in(&ast, &folded, doc_arena);
+            Ok((parse_dur, t1.elapsed()))
         }
     }
 }

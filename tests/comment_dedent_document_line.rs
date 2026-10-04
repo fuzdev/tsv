@@ -23,6 +23,19 @@
 //!
 //! `tests/comment_dedent_line_terminators.rs` is the sibling for the other thing this dedent
 //! reads two ways: which line-terminator class each of its two steps takes.
+//!
+//! Every document is read through the shared `loc` wire grader (`support/loc_wire.rs`): the
+//! `loc` definition and the span-only wire's equality to the loc wire stripped — the checks
+//! the fixture walk gives every fixture input, which these rows can never be.
+
+use tsv_debug::fixtures::InputType;
+
+#[path = "support/utf16_lines.rs"]
+mod utf16_lines;
+
+#[path = "support/loc_wire.rs"]
+mod loc_wire;
+use loc_wire::assert_definition;
 
 /// The one comment's dedented wire `value` — the field `onComment` writes.
 fn comment_value(src: &str) -> String {
@@ -33,14 +46,13 @@ fn comment_value(src: &str) -> String {
 
 /// Every comment's dedented wire `value`, in position order.
 ///
+/// Read off the loc wire, once [`assert_definition`] has graded it and its span-only twin.
 /// The wire carries each value in up to two places: the root `comments` array, emitted
 /// outside any island's walk, and the `leadingComments` / `trailingComments` copy acorn's
 /// attach put on a node. They are two emitters over one comment, so this asserts they agree
 /// and returns the one answer.
 fn comment_values(src: &str) -> Vec<String> {
-    let arena = bumpalo::Bump::new();
-    let ast = tsv_svelte::parse(src, &arena).expect("parser should accept the component");
-    let json = tsv_debug::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&ast, src));
+    let json = assert_definition(src, InputType::Svelte);
     let comments = json["comments"]
         .as_array()
         .expect("wire root should carry a `comments` array");
@@ -235,9 +247,7 @@ fn the_attached_copy_is_actually_reached() {
             "{#if c}\n\t{@const { a = /*\n\t c1 */ 1 } = expr}\n{/if}\n",
         ),
     ] {
-        let arena = bumpalo::Bump::new();
-        let ast = tsv_svelte::parse(src, &arena).expect("parser should accept the component");
-        let json = tsv_debug::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&ast, src));
+        let json = assert_definition(src, InputType::Svelte);
         let start = json["comments"][0]["start"].as_u64();
         assert!(
             !attached_values(&json, start).is_empty(),

@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! The GLUED authoring of the `<` `<` pair, at the positions where tsc never splits a `<<`
 //! token — the one authoring the fixture path cannot carry in a `<script>` body.

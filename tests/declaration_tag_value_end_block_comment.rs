@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! A `{let}` / `{const}` tag whose printed declaration ENDS on a same-line block comment the
 //! value leaves there — the run of a grouping pair the printer strips, or the one it prints

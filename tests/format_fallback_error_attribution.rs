@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! When BOTH grammars reject a source the format fallback was handed, the error it
 //! reports is the attempt's whose grammar the file was written against: the module

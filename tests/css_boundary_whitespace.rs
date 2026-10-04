@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used, clippy::panic)]
+#![expect(clippy::expect_used, clippy::panic)]
 
 //! CSS boundary whitespace is **JS `\s`**, not the CSS Syntax class and not Rust's.
 //!
