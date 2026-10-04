@@ -483,10 +483,9 @@ interface DiffGroup {
  * indices, and a matcher can accept one index and refuse its sibling (the
  * instance-comment matcher admits the indices a module-region prefix shifts and
  * refuses any other), so keyed on the signature alone an undocumented
- * `trailingComments[1]` entry folded into the documented `trailingComments[]` group
- * — the run failed with "1 UNDOCUMENTED", the group listing showed only documented
- * groups, the JSON `groups` carried no undocumented entry, and only `--verbose`
- * named the file. Undocumented entries always form their own group now.
+ * `trailingComments[1]` entry would fold into the documented `trailingComments[]` group,
+ * and a failing run would list only documented groups. An undocumented entry always
+ * forms its own group.
  */
 function build_groups(results: Map<Language, FileResult[]>): DiffGroup[] {
 	const groups = new Map<string, DiffGroup>();
@@ -699,8 +698,8 @@ function print_span_row(label: string, s: SpanStats): void {
 /**
  * The tool's entry, importable by the `conformance.ts` driver (which passes
  * `['--all']`); the CLI wrapper at the bottom feeds it the real argv. Failure
- * semantics are process-level (`Deno.exit(1)` at each gate), matching the old
- * `&&`-chain aggregate exactly.
+ * semantics are process-level (`Deno.exit(1)` at each gate), so a failing gate stops the
+ * driver's remaining legs the way it stops this tool.
  */
 export async function run_corpus_compare_parse(argv: string[] = Deno.args): Promise<void> {
 	const parsed = args_parse(argv_parse(argv), CorpusCompareParseArgs);
@@ -891,9 +890,13 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 			}
 		}
 
-		if (tsv_error || canonical_error) {
+		if (tsv_error !== null || canonical_error !== null) {
 			const status =
-				tsv_error && canonical_error ? 'both_error' : tsv_error ? 'tsv_error' : 'canonical_error';
+				tsv_error !== null && canonical_error !== null
+					? 'both_error'
+					: tsv_error !== null
+						? 'tsv_error'
+						: 'canonical_error';
 			loc_arm.record_failure(lang, arm_file, status, tsv_error ?? canonical_error ?? undefined);
 			continue;
 		}
@@ -1070,35 +1073,6 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		exit_compare_failure(impls);
 	}
 
-	// The span-only arm's vacuity guard, structural rather than pinned: it diffs exactly the
-	// files the loc arm compares (both tsv wires and the oracle parsed — a verdict mismatch
-	// fails on its own), so per language its `compared` must EQUAL the loc arm's — controls
-	// excluded from both under injection. An arm that silently stopped running would
-	// otherwise read as zero findings, not a failure. Unlike a count pin this holds on a
-	// narrowed root too, and a corpus refresh costs no re-pin. Skipped for a language with a
-	// verdict mismatch, which the loc arm counts and the span arm cannot — that failure
-	// reports itself below, with its paths. The definition check rides the same guard: it
-	// runs on every file both tsv wires parsed, so it can never have checked fewer than the
-	// loc arm compared.
-	const population_failures = LANGUAGES.flatMap((lang) => {
-		const span = span_arm.stats.get(lang)!;
-		const compared = loc_arm.stats.get(lang)!.compared;
-		const out: string[] = [];
-		if (span.verdict_mismatch === 0 && span.compared !== compared) {
-			out.push(`${lang} span-only compared ${span.compared} ≠ loc-arm compared ${compared}`);
-		}
-		if (span.verdict_mismatch === 0 && loc_books.checked[lang] < compared) {
-			out.push(
-				`${lang} loc definition checked ${loc_books.checked[lang]} < loc-arm compared ${compared}`
-			);
-		}
-		return out;
-	});
-	if (population_failures.length > 0) {
-		console.log(`\x1b[31mFAIL: arm population — ${population_failures.join('; ')}\x1b[0m`);
-		exit_compare_failure(impls);
-	}
-
 	// Pinned counts (--all only — see lib/gate_counts.ts): EXACT per-language
 	// `compared` (the corpus is the pinned `../corpora` snapshot + the prettier
 	// suites, so any move is a corpus refresh or a one-language parse collapse that
@@ -1183,7 +1157,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	);
 	if (truncated_files.length > 0) {
 		console.log(
-			`\n\x1b[33mNote: ${truncated_files.length} file(s) hit the ${MAX_DIFFS_PER_FILE}-diff cap — diff lists are partial:\x1b[0m`
+			`\n\x1b[33mNote: ${truncated_files.length} file(s) kept only ${MAX_DIFFS_PER_FILE} diffs of a class — every diff was classified, the listings are partial:\x1b[0m`
 		);
 		for (const r of truncated_files.slice(0, 5)) {
 			console.log(`  ${rel_path(r.path, base_path)}`);

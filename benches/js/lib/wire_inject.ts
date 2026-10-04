@@ -12,7 +12,7 @@
  * That gap is not theoretical. A Svelte block binding's `: T` is read by its own acorn
  * parse, and both the line seed it needs and the span it is anchored at were wrong for
  * any spelling that put whitespace between the binding and its colon — invisible to
- * 9441 fixtures and every real repo, because everyone writes `x: T`. The comparison
+ * every fixture and every real repo, because everyone writes `x: T`. The comparison
  * catches both the instant such an input exists. This module makes them exist.
  *
  * **Two families, because there are two kinds of claim to break.** Both run through the

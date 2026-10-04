@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use tsv_cli::cli::input::ParserType;
-use tsv_lang::estimated_ast_arena_capacity;
+use tsv_lang::{Wire, estimated_ast_arena_capacity};
 
 use super::profile::{format_duration, format_size, lang_token, median_us, resolve_profile_files};
 use crate::cli::CliError;
@@ -54,12 +54,17 @@ impl JsonProfileCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
         let (files, skipped) =
             resolve_profile_files(&self.paths, |p| !is_bench_corpus_excluded(p))?;
+        let wire = if self.locations {
+            Wire::Loc
+        } else {
+            Wire::Span
+        };
 
         let mut results = Vec::new();
         let mut parse_errors = 0usize;
 
         for path in &files {
-            match profile_file(path, self.iterations, self.locations) {
+            match profile_file(path, self.iterations, wire) {
                 Ok(result) => results.push(result),
                 Err(_) => parse_errors += 1,
             }
@@ -79,16 +84,10 @@ impl JsonProfileCommand {
                 self.iterations,
                 parse_errors,
                 skipped,
-                self.locations,
+                wire,
             );
         } else {
-            print_report(
-                &aggregates,
-                self.iterations,
-                parse_errors,
-                skipped,
-                self.locations,
-            );
+            print_report(&aggregates, self.iterations, parse_errors, skipped, wire);
         }
 
         // Session perf counters, when built with `--features census` (no-op otherwise).
@@ -122,7 +121,7 @@ struct IterMeta {
     wire_bytes: usize,
 }
 
-fn profile_file(path: &Path, iterations: usize, locations: bool) -> Result<FileResult, String> {
+fn profile_file(path: &Path, iterations: usize, wire: Wire) -> Result<FileResult, String> {
     let source = std::fs::read_to_string(path).map_err(|e| format!("read error: {e}"))?;
     let parser_type = ParserType::from_extension(&path.to_string_lossy());
 
@@ -130,7 +129,7 @@ fn profile_file(path: &Path, iterations: usize, locations: bool) -> Result<FileR
     let mut meta: Option<IterMeta> = None;
 
     for _ in 0..iterations {
-        profile_once(&source, parser_type, locations, &mut steps, &mut meta)?;
+        profile_once(&source, parser_type, wire, &mut steps, &mut meta)?;
     }
 
     let meta = meta.ok_or("no iterations ran")?;
@@ -150,57 +149,54 @@ fn profile_file(path: &Path, iterations: usize, locations: bool) -> Result<FileR
 }
 
 /// One iteration of the parse path: `parse`, then the span-only writer
-/// (`convert_ast_json_bytes`) — or the `loc` emitter (`convert_ast_json_bytes_with_locations`)
-/// under `locations`.
+/// (`convert_ast_json_bytes`) for [`Wire::Span`], the `loc` emitter
+/// (`convert_ast_json_bytes_with_locations`) for [`Wire::Loc`].
 fn profile_once(
     source: &str,
     parser_type: ParserType,
-    locations: bool,
+    wire: Wire,
     steps: &mut StepDurations,
     meta: &mut Option<IterMeta>,
 ) -> Result<(), String> {
     // Arena allocated outside the timed region so its setup isn't counted.
     let arena = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
 
-    let wire = match parser_type {
+    let bytes = match parser_type {
         ParserType::TypeScript => {
             let t = Instant::now();
             let ast = tsv_ts::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
             steps.parse.push(t.elapsed());
             let t = Instant::now();
-            let wire = if locations {
-                tsv_ts::convert_ast_json_bytes_with_locations(&ast, source)
-            } else {
-                tsv_ts::convert_ast_json_bytes(&ast, source)
+            let bytes = match wire {
+                Wire::Span => tsv_ts::convert_ast_json_bytes(&ast, source),
+                Wire::Loc => tsv_ts::convert_ast_json_bytes_with_locations(&ast, source),
             };
             steps.write.push(t.elapsed());
-            wire
+            bytes
         }
         ParserType::Svelte => {
             let t = Instant::now();
             let ast = tsv_svelte::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
             steps.parse.push(t.elapsed());
             let t = Instant::now();
-            let wire = if locations {
-                tsv_svelte::convert_ast_json_bytes_with_locations(&ast, source)
-            } else {
-                tsv_svelte::convert_ast_json_bytes(&ast, source)
+            let bytes = match wire {
+                Wire::Span => tsv_svelte::convert_ast_json_bytes(&ast, source),
+                Wire::Loc => tsv_svelte::convert_ast_json_bytes_with_locations(&ast, source),
             };
             steps.write.push(t.elapsed());
-            wire
+            bytes
         }
         ParserType::Css => {
             let t = Instant::now();
             let ast = tsv_css::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
             steps.parse.push(t.elapsed());
             let t = Instant::now();
-            let wire = if locations {
-                tsv_css::convert_ast_json_bytes_with_locations(&ast, source)
-            } else {
-                tsv_css::convert_ast_json_bytes(&ast, source)
+            let bytes = match wire {
+                Wire::Span => tsv_css::convert_ast_json_bytes(&ast, source),
+                Wire::Loc => tsv_css::convert_ast_json_bytes_with_locations(&ast, source),
             };
             steps.write.push(t.elapsed());
-            wire
+            bytes
         }
     };
 
@@ -209,7 +205,7 @@ fn profile_once(
             // `ByteToCharMap::has_multibyte` is exactly this — a table is built only for a
             // non-ASCII source — so ask the byte scan rather than building one to read a flag.
             multibyte: !source.is_ascii(),
-            wire_bytes: wire.len(),
+            wire_bytes: bytes.len(),
         });
     }
     Ok(())
@@ -254,12 +250,11 @@ fn print_report(
     iterations: usize,
     parse_errors: usize,
     skipped: usize,
-    locations: bool,
+    wire: Wire,
 ) {
-    let writer = if locations {
-        "convert_ast_json_bytes_with_locations, the loc writer"
-    } else {
-        "convert_ast_json_bytes, the span-only writer"
+    let writer = match wire {
+        Wire::Span => "convert_ast_json_bytes, the span-only writer",
+        Wire::Loc => "convert_ast_json_bytes_with_locations, the loc writer",
     };
     for (parser_type, a) in aggregates {
         eprintln!(
@@ -296,7 +291,7 @@ fn print_json(
     iterations: usize,
     parse_errors: usize,
     skipped: usize,
-    locations: bool,
+    wire: Wire,
 ) {
     let languages: serde_json::Map<String, serde_json::Value> = aggregates
         .iter()
@@ -330,7 +325,10 @@ fn print_json(
 
     let output = serde_json::json!({
         // the writer timed: the span-only wire every binding ships, or the `loc` one
-        "wire": if locations { "loc" } else { "span" },
+        "wire": match wire {
+            Wire::Span => "span",
+            Wire::Loc => "loc",
+        },
         "iterations": iterations,
         "parse_errors": parse_errors,
         "skipped": skipped,

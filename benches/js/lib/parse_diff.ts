@@ -16,6 +16,7 @@
  * @module
  */
 
+import { erase_indices } from './diff_path.ts';
 import {
 	classify_loc_difference,
 	is_loc_leaf,
@@ -26,9 +27,16 @@ import {
 	wire_text
 } from './loc_tolerance.ts';
 import { DOCUMENTED_MATCHERS } from './parse_divergences.ts';
+import { LOCATION_KEYS } from './span_only.ts';
 import type { Language } from './types.ts';
 
-/** Per-file diff cap — collection stops here and the file is flagged truncated. */
+/**
+ * Per-file cap on the diff entries KEPT, applied to the documented and the undocumented
+ * entries separately: every difference is still found and classified, and a file past the
+ * cap is flagged truncated. Kept per class so a file's documented entries can never fill
+ * the list ahead of an undocumented one — the undocumented entry is the file's finding,
+ * and a file is undocumented exactly when it keeps one.
+ */
 export const MAX_DIFFS_PER_FILE = 50;
 
 export type DiffKind =
@@ -94,8 +102,13 @@ export interface MatchContext {
 	declared_divergence?: boolean;
 }
 
-/** A path inside a `loc` or `name_loc` — what a fixture's span-only pins say nothing about. */
-const LINE_COLUMN_PATH = /(^|\.)(name_)?loc(\.|$)/;
+/**
+ * Whether `path` is a location object or lies inside one — a `loc` or `name_loc` key
+ * (`span_only.ts`'s `LOCATION_KEYS`) among its segments.
+ */
+function is_location_path(path: string): boolean {
+	return path.split('.').some((segment) => LOCATION_KEYS.has(segment.replace(/\[\d+\]$/, '')));
+}
 
 /**
  * The classification `--fixtures` gives a `_svelte_divergence` fixture's declared difference
@@ -106,23 +119,19 @@ const FIXTURE_DECLARED_DIVERGENCE = 'fixture_declared_divergence';
 
 /**
  * The documented divergence `entry` is, by name, or `null` = undocumented (actionable). A
- * `loc` line or column, and a tsv `loc` outside the pinned superset, are never classified
- * here — those are the tolerance rows' and the superset rule's alone (see `diff_asts`).
+ * difference at or inside a `loc` / `name_loc` is never classified here: a `loc` line or
+ * column is the tolerance rows' alone and a tsv `loc` the oracle lacks the superset rule's
+ * (see `diff_asts`), and any other — a `loc` one side lacks or holds `null`, a `name_loc`
+ * field, Svelte's `character` — is a position difference no span divergence explains.
  */
 export function classify(
 	entry: Omit<DiffEntry, 'documented' | 'signature'>,
 	canonical_parent: unknown,
 	ctx: MatchContext
 ): string | null {
-	// A `loc` line or column is classified by the tolerance rows alone (see `diff_asts`) —
-	// a whole-subtree matcher written for a span divergence must not excuse one.
-	if (is_loc_leaf(entry.path)) return null;
-	// A tsv `loc` the oracle lacks is graded by the superset rule alone (see `diff_asts`):
-	// one that reaches here is outside `LOC_SUPERSET_KEYS`, which no matcher may excuse.
-	if (entry.kind === 'missing_canonical' && /(^|\.)loc$/.test(entry.path)) return null;
-	if (ctx.declared_divergence && !LINE_COLUMN_PATH.test(entry.path)) {
-		return FIXTURE_DECLARED_DIVERGENCE;
-	}
+	// a whole-subtree matcher written for a span divergence must not excuse a position
+	if (is_location_path(entry.path)) return null;
+	if (ctx.declared_divergence) return FIXTURE_DECLARED_DIVERGENCE;
 	for (const matcher of DOCUMENTED_MATCHERS) {
 		if (matcher.matches(entry, canonical_parent, ctx)) return matcher.name;
 	}
@@ -131,17 +140,17 @@ export function classify(
 
 // --- Diff engine ---------------------------------------------------------------
 
-/** Normalize a concrete path to its grouping signature (array indices erased). */
-function path_signature(path: string): string {
-	return path.replace(/\[\d+\]/g, '[]');
-}
-
 /** Per-row counts of the `loc` differences a diff tolerated (`lib/loc_tolerance.ts`). */
 export type LocRowCounts = Partial<Record<LocRow, number>>;
 
 /** What one deep diff found. */
 export interface DiffResult {
+	/**
+	 * The differences kept, in walk order — up to `MAX_DIFFS_PER_FILE` documented and as many
+	 * undocumented ones, so the list holds an undocumented entry whenever the file has one.
+	 */
 	diffs: DiffEntry[];
+	/** Whether any classified difference was dropped by the per-class cap. */
 	truncated: boolean;
 	/**
 	 * The `loc` differences the tolerance rows absorbed, per row — counted rather than
@@ -162,9 +171,10 @@ const has_span = (o: Record<string, unknown>): boolean =>
 	typeof o.start === 'number' && typeof o.end === 'number';
 
 /**
- * Recursively diff two JSON-shaped values, collecting up to MAX_DIFFS_PER_FILE
- * entries. Arrays with differing lengths report one length_mismatch and still
- * recurse the shared prefix so positional drift inside is visible.
+ * Recursively diff two JSON-shaped values, classifying every difference and keeping up to
+ * `MAX_DIFFS_PER_FILE` of each class (documented / undocumented). Arrays with differing
+ * lengths report one length_mismatch and still recurse the shared prefix so positional
+ * drift inside is visible.
  *
  * **`loc` is graded by its own rules**, keyed on `ctx.language`:
  * - per half, only where both sides' offset at that half agrees — a span difference is
@@ -180,6 +190,8 @@ const has_span = (o: Record<string, unknown>): boolean =>
 export function diff_asts(ours: unknown, canonical: unknown, ctx: MatchContext): DiffResult {
 	const diffs: DiffEntry[] = [];
 	let truncated = false;
+	let kept_documented = 0;
+	let kept_undocumented = 0;
 	const loc_rows: LocRowCounts = {};
 	const loc_superset: Record<string, number> = {};
 	let loc_span_skipped = 0;
@@ -200,16 +212,14 @@ export function diff_asts(ours: unknown, canonical: unknown, ctx: MatchContext):
 				return;
 			}
 		}
-		if (diffs.length >= MAX_DIFFS_PER_FILE) {
+		const base = { path, kind, ours: o, canonical: c };
+		const documented = classify(base, canonical_parent, ctx);
+		const kept = documented === null ? kept_undocumented++ : kept_documented++;
+		if (kept >= MAX_DIFFS_PER_FILE) {
 			truncated = true;
 			return;
 		}
-		const base = { path, kind, ours: o, canonical: c };
-		diffs.push({
-			...base,
-			signature: `${kind}:${path_signature(path)}`,
-			documented: classify(base, canonical_parent, ctx)
-		});
+		diffs.push({ ...base, signature: `${kind}:${erase_indices(path)}`, documented });
 	};
 
 	// `anchor` is the nearest enclosing object of a pinned superset type — the context a
@@ -221,7 +231,6 @@ export function diff_asts(ours: unknown, canonical: unknown, ctx: MatchContext):
 		canonical_parent: unknown,
 		anchor: SupersetAnchor | null
 	): void => {
-		if (truncated) return;
 		if (o === c) return;
 		const o_type = value_type(o);
 		const c_type = value_type(c);

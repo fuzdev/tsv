@@ -9,11 +9,23 @@
  */
 
 import { deepStrictEqual, strictEqual } from 'node:assert';
-import { classify, diff_asts, type MatchContext, MAX_DIFFS_PER_FILE } from './parse_diff.ts';
+import {
+	classify,
+	diff_asts,
+	type DiffEntry,
+	type MatchContext,
+	MAX_DIFFS_PER_FILE
+} from './parse_diff.ts';
 import type { Language } from './types.ts';
 
-const ctx = (canonical_root: unknown, language: Language = 'typescript'): MatchContext => ({
-	source: '',
+type Entry = Omit<DiffEntry, 'documented' | 'signature'>;
+
+const ctx = (
+	canonical_root: unknown,
+	language: Language = 'typescript',
+	source = ''
+): MatchContext => ({
+	source,
 	canonical_root,
 	language
 });
@@ -73,7 +85,7 @@ Deno.test('diff_asts: a key on one side only is missing on the other', () => {
 	strictEqual(d!.canonical, 2);
 });
 
-Deno.test('diff_asts: collection stops at the per-file cap and flags the file truncated', () => {
+Deno.test('diff_asts: the per-file cap keeps each class apart and flags the file truncated', () => {
 	const ours: Record<string, number> = {};
 	const canonical: Record<string, number> = {};
 	for (let i = 0; i < MAX_DIFFS_PER_FILE + 5; i++) {
@@ -84,6 +96,39 @@ Deno.test('diff_asts: collection stops at the per-file cap and flags the file tr
 	strictEqual(result.diffs.length, MAX_DIFFS_PER_FILE);
 	strictEqual(result.truncated, true);
 	strictEqual(diff({ k: 0 }, { k: 1 }).truncated, false);
+});
+
+/**
+ * Two trees whose first `documented` differences are a documented divergence (a lone
+ * surrogate) and whose last is an undocumented one, in walk order.
+ */
+function documented_then_undocumented(documented: number): [unknown, unknown] {
+	const ours: Record<string, unknown> = {};
+	const canonical: Record<string, unknown> = {};
+	for (let i = 0; i < documented; i++) {
+		ours[`s${i}`] = '\u{FFFD}';
+		canonical[`s${i}`] = '\uD800';
+	}
+	ours.end = 4;
+	canonical.end = 5;
+	return [ours, canonical];
+}
+
+Deno.test('diff_asts: documented entries never crowd out an undocumented one', () => {
+	// past the cap: the documented tail is dropped, the undocumented entry is still kept
+	const past = diff(...documented_then_undocumented(MAX_DIFFS_PER_FILE + 5));
+	strictEqual(past.truncated, true);
+	const undocumented = past.diffs.filter((d) => d.documented === null);
+	deepStrictEqual(
+		undocumented.map((d) => d.path),
+		['end']
+	);
+	strictEqual(past.diffs.length, MAX_DIFFS_PER_FILE + 1);
+	// at the cap: nothing dropped
+	const at = diff(...documented_then_undocumented(MAX_DIFFS_PER_FILE));
+	strictEqual(at.truncated, false);
+	strictEqual(at.diffs.length, MAX_DIFFS_PER_FILE + 1);
+	strictEqual(at.diffs.at(-1)!.documented, null);
 });
 
 Deno.test('diff_asts: a documented divergence is classified by its matcher', () => {
@@ -146,35 +191,59 @@ Deno.test('classify: a declared divergence excuses span differences only', () =>
 		'fixture_declared_divergence'
 	);
 	strictEqual(classify(entry('value_mismatch', 'body[0].end'), {}, ctx({})), null);
-	// a `loc` / `name_loc` leaf is the tolerance rows' alone
+	// a `loc` leaf is the tolerance rows' alone, and a `name_loc` leaf is graded exactly —
+	// the span-only pins say nothing about either
 	strictEqual(classify(entry('value_mismatch', 'body[0].loc.start.line'), {}, declared), null);
 	strictEqual(classify(entry('value_mismatch', 'name_loc.end.column'), {}, declared), null);
 	strictEqual(classify(entry('missing_canonical', 'body[0].loc'), {}, declared), null);
 });
 
-Deno.test('classify: no matcher may excuse a `loc` leaf or an unpinned superset `loc`', () => {
-	// `static_member_ladder` claims EVERY difference under a ladder class body — the shape of
+Deno.test('classify: no matcher may excuse a difference at or inside a location', () => {
+	// `static_member_ladder` claims every difference in a ladder's members — the shape of
 	// matcher the refusal exists for
-	const member = {
+	const source = 'class C {\n\tstatic\n\tstatic\n\ta() {}\n}';
+	const member = (start: number) => ({
 		type: 'PropertyDefinition',
+		start,
+		end: start + 6,
+		static: false,
 		computed: false,
 		value: null,
-		key: { name: 'static' }
-	};
-	const root = { body: [{ type: 'ClassBody', body: [member] }] };
-	const entry = (kind: 'value_mismatch' | 'missing_canonical', path: string) => ({
+		key: { type: 'Identifier', start, end: start + 6, name: 'static' }
+	});
+	const first = member(source.indexOf('static'));
+	const second = member(source.lastIndexOf('static'));
+	const root = { body: [{ type: 'ClassBody', body: [first, second] }] };
+	const ladder = ctx(root, 'typescript', source);
+	const entry = (kind: Entry['kind'], path: string, ours: unknown = 1, canonical: unknown = 2) => ({
 		kind,
 		path,
-		ours: 1,
-		canonical: 2
+		ours,
+		canonical
 	});
 	strictEqual(
-		classify(entry('value_mismatch', 'body[0].body[0].start'), member, ctx(root)),
+		classify(entry('value_mismatch', 'body[0].body[0].start'), first, ladder),
 		'static_member_ladder'
 	);
-	strictEqual(
-		classify(entry('value_mismatch', 'body[0].body[0].loc.start.line'), member, ctx(root)),
-		null
-	);
-	strictEqual(classify(entry('missing_canonical', 'body[0].body[0].loc'), member, ctx(root)), null);
+	const at_location: Entry[] = [
+		// a `loc` line or column: the tolerance rows' alone
+		entry('value_mismatch', 'body[0].body[0].loc.start.line'),
+		// a tsv `loc` the oracle lacks: the superset rule's alone
+		entry('missing_canonical', 'body[0].body[0].loc', {}, undefined),
+		// a `loc` tsv lacks, or one side's `null`
+		entry('missing_ours', 'body[0].body[0].loc', undefined, {}),
+		entry('type_mismatch', 'body[0].body[0].loc', null, {}),
+		// Svelte's `character`, and a `name_loc` anywhere
+		entry('missing_canonical', 'body[0].body[0].loc.start.character', 3, undefined),
+		entry('value_mismatch', 'body[0].body[0].name_loc.end.column'),
+		entry('missing_ours', 'body[0].body[0].name_loc', undefined, {})
+	];
+	for (const e of at_location) {
+		strictEqual(classify(e, first, ladder), null, `${e.kind} ${e.path}`);
+		strictEqual(
+			classify(e, first, { ...ladder, declared_divergence: true }),
+			null,
+			`declared: ${e.kind} ${e.path}`
+		);
+	}
 });

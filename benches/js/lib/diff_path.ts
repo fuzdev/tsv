@@ -1,11 +1,17 @@
 /**
- * Resolving a deep diff's concrete paths (`fragment.nodes[3].expression`) back to the node
- * they name — shared by the documented-divergence matchers (`parse_divergences.ts`) and
+ * A deep diff's concrete paths (`fragment.nodes[3].expression`): resolving one back to the
+ * node it names — shared by the documented-divergence matchers (`parse_divergences.ts`) and
  * the `loc` tolerance rows (`loc_tolerance.ts`), which both read the canonical tree at a
- * difference's path.
+ * difference's path — and erasing its array indices, the grouping key the diff engine
+ * (`parse_diff.ts`) and the superset keys (`loc_tolerance.ts`) share.
  *
  * @module
  */
+
+/** `path` with every array index erased (`body[3].end` → `body[].end`) — a grouping key. */
+export function erase_indices(path: string): string {
+	return path.replace(/\[\d+\]/g, '[]');
+}
 
 /** Resolve a node by concrete diff path (`fragment.nodes[3].expression`); `''` is the root. */
 export function get_at_path(root: unknown, path: string): unknown {

@@ -59,7 +59,7 @@
  * @module
  */
 
-import { get_at_path } from './diff_path.ts';
+import { erase_indices, get_at_path } from './diff_path.ts';
 import type { Language } from './types.ts';
 
 /** One tolerance row. */
@@ -125,15 +125,15 @@ export function superset_key(
 	text: string
 ): string {
 	const type = typeof object.type === 'string' ? object.type : '';
-	const tail = path.slice(path.lastIndexOf('.') + 1).replace(/\[\d+\]/g, '[]');
+	const tail = erase_indices(path.slice(path.lastIndexOf('.') + 1));
 	// a comment's `type` (`Line` / `Block`) is no Svelte node's, so it is keyed by its list
 	if ((type === 'Line' || type === 'Block') && typeof object.value === 'string') {
 		return `${tail}:${type}`;
 	}
 	if (type !== '' && pinned.has(type)) return type;
-	if (anchor === null) return `${path.replace(/\[\d+\]/g, '[]')}:${type}`;
+	if (anchor === null) return `${erase_indices(path)}:${type}`;
 	const relative = path.slice(anchor.path === '' ? 0 : anchor.path.length + 1);
-	const slot = `${anchor.type}.${relative.replace(/\[\d+\]/g, '[]')}`;
+	const slot = `${anchor.type}.${erase_indices(relative)}`;
 	const braced = ISLAND_SLOTS.has(slot) && follows_brace(object.start as number, text);
 	return `${slot}:${braced ? `{${type}}` : type}`;
 }

@@ -365,8 +365,13 @@ against the documented divergences (`docs/conformance_svelte.md`) at the reporti
 layer only, so a bug in our own divergence reasoning surfaces as an undocumented
 group instead of being silently absorbed. The canonical AST is serialized exactly
 like the fixture sidecar (JSON round-trip, BigInt → string) so corpus and fixture
-semantics match. Diffs are grouped by path signature (array indices erased) across
-files; undocumented groups are the actionable output and fail the run (exit 1).
+semantics match. Every difference is classified; the per-file cap
+(`MAX_DIFFS_PER_FILE`) bounds only what a file KEEPS, per class, so documented entries
+never crowd an undocumented one out of the list. A difference at or inside a `loc` /
+`name_loc` is never a matcher's question — the `loc` rules below grade it, and anything
+they do not claim is undocumented. Diffs are grouped by path signature (array indices
+erased) across files; undocumented groups are the actionable output and fail the run
+(exit 1).
 Parse failures on either side are counted and skipped — `skip_triage.ts` is the
 dedicated tool for those.
 
@@ -419,10 +424,8 @@ tables.
   loc arm excuses is excused identically; an undocumented span-only group fails the run,
   and so does a file the two tsv wires give different verdicts on (one parser behind two
   writers). It prints its own table and lands in `--json` as `span_only` (`stats`,
-  `groups`, `verdict_mismatches`). Its vacuity guard is structural, not a pin: its
-  per-language `compared` must equal the loc arm's (it diffs exactly the files that arm
-  compares), and the definition check can never have checked fewer, so the guard holds on a
-  narrowed root too and a corpus refresh costs no re-pin. A span-wire panic rides the shared
+  `groups`, `verdict_mismatches`). It diffs exactly the files the loc arm compares, in the
+  same per-file pass, so its `compared` equals that arm's by construction. A span-wire panic rides the shared
   panic gate beside the loc arm's — a file whose loc wire throws a plain rejection while the
   span wire panics would otherwise read as both-errored and be skipped. Under `--inject*`
   it runs too, its controls subtracted from its variants like the loc arm's.
@@ -441,8 +444,13 @@ neither `--all` nor `--inject*`.
 
 The documented-divergence matchers live in `lib/parse_divergences.ts`
 (`DOCUMENTED_MATCHERS`, each naming its `docs/conformance_svelte.md` section — a
-`test:deno` leg, `parse_divergences_test.ts`, checks every named section exists) and cover
-only the AST-content divergences that parse on both sides; the parser-feature
+`test:deno` leg, `parse_divergences_test.ts`, checks every named section exists and gives
+each matcher the difference it exists for plus a near miss it must refuse) and cover
+only the AST-content divergences that parse on both sides. Each is gated on the SHAPE its
+catalog entry describes — the values on both sides, the duplicate or the shift that
+explains an index, the source bytes (read at the wire's offsets, so a BOM-led Svelte or
+CSS file is read without its BOM, as its oracle reads it) — and an arm for a renumbering
+reaches only the indices the shift does, never the whole document. The parser-feature
 corrections (`using`, v-flag regex, CSS namespaces) make the
 canonical parser throw, so they land in the error buckets. When triage confirms a
 new group is intentional, add a matcher AND catalog it in
@@ -667,10 +675,10 @@ deno task test:deno:canonical
 # The node-modules-free part of the harness IS gated, and mostly for free: `deno check`
 # walks transitive imports, so `typecheck:scripts` already covers the loader/guard core
 # through scripts/'s own graph (check_artifact_freshness, ffi, napi, tsv_artifacts,
-# runtime, types, reject_probe, locations_probe) and `test:deno` covers gate_counts. `typecheck:bench-core`
-# names the orphans nothing else reaches — `lib/wasm.ts`, `lib/harvest_stamp.ts`,
-# `lib/loc_wire_client.ts`, `lib/fixture_documents.ts`, `lib/error_text.ts` and
-# `compose_reports.ts`. It is deliberately NOT the maximal checkable set: the impl
+# runtime, types, reject_probe, locations_probe, and — through check_loc.ts — loc_wire_client)
+# and `test:deno` covers gate_counts. `typecheck:bench-core` names the orphans nothing else
+# reaches — `lib/wasm.ts`, `lib/harvest_stamp.ts`, `lib/fixture_documents.ts`,
+# `lib/error_text.ts` and `compose_reports.ts`. It is deliberately NOT the maximal checkable set: the impl
 # wrappers also check on a bare checkout, but only because their npm imports are
 # dynamic, and gating them would impose that import style on modules whose job is
 # loading npm (deno.json `//typecheck:bench-core`).
@@ -1805,7 +1813,7 @@ ones that measure only the native path
 (`skip_triage`), where an
 unbuilt bundle otherwise fails a run that would never have touched it, with a WASM
 error naming nothing the script is about: `deno task build:ffi && deno task
-build:wasm:all:deno` first (these two read the `release` FFI, not `corpus`). The
+build:wasm:all:deno` first (it reads the `release` FFI, not `corpus`). The
 two with `deno task` entries — `css:over-acceptance` and `ts-repo:over-acceptance`
 — build what they need themselves.
 
