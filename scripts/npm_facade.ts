@@ -6,11 +6,13 @@
  * staging scripts state the facade's export-map entry and its re-exported type names
  * from one place.
  *
- * The shared half — the options reader, the format family and the error type — rides every
- * package; the
+ * The shared part — the options reader with the format family (`api.js`) and the error
+ * type — rides every package; the format declarations ride the format-capable ones; the
  * parse half — the parse family, the `locations.js` helper it runs and the AST types its
  * declarations name — rides the parse-capable ones (the format-only package loads none of
- * it).
+ * it). The declarations are named apart from the `.js` files they sit beside
+ * (`facade_format.d.ts`, not `api.d.ts`): they type the entries' re-exports, not those
+ * modules, and a same-basename `.d.ts` would be read as the module's own types.
  *
  * Plain `node:` imports only: the package suites run this module under Node as well as
  * Deno.
@@ -35,31 +37,47 @@ const from_source_dir = (published: string): FacadeFile => ({
 	source: `${FACADE_SOURCE_DIR}/${published}`
 });
 
-/** The facade's shared half. */
+/** The facade's shared part: `api.js` (the options reader the parse half imports too, and
+ * the format family) and the error type every export throws. */
 const FACADE_SHARED_FILES: ReadonlyArray<FacadeFile> = [
 	from_source_dir('api.js'),
-	from_source_dir('api.d.ts'),
 	from_source_dir('syntax_error.d.ts')
 ];
 
-/** The facade's parse half — with the hand-maintained AST types `api_parse.d.ts` and
+/** The format family's declarations — for the format-capable packages alone. */
+const FACADE_FORMAT_FILES: ReadonlyArray<FacadeFile> = [from_source_dir('facade_format.d.ts')];
+
+/** The facade's parse half — with the hand-maintained AST types `facade_parse.d.ts` and
  * `locations.d.ts` import. */
 const FACADE_PARSE_FILES: ReadonlyArray<FacadeFile> = [
 	from_source_dir('api_parse.js'),
-	from_source_dir('api_parse.d.ts'),
+	from_source_dir('facade_parse.d.ts'),
 	from_source_dir('locations.js'),
 	from_source_dir('locations.d.ts'),
 	{ published: 'tsv_ast.d.ts', source: 'crates/tsv_wasm/types/tsv_ast.d.ts' }
 ];
 
-/** The facade files a package ships — `parse` for a parse-capable one. */
-export function facade_files(parse: boolean): Array<FacadeFile> {
-	return [...FACADE_SHARED_FILES, ...(parse ? FACADE_PARSE_FILES : [])];
+/** Which families a package carries. */
+export interface FacadeFamilies {
+	format: boolean;
+	parse: boolean;
+}
+
+/** Both families — `@fuzdev/tsv` and `@fuzdev/tsv-wasm`. */
+export const ALL_FAMILIES: FacadeFamilies = { format: true, parse: true };
+
+/** The facade files a package carrying `families` ships. */
+export function facade_files(families: FacadeFamilies): Array<FacadeFile> {
+	return [
+		...FACADE_SHARED_FILES,
+		...(families.format ? FACADE_FORMAT_FILES : []),
+		...(families.parse ? FACADE_PARSE_FILES : [])
+	];
 }
 
 /** `facade_files`' repo-relative sources. */
-export function facade_sources(parse: boolean): Array<string> {
-	return facade_files(parse).map((file) => file.source);
+export function facade_sources(families: FacadeFamilies): Array<string> {
+	return facade_files(families).map((file) => file.source);
 }
 
 /**
@@ -73,7 +91,7 @@ export const LOCATIONS_EXPORT = {
 } as const;
 
 /** The facade declaration files whose types a package's entry re-exports by name. */
-export type FacadeDeclarations = 'api.d.ts' | 'api_parse.d.ts' | 'syntax_error.d.ts';
+export type FacadeDeclarations = 'facade_format.d.ts' | 'facade_parse.d.ts' | 'syntax_error.d.ts';
 
 /**
  * The types (interfaces and type aliases) a facade declaration file exports, in source

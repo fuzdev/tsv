@@ -111,7 +111,11 @@ Deno.test('read_options: every refusal, word for word', () => {
 	);
 	throws_type_error(
 		() => read_options({ locations: 'yes' }, 'parse', 'typescript'),
-		"parse option 'locations' must be a boolean"
+		"parse option 'locations' must be a boolean (got 'yes')"
+	);
+	throws_type_error(
+		() => read_options({ locations: null }, 'parse', 'svelte'),
+		"parse option 'locations' must be a boolean (got null)"
 	);
 	throws_type_error(
 		() => read_options({ sourceType: 'module' }, 'parse', 'svelte'),
@@ -135,6 +139,33 @@ Deno.test('read_options: every refusal, word for word', () => {
 		() => read_options({ sourceType: 'sloppy' }, 'parse', 'typescript'),
 		"parse option 'sourceType' must be 'script' or 'module' (got 'sloppy')"
 	);
+	// a refused string is echoed escaped — no raw line break, control character, bidi
+	// control or lone surrogate reaches the message, and a quote cannot close the literal
+	// early — and clipped past 40 UTF-16 units, the `…` inside the quotes, never splitting
+	// a surrogate pair. `locations.js` restates the rule, so both copies run the table.
+	for (const [value, got] of [
+		['a\nb', String.raw`'a\nb'`],
+		[`it's "x"`, String.raw`'it\'s "x"'`],
+		['\u0000\\', String.raw`'\u0000\\'`],
+		['\uD800', String.raw`'\ud800'`],
+		['a\u2028b\u2029', String.raw`'a\u2028b\u2029'`],
+		['\u0085\u009b[1m\u007f', String.raw`'\u0085\u009b[1m\u007f'`],
+		['\u202ex\u2066', String.raw`'\u202ex\u2066'`],
+		['\u200e\u200f\u202a\u2069\u061c', String.raw`'\u200e\u200f\u202a\u2069\u061c'`],
+		['x'.repeat(40), `'${'x'.repeat(40)}'`],
+		['x'.repeat(41), `'${'x'.repeat(40)}…'`],
+		['x'.repeat(39) + '\u{1F600}', `'${'x'.repeat(39)}…'`],
+		['y\n'.repeat(1000), `'${String.raw`y\n`.repeat(20)}…'`]
+	]) {
+		throws_type_error(
+			() => read_options({ sourceType: value }, 'format', 'typescript'),
+			`format option 'sourceType' must be 'script' or 'module' (got ${got})`
+		);
+		throws_type_error(
+			() => create_locator('a', { language: value as 'css' }),
+			`locations option 'language' must be 'typescript', 'svelte' or 'css' (got ${got})`
+		);
+	}
 	// an unknown key errors whatever its value, `undefined` included; the detail names the
 	// export's own key set
 	throws_type_error(
@@ -148,6 +179,15 @@ Deno.test('read_options: every refusal, word for word', () => {
 	throws_type_error(
 		() => read_options({ x: 1 }, 'parse_json', 'typescript'),
 		"unknown parse option 'x' (expected 'sourceType')"
+	);
+	// an unknown key is quoted by the same rule as a refused value, in both copies
+	throws_type_error(
+		() => read_options({ 'k\u202e\n': 1 }, 'parse', 'svelte'),
+		String.raw`unknown parse option 'k\u202e\n' (expected 'locations')`
+	);
+	throws_type_error(
+		() => create_locator('a', { 'k\u202e\n': 1 } as never),
+		String.raw`unknown locations option 'k\u202e\n' (expected 'language')`
 	);
 	throws_type_error(
 		() => read_options({ locations: false }, 'format', 'typescript'),
@@ -311,17 +351,30 @@ Deno.test("create_locator: position_at answers one offset in the wire's coordina
 	deepStrictEqual(css.position_at(2), { line: 2, column: 0 });
 	deepStrictEqual(css.position_at(3), { line: 2, column: 1 });
 	throws_range_error(() => css.position_at(4), /from 0 to 3.*\(got 4\)/);
+	// a number that is not a position of the text is out of range
 	for (const [offset, got] of [
 		[-1, '-1'],
 		[1.5, '1.5'],
 		[Number.NaN, 'NaN'],
-		[7, '7'],
-		['1', "'1'"],
-		[undefined, 'none']
+		[Infinity, 'Infinity'],
+		[7, '7']
 	] as const) {
 		throws_range_error(
-			() => ts.position_at(offset as unknown as number),
+			() => ts.position_at(offset),
 			new RegExp(`^position_at: offset must be an integer from 0 to 6, .*\\(got ${got}\\)$`)
+		);
+	}
+	// a value that is not a number is the wrong type, as every argument refusal is
+	for (const [offset, got] of [
+		['1', "'1'"],
+		[undefined, 'none'],
+		[null, 'null'],
+		[1n, 'bigint'],
+		[{ valueOf: () => 1 }, 'object']
+	] as const) {
+		throws_type_error(
+			() => ts.position_at(offset as unknown as number),
+			`position_at: offset must be a number (got ${got})`
 		);
 	}
 });
@@ -416,6 +469,19 @@ Deno.test('locations: the options bag is read as the facade reads one', () => {
 	for (const bag of [undefined, null, {}, { language: undefined }]) {
 		strictEqual(reconstruct_locations({ ...ast }, 'a', bag as never).loc.end.column, 1);
 	}
+	// the bag is read by its own enumerable keys alone, as `read_options` reads one: an
+	// inherited `language` is not a setting
+	const inherited = Object.create({ language: 'css' });
+	throws_type_error(
+		() => create_locator('a', inherited),
+		"locations option 'language' must be 'typescript', 'svelte' or 'css' (got none)"
+	);
+	// so the language is inferred from the `Program` root (TypeScript's rule: the lone CR
+	// breaks a line), not read off the prototype (CSS's: it does not)
+	strictEqual(
+		reconstruct_locations({ type: 'Program', start: 0, end: 3 }, 'a\rb', inherited).loc.end.line,
+		2
+	);
 });
 
 Deno.test('reconstruct_locations: depth costs no JS stack', () => {
@@ -574,6 +640,53 @@ Deno.test('the facade builds exactly the engine families it is handed', () => {
 		'parse_typescript',
 		'parse_typescript_json'
 	]);
+});
+
+Deno.test('every function the facade builds is named for its export', () => {
+	const { engine } = fake_engine(true);
+	const api = { ...create_parse_api(engine), ...create_format_api(engine.format) };
+	for (const [name, f] of Object.entries(api)) strictEqual(f.name, name);
+});
+
+Deno.test('a source that is not well-formed UTF-16 is refused, naming its offset', () => {
+	const { engine, calls } = fake_engine(true);
+	const api: Record<string, (source: string) => unknown> = {
+		...create_parse_api(engine),
+		...create_format_api(engine.format)
+	};
+	for (const [source, offset] of [
+		['\uD800', 0],
+		['"\uD800"', 1],
+		['a\uDC00', 1],
+		// a high surrogate whose follower is not a low one, and a pair in reverse order
+		['\uD83D😀', 0],
+		['😀\uDE00\uD83D', 2],
+		['ok\uD83D', 2]
+	] as const) {
+		for (const [name, f] of Object.entries(api)) {
+			const noun = name.startsWith('format_') ? 'format' : 'parse';
+			throws_type_error(
+				() => f(source),
+				`${noun} source must be well-formed UTF-16 (a lone surrogate at offset ${offset})`
+			);
+		}
+	}
+	strictEqual(calls.length, 0, 'a refused source never reaches the engine');
+	// a pair is well-formed, astral characters included
+	strictEqual(api.format_typescript!('"😀"'), 'formatted:"😀"');
+	// the same answers on a runtime without `String.prototype.isWellFormed` (an older
+	// browser), where the scan alone decides
+	const descriptor = Object.getOwnPropertyDescriptor(String.prototype, 'isWellFormed');
+	delete (String.prototype as { isWellFormed?: unknown }).isWellFormed;
+	try {
+		strictEqual(api.format_typescript!('"😀"'), 'formatted:"😀"');
+		throws_type_error(
+			() => api.parse_css!('a\uD800'),
+			'parse source must be well-formed UTF-16 (a lone surrogate at offset 1)'
+		);
+	} finally {
+		if (descriptor) Object.defineProperty(String.prototype, 'isWellFormed', descriptor);
+	}
 });
 
 /**

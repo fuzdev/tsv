@@ -1,11 +1,10 @@
 /**
  * Hand-written types for `@fuzdev/tsv` — `@fuzdev/tsv-wasm`'s surface (the same
- * facade declarations, re-exported from the staged `api.d.ts` / `api_parse.d.ts`, and
- * the same `tsv_ast` re-export), so the two packages type-check interchangeably
- * except for what a WASM engine needs and this one doesn't: `init()` and
+ * facade declarations, re-exported from the staged `facade_format.d.ts` /
+ * `facade_parse.d.ts`, and the same `tsv_ast` re-export), so the two packages type-check
+ * interchangeably except for what a WASM engine needs and this one doesn't: `init()` and
  * `init_sync()` (nothing here needs initializing), `wasm_module` (no compiled module
- * to hand a worker),
- * `reinstantiate()` (no instance to poison), and `IgnoreStack`'s `free()` /
+ * to hand a worker), `reinstantiate()` (no instance to poison), and `IgnoreStack`'s `free()` /
  * `[Symbol.dispose]` (a GC-managed native object has no handle to release).
  * That list is the whole delta — `scripts/test_napi_npm.ts` diffs the two
  * packages' export names rather than trusting it. The `locations.js` helper's
@@ -24,15 +23,17 @@ export type * from './tsv_ast.js';
 export * from './locations.js';
 
 // The parse/format surface is the shared facade's, declared once beside it
-// (`api.d.ts` / `api_parse.d.ts`, staged in from `crates/tsv_wasm/npm/`). Re-exported by
-// NAME, so the `tsv_ast` star export above can never ambiguate one away (TS2308).
+// (`facade_format.d.ts` / `facade_parse.d.ts`, staged in from `crates/tsv_wasm/npm/`, and
+// named apart from the `api.js` / `api_parse.js` modules beside them, which do not export
+// these). Re-exported by NAME, so the `tsv_ast` star export above can never ambiguate one
+// away (TS2308).
 export type {
 	ParseOptions,
 	TypeScriptParseOptions,
 	ParseJsonOptions,
 	TypeScriptParseJsonOptions
-} from './api_parse.js';
-export type { FormatOptions, TypeScriptFormatOptions } from './api.js';
+} from './facade_parse.js';
+export type { FormatOptions, TypeScriptFormatOptions } from './facade_format.js';
 export type { TsvSyntaxError } from './syntax_error.js';
 export {
 	parse_svelte,
@@ -41,8 +42,8 @@ export {
 	parse_typescript_json,
 	parse_css,
 	parse_css_json
-} from './api_parse.js';
-export { format_svelte, format_typescript, format_css } from './api.js';
+} from './facade_parse.js';
+export { format_svelte, format_typescript, format_css } from './facade_format.js';
 
 /**
  * The gitignore-aware matcher stack — the same layering and prune decisions

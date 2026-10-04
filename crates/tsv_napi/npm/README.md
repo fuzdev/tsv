@@ -73,19 +73,19 @@ A set value is exact. With none named and both grammars rejecting the source, th
 
 `parse_svelte` / `parse_typescript` / `parse_css` return the language's public JSON AST as an object — span-only by default, `start`/`end` offsets on every node and no per-node `loc`; the `parse_*_json` siblings return that wire as a JSON string for consumers that forward it without paying `JSON.parse`. The object parsers take an optional `{locations?, sourceType?}` bag, the `_json` ones `{sourceType?}`, and `sourceType` is TypeScript-only. TypeScript types for the AST are bundled in `tsv_ast.d.ts` and re-exported from the package (`import type {...} from '@fuzdev/tsv'`).
 
-`locations: true` adds `loc` (and Svelte's `name_loc`), computed in JS after the parse by `reconstruct_locations`. It is exported too, with `create_locator(source, {language})` for sparse lookups (`language` required), whose `position_at(offset)` / `loc_of(node)` throw a `RangeError` for an offset or span the source doesn't hold; the whole-tree forms (`reconstruct_locations`, the locator's `reconstruct(ast)`) check nothing per node. Both are also the `@fuzdev/tsv/locations` entry point, pure JS that loads no native addon.
+`locations: true` adds `loc` (and Svelte's `name_loc`), computed in JS after the parse by `reconstruct_locations`. It is exported too, with `create_locator(source, {language})` for sparse lookups (`language` required), whose `position_at(offset)` / `loc_of(node)` throw a `RangeError` for an offset or span the source doesn't hold (a `TypeError` for an offset that isn't a number); the whole-tree forms (`reconstruct_locations`, the locator's `reconstruct(ast)`) check nothing per node, and take an acyclic tree — the parse's own, or a clone of it. Both are also the `@fuzdev/tsv/locations` entry point, pure JS that loads no native addon.
 
 ### Options
 
 Options behave as in `@fuzdev/tsv-wasm`: a supported key set to `undefined` reads as its default, and a `sourceType`-only bag forwards to any function (`sourceType: undefined` included on Svelte and CSS; a `locations` key, whatever its value, throws anywhere but an object parser). Argument errors are `TypeError`s:
 
 - an unknown key, whatever its value;
-- a wrong-typed or invalid value, or a non-string source;
+- a wrong-typed or invalid value, or a source that is not a string or not well-formed UTF-16 (it holds a lone surrogate);
 - a non-object second argument, arrays included — write `sources.map((s) => format_typescript(s))`, not `sources.map(format_typescript)`, which passes the index.
 
 ### File scoping
 
-`IgnoreStack` is tsv's own hierarchical, git-faithful matcher plus its discovery policy (`classify_dir`, `should_format_file`, `is_path_pruned`, `excluded_argument_warning`, `unsupported_extension_error`, and the warning templates), exported so tooling can reproduce exactly which files `tsv format` would touch — the same class `@fuzdev/tsv-wasm` exports; [`@fuzdev/tsv-format-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-format-wasm) documents it with examples.
+`IgnoreStack` is tsv's own hierarchical, git-faithful matcher plus its discovery policy (`classify_dir`, `should_format_file`, `is_path_pruned`, `path_shadow_warning`, `excluded_argument_warning`, `unsupported_extension_error`, and the warning templates), exported so tooling can reproduce exactly which files `tsv format` would touch — the same class `@fuzdev/tsv-wasm` exports; [`@fuzdev/tsv-format-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-format-wasm) documents it with examples.
 
 ### Errors
 

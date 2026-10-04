@@ -60,7 +60,7 @@ A set value is exact. With none named and both grammars rejecting the source, th
 `format_svelte`/`format_css` throw on a set `sourceType`. A supported key set to `undefined` reads as its default, so one options object forwards to every formatter. Argument errors are `TypeError`s:
 
 - an unknown key, whatever its value;
-- a wrong-typed or invalid value, or a non-string source;
+- a wrong-typed or invalid value, or a source that is not a string or not well-formed UTF-16 (it holds a lone surrogate);
 - a non-object second argument, arrays included — write `sources.map((s) => format_typescript(s))`, not `sources.map(format_typescript)`, which passes the index.
 
 ### Errors and depth limits

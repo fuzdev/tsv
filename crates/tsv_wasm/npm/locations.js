@@ -24,11 +24,13 @@
  * silently answer for the wrong document.
  *
  * **Errors.** A bad argument — a `source` that is not a string, a missing or unknown
- * `language`, a root whose language cannot be inferred — throws a `TypeError`. An offset
- * outside the indexed text throws a `RangeError` from a locator's two single lookups
- * (`position_at`, `loc_of`), which check what they are handed; the whole-tree walk
+ * `language`, a root whose language cannot be inferred, an offset handed to `position_at`
+ * that is not a number — throws a `TypeError`. A numeric offset outside the indexed text
+ * (or not an integer) throws a `RangeError` from a locator's two single lookups
+ * (`position_at`, `loc_of`), which check what they are handed; `loc_of` answers `null` for
+ * a value without numeric `start` and `end`, as the walk skips one. The whole-tree walk
  * (`reconstruct`, `reconstruct_locations`) is the hot path and checks no node — it trusts
- * the tree to be a parse of `source`.
+ * the tree to be a parse of `source`, and, like any walk of it, to be acyclic.
  *
  * Every parse-capable package also exports this module alone, as its `./locations`
  * subpath: it imports nothing, so that entry loads no engine.
@@ -77,7 +79,9 @@
  *
  * `reconstruct_locations` and a locator's `reconstruct` **mutate the ast in place** (adding a `loc`
  * key to each node) and return it, for efficiency on large trees. Callers that
- * need the input untouched should `structuredClone(ast)` first.
+ * need the input untouched should `structuredClone(ast)` first. The tree must be
+ * **acyclic** — the parse's own tree, or a structured clone of it: the walk keeps no
+ * visited set, so a tree a caller has given back-pointers (`parent`) never finishes.
  *
  * @module
  */
@@ -474,8 +478,9 @@ function read_locations_source(source) {
 /**
  * Read the `language` off an options bag, by `api.js`'s `read_options` rules: `undefined` /
  * `null` mean no bag, any other non-object (arrays included) is refused, and so is a key
- * other than `language` — a typo must not silently fall back to inference. The value itself
- * is graded by `create_locator`.
+ * other than `language` — a typo must not silently fall back to inference. The bag is read
+ * by its own enumerable keys and nothing else, so a `language` it inherits is not read. The
+ * value itself is graded by `create_locator`.
  *
  * @param {unknown} options - the caller's bag
  * @returns {unknown} the bag's `language`, `undefined` when unset
@@ -487,16 +492,18 @@ function read_language_option(options) {
 	if (typeof options !== 'object' || Array.isArray(options)) {
 		throw new TypeError('locations options must be an object');
 	}
+	let language;
 	for (const name of Object.keys(options)) {
 		if (name !== 'language') {
-			throw new TypeError(`unknown locations option '${name}' (expected 'language')`);
+			throw new TypeError(`unknown locations option ${quote_string(name)} (expected 'language')`);
+		}
+		try {
+			language = /** @type {{language?: unknown}} */ (options).language;
+		} catch (cause) {
+			throw new TypeError("failed to read locations option 'language'", { cause });
 		}
 	}
-	try {
-		return /** @type {{language?: unknown}} */ (options).language;
-	} catch (cause) {
-		throw new TypeError("failed to read locations option 'language'", { cause });
-	}
+	return language;
 }
 
 /**
@@ -518,18 +525,53 @@ function is_offset_in(offset, length) {
 /**
  * A refused value as an error message's `(got …)` names it: a string quoted, a number or
  * boolean as written, `null`, `none` for `undefined`, and anything else by its `typeof`.
- * `api.js` states the same rule; restated here rather than imported, like
- * `read_locations_source`.
+ * A string is echoed as a single-quoted literal with JSON's escapes plus the terminal-unsafe
+ * characters JSON leaves raw (so a line break, a control, a bidi control or a lone surrogate
+ * never reaches the message raw) and clipped past `DESCRIBED_STRING_MAX` UTF-16 units with a
+ * `…` inside the quotes. `api.js` states the
+ * same rule; restated here rather than imported, like `read_locations_source`.
  *
  * @param {unknown} value - the refused value
  * @returns {string}
  */
 function describe_value(value) {
-	if (typeof value === 'string') return `'${value}'`;
+	if (typeof value === 'string') return quote_string(value);
 	if (typeof value === 'number' || typeof value === 'boolean') return String(value);
 	if (value === undefined) return 'none';
 	return value === null ? 'null' : typeof value;
 }
+
+/** The longest refused string `describe_value` echoes whole, in UTF-16 units. */
+const DESCRIBED_STRING_MAX = 40;
+
+/**
+ * `value` as a single-quoted literal, escaped as `JSON.stringify` escapes (with `'` escaped
+ * and `"` not, for the other quote) plus `\uXXXX` for what JSON leaves raw but a terminal
+ * reads as a line break, a control or a reordering (`TERMINAL_UNSAFE`), clipped to
+ * `DESCRIBED_STRING_MAX` units plus `…` — one unit sooner where the cut would split a
+ * surrogate pair.
+ *
+ * @param {string} value
+ * @returns {string}
+ */
+function quote_string(value) {
+	let cut = value.length;
+	if (cut > DESCRIBED_STRING_MAX) {
+		cut = DESCRIBED_STRING_MAX;
+		const last = value.charCodeAt(cut - 1);
+		if (last >= 0xd800 && last <= 0xdbff) cut--;
+	}
+	const body = JSON.stringify(value.slice(0, cut))
+		.slice(1, -1)
+		.replace(/\\"/g, '"')
+		.replace(/'/g, "\\'")
+		.replace(TERMINAL_UNSAFE, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
+	return `'${body}${cut < value.length ? '…' : ''}'`;
+}
+
+/** The characters JSON leaves raw that a terminal reads as a line break (NEL, LS, PS), a
+ * C1 control or DEL, or a bidi control. */
+const TERMINAL_UNSAFE = /[\u007f-\u009f\u061c\u2028\u2029\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
 
 /**
  * Build a locator that holds the source's line-start table, so any number of lookups
@@ -538,8 +580,10 @@ function describe_value(value) {
  *
  * Offsets are in the wire's coordinates: UTF-16 units into the text the parse's offsets
  * index — `source` itself for TypeScript, `source` without a leading BOM for Svelte and
- * CSS. `position_at` and `loc_of` refuse an offset outside that text with a `RangeError`;
- * `reconstruct` checks nothing (see the module doc).
+ * CSS. `position_at` refuses an offset that is not a number with a `TypeError`, and
+ * `position_at` and `loc_of` refuse a numeric offset that is not an integer within that
+ * text with a `RangeError`; `loc_of` answers `null` for a value without numeric `start`
+ * and `end`. `reconstruct` checks nothing, and takes an acyclic tree (see the module doc).
  *
  * @param {string} source - the exact source the span-only wire was parsed from
  * @param {{language: 'typescript' | 'svelte' | 'css'}} options - `language` (required)
@@ -571,6 +615,9 @@ export function create_locator(source, options) {
 	const is_svelte = language === 'svelte';
 	return {
 		position_at(offset) {
+			if (typeof offset !== 'number') {
+				throw new TypeError(`position_at: offset must be a number (got ${describe_value(offset)})`);
+			}
 			if (!is_offset_in(offset, text.length)) {
 				throw new RangeError(
 					`position_at: offset must be an integer from 0 to ${text.length}, the indexed ` +
@@ -608,7 +655,8 @@ export function create_locator(source, options) {
  *
  * The result deep-equals the loc-bearing wire of the same parse — see the module doc.
  * The walk is the hot path and checks no offset: a tree that is not a parse of `source`
- * gets positions computed from offsets the text may not have.
+ * gets positions computed from offsets the text may not have. The tree must be acyclic —
+ * the parse's own tree, or a structured clone of it; one with back-pointers never finishes.
  *
  * @param {any} ast - a span-only AST, as every tsv parse returns it by default
  * @param {string} source - the exact source `ast` was parsed from

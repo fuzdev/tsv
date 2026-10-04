@@ -3,7 +3,8 @@
  *
  * - `pkg/napi/` — the `@fuzdev/tsv` loader, ESM like the wasm packages (index.js + index.d.ts +
  *   platform.js (triple detection) + the shared facade with its parse half — `api.js` /
- *   `api_parse.js`, the `locations.js` helper, their `.d.ts` and `tsv_ast.d.ts`, the table
+ *   `api_parse.js`, the `locations.js` helper, the declarations (`facade_format.d.ts`,
+ *   `facade_parse.d.ts`, `syntax_error.d.ts`, `locations.d.ts`, `tsv_ast.d.ts`), the table
  *   `scripts/npm_facade.ts` names — + the shared `cli.js` + the `bin.js` dispatcher wired
  *   as the `tsv` bin + README + LICENSE + generated package.json with the exact-pinned
  *   platform `optionalDependencies`).
@@ -32,7 +33,7 @@
 import { parseArgs } from 'node:util';
 
 import { cli_binary_name, host_triple } from './napi_host.ts';
-import { LOCATIONS_EXPORT, facade_files } from './npm_facade.ts';
+import { ALL_FAMILIES, LOCATIONS_EXPORT, facade_files } from './npm_facade.ts';
 import { NPM_SHARED_METADATA } from './npm_metadata.ts';
 import { format_size } from './size.ts';
 
@@ -112,7 +113,7 @@ for (const [from, to] of [
 	['crates/tsv_napi/npm/README.md', 'README.md'],
 	// the shared facade every tsv package exports through — one options reader and
 	// one set of error texts with the wasm packages; `index.js` imports both halves
-	...facade_files(true).map(({ source, published }) => [source, published]),
+	...facade_files(ALL_FAMILIES).map(({ source, published }) => [source, published]),
 	// the JS CLI — imports its engine from `./index.js`, so the same source
 	// binds to the native loader here and to the wasm engine in
 	// @fuzdev/tsv-wasm (where it IS the bin); here it is bin.js's fallback
@@ -151,7 +152,7 @@ write_pkg(loader_dir, {
 		'index.d.ts',
 		'platform.js',
 		'bin.js',
-		...facade_files(true).map((file) => file.published),
+		...facade_files(ALL_FAMILIES).map((file) => file.published),
 		'cli.js',
 		'README.md',
 		'LICENSE'

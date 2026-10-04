@@ -13,53 +13,47 @@ Each `## Unreleased` section must be non-empty and carry a
 ## Unreleased
 <!-- bump: minor -->
 
-- **breaking** feat: parsing returns the span-only AST by default — `start`/`end` offsets on
-  every node, no per-node `loc` and no Svelte `name_loc` — in every package and both CLIs, as
-  acorn's own `locations: false` does. Pass `{locations: true}` for `loc`
-  (`parse_svelte(src, {locations: true})`), now computed in JS from the offsets and the source
-  and appended last on each object (the native `tsv parse --locations` wire places it after
-  `end`, so a re-serialized tree no longer byte-matches the CLI's); on the CLI,
-  `tsv parse --locations` adds it and `--no-locations` is gone (its output is the default)
-- **breaking** feat: `loc` follows one definition — the line and UTF-16 column of each object's
-  own `start`/`end`, counting ECMAScript line terminators in a TypeScript document (acorn's
-  `locations: true` exactly) and `\n` alone in a whole Svelte document and in CSS. With
-  `{locations: true}` every object carrying `start`/`end` gets one — Svelte template nodes,
-  `Root`, `<style>`, comments and CSS nodes included — and Svelte's own `loc` quirks are not
-  reproduced: a `<script>`'s `Program.loc` matches its `start`/`end` rather than the tag, and a
-  destructured block binding, a block binding's `: T` and a lone CR/LS/PS in a script or
-  template expression no longer shift a line or column. A Svelte source holding a lone CR/LS/PS
-  no longer throws
-- **breaking** feat: `tsv_ast.d.ts` declares `loc` and `name_loc` optional, as estree does —
-  narrow or `!` after `{locations: true}`; the `{locations: false}` overloads returning `any` are
-  gone, so every parse returns its typed root. `parse_*_json` takes only `sourceType` and throws
-  on `locations` (the string is the span-only wire)
-- **breaking** feat: `create_locator(source, {language})` requires the language
-  (`'typescript'`, `'svelte'` or `'css'`) and no longer takes `{ast}`; the bare `loc_of` export
-  is gone — use a locator's `loc_of(node)`; `reconstruct_locations(ast, source)` reads the
-  language off a parse's root — a `Root`, a `StyleSheetFile`, or a `Program` spanning the
-  whole source — and throws on anything else passed without `{language}`, a Svelte
-  `<script>`'s `Program` included
-- **breaking** feat: for Rust source consumers of the language crates, `convert_ast_json_bytes` /
-  `convert_ast_json_string` now write the span-only wire; the loc-bearing wire is
-  `convert_ast_json_bytes_with_locations`, behind a new opt-in `locations` cargo feature, and the
-  `_no_locations` functions are gone
-- **breaking** fix: every parse and format export throws a `TypeError` on a `source` that is not
-  a string, with one message in every package — the WASM packages read one as the empty document
-  outside Node, and each engine's error differed
+- **breaking** feat: parsing returns the span-only AST by default — `start`/`end` on every
+  node, no `loc` and no Svelte `name_loc` — in every package and both CLIs, like acorn's
+  `locations: false`. Pass `{locations: true}` (or `tsv parse --locations`) for `loc`, now
+  computed in JS from the offsets and the source and appended last on each object (the native
+  CLI places it after `end`, so a re-serialized tree no longer byte-matches its output);
+  `--no-locations` is gone
+- **breaking** feat: `loc` has one definition — the line and UTF-16 column of each object's own
+  `start`/`end`, counting ECMAScript line terminators in TypeScript (acorn's
+  `locations: true` exactly) and `\n` alone in Svelte and CSS. Every object with `start`/`end`
+  gets one (Svelte template nodes, `Root`, `<style>`, comments and CSS nodes included), and
+  Svelte's `loc` quirks are not reproduced: a `<script>`'s `Program.loc` follows its
+  `start`/`end` rather than the tag, and a destructured block binding, a block binding's `: T`
+  and a lone CR/LS/PS no longer shift a position. A Svelte source holding a lone CR/LS/PS no
+  longer throws
+- **breaking** feat: `tsv_ast.d.ts` declares `loc` and `name_loc` optional, as estree does; the
+  `{locations: false}` overloads returning `any` are gone, so every parse returns its typed
+  root. `parse_*_json` takes only `sourceType` (its string is the span-only wire)
+- **breaking** feat: `create_locator(source, {language})` requires the language and no longer
+  takes `{ast}`; the bare `loc_of` export is gone (use a locator's); `reconstruct_locations`
+  reads the language off a parse's root — a `Root`, a `StyleSheetFile`, or a `Program` spanning
+  the source — and throws on anything else passed without `{language}`
+- **breaking** feat: `locations.d.ts` renames `Loc` to `SourceLocation` and `LocationOptions` to
+  `ReconstructLocationsOptions`
 - **breaking** feat: a parse or format failure throws a `SyntaxError` (typed `TsvSyntaxError`)
   with `start` — the UTF-16 offset, in the AST's coordinates — and `loc: {line, column}`; the
-  message's `line:col` header follows the same definition, its excerpt no longer echoes a
-  leading BOM, and a format error is reported in the caller's own source, CRLF included
-- **breaking** feat: every argument error is a `TypeError` — a non-string source, a bad options
-  bag, an unknown key, a wrong-typed value — and the locations helpers refuse a bad bag too
-- **breaking** feat: `locations.d.ts` drops `Loc` for `SourceLocation` and renames
-  `LocationOptions` to `ReconstructLocationsOptions`
-- feat: `create_locator(...).position_at(offset)` gives one offset's `{line, column}`; a
-  locator's `position_at` and `loc_of` throw a `RangeError` for an offset the source doesn't hold
+  message's `line:col` header follows the same definition, its excerpt drops a leading BOM, and
+  a format error is located in the caller's own source, CRLF included
+- **breaking** feat: every argument error is a `TypeError`, with one message in every package —
+  a source that is not a string or not well-formed UTF-16 (the WASM packages read a non-string
+  as the empty document outside Node, and a lone surrogate became U+FFFD), a bad options bag, an
+  unknown key, a wrong-typed value — and the locations helpers refuse the same way
+- **breaking** feat: for Rust consumers of the language crates, `convert_ast_json_bytes` /
+  `convert_ast_json_string` write the span-only wire; the loc wire is
+  `convert_ast_json_bytes_with_locations`, behind a new `locations` cargo feature, and the
+  `_no_locations` functions are gone
+- feat: a locator's `position_at(offset)` gives one offset's `{line, column}`; `position_at` and
+  `loc_of` throw a `RangeError` for an offset the source doesn't hold
 - feat: a `./locations` subpath export on the parse-capable packages — the line/column helpers
   alone, loading no engine
 - fix: a Svelte multi-line block comment's `value` is dedented by its own line in the document,
-  not by the text Svelte's reader handed acorn — so it can differ from Svelte's where a
+  not by the text Svelte's reader handed acorn, so it can differ from Svelte's where a
   `<script>` prefix, block binding or `{#snippet}` head shares that line
 
 ## 0.5.0

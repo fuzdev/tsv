@@ -49,7 +49,7 @@ Every parser takes an optional acorn-style options object:
 A supported key set to `undefined` reads as its default — `sourceType: undefined` included on Svelte and CSS — so one options bag forwards to every object parser. Argument errors are `TypeError`s:
 
 - an unknown key, whatever its value;
-- a wrong-typed or invalid value, or a non-string source;
+- a wrong-typed or invalid value, or a source that is not a string or not well-formed UTF-16 (it holds a lone surrogate);
 - a non-object second argument, arrays included — write `sources.map((s) => parse_typescript(s))`, not `sources.map(parse_typescript)`, which passes the index.
 
 ### Reconstructing line/column
@@ -66,7 +66,7 @@ const ast = parse_typescript(src, {locations: true});
 const same = reconstruct_locations(parse_typescript(src), src);
 ```
 
-`reconstruct_locations(ast, source)` adds `loc` to every object with `start`/`end` and `name_loc` to Svelte elements, attributes, and directives, **in place** (keys appended last), and returns the tree; `structuredClone` it first to keep the input.
+`reconstruct_locations(ast, source)` adds `loc` to every object with `start`/`end` and `name_loc` to Svelte elements, attributes, and directives, **in place** (keys appended last), and returns the tree; `structuredClone` it first to keep the input. The tree must be acyclic — the parse's own, or a clone of it; one given `parent` back-pointers never finishes.
 
 - Lines follow the document's rule: ECMAScript's terminators for TypeScript (as acorn counts them), LF alone for a whole Svelte document and for CSS. Offsets are UTF-16 units; a leading BOM counts in TypeScript offsets, not in Svelte or CSS ones.
 - On the nodes where Svelte's own `loc` carries a `character` offset (listed on the bundled `Position` type), so does this one.
@@ -85,7 +85,7 @@ locator.loc_of(b); // {start: {line: 2, column: 0}, end: {line: 2, column: 6}}
 locator.position_at(7); // {line: 2, column: 0}
 ```
 
-A locator's single lookups throw a `RangeError` for an offset or span the text doesn't hold; the whole-tree forms check nothing per node. A missing or unknown `language`, an uninferable root, or a non-string source throws a `TypeError`. So does an options argument that isn't an object, or a key other than `language` — a typo like `{langauge: 'css'}` throws rather than falling back to inference.
+A locator's single lookups throw a `RangeError` for an offset or span the text doesn't hold (a `TypeError` for an offset that isn't a number); the whole-tree forms check nothing per node. A missing or unknown `language`, an uninferable root, or a non-string source throws a `TypeError`. So does an options argument that isn't an object, or a key other than `language` — a typo like `{langauge: 'css'}` throws rather than falling back to inference.
 
 `reconstruct_locations` and `create_locator` are also the `@fuzdev/tsv-parse-wasm/locations` entry point, pure JS that loads no WASM; the `SourceLocation` and `Position` types they return come from the package root.
 

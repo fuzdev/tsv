@@ -41,20 +41,23 @@ export function create_parse_api(engine) {
 	const api = {};
 	for (const [language, parse_json] of Object.entries(engine.parse_json)) {
 		const engine_parse = engine.parse?.[language];
-		api[`parse_${language}`] = (source, options) => {
-			const text = read_source(source, 'parse');
-			const parsed = read_options(options, 'parse', language);
-			const ast = engine_parse
-				? call_engine(engine_parse, text, parsed.source_type)
-				: parse_wire(call_engine(parse_json, text, parsed.source_type));
-			return parsed.locations ? reconstruct_locations(ast, text, { language }) : ast;
-		};
-		api[`parse_${language}_json`] = (source, options) =>
-			call_engine(
-				parse_json,
-				read_source(source, 'parse'),
-				read_options(options, 'parse_json', language).source_type
-			);
+		// computed keys name the functions, as `create_format_api`'s do
+		Object.assign(api, {
+			[`parse_${language}`]: (source, options) => {
+				const text = read_source(source, 'parse');
+				const parsed = read_options(options, 'parse', language);
+				const ast = engine_parse
+					? call_engine(engine_parse, text, parsed.source_type)
+					: parse_wire(call_engine(parse_json, text, parsed.source_type));
+				return parsed.locations ? reconstruct_locations(ast, text, { language }) : ast;
+			},
+			[`parse_${language}_json`]: (source, options) =>
+				call_engine(
+					parse_json,
+					read_source(source, 'parse'),
+					read_options(options, 'parse_json', language).source_type
+				)
+		});
 	}
 	return api;
 }

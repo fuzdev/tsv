@@ -24,11 +24,18 @@
  *   `<style>` and template expressions included) and for CSS. Always equal to
  *   `create_locator(source, {language}).position_at(start)` where the package exports it.
  *
- * The message is `<what went wrong>`, then a line `<line>:<column> <source line>` whose
- * header is `loc.line:loc.column + 1`, then a caret under the error's character.
+ * The message is `<what went wrong>`, then a line `<line>:<column> <excerpt>` whose
+ * header is `loc.line:loc.column + 1`, then a caret under the error's character. The
+ * excerpt is the physical line around the error, bounded by ANY line terminator (LF, CR,
+ * U+2028, U+2029), so a raw CR never reaches a terminal. For a Svelte or CSS document,
+ * whose line rule is LF alone, that is narrower than the document line the header counts
+ * in: the excerpt can start after a lone CR or U+2028 that the header's line count does
+ * not break on, so the header's column counts from the start of the document line, not
+ * from the start of the excerpt.
  *
- * Every argument refusal — a source that is not a string, a bad options bag — is a
- * `TypeError` instead, and nothing else an engine throws is a `SyntaxError` either: a
+ * Every argument refusal — a source that is not a well-formed UTF-16 string, a bad
+ * options bag — is a `TypeError` instead, and nothing else an engine throws is a
+ * `SyntaxError` either: a
  * plain `Error` (a source over the 4 GiB size cap, an internal failure), a
  * `WebAssembly.RuntimeError` (a WASM trap) or a `RangeError` (stack exhaustion). So
  * `instanceof SyntaxError` asks exactly "did the source fail to parse".

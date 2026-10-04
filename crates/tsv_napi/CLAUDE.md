@@ -30,7 +30,7 @@ Unlike `tsv_ffi`'s and `tsv_wasm`'s, **no build task produces a single-feature `
 
 The `lang_bindings!` macro generates three `#[napi]` functions per language (svelte, typescript, css); the `format`/`parse` features gate which are emitted:
 
-- `parse_<lang>_json(source, sourceType?) -> string` — the span-only JSON AST string, under the name `tsv_wasm` gives its string-returning export (the WASM engine's own `parse_<lang>` returns the parsed object; this addon leaves the `JSON.parse` to its host) (`start`/`end` offsets, no per-node `loc`; Svelte also no `name_loc`) — the one parse wire every binding emits; the host `JSON.parse`s it. See [../tsv_ts/CLAUDE.md](../tsv_ts/CLAUDE.md) §Public API.
+- `parse_<lang>_json(source, sourceType?) -> string` — the span-only JSON AST string, under the name `tsv_wasm` gives its string-returning export (the WASM engine's own `parse_<lang>` returns the parsed object; this addon leaves the `JSON.parse` to its host) (`start`/`end` offsets, no per-node `loc`; Svelte also no `name_loc`) — the one parse wire every binding emits. See [../tsv_ts/CLAUDE.md](../tsv_ts/CLAUDE.md) §Public API.
 - `parse_internal_<lang>(source, sourceType?) -> void` — parses without converting (benchmark-only; `black_box` prevents elision)
 - `format_<lang>(source, sourceType?) -> string` — formatted source
 
@@ -63,7 +63,9 @@ into `crates/tsv_napi/pkg/` (gitignored):
   `npm/index.d.ts` + `npm/platform.js` (triple detection, shared by the next
   two) + `npm/bin.js` (the `tsv` bin — a dispatcher, see below) +
   `npm/README.md` + the facade with its parse half (`api.js` / `api_parse.js`,
-  `locations.js`, their `.d.ts` and `tsv_wasm`'s `tsv_ast.d.ts` — the file table
+  `locations.js`, the declarations — `facade_format.d.ts` / `facade_parse.d.ts`,
+  named apart from the modules they sit beside, `syntax_error.d.ts`, `locations.d.ts`
+  — and `tsv_wasm`'s `tsv_ast.d.ts` — the file table
   `scripts/npm_facade.ts` shares with the wasm staging), and
   `cli.js` (the JS CLI mirror, `bin.js`'s
   fallback) + a generated package.json pinning the platform packages as
@@ -210,8 +212,8 @@ TypeScript, so neither `test:napi:npm` nor the release workflow runs it
 ([docs/audits.md §Package-Declaration Check](../../docs/audits.md#package-declaration-check-typecheckpackages)).
 
 Both CLIs exist here and only here, so this is also where their contract is
-held together, in five claims the hand-written mirror can drift on and
-nothing else can see. All three read the native side from the platform
+held together, in claims the hand-written mirror can drift on and
+nothing else can see. Every one reads the native side from the platform
 package's **binary directly**, never through `bin.js`: the dispatcher falls
 back to `cli.js` when the binary is missing or unrunnable, and a parity suite
 reading "native" through it would compare the mirror to itself and pass every

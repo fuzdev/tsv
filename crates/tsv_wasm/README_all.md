@@ -38,7 +38,7 @@ Directories recurse over the JS/TS family (`.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cj
 - With no `.gitignore` in scope (in or out of a repo), discovery falls back to skipping hidden directories and `dist`/`build`/`target`. `node_modules` and VCS directories are always skipped by a walk.
 - A path you name — file or directory — is bounded by the ignore files alone: one they exclude is skipped (with a warning, unless it is a file your `.formatignore` or `.prettierignore` excludes), while the built-in skips never apply to it; a named file's extension must still be one tsv formats.
 
-`format --list` prints the discovered in-scope files without formatting — a read-only view of what `format` would touch. `--content <source>` / `--stdin` (with `--parser svelte|typescript|css`) format or parse strings to stdout. For TypeScript, `--source-type script|module` (`parse` defaults to `module`; `format` takes an unset flag as *none named* — module, retried as a script — and accepts it on `--content`/`--stdin` only) selects the parse goal — at `script`, `await` is an ordinary identifier, `import`/`export`/`import.meta` and a top-level `for await` are errors, and the code is sloppy unless its own `"use strict"` prologue makes it strict (so `with` and legacy octal literals/escapes parse). `parse` emits the span-only wire (no per-node `loc`; Svelte also no `name_loc`); `parse --locations` adds them. Exit codes — `format`: 0 clean, 1 would-change (`--check`), 2 errors; `parse`: 0 ok, 1 error.
+`format --list` prints the discovered in-scope files without formatting — a read-only view of what `format` would touch. `--content <source>` / `--stdin` (with `--parser svelte|typescript|css`) format or parse strings to stdout. For TypeScript, `--source-type script|module` (`parse` defaults to `module`; `format` takes an unset flag as *none named* — module, retried as a script, except a `.mjs`/`.mts` path, a module by its own name, which takes no retry — and accepts it on `--content`/`--stdin` only) selects the parse goal — at `script`, `await` is an ordinary identifier, `import`/`export`/`import.meta` and a top-level `for await` are errors, and the code is sloppy unless its own `"use strict"` prologue makes it strict (so `with` and legacy octal literals/escapes parse). `parse` emits the span-only wire (no per-node `loc`; Svelte also no `name_loc`); `parse --locations` adds them. Exit codes — `format`: 0 clean, 1 would-change (`--check`), 2 errors; `parse`: 0 ok, 1 error.
 
 Large trees format across worker threads — `--jobs N` sets the count, and the default is sized to your machine. Small ones stay on a single thread, where spinning a pool up would cost more than it saves. This CLI runs the WASM build; on Node.js and Bun, [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) ships tsv's real native CLI binary and its `tsv` bin execs it — the faster option there. Both packages claim the `tsv` bin name, so install one or the other in a project.
 
@@ -69,7 +69,7 @@ The object parsers also take `{locations: true}`, adding per-node `loc` (line/co
 A supported key set to `undefined` reads as its default — `sourceType: undefined` included on Svelte and CSS. Argument errors are `TypeError`s:
 
 - an unknown key, whatever its value;
-- a wrong-typed or invalid value, or a non-string source;
+- a wrong-typed or invalid value, or a source that is not a string or not well-formed UTF-16 (it holds a lone surrogate);
 - a non-object second argument, arrays included — write `sources.map((s) => format_typescript(s))`, not `sources.map(format_typescript)`, which passes the index.
 
 ### Reconstructing line/column
@@ -85,7 +85,7 @@ const ast = parse_typescript(src, {locations: true});
 const same = reconstruct_locations(parse_typescript(src), src);
 ```
 
-It adds `loc` to every object with `start`/`end` and `name_loc` to Svelte elements, attributes, and directives, **in place** (keys appended last); `structuredClone` the tree first to keep the input.
+It adds `loc` to every object with `start`/`end` and `name_loc` to Svelte elements, attributes, and directives, **in place** (keys appended last); `structuredClone` the tree first to keep the input. The tree must be acyclic — the parse's own, or a clone of it; one given `parent` back-pointers never finishes.
 
 - Lines follow the document's rule: ECMAScript's terminators for TypeScript (as acorn counts them), LF alone for a whole Svelte document and for CSS. Offsets are UTF-16 units; a leading BOM counts in TypeScript offsets, not in Svelte or CSS ones.
 - For Svelte it is a superset of Svelte's own output (which has `loc` only on acorn-parsed nodes), following the offsets where Svelte's `loc` departs from them ([docs/conformance_svelte.md](https://github.com/fuzdev/tsv/blob/main/docs/conformance_svelte.md)).
@@ -103,7 +103,7 @@ locator.loc_of(b); // {start: {line: 2, column: 0}, end: {line: 2, column: 6}}
 locator.position_at(7); // {line: 2, column: 0}
 ```
 
-A locator's single lookups throw a `RangeError` for an offset or span the text doesn't hold; the whole-tree forms check nothing per node. A missing or unknown `language`, an uninferable root, or a non-string source throws a `TypeError`. So does an options argument that isn't an object, or a key other than `language` — a typo like `{langauge: 'css'}` throws rather than falling back to inference.
+A locator's single lookups throw a `RangeError` for an offset or span the text doesn't hold (a `TypeError` for an offset that isn't a number); the whole-tree forms check nothing per node. A missing or unknown `language`, an uninferable root, or a non-string source throws a `TypeError`. So does an options argument that isn't an object, or a key other than `language` — a typo like `{langauge: 'css'}` throws rather than falling back to inference.
 
 `reconstruct_locations` and `create_locator` are also the `@fuzdev/tsv-wasm/locations` entry point, pure JS that loads no WASM.
 

@@ -1474,29 +1474,53 @@ function run_parse({ values, positionals }) {
 	// so they compose. The native CLI writes `loc` with its Rust emitter instead: the
 	// two trees are deep-equal, but its `loc` sits after `end` where the
 	// reconstruction appends it last, so the bytes differ by key order.
-	let json;
+	// The engine call and the serialization are caught apart: a throw out of the first is the
+	// engine's (or the input's), one out of the second is this process's own JS failing on a
+	// tree the engine produced fine — reported as the engine's, it would blame the input.
+	let parsed;
 	try {
-		json = values.locations
-			? JSON.stringify(
-					OBJECT_PARSERS[parser](input, { locations: true, sourceType: source_type }),
-					null,
-					values.pretty ? '\t' : undefined
-				)
+		parsed = values.locations
+			? OBJECT_PARSERS[parser](input, { locations: true, sourceType: source_type })
 			: PARSERS[parser](input, { sourceType: source_type });
 	} catch (error) {
 		exit_with_error(1, single_input_failure(error));
 	}
-	if (values.pretty && !values.locations) {
-		// A re-serialization, where the native CLI re-indents the compact bytes
-		// without ever reading them back — and byte-identical to it all the same: the
-		// wire writer spells every number in ECMAScript's own `Number::toString` form
-		// (so a `JSON.parse`/`stringify` round trip changes no token), emits no
-		// integer-like keys (so V8's key reordering never fires), and escapes exactly
-		// what `JSON.stringify` escapes. The package test pins the equality on both
-		// bins; the compact default is the verbatim wire string from Rust either way.
-		json = JSON.stringify(JSON.parse(json), null, '\t');
+	let json;
+	try {
+		if (values.locations) {
+			json = JSON.stringify(parsed, null, values.pretty ? '\t' : undefined);
+		} else if (values.pretty) {
+			// A re-serialization, where the native CLI re-indents the compact bytes
+			// without ever reading them back — and byte-identical to it all the same: the
+			// wire writer spells every number in ECMAScript's own `Number::toString` form
+			// (so a `JSON.parse`/`stringify` round trip changes no token), emits no
+			// integer-like keys (so V8's key reordering never fires), and escapes exactly
+			// what `JSON.stringify` escapes. The package test pins the equality on both
+			// bins; the compact default is the verbatim wire string from Rust either way.
+			json = JSON.stringify(JSON.parse(parsed), null, '\t');
+		} else {
+			json = parsed;
+		}
+	} catch (error) {
+		exit_with_error(1, serialization_failure(error));
 	}
 	print(`${json}\n`);
+}
+
+/**
+ * The line `parse` dies with when serializing a tree the engine returned throws — never the
+ * input's fault, and never the engine's: `JSON.stringify` (and `JSON.parse`, for `--pretty`'s
+ * re-read) recurse once per nesting level on the JS stack, which a tree the engine's own
+ * stack handled can outgrow (the N-API engine parses on the native stack, past where the
+ * JS one ends). Exit 1, as every `parse` failure exits, the native CLI's included; the
+ * native CLI itself never meets this, since it re-indents the wire's bytes without reading
+ * them back.
+ */
+function serialization_failure(error) {
+	const message = error_message(error);
+	return error instanceof RangeError && /call stack/i.test(message)
+		? `Error: the parsed tree is too deeply nested to serialize in JS (${message})`
+		: `Error: failed to serialize the parsed tree (${message})`;
 }
 
 /**

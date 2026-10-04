@@ -49,16 +49,18 @@ export interface Locator {
 	/**
 	 * Line (1-based) and column (0-based, UTF-16 units) of one offset.
 	 *
-	 * @throws RangeError when `offset` is not an integer from 0 to the indexed text's
-	 *   length (the end of the text is a position)
+	 * @throws TypeError when `offset` is not a number
+	 * @throws RangeError when `offset` is a number but not an integer from 0 to the indexed
+	 *   text's length (the end of the text is a position)
 	 */
 	position_at(offset: number): Position;
 	/**
-	 * Line/column for one node's `start` and `end`, or `null` if it has no numeric
-	 * `start`/`end`.
+	 * Line/column for one node's `start` and `end`, or `null` when either is not a number
+	 * (`null` and `undefined` nodes included) — the same objects the whole-tree walk skips,
+	 * since only an object carrying numeric `start`/`end` gets a `loc`.
 	 *
-	 * @throws RangeError when the span is not a range of the indexed text — an offset
-	 *   past its end, or `start` after `end`
+	 * @throws RangeError when `start` and `end` are numbers but not a range of the indexed
+	 *   text — an offset that is not an integer, one past its end, or `start` after `end`
 	 */
 	loc_of(
 		node: { start?: number | undefined; end?: number | undefined } | null | undefined
@@ -68,7 +70,9 @@ export interface Locator {
 	 * the Svelte elements, attributes, and directives that carry one — mutating in place;
 	 * returns `ast`. A Svelte subtree reconstructs without the in-tag comments'
 	 * `character` stamp, which reads the root's `comments` list. The walk checks no
-	 * offset: it trusts `ast` to be a parse of the locator's source.
+	 * offset: it trusts `ast` to be a parse of the locator's source. `ast` must be acyclic —
+	 * the parse's own tree, or a structured clone of it: the walk keeps no visited set, so a
+	 * tree given back-pointers (a `parent` on each node) never finishes.
 	 */
 	reconstruct<T>(ast: T): T;
 }
@@ -88,7 +92,9 @@ export declare function create_locator(source: string, options: LocatorOptions):
  * `name_loc`. Mutates `ast` in place and returns it. The result deep-equals the Rust
  * emitter's loc-bearing wire of the same parse (`tsv parse --locations`), in every
  * language — and is what a parse with `{locations: true}` returns. The walk checks no
- * offset: it trusts `ast` to be a parse of `source`.
+ * offset: it trusts `ast` to be a parse of `source`. `ast` must be acyclic — the parse's own
+ * tree, or a structured clone of it: a tree given back-pointers (a `parent` on each node)
+ * never finishes.
  *
  * @throws TypeError when `source` is not a string, `options` is not an object or carries a
  *   key other than `language`, `options.language` is omitted and `ast` is not a parse's

@@ -69,6 +69,10 @@ if (!variant) {
 }
 const has_format = variant !== 'parse';
 const has_parse = variant !== 'format';
+/** Windows has no `sh`, and no `| head`; the pipe-behavior rows below are
+ * posix-only by nature rather than by omission. */
+const posix = process.platform !== 'win32';
+
 /**
  * Deliberately a SECOND copy of `scripts/patch_npm_package.ts`'s map, not an
  * import of it: the patcher writes these names into the built package.json and
@@ -76,10 +80,6 @@ const has_parse = variant !== 'format';
  * into a tautology. Double entry — the two must agree, and a publish under a
  * name nobody meant is what disagreeing costs.
  */
-/** Windows has no `sh`, and no `| head`; the pipe-behavior rows below are
- * posix-only by nature rather than by omission. */
-const posix = process.platform !== 'win32';
-
 const PKG_NAMES = {
 	format: '@fuzdev/tsv-format-wasm',
 	parse: '@fuzdev/tsv-parse-wasm',
@@ -160,11 +160,12 @@ describe(`package metadata: ${pkg_dir}`, () => {
 		assert.deepEqual(pkg.sideEffects, ['./index.js']);
 	});
 
-	// The facade's two halves: the shared one (the options reader + the format family)
-	// in every variant, the parse one — `api_parse.js`, the `locations.js` helper it
-	// imports, and the AST types — only where parsing ships.
-	it('every variant ships its half of the facade, verbatim', () => {
-		for (const { published, source } of facade_files(has_parse)) {
+	// The facade's parts: the shared one (`api.js` — the options reader + the format family —
+	// and the error type) in every variant, the format declarations where formatting ships,
+	// and the parse half — `api_parse.js`, the `locations.js` helper it imports, and the AST
+	// types — only where parsing ships.
+	it('every variant ships its part of the facade, verbatim', () => {
+		for (const { published, source } of facade_files({ format: has_format, parse: has_parse })) {
 			assert.ok(pkg.files.includes(published), published);
 			assert.equal(
 				readFileSync(new URL(`../${pkg_dir}/${published}`, import.meta.url), 'utf8'),
@@ -175,9 +176,10 @@ describe(`package metadata: ${pkg_dir}`, () => {
 	});
 
 	it('only parse-capable variants ship the parse facade', () => {
-		for (const file of ['api_parse.js', 'api_parse.d.ts']) {
+		for (const file of ['api_parse.js', 'facade_parse.d.ts']) {
 			assert.equal(pkg.files.includes(file), has_parse, file);
 		}
+		assert.equal(pkg.files.includes('facade_format.d.ts'), has_format, 'facade_format.d.ts');
 		if (!has_parse) {
 			assert.equal(pkg.files.includes('locations.js'), false);
 			const entries = ['index.js', 'browser.js'].map((f) =>
@@ -186,6 +188,16 @@ describe(`package metadata: ${pkg_dir}`, () => {
 			for (const text of entries) {
 				assert.doesNotMatch(text, /api_parse|locations/, 'the format-only entries load neither');
 			}
+		}
+	});
+
+	// The facade's declarations type the ENTRIES' re-exports, not the `.js` modules they
+	// sit beside, so none may share a basename with one: under a resolver that ignores
+	// `exports` (`node10`), `api.d.ts` beside `api.js` would type a deep import of `api.js`
+	// as the published functions, which it does not export.
+	it('no facade declaration is named for a facade module', () => {
+		for (const file of ['api.d.ts', 'api_parse.d.ts']) {
+			assert.equal(pkg.files.includes(file), false, file);
 		}
 	});
 
@@ -402,6 +414,38 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 			'<div>x</div>\n'
 		);
 		assert.equal(node_entry.format_css('a{color:red}', null), 'a {\n\tcolor: red;\n}\n');
+	});
+
+	// A caller's stack trace and a `function.name` check read an export's own name. The
+	// facade builds its functions under computed keys, which name them; an assignment to a
+	// computed member leaves it `''`.
+	// the node entry initializes at import, so both lifecycle calls are no-ops that hand
+	// back nothing — never wasm-bindgen's own init output (the raw exports and memory)
+	it('init and init_sync return nothing', async () => {
+		assert.equal(await node_entry.init(), undefined);
+		assert.equal(node_entry.init_sync(), undefined);
+	});
+
+	it('every exported function is named for its export', () => {
+		const functions = Object.entries(node_entry).filter(([, value]) => typeof value === 'function');
+		assert.ok(functions.length > 5, `expected the published functions, found ${functions.length}`);
+		for (const [name, value] of functions) {
+			assert.equal((value as { name: string }).name, name, name);
+		}
+	});
+
+	// The engines read the source as UTF-8, which would silently replace a lone surrogate
+	// with U+FFFD — so the facade refuses one before either engine sees it, every export.
+	it('a source holding a lone surrogate is refused, never converted lossily', () => {
+		const exports = Object.keys(node_entry).filter((name) => /^(format|parse)_/.test(name));
+		assert.ok(exports.length >= 3, `expected the facade's exports, found ${exports.length}`);
+		for (const name of exports) {
+			const noun = name.startsWith('format_') ? 'format' : 'parse';
+			assert.throws(() => node_entry[name]('"\uD800";'), {
+				name: 'TypeError',
+				message: `${noun} source must be well-formed UTF-16 (a lone surrogate at offset 1)`
+			});
+		}
 	});
 
 	it('format_* absent from the parse-only build', { skip: has_format }, () => {
@@ -711,14 +755,15 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 				readFileSync(goal_marker, 'utf8').trim() === 'script'
 					? { sourceType: 'script' }
 					: {};
-			let located;
 			let span_only;
 			try {
-				located = parse(language, source, { ...options, locations: true });
 				span_only = parse(language, source, options);
 			} catch {
 				continue; // a source tsv rejects (input_invalid_*, tsv_rejects, a non-module `.ts`)
 			}
+			// outside the `try`: a source the default parse accepts must take `{locations: true}`
+			// too, so a throw there fails the test rather than skipping the file
+			const located = parse(language, source, { ...options, locations: true });
 			graded[language]++;
 			const rel = file.slice(repo_root.length + 1);
 			if (JSON.stringify(located, without_locations) !== JSON.stringify(span_only)) {
@@ -766,6 +811,15 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 		browser = await import(`../${pkg_dir}/browser.js`);
 	});
 
+	// the lazy entry builds its own facade over the guarded engine functions, and writes
+	// its own `init` / `init_sync` / class wrappers, so its names are graded apart from
+	// the node entry's
+	it('every exported function is named for its export', () => {
+		for (const [name, value] of Object.entries(browser)) {
+			if (typeof value === 'function') assert.equal((value as { name: string }).name, name, name);
+		}
+	});
+
 	it('exports throw before init', () => {
 		const guarded = has_format ? 'format_typescript' : 'parse_typescript';
 		assert.throws(() => browser[guarded]('const x = 1'), /WASM not initialized/);
@@ -805,7 +859,7 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 
 	it('init_sync initializes WASM', () => {
 		const wasm = readFileSync(new URL(`../${pkg_dir}/tsv_wasm_bg.wasm`, import.meta.url));
-		browser.init_sync({ module: wasm });
+		assert.equal(browser.init_sync({ module: wasm }), undefined);
 	});
 
 	// the parse-failure table over the lazy entry, now initialized — the same facade over

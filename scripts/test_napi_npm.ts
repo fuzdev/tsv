@@ -68,7 +68,7 @@ import {
 	wasm_package_checks,
 	wasm_package_dir
 } from './check_staged_freshness.ts';
-import { facade_files, facade_type_names } from './npm_facade.ts';
+import { ALL_FAMILIES, facade_files, facade_type_names } from './npm_facade.ts';
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
 import { register_dts_specifier_test } from './dts_specifiers.ts';
 import { register_syntax_error_suite, syntax_errors } from './syntax_error_suite.ts';
@@ -461,8 +461,33 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		throws_with(() => api.format_css(42), 'format source must be a string (got number)');
 	});
 
+	// A caller's stack trace and a `function.name` check read an export's own name; the
+	// facade's functions once all shipped as `''` (`scripts/test_npm.ts` grades the wasm
+	// entries the same way).
+	it('every exported function is named for its export', () => {
+		const functions = Object.entries(api).filter(([, value]) => typeof value === 'function');
+		assert.ok(functions.length > 5, `expected the published functions, found ${functions.length}`);
+		for (const [name, value] of functions) {
+			assert.equal((value as { name: string }).name, name, name);
+		}
+	});
+
+	// The addon reads the source as UTF-8, which would silently replace a lone surrogate
+	// with U+FFFD — the facade refuses one first, every export.
+	it('a source holding a lone surrogate is refused, never converted lossily', () => {
+		const exports = Object.keys(api).filter((name) => /^(format|parse)_/.test(name));
+		assert.equal(exports.length, 9);
+		for (const name of exports) {
+			const noun = name.startsWith('format_') ? 'format' : 'parse';
+			assert.throws(() => api[name]('"\uD800";'), {
+				name: 'TypeError',
+				message: `${noun} source must be well-formed UTF-16 (a lone surrogate at offset 1)`
+			});
+		}
+	});
+
 	it('the loader ships the shared facade verbatim', () => {
-		for (const { published, source } of facade_files(true)) {
+		for (const { published, source } of facade_files(ALL_FAMILIES)) {
 			assert.equal(
 				readFileSync(join(NAPI_LOADER_DIR, published), 'utf8'),
 				readFileSync(source, 'utf8'),
@@ -483,8 +508,14 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 				.flatMap((m) => m[1]!.split(',').map((name) => name.trim()))
 				.filter((name) => name !== '')
 				.sort();
-		assert.deepEqual(reexported('./api.js'), facade_type_names('api.d.ts').sort());
-		assert.deepEqual(reexported('./api_parse.js'), facade_type_names('api_parse.d.ts').sort());
+		assert.deepEqual(
+			reexported('./facade_format.js'),
+			facade_type_names('facade_format.d.ts').sort()
+		);
+		assert.deepEqual(
+			reexported('./facade_parse.js'),
+			facade_type_names('facade_parse.d.ts').sort()
+		);
 		assert.deepEqual(
 			reexported('./syntax_error.js'),
 			facade_type_names('syntax_error.d.ts').sort()
@@ -1376,6 +1407,37 @@ describe('message parity: the native CLI and cli.js refuse in the same order', (
 		assert.equal(mirror.status, 0, mirror.stderr);
 		assert.ok(native.stdout.includes('\t"type": "Program"'), 'the pretty form is tab-indented');
 		assert.equal(mirror.stdout, native.stdout);
+	});
+
+	// The mirror serializes in JS — `--pretty` re-reads and re-stringifies the wire,
+	// `--locations` stringifies the reconstructed tree — and `JSON.stringify` recurses per
+	// nesting level on the JS stack, which a tree the native engine parsed fine outgrows.
+	// That is the serialization failing, neither the input nor the engine: its own line,
+	// exit 1 as every parse failure exits, never an uncaught stack trace. (The native bin
+	// re-indents the wire's bytes without reading them back, so it has no such ceiling —
+	// not compared here: its `--pretty` of this tree is hundreds of megabytes of indent.)
+	it('a tree too deep to serialize in JS is its own error on the mirror', () => {
+		const deep = `x = ${Array.from({ length: 10_000 }, () => '1').join('+')};\n`;
+		for (const flag of ['--pretty', '--locations']) {
+			const args = ['parse', flag, '--content', deep, '--parser', 'typescript'];
+			const mirror = run_mirror(args);
+			assert.equal(mirror.status, 1, mirror.stderr);
+			assert.equal(mirror.stdout, '');
+			assert.match(
+				mirror.stderr,
+				/^Error: the parsed tree is too deeply nested to serialize in JS \([^)\n]+\)\n$/,
+				flag
+			);
+		}
+		// the engine parsed it: the compact default prints the engine's wire string verbatim,
+		// with nothing to serialize (a few megabytes, past `spawnSync`'s default buffer)
+		const compact = spawnSync(
+			process.execPath,
+			[cli_path, 'parse', '--content', deep, '--parser', 'typescript'],
+			{ encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 }
+		);
+		assert.equal(compact.status, 0, compact.stderr);
+		assert.ok(compact.stdout.startsWith('{"type":"Program"'));
 	});
 
 	// `parse --locations`: the native bin writes `loc` with its Rust emitter, the mirror

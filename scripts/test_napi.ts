@@ -71,8 +71,8 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 
 	it('a parse failure throws an Error carrying its point as numeric own properties', () => {
 		// the contract the npm facade's `call_engine` reads to rethrow a `SyntaxError`
-		// (`crates/tsv_wasm/npm/api.js`); the same three names the WASM engine sets
-		// the format call's source holds a CRLF: its point is still the caller's source's
+		// (`crates/tsv_wasm/npm/api.js`), the same three names the WASM engine sets. The
+		// format call's source holds a CRLF: its point is still the caller's source's
 		const cases: [() => unknown, number][] = [
 			[() => addon.parse_typescript_json('let a;\nconst = ;'), 13],
 			[() => addon.parse_internal_typescript('let a;\nconst = ;'), 13],
@@ -98,12 +98,11 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 			assert.match(pointed.message, /\n2:7 const = ;\n/);
 		}
 		// a refusal carries no point
-		try {
-			addon.parse_css_json('a {}', 'script');
-			assert.fail('a source type on CSS must throw');
-		} catch (e: any) {
-			assert.equal(e.start, undefined);
-		}
+		assert.throws(
+			() => addon.parse_css_json('a {}', 'script'),
+			(e: any) => e.start === undefined && e instanceof Error,
+			'a source type on CSS must throw, with no point'
+		);
 	});
 
 	it('multibyte content survives the JS-string marshalling boundary', () => {

@@ -103,7 +103,9 @@ export function read_options(options, kind, language) {
 			const value = read_option(options, name, noun);
 			if (value === undefined) continue;
 			if (typeof value !== 'boolean') {
-				throw new TypeError(`${noun} option 'locations' must be a boolean`);
+				throw new TypeError(
+					`${noun} option 'locations' must be a boolean (got ${describe_value(value)})`
+				);
 			}
 			parsed.locations = value;
 		} else if (name === 'locations' && kind === 'parse_json') {
@@ -134,7 +136,7 @@ export function read_options(options, kind, language) {
 						: takes_source_type
 							? "expected 'sourceType'"
 							: 'this export takes no options';
-			throw new TypeError(`unknown ${noun} option '${name}' (${detail})`);
+			throw new TypeError(`unknown ${noun} option ${quote_string(name)} (${detail})`);
 		}
 	}
 	return parsed;
@@ -143,17 +145,53 @@ export function read_options(options, kind, language) {
 /**
  * A refused value as an error message's `(got …)` names it: a string quoted, a number or
  * boolean as written, `null`, `none` for `undefined`, and anything else by its `typeof`.
- * `locations.js` restates it, since that module imports nothing.
+ * A string is echoed as a single-quoted literal with JSON's escapes plus the terminal-unsafe
+ * characters JSON leaves raw (so a line break, a control, a bidi control or a lone surrogate
+ * never reaches the message raw) and clipped past
+ * `DESCRIBED_STRING_MAX` UTF-16 units with a `…` inside the quotes. `locations.js` restates
+ * it, since that module imports nothing.
  *
  * @param {unknown} value - the refused value
  * @returns {string}
  */
 function describe_value(value) {
-	if (typeof value === 'string') return `'${value}'`;
+	if (typeof value === 'string') return quote_string(value);
 	if (typeof value === 'number' || typeof value === 'boolean') return String(value);
 	if (value === undefined) return 'none';
 	return value === null ? 'null' : typeof value;
 }
+
+/** The longest refused string `describe_value` echoes whole, in UTF-16 units. */
+const DESCRIBED_STRING_MAX = 40;
+
+/**
+ * `value` as a single-quoted literal, escaped as `JSON.stringify` escapes (with `'` escaped
+ * and `"` not, for the other quote) plus `\uXXXX` for what JSON leaves raw but a terminal
+ * reads as a line break, a control or a reordering (`TERMINAL_UNSAFE`), clipped to
+ * `DESCRIBED_STRING_MAX` units plus `…` — one unit sooner where the cut would split a
+ * surrogate pair.
+ *
+ * @param {string} value
+ * @returns {string}
+ */
+function quote_string(value) {
+	let cut = value.length;
+	if (cut > DESCRIBED_STRING_MAX) {
+		cut = DESCRIBED_STRING_MAX;
+		const last = value.charCodeAt(cut - 1);
+		if (last >= 0xd800 && last <= 0xdbff) cut--;
+	}
+	const body = JSON.stringify(value.slice(0, cut))
+		.slice(1, -1)
+		.replace(/\\"/g, '"')
+		.replace(/'/g, "\\'")
+		.replace(TERMINAL_UNSAFE, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
+	return `'${body}${cut < value.length ? '…' : ''}'`;
+}
+
+/** The characters JSON leaves raw that a terminal reads as a line break (NEL, LS, PS), a
+ * C1 control or DEL, or a bidi control. */
+const TERMINAL_UNSAFE = /[\u007f-\u009f\u061c\u2028\u2029\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
 
 /**
  * Read one supported key off a bag, naming the option when its getter throws — the
@@ -181,10 +219,15 @@ function read_option(options, name, noun) {
  * parses as the empty document) and throws a Node-specific `TypeError` on Node, while
  * the N-API addon throws its own conversion error.
  *
+ * A string that is not well-formed UTF-16 — one holding a lone surrogate — is refused too:
+ * both engines read the source as UTF-8, and the conversion replaces a lone surrogate with
+ * U+FFFD, so a format would silently hand back a different string and a parse would report
+ * a value and offsets for text the caller never wrote.
+ *
  * @param {unknown} source - the caller's source
  * @param {'parse' | 'format'} noun - the export family, as every error names it
  * @returns {string} the same `source`
- * @throws TypeError when `source` is not a string
+ * @throws TypeError when `source` is not a string, or holds a lone surrogate
  */
 export function read_source(source, noun) {
 	if (typeof source !== 'string') {
@@ -192,7 +235,39 @@ export function read_source(source, noun) {
 			`${noun} source must be a string (got ${source === null ? 'null' : typeof source})`
 		);
 	}
+	const lone = lone_surrogate_offset(source);
+	if (lone !== -1) {
+		throw new TypeError(
+			`${noun} source must be well-formed UTF-16 (a lone surrogate at offset ${lone})`
+		);
+	}
 	return source;
+}
+
+/**
+ * The UTF-16 offset of the first lone surrogate in `source`, or `-1` when it is well-formed.
+ * `String.prototype.isWellFormed` answers the common case natively where the runtime has it
+ * (Node 20+, Deno, Bun, current browsers); the scan runs only to place a lone surrogate, or
+ * on a runtime without it.
+ *
+ * @param {string} source
+ * @returns {number}
+ */
+function lone_surrogate_offset(source) {
+	if (typeof source.isWellFormed === 'function' && source.isWellFormed()) return -1;
+	for (let i = 0; i < source.length; i++) {
+		const unit = source.charCodeAt(i);
+		if (unit < 0xd800 || unit > 0xdfff) continue;
+		if (unit <= 0xdbff) {
+			const next = source.charCodeAt(i + 1);
+			if (next >= 0xdc00 && next <= 0xdfff) {
+				i++; // a pair
+				continue;
+			}
+		}
+		return i;
+	}
+	return -1;
 }
 
 /**
@@ -260,6 +335,9 @@ function is_point_property(object, key) {
  * Build the format family over one engine's `format_<lang>(source, source_type?)`
  * functions, keyed by language.
  *
+ * Each function is defined under a computed key, which names it: `format_css.name` is
+ * `'format_css'`, as a caller's stack trace and a `function.name` check expect of an export.
+ *
  * @param {Record<string, (source: string, source_type?: string) => string>} format
  * @returns {Record<string, (source: string, options?: unknown) => string>} `format_<lang>`
  */
@@ -267,12 +345,14 @@ export function create_format_api(format) {
 	/** @type {Record<string, (source: string, options?: unknown) => string>} */
 	const api = {};
 	for (const [language, format_language] of Object.entries(format)) {
-		api[`format_${language}`] = (source, options) =>
-			call_engine(
-				format_language,
-				read_source(source, 'format'),
-				read_options(options, 'format', language).source_type
-			);
+		Object.assign(api, {
+			[`format_${language}`]: (source, options) =>
+				call_engine(
+					format_language,
+					read_source(source, 'format'),
+					read_options(options, 'format', language).source_type
+				)
+		});
 	}
 	return api;
 }

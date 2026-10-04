@@ -55,7 +55,7 @@ import {
 	wasm_bundle_dir,
 	type WasmVariant
 } from '../benches/js/lib/tsv_artifacts.ts';
-import { facade_sources } from './npm_facade.ts';
+import { ALL_FAMILIES, facade_sources } from './npm_facade.ts';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -224,7 +224,10 @@ export function wasm_package_checks(
 			label: `staged facade (${variant})`,
 			staged: `${dir}/api.js`,
 			crates: [],
-			files: [...facade_sources(variant !== 'format'), 'scripts/npm_facade.ts'],
+			files: [
+				...facade_sources({ format: variant !== 'parse', parse: variant !== 'format' }),
+				'scripts/npm_facade.ts'
+			],
 			rebuild
 		},
 		...(variant === 'all'
@@ -301,7 +304,7 @@ export function napi_loader_checks(): Array<StagedCheck> {
 				'crates/tsv_napi/npm/index.d.ts',
 				'crates/tsv_napi/npm/platform.js',
 				'crates/tsv_napi/npm/bin.js',
-				...facade_sources(true),
+				...facade_sources(ALL_FAMILIES),
 				'scripts/build_napi_packages.ts',
 				'scripts/npm_facade.ts',
 				'scripts/npm_metadata.ts'

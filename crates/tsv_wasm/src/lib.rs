@@ -469,7 +469,7 @@ fn wasm_source_type(
 /// the same one `tsv_napi`'s addon takes — with `$goalness` (`goal` / `nogoal`)
 /// selecting whether a source type is accepted. The options bag, the
 /// `{locations: true}` sugar and the published declarations are the npm
-/// packages' hand-written facade (`npm/api.js` + `api.d.ts`), shared with the
+/// packages' hand-written facade (`npm/api.js` + `facade_format.d.ts`), shared with the
 /// native `@fuzdev/tsv`; the declarations wasm-bindgen generates here type only the
 /// raw module.
 // The bodies parse the source into a per-thread AST arena and run the

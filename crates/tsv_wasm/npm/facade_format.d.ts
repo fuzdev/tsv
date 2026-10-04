@@ -1,11 +1,16 @@
 /**
- * Types for the format API every tsv npm package exports, and the options bags the
- * whole facade shares the conventions of (`api.js`; the parse half is `api_parse.d.ts`).
+ * Types for the format API every format-capable tsv npm package exports, and the
+ * conventions every options bag of the facade follows (the parse half's declarations are
+ * `facade_parse.d.ts`).
  *
  * These declare the PUBLISHED functions — what each package entry re-exports by name
- * from `create_format_api`'s result — not `api.js`'s own module exports, which are
- * the entries' plumbing and reachable through no package `exports` path. Hand-written, staged into
- * every package beside `api.js`.
+ * from `create_format_api`'s result (`api.js`) — not `api.js`'s own module exports, which
+ * are the entries' plumbing and reachable through no package `exports` path. That is why
+ * this file is not named `api.d.ts`: a declaration file beside a `.js` of the same
+ * basename is read as that module's types, so under a resolver that ignores `exports`
+ * (`moduleResolution: node10`) a deep import of `api.js` would type-check as these
+ * functions and be `undefined` at runtime. Hand-written; staged into every package that
+ * formats.
  *
  * Every option key spells `| undefined` on top of `?`. That is not redundant: under a
  * consumer's `exactOptionalPropertyTypes` a bare `?` accepts an ABSENT key but rejects
@@ -56,16 +61,17 @@ export interface TypeScriptFormatOptions {
 
 /**
  * Format a Svelte component.
- * @throws TypeError when `source` is not a string, `options` is not an object, or `options`
- *   carries an unknown key or a set `sourceType`
+ * @throws TypeError when `source` is not a well-formed UTF-16 string, `options` is not an
+ *   object, or `options` carries an unknown key or a set `sourceType`
  * @throws SyntaxError when the source does not parse — a `TsvSyntaxError`, its position on
  *   `start` and `loc`
  */
 export declare function format_svelte(source: string, options?: FormatOptions): string;
 /**
  * Format TypeScript (or JavaScript).
- * @throws TypeError when `source` is not a string, `options` is not an object, or `options`
- *   carries an unknown key or a `sourceType` other than `'script'` or `'module'`
+ * @throws TypeError when `source` is not a well-formed UTF-16 string, `options` is not an
+ *   object, or `options` carries an unknown key or a `sourceType` other than `'script'` or
+ *   `'module'`
  * @throws SyntaxError when the source does not parse — a `TsvSyntaxError`, its position on
  *   `start` and `loc`
  */
@@ -75,8 +81,8 @@ export declare function format_typescript(
 ): string;
 /**
  * Format CSS.
- * @throws TypeError when `source` is not a string, `options` is not an object, or `options`
- *   carries an unknown key or a set `sourceType`
+ * @throws TypeError when `source` is not a well-formed UTF-16 string, `options` is not an
+ *   object, or `options` carries an unknown key or a set `sourceType`
  * @throws SyntaxError when the source does not parse — a `TsvSyntaxError`, its position on
  *   `start` and `loc`
  */
