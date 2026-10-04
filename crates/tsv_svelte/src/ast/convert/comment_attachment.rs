@@ -702,15 +702,15 @@ mod tests {
                     (node.to_owned(), start, end, key, value.to_owned())
                 })
                 .collect();
-            for (wire_name, bytes) in [
-                ("span-only", crate::convert_ast_json_bytes(&root, source)),
-                // the loc-bearing wire exists only under `tsv_lang`'s `locations` feature
-                #[cfg(feature = "locations")]
-                (
-                    "loc",
-                    crate::convert_ast_json_bytes_with_locations(&root, source),
-                ),
-            ] {
+            let wires =
+                std::iter::once(("span-only", crate::convert_ast_json_bytes(&root, source)));
+            // the loc-bearing wire exists only under `tsv_lang`'s `locations` feature
+            #[cfg(feature = "locations")]
+            let wires = wires.chain(std::iter::once((
+                "loc",
+                crate::convert_ast_json_bytes_with_locations(&root, source),
+            )));
+            for (wire_name, bytes) in wires {
                 let wire: Value = serde_json::from_slice(&bytes).expect("wire");
                 let mut found = Vec::new();
                 placements(&wire, &mut found);
