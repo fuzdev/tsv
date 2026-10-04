@@ -128,8 +128,8 @@ use tsv_ts::ast::convert::{
 
 use super::comment_attachment::{
     AttachInputs, attach_binding_pattern, attach_const_tag_init, attach_expression,
-    attach_expression_list, attach_script, attach_statement, is_template_comment,
-    pattern_comment_window,
+    attach_expression_list, attach_script, attach_statement, grouping_parens_around,
+    is_template_comment, pattern_comment_window,
 };
 use super::special::{bool_option, component_is_typescript, find_option_values, text_value};
 
@@ -1065,9 +1065,9 @@ fn write_render_tag(w: &mut JsonWriter, tag: &internal::RenderTag<'_>, ctx: &Ctx
 ///
 /// A multi-identifier tag is ONE canonical acorn parse (a `SequenceExpression`
 /// wrapper, discarded after identifier extraction), so its comment attach runs
-/// once across the list with the wrapper-end trailing suppression. A single
-/// identifier is itself the parse root and takes the generic-island path
-/// (root-fallback trailing).
+/// once across the list with the wrapper-end trailing suppression, each element's own
+/// grouping pairs run as silent frames. A single identifier is itself the parse root and
+/// takes the generic-island path (root-fallback trailing).
 fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"DebugTag\",\"start\":");
     w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
@@ -1101,22 +1101,48 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
         None
     };
     let identifiers = spliced.as_deref().unwrap_or(tag.identifiers);
-    // `[first, .., last]` is the multi-identifier case AND the wrapper's own bounds: the
-    // discarded `SequenceExpression` spans first identifier to last, and a single identifier
-    // (which the pattern excludes) has no wrapper at all.
-    if let [first, .., last] = identifiers
+    // `[_, _, ..]` is the multi-identifier case: a single identifier (which the pattern
+    // excludes) has no wrapper at all.
+    if let [_, _, ..] = identifiers
         && ctx.any_comment_in(tag.span.start, tag.span.end)
     {
+        // Under `preserveParens` each element the sequence holds is the element's own
+        // outermost grouping pair, if it has one (`{@debug (a), b}`) — `remove_parens` runs
+        // only after the walk — so the pairs tsv's parse discarded are read back off the
+        // source, run as silent frames around their element (each claims as the pair would
+        // and emits nothing), and bound the discarded wrapper: it spans the first element's
+        // `(` to the last element's `)`, not first identifier to last.
+        let attach_inputs = ctx.attach_inputs();
+        let element_parens: Vec<Vec<Span>> = identifiers
+            .iter()
+            .map(|id| {
+                grouping_parens_around(attach_inputs, tag.span.start, id.span(), tag.span.end)
+            })
+            .collect();
+        let outer = |i: usize| {
+            element_parens[i]
+                .first()
+                .copied()
+                .unwrap_or_else(|| identifiers[i].span())
+        };
+        let wrapper = Span::new(outer(0).start, outer(identifiers.len() - 1).end);
         let attach = attach_expression_list(
-            ctx.attach_inputs(),
+            attach_inputs,
             tag.span.start,
             tag.span.end,
-            Some(Span::new(first.span().start, last.span().end)),
+            Some(wrapper),
             true,
         );
-        write_array(w, identifiers, |w, id| {
-            write_expression_embedded(w, id, ctx.embed(attach.mode()));
-        });
+        let mode = attach.mode();
+        write_array(
+            w,
+            identifiers.iter().zip(&element_parens),
+            |w, (id, parens)| {
+                mode.with_silent_parens(parens, || {
+                    write_expression_embedded(w, id, ctx.embed(mode));
+                });
+            },
+        );
     } else {
         write_array(w, identifiers, |w, id| {
             write_braced_island(w, id, tag.span, ctx);

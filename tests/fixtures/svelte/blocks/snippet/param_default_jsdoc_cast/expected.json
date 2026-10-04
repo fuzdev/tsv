@@ -1,0 +1,182 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 143,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "SnippetBlock",
+				"start": 0,
+				"end": 66,
+				"expression": {
+					"type": "Identifier",
+					"name": "fn1",
+					"start": 10,
+					"end": 13
+				},
+				"parameters": [
+					{
+						"type": "AssignmentPattern",
+						"start": 14,
+						"end": 38,
+						"left": {
+							"type": "Identifier",
+							"start": 14,
+							"end": 15,
+							"name": "a"
+						},
+						"right": {
+							"type": "ParenthesizedExpression",
+							"start": 35,
+							"end": 38,
+							"expression": {
+								"type": "Identifier",
+								"start": 36,
+								"end": 37,
+								"name": "b"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": "* @type {T} ",
+									"start": 18,
+									"end": 34
+								}
+							]
+						}
+					}
+				],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 40,
+							"end": 56,
+							"name": "span",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 46,
+										"end": 49,
+										"expression": {
+											"type": "Identifier",
+											"start": 47,
+											"end": 48,
+											"name": "a"
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 66,
+				"end": 68,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "SnippetBlock",
+				"start": 68,
+				"end": 142,
+				"expression": {
+					"type": "Identifier",
+					"name": "fn2",
+					"start": 78,
+					"end": 81
+				},
+				"parameters": [
+					{
+						"type": "Identifier",
+						"start": 82,
+						"end": 83,
+						"name": "a"
+					},
+					{
+						"type": "AssignmentPattern",
+						"start": 85,
+						"end": 114,
+						"left": {
+							"type": "Identifier",
+							"start": 85,
+							"end": 86,
+							"name": "b"
+						},
+						"right": {
+							"type": "ParenthesizedExpression",
+							"start": 111,
+							"end": 114,
+							"expression": {
+								"type": "Identifier",
+								"start": 112,
+								"end": 113,
+								"name": "c"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": "* @satisfies {T} ",
+									"start": 89,
+									"end": 110
+								}
+							]
+						}
+					}
+				],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 116,
+							"end": 132,
+							"name": "span",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 122,
+										"end": 125,
+										"expression": {
+											"type": "Identifier",
+											"start": 123,
+											"end": 124,
+											"name": "b"
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 18,
+			"end": 34
+		},
+		{
+			"type": "Block",
+			"value": "* @satisfies {T} ",
+			"start": 89,
+			"end": 110
+		}
+	]
+}

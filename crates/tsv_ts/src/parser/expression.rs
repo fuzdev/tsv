@@ -1995,9 +1995,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // containing expression reads for a discarded pair:
         // - **JSDoc type cast** (`/** @type {T} */ (expr)`) — the parens are
         //   semantically required (dropping them drops the cast), so a preceding
-        //   `@type`/`@satisfies` block comment wraps the inner in a `JsdocCast`. Cast
-        //   semantics subsume grouping, so this wins when both apply. The cast also
-        //   takes **ownership** of that comment: the comment and this `(` are one
+        //   `@type`/`@satisfies` block comment wraps the inner in a `JsdocCast`. The cast
+        //   also takes **ownership** of that comment: the comment and this `(` are one
         //   unit, so the cast prints it and the flat-`Vec<Comment>` lookups skip it
         //   (`Comment::owned_by_node`) — printed from an enclosing gap instead, a
         //   paren synthesized around an enclosing expression lands between the two
@@ -2007,13 +2006,30 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         //   comment (`CommentGlue::SameLine`); a cast comment may sit a newline
         //   **above** its `(` (`AnyLine`) and still be the cast, so the cast owns it
         //   here regardless (a same-line cast comment is owned by both, harmlessly).
-        // - **Snippet-parameter sub-parse** (`preserve_parens`) — acorn's
-        //   `preserveParens` without Svelte's `remove_parens`; wraps in a
+        // - **Wire-only sub-parse** (`preserve_parens`: a `{#snippet}` head, the binding
+        //   audit) — acorn's `preserveParens` without Svelte's `remove_parens`; wraps in a
         //   `ParenthesizedExpression` for the wire alone — the printer and the compiler
-        //   read a second, paren-free parse of the same head.
+        //   read a second, paren-free parse of the same source. This is tested FIRST: a
+        //   cast's pair is a grouping pair to acorn like any other, so under
+        //   `preserveParens` it is a `ParenthesizedExpression` too (the cast comment
+        //   attaches to it as a leading comment — Svelte's `{#snippet}` wire), and the
+        //   `JsdocCast` belongs to the paren-free tree, the one that prints. The comment's
+        //   ownership is still claimed here, so the two parses agree on it (the binding
+        //   audit buckets a cast's re-binding HARD by it).
         // Every other comment stays located positionally at print time.
         let paren_span = Span::new(paren_start as u32, paren_end as u32);
-        let expr = if let Some(idx) = cast_comment_idx {
+        let expr = if self.preserve_parens {
+            if let Some(idx) = cast_comment_idx {
+                self.comments[idx].owned_by_node = true;
+            }
+            self.preserved_a_paren = true;
+            self.alloc(Expression {
+                span: paren_span,
+                kind: ExpressionKind::ParenthesizedExpression(ParenthesizedExpression {
+                    expression: parsed,
+                }),
+            })
+        } else if let Some(idx) = cast_comment_idx {
             self.comments[idx].owned_by_node = true;
             let comment = self.comments[idx];
             self.alloc(Expression {
@@ -2021,14 +2037,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 kind: ExpressionKind::JsdocCast(JsdocCast {
                     inner: parsed,
                     comment,
-                }),
-            })
-        } else if self.preserve_parens {
-            self.preserved_a_paren = true;
-            self.alloc(Expression {
-                span: paren_span,
-                kind: ExpressionKind::ParenthesizedExpression(ParenthesizedExpression {
-                    expression: parsed,
                 }),
             })
         } else {

@@ -1673,6 +1673,10 @@ fn format_root<'a>(
     lift: LiftRuns,
     known: Known,
 ) -> String {
+    debug_assert!(
+        !source.contains('\r'),
+        "a format entry point takes CR-folded text (`tsv_lang::printing::normalize_carriage_returns`)"
+    );
     // The printer's comment VIEW (`tsv_lang::merge_nestled_block_comments`). Two facts are
     // this array's own: it serves both this printer and every TEMPLATE island it constructs
     // (`ts_inputs` hands it over), so one merge here reaches every `{expr}` — a `<script>`

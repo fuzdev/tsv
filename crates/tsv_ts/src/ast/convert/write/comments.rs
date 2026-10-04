@@ -468,9 +468,12 @@ impl<'a> CommentAttach<'a> {
     }
 
     /// A grouping pair the canonical reader discards opens — a JSDoc cast's `(`…`)`
-    /// under [`IslandComments::removes_parens`]. It is a node of acorn's walk, so it opens
-    /// as one: it consumes a last-body mark, claims the comments ahead of it, may root a
-    /// skipped subtree, and is its inner expression's parent.
+    /// under [`IslandComments::removes_parens`], or a bare pair a host reads back off the
+    /// source around one element of a list island (`tsv_svelte`'s `{@debug a, (b)}`,
+    /// through [`CommentMode::with_silent_parens`]), whose parse kept no span for it. It
+    /// is a node of acorn's walk, so it opens as one: it consumes a last-body mark, claims
+    /// the comments ahead of it, may root a skipped subtree, and is its inner expression's
+    /// parent.
     #[cold]
     pub(super) fn paren_open(&self, span: Span) {
         self.open("ParenthesizedExpression", span);

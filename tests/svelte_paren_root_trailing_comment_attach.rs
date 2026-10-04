@@ -283,7 +283,8 @@ fn a_comment_before_a_root_pair_attaches_nowhere() {
             ("{/* c */ (x)}", &[]),
             ("{( /* c */ (x))}", &[]),
             ("{#if /* c */ (a)}t{/if}", &[]),
-            // a non-root cast in a call argument: its pair is the argument, and leads
+            // a non-root cast in a call argument: the comment leads the argument's
+            // `ParenthesizedExpression`, which `remove_parens` discards
             ("{f(/** @type {T} */ (a), b)}", &[]),
             // the cast's pair starts the call, so the comment leads the CALL and survives
             (
@@ -305,5 +306,101 @@ fn a_comment_before_a_root_pair_attaches_nowhere() {
             ),
         ],
         LEADING,
+    );
+}
+
+/// `{@debug}`'s identifier list is the flattened top-level `SequenceExpression` of one
+/// `preserveParens` parse, so a bare pair around ONE element is interior to that sequence —
+/// and the sequence, which acorn's walk attaches against, spans from the first element's
+/// `(` to the last element's `)`, not from the first identifier to the last. A comment
+/// inside or right after such a pair therefore attaches to the element as acorn sees it.
+/// None of these is a format fixed point (prettier drops the comment, tsv the paren), so
+/// the expectations live here.
+#[test]
+fn a_debug_tag_element_pair_bounds_the_sequence_wrapper() {
+    check_list(
+        &[
+            (
+                "{@debug (/* c */ a), b}",
+                &[("fragment.nodes[0].identifiers[0]", &[" c "])],
+            ),
+            ("{@debug a, (b /* c */)}", &[]),
+            ("{@debug a, (b) /* c */}", &[]),
+        ],
+        LEADING,
+    );
+}
+
+/// [`a_debug_tag_element_pair_bounds_the_sequence_wrapper`]'s trailing side.
+#[test]
+fn a_debug_tag_element_pair_bounds_the_sequence_wrapper_trailing() {
+    check_list(
+        &[
+            ("{@debug (/* c */ a), b}", &[]),
+            (
+                "{@debug a, (b /* c */)}",
+                &[("fragment.nodes[0].identifiers[1]", &[" c "])],
+            ),
+            (
+                "{@debug a, (b) /* c */}",
+                &[("fragment.nodes[0].identifiers[1]", &[" c "])],
+            ),
+            // controls: no element pair, and a pair around the whole sequence (`remove_parens`
+            // discards it with the comment it took)
+            (
+                "{@debug a, /* c */ b}",
+                &[("fragment.nodes[0].identifiers[0]", &[" c "])],
+            ),
+            ("{@debug (a, b /* c */)}", &[]),
+        ],
+        TRAILING,
+    );
+}
+
+/// A `//` comment inside a grouping pair can end in whitespace or a `(`; the walk that reads
+/// the pair back off the source must step over the comment whole rather than read its last
+/// bytes as its own, at an island root and at a `{@debug}` element alike.
+#[test]
+fn a_line_comment_inside_a_pair_is_stepped_over_whole() {
+    check_list(
+        &[
+            (
+                "{( // x \n a) /* t */}",
+                &[("fragment.nodes[0].expression", &[" x "])],
+            ),
+            (
+                "{@debug ( // x \n a), b}",
+                &[("fragment.nodes[0].identifiers[0]", &[" x "])],
+            ),
+            (
+                "{@debug a, ( // x \n b) /* t */}",
+                &[("fragment.nodes[0].identifiers[1]", &[" x "])],
+            ),
+            (
+                "{( // (\n a)}",
+                &[("fragment.nodes[0].expression", &[" ("])],
+            ),
+            (
+                "{@debug a, ( // (\n b)}",
+                &[("fragment.nodes[0].identifiers[1]", &[" ("])],
+            ),
+        ],
+        LEADING,
+    );
+    check_list(
+        &[
+            (
+                "{( // x \n a) /* t */}",
+                &[("fragment.nodes[0].expression", &[" t "])],
+            ),
+            ("{@debug ( // x \n a), b}", &[]),
+            (
+                "{@debug a, ( // x \n b) /* t */}",
+                &[("fragment.nodes[0].identifiers[1]", &[" t "])],
+            ),
+            ("{( // (\n a)}", &[]),
+            ("{@debug a, ( // (\n b)}", &[]),
+        ],
+        TRAILING,
     );
 }

@@ -1410,9 +1410,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             let base = (content_offset + head_start).saturating_sub(WRAPPER_PREFIX.len());
             // Two trees, one per reader. Svelte keeps acorn's `preserveParens` here (and,
             // unlike every other template expression, skips `remove_parens`), so the WIRE
-            // holds a `ParenthesizedExpression` for each grouping pair — `c = (2, 3)` keeps
-            // one. Everything else reads the head the way it reads a function signature:
-            // paren-free, the parens re-derived from precedence — which is what makes a
+            // holds a `ParenthesizedExpression` for each grouping pair, a JSDoc cast's
+            // included — `c = (2, 3)` keeps one. Everything else reads the head the way it
+            // reads a function signature: paren-free, the parens re-derived from precedence — which is what makes a
             // snippet parameter list format (and compile) exactly as its `function` twin
             // does. Printing the wire tree would lose every pair: a
             // `ParenthesizedExpression` matches no precedence rule, so `(x + y) * 2`
@@ -1502,7 +1502,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// rather than mis-sliced and corrupted on format.
     ///
     /// `content_offset` is `content`'s position in the document: an unmatched `<` is
-    /// reported at `content`'s end, in the document's coordinates.
+    /// reported as the missing `>` at `content`'s end, in the document's coordinates. The
+    /// head is bounded by its `}` before this scan runs, so an unclosed generic runs out of
+    /// HEAD, not out of document — the unclosed parameter `(` reads the same way
+    /// (`Expected ')'`). Svelte's own scanner is not bounded by the head and walks to the
+    /// end of the template; the message is tsv's own either way.
     fn find_matching_angle_bracket(
         &self,
         content: &str,
@@ -1517,7 +1521,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             b'>',
             TriviaProfile::JS,
         )
-        .ok_or_else(|| ParseError::unexpected_eof(content_offset + content.len()))
+        .ok_or_else(|| self.error_expected_at("'>'", content_offset + content.len()))
     }
 
     /// Scan source from a position until we find the closing } of a block tag

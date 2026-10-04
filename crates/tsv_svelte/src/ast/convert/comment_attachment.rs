@@ -61,7 +61,7 @@ impl<'a> AttachInputs<'a> {
 /// tsv's parse keeps a span for one kind of pair — a JSDoc cast's
 /// (`internal::JsdocCast`'s span covers its `(`…`)`), which the writer runs as a silent
 /// frame (`IslandComments::removes_parens`) — and discards the rest, so the bare pairs
-/// around the ROOT are recovered here ([`root_grouping_parens`]) and handed over as
+/// around the ROOT are recovered here ([`grouping_parens_around`]) and handed over as
 /// `IslandComments::root_parens`. Two things follow from the root being a pair:
 ///
 /// - **where the parse ended** is past the outermost `)`, and that is where acorn's
@@ -86,7 +86,7 @@ pub(super) fn attach_expression<'a>(
     root: Span,
     range_end: u32,
 ) -> CommentAttach<'a> {
-    let root_parens = root_grouping_parens(attach, container_start, root, range_end);
+    let root_parens = grouping_parens_around(attach, container_start, root, range_end);
     let parse_end = root_parens.first().map_or(root.end, |pair| pair.end);
     let window_end = scan_past_trailing_comments(attach.source, parse_end, range_end);
     CommentAttach::new(
@@ -128,9 +128,10 @@ pub(super) fn attach_statement<'a>(
     )
 }
 
-/// The bare grouping pairs wrapping an island's root expression at `root`, outermost
-/// first, as `(`…`)` spans — what the canonical `preserveParens` parse has above the node
-/// the wire emits (see [`attach_expression`]).
+/// The bare grouping pairs wrapping the expression at `root`, outermost first, as
+/// `(`…`)` spans — what the canonical `preserveParens` parse has above the node the wire
+/// emits. Asked of an island's root (see [`attach_expression`]) and of each element of
+/// `{@debug}`'s identifier list (see [`attach_expression_list`]).
 ///
 /// tsv's parse discards a bare pair and its root keeps the inner span, so the pairs are
 /// read back off the source: the `(`s met walking back from `root.start` and the `)`s met
@@ -141,7 +142,12 @@ pub(super) fn attach_statement<'a>(
 /// `{#each}` key's own parens, is outside the bounds its caller passes. The two walks
 /// pair innermost-out; a JSDoc cast root's own pair is its span, so the walks start
 /// outside it.
-fn root_grouping_parens(
+///
+/// A list element's walks stop at the `,` beside it, so a pair around the WHOLE list
+/// (`{@debug (a, b)}`) reaches only one of them — an open the first element's walk meets
+/// with no close, a close the last one's meets with no open — and pairs with nothing:
+/// the counts are paired innermost-out and the unmatched outer bracket falls off.
+pub(super) fn grouping_parens_around(
     attach: AttachInputs<'_>,
     container_start: u32,
     root: Span,
@@ -156,15 +162,17 @@ fn root_grouping_parens(
         let Some(ch) = source[floor..pos].chars().next_back() else {
             break;
         };
-        if is_svelte_ws(ch) {
+        // A comment ending here is asked first: a `//` comment's last byte can be
+        // whitespace or a `(`, which the walk must not read as its own.
+        if let Some(comment) = comment_ending_at(attach.template_comments, pos as u32)
+            && comment.span.start >= container_start
+        {
+            pos = comment.span.start as usize;
+        } else if is_svelte_ws(ch) {
             pos -= ch.len_utf8();
         } else if ch == '(' {
             pos -= 1;
             opens.push(pos as u32);
-        } else if let Some(comment) = comment_ending_at(attach.template_comments, pos as u32)
-            && comment.span.start >= container_start
-        {
-            pos = comment.span.start as usize;
         } else {
             break;
         }
@@ -318,7 +326,9 @@ pub(super) fn attach_const_tag_init<'a>(
 /// *preceding* item, anything else leads the *following* one.
 ///
 /// `wrapper` is the discarded parse wrapper's own span — `{@debug}`'s
-/// `SequenceExpression`, which spans first identifier to last; `None` for
+/// `SequenceExpression`, which spans the first element to the last, each with the
+/// grouping pairs of its own (`(a), (b)` runs `(` to `)`: under `preserveParens` the
+/// sequence's elements are those pairs, see [`grouping_parens_around`]); `None` for
 /// snippet params, whose function wrapper encloses the whole list. Everything
 /// the wrapper would have claimed dies with it, at both ends: its `end` drives
 /// acorn's `node.end == parent.end` trailing suppression (so `{@debug}`'s last

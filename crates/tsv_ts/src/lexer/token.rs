@@ -496,7 +496,7 @@ impl fmt::Display for TokenKind {
 pub struct Token {
     pub kind: TokenKind,
     /// Byte offsets into the lexer's source. `u32` (not `usize`) keeps `Token`
-    /// 16 bytes; source length is capped < 4 GB upstream (`ParseError::FileTooLarge`).
+    /// 16 bytes; source length is capped < 4 GiB upstream (`ParseError::FileTooLarge`).
     pub start: u32,
     pub end: u32,
 }

@@ -327,8 +327,10 @@ pub struct JsdocCast<'arena> {
 /// produced **only** under the parser's `preserve_parens` mode — active solely
 /// for `{#snippet}` parameters, where Svelte parses with acorn's
 /// `preserveParens: true` and, unlike every other template expression, skips
-/// `remove_parens` (`1-parse/state/tag.js`). The public AST then keeps the
-/// `ParenthesizedExpression` node, matching Svelte's output.
+/// `remove_parens` (`1-parse/state/tag.js`) — and for the binding audit's wire-only
+/// reparse. The public AST then keeps the `ParenthesizedExpression` node, matching
+/// Svelte's output. A JSDoc cast's pair is one of them: under that mode it is this node
+/// (the cast comment leading it on Svelte's wire), never a [`JsdocCast`].
 ///
 /// The holding `Expression`'s span covers the parentheses (`(`…`)`); `expression`
 /// keeps its own paren-free span. Unlike [`JsdocCast`], the parens are **not** semantically

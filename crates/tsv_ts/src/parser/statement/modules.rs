@@ -225,11 +225,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // So `export async⏎function b() {}` is a syntax error rather than two
             // statements — acorn and Svelte both reject it; welding the two halves into
             // one async function nobody wrote would be an over-acceptance.
+            //
+            // Either fault is reported at the token AFTER `async`, the way the
+            // `export declare async` sibling (`parse_declare_statement_kind`) reports it: a
+            // `found 'async'` would read as though the keyword itself were the stray token.
             TokenKind::Keyword(KeywordKind::Async) => {
                 if self.peek_kind() != TokenKind::Keyword(KeywordKind::Function)
                     || self.peek_preceded_by_line_terminator()
                 {
-                    return Err(self.error_expected_after("'function'", "export async"));
+                    self.advance()?;
+                    if !matches!(
+                        self.current_kind(),
+                        TokenKind::Keyword(KeywordKind::Function)
+                    ) {
+                        return Err(self.error_expected_after("'function'", "export async"));
+                    }
+                    return Err(self.error_msg("'function' must be on the same line as 'async'"));
                 }
                 let decl = self.parse_async_function_declaration()?;
                 Ok(self.export_named(start, decl, ExportKind::Value))

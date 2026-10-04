@@ -230,6 +230,28 @@ pub enum CommentMode<'a> {
     Attach(&'a CommentAttach<'a>),
 }
 
+impl CommentMode<'_> {
+    /// Run `f` — the write of one node — inside **silent frames** for the grouping pairs
+    /// around it that the parse kept no span for (`tsv_svelte`'s `{@debug a, (b)}`, its
+    /// pairs read back off the source): each pair opens outermost-first, claims as the pair
+    /// would in acorn's walk and emits nothing, and closes innermost-first once `f` is
+    /// done. `parens` is outermost-first. A no-op wrapper in `Off` mode, which has no walk
+    /// to frame.
+    pub fn with_silent_parens<R>(self, parens: &[Span], f: impl FnOnce() -> R) -> R {
+        let CommentMode::Attach(attach) = self else {
+            return f();
+        };
+        for &pair in parens {
+            attach.paren_open(pair);
+        }
+        let result = f();
+        for &pair in parens.iter().rev() {
+            attach.paren_close(pair);
+        }
+        result
+    }
+}
+
 /// The per-document inputs every embedded writer shares (`write_program_embedded`,
 /// `write_expression_embedded`, `write_pattern_embedded`,
 /// `write_variable_declaration_embedded`,
@@ -844,8 +866,8 @@ pub(super) fn write_literal(w: &mut JsonWriter, lit: &internal::Literal<'_>, ctx
 /// two fields are one constant or one source token: a string with no escape to
 /// decode, a plain decimal integer, `true`, `false` and `null`. Returns `false`,
 /// having written nothing, for every other literal — and for a string or number
-/// the writer's own conditions decline ([`JsonWriter::string_value_raw`],
-/// [`JsonWriter::number_value_raw`]).
+/// the writer's own conditions decline ([`JsonWriter::try_string_value_raw`],
+/// [`JsonWriter::try_number_value_raw`]).
 ///
 /// A numeric token is tested as text, not by its parsed value: one made only of
 /// decimal digits with no leading zero is the shortest form of the integer it
@@ -858,10 +880,10 @@ fn write_literal_fields_fused(
 ) -> bool {
     match lit.value {
         internal::LiteralValue::String(internal::StringCooked::Verbatim) => {
-            w.string_value_raw(lit.span.extract(ctx.source).as_bytes())
+            w.try_string_value_raw(lit.span.extract(ctx.source).as_bytes())
         }
         internal::LiteralValue::Number(_) => {
-            w.number_value_raw(lit.span.extract(ctx.source).as_bytes())
+            w.try_number_value_raw(lit.span.extract(ctx.source).as_bytes())
         }
         internal::LiteralValue::Boolean(true) => {
             w.raw(",\"value\":true,\"raw\":\"true\"");
