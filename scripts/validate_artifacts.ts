@@ -134,8 +134,8 @@ for (const variant of VARIANTS) {
 }
 await assert_staged_fresh(freshness_checks);
 
-// Center measured 2026-09-30 (deno target; npm == deno, identical `.wasm`):
-// format 2,393,174 B; parse 990,061 B; all 2,670,398 B. Bounds are ±8% of it.
+// Center measured 2026-10-04 (deno target; npm == deno, identical `.wasm`):
+// format 2,398,778 B; parse 967,938 B; all 2,661,745 B. Bounds are ±8% of it.
 //
 // Recenter (and re-measure the deltas below) whenever a measure has drifted to
 // within a few percent of a band edge through accumulated work — otherwise the
@@ -145,9 +145,9 @@ await assert_staged_fresh(freshness_checks);
 // named in the commit. The retired centers and what moved them are recorded
 // elsewhere, not here.
 const BOUNDS = {
-	format: { min: 2_202_000, max: 2_585_000 },
-	parse: { min: 911_000, max: 1_069_000 },
-	all: { min: 2_457_000, max: 2_884_000 }
+	format: { min: 2_206_000, max: 2_591_000 },
+	parse: { min: 890_000, max: 1_046_000 },
+	all: { min: 2_448_000, max: 2_875_000 }
 };
 
 // all = format + parse. `all − format` is what the parse feature adds (parser
@@ -160,10 +160,10 @@ const BOUNDS = {
 // bundles and leaves the deltas where they were; a delta that moves with the
 // bundles means a feature boundary shifted, not that code got smaller.
 //
-// At the current center: `all − format` 277,224 B; `all − parse` 1,680,337 B.
+// At the current center: `all − format` 262,967 B; `all − parse` 1,693,807 B.
 const DELTAS = {
-	format: { min: 255_000, max: 299_000 }, // all − format
-	parse: { min: 1_546_000, max: 1_815_000 } // all − parse
+	format: { min: 241_000, max: 285_000 }, // all − format
+	parse: { min: 1_558_000, max: 1_830_000 } // all − parse
 };
 
 console.log('=== WASM binary sizes ===');

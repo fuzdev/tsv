@@ -158,7 +158,7 @@ deno task typecheck:scripts # deno check over scripts/ alone — node-modules-fr
 #                          (nothing else typechecks the release scripts, and `deno run` doesn't).
 #                          `scripts/doctor.ts` is the one exclusion: its corpus probe reaches the bench node_modules
 deno task typecheck:bench-core # the bench modules that are DELIBERATELY node-modules-free and that
-#                          scripts/'s import graph does not reach — `lib/{wasm,harvest_stamp,loc_wire_client,
+#                          scripts/'s import graph does not reach — `lib/{wasm,harvest_stamp,
 #                          fixture_documents,error_text}.ts` + `compose_reports.ts` — so the harness's loader/guard core and its report composer
 #                          gate too. The rest of that core rides `typecheck:scripts` (deno check walks
 #                          transitive imports) or `test:deno`. NOT the maximal checkable set: the impl

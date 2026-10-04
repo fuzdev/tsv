@@ -304,7 +304,9 @@ pub(crate) fn collect_module_script_comments(
 ///
 /// The oracle rewrites its interior lines twice: Svelte's parse strips the comment's
 /// start-line indentation from the start of every line of the value
-/// ([`tsv_lang::Comment::wire_value`] models it), and esrap prints each later line after a
+/// ([`tsv_lang::Comment::wire_value`] applies the same strip measured on the comment's
+/// document line, so the two differ for a comment opening on the `<script>` tag's own line,
+/// where Svelte measures the prefix its reader manufactured), and esrap prints each later line after a
 /// newline plus the emit indent. tsv carries the host text. Both outputs then pass through
 /// `canonicalize_js`, whose printer rebuilds an indentable (`*`-gutter) comment from its
 /// trimmed lines — erasing every leading-whitespace difference on the lines after the

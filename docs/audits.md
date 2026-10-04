@@ -233,10 +233,9 @@ already **written**: committed fixtures and real repos. Nothing manufactured an 
 and graded the resulting *wire*.
 
 A hand-rolled scan can therefore be confidently wrong about a spelling no document
-contains. Both block-annotation bugs lived exactly there: the line seed a `: T`'s own
-acorn parse needs, and the offset that annotation is anchored at, were each wrong for
-any spelling that put whitespace between a binding and its colon — invisible to 9441
-fixtures and every real repo, because everyone writes `x: T`. The comparison catches
+contains. Both block-annotation bugs lived exactly there: where a `: T` annotation's own parse
+was anchored was wrong for any spelling that put whitespace between a binding and its
+colon — invisible to every fixture and every real repo, because everyone writes `x: T`. The comparison catches
 both the instant such an input exists; this audit makes them exist.
 
 **What it perturbs — two families, because there are two kinds of claim to break.**
@@ -423,8 +422,7 @@ both need the canonical parser, so they are conformance-tier at best. Standing f
     `static_member_ladder` / `extends_instantiation_linebreak` matchers document for `\n`;
   - the An+B residue the CSS finding left behind — `REGEX_NTH_OF` is a JS regex and tsv's
     An+B scanner is ASCII, so a `<LS>`/`<PS>` in an `:nth-*()` argument diverges; enumerated
-    and pinned in [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs)
-    (4 files, down from 52 / 38 / 20).
+    and pinned in [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs).
 
   The unquoted-attribute-value terminator is a **whitespace-class** question, not a terminator
   one: it must spell Svelte's JS `\s` (all nineteen non-ASCII members plus VT), not a raw BYTE
@@ -993,7 +991,7 @@ world the other `check` audits use, so it adds a short compile of its own.
 
 ```bash
 # scripts/check_ast_types.ts — three arms over crates/tsv_wasm/types/tsv_ast.d.ts:
-# (A) `tsv parse` a curated sample set, (B) assert every wire discriminant the fixture
+# (A) `tsv parse --locations` a curated sample set, (B) assert every wire discriminant the fixture
 # corpus produces is declared, (C) type a computed cover of the corpus against the .d.ts.
 # A and C share one generated file and one `deno check`. ~20 s when the generated content
 # changes (nearly all arm C); an unchanged rerun hits deno's check cache at ~4.5 s.
@@ -1211,7 +1209,7 @@ asks for the install. A stale staging is refused as the package suites refuse it
 - **Lean consumers, not a restatement.** The modules wire the surface; a wrong field type deep
   in the AST declarations is `check:ast-types`'s to catch.
 - **A shipped declaration no entry reaches is not graded** — nor can a consumer's compiler reach
-  it (the parse-only package ships `api.d.ts` and `tsv_wasm.d.ts` that no entry imports).
+  it (the parse-only package ships the generated `tsv_wasm.d.ts`, which no entry imports).
 
 ## Canonical-Pin Agreement Audit (`pins:audit`)
 

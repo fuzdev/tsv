@@ -108,7 +108,7 @@ const ALLOWED_NONDIVERGENCE_READMES: &[&str] = &[
     // Empty-brace-drop matching behavior + idempotency note + `basic` contrast.
     "typescript/modules/imports/default_empty_braces",
     // Which source Svelte prepares for each acorn island, and which of the cases
-    // belong to the sibling Rust tests because a `<CR>` cannot be a fixture input
+    // belong to the sibling Rust test (`tests/loc_definition.rs`) because a `<CR>` cannot be a fixture input
     // (the format path folds it, so such a document is not a fixed point).
     "svelte/syntax/whitespace/line_terminators_acorn_regions",
     "svelte/syntax/whitespace/line_terminators_comment_dedent",

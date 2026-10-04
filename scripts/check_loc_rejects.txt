@@ -11,8 +11,8 @@
 # not a gap.
 #
 # Graded both ways: a prettier-side document tsv rejects that is not listed fails the run
-# (tsv started rejecting a form it parsed), and on a run over the whole fixture tree a
-# listed one tsv now parses fails as stale (delete its line). Paths are relative to
+# (tsv started rejecting a form it parsed), and a listed one tsv now parses fails as stale
+# (delete its line) — on a narrowed root, only the entries under it are graded. Paths are relative to
 # tests/fixtures, sorted; a `#` starts a comment.
 
 css/values/escaped_whitespace_prettier_divergence/output_prettier.svelte  # canonical-accepts

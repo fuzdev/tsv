@@ -69,8 +69,8 @@ export const CORE_CRATES = ['tsv_lang', 'tsv_arena', 'tsv_html', 'tsv_ts', 'tsv_
  * Crates that feed the WASM bundle beyond `CORE_CRATES`: the binding crate
  * itself plus `tsv_ignore` + `tsv_discover` (the `IgnoreStack` export). Of the
  * measured bindings `tsv_ffi` links neither; `tsv_napi` links both (its `format`
- * feature, for the same export), which its own staleness rows name
- * (`scripts/test_napi_npm.ts`).
+ * feature, for the same export), which its own staleness row names
+ * (`napi_addon_check` in `scripts/check_staged_freshness.ts`).
  */
 export const WASM_CRATES = ['tsv_wasm', 'tsv_ignore', 'tsv_discover'];
 

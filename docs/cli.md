@@ -183,10 +183,12 @@ Implemented in `tsv_cli/src/cli/input.rs`
 
 ### Parse errors
 
-A source that does not parse is reported as the message, a located line, and a caret:
+A source that does not parse is reported as the message, a located line, and a caret — after
+`Parse error: ` from `parse` and from `format --content`/`--stdin`, and after `error: <path>: `
+from a path-mode `format`:
 
 ```
-Expected identifier or destructuring pattern, found '='
+Parse error: Expected identifier or destructuring pattern, found '='
 2:7 const = ;
           ^ here
 ```

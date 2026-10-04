@@ -426,9 +426,8 @@ Things the published numbers measure that aren't quite what they look like.
     JSON. A probe over fuz_util's `src/lib` `.ts` files at oxc-parser 0.150.0 measured
     it ~2.8x faster with `.program` materialized (10.8 vs 30.7 ms per sweep; 16.1 vs
     36.8 ms with a full AST walk) — enough to likely reverse the published native
-    `parse/typescript` ratio against `tsv-json-no-locations`. The fix is an
-    `oxc-parser-raw` row; until it lands, the `oxc-parser` row times oxc's default path
-    only.
+    `parse/typescript` ratio against `tsv-json-no-locations`. The `oxc-parser` row
+    times oxc's default path only; an `oxc-parser-raw` row would price the other.
 - **The `+reconstruct` rows price `{locations: true}`, and they are not opponents of
   tsv's own rows.** `tsv-json-no-locations+reconstruct` and its wasm sibling run the
   span row's exact call (`JSON.parse` included), then rebuild `loc` on every node with
