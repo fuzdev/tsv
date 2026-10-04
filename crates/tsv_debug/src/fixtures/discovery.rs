@@ -17,6 +17,7 @@ use std::path::Path;
 /// Returns an error if any directory violates the hierarchy rules:
 /// - Has both an input file AND subdirectories (must be one or the other)
 /// - Has neither an input file nor subdirectories (orphan directory)
+/// - Is a container (subdirectories, no input file) holding any file but a README.md
 pub fn walk_fixtures(fixtures_dir: &Path) -> Result<Vec<Fixture>, String> {
     let mut fixtures = Vec::new();
     walk_fixtures_recursive(fixtures_dir, fixtures_dir, "", &mut fixtures)?;
@@ -30,6 +31,20 @@ fn has_subdirectories(dir: &Path) -> bool {
         .flatten()
         .flatten()
         .any(|e| e.path().is_dir())
+}
+
+/// The files in a container directory other than its README, sorted.
+fn stray_container_files(dir: &Path) -> Vec<String> {
+    let mut stray: Vec<String> = fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|e| e.path().is_file())
+        .filter_map(|e| e.file_name().into_string().ok())
+        .filter(|name| name != "README.md")
+        .collect();
+    stray.sort();
+    stray
 }
 
 /// Get list of subdirectory names in a directory
@@ -118,7 +133,22 @@ fn walk_fixtures_recursive(
                     });
                 }
                 (None, true) => {
-                    // Valid container directory (no input file, has subdirectories) - recurse
+                    // Valid container directory (no input file, has subdirectories) - recurse.
+                    // A fixture file left beside the subdirectories (an `input_invalid_*`, say)
+                    // belongs to no fixture, so nothing grades it: refuse it. A README
+                    // documenting the container is the one file it may hold.
+                    let stray = stray_container_files(&path);
+                    if !stray.is_empty() {
+                        return Err(format!(
+                            "Container directory holds fixture files no fixture owns: {}\n\
+                            Found: {}\n\
+                            \n\
+                            A container (subdirectories, no input file) may hold only a README.md;\n\
+                            move each file into the fixture it belongs to.",
+                            path.display(),
+                            stray.join(", "),
+                        ));
+                    }
                     walk_fixtures_recursive(root, &path, &new_relative, fixtures)?;
                 }
                 (None, false) => {
