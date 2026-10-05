@@ -692,22 +692,30 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
 
             // Read BEFORE the operator is consumed and the right operand parsed: the
-            // question is whether a `<` stands AHEAD of this `>`, and a `<` inside its own
-            // right operand does not (`BinaryExpression::may_close_type_arguments`).
+            // question is whether enough `<` stand AHEAD of this token for it to close
+            // every list they open — one for a `>`, two for a `>>`, three for a `>>>` —
+            // and a `<` inside its own right operand does not
+            // (`BinaryExpression::may_close_type_arguments`).
+            let lists_closed = match operator {
+                BinaryOperator::GreaterThan => 1,
+                BinaryOperator::RightShift => 2,
+                BinaryOperator::UnsignedRightShift => 3,
+                _ => 0,
+            };
             let may_close_type_arguments =
-                operator == BinaryOperator::GreaterThan && self.lt_region_open_before(expr_start);
+                lists_closed > 0 && self.lt_regions_open_before(expr_start) >= lists_closed;
             // Span coordinates, as `expr_start` is — the two are only ever compared.
             let operator_pos = self.current_pos().0;
 
             self.advance()?; // consume operator
 
-            // A `<<` opens a region as a `<` does — tsc re-scans it to one where it looks
-            // for type arguments (`reScanLessThanToken`).
-            if matches!(
-                operator,
-                BinaryOperator::LessThan | BinaryOperator::LeftShift
-            ) {
-                self.open_lt_region(operator_pos);
+            // A `<<` opens regions as a `<` does — tsc re-scans it to one where it looks
+            // for type arguments (`reScanLessThanToken`), and the `<` left behind is the
+            // next list's.
+            match operator {
+                BinaryOperator::LessThan => self.open_lt_regions(operator_pos, 1),
+                BinaryOperator::LeftShift => self.open_lt_regions(operator_pos, 2),
+                _ => {}
             }
 
             // Parse right-hand side with right binding power

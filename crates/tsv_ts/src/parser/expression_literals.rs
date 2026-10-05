@@ -446,7 +446,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Check for return type annotation: (): type or type predicate
         let return_type = self.parse_optional_return_type()?;
 
-        let body = self.with_fn_context(is_async, is_generator, Self::parse_function_body)?;
+        // A body written inside an open `<` region is still inside it, and the region is
+        // still open past the body's `}` (`fn(a < b, { m() {} }, c > d)`): the body's
+        // statements start from the open regions and hand them back
+        // (`Parser::with_lt_region_inherited`).
+        let body = self.with_fn_context(is_async, is_generator, |p| {
+            p.with_lt_region_inherited(Self::parse_function_body)
+        })?;
         let end = body.span.end;
 
         Ok(FunctionExpression {

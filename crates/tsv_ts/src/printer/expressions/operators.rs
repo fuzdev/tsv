@@ -33,10 +33,10 @@ pub(super) type OperatorBuf = SmallVec<[ChainOperator; 8]>;
 pub(super) struct ChainOperator {
     pub(super) op: BinaryOperator,
     /// The operator LEADS its line when the chain breaks (`aaa⏎> bbb`) rather than ending
-    /// the one before — a lone `>` that may close a type-argument region an earlier `<`
-    /// opened, which a line break past it would commit
-    /// (`BinaryExpression::may_close_type_arguments`). Every chain emitter reads it, since
-    /// a `>` any one of them lets end a line is the same syntax error.
+    /// the one before — a `>` that may close a type-argument region an earlier `<`
+    /// opened (or a `>>` / `>>>` behind as many nested ones), which a line break past it
+    /// would commit (`BinaryExpression::may_close_type_arguments`). Every chain emitter
+    /// reads it, since a `>` any one of them lets end a line is the same syntax error.
     pub(super) leads_line: bool,
 }
 
@@ -1430,6 +1430,7 @@ impl<'a> Printer<'a> {
         ends_chain: bool,
     ) {
         self.mark_dividend_tail(expr);
+        self.withhold_clarity_pairs_behind_region_close(expr);
         // Recursively flatten left side if it can be chained with current operator
         match self.flattenable_left(expr) {
             Some(left_binary) => {

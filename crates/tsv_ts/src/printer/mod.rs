@@ -71,8 +71,9 @@ pub(crate) use expressions::assignment::{
 };
 pub(crate) use needs_parens::ends_with_instantiation_close;
 use needs_parens::{
-    ParenContext, SecondTypeArgs, instantiation_keeps_pair_before_type_args, is_in_binary,
-    needs_parens, prints_as_tsc_comparison,
+    ParenContext, SecondTypeArgs, clarity_pairs_behind_region_close,
+    instantiation_keeps_pair_before_type_args, is_called_function, is_in_binary, needs_parens,
+    prints_as_tsc_comparison,
 };
 use types::unwrap_parenthesized;
 
@@ -652,6 +653,18 @@ pub struct Printer<'a> {
     /// ever adds a pair, and only the node's own position asks about it — which is built
     /// inside the operand the collector records ahead of.
     pub(crate) dividend_tail_targets: SpanMarks,
+    /// Spans of the nodes whose CLARITY pair is withheld: the ones that would print a
+    /// `(` of the printer's own directly behind a `>` / `>>` / `>>>` that may close a
+    /// type-argument region, where that `(` commits the list
+    /// ([`Self::withhold_clarity_pairs_behind_region_close`]). Recorded by the binary
+    /// chain collectors ahead of the operand's build, read by [`Self::needs_parens`] at a
+    /// binary operand's position, a callee's and a tag's, and by the chain linearizer for
+    /// a callee that is a chain's base ([`Self::linearize_input`]). Keyed by span and
+    /// never consumed, like [`Self::dividend_tail_targets`]. Sound because a recorded
+    /// span only ever removes a pair the tree does not need, and only the node's own
+    /// position asks about it — one built inside the comparison the collector records
+    /// ahead of; an operand and the node it leads share a start, never a span.
+    pub(crate) withheld_clarity_pair_targets: SpanMarks,
     /// Set while the FIRST type argument list of an instantiation chain printed bare is
     /// built (`f<keyof (A)><U>(x)`): tsc reads that list as the right operand of a `<`
     /// comparison, so every authored paren the decision that the chain prints bare reads
@@ -743,6 +756,7 @@ impl<'a> Printer<'a> {
             continued_instantiation_targets: SpanMarks::default(),
             negative_literal_pair_targets: SpanMarks::default(),
             dividend_tail_targets: SpanMarks::default(),
+            withheld_clarity_pair_targets: SpanMarks::default(),
             first_list_keeps_maybe_parens: Cell::new(false),
             comment_free_gap,
         }
@@ -1002,11 +1016,77 @@ impl<'a> Printer<'a> {
     /// It also keeps a pair the author wrote around an expression tsc reads as a
     /// comparison ([`prints_as_tsc_comparison`]) wherever the position would strip it —
     /// the positions [`ParenContext::binds_tighter_than_a_comparison`] names, where a bare
-    /// comparison reaches out of its own extent.
+    /// comparison reaches out of its own extent — and withholds a clarity pair where it
+    /// would commit a type-argument list ([`Self::clarity_pair_is_withheld`]).
     #[inline]
     pub(crate) fn needs_parens(&self, expr: &internal::Expression<'_>, ctx: ParenContext) -> bool {
-        needs_parens(expr, ctx, self.in_for_init.get())
+        (needs_parens(expr, ctx, self.in_for_init.get())
+            && !self.clarity_pair_is_withheld(expr, ctx))
             || (ctx.binds_tighter_than_a_comparison() && self.authored_pair_holds_comparison(expr))
+    }
+
+    /// Whether `expr`, at the position `ctx`, is a node whose clarity pair
+    /// [`Self::withhold_clarity_pairs_behind_region_close`] recorded — a binary operand's,
+    /// or a called or tagging function expression's. Asked only once the position has
+    /// answered that it would print a pair, so every other expression pays nothing.
+    ///
+    /// The chain linearizer answers the same question for a base that is its first
+    /// call's callee, off the same marks ([`Self::linearize_input`]).
+    #[cold]
+    fn clarity_pair_is_withheld(&self, expr: &internal::Expression<'_>, ctx: ParenContext) -> bool {
+        let takes_a_clarity_pair = match ctx {
+            ParenContext::BinaryLeft { .. } | ParenContext::BinaryRight { .. } => matches!(
+                expr.kind,
+                internal::ExpressionKind::AwaitExpression(_)
+                    | internal::ExpressionKind::BinaryExpression(_)
+            ),
+            ParenContext::Callee | ParenContext::TaggedTemplateTag => is_called_function(expr),
+            _ => false,
+        };
+        takes_a_clarity_pair && self.withheld_clarity_pair_targets.is_marked(expr.span())
+    }
+
+    /// Record the nodes that print BARE behind `expr`, where it is a `>` / `>>` / `>>>`
+    /// that may close a type-argument region
+    /// (`BinaryExpression::may_close_type_arguments`): a `(` the printer invents directly
+    /// behind that token commits the list on any line, so the clarity pairs between it
+    /// and the right operand's first token are left out. The rule, what ends its walk
+    /// and what it leaves behind: `needs_parens`'s `clarity_pairs_behind_region_close`.
+    ///
+    /// Called by both chain collectors on every binary they visit, ahead of any operand's
+    /// build, beside [`Self::mark_dividend_tail`] — a flattened chain's inner comparison
+    /// is visited, never built as a node.
+    #[inline]
+    pub(in crate::printer) fn withhold_clarity_pairs_behind_region_close(
+        &self,
+        expr: &internal::BinaryExpression<'_>,
+    ) {
+        if expr.may_close_type_arguments {
+            self.record_withheld_clarity_pairs(expr);
+        }
+    }
+
+    /// [`Self::withhold_clarity_pairs_behind_region_close`]'s recording, out of line: a
+    /// comparison behind an open `<` region is the rare one.
+    #[cold]
+    fn record_withheld_clarity_pairs(&self, close: &internal::BinaryExpression<'_>) {
+        let withheld =
+            clarity_pairs_behind_region_close(close, self.in_for_init.get(), |operand| {
+                self.source_holds_pair_around(operand)
+            });
+        for span in withheld {
+            self.withheld_clarity_pair_targets.mark(span);
+        }
+    }
+
+    /// Whether the author wrote a paren pair directly around `expr`: the token before it
+    /// is a `(` and the token after it a `)`, whitespace and comments stepped over. Read
+    /// only where one side of `expr` is its parent's own token, so a `(` right before and
+    /// a `)` right after are a pair around `expr` itself or around a run of pairs that
+    /// begins and ends on it.
+    fn source_holds_pair_around(&self, expr: &internal::Expression<'_>) -> bool {
+        paren_shell_close_after(self.source, expr.span().end).is_some()
+            && self.prev_significant_byte(expr.span().start) == Some(b'(')
     }
 
     /// [`Self::needs_parens`] at a position a division's left operand can END on — a prefix
@@ -1745,12 +1825,13 @@ impl<'a> Printer<'a> {
         )
     }
 
-    /// What the chain linearizer reads off the input — the source and the comment table
-    /// as one value, so the two cannot be handed over separately at a call site.
+    /// What the chain linearizer reads — the source, the comment table and the withheld
+    /// clarity pairs as one value, so no call site can hand one over without the others.
     pub(crate) fn linearize_input(&self) -> chain::LinearizeInput<'_> {
         chain::LinearizeInput {
             source: self.source,
             comments: self.comments,
+            withheld_clarity_pairs: &self.withheld_clarity_pair_targets,
         }
     }
 

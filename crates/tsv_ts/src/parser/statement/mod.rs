@@ -72,6 +72,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         context: ModuleItemContext,
     ) -> Result<Statement<'arena>, ParseError> {
+        // A module item is a statement boundary, and `export` / `import` return below
+        // without reaching `parse_statement_at`, which is where every other statement
+        // ends the `<` regions of the one before it (`Parser::lt_regions_statement_base`).
+        self.reset_lt_region_for_statement();
+
         if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Export)) {
             return self.parse_export_declaration(context);
         }
@@ -145,7 +150,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<Statement<'arena>, ParseError> {
         // A `<` region dies at a statement boundary: what came before this statement —
         // an earlier statement, or the head this one is the body of — cannot reach a
-        // `>` in it (`Parser::lt_region_statement_base`).
+        // `>` in it (`Parser::lt_regions_statement_base`).
         self.reset_lt_region_for_statement();
 
         // A labeled statement, checked before the keyword dispatch below because a

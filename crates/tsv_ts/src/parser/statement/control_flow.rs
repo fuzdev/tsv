@@ -482,6 +482,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
         self.advance()?;
 
+        // The test stands past the body, which is a statement of its own: its `<` regions
+        // do not reach it (`Parser::lt_regions_statement_base`).
+        self.reset_lt_region_for_statement();
+
         // Parse condition: (test)
         self.expect(&TokenKind::ParenOpen)?;
         let test = self.parse_expression_ref()?;
@@ -520,6 +524,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse cases: { case ... }
         self.expect(&TokenKind::BraceOpen)?;
+        // The clauses stand past the discriminant's `) {`: its `<` regions do not reach
+        // their tests (`Parser::lt_regions_statement_base`).
+        self.reset_lt_region_for_statement();
         let mut cases = self.bvec();
 
         while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
@@ -569,6 +576,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 | TokenKind::Eof
         ) {
             consequent.push(self.parse_statement()?);
+        }
+        // The next clause's test stands past this clause's statements, whose `<` regions
+        // do not reach it. A clause with NO statement ends none: only a `:` and a keyword
+        // part its test from the next one, and tsv's own type-argument scan reads through
+        // both (`case a < b < c:⏎case d >> (e):` is a list to it), so those two tests
+        // stay one region.
+        if !consequent.is_empty() {
+            self.reset_lt_region_for_statement();
         }
 
         let end = consequent

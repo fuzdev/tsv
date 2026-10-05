@@ -28,6 +28,8 @@ use crate::printer::comments::{
     next_significant_byte, paren_shell_close_after, printed_left_spine_step,
 };
 use crate::printer::expressions::conditional::ternary_branch_needs_parens;
+use smallvec::SmallVec;
+use tsv_lang::Span;
 
 /// Context for parenthesization decisions
 ///
@@ -1710,6 +1712,26 @@ fn dividend_opens_on_its_pair(
         }
 }
 
+/// Why a binary operand prints in a paren pair ([`binary_operand_pair`]).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(in crate::printer) enum OperandPair {
+    /// It does not.
+    None,
+    /// The tree, or a join of two tokens, needs it: stripped, the operand reads as
+    /// another program or as none.
+    Owed,
+    /// For the reader alone: the bare spelling parses to the same tree, and no token
+    /// on either side of the pair is one it keeps apart. `a && (await b)`,
+    /// `(a % b) + c`, `(a * b) / c`, `(a << b) << c`, `(!a) in b`.
+    ///
+    /// The one position that withholds it is the operand behind a `>` that may close a
+    /// type-argument region, where a `(` commits the list
+    /// ([`clarity_pairs_behind_region_close`]) — which reads one pair of another
+    /// position as this kind too, a called or tagging function expression's
+    /// (`(function () {})()`).
+    Clarity,
+}
+
 /// Binary operand: `<expr> op y` or `x op <expr>`. `in_for_init` is the ambient
 /// for-init flag, read only by the instantiation-tail walk below (it asks the
 /// printed shape of the operand's own children).
@@ -1719,12 +1741,27 @@ fn needs_parens_binary_operand(
     is_right: bool,
     in_for_init: bool,
 ) -> bool {
-    // These expressions need parens when used as operands of binary expressions.
-    // Some have lower precedence, others are for clarity (await/yield).
+    binary_operand_pair(expr, parent_op, is_right, in_for_init) != OperandPair::None
+}
+
+/// [`needs_parens_binary_operand`], with the reason the pair is there.
+///
+/// Every [`OperandPair::Owed`] arm is asked ahead of every [`OperandPair::Clarity`] one,
+/// so an operand that takes a pair for two reasons answers with the one that cannot be
+/// withheld: `(await f<T>) + 1` is owed by the `>` its `await` operand ends on, though
+/// the `await` alone would take a clarity pair there.
+pub(in crate::printer) fn binary_operand_pair(
+    expr: &Expression<'_>,
+    parent_op: BinaryOperator,
+    is_right: bool,
+    in_for_init: bool,
+) -> OperandPair {
+    // These expressions need parens when used as operands of binary expressions: each
+    // binds looser than any binary operator.
     // e.g., `a && (b ? c : d)` - without parens it becomes `(a && b) ? c : d`
     // e.g., `(x as string) in obj` - without parens it becomes `x as (string in obj)`
     // e.g., `b || ((fn) => fn)` - without parens it becomes `(b || fn) => fn` (syntax error)
-    // e.g., `a && (await b)` - parens for clarity (Prettier style)
+    // (`await` binds tighter than all of them; its pair is the clarity arm further down.)
     if matches!(
         expr.kind,
         ExpressionKind::ConditionalExpression(_)
@@ -1732,14 +1769,14 @@ fn needs_parens_binary_operand(
             | ExpressionKind::TSAsExpression(_)
             | ExpressionKind::TSSatisfiesExpression(_)
             | ExpressionKind::ArrowFunctionExpression(_)
-            | ExpressionKind::AwaitExpression(_)
             | ExpressionKind::YieldExpression(_)
     ) {
-        return true;
+        return OperandPair::Owed;
     }
 
     // Unary expressions as left operand of ** require parens (ES2016+ syntax rule)
-    // `-2 ** 3` is a syntax error; must be `(-2) ** 3` or `-(2 ** 3)`. An angle-bracket
+    // `-2 ** 3` is a syntax error; must be `(-2) ** 3` or `-(2 ** 3)` — and an `await`
+    // operand is a `UnaryExpression` to that rule (`await a ** 2`). An angle-bracket
     // assertion is the TypeScript twin: tsc rejects `<T>x ** 3` with the same diagnostic
     // family, and acorn-typescript reads it as `<T>(x ** 3)` — a different tree. Prettier
     // strips this pair, a cataloged ◆prettier_bug.
@@ -1747,10 +1784,12 @@ fn needs_parens_binary_operand(
         && parent_op == BinaryOperator::StarStar
         && matches!(
             expr.kind,
-            ExpressionKind::UnaryExpression(_) | ExpressionKind::TSTypeAssertion(_)
+            ExpressionKind::UnaryExpression(_)
+                | ExpressionKind::TSTypeAssertion(_)
+                | ExpressionKind::AwaitExpression(_)
         )
     {
-        return true;
+        return OperandPair::Owed;
     }
 
     // A function or class expression as the left operand of `/` keeps its pair — `(function
@@ -1770,21 +1809,7 @@ fn needs_parens_binary_operand(
     // body's `}` prints directly before a `/` — whose indirect case, a body the left operand
     // ENDS on (`!function () {} / 2`), is `Printer::mark_dividend_tail`.
     if !is_right && is_function_dividend(expr, parent_op) {
-        return true;
-    }
-
-    // A unary left operand of `in` / `instanceof` keeps CLARITY parens (prettier's
-    // `parentheses/needs-parentheses.js`, the `UnaryExpression` → `BinaryExpression` arm).
-    // The parse is unambiguous either way — `!` binds tighter than a relational operator —
-    // but `!a in b` reads as `!(a in b)` to a human, so the parens say which one the author
-    // wrote. An UpdateExpression is deliberately NOT covered: it falls through to this same
-    // arm in prettier, which keys the rule on `node.type === "UnaryExpression"`, so
-    // `a++ in b` stays bare.
-    if !is_right
-        && matches!(parent_op, BinaryOperator::In | BinaryOperator::Instanceof)
-        && matches!(expr.kind, ExpressionKind::UnaryExpression(_))
-    {
-        return true;
+        return OperandPair::Owed;
     }
 
     // A left operand whose LAST printed token is an instantiation's closing `>` takes
@@ -1802,7 +1827,7 @@ fn needs_parens_binary_operand(
         && joins_a_trailing_angle_bracket(parent_op)
         && ends_with_instantiation_close(expr, in_for_init)
     {
-        return true;
+        return OperandPair::Owed;
     }
 
     // The DUAL of the arm above, read off the same `canFollowTypeArgumentsInExpression`
@@ -1838,17 +1863,39 @@ fn needs_parens_binary_operand(
                         || relational_region_opens_on_a_kept_shell(child.right, in_for_init))
         )
     {
-        return true;
+        return OperandPair::Owed;
+    }
+
+    // A unary left operand of `in` / `instanceof` keeps CLARITY parens (prettier's
+    // `parentheses/needs-parentheses.js`, the `UnaryExpression` → `BinaryExpression` arm).
+    // The parse is unambiguous either way — `!` binds tighter than a relational operator —
+    // but `!a in b` reads as `!(a in b)` to a human, so the parens say which one the author
+    // wrote. An UpdateExpression is deliberately NOT covered: it falls through to this same
+    // arm in prettier, which keys the rule on `node.type === "UnaryExpression"`, so
+    // `a++ in b` stays bare.
+    if !is_right
+        && matches!(parent_op, BinaryOperator::In | BinaryOperator::Instanceof)
+        && matches!(expr.kind, ExpressionKind::UnaryExpression(_))
+    {
+        return OperandPair::Clarity;
+    }
+
+    // `await` binds tighter than every binary operator, so `a && await b` is the tree
+    // `a && (await b)` is: the pair is for clarity (Prettier style). Asked BELOW the arms
+    // that owe one — the `**` rule and the instantiation join above — which an `await`
+    // operand can meet too.
+    if matches!(expr.kind, ExpressionKind::AwaitExpression(_)) {
+        return OperandPair::Clarity;
     }
 
     let ExpressionKind::BinaryExpression(child) = &expr.kind else {
-        return false;
+        return OperandPair::None;
     };
     let child_op = child.operator;
 
     // Special case: Logical operators (&&, ||, ??) mixing requires parens
     if parent_op.is_logical() && child_op.is_logical() && parent_op != child_op {
-        return true;
+        return OperandPair::Owed;
     }
 
     let parent_prec = parent_op.precedence();
@@ -1856,29 +1903,197 @@ fn needs_parens_binary_operand(
 
     // 1. Child has weaker precedence
     if child_prec < parent_prec {
-        return true;
+        return OperandPair::Owed;
     }
 
     // 2. Right operand with same precedence - preserve programmer's grouping
     if is_right && child_prec == parent_prec {
-        return true;
+        return OperandPair::Owed;
     }
 
-    // 3. Same precedence but can't flatten
+    // 3. Same precedence but can't flatten. A LEFT operand by now, so the bare spelling
+    // re-associates onto it by itself — except under `**`, the one right-associative
+    // operator, where `(a ** b) ** c` is not `a ** b ** c`.
     if child_prec == parent_prec && !parent_op.can_flatten_with(child_op) {
-        return true;
+        return if parent_op == BinaryOperator::StarStar {
+            OperandPair::Owed
+        } else {
+            OperandPair::Clarity
+        };
     }
 
-    // 4. Special handling for modulo
+    // 4. Special handling for modulo (the child binds tighter: clarity)
     if parent_prec < child_prec && child_op == BinaryOperator::Percent {
-        return matches!(parent_op, BinaryOperator::Plus | BinaryOperator::Minus)
-            || parent_op.is_bitwise();
+        return if matches!(parent_op, BinaryOperator::Plus | BinaryOperator::Minus)
+            || parent_op.is_bitwise()
+        {
+            OperandPair::Clarity
+        } else {
+            OperandPair::None
+        };
     }
 
-    // 5. Bitwise operators with different precedence
+    // 5. Bitwise operators with different precedence (the child binds tighter: clarity)
     if parent_op.is_bitwise() && child_prec != parent_prec {
-        return true;
+        return OperandPair::Clarity;
     }
 
-    false
+    OperandPair::None
+}
+
+/// The clarity pairs that would stand between `close` — a `>`, `>>` or `>>>` that may
+/// close a type-argument region (`BinaryExpression::may_close_type_arguments`) — and the
+/// first token of its right operand: the spans of the nodes that print BARE there.
+///
+/// A `(` directly behind such a token commits the list on any line, for every parser:
+/// `fn(a < b, c > (await d))` is the generic call `a<b, c>(await d)`, and
+/// `fn(a < b, c > (d % e) + f)` the call `a<b, c>(d % e)` plus `f`. Printed from
+/// `fn(a < b, c > await d)` that `(` is the printer's own invention, so two comparisons
+/// become one call's type arguments in a single pass — and nothing between the `<` and
+/// the `>` can be reworded to prevent it (the family's other half, the pair around a
+/// chain's `<` operand, ends a region of the `>`'s OWN left operand and does not reach a
+/// sibling's). What CAN be left out is the pair: a clarity pair is one the tree does not
+/// need ([`OperandPair::Clarity`]), so the operand prints as the author's bare spelling
+/// would, the same tree to every parser.
+///
+/// The walk runs from the right operand down its printed left spine, since the `(` in
+/// question is whichever one prints first: `c > ((await d) % e) + f` opens on the `%`
+/// operand's pair and then on the `await`'s, and both are withheld. One pair on that
+/// spine is no binary operand's and is a clarity pair all the same: the one around a
+/// function expression that is called or used as a tag (`(function () {})()`,
+/// `` (function () {})`t` ``), which a statement's first token needs and no other
+/// position does — behind an operator `function () {}()` is the same call to every
+/// parser. The walk ends at the first token that is no clarity pair of the printer's own:
+///
+/// - **a pair the AUTHOR wrote** (`source_holds_pair`) stays, with everything inside it.
+///   Behind a region that reads as a list that `(` is no pair at all but the generic
+///   call's argument list, so the parser never built this comparison; where one WAS
+///   built, the region reads as no list to the parser that built it (an operator or a
+///   call stands inside it, or one oracle alone reads a type there), and the author's
+///   spelling is the one each of them read. Both authorings are therefore fixed points
+///   where the pair is harmless: `a < b && c > (await d)` and `a < b && c > await d`.
+/// - **a pair the tree owes, or one whose `)` keeps two tokens apart**, ends the walk
+///   with nothing withheld at all — the operand still opens on a `(`, so leaving out the
+///   pairs above it would change the output and not what it reads as. The second kind is
+///   a clarity pair in name only: a binary operand that ends on an instantiation's `>` or
+///   on a function or class body's `}` reads differently, or not at all, once the token
+///   past the `)` stands directly behind it (`c > (await f<T>)`,
+///   `(await function () {}) / 2` — [`ends_with_instantiation_close`],
+///   `Printer::mark_dividend_tail`). A called function's pair is not asked: what follows
+///   its `)` is the call's own `(`, `?.`, `<` or template, never an operator.
+///
+/// It is LAYOUT-BLIND with the rest of the family, and keyed on the same SUPERSET: which
+/// regions are open is the parser's answer, and no model of what each parser's list
+/// grammar takes — so the pair is also withheld where it would have been harmless.
+// TODO: the pairs the PRINTER adds that this walk stops at still print behind such a
+// token and commit the list — a function or class dividend's
+// (`fn(a < b, c > function () {} / 2)` prints `c > (function () {}) / 2`), an
+// instantiation's ahead of a token that would re-lex its `>` (`c > g<T>⏎+ 1` prints
+// `c > (g<T>) + 1`), a numeric literal's as a member object (`c > 0..toString()` prints
+// `c > (0).toString()`), and the clarity pair around an operand that ends on one of the
+// first two. Each is a pair the printed tokens need as they stand (the dividend rule asks
+// no position, the instantiation's bare spelling is a line break, and the literal's is
+// one the number printer does not emit), so the answer there is a pair on the `<` side,
+// which needs the `<` node to know about a `>` in a later sibling.
+pub(in crate::printer) fn clarity_pairs_behind_region_close(
+    close: &BinaryExpression<'_>,
+    in_for_init: bool,
+    source_holds_pair: impl Fn(&Expression<'_>) -> bool,
+) -> SmallVec<[Span; 2]> {
+    let mut withheld = SmallVec::new();
+    let mut node = close.right;
+    if prints_its_own_paren_pair(node) {
+        return SmallVec::new();
+    }
+    // The pair `node` takes where it stands, and whether that position is a binary
+    // operand's — the one whose `)` an operator follows.
+    let mut pair = binary_operand_pair(node, close.operator, true, in_for_init);
+    let mut is_operand = true;
+    loop {
+        match pair {
+            OperandPair::None => {}
+            OperandPair::Owed => return SmallVec::new(),
+            OperandPair::Clarity => {
+                if source_holds_pair(node) {
+                    break;
+                }
+                if is_operand
+                    && (ends_with_instantiation_close(node, in_for_init)
+                        || ends_on_a_function_or_class_body(node, in_for_init))
+                {
+                    return SmallVec::new();
+                }
+                withheld.push(node.span());
+            }
+        }
+        let Some((child, parenthesized)) = printed_left_spine_step(node, in_for_init) else {
+            break;
+        };
+        if prints_its_own_paren_pair(child) {
+            return SmallVec::new();
+        }
+        (pair, is_operand) = match &node.kind {
+            _ if !parenthesized => (OperandPair::None, false),
+            ExpressionKind::BinaryExpression(parent) => (
+                binary_operand_pair(child, parent.operator, false, in_for_init),
+                true,
+            ),
+            ExpressionKind::CallExpression(_) | ExpressionKind::TaggedTemplateExpression(_)
+                if is_called_function(child) =>
+            {
+                (OperandPair::Clarity, false)
+            }
+            // A pair some other position asks for — a callee's, a member object's.
+            _ => (OperandPair::Owed, false),
+        };
+        node = child;
+    }
+    withheld
+}
+
+/// Whether `expr`, a call's callee or a tagged template's tag, is the one kind whose
+/// pair there is for the reader alone — a function expression. An arrow's is owed (bare,
+/// its body takes the call), and so is every other kind's the position parenthesizes.
+pub(in crate::printer) fn is_called_function(expr: &Expression<'_>) -> bool {
+    matches!(expr.kind, ExpressionKind::FunctionExpression(_))
+}
+
+/// Whether the last token `expr` prints is the `}` of a function or class expression's
+/// body — the operand [`clarity_pairs_behind_region_close`] leaves in its pair, since a
+/// `/` directly behind that `}` is a regex to acorn wherever its tokenizer took the
+/// keyword for a statement's (`Printer::mark_dividend_tail`, whose walk this mirrors
+/// through `await`, the one kind that walk never meets bare).
+fn ends_on_a_function_or_class_body(expr: &Expression<'_>, in_for_init: bool) -> bool {
+    let mut operand = expr;
+    loop {
+        let (child, ctx) = match &operand.kind {
+            ExpressionKind::FunctionExpression(_) | ExpressionKind::ClassExpression(_) => {
+                return true;
+            }
+            ExpressionKind::AwaitExpression(await_expr) => {
+                (await_expr.argument, ParenContext::AwaitArgument)
+            }
+            ExpressionKind::UnaryExpression(unary) => (
+                unary.argument,
+                ParenContext::UnaryArgument {
+                    parent_op: unary.operator,
+                },
+            ),
+            ExpressionKind::BinaryExpression(binary) => (
+                binary.rebalanced_right(),
+                ParenContext::BinaryRight {
+                    parent_op: binary.operator,
+                },
+            ),
+            ExpressionKind::TSTypeAssertion(assertion) => {
+                (assertion.expression, ParenContext::AngleBracketAssertion)
+            }
+            _ => return false,
+        };
+        // An operand inside a pair ends on its `)`.
+        if needs_parens(child, ctx, in_for_init) {
+            return false;
+        }
+        operand = child;
+    }
 }

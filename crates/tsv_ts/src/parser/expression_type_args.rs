@@ -73,8 +73,8 @@ use tsv_lang::source_scan::{
 ///   recovering list parse stops at the first token the type grammar cannot take, so the
 ///   `>` inside `x < (a > b)`, or a comma sibling's in `fn(x < q, a > b)` — is no reading's
 ///   to answer, since no pair can end a region ahead of a token inside it. It takes a
-///   LAYOUT answer instead: the printer never lets it end a line
-///   (`BinaryExpression::may_close_type_arguments`).
+///   LAYOUT answer instead: the printer never lets it end a line, nor prints a pair of
+///   its own directly behind it (`BinaryExpression::may_close_type_arguments`).
 ///
 /// WHITESPACE between a numeric type's SIGN and its digits is not one of them, though the
 /// printer folds a line break there too: a literal type's `-` is a token of its own to tsc

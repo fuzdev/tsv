@@ -244,6 +244,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let expr = self.parse_expression_ref()?;
                     expressions.push(expr);
 
+                    // Each `${…}` is a delimiter of its own: its `}` ends the `<` regions
+                    // opened inside it, as the template's end does for the last one
+                    // (`LtRegion`).
+                    self.exit_grouping();
+                    self.enter_grouping();
+
                     // Expect closing } of the interpolation
                     let (brace_start, _) = self.current_pos();
                     if !self.check(&TokenKind::BraceClose) {

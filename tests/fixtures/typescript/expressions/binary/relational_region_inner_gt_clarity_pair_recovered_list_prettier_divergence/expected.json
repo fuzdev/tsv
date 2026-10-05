@@ -1,0 +1,811 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 939,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " tsc's type-argument parse is error-recovering: a `)` or `]` it is missing is reported and",
+			"start": 20,
+			"end": 112
+		},
+		{
+			"type": "Line",
+			"value": " stepped over, so a `>` INSIDE a pair or a bracket the region holds is still the first",
+			"start": 114,
+			"end": 202
+		},
+		{
+			"type": "Line",
+			"value": " token its list cannot take, and a `(` past it commits the list — errors and all. The",
+			"start": 204,
+			"end": 291
+		},
+		{
+			"type": "Line",
+			"value": " clarity pair behind that `>` is what the compiler would reject, so the operand prints bare.",
+			"start": 293,
+			"end": 387
+		},
+		{
+			"type": "Line",
+			"value": " The pair an assertion puts around its comparison.",
+			"start": 390,
+			"end": 442
+		},
+		{
+			"type": "Line",
+			"value": " A union's operand pair, a prefix operator's, and an array.",
+			"start": 550,
+			"end": 611
+		},
+		{
+			"type": "Line",
+			"value": " A `<<` is two `<` to that parse, and a `>>` closes both. Behind a `<` of its own the two",
+			"start": 700,
+			"end": 791
+		},
+		{
+			"type": "Line",
+			"value": " nest under it, and a `>>>` closes all three.",
+			"start": 793,
+			"end": 840
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 938,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 929,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 444,
+					"end": 474,
+					"expression": {
+						"type": "CallExpression",
+						"start": 444,
+						"end": 473,
+						"callee": {
+							"type": "Identifier",
+							"start": 444,
+							"end": 446,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 447,
+								"end": 452,
+								"left": {
+									"type": "Identifier",
+									"start": 447,
+									"end": 448,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 451,
+									"end": 452,
+									"name": "b"
+								}
+							},
+							{
+								"type": "TSAsExpression",
+								"start": 454,
+								"end": 472,
+								"expression": {
+									"type": "BinaryExpression",
+									"start": 455,
+									"end": 466,
+									"left": {
+										"type": "Identifier",
+										"start": 455,
+										"end": 456,
+										"name": "c"
+									},
+									"operator": ">",
+									"right": {
+										"type": "AwaitExpression",
+										"start": 459,
+										"end": 466,
+										"argument": {
+											"type": "Identifier",
+											"start": 465,
+											"end": 466,
+											"name": "d"
+										}
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 471,
+									"end": 472,
+									"typeName": {
+										"type": "Identifier",
+										"start": 471,
+										"end": 472,
+										"name": "T"
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " tsc's type-argument parse is error-recovering: a `)` or `]` it is missing is reported and",
+							"start": 20,
+							"end": 112
+						},
+						{
+							"type": "Line",
+							"value": " stepped over, so a `>` INSIDE a pair or a bracket the region holds is still the first",
+							"start": 114,
+							"end": 202
+						},
+						{
+							"type": "Line",
+							"value": " token its list cannot take, and a `(` past it commits the list — errors and all. The",
+							"start": 204,
+							"end": 291
+						},
+						{
+							"type": "Line",
+							"value": " clarity pair behind that `>` is what the compiler would reject, so the operand prints bare.",
+							"start": 293,
+							"end": 387
+						},
+						{
+							"type": "Line",
+							"value": " The pair an assertion puts around its comparison.",
+							"start": 390,
+							"end": 442
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 476,
+					"end": 513,
+					"expression": {
+						"type": "CallExpression",
+						"start": 476,
+						"end": 512,
+						"callee": {
+							"type": "Identifier",
+							"start": 476,
+							"end": 478,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 479,
+								"end": 484,
+								"left": {
+									"type": "Identifier",
+									"start": 479,
+									"end": 480,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 483,
+									"end": 484,
+									"name": "b"
+								}
+							},
+							{
+								"type": "TSSatisfiesExpression",
+								"start": 486,
+								"end": 511,
+								"expression": {
+									"type": "BinaryExpression",
+									"start": 487,
+									"end": 498,
+									"left": {
+										"type": "Identifier",
+										"start": 487,
+										"end": 488,
+										"name": "c"
+									},
+									"operator": ">",
+									"right": {
+										"type": "AwaitExpression",
+										"start": 491,
+										"end": 498,
+										"argument": {
+											"type": "Identifier",
+											"start": 497,
+											"end": 498,
+											"name": "d"
+										}
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 510,
+									"end": 511,
+									"typeName": {
+										"type": "Identifier",
+										"start": 510,
+										"end": 511,
+										"name": "T"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 515,
+					"end": 547,
+					"expression": {
+						"type": "CallExpression",
+						"start": 515,
+						"end": 546,
+						"callee": {
+							"type": "Identifier",
+							"start": 515,
+							"end": 517,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 518,
+								"end": 523,
+								"left": {
+									"type": "Identifier",
+									"start": 518,
+									"end": 519,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 522,
+									"end": 523,
+									"name": "b"
+								}
+							},
+							{
+								"type": "TSAsExpression",
+								"start": 525,
+								"end": 545,
+								"expression": {
+									"type": "BinaryExpression",
+									"start": 526,
+									"end": 539,
+									"left": {
+										"type": "Identifier",
+										"start": 526,
+										"end": 527,
+										"name": "c"
+									},
+									"operator": ">",
+									"right": {
+										"type": "BinaryExpression",
+										"start": 530,
+										"end": 539,
+										"left": {
+											"type": "BinaryExpression",
+											"start": 530,
+											"end": 535,
+											"left": {
+												"type": "Identifier",
+												"start": 530,
+												"end": 531,
+												"name": "d"
+											},
+											"operator": "%",
+											"right": {
+												"type": "Identifier",
+												"start": 534,
+												"end": 535,
+												"name": "e"
+											}
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 538,
+											"end": 539,
+											"name": "f"
+										}
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 544,
+									"end": 545,
+									"typeName": {
+										"type": "Identifier",
+										"start": 544,
+										"end": 545,
+										"name": "T"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 613,
+					"end": 642,
+					"expression": {
+						"type": "CallExpression",
+						"start": 613,
+						"end": 641,
+						"callee": {
+							"type": "Identifier",
+							"start": 613,
+							"end": 615,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 616,
+								"end": 621,
+								"left": {
+									"type": "Identifier",
+									"start": 616,
+									"end": 617,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 620,
+									"end": 621,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 623,
+								"end": 640,
+								"left": {
+									"type": "Identifier",
+									"start": 623,
+									"end": 624,
+									"name": "c"
+								},
+								"operator": "|",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 628,
+									"end": 639,
+									"left": {
+										"type": "Identifier",
+										"start": 628,
+										"end": 629,
+										"name": "d"
+									},
+									"operator": ">",
+									"right": {
+										"type": "AwaitExpression",
+										"start": 632,
+										"end": 639,
+										"argument": {
+											"type": "Identifier",
+											"start": 638,
+											"end": 639,
+											"name": "e"
+										}
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A union's operand pair, a prefix operator's, and an array.",
+							"start": 550,
+							"end": 611
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 644,
+					"end": 670,
+					"expression": {
+						"type": "CallExpression",
+						"start": 644,
+						"end": 669,
+						"callee": {
+							"type": "Identifier",
+							"start": 644,
+							"end": 646,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 647,
+								"end": 652,
+								"left": {
+									"type": "Identifier",
+									"start": 647,
+									"end": 648,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 651,
+									"end": 652,
+									"name": "b"
+								}
+							},
+							{
+								"type": "UnaryExpression",
+								"start": 654,
+								"end": 668,
+								"operator": "!",
+								"prefix": true,
+								"argument": {
+									"type": "BinaryExpression",
+									"start": 656,
+									"end": 667,
+									"left": {
+										"type": "Identifier",
+										"start": 656,
+										"end": 657,
+										"name": "c"
+									},
+									"operator": ">",
+									"right": {
+										"type": "AwaitExpression",
+										"start": 660,
+										"end": 667,
+										"argument": {
+											"type": "Identifier",
+											"start": 666,
+											"end": 667,
+											"name": "d"
+										}
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 672,
+					"end": 697,
+					"expression": {
+						"type": "CallExpression",
+						"start": 672,
+						"end": 696,
+						"callee": {
+							"type": "Identifier",
+							"start": 672,
+							"end": 674,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 675,
+								"end": 680,
+								"left": {
+									"type": "Identifier",
+									"start": 675,
+									"end": 676,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 679,
+									"end": 680,
+									"name": "b"
+								}
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 682,
+								"end": 695,
+								"elements": [
+									{
+										"type": "BinaryExpression",
+										"start": 683,
+										"end": 694,
+										"left": {
+											"type": "Identifier",
+											"start": 683,
+											"end": 684,
+											"name": "c"
+										},
+										"operator": ">",
+										"right": {
+											"type": "AwaitExpression",
+											"start": 687,
+											"end": 694,
+											"argument": {
+												"type": "Identifier",
+												"start": 693,
+												"end": 694,
+												"name": "d"
+											}
+										}
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 842,
+					"end": 867,
+					"expression": {
+						"type": "CallExpression",
+						"start": 842,
+						"end": 866,
+						"callee": {
+							"type": "Identifier",
+							"start": 842,
+							"end": 844,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 845,
+								"end": 851,
+								"left": {
+									"type": "Identifier",
+									"start": 845,
+									"end": 846,
+									"name": "a"
+								},
+								"operator": "<<",
+								"right": {
+									"type": "Identifier",
+									"start": 850,
+									"end": 851,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 853,
+								"end": 865,
+								"left": {
+									"type": "Identifier",
+									"start": 853,
+									"end": 854,
+									"name": "c"
+								},
+								"operator": ">>",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 858,
+									"end": 865,
+									"argument": {
+										"type": "Identifier",
+										"start": 864,
+										"end": 865,
+										"name": "d"
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `<<` is two `<` to that parse, and a `>>` closes both. Behind a `<` of its own the two",
+							"start": 700,
+							"end": 791
+						},
+						{
+							"type": "Line",
+							"value": " nest under it, and a `>>>` closes all three.",
+							"start": 793,
+							"end": 840
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 869,
+					"end": 896,
+					"expression": {
+						"type": "CallExpression",
+						"start": 869,
+						"end": 895,
+						"callee": {
+							"type": "Identifier",
+							"start": 869,
+							"end": 871,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 872,
+								"end": 878,
+								"left": {
+									"type": "Identifier",
+									"start": 872,
+									"end": 873,
+									"name": "a"
+								},
+								"operator": "<<",
+								"right": {
+									"type": "Identifier",
+									"start": 877,
+									"end": 878,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 880,
+								"end": 894,
+								"left": {
+									"type": "Identifier",
+									"start": 880,
+									"end": 881,
+									"name": "c"
+								},
+								"operator": ">>",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 885,
+									"end": 894,
+									"left": {
+										"type": "BinaryExpression",
+										"start": 885,
+										"end": 890,
+										"left": {
+											"type": "Identifier",
+											"start": 885,
+											"end": 886,
+											"name": "d"
+										},
+										"operator": "%",
+										"right": {
+											"type": "Identifier",
+											"start": 889,
+											"end": 890,
+											"name": "e"
+										}
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 893,
+										"end": 894,
+										"name": "f"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 898,
+					"end": 928,
+					"expression": {
+						"type": "CallExpression",
+						"start": 898,
+						"end": 927,
+						"callee": {
+							"type": "Identifier",
+							"start": 898,
+							"end": 900,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 901,
+								"end": 911,
+								"left": {
+									"type": "Identifier",
+									"start": 901,
+									"end": 902,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 905,
+									"end": 911,
+									"left": {
+										"type": "Identifier",
+										"start": 905,
+										"end": 906,
+										"name": "b"
+									},
+									"operator": "<<",
+									"right": {
+										"type": "Identifier",
+										"start": 910,
+										"end": 911,
+										"name": "c"
+									}
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 913,
+								"end": 926,
+								"left": {
+									"type": "Identifier",
+									"start": 913,
+									"end": 914,
+									"name": "d"
+								},
+								"operator": ">>>",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 919,
+									"end": 926,
+									"argument": {
+										"type": "Identifier",
+										"start": 925,
+										"end": 926,
+										"name": "e"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

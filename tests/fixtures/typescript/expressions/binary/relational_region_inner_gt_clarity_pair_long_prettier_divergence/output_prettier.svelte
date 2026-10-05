@@ -1,0 +1,64 @@
+<script lang="ts">
+	// The operand behind a `>` that may close a type-argument region prints bare, and that `>`
+	// never ends a line: where its comparison breaks, the `>` leads the next line and the bare
+	// operand shares it.
+
+	// The whole call is exactly 100, and stays flat.
+	fn(
+		aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa < bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+		cccccccccc > (await ddd)
+	);
+
+	// One character longer: 101, so the arguments take a line each.
+	fn(
+		aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa < bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+		cccccccccc > (await dddd)
+	);
+
+	// The comparison's own line is exactly 100, and stays flat.
+	fn(
+		a < b,
+		cccccccccccccccccccccccccccccccccccccccccccc >
+			(await ddddddddddddddddddddddddddddddddddddddddddd)
+	);
+
+	// 101 breaks ahead of the `>`, the `await` bare behind it.
+	fn(
+		a < b,
+		cccccccccccccccccccccccccccccccccccccccccccc >
+			(await dddddddddddddddddddddddddddddddddddddddddddd)
+	);
+
+	// A mixed-arithmetic operand at the same two widths: 100 flat, 101 broken ahead of the `>`.
+	fn(
+		a < b,
+		cccccccccccccccccccccccccccccccccccccccccccc >
+			(dddddddddddddddddddd % eeeeeeeeeeeeeeeeee) + fffff
+	);
+	fn(
+		a < b,
+		cccccccccccccccccccccccccccccccccccccccccccc >
+			(dddddddddddddddddddd % eeeeeeeeeeeeeeeeee) + ffffff
+	);
+
+	// A `>>` behind two nested `<` closes both lists, so it takes the same two answers: 100
+	// flat, 101 broken ahead of the `>>`.
+	fn(
+		a < b < c,
+		dddddddddddddddddddddddddddddddddddddddddddd >>
+			(await eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee)
+	);
+	fn(
+		a < b < c,
+		dddddddddddddddddddddddddddddddddddddddddddd >>
+			(await eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee)
+	);
+
+	// Behind a single `<` a `>>` closes nothing: at 101 it ends its line as any operator
+	// does, and its operand keeps the clarity pair.
+	fn(
+		a < b,
+		cccccccccccccccccccccccccccccccccccccccccccc >>
+			(await ddddddddddddddddddddddddddddddddddddddddd)
+	);
+</script>

@@ -1395,7 +1395,10 @@ structurally — its parse postprocess (`../prettier/src/language-js/parse/postp
 same tree. The doctrine is [§Authoring Convergence
 Philosophy](./conformance_prettier.md#authoring-convergence-philosophy); this is its one
 non-whitespace instance, and unlike the whitespace one it has **no dual-stable remainder** — a
-redundant paren carries no authoring signal either formatter honors.
+redundant paren carries no authoring signal either formatter honors. (One paren pair IS held
+per authoring, for soundness rather than as a signal, and neither site class below splices
+it: the clarity pair behind a `>` that may close a type-argument region, item 8 of the
+doctrine's enumerated remainder.)
 
 **Why it exists.** tsv cannot rebalance: acorn keeps the right-nested shape and tsv's wire must
 match it (the drop-in AST contract, priority #1). So every rule prettier asks of the rebalanced

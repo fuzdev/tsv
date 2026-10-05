@@ -1,8 +1,9 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
 #![expect(clippy::expect_used)]
 
-//! Where an open `<` region BEGINS and ENDS — the lifetime half of the rule that a lone `>`
-//! which may close a type-argument region never ends a line
+//! Where an open `<` region BEGINS and ENDS — the lifetime half of the rule that a `>`
+//! (or a `>>` / `>>>` behind as many nested `<`) which may close a type-argument region
+//! never ends a line
 //! (`BinaryExpression::may_close_type_arguments`, `docs/conformance_prettier_ts.md`
 //! §Relational chain type-argument parens).
 //!
@@ -70,6 +71,11 @@ fn a_region_is_open_behind_a_less_than() {
         "fn((x < q), A > B);",
         // The earliest region outlives a later, deeper one.
         "fn(x < q, g(y < r), A > B);",
+        // Two `case` tests with no statement between them are one region.
+        "switch (k) { case x < q: case A > B: y; }",
+        // A method's body between the two ends none: it is one more sibling.
+        "fn(x < q, { m() { y; } }, A > B);",
+        "fn(x < q, { set m(v) { y; } }, A > B);",
     ] {
         assert_eq!(break_side(template), Break::Ahead, "{template}");
     }
@@ -82,6 +88,8 @@ fn a_body_inherits_the_region_it_was_written_in() {
         "x < (() => { q; return A > B; });",
         "x < function () { return A > B; };",
         "x < class { p = A > B; };",
+        "x < { m() { return A > B; } };",
+        "x < { get m() { return A > B; } };",
     ] {
         assert_eq!(break_side(template), Break::Ahead, "{template}");
     }
@@ -96,6 +104,8 @@ fn a_region_ends_at_the_closer_of_the_delimiter_it_opened_in() {
         "fn(`${x < q}`, A > B);",
         // A body's own regions die with it.
         "fn(function () { return x < q; }, A > B);",
+        "fn({ m() { return x < q; } }, A > B);",
+        "fn({ async *m() { return x < q; } }, A > B);",
     ] {
         assert_eq!(break_side(template), Break::After, "{template}");
     }
@@ -109,9 +119,30 @@ fn a_region_ends_at_a_statement_or_member_boundary() {
         "if (x < q) { fn(A > B); }",
         "for (let i = 0; i < n; i++) fn(A > B);",
         "while (x < q) fn(A > B);",
+        // A do-while's test is past its body, and a `case` test past the discriminant
+        // and past the statements of the clause ahead of it.
+        "do { p = x < q; } while (A > B);",
+        "switch (x < q) { case A > B: y; }",
+        "switch (k) { case 1: p = x < q; case A > B: y; }",
         "class C { p = x < q; r = A > B; }",
+        // A module item is a statement boundary too.
+        "export const p = x < q; export const r = A > B;",
+        "export const p = x < q; export default A > B;",
+        "namespace N { export const p = x < q; export const r = A > B; }",
         // … including inside a body that inherited none.
         "fn(() => { if (x < q) { y; } return A > B; });",
+    ] {
+        assert_eq!(break_side(template), Break::After, "{template}");
+    }
+}
+
+#[test]
+fn only_a_less_than_or_a_left_shift_opens_a_region() {
+    for template in [
+        "fn(x <= q, A > B);",
+        "fn(x > q, A > B);",
+        "fn(x >> q, A > B);",
+        "fn(x == q, A > B);",
     ] {
         assert_eq!(break_side(template), Break::After, "{template}");
     }
@@ -128,9 +159,46 @@ fn a_less_than_in_the_greater_thans_own_left_operand_is_the_pair_rules() {
 }
 
 #[test]
-fn only_a_lone_greater_than_closes_a_region() {
-    for operator in [">=", ">>", ">>>"] {
-        let output = tsv_ts::format_str(&format!("x < ({A} {operator} {B});")).expect("parses");
+fn a_shift_closes_no_region_with_fewer_open_than_it_has_angle_brackets() {
+    for (template, operator) in [
+        ("x < ({A} >= {B});", ">="),
+        ("x < ({A} >> {B});", ">>"),
+        ("x < ({A} >>> {B});", ">>>"),
+        ("fn(x < q < r, {A} >>> {B});", ">>>"),
+        // A `<<` opens two regions, not three.
+        ("fn(x << q, {A} >>> {B});", ">>>"),
+    ] {
+        let source = template.replace("{A}", A).replace("{B}", B);
+        let output = tsv_ts::format_str(&source).expect("parses");
         assert!(output.contains(&format!(" {operator}\n")), "{output}");
+    }
+}
+
+#[test]
+fn a_shift_closes_as_many_regions_as_it_has_angle_brackets() {
+    // The type grammar scans a `>` at a time: a `>>` behind two open regions closes both
+    // lists, a `>>>` behind three all of them. Behind `<` alone (the rows with no `<<`),
+    // a line break past the token is one tsc, acorn-typescript and tsv's own parse all
+    // commit the list on. A `<<` opens two regions by tsc's re-scan, and the count is the
+    // superset's from there: `fn(x << q, A >>⏎B)` is tsc's reject and no other parser's,
+    // and `fn(x << q < r, A >>>⏎B)` is one every parser reads as the shift.
+    for (template, operator) in [
+        ("fn(x < q < r, {A} >> {B});", ">>"),
+        ("fn(x < q, y < r, {A} >> {B});", ">>"),
+        ("fn(x << q, {A} >> {B});", ">>"),
+        ("fn(x < q < r < s, {A} >>> {B});", ">>>"),
+        ("fn(x << q < r, {A} >>> {B});", ">>>"),
+    ] {
+        let source = template.replace("{A}", A).replace("{B}", B);
+        let output = tsv_ts::format_str(&source).expect("parses");
+        assert_eq!(
+            tsv_ts::format_str(&output).expect("the output reparses"),
+            output,
+            "not a fixed point: {template}"
+        );
+        assert!(
+            output.contains(&format!("\n\t\t{operator} ")),
+            "{template} printed {output}"
+        );
     }
 }

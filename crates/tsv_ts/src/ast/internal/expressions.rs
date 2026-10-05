@@ -677,9 +677,11 @@ pub struct BinaryExpression<'arena> {
     ///
     /// `false` on every other operator, and free in the struct's existing padding.
     pub relexes_as_type_arguments: bool,
-    /// For a lone `>` only: whether a binary `<` stands AHEAD of it with its region still
-    /// open — so this `>` may be the token tsc's type-argument parse stops at, and must
-    /// never END A LINE.
+    /// For a `>`, `>>` or `>>>` only: whether enough binary `<` stand AHEAD of it with
+    /// their regions still open for it to close every list they opened — one for a `>`,
+    /// two for a `>>`, three for a `>>>` (a `<<` opens two) — so this token may be where
+    /// tsc's type-argument parse stops. It must then never END A LINE, and never stand
+    /// directly ahead of a paren pair the printer invents.
     ///
     /// tsc does not guess at a `<`: `parseTypeArgumentsInExpression` parses a list for
     /// real, with error recovery, and keeps a truthy result errors and all. The list runs
@@ -694,9 +696,22 @@ pub struct BinaryExpression<'arena> {
     /// it: that pair ends the OUTER `>`'s region on a `)`, and this `>` is met first.
     ///
     /// Nothing between the two tokens can be reworded, and a `(` or template follower
-    /// commits on any line, so the one free choice is where the line breaks: the printer
-    /// breaks AHEAD of such a `>` (`aaa⏎> bbb`), its follower sharing its line — the
-    /// binary-chain emitters' `ChainOperator::leads_line`.
+    /// commits on any line, so the printer's free choices are two, and it makes both:
+    ///
+    /// - where the line breaks: it breaks AHEAD of such a `>` (`aaa⏎> bbb`), its follower
+    ///   sharing its line — the binary-chain emitters' `ChainOperator::leads_line`;
+    /// - whether a `(` of its own follows: a CLARITY pair around the right operand's
+    ///   first token (`c > (await d)`, `c > (d % e) + f`, `c > (function () {})()`) is
+    ///   one the tree does not need, and printed behind this `>` it is the `(` that
+    ///   commits the list — `fn(a < b, c > (await d))` is the generic call
+    ///   `a<b, c>(await d)` to every parser. So the operand prints bare there
+    ///   (`Printer::withhold_clarity_pairs_behind_region_close`); a pair the author wrote
+    ///   stays, since behind a region that reads as a list it is no pair but that call's
+    ///   own argument list.
+    ///
+    /// A `>>` behind two open regions and a `>>>` behind three are the same token in the
+    /// type grammar, which scans a `>` at a time: `fn(a < b < c, d >> (e))` is the call
+    /// `a<b<c, d>>(e)`, and `fn(a < b < c, d >>⏎e)` a list with a statement after it.
     ///
     /// A deliberate SUPERSET, decided by the parser because only it sees the tokens in
     /// order: which `<` regions are still open is the parser's `LtRegion`, which states

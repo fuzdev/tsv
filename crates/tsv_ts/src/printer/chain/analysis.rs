@@ -12,8 +12,8 @@ use crate::ast::internal::{self, Expression, ExpressionKind, IdentName};
 use crate::printer::calls::is_memberish;
 use crate::printer::comments::{paren_pair_keeps_leading_run, paren_shell_close_after};
 use crate::printer::{
-    ParenContext, Printer, SecondTypeArgs, instantiation_keeps_pair_before_type_args,
-    is_multiline_template_expression, needs_parens, prints_as_tsc_comparison,
+    ParenContext, Printer, SecondTypeArgs, SpanMarks, instantiation_keeps_pair_before_type_args,
+    is_called_function, is_multiline_template_expression, needs_parens, prints_as_tsc_comparison,
 };
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::has_newline_before_position;
@@ -23,16 +23,18 @@ use tsv_lang::{Comment, Span, TAB_WIDTH, has_line_spanning_comments_to_emit_in_r
 // Linearization
 //
 
-/// What the linearizer reads off the INPUT, beyond the AST it walks: the source (to
-/// locate the `)` of a pair a base owns) and the comment table (for the gates asking
-/// whether a gap holds a `//`).
+/// What the linearizer reads beyond the AST it walks: the source (to locate the `)` of a
+/// pair a base owns), the comment table (for the gates asking whether a gap holds a
+/// `//`), and the printer's withheld clarity pairs (for a base that is a called function
+/// expression, whose pair is one — `Printer::withheld_clarity_pair_targets`).
 ///
-/// A struct rather than two parameters because every recursive step needs both and
-/// neither is ever passed alone — the same reason `ParenLeadingValue` travels as one.
+/// A struct rather than separate parameters because every recursive step needs the first
+/// two and none is ever passed alone — the same reason `ParenLeadingValue` travels as one.
 #[derive(Clone, Copy)]
 pub struct LinearizeInput<'i> {
     pub source: &'i str,
     pub comments: &'i [Comment],
+    pub(crate) withheld_clarity_pairs: &'i SpanMarks,
 }
 
 /// Linearize a chain expression into a flat list of nodes
@@ -53,7 +55,7 @@ fn linearize_chain<'a>(expr: &'a Expression<'_>, input: LinearizeInput<'_>) -> C
     let mut nodes = ChainNodeVec::new();
     let mut paren_gaps = Vec::new();
     linearize_recursive(expr, input, &mut nodes, &mut paren_gaps);
-    finalize_chain_nodes(&mut nodes, &paren_gaps, input.source);
+    finalize_chain_nodes(&mut nodes, &paren_gaps, input);
     nodes
 }
 
@@ -105,7 +107,7 @@ pub fn linearize_chain_from_call_into<'a>(
     let mut paren_gaps = Vec::new();
     linearize_call_callee(call, span, input, nodes, &mut paren_gaps);
     nodes.push(ChainNode::call(call, span));
-    finalize_chain_nodes(nodes, &paren_gaps, input.source);
+    finalize_chain_nodes(nodes, &paren_gaps, input);
 }
 
 /// Linearize starting from a MemberExpression (avoids cloning to wrap in Expression)
@@ -122,7 +124,7 @@ pub fn linearize_chain_from_member_into<'a>(
     let mut paren_gaps = Vec::new();
     linearize_member_object(member, span, input, nodes, &mut paren_gaps);
     linearize_member_node(member, span, input.source, nodes, &mut paren_gaps);
-    finalize_chain_nodes(nodes, &paren_gaps, input.source);
+    finalize_chain_nodes(nodes, &paren_gaps, input);
 }
 
 /// Linearize starting from a TSNonNullExpression (avoids cloning to wrap in Expression)
@@ -145,7 +147,7 @@ pub fn linearize_chain_from_non_null_into<'a>(
     let mut paren_gaps = Vec::new();
     linearize_recursive(non_null.expression, input, nodes, &mut paren_gaps);
     nodes.push(ChainNode::non_null(non_null, span));
-    finalize_chain_nodes(nodes, &paren_gaps, input.source);
+    finalize_chain_nodes(nodes, &paren_gaps, input);
 }
 
 /// Apply deferred paren gap extensions to member nodes.
@@ -195,10 +197,14 @@ type ParenGap = (usize, u32, u32);
 /// extensions, then re-evaluate the base node's parens for the callee case.
 /// Shared by every linearization entry point so the two post-passes never
 /// drift apart.
-fn finalize_chain_nodes(nodes: &mut [ChainNode<'_>], paren_gaps: &[ParenGap], source: &str) {
+fn finalize_chain_nodes(
+    nodes: &mut [ChainNode<'_>],
+    paren_gaps: &[ParenGap],
+    input: LinearizeInput<'_>,
+) {
     apply_paren_gaps(nodes, paren_gaps);
-    fix_callee_base_parens(nodes, source);
-    mark_own_call_layout(nodes, source);
+    fix_callee_base_parens(nodes, input);
+    mark_own_call_layout(nodes, input.source);
     #[cfg(feature = "buffer_stats")]
     crate::printer::buffer_stats::record_chain_nodes(nodes.len());
 }
@@ -274,7 +280,13 @@ fn template_preempts_chain_redirect(call: &internal::CallExpression<'_>, source:
 /// `comparison_pair`, `(f<T><U>(x))()`) is not a kind rule and is left as it is:
 /// recomputed from the callee's kind it would strip, and the call after it would join
 /// the comparison's right side in tsc's reading (`f<T><U>(x)()`).
-fn fix_callee_base_parens(nodes: &mut [ChainNode<'_>], source: &str) {
+///
+/// The one `Callee` pair that is not owed is a function expression's, and the printer
+/// withholds it behind a `>` that may close a type-argument region
+/// (`Printer::withhold_clarity_pairs_behind_region_close`) — read here off the same
+/// marks the bare-callee path reads, so the two paths print one callee one way.
+fn fix_callee_base_parens(nodes: &mut [ChainNode<'_>], input: LinearizeInput<'_>) {
+    let source = input.source;
     if let [
         ChainNode::Base {
             expr,
@@ -311,7 +323,9 @@ fn fix_callee_base_parens(nodes: &mut [ChainNode<'_>], source: &str) {
                 SecondTypeArgs::Arguments(list, call.arguments),
             )
         });
-        *np = needs_parens(expr, ParenContext::Callee, false) || second_list == Some(true);
+        let callee_pair = needs_parens(expr, ParenContext::Callee, false)
+            && !(is_called_function(expr) && input.withheld_clarity_pairs.is_marked(expr.span()));
+        *np = callee_pair || second_list == Some(true);
         *continues_instantiation = !*np && second_list == Some(false);
     }
 }
@@ -1216,6 +1230,7 @@ mod tests {
             LinearizeInput {
                 source: "",
                 comments: &[],
+                withheld_clarity_pairs: &SpanMarks::default(),
             },
         );
 
@@ -1242,6 +1257,7 @@ mod tests {
             LinearizeInput {
                 source: "",
                 comments: &[],
+                withheld_clarity_pairs: &SpanMarks::default(),
             },
         );
 
@@ -1266,6 +1282,7 @@ mod tests {
             LinearizeInput {
                 source: "",
                 comments: &[],
+                withheld_clarity_pairs: &SpanMarks::default(),
             },
         );
 
@@ -1291,6 +1308,7 @@ mod tests {
             LinearizeInput {
                 source: "",
                 comments: &[],
+                withheld_clarity_pairs: &SpanMarks::default(),
             },
         );
         let arena_docs = DocArena::new();
@@ -1326,6 +1344,7 @@ mod tests {
             LinearizeInput {
                 source: "",
                 comments: &[],
+                withheld_clarity_pairs: &SpanMarks::default(),
             },
         );
         let arena_docs = DocArena::new();

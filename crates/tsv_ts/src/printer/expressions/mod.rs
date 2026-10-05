@@ -1939,6 +1939,7 @@ impl<'a> Printer<'a> {
         operators: &mut OperatorBuf,
     ) {
         self.mark_dividend_tail(expr);
+        self.withhold_clarity_pairs_behind_region_close(expr);
         // Recursively flatten left side if it can be chained with current operator
         // (`flattenable_left`, shared with `collect_binary_chain_with_spans`); otherwise
         // build the operand with parens if needed.

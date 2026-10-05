@@ -12,7 +12,7 @@ governs every entry here live in [conformance_prettier.md](./conformance_prettie
 - Return type generic union — ◆print_width — [return_type_generic_union_long](../tests/fixtures/typescript/declarations/function/return_type_generic_union_long_prettier_divergence/)
 - Module path calls — ◆print_width — [path_calls_long](../tests/fixtures/typescript/modules/imports/path_calls_long_prettier_divergence/)
 - Instantiation expression parens — ◆prettier_bug — [instantiation_parens](../tests/fixtures/typescript/typescript_specific/assertions/instantiation_parens_prettier_divergence/), [export_default_instantiation](../tests/fixtures/typescript/modules/exports/default_wrappable_leftmost_operators/instantiation_prettier_divergence/), [instantiation_paren_follow](../tests/fixtures/typescript/typescript_specific/generics/instantiation_paren_follow_prettier_divergence/), [instantiation_paren_type_args_follow](../tests/fixtures/typescript/typescript_specific/generics/instantiation_paren_type_args_follow_prettier_divergence/), [callee_type_args_second_list](../tests/fixtures/typescript/expressions/new/callee_type_args_second_list_prettier_divergence/), [less_than_index_second_list](../tests/fixtures/typescript/syntax/disambiguation/less_than_index_second_list_prettier_divergence/), [instantiation_target_paren](../tests/fixtures/typescript/expressions/assignment/instantiation_target_paren_svelte_prettier_divergence/), [call_callee_instantiation_parens](../tests/fixtures/typescript/expressions/new/call_callee_instantiation_parens_prettier_divergence/), [instantiation_sealed_chain](../tests/fixtures/typescript/typescript_specific/generics/instantiation_sealed_chain_prettier_divergence/), [instantiation_paren_assertion_follow](../tests/fixtures/typescript/typescript_specific/generics/instantiation_paren_assertion_follow_prettier_divergence/)
-- Relational chain type-argument parens — ◆prettier_bug — [relational_chain_type_arg_parens](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_prettier_divergence/), [relational_chain_type_arg_parens_object_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_object_long_prettier_divergence/), [relational_chain_type_arg_parens_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_long_prettier_divergence/), [relational_chain_type_arg_parens_close_follow](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_close_follow_prettier_divergence/), [relational_chain_type_arg_parens_kept_shell](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_kept_shell_prettier_divergence/), [relational_chain_type_arg_parens_kept_shell_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_kept_shell_long_prettier_divergence/), [relational_chain_type_arg_parens_index_body](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_index_body_prettier_divergence/), [relational_paren_head_value_body_pair](../tests/fixtures/typescript/expressions/binary/relational_paren_head_value_body_pair_prettier_divergence/), [relational_region_inner_gt_break_long](../tests/fixtures/typescript/expressions/binary/relational_region_inner_gt_break_long_prettier_divergence/), [relational_chain_type_arg_parens_regex_follow](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_regex_follow_prettier_divergence/)
+- Relational chain type-argument parens — ◆prettier_bug — [relational_chain_type_arg_parens](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_prettier_divergence/), [relational_chain_type_arg_parens_object_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_object_long_prettier_divergence/), [relational_chain_type_arg_parens_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_long_prettier_divergence/), [relational_chain_type_arg_parens_close_follow](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_close_follow_prettier_divergence/), [relational_chain_type_arg_parens_kept_shell](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_kept_shell_prettier_divergence/), [relational_chain_type_arg_parens_kept_shell_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_kept_shell_long_prettier_divergence/), [relational_chain_type_arg_parens_index_body](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_index_body_prettier_divergence/), [relational_paren_head_value_body_pair](../tests/fixtures/typescript/expressions/binary/relational_paren_head_value_body_pair_prettier_divergence/), [relational_region_inner_gt_break_long](../tests/fixtures/typescript/expressions/binary/relational_region_inner_gt_break_long_prettier_divergence/), [relational_chain_type_arg_parens_regex_follow](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_regex_follow_prettier_divergence/), [relational_region_inner_gt_clarity_pair](../tests/fixtures/typescript/expressions/binary/relational_region_inner_gt_clarity_pair_prettier_divergence/), [relational_region_inner_gt_clarity_pair_long](../tests/fixtures/typescript/expressions/binary/relational_region_inner_gt_clarity_pair_long_prettier_divergence/), [relational_region_inner_gt_clarity_pair_recovered_list](../tests/fixtures/typescript/expressions/binary/relational_region_inner_gt_clarity_pair_recovered_list_prettier_divergence/)
 - Non-null parenthesized base — ◆design_choice — [non_null_paren_base_long](../tests/fixtures/typescript/expressions/member/non_null_paren_base_long_prettier_divergence/)
 - Parenthesized binary member base — ◆design_choice ◆print_width — [paren_binary_base_long](../tests/fixtures/typescript/expressions/member/paren_binary_base_long_prettier_divergence/)
 - Constrained infer extends-operand parens — ◆prettier_bug — [constrained_extends_parens](../tests/fixtures/typescript/types/infer/constrained_extends_parens_prettier_divergence/)
@@ -465,22 +465,95 @@ first. Nor can anything between the two tokens be reworded, and a `(` or a templ
 commits on any line — those authorings are tsc's rejects as written, as is a comment that forces
 the follower down (`a > // c⏎b`), whose only repair would be a comment relocation.
 
-So the one free choice is where the line breaks, and tsv breaks AHEAD of such a `>`
-(`aaa…⏎> bbb…`): its follower shares its line, which is the comparison to every parser at every
-width, a fixed point by construction, and never over the print width. `>=`, `>>` and `>>>` are
-one token each and re-scan to something the list parse abandons, so they end a line as any
-operator does, as does a `>` whose follower is a `+`, `-` or `<` tsc refuses outright — the rule
-does not read the follower, since the break is free either way.
+So the printer's free choices are the two things it can put directly behind that `>`, and tsv
+makes both.
 
-Which `>` that is, is decided in the parser (`BinaryExpression::may_close_type_arguments`), the
+**Where the line breaks.** tsv breaks AHEAD of such a `>` (`aaa…⏎> bbb…`): its follower shares
+its line, which is the comparison to every parser at every width, a fixed point by construction,
+and never over the print width. A `>=` re-scans to something the list parse abandons, so it ends
+a line as any operator does, as does a `>` whose follower is a `+`, `-` or `<` tsc refuses
+outright — the rule does not read the follower, since the break is free either way.
+
+**Whether a `(` of the printer's own follows.** A `(` past the `>` commits on any line, and
+printed from a bare authoring that `(` is the formatter's doing. `fn(a < b, c > await d)` is two
+comparisons to every parser; with the clarity pair both formatters put around an `await` operand,
+`fn(a < b, c > (await d))`, it is the generic call `a<b, c>(await d)` to every parser — one
+argument where there were two, in one pass, with no diagnostic, and prettier's own second pass
+writes it out. A mixed-arithmetic left operand's pair does the same from one level down
+(`c > (d % e) + f`, `(d * e) / f`, `(d << e) << f`, `(d + e) << f`), and so does the pair around
+a function expression that is called or used as a tag (`c > (function () {})()`,
+`` c > (function () {})`t` ``), which only a statement's first token needs — in every position a
+comma separates expressions: call, `new` and decorator arguments, array elements, and a sequence
+wherever one stands (a statement, a `for` head, a template's `${…}`). A clarity pair is one the
+tree does not need, so tsv leaves it out there and the operand prints as the bare spelling it
+was written in — every clarity pair between the `>` and the operand's first token
+(`c > ((await d) % e) + f` prints `c > await d % e + f`), down to the first token that is no
+clarity pair of the printer's own
+([relational_region_inner_gt_clarity_pair](../tests/fixtures/typescript/expressions/binary/relational_region_inner_gt_clarity_pair_prettier_divergence/);
+at the 100/101 boundary, where the `>` leads its line and the bare operand shares it,
+[relational_region_inner_gt_clarity_pair_long](../tests/fixtures/typescript/expressions/binary/relational_region_inner_gt_clarity_pair_long_prettier_divergence/)).
+What ends that walk:
+
+- **A pair the author wrote stays**, with everything inside it. Behind a region that reads as a
+  list it is no pair at all but the generic call's own argument list, so the parser never built
+  the comparison; wherever one WAS built, the region reads as no list to the parser that built
+  it, and the author's spelling is the one each parser read. `f(a < b!, c > (await d))` is the
+  sharp case: a call to tsc alone, through its `JSDocNonNullableType`, which a stripped pair
+  would hand a comparison.
+- **A pair the tree owes, or one whose `)` keeps two tokens apart**, ends it with nothing left
+  out: the operand still opens on a `(`, so dropping the pairs above it would move the output
+  and not its reading. An `await` whose operand ends on an instantiation's `>` or on a function
+  or class body is the second kind (`(await f<T>) + 1`, `(await function () {}) / 2`).
+  **Known gap**: some of the pairs that end the walk this way are the printer's own, and
+  still commit the list — a function or class dividend's (`fn(a < b, c > function () {} / 2)`
+  prints `c > (function () {}) / 2`), an instantiation's ahead of a token that would re-lex its
+  `>` (`c > g<T>⏎+ 1` prints `c > (g<T>) + 1`), a numeric literal's as a member object
+  (`c > 0..toString()` prints `c > (0).toString()`), and the clarity pair around an operand
+  that ends on one of the first two. Each is a pair the printed tokens need as they stand: the
+  dividend rule is asked of every position alike, the instantiation's bare spelling is a line
+  break, and the literal's is one the number printer does not emit. The answer there is a pair
+  on the `<` side.
+
+A second chain in the later sibling is the comma-sibling cell with one more pair in play:
+`c < d > await e` takes the family's pair around its own `<` operand, which ends that region
+and leaves the first sibling's open, so the operand behind the `>` still prints bare —
+`fn(a < b, (c < d) > await e)`, where a `(await e)` would make the line one tsc and tsv's own
+parse both reject. Prettier strips the chain's pair as well, and its
+`fn(a < b, c < d > (await e))` is the generic call `c<d>(await e)`.
+
+Where the `>` itself sits inside a pair or a bracket the region holds — an assertion's operand
+pair, a union's, a prefix operator's, an array — the list is tsc's alone to claim, through its
+recovery, and prettier's output is one the compiler rejects (`fn(a < b, (c > (await d)) as T)`,
+`')' expected.`). The same bare operand answers it
+([relational_region_inner_gt_clarity_pair_recovered_list](../tests/fixtures/typescript/expressions/binary/relational_region_inner_gt_clarity_pair_recovered_list_prettier_divergence/)).
+
+This rule reads the same superset the break does, so it also reaches comparisons no list can
+be read from (`a < b && c > await d`). The pair would have been harmless there, and since an
+authored one stays, both spellings are fixed points — the one paren form tsv holds per
+authoring
+([conformance_prettier.md §The dual-stable remainder, enumerated](./conformance_prettier.md#the-dual-stable-remainder-enumerated)),
+where prettier adds the pair to the bare one.
+
+**A `>>` or a `>>>` is that token behind as many nested `<`.** The type grammar scans a `>` at a
+time, so `fn(a < b < c, d >> (await e))` is the call `a<b<c, d>>(await e)` and
+`fn(a < b < c, ddd… >>⏎eee…)` a list with a statement after it — to tsc, to acorn-typescript and
+to tsv's own parse. A `>>` behind two open regions and a `>>>` behind three therefore take both
+answers, and a `<<` opens two: tsc re-scans it to a `<` and reads the `<` left behind as a
+nested list's, so `fn(a << b, c >> (await d))` is its reject, and
+`fn(a < b << c, d >>> (await e))` its own and tsv's. Behind fewer, each is the shift it looks
+like: it ends a line as any operator does, and its operand keeps the clarity pair.
+
+Which token that is, is decided in the parser (`BinaryExpression::may_close_type_arguments`), the
 one component that sees the tokens in order, and deliberately as a **superset**: no model of
 which tokens tsc's recovery takes — the block-body case above is what such a model looks like —
-but "a binary `<` stands ahead of this `>`'s left operand, and nothing that provably ends its
-region has been printed since". Two things provably end one, both tokens the type grammar cannot
+but "enough binary `<` stand ahead of this token's left operand for it to close every list they
+open, and nothing that provably ends their regions has been printed since". Two things provably end one, both tokens the type grammar cannot
 take at list level and the printer always prints: the closer of the delimiter the `<` was
 written in (call arguments, `[…]`, `{…}`, `${…}` — but **not** a grouping paren, which the
 printer may strip, so `f((x < q), a > b)` is the comma-sibling case), and a statement or class
-member boundary, which a body inherits the open region across (the parser's `LtRegion`). A
+member boundary — a module item is one, and so are a do-while's test past its body and a
+`switch` clause's test past the discriminant or the statements before it — which a body
+inherits the open region across (the parser's `LtRegion`). A
 region opened inside the `>`'s own left operand is the chain the pair rule answers and is not
 this rule's. Erring early is the unsound direction; erring late costs an operator-leading break
 on a shape real code does not hold — the `../corpora` snapshot holds two lines ending in a

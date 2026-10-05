@@ -1,0 +1,3647 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 3188,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 3107,
+				"end": 3109,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 3109,
+				"end": 3160,
+				"data": " A template expression takes the same rule. "
+			},
+			{
+				"type": "Text",
+				"start": 3160,
+				"end": 3161,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 3161,
+				"end": 3187,
+				"expression": {
+					"type": "CallExpression",
+					"start": 3162,
+					"end": 3186,
+					"callee": {
+						"type": "Identifier",
+						"start": 3162,
+						"end": 3164,
+						"name": "fn"
+					},
+					"arguments": [
+						{
+							"type": "BinaryExpression",
+							"start": 3165,
+							"end": 3170,
+							"left": {
+								"type": "Identifier",
+								"start": 3165,
+								"end": 3166,
+								"name": "a"
+							},
+							"operator": "<",
+							"right": {
+								"type": "Identifier",
+								"start": 3169,
+								"end": 3170,
+								"name": "b"
+							}
+						},
+						{
+							"type": "BinaryExpression",
+							"start": 3172,
+							"end": 3185,
+							"left": {
+								"type": "Identifier",
+								"start": 3172,
+								"end": 3173,
+								"name": "c"
+							},
+							"operator": ">",
+							"right": {
+								"type": "BinaryExpression",
+								"start": 3176,
+								"end": 3185,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 3176,
+									"end": 3181,
+									"left": {
+										"type": "Identifier",
+										"start": 3176,
+										"end": 3177,
+										"name": "d"
+									},
+									"operator": "%",
+									"right": {
+										"type": "Identifier",
+										"start": 3180,
+										"end": 3181,
+										"name": "e"
+									}
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 3184,
+									"end": 3185,
+									"name": "f"
+								}
+							}
+						}
+					],
+					"optional": false
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A comma is a type-argument separator, so a `>` in a later sibling closes the region an",
+			"start": 20,
+			"end": 109
+		},
+		{
+			"type": "Line",
+			"value": " earlier sibling's `<` opened, and a `(` past that `>` commits the list on any line:",
+			"start": 111,
+			"end": 197
+		},
+		{
+			"type": "Line",
+			"value": " `fn(a < b, c > (await d))` is the generic call `a<b, c>(await d)`. The clarity pair an",
+			"start": 199,
+			"end": 288
+		},
+		{
+			"type": "Line",
+			"value": " operand takes behind any other operator would be the printer's own invention there, so",
+			"start": 290,
+			"end": 379
+		},
+		{
+			"type": "Line",
+			"value": " the operand prints bare.",
+			"start": 381,
+			"end": 408
+		},
+		{
+			"type": "Line",
+			"value": " Call arguments, `new` arguments, array elements and an optional call.",
+			"start": 411,
+			"end": 483
+		},
+		{
+			"type": "Line",
+			"value": " A sequence, a `for` head and a template.",
+			"start": 601,
+			"end": 644
+		},
+		{
+			"type": "Line",
+			"value": " The `<` opens the region wherever it stands in its sibling, and a sibling between the two",
+			"start": 741,
+			"end": 833
+		},
+		{
+			"type": "Line",
+			"value": " is one more type argument.",
+			"start": 835,
+			"end": 864
+		},
+		{
+			"type": "Line",
+			"value": " The `await` may lead a longer operand or a chain.",
+			"start": 925,
+			"end": 977
+		},
+		{
+			"type": "Line",
+			"value": " A mixed-arithmetic left operand takes the same clarity pair at the same place.",
+			"start": 1067,
+			"end": 1148
+		},
+		{
+			"type": "Line",
+			"value": " So does a function expression that is called or used as a tag, alone or leading a longer",
+			"start": 1295,
+			"end": 1386
+		},
+		{
+			"type": "Line",
+			"value": " operand.",
+			"start": 1388,
+			"end": 1399
+		},
+		{
+			"type": "Line",
+			"value": " A `>>` closes two nested lists and a `>>>` three.",
+			"start": 1549,
+			"end": 1601
+		},
+		{
+			"type": "Line",
+			"value": " A second chain's own pair ends its own region and no other: the first sibling's is still",
+			"start": 1701,
+			"end": 1792
+		},
+		{
+			"type": "Line",
+			"value": " open behind the `>`.",
+			"start": 1794,
+			"end": 1817
+		},
+		{
+			"type": "Line",
+			"value": " A pair the AUTHOR wrote stays. Behind a region that reads as a list it is the argument",
+			"start": 1851,
+			"end": 1940
+		},
+		{
+			"type": "Line",
+			"value": " list of a generic call, to every parser.",
+			"start": 1942,
+			"end": 1985
+		},
+		{
+			"type": "Line",
+			"value": " Where no list can be read — an operator or a call inside the region — the comparison",
+			"start": 2011,
+			"end": 2098
+		},
+		{
+			"type": "Line",
+			"value": " reads the same with the pair or without it, and each authoring keeps its own.",
+			"start": 2100,
+			"end": 2180
+		},
+		{
+			"type": "Line",
+			"value": " An operand that takes no pair is untouched.",
+			"start": 2357,
+			"end": 2403
+		},
+		{
+			"type": "Line",
+			"value": " So is a `>` no region reaches: the chain's own pair ends its region on a `)`, the",
+			"start": 2497,
+			"end": 2581
+		},
+		{
+			"type": "Line",
+			"value": " closer of the delimiter the `<` was written in ends it too, and a statement starts none.",
+			"start": 2583,
+			"end": 2674
+		},
+		{
+			"type": "Line",
+			"value": " Nor does a shift close more regions than are open, or a `<=` open one.",
+			"start": 2676,
+			"end": 2749
+		},
+		{
+			"type": "Line",
+			"value": " A module item is a statement boundary like any other.",
+			"start": 2981,
+			"end": 3037
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 3107,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 3098,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 485,
+					"end": 508,
+					"expression": {
+						"type": "CallExpression",
+						"start": 485,
+						"end": 507,
+						"callee": {
+							"type": "Identifier",
+							"start": 485,
+							"end": 487,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 488,
+								"end": 493,
+								"left": {
+									"type": "Identifier",
+									"start": 488,
+									"end": 489,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 492,
+									"end": 493,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 495,
+								"end": 506,
+								"left": {
+									"type": "Identifier",
+									"start": 495,
+									"end": 496,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 499,
+									"end": 506,
+									"argument": {
+										"type": "Identifier",
+										"start": 505,
+										"end": 506,
+										"name": "d"
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comma is a type-argument separator, so a `>` in a later sibling closes the region an",
+							"start": 20,
+							"end": 109
+						},
+						{
+							"type": "Line",
+							"value": " earlier sibling's `<` opened, and a `(` past that `>` commits the list on any line:",
+							"start": 111,
+							"end": 197
+						},
+						{
+							"type": "Line",
+							"value": " `fn(a < b, c > (await d))` is the generic call `a<b, c>(await d)`. The clarity pair an",
+							"start": 199,
+							"end": 288
+						},
+						{
+							"type": "Line",
+							"value": " operand takes behind any other operator would be the printer's own invention there, so",
+							"start": 290,
+							"end": 379
+						},
+						{
+							"type": "Line",
+							"value": " the operand prints bare.",
+							"start": 381,
+							"end": 408
+						},
+						{
+							"type": "Line",
+							"value": " Call arguments, `new` arguments, array elements and an optional call.",
+							"start": 411,
+							"end": 483
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 510,
+					"end": 537,
+					"expression": {
+						"type": "NewExpression",
+						"start": 510,
+						"end": 536,
+						"callee": {
+							"type": "Identifier",
+							"start": 514,
+							"end": 516,
+							"name": "Fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 517,
+								"end": 522,
+								"left": {
+									"type": "Identifier",
+									"start": 517,
+									"end": 518,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 521,
+									"end": 522,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 524,
+								"end": 535,
+								"left": {
+									"type": "Identifier",
+									"start": 524,
+									"end": 525,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 528,
+									"end": 535,
+									"argument": {
+										"type": "Identifier",
+										"start": 534,
+										"end": 535,
+										"name": "d"
+									}
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 539,
+					"end": 571,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 545,
+							"end": 570,
+							"id": {
+								"type": "Identifier",
+								"start": 545,
+								"end": 547,
+								"name": "a1"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 550,
+								"end": 570,
+								"elements": [
+									{
+										"type": "BinaryExpression",
+										"start": 551,
+										"end": 556,
+										"left": {
+											"type": "Identifier",
+											"start": 551,
+											"end": 552,
+											"name": "a"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 555,
+											"end": 556,
+											"name": "b"
+										}
+									},
+									{
+										"type": "BinaryExpression",
+										"start": 558,
+										"end": 569,
+										"left": {
+											"type": "Identifier",
+											"start": 558,
+											"end": 559,
+											"name": "c"
+										},
+										"operator": ">",
+										"right": {
+											"type": "AwaitExpression",
+											"start": 562,
+											"end": 569,
+											"argument": {
+												"type": "Identifier",
+												"start": 568,
+												"end": 569,
+												"name": "d"
+											}
+										}
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 573,
+					"end": 598,
+					"expression": {
+						"type": "ChainExpression",
+						"start": 573,
+						"end": 597,
+						"expression": {
+							"type": "CallExpression",
+							"start": 573,
+							"end": 597,
+							"callee": {
+								"type": "Identifier",
+								"start": 573,
+								"end": 575,
+								"name": "fn"
+							},
+							"arguments": [
+								{
+									"type": "BinaryExpression",
+									"start": 578,
+									"end": 583,
+									"left": {
+										"type": "Identifier",
+										"start": 578,
+										"end": 579,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 582,
+										"end": 583,
+										"name": "b"
+									}
+								},
+								{
+									"type": "BinaryExpression",
+									"start": 585,
+									"end": 596,
+									"left": {
+										"type": "Identifier",
+										"start": 585,
+										"end": 586,
+										"name": "c"
+									},
+									"operator": ">",
+									"right": {
+										"type": "AwaitExpression",
+										"start": 589,
+										"end": 596,
+										"argument": {
+											"type": "Identifier",
+											"start": 595,
+											"end": 596,
+											"name": "d"
+										}
+									}
+								}
+							],
+							"optional": true
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 646,
+					"end": 667,
+					"expression": {
+						"type": "SequenceExpression",
+						"start": 647,
+						"end": 665,
+						"expressions": [
+							{
+								"type": "BinaryExpression",
+								"start": 647,
+								"end": 652,
+								"left": {
+									"type": "Identifier",
+									"start": 647,
+									"end": 648,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 651,
+									"end": 652,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 654,
+								"end": 665,
+								"left": {
+									"type": "Identifier",
+									"start": 654,
+									"end": 655,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 658,
+									"end": 665,
+									"argument": {
+										"type": "Identifier",
+										"start": 664,
+										"end": 665,
+										"name": "d"
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A sequence, a `for` head and a template.",
+							"start": 601,
+							"end": 644
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 669,
+					"end": 699,
+					"init": {
+						"type": "SequenceExpression",
+						"start": 674,
+						"end": 692,
+						"expressions": [
+							{
+								"type": "BinaryExpression",
+								"start": 674,
+								"end": 679,
+								"left": {
+									"type": "Identifier",
+									"start": 674,
+									"end": 675,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 678,
+									"end": 679,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 681,
+								"end": 692,
+								"left": {
+									"type": "Identifier",
+									"start": 681,
+									"end": 682,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 685,
+									"end": 692,
+									"argument": {
+										"type": "Identifier",
+										"start": 691,
+										"end": 692,
+										"name": "d"
+									}
+								}
+							}
+						]
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 697,
+						"end": 699,
+						"body": []
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 701,
+					"end": 738,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 707,
+							"end": 737,
+							"id": {
+								"type": "Identifier",
+								"start": 707,
+								"end": 709,
+								"name": "a2"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 712,
+								"end": 737,
+								"expressions": [
+									{
+										"type": "SequenceExpression",
+										"start": 716,
+										"end": 734,
+										"expressions": [
+											{
+												"type": "BinaryExpression",
+												"start": 716,
+												"end": 721,
+												"left": {
+													"type": "Identifier",
+													"start": 716,
+													"end": 717,
+													"name": "a"
+												},
+												"operator": "<",
+												"right": {
+													"type": "Identifier",
+													"start": 720,
+													"end": 721,
+													"name": "b"
+												}
+											},
+											{
+												"type": "BinaryExpression",
+												"start": 723,
+												"end": 734,
+												"left": {
+													"type": "Identifier",
+													"start": 723,
+													"end": 724,
+													"name": "c"
+												},
+												"operator": ">",
+												"right": {
+													"type": "AwaitExpression",
+													"start": 727,
+													"end": 734,
+													"argument": {
+														"type": "Identifier",
+														"start": 733,
+														"end": 734,
+														"name": "d"
+													}
+												}
+											}
+										]
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 713,
+										"end": 713,
+										"value": {
+											"raw": "",
+											"cooked": ""
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 736,
+										"end": 736,
+										"value": {
+											"raw": "",
+											"cooked": ""
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 866,
+					"end": 894,
+					"expression": {
+						"type": "CallExpression",
+						"start": 866,
+						"end": 893,
+						"callee": {
+							"type": "Identifier",
+							"start": 866,
+							"end": 868,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "LogicalExpression",
+								"start": 869,
+								"end": 879,
+								"left": {
+									"type": "Identifier",
+									"start": 869,
+									"end": 870,
+									"name": "x"
+								},
+								"operator": "&&",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 874,
+									"end": 879,
+									"left": {
+										"type": "Identifier",
+										"start": 874,
+										"end": 875,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 878,
+										"end": 879,
+										"name": "b"
+									}
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 881,
+								"end": 892,
+								"left": {
+									"type": "Identifier",
+									"start": 881,
+									"end": 882,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 885,
+									"end": 892,
+									"argument": {
+										"type": "Identifier",
+										"start": 891,
+										"end": 892,
+										"name": "d"
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The `<` opens the region wherever it stands in its sibling, and a sibling between the two",
+							"start": 741,
+							"end": 833
+						},
+						{
+							"type": "Line",
+							"value": " is one more type argument.",
+							"start": 835,
+							"end": 864
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 896,
+					"end": 922,
+					"expression": {
+						"type": "CallExpression",
+						"start": 896,
+						"end": 921,
+						"callee": {
+							"type": "Identifier",
+							"start": 896,
+							"end": 898,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 899,
+								"end": 904,
+								"left": {
+									"type": "Identifier",
+									"start": 899,
+									"end": 900,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 903,
+									"end": 904,
+									"name": "b"
+								}
+							},
+							{
+								"type": "Identifier",
+								"start": 906,
+								"end": 907,
+								"name": "y"
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 909,
+								"end": 920,
+								"left": {
+									"type": "Identifier",
+									"start": 909,
+									"end": 910,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 913,
+									"end": 920,
+									"argument": {
+										"type": "Identifier",
+										"start": 919,
+										"end": 920,
+										"name": "d"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 979,
+					"end": 1006,
+					"expression": {
+						"type": "CallExpression",
+						"start": 979,
+						"end": 1005,
+						"callee": {
+							"type": "Identifier",
+							"start": 979,
+							"end": 981,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 982,
+								"end": 987,
+								"left": {
+									"type": "Identifier",
+									"start": 982,
+									"end": 983,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 986,
+									"end": 987,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 989,
+								"end": 1004,
+								"left": {
+									"type": "Identifier",
+									"start": 989,
+									"end": 990,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 993,
+									"end": 1004,
+									"left": {
+										"type": "AwaitExpression",
+										"start": 993,
+										"end": 1000,
+										"argument": {
+											"type": "Identifier",
+											"start": 999,
+											"end": 1000,
+											"name": "d"
+										}
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 1003,
+										"end": 1004,
+										"name": "e"
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The `await` may lead a longer operand or a chain.",
+							"start": 925,
+							"end": 977
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1008,
+					"end": 1035,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1008,
+						"end": 1034,
+						"callee": {
+							"type": "Identifier",
+							"start": 1008,
+							"end": 1010,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1011,
+								"end": 1016,
+								"left": {
+									"type": "Identifier",
+									"start": 1011,
+									"end": 1012,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1015,
+									"end": 1016,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 1018,
+								"end": 1033,
+								"left": {
+									"type": "Identifier",
+									"start": 1018,
+									"end": 1019,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 1022,
+									"end": 1033,
+									"argument": {
+										"type": "CallExpression",
+										"start": 1028,
+										"end": 1033,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 1028,
+											"end": 1031,
+											"object": {
+												"type": "Identifier",
+												"start": 1028,
+												"end": 1029,
+												"name": "d"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 1030,
+												"end": 1031,
+												"name": "e"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1037,
+					"end": 1064,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1037,
+						"end": 1063,
+						"callee": {
+							"type": "Identifier",
+							"start": 1037,
+							"end": 1039,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1040,
+								"end": 1045,
+								"left": {
+									"type": "Identifier",
+									"start": 1040,
+									"end": 1041,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1044,
+									"end": 1045,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 1047,
+								"end": 1062,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 1047,
+									"end": 1058,
+									"left": {
+										"type": "Identifier",
+										"start": 1047,
+										"end": 1048,
+										"name": "c"
+									},
+									"operator": ">",
+									"right": {
+										"type": "AwaitExpression",
+										"start": 1051,
+										"end": 1058,
+										"argument": {
+											"type": "Identifier",
+											"start": 1057,
+											"end": 1058,
+											"name": "d"
+										}
+									}
+								},
+								"operator": ">",
+								"right": {
+									"type": "Identifier",
+									"start": 1061,
+									"end": 1062,
+									"name": "e"
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1150,
+					"end": 1175,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1150,
+						"end": 1174,
+						"callee": {
+							"type": "Identifier",
+							"start": 1150,
+							"end": 1152,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1153,
+								"end": 1158,
+								"left": {
+									"type": "Identifier",
+									"start": 1153,
+									"end": 1154,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1157,
+									"end": 1158,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 1160,
+								"end": 1173,
+								"left": {
+									"type": "Identifier",
+									"start": 1160,
+									"end": 1161,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 1164,
+									"end": 1173,
+									"left": {
+										"type": "BinaryExpression",
+										"start": 1164,
+										"end": 1169,
+										"left": {
+											"type": "Identifier",
+											"start": 1164,
+											"end": 1165,
+											"name": "d"
+										},
+										"operator": "%",
+										"right": {
+											"type": "Identifier",
+											"start": 1168,
+											"end": 1169,
+											"name": "e"
+										}
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 1172,
+										"end": 1173,
+										"name": "f"
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A mixed-arithmetic left operand takes the same clarity pair at the same place.",
+							"start": 1067,
+							"end": 1148
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1177,
+					"end": 1202,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1177,
+						"end": 1201,
+						"callee": {
+							"type": "Identifier",
+							"start": 1177,
+							"end": 1179,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1180,
+								"end": 1185,
+								"left": {
+									"type": "Identifier",
+									"start": 1180,
+									"end": 1181,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1184,
+									"end": 1185,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 1187,
+								"end": 1200,
+								"left": {
+									"type": "Identifier",
+									"start": 1187,
+									"end": 1188,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 1191,
+									"end": 1200,
+									"left": {
+										"type": "BinaryExpression",
+										"start": 1191,
+										"end": 1196,
+										"left": {
+											"type": "Identifier",
+											"start": 1191,
+											"end": 1192,
+											"name": "d"
+										},
+										"operator": "*",
+										"right": {
+											"type": "Identifier",
+											"start": 1195,
+											"end": 1196,
+											"name": "e"
+										}
+									},
+									"operator": "/",
+									"right": {
+										"type": "Identifier",
+										"start": 1199,
+										"end": 1200,
+										"name": "f"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1204,
+					"end": 1231,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1204,
+						"end": 1230,
+						"callee": {
+							"type": "Identifier",
+							"start": 1204,
+							"end": 1206,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1207,
+								"end": 1212,
+								"left": {
+									"type": "Identifier",
+									"start": 1207,
+									"end": 1208,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1211,
+									"end": 1212,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 1214,
+								"end": 1229,
+								"left": {
+									"type": "Identifier",
+									"start": 1214,
+									"end": 1215,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 1218,
+									"end": 1229,
+									"left": {
+										"type": "BinaryExpression",
+										"start": 1218,
+										"end": 1224,
+										"left": {
+											"type": "Identifier",
+											"start": 1218,
+											"end": 1219,
+											"name": "d"
+										},
+										"operator": "<<",
+										"right": {
+											"type": "Identifier",
+											"start": 1223,
+											"end": 1224,
+											"name": "e"
+										}
+									},
+									"operator": "<<",
+									"right": {
+										"type": "Identifier",
+										"start": 1228,
+										"end": 1229,
+										"name": "f"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1233,
+					"end": 1259,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1233,
+						"end": 1258,
+						"callee": {
+							"type": "Identifier",
+							"start": 1233,
+							"end": 1235,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1236,
+								"end": 1241,
+								"left": {
+									"type": "Identifier",
+									"start": 1236,
+									"end": 1237,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1240,
+									"end": 1241,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 1243,
+								"end": 1257,
+								"left": {
+									"type": "Identifier",
+									"start": 1243,
+									"end": 1244,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 1247,
+									"end": 1257,
+									"left": {
+										"type": "BinaryExpression",
+										"start": 1247,
+										"end": 1252,
+										"left": {
+											"type": "Identifier",
+											"start": 1247,
+											"end": 1248,
+											"name": "d"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 1251,
+											"end": 1252,
+											"name": "e"
+										}
+									},
+									"operator": "<<",
+									"right": {
+										"type": "Identifier",
+										"start": 1256,
+										"end": 1257,
+										"name": "f"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1261,
+					"end": 1292,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1261,
+						"end": 1291,
+						"callee": {
+							"type": "Identifier",
+							"start": 1261,
+							"end": 1263,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1264,
+								"end": 1269,
+								"left": {
+									"type": "Identifier",
+									"start": 1264,
+									"end": 1265,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1268,
+									"end": 1269,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 1271,
+								"end": 1290,
+								"left": {
+									"type": "Identifier",
+									"start": 1271,
+									"end": 1272,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 1275,
+									"end": 1290,
+									"left": {
+										"type": "BinaryExpression",
+										"start": 1275,
+										"end": 1286,
+										"left": {
+											"type": "AwaitExpression",
+											"start": 1275,
+											"end": 1282,
+											"argument": {
+												"type": "Identifier",
+												"start": 1281,
+												"end": 1282,
+												"name": "d"
+											}
+										},
+										"operator": "%",
+										"right": {
+											"type": "Identifier",
+											"start": 1285,
+											"end": 1286,
+											"name": "e"
+										}
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 1289,
+										"end": 1290,
+										"name": "f"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1401,
+					"end": 1433,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1401,
+						"end": 1432,
+						"callee": {
+							"type": "Identifier",
+							"start": 1401,
+							"end": 1403,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1404,
+								"end": 1409,
+								"left": {
+									"type": "Identifier",
+									"start": 1404,
+									"end": 1405,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1408,
+									"end": 1409,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 1411,
+								"end": 1431,
+								"left": {
+									"type": "Identifier",
+									"start": 1411,
+									"end": 1412,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "CallExpression",
+									"start": 1415,
+									"end": 1431,
+									"callee": {
+										"type": "FunctionExpression",
+										"start": 1415,
+										"end": 1429,
+										"id": null,
+										"expression": false,
+										"generator": false,
+										"async": false,
+										"params": [],
+										"body": {
+											"type": "BlockStatement",
+											"start": 1427,
+											"end": 1429,
+											"body": []
+										}
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " So does a function expression that is called or used as a tag, alone or leading a longer",
+							"start": 1295,
+							"end": 1386
+						},
+						{
+							"type": "Line",
+							"value": " operand.",
+							"start": 1388,
+							"end": 1399
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1435,
+					"end": 1468,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1435,
+						"end": 1467,
+						"callee": {
+							"type": "Identifier",
+							"start": 1435,
+							"end": 1437,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1438,
+								"end": 1443,
+								"left": {
+									"type": "Identifier",
+									"start": 1438,
+									"end": 1439,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1442,
+									"end": 1443,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 1445,
+								"end": 1466,
+								"left": {
+									"type": "Identifier",
+									"start": 1445,
+									"end": 1446,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "TaggedTemplateExpression",
+									"start": 1449,
+									"end": 1466,
+									"tag": {
+										"type": "FunctionExpression",
+										"start": 1449,
+										"end": 1463,
+										"id": null,
+										"expression": false,
+										"generator": false,
+										"async": false,
+										"params": [],
+										"body": {
+											"type": "BlockStatement",
+											"start": 1461,
+											"end": 1463,
+											"body": []
+										}
+									},
+									"quasi": {
+										"type": "TemplateLiteral",
+										"start": 1463,
+										"end": 1466,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 1464,
+												"end": 1465,
+												"value": {
+													"raw": "t",
+													"cooked": "t"
+												},
+												"tail": true
+											}
+										]
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1470,
+					"end": 1504,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1470,
+						"end": 1503,
+						"callee": {
+							"type": "Identifier",
+							"start": 1470,
+							"end": 1472,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1473,
+								"end": 1478,
+								"left": {
+									"type": "Identifier",
+									"start": 1473,
+									"end": 1474,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1477,
+									"end": 1478,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 1480,
+								"end": 1502,
+								"left": {
+									"type": "Identifier",
+									"start": 1480,
+									"end": 1481,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "MemberExpression",
+									"start": 1484,
+									"end": 1502,
+									"object": {
+										"type": "CallExpression",
+										"start": 1484,
+										"end": 1500,
+										"callee": {
+											"type": "FunctionExpression",
+											"start": 1484,
+											"end": 1498,
+											"id": null,
+											"expression": false,
+											"generator": false,
+											"async": false,
+											"params": [],
+											"body": {
+												"type": "BlockStatement",
+												"start": 1496,
+												"end": 1498,
+												"body": []
+											}
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1501,
+										"end": 1502,
+										"name": "e"
+									},
+									"computed": false,
+									"optional": false
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1506,
+					"end": 1546,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1506,
+						"end": 1545,
+						"callee": {
+							"type": "Identifier",
+							"start": 1506,
+							"end": 1508,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1509,
+								"end": 1514,
+								"left": {
+									"type": "Identifier",
+									"start": 1509,
+									"end": 1510,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1513,
+									"end": 1514,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 1516,
+								"end": 1544,
+								"left": {
+									"type": "Identifier",
+									"start": 1516,
+									"end": 1517,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 1520,
+									"end": 1544,
+									"left": {
+										"type": "BinaryExpression",
+										"start": 1520,
+										"end": 1540,
+										"left": {
+											"type": "CallExpression",
+											"start": 1520,
+											"end": 1536,
+											"callee": {
+												"type": "FunctionExpression",
+												"start": 1520,
+												"end": 1534,
+												"id": null,
+												"expression": false,
+												"generator": false,
+												"async": false,
+												"params": [],
+												"body": {
+													"type": "BlockStatement",
+													"start": 1532,
+													"end": 1534,
+													"body": []
+												}
+											},
+											"arguments": [],
+											"optional": false
+										},
+										"operator": "%",
+										"right": {
+											"type": "Identifier",
+											"start": 1539,
+											"end": 1540,
+											"name": "e"
+										}
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 1543,
+										"end": 1544,
+										"name": "f"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1603,
+					"end": 1631,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1603,
+						"end": 1630,
+						"callee": {
+							"type": "Identifier",
+							"start": 1603,
+							"end": 1605,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1606,
+								"end": 1615,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 1606,
+									"end": 1611,
+									"left": {
+										"type": "Identifier",
+										"start": 1606,
+										"end": 1607,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 1610,
+										"end": 1611,
+										"name": "b"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1614,
+									"end": 1615,
+									"name": "c"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 1617,
+								"end": 1629,
+								"left": {
+									"type": "Identifier",
+									"start": 1617,
+									"end": 1618,
+									"name": "d"
+								},
+								"operator": ">>",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 1622,
+									"end": 1629,
+									"argument": {
+										"type": "Identifier",
+										"start": 1628,
+										"end": 1629,
+										"name": "e"
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `>>` closes two nested lists and a `>>>` three.",
+							"start": 1549,
+							"end": 1601
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1633,
+					"end": 1663,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1633,
+						"end": 1662,
+						"callee": {
+							"type": "Identifier",
+							"start": 1633,
+							"end": 1635,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1636,
+								"end": 1645,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 1636,
+									"end": 1641,
+									"left": {
+										"type": "Identifier",
+										"start": 1636,
+										"end": 1637,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 1640,
+										"end": 1641,
+										"name": "b"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1644,
+									"end": 1645,
+									"name": "c"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 1647,
+								"end": 1661,
+								"left": {
+									"type": "Identifier",
+									"start": 1647,
+									"end": 1648,
+									"name": "d"
+								},
+								"operator": ">>",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 1652,
+									"end": 1661,
+									"left": {
+										"type": "BinaryExpression",
+										"start": 1652,
+										"end": 1657,
+										"left": {
+											"type": "Identifier",
+											"start": 1652,
+											"end": 1653,
+											"name": "e"
+										},
+										"operator": "%",
+										"right": {
+											"type": "Identifier",
+											"start": 1656,
+											"end": 1657,
+											"name": "f"
+										}
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 1660,
+										"end": 1661,
+										"name": "g"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1665,
+					"end": 1698,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1665,
+						"end": 1697,
+						"callee": {
+							"type": "Identifier",
+							"start": 1665,
+							"end": 1667,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1668,
+								"end": 1681,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 1668,
+									"end": 1677,
+									"left": {
+										"type": "BinaryExpression",
+										"start": 1668,
+										"end": 1673,
+										"left": {
+											"type": "Identifier",
+											"start": 1668,
+											"end": 1669,
+											"name": "a"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 1672,
+											"end": 1673,
+											"name": "b"
+										}
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 1676,
+										"end": 1677,
+										"name": "c"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1680,
+									"end": 1681,
+									"name": "d"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 1683,
+								"end": 1696,
+								"left": {
+									"type": "Identifier",
+									"start": 1683,
+									"end": 1684,
+									"name": "e"
+								},
+								"operator": ">>>",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 1689,
+									"end": 1696,
+									"argument": {
+										"type": "Identifier",
+										"start": 1695,
+										"end": 1696,
+										"name": "f"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1819,
+					"end": 1848,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1819,
+						"end": 1847,
+						"callee": {
+							"type": "Identifier",
+							"start": 1819,
+							"end": 1821,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1822,
+								"end": 1827,
+								"left": {
+									"type": "Identifier",
+									"start": 1822,
+									"end": 1823,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1826,
+									"end": 1827,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 1829,
+								"end": 1846,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 1830,
+									"end": 1835,
+									"left": {
+										"type": "Identifier",
+										"start": 1830,
+										"end": 1831,
+										"name": "c"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 1834,
+										"end": 1835,
+										"name": "d"
+									}
+								},
+								"operator": ">",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 1839,
+									"end": 1846,
+									"argument": {
+										"type": "Identifier",
+										"start": 1845,
+										"end": 1846,
+										"name": "e"
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A second chain's own pair ends its own region and no other: the first sibling's is still",
+							"start": 1701,
+							"end": 1792
+						},
+						{
+							"type": "Line",
+							"value": " open behind the `>`.",
+							"start": 1794,
+							"end": 1817
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1987,
+					"end": 2008,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1987,
+						"end": 2007,
+						"callee": {
+							"type": "Identifier",
+							"start": 1987,
+							"end": 1989,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "CallExpression",
+								"start": 1990,
+								"end": 2006,
+								"callee": {
+									"type": "Identifier",
+									"start": 1990,
+									"end": 1991,
+									"name": "a"
+								},
+								"arguments": [
+									{
+										"type": "AwaitExpression",
+										"start": 1998,
+										"end": 2005,
+										"argument": {
+											"type": "Identifier",
+											"start": 2004,
+											"end": 2005,
+											"name": "d"
+										}
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 1991,
+									"end": 1997,
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 1992,
+											"end": 1993,
+											"typeName": {
+												"type": "Identifier",
+												"start": 1992,
+												"end": 1993,
+												"name": "b"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 1995,
+											"end": 1996,
+											"typeName": {
+												"type": "Identifier",
+												"start": 1995,
+												"end": 1996,
+												"name": "c"
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A pair the AUTHOR wrote stays. Behind a region that reads as a list it is the argument",
+							"start": 1851,
+							"end": 1940
+						},
+						{
+							"type": "Line",
+							"value": " list of a generic call, to every parser.",
+							"start": 1942,
+							"end": 1985
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 2182,
+					"end": 2216,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 2188,
+							"end": 2215,
+							"id": {
+								"type": "Identifier",
+								"start": 2188,
+								"end": 2190,
+								"name": "b1"
+							},
+							"init": {
+								"type": "LogicalExpression",
+								"start": 2193,
+								"end": 2215,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 2193,
+									"end": 2198,
+									"left": {
+										"type": "Identifier",
+										"start": 2193,
+										"end": 2194,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 2197,
+										"end": 2198,
+										"name": "b"
+									}
+								},
+								"operator": "&&",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 2202,
+									"end": 2215,
+									"left": {
+										"type": "Identifier",
+										"start": 2202,
+										"end": 2203,
+										"name": "c"
+									},
+									"operator": ">",
+									"right": {
+										"type": "AwaitExpression",
+										"start": 2207,
+										"end": 2214,
+										"argument": {
+											"type": "Identifier",
+											"start": 2213,
+											"end": 2214,
+											"name": "d"
+										}
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Where no list can be read — an operator or a call inside the region — the comparison",
+							"start": 2011,
+							"end": 2098
+						},
+						{
+							"type": "Line",
+							"value": " reads the same with the pair or without it, and each authoring keeps its own.",
+							"start": 2100,
+							"end": 2180
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 2218,
+					"end": 2250,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 2224,
+							"end": 2249,
+							"id": {
+								"type": "Identifier",
+								"start": 2224,
+								"end": 2226,
+								"name": "b2"
+							},
+							"init": {
+								"type": "LogicalExpression",
+								"start": 2229,
+								"end": 2249,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 2229,
+									"end": 2234,
+									"left": {
+										"type": "Identifier",
+										"start": 2229,
+										"end": 2230,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 2233,
+										"end": 2234,
+										"name": "b"
+									}
+								},
+								"operator": "&&",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 2238,
+									"end": 2249,
+									"left": {
+										"type": "Identifier",
+										"start": 2238,
+										"end": 2239,
+										"name": "c"
+									},
+									"operator": ">",
+									"right": {
+										"type": "AwaitExpression",
+										"start": 2242,
+										"end": 2249,
+										"argument": {
+											"type": "Identifier",
+											"start": 2248,
+											"end": 2249,
+											"name": "d"
+										}
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2252,
+					"end": 2279,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2252,
+						"end": 2278,
+						"callee": {
+							"type": "Identifier",
+							"start": 2252,
+							"end": 2254,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 2255,
+								"end": 2262,
+								"left": {
+									"type": "Identifier",
+									"start": 2255,
+									"end": 2256,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "CallExpression",
+									"start": 2259,
+									"end": 2262,
+									"callee": {
+										"type": "Identifier",
+										"start": 2259,
+										"end": 2260,
+										"name": "b"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 2264,
+								"end": 2277,
+								"left": {
+									"type": "Identifier",
+									"start": 2264,
+									"end": 2265,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 2269,
+									"end": 2276,
+									"argument": {
+										"type": "Identifier",
+										"start": 2275,
+										"end": 2276,
+										"name": "d"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2281,
+					"end": 2312,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2281,
+						"end": 2311,
+						"callee": {
+							"type": "Identifier",
+							"start": 2281,
+							"end": 2283,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 2284,
+								"end": 2293,
+								"left": {
+									"type": "Identifier",
+									"start": 2284,
+									"end": 2285,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 2288,
+									"end": 2293,
+									"left": {
+										"type": "Identifier",
+										"start": 2288,
+										"end": 2289,
+										"name": "b"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Literal",
+										"start": 2292,
+										"end": 2293,
+										"value": 1,
+										"raw": "1"
+									}
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 2295,
+								"end": 2310,
+								"left": {
+									"type": "Identifier",
+									"start": 2295,
+									"end": 2296,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 2299,
+									"end": 2310,
+									"left": {
+										"type": "BinaryExpression",
+										"start": 2300,
+										"end": 2305,
+										"left": {
+											"type": "Identifier",
+											"start": 2300,
+											"end": 2301,
+											"name": "d"
+										},
+										"operator": "%",
+										"right": {
+											"type": "Identifier",
+											"start": 2304,
+											"end": 2305,
+											"name": "e"
+										}
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 2309,
+										"end": 2310,
+										"name": "f"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2314,
+					"end": 2354,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2314,
+						"end": 2353,
+						"callee": {
+							"type": "Identifier",
+							"start": 2314,
+							"end": 2316,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 2317,
+								"end": 2326,
+								"left": {
+									"type": "Identifier",
+									"start": 2317,
+									"end": 2318,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 2321,
+									"end": 2326,
+									"left": {
+										"type": "Identifier",
+										"start": 2321,
+										"end": 2322,
+										"name": "b"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Literal",
+										"start": 2325,
+										"end": 2326,
+										"value": 1,
+										"raw": "1"
+									}
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 2328,
+								"end": 2352,
+								"left": {
+									"type": "Identifier",
+									"start": 2328,
+									"end": 2329,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "MemberExpression",
+									"start": 2332,
+									"end": 2352,
+									"object": {
+										"type": "CallExpression",
+										"start": 2332,
+										"end": 2350,
+										"callee": {
+											"type": "FunctionExpression",
+											"start": 2333,
+											"end": 2347,
+											"id": null,
+											"expression": false,
+											"generator": false,
+											"async": false,
+											"params": [],
+											"body": {
+												"type": "BlockStatement",
+												"start": 2345,
+												"end": 2347,
+												"body": []
+											}
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 2351,
+										"end": 2352,
+										"name": "e"
+									},
+									"computed": false,
+									"optional": false
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2405,
+					"end": 2423,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2405,
+						"end": 2422,
+						"callee": {
+							"type": "Identifier",
+							"start": 2405,
+							"end": 2407,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 2408,
+								"end": 2413,
+								"left": {
+									"type": "Identifier",
+									"start": 2408,
+									"end": 2409,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 2412,
+									"end": 2413,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 2415,
+								"end": 2421,
+								"left": {
+									"type": "Identifier",
+									"start": 2415,
+									"end": 2416,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "UnaryExpression",
+									"start": 2419,
+									"end": 2421,
+									"operator": "-",
+									"prefix": true,
+									"argument": {
+										"type": "Identifier",
+										"start": 2420,
+										"end": 2421,
+										"name": "d"
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An operand that takes no pair is untouched.",
+							"start": 2357,
+							"end": 2403
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2425,
+					"end": 2443,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2425,
+						"end": 2442,
+						"callee": {
+							"type": "Identifier",
+							"start": 2425,
+							"end": 2427,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 2428,
+								"end": 2433,
+								"left": {
+									"type": "Identifier",
+									"start": 2428,
+									"end": 2429,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 2432,
+									"end": 2433,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 2435,
+								"end": 2441,
+								"left": {
+									"type": "Identifier",
+									"start": 2435,
+									"end": 2436,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "UnaryExpression",
+									"start": 2439,
+									"end": 2441,
+									"operator": "!",
+									"prefix": true,
+									"argument": {
+										"type": "Identifier",
+										"start": 2440,
+										"end": 2441,
+										"name": "d"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2445,
+					"end": 2469,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2445,
+						"end": 2468,
+						"callee": {
+							"type": "Identifier",
+							"start": 2445,
+							"end": 2447,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 2448,
+								"end": 2453,
+								"left": {
+									"type": "Identifier",
+									"start": 2448,
+									"end": 2449,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 2452,
+									"end": 2453,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 2455,
+								"end": 2467,
+								"left": {
+									"type": "Identifier",
+									"start": 2455,
+									"end": 2456,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "UnaryExpression",
+									"start": 2459,
+									"end": 2467,
+									"operator": "typeof",
+									"prefix": true,
+									"argument": {
+										"type": "Identifier",
+										"start": 2466,
+										"end": 2467,
+										"name": "d"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2471,
+					"end": 2494,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2471,
+						"end": 2493,
+						"callee": {
+							"type": "Identifier",
+							"start": 2471,
+							"end": 2473,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 2474,
+								"end": 2479,
+								"left": {
+									"type": "Identifier",
+									"start": 2474,
+									"end": 2475,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 2478,
+									"end": 2479,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 2481,
+								"end": 2492,
+								"left": {
+									"type": "Identifier",
+									"start": 2481,
+									"end": 2482,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "NewExpression",
+									"start": 2485,
+									"end": 2492,
+									"callee": {
+										"type": "Identifier",
+										"start": 2489,
+										"end": 2490,
+										"name": "D"
+									},
+									"arguments": []
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 2751,
+					"end": 2782,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 2757,
+							"end": 2781,
+							"id": {
+								"type": "Identifier",
+								"start": 2757,
+								"end": 2759,
+								"name": "b3"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 2762,
+								"end": 2781,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 2763,
+									"end": 2768,
+									"left": {
+										"type": "Identifier",
+										"start": 2763,
+										"end": 2764,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 2767,
+										"end": 2768,
+										"name": "b"
+									}
+								},
+								"operator": ">",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 2773,
+									"end": 2780,
+									"argument": {
+										"type": "Identifier",
+										"start": 2779,
+										"end": 2780,
+										"name": "c"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " So is a `>` no region reaches: the chain's own pair ends its region on a `)`, the",
+							"start": 2497,
+							"end": 2581
+						},
+						{
+							"type": "Line",
+							"value": " closer of the delimiter the `<` was written in ends it too, and a statement starts none.",
+							"start": 2583,
+							"end": 2674
+						},
+						{
+							"type": "Line",
+							"value": " Nor does a shift close more regions than are open, or a `<=` open one.",
+							"start": 2676,
+							"end": 2749
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2784,
+					"end": 2812,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2784,
+						"end": 2811,
+						"callee": {
+							"type": "Identifier",
+							"start": 2784,
+							"end": 2786,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "CallExpression",
+								"start": 2787,
+								"end": 2795,
+								"callee": {
+									"type": "Identifier",
+									"start": 2787,
+									"end": 2788,
+									"name": "g"
+								},
+								"arguments": [
+									{
+										"type": "BinaryExpression",
+										"start": 2789,
+										"end": 2794,
+										"left": {
+											"type": "Identifier",
+											"start": 2789,
+											"end": 2790,
+											"name": "a"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 2793,
+											"end": 2794,
+											"name": "b"
+										}
+									}
+								],
+								"optional": false
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 2797,
+								"end": 2810,
+								"left": {
+									"type": "Identifier",
+									"start": 2797,
+									"end": 2798,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 2802,
+									"end": 2809,
+									"argument": {
+										"type": "Identifier",
+										"start": 2808,
+										"end": 2809,
+										"name": "d"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2814,
+					"end": 2843,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2814,
+						"end": 2842,
+						"callee": {
+							"type": "Identifier",
+							"start": 2814,
+							"end": 2816,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrayExpression",
+								"start": 2817,
+								"end": 2824,
+								"elements": [
+									{
+										"type": "BinaryExpression",
+										"start": 2818,
+										"end": 2823,
+										"left": {
+											"type": "Identifier",
+											"start": 2818,
+											"end": 2819,
+											"name": "a"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 2822,
+											"end": 2823,
+											"name": "b"
+										}
+									}
+								]
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 2826,
+								"end": 2841,
+								"left": {
+									"type": "Identifier",
+									"start": 2826,
+									"end": 2827,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 2830,
+									"end": 2841,
+									"left": {
+										"type": "BinaryExpression",
+										"start": 2831,
+										"end": 2836,
+										"left": {
+											"type": "Identifier",
+											"start": 2831,
+											"end": 2832,
+											"name": "d"
+										},
+										"operator": "%",
+										"right": {
+											"type": "Identifier",
+											"start": 2835,
+											"end": 2836,
+											"name": "e"
+										}
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 2840,
+										"end": 2841,
+										"name": "f"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2845,
+					"end": 2863,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2845,
+						"end": 2862,
+						"callee": {
+							"type": "Identifier",
+							"start": 2845,
+							"end": 2847,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 2848,
+								"end": 2861,
+								"left": {
+									"type": "Identifier",
+									"start": 2848,
+									"end": 2849,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 2853,
+									"end": 2860,
+									"argument": {
+										"type": "Identifier",
+										"start": 2859,
+										"end": 2860,
+										"name": "d"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2865,
+					"end": 2892,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2865,
+						"end": 2891,
+						"callee": {
+							"type": "Identifier",
+							"start": 2865,
+							"end": 2867,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 2868,
+								"end": 2890,
+								"left": {
+									"type": "Identifier",
+									"start": 2868,
+									"end": 2869,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "CallExpression",
+									"start": 2872,
+									"end": 2890,
+									"callee": {
+										"type": "FunctionExpression",
+										"start": 2873,
+										"end": 2887,
+										"id": null,
+										"expression": false,
+										"generator": false,
+										"async": false,
+										"params": [],
+										"body": {
+											"type": "BlockStatement",
+											"start": 2885,
+											"end": 2887,
+											"body": []
+										}
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2894,
+					"end": 2920,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2894,
+						"end": 2919,
+						"callee": {
+							"type": "Identifier",
+							"start": 2894,
+							"end": 2896,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 2897,
+								"end": 2902,
+								"left": {
+									"type": "Identifier",
+									"start": 2897,
+									"end": 2898,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 2901,
+									"end": 2902,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 2904,
+								"end": 2918,
+								"left": {
+									"type": "Identifier",
+									"start": 2904,
+									"end": 2905,
+									"name": "c"
+								},
+								"operator": ">>",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 2910,
+									"end": 2917,
+									"argument": {
+										"type": "Identifier",
+										"start": 2916,
+										"end": 2917,
+										"name": "d"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2922,
+					"end": 2950,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2922,
+						"end": 2949,
+						"callee": {
+							"type": "Identifier",
+							"start": 2922,
+							"end": 2924,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 2925,
+								"end": 2931,
+								"left": {
+									"type": "Identifier",
+									"start": 2925,
+									"end": 2926,
+									"name": "a"
+								},
+								"operator": "<<",
+								"right": {
+									"type": "Identifier",
+									"start": 2930,
+									"end": 2931,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 2933,
+								"end": 2948,
+								"left": {
+									"type": "Identifier",
+									"start": 2933,
+									"end": 2934,
+									"name": "c"
+								},
+								"operator": ">>>",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 2940,
+									"end": 2947,
+									"argument": {
+										"type": "Identifier",
+										"start": 2946,
+										"end": 2947,
+										"name": "d"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2952,
+					"end": 2978,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2952,
+						"end": 2977,
+						"callee": {
+							"type": "Identifier",
+							"start": 2952,
+							"end": 2954,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 2955,
+								"end": 2961,
+								"left": {
+									"type": "Identifier",
+									"start": 2955,
+									"end": 2956,
+									"name": "a"
+								},
+								"operator": "<=",
+								"right": {
+									"type": "Identifier",
+									"start": 2960,
+									"end": 2961,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 2963,
+								"end": 2976,
+								"left": {
+									"type": "Identifier",
+									"start": 2963,
+									"end": 2964,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 2968,
+									"end": 2975,
+									"argument": {
+										"type": "Identifier",
+										"start": 2974,
+										"end": 2975,
+										"name": "d"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 3039,
+					"end": 3063,
+					"exportKind": "value",
+					"declaration": {
+						"type": "VariableDeclaration",
+						"start": 3046,
+						"end": 3063,
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 3052,
+								"end": 3062,
+								"id": {
+									"type": "Identifier",
+									"start": 3052,
+									"end": 3054,
+									"name": "b4"
+								},
+								"init": {
+									"type": "BinaryExpression",
+									"start": 3057,
+									"end": 3062,
+									"left": {
+										"type": "Identifier",
+										"start": 3057,
+										"end": 3058,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 3061,
+										"end": 3062,
+										"name": "b"
+									}
+								}
+							}
+						],
+						"kind": "const"
+					},
+					"specifiers": [],
+					"source": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A module item is a statement boundary like any other.",
+							"start": 2981,
+							"end": 3037
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 3065,
+					"end": 3097,
+					"exportKind": "value",
+					"declaration": {
+						"type": "VariableDeclaration",
+						"start": 3072,
+						"end": 3097,
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 3078,
+								"end": 3096,
+								"id": {
+									"type": "Identifier",
+									"start": 3078,
+									"end": 3080,
+									"name": "b5"
+								},
+								"init": {
+									"type": "BinaryExpression",
+									"start": 3083,
+									"end": 3096,
+									"left": {
+										"type": "Identifier",
+										"start": 3083,
+										"end": 3084,
+										"name": "c"
+									},
+									"operator": ">",
+									"right": {
+										"type": "AwaitExpression",
+										"start": 3088,
+										"end": 3095,
+										"argument": {
+											"type": "Identifier",
+											"start": 3094,
+											"end": 3095,
+											"name": "d"
+										}
+									}
+								}
+							}
+						],
+						"kind": "const"
+					},
+					"specifiers": [],
+					"source": null
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -1,0 +1,805 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1897,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " The operand behind a `>` that may close a type-argument region prints bare, and that `>`",
+			"start": 20,
+			"end": 111
+		},
+		{
+			"type": "Line",
+			"value": " never ends a line: where its comparison breaks, the `>` leads the next line and the bare",
+			"start": 113,
+			"end": 204
+		},
+		{
+			"type": "Line",
+			"value": " operand shares it.",
+			"start": 206,
+			"end": 227
+		},
+		{
+			"type": "Line",
+			"value": " The whole call is exactly 100, and stays flat.",
+			"start": 230,
+			"end": 279
+		},
+		{
+			"type": "Line",
+			"value": " One character longer: 101, so the arguments take a line each.",
+			"start": 382,
+			"end": 446
+		},
+		{
+			"type": "Line",
+			"value": " The comparison's own line is exactly 100, and stays flat.",
+			"start": 557,
+			"end": 617
+		},
+		{
+			"type": "Line",
+			"value": " 101 breaks ahead of the `>`, the `await` bare behind it.",
+			"start": 737,
+			"end": 796
+		},
+		{
+			"type": "Line",
+			"value": " A mixed-arithmetic operand at the same two widths: 100 flat, 101 broken ahead of the `>`.",
+			"start": 920,
+			"end": 1012
+		},
+		{
+			"type": "Line",
+			"value": " A `>>` behind two nested `<` closes both lists, so it takes the same two answers: 100",
+			"start": 1253,
+			"end": 1341
+		},
+		{
+			"type": "Line",
+			"value": " flat, 101 broken ahead of the `>>`.",
+			"start": 1343,
+			"end": 1381
+		},
+		{
+			"type": "Line",
+			"value": " Behind a single `<` a `>>` closes nothing: at 101 it ends its line as any operator",
+			"start": 1630,
+			"end": 1715
+		},
+		{
+			"type": "Line",
+			"value": " does, and its operand keeps the clarity pair.",
+			"start": 1717,
+			"end": 1765
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1896,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1887,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 281,
+					"end": 379,
+					"expression": {
+						"type": "CallExpression",
+						"start": 281,
+						"end": 378,
+						"callee": {
+							"type": "Identifier",
+							"start": 281,
+							"end": 283,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 284,
+								"end": 353,
+								"left": {
+									"type": "Identifier",
+									"start": 284,
+									"end": 320,
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 323,
+									"end": 353,
+									"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 355,
+								"end": 377,
+								"left": {
+									"type": "Identifier",
+									"start": 355,
+									"end": 365,
+									"name": "cccccccccc"
+								},
+								"operator": ">",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 368,
+									"end": 377,
+									"argument": {
+										"type": "Identifier",
+										"start": 374,
+										"end": 377,
+										"name": "ddd"
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The operand behind a `>` that may close a type-argument region prints bare, and that `>`",
+							"start": 20,
+							"end": 111
+						},
+						{
+							"type": "Line",
+							"value": " never ends a line: where its comparison breaks, the `>` leads the next line and the bare",
+							"start": 113,
+							"end": 204
+						},
+						{
+							"type": "Line",
+							"value": " operand shares it.",
+							"start": 206,
+							"end": 227
+						},
+						{
+							"type": "Line",
+							"value": " The whole call is exactly 100, and stays flat.",
+							"start": 230,
+							"end": 279
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 448,
+					"end": 554,
+					"expression": {
+						"type": "CallExpression",
+						"start": 448,
+						"end": 553,
+						"callee": {
+							"type": "Identifier",
+							"start": 448,
+							"end": 450,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 454,
+								"end": 523,
+								"left": {
+									"type": "Identifier",
+									"start": 454,
+									"end": 490,
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 493,
+									"end": 523,
+									"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 527,
+								"end": 550,
+								"left": {
+									"type": "Identifier",
+									"start": 527,
+									"end": 537,
+									"name": "cccccccccc"
+								},
+								"operator": ">",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 540,
+									"end": 550,
+									"argument": {
+										"type": "Identifier",
+										"start": 546,
+										"end": 550,
+										"name": "dddd"
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " One character longer: 101, so the arguments take a line each.",
+							"start": 382,
+							"end": 446
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 619,
+					"end": 734,
+					"expression": {
+						"type": "CallExpression",
+						"start": 619,
+						"end": 733,
+						"callee": {
+							"type": "Identifier",
+							"start": 619,
+							"end": 621,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 625,
+								"end": 630,
+								"left": {
+									"type": "Identifier",
+									"start": 625,
+									"end": 626,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 629,
+									"end": 630,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 634,
+								"end": 730,
+								"left": {
+									"type": "Identifier",
+									"start": 634,
+									"end": 678,
+									"name": "cccccccccccccccccccccccccccccccccccccccccccc"
+								},
+								"operator": ">",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 681,
+									"end": 730,
+									"argument": {
+										"type": "Identifier",
+										"start": 687,
+										"end": 730,
+										"name": "ddddddddddddddddddddddddddddddddddddddddddd"
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The comparison's own line is exactly 100, and stays flat.",
+							"start": 557,
+							"end": 617
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 798,
+					"end": 917,
+					"expression": {
+						"type": "CallExpression",
+						"start": 798,
+						"end": 916,
+						"callee": {
+							"type": "Identifier",
+							"start": 798,
+							"end": 800,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 804,
+								"end": 809,
+								"left": {
+									"type": "Identifier",
+									"start": 804,
+									"end": 805,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 808,
+									"end": 809,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 813,
+								"end": 913,
+								"left": {
+									"type": "Identifier",
+									"start": 813,
+									"end": 857,
+									"name": "cccccccccccccccccccccccccccccccccccccccccccc"
+								},
+								"operator": ">",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 863,
+									"end": 913,
+									"argument": {
+										"type": "Identifier",
+										"start": 869,
+										"end": 913,
+										"name": "dddddddddddddddddddddddddddddddddddddddddddd"
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 breaks ahead of the `>`, the `await` bare behind it.",
+							"start": 737,
+							"end": 796
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1014,
+					"end": 1129,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1014,
+						"end": 1128,
+						"callee": {
+							"type": "Identifier",
+							"start": 1014,
+							"end": 1016,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1020,
+								"end": 1025,
+								"left": {
+									"type": "Identifier",
+									"start": 1020,
+									"end": 1021,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1024,
+									"end": 1025,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 1029,
+								"end": 1125,
+								"left": {
+									"type": "Identifier",
+									"start": 1029,
+									"end": 1073,
+									"name": "cccccccccccccccccccccccccccccccccccccccccccc"
+								},
+								"operator": ">",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 1076,
+									"end": 1125,
+									"left": {
+										"type": "BinaryExpression",
+										"start": 1076,
+										"end": 1117,
+										"left": {
+											"type": "Identifier",
+											"start": 1076,
+											"end": 1096,
+											"name": "dddddddddddddddddddd"
+										},
+										"operator": "%",
+										"right": {
+											"type": "Identifier",
+											"start": 1099,
+											"end": 1117,
+											"name": "eeeeeeeeeeeeeeeeee"
+										}
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 1120,
+										"end": 1125,
+										"name": "fffff"
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A mixed-arithmetic operand at the same two widths: 100 flat, 101 broken ahead of the `>`.",
+							"start": 920,
+							"end": 1012
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1131,
+					"end": 1250,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1131,
+						"end": 1249,
+						"callee": {
+							"type": "Identifier",
+							"start": 1131,
+							"end": 1133,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1137,
+								"end": 1142,
+								"left": {
+									"type": "Identifier",
+									"start": 1137,
+									"end": 1138,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1141,
+									"end": 1142,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 1146,
+								"end": 1246,
+								"left": {
+									"type": "Identifier",
+									"start": 1146,
+									"end": 1190,
+									"name": "cccccccccccccccccccccccccccccccccccccccccccc"
+								},
+								"operator": ">",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 1196,
+									"end": 1246,
+									"left": {
+										"type": "BinaryExpression",
+										"start": 1196,
+										"end": 1237,
+										"left": {
+											"type": "Identifier",
+											"start": 1196,
+											"end": 1216,
+											"name": "dddddddddddddddddddd"
+										},
+										"operator": "%",
+										"right": {
+											"type": "Identifier",
+											"start": 1219,
+											"end": 1237,
+											"name": "eeeeeeeeeeeeeeeeee"
+										}
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 1240,
+										"end": 1246,
+										"name": "ffffff"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1383,
+					"end": 1502,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1383,
+						"end": 1501,
+						"callee": {
+							"type": "Identifier",
+							"start": 1383,
+							"end": 1385,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1389,
+								"end": 1398,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 1389,
+									"end": 1394,
+									"left": {
+										"type": "Identifier",
+										"start": 1389,
+										"end": 1390,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 1393,
+										"end": 1394,
+										"name": "b"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1397,
+									"end": 1398,
+									"name": "c"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 1402,
+								"end": 1498,
+								"left": {
+									"type": "Identifier",
+									"start": 1402,
+									"end": 1446,
+									"name": "dddddddddddddddddddddddddddddddddddddddddddd"
+								},
+								"operator": ">>",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 1450,
+									"end": 1498,
+									"argument": {
+										"type": "Identifier",
+										"start": 1456,
+										"end": 1498,
+										"name": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `>>` behind two nested `<` closes both lists, so it takes the same two answers: 100",
+							"start": 1253,
+							"end": 1341
+						},
+						{
+							"type": "Line",
+							"value": " flat, 101 broken ahead of the `>>`.",
+							"start": 1343,
+							"end": 1381
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1504,
+					"end": 1627,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1504,
+						"end": 1626,
+						"callee": {
+							"type": "Identifier",
+							"start": 1504,
+							"end": 1506,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1510,
+								"end": 1519,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 1510,
+									"end": 1515,
+									"left": {
+										"type": "Identifier",
+										"start": 1510,
+										"end": 1511,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 1514,
+										"end": 1515,
+										"name": "b"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1518,
+									"end": 1519,
+									"name": "c"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 1523,
+								"end": 1623,
+								"left": {
+									"type": "Identifier",
+									"start": 1523,
+									"end": 1567,
+									"name": "dddddddddddddddddddddddddddddddddddddddddddd"
+								},
+								"operator": ">>",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 1574,
+									"end": 1623,
+									"argument": {
+										"type": "Identifier",
+										"start": 1580,
+										"end": 1623,
+										"name": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1767,
+					"end": 1886,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1767,
+						"end": 1885,
+						"callee": {
+							"type": "Identifier",
+							"start": 1767,
+							"end": 1769,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1773,
+								"end": 1778,
+								"left": {
+									"type": "Identifier",
+									"start": 1773,
+									"end": 1774,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1777,
+									"end": 1778,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 1782,
+								"end": 1882,
+								"left": {
+									"type": "Identifier",
+									"start": 1782,
+									"end": 1826,
+									"name": "cccccccccccccccccccccccccccccccccccccccccccc"
+								},
+								"operator": ">>",
+								"right": {
+									"type": "AwaitExpression",
+									"start": 1834,
+									"end": 1881,
+									"argument": {
+										"type": "Identifier",
+										"start": 1840,
+										"end": 1881,
+										"name": "ddddddddddddddddddddddddddddddddddddddddd"
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Behind a single `<` a `>>` closes nothing: at 101 it ends its line as any operator",
+							"start": 1630,
+							"end": 1715
+						},
+						{
+							"type": "Line",
+							"value": " does, and its operand keeps the clarity pair.",
+							"start": 1717,
+							"end": 1765
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

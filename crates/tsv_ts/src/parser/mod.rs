@@ -108,27 +108,45 @@ fn comment_from_token(
 
 /// A `<` region: what tsc's type-argument parse may still be consuming.
 ///
-/// It opens at a binary `<` (or a `<<`, which tsc re-scans to one), and a lone `>` reduced
-/// while it is open may be the token that recovering parse stops at — which the printer
-/// must then never let end a line (`BinaryExpression::may_close_type_arguments`). It is a
-/// deliberate SUPERSET — no model of which tokens the recovery takes — and it ends only
-/// where the printed form provably ends it, all of them tokens the type grammar cannot
-/// take at list level:
+/// It opens at a binary `<` (a `<<` opens two — tsc re-scans it to a `<` and reads the
+/// second as a nested list's), and a `>` reduced while it is open may be the token that
+/// recovering parse stops at — which the printer must then never let end a line, nor put
+/// a pair of its own behind (`BinaryExpression::may_close_type_arguments`). A `>>` closes
+/// two nested lists and a `>>>` three, so each is such a token behind that many open
+/// regions ([`LtRegions`]). It is a deliberate SUPERSET — no model of which tokens the
+/// recovery takes — and it ends only where the printed form provably ends it, all of them
+/// tokens the type grammar cannot take at list level:
 ///
 /// - the closer of the delimiter the `<` was written in ([`Parser::exit_grouping`], read
 ///   against [`LtRegion::floor`] as `no_in_depth` reads its baseline) — call arguments,
-///   a parameter list, `[…]`, `{…}`, `${…}`. **A grouping paren is not one**: the printer
-///   may strip it, so `f((x < q), a > b)` prints as one comma list, and the region
-///   re-anchors one level out instead ([`Parser::exit_stripped_grouping`]);
-/// - a statement or class-member boundary ([`Parser::lt_region_statement_base`]).
+///   a parameter list, `[…]`, `{…}`, each `${…}` of a template. **A grouping paren is
+///   not one**: the printer may strip it, so `f((x < q), a > b)` prints as one comma
+///   list, and the region re-anchors one level out instead
+///   ([`Parser::exit_stripped_grouping`]);
+/// - a statement, module-item or class-member boundary
+///   ([`Parser::lt_regions_statement_base`]), and the two places a statement's own parts
+///   stand past one: a do-while's test, past its body, and a `switch` clause's test, past
+///   the discriminant and past the statements of the clause before it. Two `case` tests
+///   with no statement between them are NOT parted: only a `:` and a keyword stand there,
+///   and tsv's own type-argument scan reads through both.
 ///
-/// Ending it EARLY is the unsound direction (a `>` the printer may then end a line on);
-/// ending it late costs one operator-leading line break on a shape real code does not
-/// hold.
+/// A **body** is no boundary of the region it was written in — an arrow's, a function's,
+/// a class's, an object literal method's: its statements start from the open regions,
+/// and the regions are still open past its `}` ([`Parser::with_lt_region_inherited`]).
 ///
-/// Only the EARLIEST open region is kept: a later one opens at the same depth or deeper,
-/// so it dies no later, and the earliest `<` is the one every reader wants.
-#[derive(Clone, Copy)]
+/// Ending it EARLY is the unsound direction (a `>` the printer may then end a line on,
+/// or put a pair behind); ending it late costs one operator-leading line break, or one
+/// withheld clarity pair, on a shape real code does not hold.
+///
+/// Regions die in the reverse of the order they opened: a later one opens at the same depth
+/// or deeper, so it dies no later than every one before it ([`LtRegions`]).
+// TODO: a region still outlives the part of a statement it was written in at these
+// places, each the late (sound) direction: a `for` head's parts across their `;`
+// (`for (let i = 0; i < n; i += c > d % e + f ? 1 : 2) {}`), a class heritage's or a
+// decorator's paren into the class body or the member it heads
+// (`class K extends (a < b ? B : C) { q = c > d % e + f; }`), and an object literal's
+// computed key into a later property (`x = { [a < b]: 1, q: c > await d };`).
+#[derive(Clone, Copy, Default)]
 struct LtRegion {
     /// The [`Parser::grouping_depth`] the region lives at: it is dead once the depth drops
     /// below this.
@@ -138,8 +156,64 @@ struct LtRegion {
     /// `x < 1 + 2 > c` are the chain the pair rule answers
     /// (`BinaryExpression::relexes_as_type_arguments`), which either ends the region on a
     /// `)` or has graded it no type-argument list — so the reader asks for a `<` standing
-    /// AHEAD of that operand ([`Parser::lt_region_open_before`]).
+    /// AHEAD of that operand ([`Parser::lt_regions_open_before`]).
     lt_pos: usize,
+}
+
+/// The `<` regions open at one point of the parse, in opening order — the earliest
+/// [`LtRegions::CAP`] of them, which is every count a reader asks for: a `>` closes one
+/// list, a `>>` two, a `>>>` three.
+///
+/// Dropping the rest loses nothing. Floors never decrease along the order regions opened
+/// in (a later `<` stands at the same depth or deeper, and re-anchoring a stripped paren's
+/// regions lowers them only to the depth every earlier one already lives at), so the
+/// regions that die at a closer are always a suffix, and an untracked one is dead before
+/// any tracked one it followed.
+#[derive(Clone, Copy, Default)]
+struct LtRegions {
+    len: u8,
+    open: [LtRegion; Self::CAP],
+}
+
+impl LtRegions {
+    /// The most lists one token closes (`>>>`).
+    const CAP: usize = 3;
+
+    /// Record a region that just opened; past [`Self::CAP`] it is not tracked.
+    #[inline]
+    fn open(&mut self, region: LtRegion) {
+        if let Some(slot) = self.open.get_mut(usize::from(self.len)) {
+            *slot = region;
+            self.len += 1;
+        }
+    }
+
+    /// Drop the regions that lived deeper than `depth` — the delimiter they opened in
+    /// has closed.
+    #[inline]
+    fn close_above(&mut self, depth: u32) {
+        while self.len > 0 && self.open[usize::from(self.len) - 1].floor > depth {
+            self.len -= 1;
+        }
+    }
+
+    /// Re-anchor the regions that lived deeper than `depth` AT `depth` — the grouping
+    /// paren they opened in is one the printer may strip.
+    #[inline]
+    fn reanchor_above(&mut self, depth: u32) {
+        for region in &mut self.open[..usize::from(self.len)] {
+            region.floor = region.floor.min(depth);
+        }
+    }
+
+    /// How many open regions have their `<` ahead of `operand_start`.
+    #[inline]
+    fn open_before(&self, operand_start: usize) -> usize {
+        self.open[..usize::from(self.len)]
+            .iter()
+            .take_while(|region| region.lt_pos < operand_start)
+            .count()
+    }
 }
 
 /// One discarded grouping paren pair, recorded while a binding pattern is read
@@ -155,7 +229,7 @@ pub(super) struct GroupingParen {
 /// speculative parse ([`Parser::parse_arrow_or_rewind`]): the lexer cursor, the
 /// one-token window with its decoded values and line-terminator flags, `prev_end`,
 /// a peek's stored lexer error, the comment ledger's length, the grouping depth and the
-/// open `<` region that is read against it ([`Parser::lt_region`]).
+/// open `<` regions that are read against it ([`Parser::lt_regions`]).
 /// Context flags (`allow_in`, `in_await`, …) are not carried — their combinators
 /// restore them on every path — and neither are arena nodes, which an abandoned
 /// parse simply leaves unreachable.
@@ -184,7 +258,7 @@ pub(super) struct Checkpoint<'arena> {
     lexer_error: Option<ParseError>,
     comments_len: usize,
     grouping_depth: u32,
-    lt_region: Option<LtRegion>,
+    lt_regions: LtRegions,
 }
 
 #[expect(clippy::struct_excessive_bools)]
@@ -332,20 +406,20 @@ pub struct Parser<'a, 'arena> {
     /// body, the conditional's alternate and an assignment's right side, which
     /// inherit it exactly as tsc threads the parameter through those three.
     arrow_return_type_barred_at: Option<u32>,
-    /// The OPEN `<` region, or `None` while none is open — the one input of
+    /// The OPEN `<` regions — the one input of
     /// `BinaryExpression::may_close_type_arguments`, where the hazard, tsc's recovering
     /// list parse, is stated. What a region is, and where one ends: [`LtRegion`].
     ///
     /// Carried by [`Checkpoint`], since the speculative arrow head may open one.
-    lt_region: Option<LtRegion>,
-    /// What [`Parser::lt_region`] is reset to where a statement (or a class member)
-    /// begins: the region a **body** inherited. A statement's own regions die with it — a
+    lt_regions: LtRegions,
+    /// What [`Parser::lt_regions`] is reset to where a statement (or a class member)
+    /// begins: the regions a **body** inherited. A statement's own regions die with it — a
     /// head's `<` says nothing about the body (`if (x < q) a > b`) — but a body written
     /// inside an open region is still inside it, tsc reading an arrow's block as a type
     /// literal and its `return (` as a method signature
     /// (`x < (() => { return (a > b); })`). [`Parser::with_lt_region_inherited`] hands the
-    /// open region down and restores both on the way out.
-    lt_region_statement_base: Option<LtRegion>,
+    /// open regions down and restores both on the way out.
+    lt_regions_statement_base: LtRegions,
     /// The syntactic goal symbol (`Script` vs `Module`) this parse runs against.
     /// Fixed for the whole parse — embedders (Svelte) and the standalone
     /// `parse`/`format` default to `Module`; `parse_with_goal` overrides it.
@@ -579,8 +653,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             allow_in: true,                  // Allow `in` binary operator by default
             no_in_depth: 0,                  // Only read while `allow_in` is false
             arrow_return_type_barred_at: None, // Not inside a conditional consequent
-            lt_region: None,                 // No `<` region open
-            lt_region_statement_base: None,  // The top level inherits none
+            lt_regions: LtRegions::default(), // No `<` region open
+            lt_regions_statement_base: LtRegions::default(), // The top level inherits none
             goal,
             // Module top level is `[+Await]` (`ModuleItem[+Await]`); Script top
             // level is `[~Await]` (`ScriptBody[~Await]`).
@@ -1190,12 +1264,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.grouping_depth -= 1;
         // The delimiter a `<` region opened in has closed, and its closer is a token the
         // printed form always holds ([`LtRegion`]).
-        if self
-            .lt_region
-            .is_some_and(|region| region.floor > self.grouping_depth)
-        {
-            self.lt_region = None;
-        }
+        self.lt_regions.close_above(self.grouping_depth);
     }
 
     /// [`Parser::exit_grouping`] for a GROUPING paren, the one delimiter the printer may
@@ -1203,57 +1272,52 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// paren sat in ([`LtRegion`]).
     #[inline]
     pub(super) fn exit_stripped_grouping(&mut self) {
-        let open = self.lt_region;
+        self.lt_regions
+            .reanchor_above(self.grouping_depth.saturating_sub(1));
         self.exit_grouping();
-        if let Some(region) = open
-            && self.lt_region.is_none()
-        {
-            self.lt_region = Some(LtRegion {
+    }
+
+    /// Record a binary `<` / `<<` just consumed, at `lt_pos`: a `<` opens one region and a
+    /// `<<` two, the second `<` being a nested list's to the parse that re-scans it
+    /// ([`LtRegion`]).
+    #[inline]
+    pub(super) fn open_lt_regions(&mut self, lt_pos: usize, count: usize) {
+        for _ in 0..count {
+            self.lt_regions.open(LtRegion {
                 floor: self.grouping_depth,
-                ..region
+                lt_pos,
             });
         }
     }
 
-    /// Record a binary `<` / `<<` just consumed, at `lt_pos`: it opens a region unless one
-    /// is already open, whose floor is the lower and so outlives this one ([`LtRegion`]).
+    /// How many `<` regions are open at the current token with their `<` ahead of
+    /// `operand_start` — the start of the left operand of the `>` / `>>` / `>>>` being
+    /// reduced ([`LtRegion::lt_pos`]).
     #[inline]
-    pub(super) fn open_lt_region(&mut self, lt_pos: usize) {
-        self.lt_region.get_or_insert(LtRegion {
-            floor: self.grouping_depth,
-            lt_pos,
-        });
-    }
-
-    /// Whether a `<` region is open at the current token whose `<` stands ahead of
-    /// `operand_start` — the start of the left operand of the `>` being reduced
-    /// ([`LtRegion::lt_pos`]).
-    #[inline]
-    pub(super) fn lt_region_open_before(&self, operand_start: usize) -> bool {
-        self.lt_region
-            .is_some_and(|region| region.lt_pos < operand_start)
+    pub(super) fn lt_regions_open_before(&self, operand_start: usize) -> usize {
+        self.lt_regions.open_before(operand_start)
     }
 
     /// A statement or class member begins: the regions of whatever came before it in this
-    /// body are dead ([`Parser::lt_region_statement_base`]).
+    /// body are dead ([`Parser::lt_regions_statement_base`]).
     #[inline]
     pub(super) fn reset_lt_region_for_statement(&mut self) {
-        self.lt_region = self.lt_region_statement_base;
+        self.lt_regions = self.lt_regions_statement_base;
     }
 
-    /// Run `f` as a **body** written inside whatever `<` region is open: its statements
-    /// start from that region rather than from none
-    /// ([`Parser::lt_region_statement_base`]), and both are restored afterward (on success
-    /// and error alike), where the body's own regions are dead.
+    /// Run `f` as a **body** written inside whatever `<` regions are open: its statements
+    /// start from those regions rather than from none
+    /// ([`Parser::lt_regions_statement_base`]), and both are restored afterward (on
+    /// success and error alike), where the body's own regions are dead.
     pub(super) fn with_lt_region_inherited<T>(
         &mut self,
         f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
     ) -> Result<T, ParseError> {
-        let saved = self.lt_region;
-        let saved_base = std::mem::replace(&mut self.lt_region_statement_base, saved);
+        let saved = self.lt_regions;
+        let saved_base = std::mem::replace(&mut self.lt_regions_statement_base, saved);
         let result = f(self);
-        self.lt_region_statement_base = saved_base;
-        self.lt_region = saved;
+        self.lt_regions_statement_base = saved_base;
+        self.lt_regions = saved;
         result
     }
 
@@ -1339,7 +1403,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             lexer_error: self.lexer_error.clone(),
             comments_len: self.comments.len(),
             grouping_depth: self.grouping_depth,
-            lt_region: self.lt_region,
+            lt_regions: self.lt_regions,
         }
     }
 
@@ -1363,7 +1427,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             lexer_error,
             comments_len,
             grouping_depth,
-            lt_region,
+            lt_regions,
         } = checkpoint;
         self.lexer.rewind(lexer);
         self.current = current;
@@ -1376,7 +1440,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.lexer_error = lexer_error;
         self.comments.truncate(comments_len);
         self.grouping_depth = grouping_depth;
-        self.lt_region = lt_region;
+        self.lt_regions = lt_regions;
         // Whatever the abandoned parse's type grammar was handing to itself is not
         // for the re-parse to receive (`checkpoint` asserts it was empty).
         self.pending_conditional_extends = None;
