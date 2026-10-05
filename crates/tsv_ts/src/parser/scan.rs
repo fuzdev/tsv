@@ -343,12 +343,18 @@ pub(super) fn is_word_at(bytes: &[u8], pos: usize, word: &[u8]) -> bool {
 /// `A[+1]` is not one), radix prefixes (`0x`), separators (`1_000`), a BigInt `n`, and an
 /// exponent whose own sign (`1e-3`) would otherwise end the scan.
 ///
-/// Deliberately loose about a literal's INTERIOR — it accepts more than the grammar does.
+/// Deliberately loose about a literal's DIGITS — it accepts more than the grammar does.
 /// Callers use it to find where a literal ENDS, then check what follows, so over-consuming
-/// a malformed literal only makes that follow-check fail. The FIRST character is the one
-/// place it is strict, and must stay so: `-b` would otherwise scan as a literal ending at
-/// the very `]` a real one ends at, leaving the follow-check no way to tell a negated
-/// identifier from a negative number.
+/// a malformed digit run only makes that follow-check fail. Two places are strict, because
+/// each is where a well-formed literal ends and a different token begins:
+///
+/// - the FIRST character. `-b` would otherwise scan as a literal ending at the very `]` a
+///   real one ends at, leaving the follow-check no way to tell a negated identifier from a
+///   negative number;
+/// - the decimal POINT. A literal holds at most one, and none behind a radix prefix, an
+///   exponent or a BigInt suffix, so a `.` past any of those is a MEMBER ACCESS on the
+///   literal (`1..x`, `1.5.x`, `.5.x`, `1e3.x`, `0x1.x`, `1n.x`) — swallowing it hides the
+///   one token that says the literal is an expression's operand, not a type.
 #[inline]
 pub(super) fn skip_numeric_literal(bytes: &[u8], pos: usize) -> usize {
     let mut cursor = pos;
@@ -360,17 +366,35 @@ pub(super) fn skip_numeric_literal(bytes: &[u8], pos: usize) -> usize {
     if !matches!(bytes.get(cursor), Some(b'0'..=b'9' | b'.')) {
         return pos;
     }
+    let radix_prefixed = bytes[cursor] == b'0'
+        && matches!(
+            bytes.get(cursor + 1),
+            Some(b'x' | b'X' | b'o' | b'O' | b'b' | b'B')
+        );
+    // Whether a `.` here is still the literal's own.
+    let mut takes_point = !radix_prefixed;
     while cursor < bytes.len() {
         let b = bytes[cursor];
-        if b.is_ascii_alphanumeric() || b == b'.' || b == b'_' {
+        if b == b'.' {
+            if !takes_point {
+                break;
+            }
+            takes_point = false;
+        } else if b.is_ascii_alphabetic() {
+            // A letter in a decimal literal is its exponent or its BigInt suffix, either of
+            // which ends the mantissa; in a radix-prefixed one it is the prefix or a digit.
+            takes_point = false;
             // An exponent's sign belongs to the literal, not to a following operator.
-            if matches!(b, b'e' | b'E') && matches!(bytes.get(cursor + 1), Some(b'-' | b'+')) {
+            if !radix_prefixed
+                && matches!(b, b'e' | b'E')
+                && matches!(bytes.get(cursor + 1), Some(b'-' | b'+'))
+            {
                 cursor += 1;
             }
-            cursor += 1;
-        } else {
+        } else if !(b.is_ascii_digit() || b == b'_') {
             break;
         }
+        cursor += 1;
     }
     cursor
 }

@@ -117,9 +117,9 @@ fn left_side_child<'e>(expr: &'e internal::Expression<'e>) -> Option<&'e interna
 /// One table, because "which paren context does a naked left side sit in?" has one answer
 /// per parent kind and two askers with opposite needs:
 /// [`Printer::left_shell_paren_is_emitted`] adds a source-shell precondition and reads it as
-/// "is the erased shell RE-EMITTED", while the relational-chain rule
-/// (`needs_parens`'s `relational_region_opens_on_a_kept_shell`) reads it bare, as "does the
-/// printed form open on a `(`", and so must see a pair the printer SYNTHESIZES too. Split
+/// "is the erased shell RE-EMITTED", while the printed-spine walk
+/// ([`printed_left_spine_step`]) reads it bare, as "does the printed form open on a `(`",
+/// and so must see a pair the printer SYNTHESIZES too. Split
 /// into two matches, the two would answer one position two ways the first time a builder's
 /// context moved.
 ///
@@ -129,7 +129,7 @@ fn left_side_child<'e>(expr: &'e internal::Expression<'e>) -> Option<&'e interna
 /// ([`ternary_test_needs_parens`], shared by the inline, line-comment and frozen layouts).
 /// A sequence answers `false`: its operands ride the sequence's OWN envelope, so an operand
 /// never prints a pair of its own — the sequence's envelope is the CALLER's to notice.
-pub(in crate::printer) fn left_side_child_is_parenthesized(
+fn left_side_child_is_parenthesized(
     expr: &internal::Expression<'_>,
     child: &internal::Expression<'_>,
     in_for_init: bool,
@@ -156,14 +156,10 @@ pub(in crate::printer) fn left_side_child_is_parenthesized(
 /// start of the literal whose opening `/` is the expression's first printed byte, or `None`
 /// when a pair the printer keeps (or any other token) comes first.
 ///
-/// The walk descends the left spine as it will be PRINTED: at each step it asks the
-/// builder's own pair question for the child ([`left_side_child_is_parenthesized`]; for a
-/// cast, an instantiation and a postfix update, whose left side [`left_side_child`] leaves
-/// out, the context their builders pass), and stops at the first pair that stands. So
-/// `(/a/).test(s)` and `(/a/) ? b : c` reach the literal — the author's pair is not
-/// printed — while `(/a/ + b).c` stops at the member object's pair. An instantiation is
-/// asked as if its operand's pair were not the author's: a pair it keeps anyway only makes
-/// an asker's own wrap redundant, never wrong.
+/// The walk descends the left spine as it will be PRINTED ([`printed_left_spine_step`])
+/// and stops at the first pair that stands. So `(/a/).test(s)` and `(/a/) ? b : c` reach
+/// the literal — the author's pair is not printed — while `(/a/ + b).c` stops at the
+/// member object's pair.
 ///
 /// An embedder asks it where its own syntax gives a leading `/` another meaning: a Svelte
 /// `{…}` tag in text position reads `{/` as a block close, so `{/a/.test(s)}` does not parse.
@@ -171,45 +167,72 @@ pub(crate) fn leading_regex_start(expr: &internal::Expression<'_>) -> Option<u32
     use internal::ExpressionKind;
     let mut node = expr;
     loop {
-        let (child, parenthesized) = match &node.kind {
+        match &node.kind {
             ExpressionKind::RegexLiteral(_) => return Some(node.span().start),
             // A sequence at a value position prints its own envelope (`build_sequence_doc`'s
             // default layout), so its `(` comes first.
             ExpressionKind::SequenceExpression(_) => return None,
-            ExpressionKind::TSAsExpression(cast) => (
-                cast.expression,
-                needs_parens(cast.expression, ParenContext::TypeAssertion, false),
-            ),
-            ExpressionKind::TSSatisfiesExpression(cast) => (
-                cast.expression,
-                needs_parens(cast.expression, ParenContext::TypeAssertion, false),
-            ),
-            ExpressionKind::TSInstantiationExpression(inst) => (
-                inst.expression,
-                needs_parens(
-                    inst.expression,
-                    ParenContext::InstantiationExpression { source_pair: false },
-                    false,
-                ),
-            ),
-            ExpressionKind::UpdateExpression(update) if !update.prefix => (
-                update.argument,
-                needs_parens(
-                    update.argument,
-                    ParenContext::UpdateArgument { postfix: true },
-                    false,
-                ),
-            ),
-            _ => {
-                let child = left_side_child(node)?;
-                (child, left_side_child_is_parenthesized(node, child, false))
-            }
-        };
+            _ => {}
+        }
+        let (child, parenthesized) = printed_left_spine_step(node, false)?;
         if parenthesized {
             return None;
         }
         node = child;
     }
+}
+
+/// One step down `node`'s left spine as it will be PRINTED: the child whose printed form
+/// opens `node`'s own, and whether that child prints inside a paren pair there — the
+/// builder's own pair question for it ([`left_side_child_is_parenthesized`]; for a cast, an
+/// instantiation and a postfix update, whose left side [`left_side_child`] leaves out, the
+/// context their builders pass). `None` where `node` prints a token of its own first, or
+/// has no children.
+///
+/// An instantiation is asked as if its operand's pair were not the author's: a pair it
+/// keeps anyway only makes an asker's own wrap redundant, never wrong.
+///
+/// The walk every "what does this expression print FIRST" question makes —
+/// [`leading_regex_start`], and the relational-chain rule's search for a kept shell
+/// (`needs_parens`'s `relational_region_opens_on_a_kept_shell`).
+pub(in crate::printer) fn printed_left_spine_step<'e>(
+    node: &'e internal::Expression<'e>,
+    in_for_init: bool,
+) -> Option<(&'e internal::Expression<'e>, bool)> {
+    use internal::ExpressionKind;
+    Some(match &node.kind {
+        ExpressionKind::TSAsExpression(cast) => (
+            cast.expression,
+            needs_parens(cast.expression, ParenContext::TypeAssertion, in_for_init),
+        ),
+        ExpressionKind::TSSatisfiesExpression(cast) => (
+            cast.expression,
+            needs_parens(cast.expression, ParenContext::TypeAssertion, in_for_init),
+        ),
+        ExpressionKind::TSInstantiationExpression(inst) => (
+            inst.expression,
+            needs_parens(
+                inst.expression,
+                ParenContext::InstantiationExpression { source_pair: false },
+                in_for_init,
+            ),
+        ),
+        ExpressionKind::UpdateExpression(update) if !update.prefix => (
+            update.argument,
+            needs_parens(
+                update.argument,
+                ParenContext::UpdateArgument { postfix: true },
+                in_for_init,
+            ),
+        ),
+        _ => {
+            let child = left_side_child(node)?;
+            (
+                child,
+                left_side_child_is_parenthesized(node, child, in_for_init),
+            )
+        }
+    })
 }
 
 /// Where a `SequenceExpression`'s OPERANDS stop — its last operand's end, which its span

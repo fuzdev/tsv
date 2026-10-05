@@ -204,7 +204,7 @@ pub(super) fn scan_arrow_head_close(bytes: &[u8], start: usize) -> Option<usize>
 /// source does not have. Every caller that acts on the `)` ALONE — with no follow-token
 /// filter behind it to refuse a false one — must use this walk, because a false close
 /// picks up whatever byte follows it as if it were the group's own
-/// ([`paren_list_then_arrow`]'s `=>`).
+/// ([`paren_list_arrow_end`]'s `=>`).
 pub(super) fn matching_paren_close(bytes: &[u8], start: usize) -> Option<usize> {
     if start >= bytes.len() || bytes[start] != b'(' {
         return None;
@@ -775,32 +775,37 @@ pub(super) fn type_args_follower_refuses(bytes: &[u8], close_end: usize, after: 
         && expression_follows_type_args_close(bytes, close_end, after)
 }
 
-/// Whether `pos` (the first byte after an inner `<` that directly follows a
-/// type-argument-opening `<`) begins a generic function type's type-parameter
-/// list — the only type that can start with `<`, so the only valid reading of
-/// a `<<` at a type-argument position (`f<<T>(v: T) => void>()`). True iff
-/// the list's matching `>` is followed by a parenthesized parameter list whose
+/// Where a generic function type's RETURN begins — the byte past its `=>` — if `pos` (the
+/// first byte after an inner `<` that directly follows a type-argument-opening `<`)
+/// begins one's type-parameter list: the only type that can start with `<`, so the only
+/// valid reading of a `<<` at a type-argument position (`f<<T>(v: T) => void>()`). `Some`
+/// iff the list's matching `>` is followed by a parenthesized parameter list whose
 /// matching `)` is followed by `=>`. The `=>` requirement is what separates
 /// the split from a shift-comparison chain whose right operand is
 /// parenthesized (`a << b > (c)`): an arrow can never be a relational
 /// operand, so real shift code never has `(…) =>` after the would-be close.
-pub(super) fn is_generic_function_type_start(bytes: &[u8], pos: usize) -> bool {
-    let Some(close) = matching_angle_close(bytes, pos, TypeArgScan::Parse) else {
-        return false;
-    };
+///
+/// A generic CONSTRUCT type has the same tail behind its `new`
+/// ([`construct_type_arrow_end`]), where `pos` is the first byte after that `<`.
+pub(super) fn generic_function_type_arrow_end(bytes: &[u8], pos: usize) -> Option<usize> {
+    let close = matching_angle_close(bytes, pos, TypeArgScan::Parse)?;
     let after = skip_whitespace_and_comments(bytes, close + 1);
-    if after >= bytes.len() || bytes[after] != b'(' {
-        return false;
+    if bytes.get(after) != Some(&b'(') {
+        return None;
     }
-    paren_list_then_arrow(bytes, after)
+    paren_list_arrow_end(bytes, after)
 }
 
-/// Whether the `(` at `paren` opens a parameter list whose matching `)` is
-/// followed by `=>` — the tail shared by a plain function type (`(params) =>`), a
-/// generic function type's split (`<…>(params) =>`) and a construct type
-/// (`new (params) =>`). `paren` must point at the `(`; comments between `)` and
-/// `=>` are skipped. The `=>` is the signal that separates these types from a
+/// Where the RETURN type begins — the byte past the `=>` — if the `(` at `paren` opens a
+/// parameter list whose matching `)` is followed by `=>`: the tail shared by a plain
+/// function type (`(params) =>`), a generic function type's split (`<…>(params) =>`) and a
+/// construct type (`new (params) =>`). `paren` must point at the `(`; comments between `)`
+/// and `=>` are skipped. The `=>` is the signal that separates these types from a
 /// shift/comparison chain or a `new Foo()` value (neither of which has `(…) =>`).
+///
+/// The offset is for the callers that GRADE the return rather than commit on the arrow
+/// alone — a function or construct type inside an index, where an arrow function is as
+/// well-formed; every other caller reads only whether there is one.
 ///
 /// The close comes from [`matching_paren_close`], the REGEX-AWARE walk, because the
 /// `=>` this reads is whatever byte follows the `)` — so a pattern holding an
@@ -808,36 +813,38 @@ pub(super) fn is_generic_function_type_start(bytes: &[u8], pos: usize) -> bool {
 /// otherwise hand it a close inside the literal and an arrow that is the pattern's own
 /// text.
 #[inline]
-pub(super) fn paren_list_then_arrow(bytes: &[u8], paren: usize) -> bool {
-    matching_paren_close(bytes, paren).is_some_and(|paren_close| {
-        let after_params = skip_whitespace_and_comments(bytes, paren_close + 1);
-        after_params + 1 < bytes.len()
-            && bytes[after_params] == b'='
-            && bytes[after_params + 1] == b'>'
-    })
+pub(super) fn paren_list_arrow_end(bytes: &[u8], paren: usize) -> Option<usize> {
+    let paren_close = matching_paren_close(bytes, paren)?;
+    let after_params = skip_whitespace_and_comments(bytes, paren_close + 1);
+    (bytes.get(after_params) == Some(&b'=') && bytes.get(after_params + 1) == Some(&b'>'))
+        .then_some(after_params + 2)
 }
 
-/// Whether `pos` begins a construct-signature type `new (params) => R` — the
-/// `new`-prefixed sibling of [`paren_starts_function_type`]. True iff a whole-word
-/// `new` is followed by a parenthesized parameter list whose matching `)` is
-/// followed by `=>`. The `=>` is what separates the construct TYPE from a
-/// `new Foo()` value expression, so `a < new Foo() > (c)` stays a comparison
-/// while `f<new () => T>(x)` is a generic call — the same [`paren_list_then_arrow`]
-/// tail the plain and generic function-type heads require. Callers
-/// still gate on the closing-`>` follow-token scan, so a construct type only
-/// reads as type arguments when a call/tagged-template/end token actually
-/// follows the `>`. `pos` may point at `new` directly or (for `abstract new`)
-/// past the `abstract` keyword.
-pub(super) fn is_construct_type_start(bytes: &[u8], pos: usize) -> bool {
+/// Where a construct-signature type's RETURN begins — the byte past its `=>` — if `pos`
+/// begins one, `new (params) => R` or the generic `new <T>(params) => R`: the
+/// `new`-prefixed sibling of [`paren_starts_function_type`]. `Some` iff a whole-word `new`
+/// is followed by a parenthesized parameter list — behind a type-parameter list or not —
+/// whose matching `)` is followed by `=>`. The `=>` is what separates the construct TYPE
+/// from a `new Foo()` value expression, so `a < new Foo() > (c)` stays a comparison while
+/// `f<new () => T>(x)` is a generic call — the same [`paren_list_arrow_end`] tail the
+/// plain and generic function-type heads require, the second of which
+/// ([`generic_function_type_arrow_end`]) reads the generic form here too: a `new` takes no
+/// `<` behind it in an expression, so `new <T>(…) =>` has no other reading. At a
+/// type-argument list's own level callers still gate on the closing-`>` follow-token
+/// scan, so a construct type only reads as type arguments when a call/tagged-template/end
+/// token actually follows the `>`. `pos` may point at `new` directly or (for
+/// `abstract new`) past the `abstract` keyword.
+pub(super) fn construct_type_arrow_end(bytes: &[u8], pos: usize) -> Option<usize> {
     // Whole-word `new` (not an identifier like `newType`).
-    if !is_word_at(bytes, pos, b"new") {
-        return false;
+    if pos >= bytes.len() || !is_word_at(bytes, pos, b"new") {
+        return None;
     }
-    let paren = skip_whitespace_and_comments(bytes, pos + b"new".len());
-    if bytes.get(paren) != Some(&b'(') {
-        return false;
+    let after_new = skip_whitespace_and_comments(bytes, pos + b"new".len());
+    match bytes.get(after_new)? {
+        b'(' => paren_list_arrow_end(bytes, after_new),
+        b'<' => generic_function_type_arrow_end(bytes, after_new + 1),
+        _ => None,
     }
-    paren_list_then_arrow(bytes, paren)
 }
 
 /// Find the `>` closing the angle-bracket list opened just before `pos`
@@ -996,7 +1003,7 @@ pub(super) fn matching_delimiter_close(bytes: &[u8], open: usize) -> Option<usiz
 /// `x < y > /a/` (a `/` there is the division operator to both parsers) — except one
 /// opening `/=`, the head tsc's `isStartOfExpression` counts, since an assignment
 /// operator never continues a list the way a binary one does.
-fn starts_expression_after_type_args(bytes: &[u8], pos: usize) -> bool {
+pub(super) fn starts_expression_after_type_args(bytes: &[u8], pos: usize) -> bool {
     if identifier_starts_at(bytes, pos) {
         // `in` and `instanceof` are binary keyword operators — acorn's `tt._in` /
         // `tt._instanceof` have `startsExpr = false`, so a would-be `<…>` close

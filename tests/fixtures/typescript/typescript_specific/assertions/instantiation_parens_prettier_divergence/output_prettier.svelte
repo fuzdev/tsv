@@ -10,4 +10,11 @@
 	// Binary in instantiation: parens preserve semantics
 	// `(a + b)<T>` (instantiate sum) vs `a + b<T>` (add to instantiated b)
 	let d = a + b<T>;
+
+	// Unary in instantiation: parens preserve semantics
+	// `(typeof e)<T>` (instantiate the operator's result) vs `typeof e<T>` (the operator over an instantiated `e`)
+	let f = typeof e<T>;
+	let g = -e<T>;
+	let h = !e<T>;
+	let i = void e<T>;
 </script>

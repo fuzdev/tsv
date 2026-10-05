@@ -30,7 +30,7 @@
 	};
 
 	// Complex expression inside brackets on comparison RHS
-	// check_indexed_type_pattern must not assume type args for expressions
+	// an arithmetic index is a member access, never an indexed-access type argument
 	if (x < a[b - 1]) {
 	}
 	if (x < a[b + 1]) {

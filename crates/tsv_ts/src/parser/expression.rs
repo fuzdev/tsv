@@ -680,7 +680,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     self.local_pos(child.left.span().end),
                     b'<',
                 )
-                && self.is_type_arguments_start_at(lt, TypeArgScan::Relex)
+                && self.chain_owes_type_argument_pair(lt, expr_start != left.span().start as usize)
             {
                 left = arena.alloc(Expression {
                     span: left.span,

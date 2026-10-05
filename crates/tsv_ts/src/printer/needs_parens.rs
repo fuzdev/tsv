@@ -25,7 +25,7 @@ use crate::ast::internal::{
 use crate::printer::chain::child_stops_optional_chain;
 use crate::printer::class_expr_has_decorators;
 use crate::printer::comments::{
-    left_side_child_is_parenthesized, next_significant_byte, paren_shell_close_after,
+    next_significant_byte, paren_shell_close_after, printed_left_spine_step,
 };
 use crate::printer::expressions::conditional::ternary_branch_needs_parens;
 
@@ -354,12 +354,29 @@ fn type_is_never_an_expression(ty: &TSType<'_>) -> bool {
         TSType::Parenthesized(inner) => {
             !matches!(inner.type_annotation, TSType::Function(_)) && never(inner.type_annotation)
         }
-        TSType::IndexedAccess(access) => never(access.object_type) || never(access.index_type),
+        TSType::IndexedAccess(access) => {
+            never(access.object_type) || index_is_never_an_expression(access.index_type)
+        }
         TSType::TypeReference(reference) => reference
             .type_arguments
             .as_ref()
             .is_some_and(|list| list.params.iter().any(|t| never(t))),
         _ => false,
+    }
+}
+
+/// [`type_is_never_an_expression`] for an indexed access's INDEX — the one position in a
+/// type's text where the comparison reading takes a whole expression rather than an
+/// operand, so a function type there is an arrow FUNCTION (`f<A[() => B]><U>(x)` is
+/// `f < A[() => B] > <U>(x)` to tsc, an arrow indexing `A`), and only what stands where its
+/// body would decides: `A[() => B[]]` and `A[(a) => a is B]` return nothing an expression
+/// spells.
+fn index_is_never_an_expression(index: &TSType<'_>) -> bool {
+    match index {
+        TSType::Function(function) => {
+            index_is_never_an_expression(function.return_type.type_annotation)
+        }
+        _ => type_is_never_an_expression(index),
     }
 }
 
@@ -770,12 +787,16 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         // Instantiation: `(<T>() => {})<U>`, `(x as A)<T>`, `(<T>x)<U>`, `(await x)<T>`, `(a = b)<T>`
         // Ternary/binary/assignment need parens to preserve semantics:
         // `(a ? b : c)<T>` vs `a ? b : c<T>` (different - ternary result vs alternate instantiated)
+        // A unary or update operand does too: bare, the operator takes the instantiation
+        // (`typeof a<T>` is `typeof (a<T>)`, `-a<T>` is `-(a<T>)`), and a postfix update
+        // has no bare spelling at all (`a++<T>` does not parse).
         // An instantiation instantiated again takes the pair the printer decided.
         ParenContext::InstantiationExpression { source_pair } => {
             source_pair
                 || is_await_or_yield(expr)
                 || is_type_assertion(expr)
                 || is_function_like(expr)
+                || is_unary_or_update(expr)
                 || matches!(
                     expr.kind,
                     ExpressionKind::ConditionalExpression(_)
@@ -1440,19 +1461,32 @@ fn export_default_leftmost<'a>(expr: &'a Expression<'a>, text: LeftmostText) -> 
 ///   separator — so this is belt-and-braces, and it is here because the rule is about the
 ///   printed `(`, not about which reading happens to reach it.)
 ///
-/// **Where the spine STOPS, and why that is a grammar fact rather than an accident.** A `(`
-/// only opens a *type-argument* region if the type grammar can carry on past its matching
-/// `)`, and the only postfix a parenthesized type takes is `[`…`]`. So the walk descends
-/// exactly one hop kind: the OBJECT of a plain **computed** member, the one node that prints
-/// `[` and nothing else between its object and the rest of the region. Every other spine hop
-/// puts a token there that no type continues — `.` (a qualified name needs an identifier
-/// head, never a `)`), `(`, a template's backtick, an operator, a `?` — and an OPTIONAL
-/// computed member prints `?.[`, whose `?` is not a type token either. A hop that could put
-/// a type SEPARATOR there instead (`,`, `|`, `&`, a nested `<`) cannot be reached without
-/// the operand ROOT itself taking a pair first, since each of those binds looser than `<`
-/// and a sequence self-parenthesizes — so the root test above has already answered. The one
-/// other token a type operand may be followed by, `extends`, is no expression token, so no
-/// printed `)` is ever followed by it.
+/// **Which `(` opens the region, and what may stand between the root and it.** The walk
+/// goes down the printed left spine to the first child that prints in a pair
+/// ([`printed_left_spine_step`]), and the node directly above that child decides
+/// ([`RegionHop`]):
+///
+/// - a plain **computed** member, whose `[` is the one postfix the type grammar gives a
+///   parenthesized type. The reading of the region then carries on past the `]`, so the
+///   pair is owed only where every node above is such a member or a list hop: any other
+///   hop puts a token there that no reading continues past — `.` (a qualified name needs
+///   an identifier head, never a `)`), a plain call's `(`, a plain template's backtick, an
+///   operator, a `?` — and an OPTIONAL member or call prints `?.` first, whose `?` is not
+///   a type token either;
+/// - an **argument list** — an instantiation's, a generic call's, a generic tagged
+///   template's. The parser's own lookahead keeps a region claimed where a `<` stands
+///   behind a shell that heads it, and reads nothing past that list (the parser's
+///   `OperandEnd::RegionHeadShell`), so whatever stands ABOVE the list on the spine is
+///   beside the point: `x < (typeof a)<C>(e).m > c` owes the pair that
+///   `x < (typeof a)<C>(e) > c` does. The pair is owed there on the shells the recorded
+///   flag does not already answer for ([`shell_content_may_read_as_a_type`]);
+/// - anything else closes the region at the `)`, and no pair is owed.
+///
+/// A hop that could put a type SEPARATOR behind the `)` instead (`,`, `|`, `&`) cannot be
+/// reached without the operand ROOT itself taking a pair first, since each of those binds
+/// looser than `<` and a sequence self-parenthesizes — so the root test above has already
+/// answered. The one other token a type operand may be followed by, `extends`, is no
+/// expression token, so no printed `)` is ever followed by it.
 ///
 /// ⚠️ The one token in that list whose answer is a tsv POSITION rather than a grammar fact
 /// is the non-null `!`: it is tsc's `JSDocNonNullableType`, so a compiler reading
@@ -1481,22 +1515,156 @@ fn relational_region_opens_on_a_kept_shell(operand: &Expression<'_>, in_for_init
     {
         return true;
     }
-    // Then the one hop that leaves the region open: a plain computed member's OBJECT, asked
-    // through the shared position table so the context cannot drift from the one the chain
-    // builder passes for that child.
-    while let ExpressionKind::MemberExpression(member) = &node.kind {
-        if !member.computed || member.optional {
+    // Then down the printed left spine to the first child that prints in a pair — the
+    // `(` the region opens on — each step asked through the context its own builder passes
+    // for that child ([`printed_left_spine_step`]), so the two cannot drift.
+    let mut open = true;
+    loop {
+        let Some((child, parenthesized)) = printed_left_spine_step(node, in_for_init) else {
             return false;
+        };
+        let hop = RegionHop::of(node);
+        if prints_its_own_paren_pair(child) || parenthesized {
+            return match hop {
+                RegionHop::Index => open,
+                // A `<` behind the shell keeps the region claimed by the parser's own
+                // lookahead whatever stands above the list, and the recorded flag has
+                // already answered for every content but one kind — so the pair is owed
+                // on those shells alone ([`shell_content_may_read_as_a_type`]), and on a
+                // self-parenthesizing child as it is at the root.
+                RegionHop::List => {
+                    shell_content_may_read_as_a_type(child) || prints_its_own_paren_pair(child)
+                }
+                RegionHop::Closing => false,
+            };
         }
-        let child = member.object;
-        if prints_its_own_paren_pair(child)
-            || left_side_child_is_parenthesized(node, child, in_for_init)
-        {
-            return true;
-        }
+        open &= hop != RegionHop::Closing;
         node = child;
     }
-    false
+}
+
+/// Whether a paren shell around `expr`, kept ahead of an argument list, is one the chain's
+/// pair is owed on — a shell the parser's type-argument lookahead reads as a
+/// parenthesized type with a list behind it.
+///
+/// The recorded flag (`BinaryExpression::relexes_as_type_arguments`) answers for most of
+/// them by itself: its reading looks through the shell at the content, and a content it
+/// claims — an arrow function, a sequence, an instantiation — sets the flag whether the
+/// shell is kept or not. What it cannot answer is the content that reads as a type NAME:
+/// behind a name the reading steps over the list as the name's own and grades what
+/// follows it, which is right where the printer strips the shell (`(A)<C>(e)` prints as
+/// `A<C>(e)`, a generic call no type spells) and wrong where it keeps one, since the
+/// printed `(`…`)<C>` is a parenthesized type the lookahead claims whatever follows the
+/// list. The shells the printer keeps there are an instantiation's unary operand —
+/// `(typeof a)<C>`, `(!a)<C>`, `(-1)<C>` — and a union or intersection's own pair
+/// (`(a | b)<C>`).
+///
+/// A unary operand answers only where its own operand ends as a type operand does, and a
+/// union or intersection only where every member does ([`ends_like_a_type_operand`]):
+/// one that holds a call is no type to the parser's grade of the shell, which then makes
+/// no claim behind it.
+///
+/// **Known gap.** The parser's claim behind a shell that heads the region asks nothing of
+/// what the shell holds, so it also covers kept shells this filter omits — a conditional,
+/// an assignment, a relational or shift chain, an angle-bracket assertion, a bare-name
+/// arrow function, a unary operand that ends on a call (`(a ? b : c)<C>`, `(a = b)<C>`,
+/// `(a < b)<C>`, `(<B>a)<C>`, `(typeof a())<C>`). Those chains print bare, and a width
+/// that ends a line on their `>` prints a region the parser then claims and rejects.
+fn shell_content_may_read_as_a_type(expr: &Expression<'_>) -> bool {
+    match &expr.kind {
+        ExpressionKind::UnaryExpression(unary) => match unary.operator {
+            UnaryOperator::Typeof | UnaryOperator::Bang => ends_like_a_type_operand(unary.argument),
+            UnaryOperator::Minus => is_numeral(unary.argument),
+            UnaryOperator::Plus
+            | UnaryOperator::Void
+            | UnaryOperator::Delete
+            | UnaryOperator::Tilde => false,
+        },
+        ExpressionKind::BinaryExpression(_) => ends_like_a_type_operand(expr),
+        _ => false,
+    }
+}
+
+/// Whether `expr` prints ending on an operand a type-argument list may stand behind in
+/// the lookahead's reading: a name or qualified name, `this`, a literal, an object or
+/// array, a group, a member of one, or one of those under `typeof` / `!` or ahead of a
+/// non-null `!`.
+fn ends_like_a_type_operand(expr: &Expression<'_>) -> bool {
+    match &expr.kind {
+        ExpressionKind::Identifier(_)
+        | ExpressionKind::ThisExpression(_)
+        | ExpressionKind::Literal(_)
+        | ExpressionKind::ObjectExpression(_)
+        | ExpressionKind::ArrayExpression(_)
+        | ExpressionKind::SequenceExpression(_)
+        | ExpressionKind::ImportExpression(_) => true,
+        ExpressionKind::MemberExpression(member) => {
+            !member.optional && ends_like_a_type_operand(member.object)
+        }
+        ExpressionKind::TSNonNullExpression(non_null) => {
+            ends_like_a_type_operand(non_null.expression)
+        }
+        ExpressionKind::UnaryExpression(unary) => match unary.operator {
+            UnaryOperator::Typeof | UnaryOperator::Bang => ends_like_a_type_operand(unary.argument),
+            UnaryOperator::Minus => is_numeral(unary.argument),
+            _ => false,
+        },
+        ExpressionKind::BinaryExpression(binary) => {
+            matches!(
+                binary.operator,
+                BinaryOperator::Pipe | BinaryOperator::Ampersand
+            ) && ends_like_a_type_operand(binary.left)
+                && ends_like_a_type_operand(binary.right)
+        }
+        _ => false,
+    }
+}
+
+/// Whether `expr` is a numeric or BigInt literal — the operand a `-` makes a negative
+/// literal TYPE of.
+fn is_numeral(expr: &Expression<'_>) -> bool {
+    matches!(
+        &expr.kind,
+        ExpressionKind::Literal(literal)
+            if matches!(literal.value, LiteralValue::Number(_) | LiteralValue::BigInt)
+    )
+}
+
+/// What a node prints directly behind the child that opens its printed form, as the
+/// reading of a type-argument region that opened on that child's `(` takes it.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RegionHop {
+    /// A plain computed member's `[` — the one postfix the type grammar gives a
+    /// parenthesized type. The region stays open through it.
+    Index,
+    /// The `<` of an argument list — an instantiation's, a generic call's, a generic
+    /// tagged template's. Behind a shell the parser's lookahead keeps the region claimed
+    /// there, reading nothing past the list.
+    List,
+    /// Anything else, each a token neither reading continues past
+    /// ([`relational_region_opens_on_a_kept_shell`] names them). An OPTIONAL member or
+    /// generic call is one: it prints `?.` first.
+    Closing,
+}
+
+impl RegionHop {
+    fn of(node: &Expression<'_>) -> Self {
+        match &node.kind {
+            ExpressionKind::MemberExpression(member) if member.computed && !member.optional => {
+                Self::Index
+            }
+            ExpressionKind::CallExpression(call)
+                if call.type_arguments.is_some() && !call.optional =>
+            {
+                Self::List
+            }
+            ExpressionKind::TaggedTemplateExpression(tagged) if tagged.type_arguments.is_some() => {
+                Self::List
+            }
+            ExpressionKind::TSInstantiationExpression(_) => Self::List,
+            _ => Self::Closing,
+        }
+    }
 }
 
 /// A node whose own doc prints a paren pair whatever position it sits in, so no

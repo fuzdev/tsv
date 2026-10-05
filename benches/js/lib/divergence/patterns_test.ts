@@ -2105,6 +2105,65 @@ Deno.test('instantiation_parens: positive - binary parens stripped', () => {
 	assertNotEquals(match, null);
 });
 
+Deno.test('instantiation_parens: positive - unary parens stripped', () => {
+	const prettier = '\tlet f = typeof e<T>;\n\tlet g = -e<T>;\n\tlet h = !e<T>;';
+	const ours = '\tlet f = (typeof e)<T>;\n\tlet g = (-e)<T>;\n\tlet h = (!e)<T>;';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('instantiation_parens', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('instantiation_parens: negative - a pair added with other changes', () => {
+	// not the exact twin: the operand changed too, so the pair is not the whole difference
+	const prettier = '\tlet f = typeof d<T>;';
+	const ours = '\tlet f = (typeof e)<T>;';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('instantiation_parens', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('instantiation_parens: positive - two unary pairs on one line', () => {
+	const prettier = '\tlet f = g(typeof e<T>, !f<U>);';
+	const ours = '\tlet f = g((typeof e)<T>, (!f)<U>);';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('instantiation_parens', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('instantiation_parens: negative - a pair around a plain callee', () => {
+	// a redundant pair around an identifier is no unary operand's
+	const prettier = '\tlet f = g<T>(x);';
+	const ours = '\tlet f = (g)<T>(x);';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('instantiation_parens', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('instantiation_parens: negative - a double wrap', () => {
+	// prettier keeps one pair and ours adds a second: not the pair this pattern explains
+	const prettier = '\tlet f = (typeof e)<T>;';
+	const ours = '\tlet f = ((typeof e))<T>;';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('instantiation_parens', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('instantiation_parens: negative - an extra line beside the twin', () => {
+	const prettier = '\tlet f = typeof e<T>;';
+	const ours = '\tlet f = (typeof e)<T>;\n\tlet g = 1;';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('instantiation_parens', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test("instantiation_parens: negative - a call's own paren", () => {
+	const prettier = '\tlet f = htypeof e<T>;';
+	const ours = '\tlet f = h(typeof e)<T>;';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('instantiation_parens', ctx);
+	assertEquals(match, null);
+});
+
 Deno.test('instantiation_parens: negative - assignment parens (both agree)', () => {
 	// Both formatters preserve parens for assignment — no diff
 	const prettier = '\tlet a = (x = y)<T>;';

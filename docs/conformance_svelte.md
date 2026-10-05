@@ -1165,6 +1165,85 @@ whose `(-1[K])[]` prettier strips into the rejected `-1[K][]`. The bare `-1[]` c
 numeric literal alone, as tsc's `parseLiteralTypeNode` does, rather than parsing a whole
 unary expression, so the type parser's postfix loop sees the brackets.
 
+The same expression parse takes every OTHER postfix behind the digits — a member, a
+call's arguments, a template, a non-null `!`, a type-argument list — and that reaches tsv
+where the literal stands in a `<` region the type-argument lookahead has to grade.
+`f<-1 .x>(x)`, `f<-1(e)>(x)` and ``f<-1`t`>(x)`` are generic calls to acorn-typescript,
+each over the literal type of the whole unary expression (`-(1 .x)`), and comparison
+chains to tsc. tsv has neither tree for a region read as a list, so each spelling is one
+of two things, and which one turns on where the literal stands and never on what it is.
+
+**At the list's own level** the spaced postfix is the chain the compiler reads
+(`f < -(1).x > x`, `f < -1(e) > x`), a tree acorn-typescript does not have. Two spellings
+stay claimed and are rejected instead, under *A region the lookahead claims and the type
+parse rejects* below: a type-argument list behind the digits (`f<-1<C>(e)>(x)`), and a
+member tail GLUED to them (`f<-1..x>(x)`), inside a paren shell heading the list too
+(`f<(-1..x())>(x)`).
+
+**Inside an index** every postfix — spaced or glued, and the printer's own spellings of
+one (`-(1).x`, the member it writes on a parenthesized literal; `-(1)(e)`, which it
+strips to `-1(e)`) — follows the INDEX:
+
+- where the body **opens as a type**, the region is claimed and rejected
+  (`f<A[B | -1(e)]>(x)`, ``f<A[A[-1`t`]]>(x)``, `f<A[-1 .x]>(x)`, `f<A[-1..x]>(x)`,
+  `f<A[keyof -1(e)]>(x)`, `f<A[B | -1!]>(x)`). A body opens as a
+  type on its first operand, read through any paren shells: a string or template key, a
+  `keyof` or a `typeof`, or a name or numeric literal with a type-continuation token
+  behind it — a single `|` or `&`, a `.`, a `<`, an `extends`, a `[` on the operand's own
+  line. An index behind a nested argument list or an import type at the list's own level
+  is claimed whatever opens it (`f<A<B>[-1(e)]>(x)`, `f<import('m').A[-1(e)]>(x)`); one
+  behind a type QUERY of an import is not (`f<typeof import('m')[-1(e)]>(x)` is the
+  chain). The spelling the printer strips to one of these is rejected with them
+  (`f<A[B | -(1)(e)]>(x)`), though both parsers read a comparison chain in it as
+  written: a **known over-rejection**, of the printed form's kind;
+- anywhere else the line is the comparison chain: an index that opens on the literal
+  itself ahead of a call, a template or a `!` (`f<A[-1(e)]>(x)`, `f<A[-1(e) | B]>(x)`),
+  on an arrow function (`f<A[() => B | -1(e)]>(x)`, `f<A[() => -1..x]>(x)`), on an
+  object or array literal (`f<A[{} | -1(e)]>(x)`), or on a name no type-continuation
+  token follows (`f<A[readonly -1(e)]>(x)`).
+
+That chain prints **with no paren pair the source did not have**. acorn-typescript read
+a generic call in the bare text, and a pair around the chain's `<` operand would hand it
+a comparison instead, so the bare form — which tsv's own parse does not claim — keeps
+the one program it read. A pair the author wrote is kept where the printed form would
+otherwise read as a region — the token stands behind a bar or another type-continuation
+token (`(f < A[() => B | -1(e)]) > x`, `(f < A[{} | -1(e)]) > x`) — since that text was a
+comparison to it already. Where the token is the body's first operand, or the first
+operand of an arrow function's return there, the printed form reads as no region and
+the pair is dropped like any pair a chain does not need: `(f < A[-1(e)]) > (x, y)` prints
+as `f < A[-1(e)] > (x, y)`, which acorn-typescript reads as the generic call, and
+`(f < A[(a = 1) => 0]) > (x, y)` as `f < A[(a = 1) => 0] > (x, y)`, which tsc does — a
+**known reading change**. The same holds for the three other tokens one oracle reads a
+type through inside such an index: a **non-null `!`** on any operand, tsc's JSDoc
+non-nullable type (`` f<A[() => typeof b!]>`t` `` prints as written, where
+`f<A[B | c!]>(x)` — an index that opens as a type — takes its pair, above); an **arrow
+function whose parameter list holds a default** (`f<A[(a = 1) => 0]>(x)`,
+`f<A[({ a } = b) => 0]>(x)`), which tsc reads a function type in and acorn-typescript an
+arrow function; a `=` inside a destructuring pattern or a type-parameter list is no
+default of the parameter's own, and both read the function type
+(`f<A[({ a = 1 }) => 0]>(x)` is a generic call) — the split claimed where the index
+opens as a type (`f<A[A[(a = 1) => 0]]>(x)`); and a **meta-property**
+(`f<A[B | new.target]>(x)` is claimed, acorn-typescript reading a type named
+`new.target` there; `f<A[() => new.target]>(x)` is the chain).
+
+A GENERIC head's default is the same split, read where the region runs on as a list
+through it: `f<A[<T>(a = 1) => B]>(x, y)` prints as `f < A[<T>(a = 1) => B] > (x, y)`,
+and `f<A[A[<T>(a = 1) => 0]]>(x)` — an index that opens as a type — is claimed. With a
+return no type spells, both parsers read the chain already, and it takes its pair like
+any other (``f<import('m').B[<T>(a = 1) => b + 1]>`t` ``).
+
+A literal's **type-argument list** inside an index is the acorn-typescript split only
+where an instantiation may stand: ahead of an operand it is the comparison both parsers
+read (`f<A[() => -1<C>[]]>(x)` compares `-1 < C` with `[]`), as it is past a line break
+in an index that opens as no type.
+
+The claimed spellings and the ones read as a chain are a single construct read two ways,
+and nothing in either grammar separates them: which reading should hold for every
+postfix is open. `negative_literal_postfix_reads_as_the_comparison_tsc_reads`,
+`non_null_in_an_index_keeps_the_chain_bare_where_no_type_opens`,
+`expression_index_bodies_print_as_their_chain` and `claimed_regions_stay_rejected` in
+[index_type_args_follow.rs](../tests/index_type_args_follow.rs) pin the sides.
+
 **A type-argument region tsc claims and acorn-typescript abandons** —
 `a < (b = c) > (t, u)`, `a < (b << c) > (t, u)`, `a < [b as C] > (t, u)`,
 `a < { b: c(d) } > (t, u)`. A `<` opening on a `(` is a type-argument list only where
@@ -1204,7 +1283,17 @@ where it keeps it. Three families are the exception, and all are **tsc's own**:
   one its parser rejects rather than defers —
   [relational_paren_head_non_null](../tests/fixtures/typescript/expressions/binary/relational_paren_head_non_null_svelte_divergence/).
   The shell-free `a < !b > (t, u)` opens the region on the `!` itself, where tsv's parse
-  follows acorn-typescript and reads the chain.
+  follows acorn-typescript and reads the chain. The same holds wherever the `!` stands
+  outside a paren-headed region — postfix (`a < b! > (t, u)`), behind a bar
+  (`f<A | b!>(x)`), on an import type (`f<import('m').B!>(x)`), and at any depth inside
+  an index (`f<A[!b]>(x)`, `f<A[B | c!]>(x)`): tsc reads a generic call, tsv follows
+  acorn-typescript's chain. Printed, that chain takes its paren pair wherever the reading
+  of the printed form finds a region (`(f < A[B | c!]) > x`), and the compiler reads the
+  paired form as the comparison it spells — the same split, met from the pair's side.
+  Inside an index that opens as no type the chain takes no pair the source did not have
+  (`f<A[() => typeof b!]>(x)` prints as `f < A[() => typeof b!] > x`), so the compiler
+  keeps the call it read there; *A negative literal type as the operand of postfix
+  brackets* above states that rule.
 
 All three are decisions about what the compiler's own grammar claims, so tsv follows them at
 the `(` head and rejects too; at a `{` or `[` head it reaches the same rejection by
@@ -1233,6 +1322,145 @@ looks. A refusal would therefore print a bare chain that tsv's own parse claims 
 `conformance:ts-repo` would carry a knowingly-kept over-rejection like this in its
 sanctioned ledger the moment a corpus file hit one; none does, so the ledger is silent
 and the fixture is the whole record.
+
+The same two delimiters are ungraded one level down, as the body of an **index** inside
+the region — `a < b[{ c: d + 1 }] > (t, u)`, `a < b[[c || d]] > (t, u)`, and an arrow
+function's own body there, which stands where a function type's return does
+(`a < b[() => [c + 1]] > (t, u)`) —
+[relational_index_ungraded_body](../tests/fixtures/typescript/expressions/binary/relational_index_ungraded_body_svelte_divergence/).
+Everything else in an index IS graded, by the walk that grades the region: `f<A[K] | B>(x)`
+and `f<A[() => B]>(x)` are generic calls, `f<A[a.b()]>(x)` and `a < b[c | d()] | e > (f)`
+comparison chains. The bracketed body commits rather than refuses because the same bytes
+with a type in the brackets are a generic call to both oracles (`f<A[{ a: 1 }]>(x)`,
+`f<A[[0]] | B>(x)`,
+[less_than_index_type_body](../tests/fixtures/typescript/syntax/disambiguation/less_than_index_type_body/)),
+and a refusal would read each of those as a comparison chain and reprint it as one — a
+silent wrong tree on real generic syntax, against a loud error on a chain no program
+compares with.
+
+A `(` in an index is where the index parts from the head. The three tsc-only families
+above are claims about a `(`-headed REGION, whose shell is required there
+(`a < (b = c) > (t, u)` has no paren-free twin); inside an index a pair is never the
+operand's own — `b[(c = d)]` and `b[c = d]` are one document, which the formatter prints
+with the pair either way — so tsv reads a shell there by its content under both readings,
+and `a < b[(c = d)] > (t, u)` and `a < b[(c, d)] > (t, u)` stay the comparison chains
+acorn-typescript reads, where tsc claims the shelled spelling and abandons the bare one.
+
+**A region the lookahead claims and the type parse rejects** — shapes where the
+comparison chain acorn-typescript reads has no printed form every parser reads back as the
+input, so tsv keeps the region claimed and fails loudly rather than print a chain one of
+them reads as another program —
+[relational_claimed_region](../tests/fixtures/typescript/expressions/binary/relational_claimed_region_svelte_divergence/):
+
+- **a paren shell heading the region**, with a list behind it — `f<(A)<C>>(x)`,
+  `g(f<(A)<C>, D>(x))`, `g(f<(A)<C, D>[0]>(x))`, `f<(typeof (b))<C>>(x)`,
+  `f<(A | B)<C>>(x)`, `f<(A)<C> | D>(x)`. A parenthesized type takes no argument list, so
+  tsc and acorn-typescript both read the chain `f < (A) < C >> x`: this one is a **tsv
+  over-rejection**, like the ungraded bracket above. Around a name the printer strips the
+  shell — a name it may itself make by stripping a shell inside (`(typeof (b))`,
+  `((b).c)`) — and the bare `f < A < C >> x` closes two lists on one shift token, as
+  `f < A < C, D > [0] > x` reads on past its comma to a later `>`; the pairs the printer
+  has stand at a `>` operator and at a bar, and no pair ends a region there. The claim
+  asks neither what the shell holds nor what follows the list: which contents print as a
+  list-taking name, which lists then read back as one, and which shells the printer
+  keeps for the compiler to read as a parameter list (`f<((a, b))<C> | D>(x)`) is the
+  printer's own paren rules to say, and a region read wrongly is a chain that reads back
+  as another program — so a shell the printer would have kept (`f<(A | B)<C>>(x)`) is
+  rejected with the rest. Behind a bar ahead of the shell the chain's own pair ends the
+  region first, and the same shell is the parenthesized type it looks like
+  (`f<A | (B)<C>>(x)` prints as `(f < A) | (B < C >> x)`).
+
+  A name whose own `<` the source puts past a line break heads the region the same way
+  (`f<B⏎<C>>(x)`): the break ends the type for both parsers, and the printer folds it.
+  That head is a bare name by construction, so one follower ends its claim, a bar behind
+  the list — the chain's `<` is then the bar's left operand, which prints in a pair of
+  its own (`f<B⏎<C> | D>(x)` prints as `(f < B<C>) | (D > x)`). Anywhere else — behind a
+  bar, inside an index — the same `<` is the comparison or the instantiation both
+  parsers read (`f<A[B⏎<C>]>(x)` compares `f` with `A[B<C>]`). An **import type** is the
+  one name whose list acorn-typescript takes across the break
+  (`f<A | import('m').B⏎<C>>(x)` is a generic call to it, a chain to tsc), so that region
+  stays claimed in every position and the type parse, which holds tsc's line rule,
+  rejects it — the lookahead's side of
+  [type_args/import_type_line_break](../tests/fixtures/typescript/types/type_args/import_type_line_break_svelte_divergence/).
+  Two edges: inside the index of a negative literal acorn-typescript reads an
+  expression, welds no list, and the line is the chain both read
+  (``f<-1[import('m').B⏎<C<D>>[]]>`t` ``); and `async` / `await` are no names a break
+  stands a list off from, since the printer folds the break and `async<C>(e)` is a
+  generic arrow function's head, so that region stays claimed (`f<A[async⏎<C>(e)]>(x)`)
+  unless a comment carries the break into the output. A list that holds no type is
+  claimed with the rest (`f<A[import('m')⏎<c + 1>[]][K]>(x, y)`, a chain to both
+  parsers): a **known over-rejection**.
+- **a negative literal's list** ahead of what an instantiation may be followed by —
+  `f<-1<C>(e)>(x)`, `f<-1<C> | D>(x)`. acorn-typescript reads a negative literal type with
+  its expression parser, which takes the list, so the line is a generic call over the
+  literal type of `-(1<C>(e))`; tsc reads the comparison chain. tsv's type parser has
+  neither tree, and the chain would print as text acorn-typescript reads as the call.
+  Where the list would close into a shift (`f<-1<C>>(x)`) no parser reads one and tsv
+  reads the chain both do. The claim reads nothing between the `<` and the region's
+  close, so it also takes shapes both parsers read as a chain (`f<-1<C>[]>(x)`,
+  `f<-1<C> + 1>(x)`). Inside an index it holds where the list ends the body or stands
+  ahead of what an instantiation may be followed by — as an arrow function's body there
+  (`f<A[() => -1<C>]>(x)`), behind `unique` (`f<A[unique -1<C>]>(x)`) — and not ahead of
+  an operand, where both parsers read a comparison over `-1 < C`
+  (`f<A[() => -1<C>[]]>(x)`). A **member tail glued to the digits** is taken with the
+  literal for the same reason at the list's own level (`f<-1..x>(x)`,
+  `f<(-1..x())>(x)`): acorn-typescript reads the literal type of `-(1..x)`, tsc a chain,
+  and the chain would print as `f < -(1).x > x`, a comparison to both. Every **postfix
+  inside an index** — a call's arguments, a template, a member glued or spaced, a
+  non-null `!` — is claimed where the index's body opens as a type, or the index stands
+  behind a nested list or an import type (`f<A[B | -1(e)]>(x)`, ``f<A[A[-1`t`]]>(x)``,
+  `f<A[-1 .x]>(x)`, `f<A[-1..x]>(x)`): the index is a type to acorn-typescript, and the
+  chain prints as text it reads as a comparison. Which indexes those are, and what the
+  same postfix reads as everywhere else, is under *A negative literal type as the
+  operand of postfix brackets* above — as are the two other tokens claimed on the same
+  line, an arrow function's parameter default and a meta-property.
+- **an import head that is no import type** — `f<import(c)>(x)`,
+  `a < b | import(c) > (x)`, `f<import.meta>(x)`. tsc's import type takes any specifier
+  (the string rule is its checker's), so the first two are generic calls to the compiler
+  and chains over a dynamic import to acorn-typescript. Claimed at the list's own level
+  only: inside an index a dynamic import is the expression acorn-typescript reads
+  (`a < b[import(c)] > d`, `f<A[B | import(c)]>(x)`), where tsc reads a generic call.
+- **a second list behind a nested one** — `f<A<B><C>>(x)`, `f<A<B><C> + 1>(x)`.
+  acorn-typescript reads an instantiation instantiated again; tsc rejects the first and
+  reads a chain through a type assertion in the second, and the pair the printed chain
+  would take around `f < A<B>` moves the compiler's reading of both. Behind a keyword
+  type's or a literal's own list a second one is the same instantiation to
+  acorn-typescript, printed as `(string<C>)<D>`: claimed where that operand heads the
+  region (`g(f<string<C><D>, B>(x))`), since the printed region would open on a paren
+  shell, and anywhere an operand follows the lists for the compiler's assertion to take
+  (`f<A | this<C><D> + 1>(x)`). Inside an index a second list is a claim only in that
+  last shape (`f<A[b<C><D> + 1]>(x)`, `f<A[() => b<C><D>[0]]>(x)`), behind a shell or an
+  indexed access there too (`f<A[(b)<C><D> + 1]>(x)`, `f<A[B[K]<C><D> + 1]>(x)`). Where
+  none does — the list, or the run of lists it opens, ends the body
+  (`a < b[A<B><C>] > (c)`), or a bar or a comma follows it
+  (`f<A[() => b<C><D> | B]>(x)`) — the compiler rejects the spelling and
+  acorn-typescript's instantiation is the only reading; and ahead of a call's arguments
+  or a template (`a < b[c<D><E>(e)] > (t, u)`, `f<A[() => b<C><D>(e)]>(x)`) both read
+  an expression — a call with two lists to acorn-typescript, a chain through an
+  assertion to tsc — which prints as written, so neither reading moves. One operand
+  takes two lists as a TYPE: a type query of an import, the import type's list and then
+  its own (`f<A[typeof import('m')<C><D>]>(x)` is the generic call acorn-typescript
+  reads, in an index as at the list's own level). Over an import with OPTIONS
+  (`typeof import('m', { with: … })<C><D>`) acorn-typescript reads no import type and so an
+  expression, where tsv's type parser takes both lists: inside an index that spelling is
+  the type where the index opens as one and the comparison anywhere else, the line the
+  other parser-split tokens follow (*A negative literal type as the operand of postfix
+  brackets* above). With no second list the same import is the *Import type options*
+  correction wherever a type is graded — the list's own level, an index that opens as a
+  type, a function type's return and a bar's member in any index:
+  `f<A[() => typeof import('m', { with: … })]>(x)` is the generic call tsc reads, and
+  acorn-typescript, which has no such type, reads the comparison chain. Ahead of a second
+  list (`…]><U>(x)`) tsv reads an instantiation instantiated again where both parsers
+  read a chain: a known wrong tree.
+
+Each region is claimed only where its closing `>` is followed by a token that commits a
+list — a `(`, a template, a line break — so the same bytes ahead of an expression stay the
+chain every parser reads (`f<-1<C>(e)> x`, `a < import(c) > d`, `f<(A)<C>> x`). Behind a
+negative literal's list, an import head and a second list, that chain takes a paren pair
+around its `<` operand, since the reading of the printed form makes the same claim — as
+it does of a BigInt's member, the one glued tail the printer writes as such
+(`x = f < -1n.x > y` prints as `x = (f < -1n.x) > y`); the shelled head's chain prints
+bare (`f < A < C >> x`), its region being the one no pair of the printer's ends.
 
 The **printer** side of both entries is unaffected: a chain whose region opens on a
 bracketed head — or on a paren shell the printer keeps — takes a paren pair around the

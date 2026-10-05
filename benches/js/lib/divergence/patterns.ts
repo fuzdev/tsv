@@ -3758,7 +3758,7 @@ const comment_position: DivergencePattern = {
 
 const instantiation_parens: DivergencePattern = {
 	id: 'instantiation_parens',
-	description: 'Parens preserved in ternary/binary instantiation expressions',
+	description: 'Parens preserved in ternary/binary/unary instantiation expressions',
 	languages: ['typescript', 'svelte'],
 	conformance_sections: ['TypeScript'],
 	fixtures: ['typescript/typescript_specific/assertions/instantiation_parens_prettier_divergence'],
@@ -3769,12 +3769,51 @@ const instantiation_parens: DivergencePattern = {
 		// Prettier strips:  x ? y : z<T>  or  a + b<T>  — no )<
 		const paren_before_type_args = /\)<[a-zA-Z]/;
 
+		// Ours with every UNARY operand's own pair removed — a pair whose `)` stands ahead of
+		// type arguments, whose content opens on a prefix operator or ends on a postfix
+		// update, and which no callee stands before (so a call's own paren is left alone).
+		// A unary operand has no operator spelling outside the pair to key on
+		// (`(typeof e)<T>`, `(-e)<T>`, `(e++)<T>`), so its hunk is claimed by the exact twin:
+		// line for line, prettier's is ours minus those pairs and nothing else.
+		const unary_operand = /^\s*(?:(?:typeof|void|delete)\b|[-+!~])|(?:\+\+|--)\s*$/;
+		const without_unary_operand_pairs = (line: string): string => {
+			let out = line;
+			for (let from = 0; ;) {
+				const rel = out.slice(from).search(paren_before_type_args);
+				if (rel < 0) return out;
+				const close = from + rel;
+				let depth = 0;
+				let open = -1;
+				for (let i = close; i >= 0; i--) {
+					if (out[i] === ')') depth++;
+					else if (out[i] === '(' && --depth === 0) {
+						open = i;
+						break;
+					}
+				}
+				// an operand's pair, not a call's: nothing callable stands right before the `(`
+				if (
+					open >= 0 &&
+					unary_operand.test(out.slice(open + 1, close)) &&
+					!/[\w$)\]]$/.test(out.slice(0, open))
+				) {
+					out = out.slice(0, open) + out.slice(open + 1, close) + out.slice(close + 1);
+					from = close - 1;
+				} else from = close + 1;
+			}
+		};
+
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
 			const ours_has_parens = hunk.added_lines.some((l) => paren_before_type_args.test(l));
+			if (!ours_has_parens) return false;
 			const prettier_missing = hunk.removed_lines.some(
 				(l) => !paren_before_type_args.test(l) && /[?+\-]\s.*<[a-zA-Z]/.test(l)
 			);
-			return ours_has_parens && prettier_missing;
+			if (prettier_missing) return true;
+			return (
+				hunk.removed_lines.length === hunk.added_lines.length &&
+				hunk.added_lines.every((l, i) => without_unary_operand_pairs(l) === hunk.removed_lines[i])
+			);
 		});
 
 		if (hunk_indices.length > 0) {
@@ -3783,7 +3822,7 @@ const instantiation_parens: DivergencePattern = {
 				confidence: 'certain',
 				hunk_indices,
 				reason:
-					'Parens preserved around ternary/binary in instantiation expression (changes semantics)'
+					'Parens preserved around ternary/binary/unary in instantiation expression (changes semantics)'
 			};
 		}
 		return null;

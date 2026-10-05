@@ -179,3 +179,28 @@ fn a_block_head_keeps_the_pair_its_keyword_would_join() {
         "the pair ahead of `as` must stay"
     );
 }
+
+#[test]
+fn a_unary_or_update_operand_keeps_its_pair() {
+    // `(typeof a)<T>` instantiates the operator's result; bare, the operator takes the
+    // instantiation (`typeof (a<T>)`), a different tree to every parser. The fixture
+    // `typescript_specific/assertions/instantiation_parens_prettier_divergence` carries
+    // the operators whose stripped spelling still parses. An update operand has no bare
+    // spelling at all — `a++<T>` is rejected by tsc, acorn-typescript and tsv alike, so
+    // prettier's stripped output is no `output_prettier.*` — and a prefix one is
+    // acorn-typescript's reject alone.
+    for source in [
+        "x = (typeof a)<T>;\n",
+        "x = (-a)<T>;\n",
+        "x = (+a)<T>;\n",
+        "x = (~a)<T>;\n",
+        "x = (delete a.b)<T>;\n",
+        "x = (a++)<T>;\n",
+        "x = (a--)<T>;\n",
+        "x = (++a)<T>;\n",
+        "x = (typeof a)<T>(b);\n",
+        "x = (f < B) | (typeof a)<T> | (D > c);\n",
+    ] {
+        assert_eq!(format(source), source);
+    }
+}

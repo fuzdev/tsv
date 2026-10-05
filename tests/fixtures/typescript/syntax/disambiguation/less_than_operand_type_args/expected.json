@@ -1,0 +1,1460 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1171,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Only a type NAME takes type arguments: a reference, a qualified name, a type query,",
+			"start": 20,
+			"end": 106
+		},
+		{
+			"type": "Line",
+			"value": " an import type. A `<` behind one opens the name's own argument list, inside the list",
+			"start": 108,
+			"end": 195
+		},
+		{
+			"type": "Line",
+			"value": " the first `<` opened.",
+			"start": 197,
+			"end": 221
+		},
+		{
+			"type": "Line",
+			"value": " A keyword type, a literal type, an object or tuple type, a parenthesized type and an",
+			"start": 424,
+			"end": 511
+		},
+		{
+			"type": "Line",
+			"value": " indexed access take none, so a `<` behind one is the comparison operator and the",
+			"start": 513,
+			"end": 596
+		},
+		{
+			"type": "Line",
+			"value": " whole line a comparison chain — as a member and as the head. Each line is the chain",
+			"start": 598,
+			"end": 684
+		},
+		{
+			"type": "Line",
+			"value": " the call-shaped authoring in the `unformatted_call_shaped` variant reads as.",
+			"start": 686,
+			"end": 765
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1170,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1161,
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 223,
+					"end": 250,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 229,
+							"end": 249,
+							"id": {
+								"type": "Identifier",
+								"start": 229,
+								"end": 231,
+								"name": "a1"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 234,
+								"end": 249,
+								"callee": {
+									"type": "Identifier",
+									"start": 234,
+									"end": 236,
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 247,
+										"end": 248,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 236,
+									"end": 246,
+									"params": [
+										{
+											"type": "TSUnionType",
+											"start": 237,
+											"end": 245,
+											"types": [
+												{
+													"type": "TSTypeReference",
+													"start": 237,
+													"end": 238,
+													"typeName": {
+														"type": "Identifier",
+														"start": 237,
+														"end": 238,
+														"name": "A"
+													}
+												},
+												{
+													"type": "TSTypeReference",
+													"start": 241,
+													"end": 245,
+													"typeName": {
+														"type": "Identifier",
+														"start": 241,
+														"end": 242,
+														"name": "B"
+													},
+													"typeArguments": {
+														"type": "TSTypeParameterInstantiation",
+														"start": 242,
+														"end": 245,
+														"params": [
+															{
+																"type": "TSTypeReference",
+																"start": 243,
+																"end": 244,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 243,
+																	"end": 244,
+																	"name": "C"
+																}
+															}
+														]
+													}
+												}
+											]
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Only a type NAME takes type arguments: a reference, a qualified name, a type query,",
+							"start": 20,
+							"end": 106
+						},
+						{
+							"type": "Line",
+							"value": " an import type. A `<` behind one opens the name's own argument list, inside the list",
+							"start": 108,
+							"end": 195
+						},
+						{
+							"type": "Line",
+							"value": " the first `<` opened.",
+							"start": 197,
+							"end": 221
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 252,
+					"end": 284,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 258,
+							"end": 283,
+							"id": {
+								"type": "Identifier",
+								"start": 258,
+								"end": 260,
+								"name": "a2"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 263,
+								"end": 283,
+								"callee": {
+									"type": "Identifier",
+									"start": 263,
+									"end": 265,
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 281,
+										"end": 282,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 265,
+									"end": 280,
+									"params": [
+										{
+											"type": "TSUnionType",
+											"start": 266,
+											"end": 279,
+											"types": [
+												{
+													"type": "TSIndexedAccessType",
+													"start": 266,
+													"end": 270,
+													"objectType": {
+														"type": "TSTypeReference",
+														"start": 266,
+														"end": 267,
+														"typeName": {
+															"type": "Identifier",
+															"start": 266,
+															"end": 267,
+															"name": "A"
+														}
+													},
+													"indexType": {
+														"type": "TSTypeReference",
+														"start": 268,
+														"end": 269,
+														"typeName": {
+															"type": "Identifier",
+															"start": 268,
+															"end": 269,
+															"name": "K"
+														}
+													}
+												},
+												{
+													"type": "TSTypeReference",
+													"start": 273,
+													"end": 279,
+													"typeName": {
+														"type": "TSQualifiedName",
+														"start": 273,
+														"end": 276,
+														"left": {
+															"type": "Identifier",
+															"start": 273,
+															"end": 274,
+															"name": "B"
+														},
+														"right": {
+															"type": "Identifier",
+															"start": 275,
+															"end": 276,
+															"name": "C"
+														}
+													},
+													"typeArguments": {
+														"type": "TSTypeParameterInstantiation",
+														"start": 276,
+														"end": 279,
+														"params": [
+															{
+																"type": "TSTypeReference",
+																"start": 277,
+																"end": 278,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 277,
+																	"end": 278,
+																	"name": "D"
+																}
+															}
+														]
+													}
+												}
+											]
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 286,
+					"end": 316,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 292,
+							"end": 315,
+							"id": {
+								"type": "Identifier",
+								"start": 292,
+								"end": 294,
+								"name": "a3"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 297,
+								"end": 315,
+								"callee": {
+									"type": "Identifier",
+									"start": 297,
+									"end": 299,
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 313,
+										"end": 314,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 299,
+									"end": 312,
+									"params": [
+										{
+											"type": "TSTypeQuery",
+											"start": 300,
+											"end": 311,
+											"exprName": {
+												"type": "Identifier",
+												"start": 307,
+												"end": 308,
+												"name": "b"
+											},
+											"typeArguments": {
+												"type": "TSTypeParameterInstantiation",
+												"start": 308,
+												"end": 311,
+												"params": [
+													{
+														"type": "TSTypeReference",
+														"start": 309,
+														"end": 310,
+														"typeName": {
+															"type": "Identifier",
+															"start": 309,
+															"end": 310,
+															"name": "C"
+														}
+													}
+												]
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 318,
+					"end": 353,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 324,
+							"end": 352,
+							"id": {
+								"type": "Identifier",
+								"start": 324,
+								"end": 326,
+								"name": "a4"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 329,
+								"end": 352,
+								"callee": {
+									"type": "Identifier",
+									"start": 329,
+									"end": 331,
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 350,
+										"end": 351,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 331,
+									"end": 349,
+									"params": [
+										{
+											"type": "TSImportType",
+											"start": 332,
+											"end": 348,
+											"argument": {
+												"type": "Literal",
+												"start": 339,
+												"end": 342,
+												"value": "m",
+												"raw": "'m'"
+											},
+											"qualifier": {
+												"type": "Identifier",
+												"start": 344,
+												"end": 345,
+												"name": "B"
+											},
+											"typeArguments": {
+												"type": "TSTypeParameterInstantiation",
+												"start": 345,
+												"end": 348,
+												"params": [
+													{
+														"type": "TSTypeReference",
+														"start": 346,
+														"end": 347,
+														"typeName": {
+															"type": "Identifier",
+															"start": 346,
+															"end": 347,
+															"name": "C"
+														}
+													}
+												]
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 355,
+					"end": 385,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 361,
+							"end": 384,
+							"id": {
+								"type": "Identifier",
+								"start": 361,
+								"end": 363,
+								"name": "a5"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 366,
+								"end": 384,
+								"callee": {
+									"type": "Identifier",
+									"start": 366,
+									"end": 368,
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 382,
+										"end": 383,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 368,
+									"end": 381,
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 369,
+											"end": 380,
+											"typeName": {
+												"type": "TSQualifiedName",
+												"start": 369,
+												"end": 377,
+												"left": {
+													"type": "Identifier",
+													"start": 369,
+													"end": 375,
+													"name": "string"
+												},
+												"right": {
+													"type": "Identifier",
+													"start": 376,
+													"end": 377,
+													"name": "x"
+												}
+											},
+											"typeArguments": {
+												"type": "TSTypeParameterInstantiation",
+												"start": 377,
+												"end": 380,
+												"params": [
+													{
+														"type": "TSTypeReference",
+														"start": 378,
+														"end": 379,
+														"typeName": {
+															"type": "Identifier",
+															"start": 378,
+															"end": 379,
+															"name": "C"
+														}
+													}
+												]
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 387,
+					"end": 421,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 393,
+							"end": 420,
+							"id": {
+								"type": "Identifier",
+								"start": 393,
+								"end": 395,
+								"name": "a6"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 398,
+								"end": 420,
+								"callee": {
+									"type": "Identifier",
+									"start": 398,
+									"end": 400,
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 418,
+										"end": 419,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 400,
+									"end": 417,
+									"params": [
+										{
+											"type": "TSTypeOperator",
+											"start": 401,
+											"end": 416,
+											"operator": "readonly",
+											"typeAnnotation": {
+												"type": "TSArrayType",
+												"start": 410,
+												"end": 416,
+												"elementType": {
+													"type": "TSTypeReference",
+													"start": 410,
+													"end": 414,
+													"typeName": {
+														"type": "Identifier",
+														"start": 410,
+														"end": 411,
+														"name": "A"
+													},
+													"typeArguments": {
+														"type": "TSTypeParameterInstantiation",
+														"start": 411,
+														"end": 414,
+														"params": [
+															{
+																"type": "TSTypeReference",
+																"start": 412,
+																"end": 413,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 412,
+																	"end": 413,
+																	"name": "C"
+																}
+															}
+														]
+													}
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 767,
+					"end": 806,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 773,
+							"end": 805,
+							"id": {
+								"type": "Identifier",
+								"start": 773,
+								"end": 775,
+								"name": "b1"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 778,
+								"end": 805,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 779,
+									"end": 784,
+									"left": {
+										"type": "Identifier",
+										"start": 779,
+										"end": 780,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 783,
+										"end": 784,
+										"name": "A"
+									}
+								},
+								"operator": "|",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 789,
+									"end": 804,
+									"left": {
+										"type": "Identifier",
+										"start": 789,
+										"end": 795,
+										"name": "string"
+									},
+									"operator": "<",
+									"right": {
+										"type": "BinaryExpression",
+										"start": 798,
+										"end": 804,
+										"left": {
+											"type": "Identifier",
+											"start": 798,
+											"end": 799,
+											"name": "C"
+										},
+										"operator": ">>",
+										"right": {
+											"type": "Identifier",
+											"start": 803,
+											"end": 804,
+											"name": "x"
+										}
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A keyword type, a literal type, an object or tuple type, a parenthesized type and an",
+							"start": 424,
+							"end": 511
+						},
+						{
+							"type": "Line",
+							"value": " indexed access take none, so a `<` behind one is the comparison operator and the",
+							"start": 513,
+							"end": 596
+						},
+						{
+							"type": "Line",
+							"value": " whole line a comparison chain — as a member and as the head. Each line is the chain",
+							"start": 598,
+							"end": 684
+						},
+						{
+							"type": "Line",
+							"value": " the call-shaped authoring in the `unformatted_call_shaped` variant reads as.",
+							"start": 686,
+							"end": 765
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 808,
+					"end": 848,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 814,
+							"end": 847,
+							"id": {
+								"type": "Identifier",
+								"start": 814,
+								"end": 816,
+								"name": "b2"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 819,
+								"end": 847,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 820,
+									"end": 828,
+									"left": {
+										"type": "Identifier",
+										"start": 820,
+										"end": 821,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "MemberExpression",
+										"start": 824,
+										"end": 828,
+										"object": {
+											"type": "Identifier",
+											"start": 824,
+											"end": 825,
+											"name": "A"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 826,
+											"end": 827,
+											"name": "K"
+										},
+										"computed": true,
+										"optional": false
+									}
+								},
+								"operator": "|",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 833,
+									"end": 846,
+									"left": {
+										"type": "ThisExpression",
+										"start": 833,
+										"end": 837
+									},
+									"operator": "<",
+									"right": {
+										"type": "BinaryExpression",
+										"start": 840,
+										"end": 846,
+										"left": {
+											"type": "Identifier",
+											"start": 840,
+											"end": 841,
+											"name": "C"
+										},
+										"operator": ">>",
+										"right": {
+											"type": "Identifier",
+											"start": 845,
+											"end": 846,
+											"name": "x"
+										}
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 850,
+					"end": 887,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 856,
+							"end": 886,
+							"id": {
+								"type": "Identifier",
+								"start": 856,
+								"end": 858,
+								"name": "b3"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 861,
+								"end": 886,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 862,
+									"end": 867,
+									"left": {
+										"type": "Identifier",
+										"start": 862,
+										"end": 863,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 866,
+										"end": 867,
+										"name": "A"
+									}
+								},
+								"operator": "|",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 872,
+									"end": 885,
+									"left": {
+										"type": "Literal",
+										"start": 872,
+										"end": 876,
+										"value": null,
+										"raw": "null"
+									},
+									"operator": "<",
+									"right": {
+										"type": "BinaryExpression",
+										"start": 879,
+										"end": 885,
+										"left": {
+											"type": "Identifier",
+											"start": 879,
+											"end": 880,
+											"name": "C"
+										},
+										"operator": ">>",
+										"right": {
+											"type": "Identifier",
+											"start": 884,
+											"end": 885,
+											"name": "x"
+										}
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 889,
+					"end": 925,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 895,
+							"end": 924,
+							"id": {
+								"type": "Identifier",
+								"start": 895,
+								"end": 897,
+								"name": "b4"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 900,
+								"end": 924,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 901,
+									"end": 906,
+									"left": {
+										"type": "Identifier",
+										"start": 901,
+										"end": 902,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 905,
+										"end": 906,
+										"name": "A"
+									}
+								},
+								"operator": "|",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 911,
+									"end": 923,
+									"left": {
+										"type": "Literal",
+										"start": 911,
+										"end": 914,
+										"value": "a",
+										"raw": "'a'"
+									},
+									"operator": "<",
+									"right": {
+										"type": "BinaryExpression",
+										"start": 917,
+										"end": 923,
+										"left": {
+											"type": "Identifier",
+											"start": 917,
+											"end": 918,
+											"name": "C"
+										},
+										"operator": ">>",
+										"right": {
+											"type": "Identifier",
+											"start": 922,
+											"end": 923,
+											"name": "x"
+										}
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 927,
+					"end": 961,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 933,
+							"end": 960,
+							"id": {
+								"type": "Identifier",
+								"start": 933,
+								"end": 935,
+								"name": "b5"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 938,
+								"end": 960,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 939,
+									"end": 944,
+									"left": {
+										"type": "Identifier",
+										"start": 939,
+										"end": 940,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 943,
+										"end": 944,
+										"name": "A"
+									}
+								},
+								"operator": "|",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 949,
+									"end": 959,
+									"left": {
+										"type": "Literal",
+										"start": 949,
+										"end": 950,
+										"value": 1,
+										"raw": "1"
+									},
+									"operator": "<",
+									"right": {
+										"type": "BinaryExpression",
+										"start": 953,
+										"end": 959,
+										"left": {
+											"type": "Identifier",
+											"start": 953,
+											"end": 954,
+											"name": "C"
+										},
+										"operator": ">>",
+										"right": {
+											"type": "Identifier",
+											"start": 958,
+											"end": 959,
+											"name": "x"
+										}
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 963,
+					"end": 998,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 969,
+							"end": 997,
+							"id": {
+								"type": "Identifier",
+								"start": 969,
+								"end": 971,
+								"name": "b6"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 974,
+								"end": 997,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 975,
+									"end": 980,
+									"left": {
+										"type": "Identifier",
+										"start": 975,
+										"end": 976,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 979,
+										"end": 980,
+										"name": "A"
+									}
+								},
+								"operator": "|",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 985,
+									"end": 996,
+									"left": {
+										"type": "ObjectExpression",
+										"start": 985,
+										"end": 987,
+										"properties": []
+									},
+									"operator": "<",
+									"right": {
+										"type": "BinaryExpression",
+										"start": 990,
+										"end": 996,
+										"left": {
+											"type": "Identifier",
+											"start": 990,
+											"end": 991,
+											"name": "C"
+										},
+										"operator": ">>",
+										"right": {
+											"type": "Identifier",
+											"start": 995,
+											"end": 996,
+											"name": "x"
+										}
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1000,
+					"end": 1034,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1006,
+							"end": 1033,
+							"id": {
+								"type": "Identifier",
+								"start": 1006,
+								"end": 1008,
+								"name": "b7"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 1011,
+								"end": 1033,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 1012,
+									"end": 1017,
+									"left": {
+										"type": "Identifier",
+										"start": 1012,
+										"end": 1013,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 1016,
+										"end": 1017,
+										"name": "A"
+									}
+								},
+								"operator": "|",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 1022,
+									"end": 1032,
+									"left": {
+										"type": "Identifier",
+										"start": 1022,
+										"end": 1023,
+										"name": "B"
+									},
+									"operator": "<",
+									"right": {
+										"type": "BinaryExpression",
+										"start": 1026,
+										"end": 1032,
+										"left": {
+											"type": "Identifier",
+											"start": 1026,
+											"end": 1027,
+											"name": "C"
+										},
+										"operator": ">>",
+										"right": {
+											"type": "Identifier",
+											"start": 1031,
+											"end": 1032,
+											"name": "x"
+										}
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1036,
+					"end": 1064,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1042,
+							"end": 1063,
+							"id": {
+								"type": "Identifier",
+								"start": 1042,
+								"end": 1044,
+								"name": "b8"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 1047,
+								"end": 1063,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 1047,
+									"end": 1054,
+									"left": {
+										"type": "Identifier",
+										"start": 1047,
+										"end": 1048,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Literal",
+										"start": 1051,
+										"end": 1054,
+										"value": "a",
+										"raw": "'a'"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 1057,
+									"end": 1063,
+									"left": {
+										"type": "Identifier",
+										"start": 1057,
+										"end": 1058,
+										"name": "C"
+									},
+									"operator": ">>",
+									"right": {
+										"type": "Identifier",
+										"start": 1062,
+										"end": 1063,
+										"name": "x"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1066,
+					"end": 1097,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1072,
+							"end": 1096,
+							"id": {
+								"type": "Identifier",
+								"start": 1072,
+								"end": 1074,
+								"name": "b9"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 1077,
+								"end": 1096,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 1077,
+									"end": 1087,
+									"left": {
+										"type": "Identifier",
+										"start": 1077,
+										"end": 1078,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 1081,
+										"end": 1087,
+										"name": "string"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 1090,
+									"end": 1096,
+									"left": {
+										"type": "Identifier",
+										"start": 1090,
+										"end": 1091,
+										"name": "C"
+									},
+									"operator": ">>",
+									"right": {
+										"type": "Identifier",
+										"start": 1095,
+										"end": 1096,
+										"name": "x"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1099,
+					"end": 1128,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1105,
+							"end": 1127,
+							"id": {
+								"type": "Identifier",
+								"start": 1105,
+								"end": 1108,
+								"name": "b10"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 1111,
+								"end": 1127,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 1111,
+									"end": 1118,
+									"left": {
+										"type": "Identifier",
+										"start": 1111,
+										"end": 1112,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "ArrayExpression",
+										"start": 1115,
+										"end": 1118,
+										"elements": [
+											{
+												"type": "Identifier",
+												"start": 1116,
+												"end": 1117,
+												"name": "B"
+											}
+										]
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 1121,
+									"end": 1127,
+									"left": {
+										"type": "Identifier",
+										"start": 1121,
+										"end": 1122,
+										"name": "C"
+									},
+									"operator": ">>",
+									"right": {
+										"type": "Identifier",
+										"start": 1126,
+										"end": 1127,
+										"name": "x"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1130,
+					"end": 1160,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1136,
+							"end": 1159,
+							"id": {
+								"type": "Identifier",
+								"start": 1136,
+								"end": 1139,
+								"name": "b11"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 1142,
+								"end": 1159,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 1142,
+									"end": 1150,
+									"left": {
+										"type": "Identifier",
+										"start": 1142,
+										"end": 1143,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "MemberExpression",
+										"start": 1146,
+										"end": 1150,
+										"object": {
+											"type": "Identifier",
+											"start": 1146,
+											"end": 1147,
+											"name": "A"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 1148,
+											"end": 1149,
+											"name": "K"
+										},
+										"computed": true,
+										"optional": false
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 1153,
+									"end": 1159,
+									"left": {
+										"type": "Identifier",
+										"start": 1153,
+										"end": 1154,
+										"name": "C"
+									},
+									"operator": ">>",
+									"right": {
+										"type": "Identifier",
+										"start": 1158,
+										"end": 1159,
+										"name": "x"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

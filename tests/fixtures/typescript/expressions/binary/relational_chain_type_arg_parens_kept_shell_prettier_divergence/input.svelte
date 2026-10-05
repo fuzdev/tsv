@@ -68,6 +68,29 @@
 	const k29 = x < (a = b) + 1 > c;
 	const k30 = x < (a = b)?.[0] > c;
 
+	// An ARGUMENT LIST is the other token that may stand directly behind the shell: tsv's
+	// own parse keeps a region claimed where a `<` follows a shell that heads it. Where the
+	// shell holds what reads as a type name — a `typeof` query, a `!`, a union — the pair
+	// reaches through an instantiation, a generic call's callee and a generic tagged
+	// template's tag, and through a computed member behind one.
+	const k36 = (x < (typeof a)<T>(d)) > c;
+	const k37 = (x < (!a)<T>`t`) > c;
+	const k38 = (x < (a | b)<T>(d)[0]) > c;
+	// whatever stands above the list on the spine: a member, a second call, an
+	// optional call, an arithmetic tail
+	const k42 = (x < (typeof a)<T>(d).m) > c;
+	const k43 = (x < (typeof a)<T>(d)(g)) > c;
+	const k44 = (x < (a | b)<T>?.(d)) > c;
+	const k45 = (x < (!a[0])<T>(d) + 1) > c;
+
+	// A shell that parse refuses by its content — a logical or arithmetic operator, `as`,
+	// a sign on a name, a union over a call — is a comparison operand whatever follows it,
+	// and the chain stays bare.
+	const k39 = x < (a ?? b)<T>(d) > c;
+	const k40 = x < (a as T)<U>`t` > c;
+	const k41 = x < (-a)<T>(d) > c;
+	const k46 = x < (a | b())<T>(d) > c;
+
 	// A REGEX literal inside the shell is the one thing a delimiter scan can misread: an
 	// unescaped `)` in its pattern closes nothing, so the group's own `)` — and the byte
 	// past it, which is what a `(…) =>` reading keys on — are reachable only by a walk

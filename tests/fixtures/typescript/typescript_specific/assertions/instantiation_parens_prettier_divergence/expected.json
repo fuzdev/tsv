@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 478,
+	"end": 728,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -39,17 +39,29 @@
 			"value": " `(a + b)<T>` (instantiate sum) vs `a + b<T>` (add to instantiated b)",
 			"start": 375,
 			"end": 446
+		},
+		{
+			"type": "Line",
+			"value": " Unary in instantiation: parens preserve semantics",
+			"start": 470,
+			"end": 522
+		},
+		{
+			"type": "Line",
+			"value": " `(typeof e)<T>` (instantiate the operator's result) vs `typeof e<T>` (the operator over an instantiated `e`)",
+			"start": 524,
+			"end": 635
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 477,
+		"end": 727,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 468,
+			"end": 718,
 			"body": [
 				{
 					"type": "VariableDeclaration",
@@ -342,6 +354,240 @@
 							"end": 446
 						}
 					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 637,
+					"end": 659,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 641,
+							"end": 658,
+							"id": {
+								"type": "Identifier",
+								"start": 641,
+								"end": 642,
+								"name": "f"
+							},
+							"init": {
+								"type": "TSInstantiationExpression",
+								"start": 645,
+								"end": 658,
+								"expression": {
+									"type": "UnaryExpression",
+									"start": 646,
+									"end": 654,
+									"operator": "typeof",
+									"prefix": true,
+									"argument": {
+										"type": "Identifier",
+										"start": 653,
+										"end": 654,
+										"name": "e"
+									}
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 655,
+									"end": 658,
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 656,
+											"end": 657,
+											"typeName": {
+												"type": "Identifier",
+												"start": 656,
+												"end": 657,
+												"name": "T"
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Unary in instantiation: parens preserve semantics",
+							"start": 470,
+							"end": 522
+						},
+						{
+							"type": "Line",
+							"value": " `(typeof e)<T>` (instantiate the operator's result) vs `typeof e<T>` (the operator over an instantiated `e`)",
+							"start": 524,
+							"end": 635
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 661,
+					"end": 677,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 665,
+							"end": 676,
+							"id": {
+								"type": "Identifier",
+								"start": 665,
+								"end": 666,
+								"name": "g"
+							},
+							"init": {
+								"type": "TSInstantiationExpression",
+								"start": 669,
+								"end": 676,
+								"expression": {
+									"type": "UnaryExpression",
+									"start": 670,
+									"end": 672,
+									"operator": "-",
+									"prefix": true,
+									"argument": {
+										"type": "Identifier",
+										"start": 671,
+										"end": 672,
+										"name": "e"
+									}
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 673,
+									"end": 676,
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 674,
+											"end": 675,
+											"typeName": {
+												"type": "Identifier",
+												"start": 674,
+												"end": 675,
+												"name": "T"
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "let"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 679,
+					"end": 695,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 683,
+							"end": 694,
+							"id": {
+								"type": "Identifier",
+								"start": 683,
+								"end": 684,
+								"name": "h"
+							},
+							"init": {
+								"type": "TSInstantiationExpression",
+								"start": 687,
+								"end": 694,
+								"expression": {
+									"type": "UnaryExpression",
+									"start": 688,
+									"end": 690,
+									"operator": "!",
+									"prefix": true,
+									"argument": {
+										"type": "Identifier",
+										"start": 689,
+										"end": 690,
+										"name": "e"
+									}
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 691,
+									"end": 694,
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 692,
+											"end": 693,
+											"typeName": {
+												"type": "Identifier",
+												"start": 692,
+												"end": 693,
+												"name": "T"
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "let"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 697,
+					"end": 717,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 701,
+							"end": 716,
+							"id": {
+								"type": "Identifier",
+								"start": 701,
+								"end": 702,
+								"name": "i"
+							},
+							"init": {
+								"type": "TSInstantiationExpression",
+								"start": 705,
+								"end": 716,
+								"expression": {
+									"type": "UnaryExpression",
+									"start": 706,
+									"end": 712,
+									"operator": "void",
+									"prefix": true,
+									"argument": {
+										"type": "Identifier",
+										"start": 711,
+										"end": 712,
+										"name": "e"
+									}
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 713,
+									"end": 716,
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 714,
+											"end": 715,
+											"typeName": {
+												"type": "Identifier",
+												"start": 714,
+												"end": 715,
+												"name": "T"
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "let"
 				}
 			],
 			"sourceType": "module"

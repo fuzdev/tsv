@@ -1,0 +1,788 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 617,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A numeric literal ends at its own last digit: a `.` behind a complete literal is a",
+			"start": 20,
+			"end": 105
+		},
+		{
+			"type": "Line",
+			"value": " member access on it, which no type continues with, so the `<` is the comparison",
+			"start": 107,
+			"end": 189
+		},
+		{
+			"type": "Line",
+			"value": " operator. Each line is the chain the bare authoring in the `unformatted_bare_literal`",
+			"start": 191,
+			"end": 279
+		},
+		{
+			"type": "Line",
+			"value": " variant reads as.",
+			"start": 281,
+			"end": 301
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 616,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 607,
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 303,
+					"end": 339,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 309,
+							"end": 338,
+							"id": {
+								"type": "Identifier",
+								"start": 309,
+								"end": 311,
+								"name": "a1"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 314,
+								"end": 338,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 315,
+									"end": 323,
+									"left": {
+										"type": "Identifier",
+										"start": 315,
+										"end": 316,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "MemberExpression",
+										"start": 319,
+										"end": 323,
+										"object": {
+											"type": "Identifier",
+											"start": 319,
+											"end": 320,
+											"name": "b"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 321,
+											"end": 322,
+											"name": "c"
+										},
+										"computed": true,
+										"optional": false
+									}
+								},
+								"operator": "|",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 328,
+									"end": 337,
+									"left": {
+										"type": "MemberExpression",
+										"start": 328,
+										"end": 333,
+										"object": {
+											"type": "Literal",
+											"start": 329,
+											"end": 330,
+											"value": 1,
+											"raw": "1"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 332,
+											"end": 333,
+											"name": "x"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"operator": ">",
+									"right": {
+										"type": "Identifier",
+										"start": 336,
+										"end": 337,
+										"name": "e"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A numeric literal ends at its own last digit: a `.` behind a complete literal is a",
+							"start": 20,
+							"end": 105
+						},
+						{
+							"type": "Line",
+							"value": " member access on it, which no type continues with, so the `<` is the comparison",
+							"start": 107,
+							"end": 189
+						},
+						{
+							"type": "Line",
+							"value": " operator. Each line is the chain the bare authoring in the `unformatted_bare_literal`",
+							"start": 191,
+							"end": 279
+						},
+						{
+							"type": "Line",
+							"value": " variant reads as.",
+							"start": 281,
+							"end": 301
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 341,
+					"end": 379,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 347,
+							"end": 378,
+							"id": {
+								"type": "Identifier",
+								"start": 347,
+								"end": 349,
+								"name": "a2"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 352,
+								"end": 378,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 353,
+									"end": 361,
+									"left": {
+										"type": "Identifier",
+										"start": 353,
+										"end": 354,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "MemberExpression",
+										"start": 357,
+										"end": 361,
+										"object": {
+											"type": "Identifier",
+											"start": 357,
+											"end": 358,
+											"name": "b"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 359,
+											"end": 360,
+											"name": "c"
+										},
+										"computed": true,
+										"optional": false
+									}
+								},
+								"operator": "|",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 366,
+									"end": 377,
+									"left": {
+										"type": "MemberExpression",
+										"start": 366,
+										"end": 373,
+										"object": {
+											"type": "Literal",
+											"start": 367,
+											"end": 370,
+											"value": 1.5,
+											"raw": "1.5"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 372,
+											"end": 373,
+											"name": "x"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"operator": ">",
+									"right": {
+										"type": "Identifier",
+										"start": 376,
+										"end": 377,
+										"name": "e"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 381,
+					"end": 419,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 387,
+							"end": 418,
+							"id": {
+								"type": "Identifier",
+								"start": 387,
+								"end": 389,
+								"name": "a3"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 392,
+								"end": 418,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 393,
+									"end": 401,
+									"left": {
+										"type": "Identifier",
+										"start": 393,
+										"end": 394,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "MemberExpression",
+										"start": 397,
+										"end": 401,
+										"object": {
+											"type": "Identifier",
+											"start": 397,
+											"end": 398,
+											"name": "b"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 399,
+											"end": 400,
+											"name": "c"
+										},
+										"computed": true,
+										"optional": false
+									}
+								},
+								"operator": "|",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 406,
+									"end": 417,
+									"left": {
+										"type": "MemberExpression",
+										"start": 406,
+										"end": 413,
+										"object": {
+											"type": "Literal",
+											"start": 407,
+											"end": 410,
+											"value": 0.5,
+											"raw": "0.5"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 412,
+											"end": 413,
+											"name": "x"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"operator": ">",
+									"right": {
+										"type": "Identifier",
+										"start": 416,
+										"end": 417,
+										"name": "e"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 421,
+					"end": 457,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 427,
+							"end": 456,
+							"id": {
+								"type": "Identifier",
+								"start": 427,
+								"end": 429,
+								"name": "a4"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 432,
+								"end": 456,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 433,
+									"end": 441,
+									"left": {
+										"type": "Identifier",
+										"start": 433,
+										"end": 434,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "MemberExpression",
+										"start": 437,
+										"end": 441,
+										"object": {
+											"type": "Identifier",
+											"start": 437,
+											"end": 438,
+											"name": "A"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 439,
+											"end": 440,
+											"name": "K"
+										},
+										"computed": true,
+										"optional": false
+									}
+								},
+								"operator": "|",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 446,
+									"end": 455,
+									"left": {
+										"type": "MemberExpression",
+										"start": 446,
+										"end": 451,
+										"object": {
+											"type": "Literal",
+											"start": 447,
+											"end": 448,
+											"value": 1,
+											"raw": "1"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 450,
+											"end": 451,
+											"name": "x"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"operator": ">",
+									"right": {
+										"type": "Identifier",
+										"start": 454,
+										"end": 455,
+										"name": "e"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 459,
+					"end": 484,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 465,
+							"end": 483,
+							"id": {
+								"type": "Identifier",
+								"start": 465,
+								"end": 467,
+								"name": "a5"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 470,
+								"end": 483,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 470,
+									"end": 479,
+									"left": {
+										"type": "Identifier",
+										"start": 470,
+										"end": 471,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "MemberExpression",
+										"start": 474,
+										"end": 479,
+										"object": {
+											"type": "Literal",
+											"start": 475,
+											"end": 476,
+											"value": 1,
+											"raw": "1"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 478,
+											"end": 479,
+											"name": "x"
+										},
+										"computed": false,
+										"optional": false
+									}
+								},
+								"operator": ">",
+								"right": {
+									"type": "Identifier",
+									"start": 482,
+									"end": 483,
+									"name": "e"
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 486,
+					"end": 522,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 492,
+							"end": 521,
+							"id": {
+								"type": "Identifier",
+								"start": 492,
+								"end": 494,
+								"name": "a6"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 497,
+								"end": 521,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 498,
+									"end": 510,
+									"left": {
+										"type": "Identifier",
+										"start": 498,
+										"end": 499,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "MemberExpression",
+										"start": 502,
+										"end": 510,
+										"object": {
+											"type": "Identifier",
+											"start": 502,
+											"end": 503,
+											"name": "b"
+										},
+										"property": {
+											"type": "MemberExpression",
+											"start": 504,
+											"end": 509,
+											"object": {
+												"type": "Literal",
+												"start": 505,
+												"end": 506,
+												"value": 1,
+												"raw": "1"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 508,
+												"end": 509,
+												"name": "x"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"computed": true,
+										"optional": false
+									}
+								},
+								"operator": "|",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 515,
+									"end": 520,
+									"left": {
+										"type": "Identifier",
+										"start": 515,
+										"end": 516,
+										"name": "c"
+									},
+									"operator": ">",
+									"right": {
+										"type": "Identifier",
+										"start": 519,
+										"end": 520,
+										"name": "e"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 524,
+					"end": 551,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 530,
+							"end": 550,
+							"id": {
+								"type": "Identifier",
+								"start": 530,
+								"end": 532,
+								"name": "a7"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 535,
+								"end": 550,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 535,
+									"end": 546,
+									"left": {
+										"type": "Identifier",
+										"start": 535,
+										"end": 536,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "MemberExpression",
+										"start": 539,
+										"end": 546,
+										"object": {
+											"type": "Literal",
+											"start": 540,
+											"end": 543,
+											"value": 1000,
+											"raw": "1e3"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 545,
+											"end": 546,
+											"name": "x"
+										},
+										"computed": false,
+										"optional": false
+									}
+								},
+								"operator": ">",
+								"right": {
+									"type": "Identifier",
+									"start": 549,
+									"end": 550,
+									"name": "e"
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 553,
+					"end": 580,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 559,
+							"end": 579,
+							"id": {
+								"type": "Identifier",
+								"start": 559,
+								"end": 561,
+								"name": "a8"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 564,
+								"end": 579,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 564,
+									"end": 575,
+									"left": {
+										"type": "Identifier",
+										"start": 564,
+										"end": 565,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "MemberExpression",
+										"start": 568,
+										"end": 575,
+										"object": {
+											"type": "Literal",
+											"start": 569,
+											"end": 572,
+											"value": 1,
+											"raw": "0x1"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 574,
+											"end": 575,
+											"name": "x"
+										},
+										"computed": false,
+										"optional": false
+									}
+								},
+								"operator": ">",
+								"right": {
+									"type": "Identifier",
+									"start": 578,
+									"end": 579,
+									"name": "e"
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 582,
+					"end": 606,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 588,
+							"end": 605,
+							"id": {
+								"type": "Identifier",
+								"start": 588,
+								"end": 590,
+								"name": "a9"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 593,
+								"end": 605,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 593,
+									"end": 601,
+									"left": {
+										"type": "Identifier",
+										"start": 593,
+										"end": 594,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "MemberExpression",
+										"start": 597,
+										"end": 601,
+										"object": {
+											"type": "Literal",
+											"start": 597,
+											"end": 599,
+											"value": "1",
+											"raw": "1n",
+											"bigint": "1"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 600,
+											"end": 601,
+											"name": "x"
+										},
+										"computed": false,
+										"optional": false
+									}
+								},
+								"operator": ">",
+								"right": {
+									"type": "Identifier",
+									"start": 604,
+									"end": 605,
+									"name": "e"
+								}
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

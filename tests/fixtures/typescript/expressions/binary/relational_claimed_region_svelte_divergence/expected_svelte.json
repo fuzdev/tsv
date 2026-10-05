@@ -1,0 +1,3046 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 2568,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A paren shell heading the region, with a list behind it. tsc and acorn-typescript",
+			"start": 20,
+			"end": 104
+		},
+		{
+			"type": "Line",
+			"value": " both read the comparison chain `expected_svelte.json` records; tsv rejects it",
+			"start": 106,
+			"end": 186
+		},
+		{
+			"type": "Line",
+			"value": " whatever the shell holds and whatever follows the list, since where the printer",
+			"start": 188,
+			"end": 270
+		},
+		{
+			"type": "Line",
+			"value": " strips the shell the chain has no printed form that reads back as one.",
+			"start": 272,
+			"end": 345
+		},
+		{
+			"type": "Line",
+			"value": " a name whose list opens past a line break heads the region the same way",
+			"start": 631,
+			"end": 705
+		},
+		{
+			"type": "Line",
+			"value": " A negative literal's list ahead of a call, a template or a bar: acorn-typescript",
+			"start": 735,
+			"end": 818
+		},
+		{
+			"type": "Line",
+			"value": " reads a generic call over the literal type, tsc a comparison chain.",
+			"start": 820,
+			"end": 890
+		},
+		{
+			"type": "Line",
+			"value": " and a member tail glued to its digits, read the same two ways",
+			"start": 1015,
+			"end": 1079
+		},
+		{
+			"type": "Line",
+			"value": " and its spaced postfix in an index whose body opens as a type",
+			"start": 1134,
+			"end": 1198
+		},
+		{
+			"type": "Line",
+			"value": " An import head that is no import type: tsc reads a generic call, acorn-typescript a",
+			"start": 1292,
+			"end": 1378
+		},
+		{
+			"type": "Line",
+			"value": " comparison chain over a dynamic import or the meta-property.",
+			"start": 1380,
+			"end": 1443
+		},
+		{
+			"type": "Line",
+			"value": " A second list behind a nested one: acorn-typescript reads a comparison chain over",
+			"start": 1543,
+			"end": 1627
+		},
+		{
+			"type": "Line",
+			"value": " an instantiation, tsc rejects the first line and reads another chain in the second.",
+			"start": 1629,
+			"end": 1715
+		},
+		{
+			"type": "Line",
+			"value": " behind a keyword type's own list heading the region, and inside an index where an",
+			"start": 1775,
+			"end": 1859
+		},
+		{
+			"type": "Line",
+			"value": " operand follows the second list",
+			"start": 1861,
+			"end": 1895
+		},
+		{
+			"type": "Line",
+			"value": " An import type's list past a line break: acorn-typescript takes it and reads a",
+			"start": 2006,
+			"end": 2087
+		},
+		{
+			"type": "Line",
+			"value": " generic call, tsc ends the type at the break and reads a comparison chain.",
+			"start": 2089,
+			"end": 2166
+		},
+		{
+			"type": "Line",
+			"value": " Two more tokens the parsers part on, in an index whose body opens as a type: an arrow",
+			"start": 2212,
+			"end": 2300
+		},
+		{
+			"type": "Line",
+			"value": " function's parameter default (a function type to tsc, an arrow function to",
+			"start": 2302,
+			"end": 2379
+		},
+		{
+			"type": "Line",
+			"value": " acorn-typescript) and a meta-property (a type reference to acorn-typescript, an error",
+			"start": 2381,
+			"end": 2469
+		},
+		{
+			"type": "Line",
+			"value": " to tsc).",
+			"start": 2471,
+			"end": 2482
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 2567,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 2558,
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 347,
+					"end": 371,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 353,
+							"end": 370,
+							"id": {
+								"type": "Identifier",
+								"start": 353,
+								"end": 355,
+								"name": "a1"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 358,
+								"end": 370,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 358,
+									"end": 363,
+									"left": {
+										"type": "Identifier",
+										"start": 358,
+										"end": 359,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 361,
+										"end": 362,
+										"name": "A"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 364,
+									"end": 370,
+									"left": {
+										"type": "Identifier",
+										"start": 364,
+										"end": 365,
+										"name": "C"
+									},
+									"operator": ">>",
+									"right": {
+										"type": "Identifier",
+										"start": 368,
+										"end": 369,
+										"name": "x"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A paren shell heading the region, with a list behind it. tsc and acorn-typescript",
+							"start": 20,
+							"end": 104
+						},
+						{
+							"type": "Line",
+							"value": " both read the comparison chain `expected_svelte.json` records; tsv rejects it",
+							"start": 106,
+							"end": 186
+						},
+						{
+							"type": "Line",
+							"value": " whatever the shell holds and whatever follows the list, since where the printer",
+							"start": 188,
+							"end": 270
+						},
+						{
+							"type": "Line",
+							"value": " strips the shell the chain has no printed form that reads back as one.",
+							"start": 272,
+							"end": 345
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 373,
+					"end": 397,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 379,
+							"end": 396,
+							"id": {
+								"type": "Identifier",
+								"start": 379,
+								"end": 381,
+								"name": "a2"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 384,
+								"end": 396,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 384,
+									"end": 389,
+									"left": {
+										"type": "Identifier",
+										"start": 384,
+										"end": 385,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 387,
+										"end": 388,
+										"name": "A"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 390,
+									"end": 396,
+									"left": {
+										"type": "Identifier",
+										"start": 390,
+										"end": 391,
+										"name": "C"
+									},
+									"operator": ">>",
+									"right": {
+										"type": "TemplateLiteral",
+										"start": 393,
+										"end": 396,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 394,
+												"end": 395,
+												"value": {
+													"raw": "t",
+													"cooked": "t"
+												},
+												"tail": true
+											}
+										]
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 399,
+					"end": 430,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 405,
+							"end": 429,
+							"id": {
+								"type": "Identifier",
+								"start": 405,
+								"end": 407,
+								"name": "a3"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 410,
+								"end": 429,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 410,
+									"end": 422,
+									"left": {
+										"type": "Identifier",
+										"start": 410,
+										"end": 411,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "UnaryExpression",
+										"start": 413,
+										"end": 421,
+										"operator": "typeof",
+										"prefix": true,
+										"argument": {
+											"type": "Identifier",
+											"start": 420,
+											"end": 421,
+											"name": "a"
+										}
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 423,
+									"end": 429,
+									"left": {
+										"type": "Identifier",
+										"start": 423,
+										"end": 424,
+										"name": "C"
+									},
+									"operator": ">>",
+									"right": {
+										"type": "Identifier",
+										"start": 427,
+										"end": 428,
+										"name": "x"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 432,
+					"end": 462,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 438,
+							"end": 461,
+							"id": {
+								"type": "Identifier",
+								"start": 438,
+								"end": 440,
+								"name": "a4"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 443,
+								"end": 461,
+								"callee": {
+									"type": "Identifier",
+									"start": 443,
+									"end": 444,
+									"name": "g"
+								},
+								"arguments": [
+									{
+										"type": "BinaryExpression",
+										"start": 445,
+										"end": 453,
+										"left": {
+											"type": "Identifier",
+											"start": 445,
+											"end": 446,
+											"name": "f"
+										},
+										"operator": "<",
+										"right": {
+											"type": "TSInstantiationExpression",
+											"start": 447,
+											"end": 453,
+											"expression": {
+												"type": "Identifier",
+												"start": 448,
+												"end": 449,
+												"name": "A"
+											},
+											"typeArguments": {
+												"type": "TSTypeParameterInstantiation",
+												"start": 450,
+												"end": 453,
+												"params": [
+													{
+														"type": "TSTypeReference",
+														"start": 451,
+														"end": 452,
+														"typeName": {
+															"type": "Identifier",
+															"start": 451,
+															"end": 452,
+															"name": "C"
+														}
+													}
+												]
+											}
+										}
+									},
+									{
+										"type": "BinaryExpression",
+										"start": 455,
+										"end": 460,
+										"left": {
+											"type": "Identifier",
+											"start": 455,
+											"end": 456,
+											"name": "D"
+										},
+										"operator": ">",
+										"right": {
+											"type": "Identifier",
+											"start": 458,
+											"end": 459,
+											"name": "x"
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 464,
+					"end": 497,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 470,
+							"end": 496,
+							"id": {
+								"type": "Identifier",
+								"start": 470,
+								"end": 472,
+								"name": "a5"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 475,
+								"end": 496,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 475,
+									"end": 489,
+									"left": {
+										"type": "Identifier",
+										"start": 475,
+										"end": 476,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "UnaryExpression",
+										"start": 478,
+										"end": 488,
+										"operator": "typeof",
+										"prefix": true,
+										"argument": {
+											"type": "Identifier",
+											"start": 486,
+											"end": 487,
+											"name": "b"
+										}
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 490,
+									"end": 496,
+									"left": {
+										"type": "Identifier",
+										"start": 490,
+										"end": 491,
+										"name": "C"
+									},
+									"operator": ">>",
+									"right": {
+										"type": "Identifier",
+										"start": 494,
+										"end": 495,
+										"name": "x"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 499,
+					"end": 533,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 505,
+							"end": 532,
+							"id": {
+								"type": "Identifier",
+								"start": 505,
+								"end": 507,
+								"name": "a6"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 510,
+								"end": 532,
+								"callee": {
+									"type": "Identifier",
+									"start": 510,
+									"end": 511,
+									"name": "g"
+								},
+								"arguments": [
+									{
+										"type": "BinaryExpression",
+										"start": 512,
+										"end": 524,
+										"left": {
+											"type": "Identifier",
+											"start": 512,
+											"end": 513,
+											"name": "f"
+										},
+										"operator": "<",
+										"right": {
+											"type": "TSInstantiationExpression",
+											"start": 514,
+											"end": 524,
+											"expression": {
+												"type": "MemberExpression",
+												"start": 515,
+												"end": 520,
+												"object": {
+													"type": "Identifier",
+													"start": 516,
+													"end": 517,
+													"name": "b"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 519,
+													"end": 520,
+													"name": "c"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"typeArguments": {
+												"type": "TSTypeParameterInstantiation",
+												"start": 521,
+												"end": 524,
+												"params": [
+													{
+														"type": "TSTypeReference",
+														"start": 522,
+														"end": 523,
+														"typeName": {
+															"type": "Identifier",
+															"start": 522,
+															"end": 523,
+															"name": "C"
+														}
+													}
+												]
+											}
+										}
+									},
+									{
+										"type": "BinaryExpression",
+										"start": 526,
+										"end": 531,
+										"left": {
+											"type": "Identifier",
+											"start": 526,
+											"end": 527,
+											"name": "D"
+										},
+										"operator": ">",
+										"right": {
+											"type": "Identifier",
+											"start": 529,
+											"end": 530,
+											"name": "x"
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 535,
+					"end": 563,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 541,
+							"end": 562,
+							"id": {
+								"type": "Identifier",
+								"start": 541,
+								"end": 543,
+								"name": "a7"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 546,
+								"end": 562,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 546,
+									"end": 555,
+									"left": {
+										"type": "Identifier",
+										"start": 546,
+										"end": 547,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "BinaryExpression",
+										"start": 549,
+										"end": 554,
+										"left": {
+											"type": "Identifier",
+											"start": 549,
+											"end": 550,
+											"name": "A"
+										},
+										"operator": "|",
+										"right": {
+											"type": "Identifier",
+											"start": 553,
+											"end": 554,
+											"name": "B"
+										}
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 556,
+									"end": 562,
+									"left": {
+										"type": "Identifier",
+										"start": 556,
+										"end": 557,
+										"name": "C"
+									},
+									"operator": ">>",
+									"right": {
+										"type": "Identifier",
+										"start": 560,
+										"end": 561,
+										"name": "x"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 565,
+					"end": 598,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 571,
+							"end": 597,
+							"id": {
+								"type": "Identifier",
+								"start": 571,
+								"end": 573,
+								"name": "a8"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 576,
+								"end": 597,
+								"callee": {
+									"type": "Identifier",
+									"start": 576,
+									"end": 577,
+									"name": "g"
+								},
+								"arguments": [
+									{
+										"type": "BinaryExpression",
+										"start": 578,
+										"end": 585,
+										"left": {
+											"type": "BinaryExpression",
+											"start": 578,
+											"end": 583,
+											"left": {
+												"type": "Identifier",
+												"start": 578,
+												"end": 579,
+												"name": "f"
+											},
+											"operator": "<",
+											"right": {
+												"type": "Identifier",
+												"start": 581,
+												"end": 582,
+												"name": "A"
+											}
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 584,
+											"end": 585,
+											"name": "C"
+										}
+									},
+									{
+										"type": "BinaryExpression",
+										"start": 587,
+										"end": 596,
+										"left": {
+											"type": "BinaryExpression",
+											"start": 587,
+											"end": 592,
+											"left": {
+												"type": "Identifier",
+												"start": 587,
+												"end": 588,
+												"name": "D"
+											},
+											"operator": ">",
+											"right": {
+												"type": "ArrayExpression",
+												"start": 589,
+												"end": 592,
+												"elements": [
+													{
+														"type": "Literal",
+														"start": 590,
+														"end": 591,
+														"value": 0,
+														"raw": "0"
+													}
+												]
+											}
+										},
+										"operator": ">",
+										"right": {
+											"type": "Identifier",
+											"start": 594,
+											"end": 595,
+											"name": "x"
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 600,
+					"end": 629,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 606,
+							"end": 628,
+							"id": {
+								"type": "Identifier",
+								"start": 606,
+								"end": 609,
+								"name": "a10"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 612,
+								"end": 628,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 612,
+									"end": 620,
+									"left": {
+										"type": "Identifier",
+										"start": 612,
+										"end": 613,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "TSInstantiationExpression",
+										"start": 614,
+										"end": 620,
+										"expression": {
+											"type": "Identifier",
+											"start": 615,
+											"end": 616,
+											"name": "A"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 617,
+											"end": 620,
+											"params": [
+												{
+													"type": "TSTypeReference",
+													"start": 618,
+													"end": 619,
+													"typeName": {
+														"type": "Identifier",
+														"start": 618,
+														"end": 619,
+														"name": "C"
+													}
+												}
+											]
+										}
+									}
+								},
+								"operator": "|",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 623,
+									"end": 628,
+									"left": {
+										"type": "Identifier",
+										"start": 623,
+										"end": 624,
+										"name": "D"
+									},
+									"operator": ">",
+									"right": {
+										"type": "Identifier",
+										"start": 626,
+										"end": 627,
+										"name": "x"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 707,
+					"end": 732,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 713,
+							"end": 731,
+							"id": {
+								"type": "Identifier",
+								"start": 713,
+								"end": 715,
+								"name": "a9"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 718,
+								"end": 731,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 718,
+									"end": 721,
+									"left": {
+										"type": "Identifier",
+										"start": 718,
+										"end": 719,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 720,
+										"end": 721,
+										"name": "B"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 725,
+									"end": 731,
+									"left": {
+										"type": "Identifier",
+										"start": 725,
+										"end": 726,
+										"name": "C"
+									},
+									"operator": ">>",
+									"right": {
+										"type": "Identifier",
+										"start": 729,
+										"end": 730,
+										"name": "x"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a name whose list opens past a line break heads the region the same way",
+							"start": 631,
+							"end": 705
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 892,
+					"end": 918,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 898,
+							"end": 917,
+							"id": {
+								"type": "Identifier",
+								"start": 898,
+								"end": 900,
+								"name": "b1"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 903,
+								"end": 917,
+								"callee": {
+									"type": "Identifier",
+									"start": 903,
+									"end": 904,
+									"name": "f"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 915,
+										"end": 916,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 904,
+									"end": 914,
+									"params": [
+										{
+											"type": "TSLiteralType",
+											"start": 905,
+											"end": 913,
+											"literal": {
+												"type": "UnaryExpression",
+												"start": 905,
+												"end": 913,
+												"operator": "-",
+												"prefix": true,
+												"argument": {
+													"type": "CallExpression",
+													"start": 906,
+													"end": 913,
+													"callee": {
+														"type": "Literal",
+														"start": 906,
+														"end": 907,
+														"value": 1,
+														"raw": "1"
+													},
+													"arguments": [
+														{
+															"type": "Identifier",
+															"start": 911,
+															"end": 912,
+															"name": "e"
+														}
+													],
+													"typeArguments": {
+														"type": "TSTypeParameterInstantiation",
+														"start": 907,
+														"end": 910,
+														"params": [
+															{
+																"type": "TSTypeReference",
+																"start": 908,
+																"end": 909,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 908,
+																	"end": 909,
+																	"name": "C"
+																}
+															}
+														]
+													}
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A negative literal's list ahead of a call, a template or a bar: acorn-typescript",
+							"start": 735,
+							"end": 818
+						},
+						{
+							"type": "Line",
+							"value": " reads a generic call over the literal type, tsc a comparison chain.",
+							"start": 820,
+							"end": 890
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 920,
+					"end": 950,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 926,
+							"end": 949,
+							"id": {
+								"type": "Identifier",
+								"start": 926,
+								"end": 928,
+								"name": "b2"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 931,
+								"end": 949,
+								"callee": {
+									"type": "Identifier",
+									"start": 931,
+									"end": 932,
+									"name": "f"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 947,
+										"end": 948,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 932,
+									"end": 946,
+									"params": [
+										{
+											"type": "TSUnionType",
+											"start": 933,
+											"end": 945,
+											"types": [
+												{
+													"type": "TSTypeReference",
+													"start": 933,
+													"end": 934,
+													"typeName": {
+														"type": "Identifier",
+														"start": 933,
+														"end": 934,
+														"name": "A"
+													}
+												},
+												{
+													"type": "TSLiteralType",
+													"start": 937,
+													"end": 945,
+													"literal": {
+														"type": "UnaryExpression",
+														"start": 937,
+														"end": 945,
+														"operator": "-",
+														"prefix": true,
+														"argument": {
+															"type": "CallExpression",
+															"start": 938,
+															"end": 945,
+															"callee": {
+																"type": "Literal",
+																"start": 938,
+																"end": 939,
+																"value": 1,
+																"raw": "1"
+															},
+															"arguments": [
+																{
+																	"type": "Identifier",
+																	"start": 943,
+																	"end": 944,
+																	"name": "e"
+																}
+															],
+															"typeArguments": {
+																"type": "TSTypeParameterInstantiation",
+																"start": 939,
+																"end": 942,
+																"params": [
+																	{
+																		"type": "TSTypeReference",
+																		"start": 940,
+																		"end": 941,
+																		"typeName": {
+																			"type": "Identifier",
+																			"start": 940,
+																			"end": 941,
+																			"name": "C"
+																		}
+																	}
+																]
+															}
+														}
+													}
+												}
+											]
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 952,
+					"end": 979,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 958,
+							"end": 978,
+							"id": {
+								"type": "Identifier",
+								"start": 958,
+								"end": 960,
+								"name": "b3"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 963,
+								"end": 978,
+								"callee": {
+									"type": "Identifier",
+									"start": 963,
+									"end": 964,
+									"name": "f"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 976,
+										"end": 977,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 964,
+									"end": 975,
+									"params": [
+										{
+											"type": "TSUnionType",
+											"start": 965,
+											"end": 974,
+											"types": [
+												{
+													"type": "TSLiteralType",
+													"start": 965,
+													"end": 970,
+													"literal": {
+														"type": "UnaryExpression",
+														"start": 965,
+														"end": 970,
+														"operator": "-",
+														"prefix": true,
+														"argument": {
+															"type": "TSInstantiationExpression",
+															"start": 966,
+															"end": 970,
+															"expression": {
+																"type": "Literal",
+																"start": 966,
+																"end": 967,
+																"value": 1,
+																"raw": "1"
+															},
+															"typeArguments": {
+																"type": "TSTypeParameterInstantiation",
+																"start": 967,
+																"end": 970,
+																"params": [
+																	{
+																		"type": "TSTypeReference",
+																		"start": 968,
+																		"end": 969,
+																		"typeName": {
+																			"type": "Identifier",
+																			"start": 968,
+																			"end": 969,
+																			"name": "C"
+																		}
+																	}
+																]
+															}
+														}
+													}
+												},
+												{
+													"type": "TSTypeReference",
+													"start": 973,
+													"end": 974,
+													"typeName": {
+														"type": "Identifier",
+														"start": 973,
+														"end": 974,
+														"name": "D"
+													}
+												}
+											]
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 981,
+					"end": 1013,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 987,
+							"end": 1012,
+							"id": {
+								"type": "Identifier",
+								"start": 987,
+								"end": 989,
+								"name": "b4"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 992,
+								"end": 1012,
+								"callee": {
+									"type": "Identifier",
+									"start": 992,
+									"end": 993,
+									"name": "f"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 1010,
+										"end": 1011,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 993,
+									"end": 1009,
+									"params": [
+										{
+											"type": "TSIndexedAccessType",
+											"start": 994,
+											"end": 1008,
+											"objectType": {
+												"type": "TSTypeReference",
+												"start": 994,
+												"end": 995,
+												"typeName": {
+													"type": "Identifier",
+													"start": 994,
+													"end": 995,
+													"name": "A"
+												}
+											},
+											"indexType": {
+												"type": "TSFunctionType",
+												"start": 996,
+												"end": 1007,
+												"parameters": [],
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 999,
+													"end": 1007,
+													"typeAnnotation": {
+														"type": "TSLiteralType",
+														"start": 1002,
+														"end": 1007,
+														"literal": {
+															"type": "UnaryExpression",
+															"start": 1002,
+															"end": 1007,
+															"operator": "-",
+															"prefix": true,
+															"argument": {
+																"type": "TSInstantiationExpression",
+																"start": 1003,
+																"end": 1007,
+																"expression": {
+																	"type": "Literal",
+																	"start": 1003,
+																	"end": 1004,
+																	"value": 1,
+																	"raw": "1"
+																},
+																"typeArguments": {
+																	"type": "TSTypeParameterInstantiation",
+																	"start": 1004,
+																	"end": 1007,
+																	"params": [
+																		{
+																			"type": "TSTypeReference",
+																			"start": 1005,
+																			"end": 1006,
+																			"typeName": {
+																				"type": "Identifier",
+																				"start": 1005,
+																				"end": 1006,
+																				"name": "C"
+																			}
+																		}
+																	]
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1081,
+					"end": 1104,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1087,
+							"end": 1103,
+							"id": {
+								"type": "Identifier",
+								"start": 1087,
+								"end": 1089,
+								"name": "b5"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1092,
+								"end": 1103,
+								"callee": {
+									"type": "Identifier",
+									"start": 1092,
+									"end": 1093,
+									"name": "f"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 1101,
+										"end": 1102,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 1093,
+									"end": 1100,
+									"params": [
+										{
+											"type": "TSLiteralType",
+											"start": 1094,
+											"end": 1099,
+											"literal": {
+												"type": "UnaryExpression",
+												"start": 1094,
+												"end": 1099,
+												"operator": "-",
+												"prefix": true,
+												"argument": {
+													"type": "MemberExpression",
+													"start": 1095,
+													"end": 1099,
+													"object": {
+														"type": "Literal",
+														"start": 1095,
+														"end": 1097,
+														"value": 1,
+														"raw": "1."
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 1098,
+														"end": 1099,
+														"name": "x"
+													},
+													"computed": false,
+													"optional": false
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " and a member tail glued to its digits, read the same two ways",
+							"start": 1015,
+							"end": 1079
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1106,
+					"end": 1132,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1112,
+							"end": 1131,
+							"id": {
+								"type": "Identifier",
+								"start": 1112,
+								"end": 1114,
+								"name": "b6"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1117,
+								"end": 1131,
+								"callee": {
+									"type": "Identifier",
+									"start": 1117,
+									"end": 1118,
+									"name": "f"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 1129,
+										"end": 1130,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 1118,
+									"end": 1128,
+									"params": [
+										{
+											"type": "TSIndexedAccessType",
+											"start": 1119,
+											"end": 1127,
+											"objectType": {
+												"type": "TSTypeReference",
+												"start": 1119,
+												"end": 1120,
+												"typeName": {
+													"type": "Identifier",
+													"start": 1119,
+													"end": 1120,
+													"name": "A"
+												}
+											},
+											"indexType": {
+												"type": "TSLiteralType",
+												"start": 1121,
+												"end": 1126,
+												"literal": {
+													"type": "UnaryExpression",
+													"start": 1121,
+													"end": 1126,
+													"operator": "-",
+													"prefix": true,
+													"argument": {
+														"type": "MemberExpression",
+														"start": 1122,
+														"end": 1126,
+														"object": {
+															"type": "Literal",
+															"start": 1122,
+															"end": 1124,
+															"value": 1,
+															"raw": "1."
+														},
+														"property": {
+															"type": "Identifier",
+															"start": 1125,
+															"end": 1126,
+															"name": "x"
+														},
+														"computed": false,
+														"optional": false
+													}
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1200,
+					"end": 1230,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1206,
+							"end": 1229,
+							"id": {
+								"type": "Identifier",
+								"start": 1206,
+								"end": 1208,
+								"name": "b7"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1211,
+								"end": 1229,
+								"callee": {
+									"type": "Identifier",
+									"start": 1211,
+									"end": 1212,
+									"name": "f"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 1227,
+										"end": 1228,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 1212,
+									"end": 1226,
+									"params": [
+										{
+											"type": "TSIndexedAccessType",
+											"start": 1213,
+											"end": 1225,
+											"objectType": {
+												"type": "TSTypeReference",
+												"start": 1213,
+												"end": 1214,
+												"typeName": {
+													"type": "Identifier",
+													"start": 1213,
+													"end": 1214,
+													"name": "A"
+												}
+											},
+											"indexType": {
+												"type": "TSUnionType",
+												"start": 1215,
+												"end": 1224,
+												"types": [
+													{
+														"type": "TSTypeReference",
+														"start": 1215,
+														"end": 1216,
+														"typeName": {
+															"type": "Identifier",
+															"start": 1215,
+															"end": 1216,
+															"name": "B"
+														}
+													},
+													{
+														"type": "TSLiteralType",
+														"start": 1219,
+														"end": 1224,
+														"literal": {
+															"type": "UnaryExpression",
+															"start": 1219,
+															"end": 1224,
+															"operator": "-",
+															"prefix": true,
+															"argument": {
+																"type": "CallExpression",
+																"start": 1220,
+																"end": 1224,
+																"callee": {
+																	"type": "Literal",
+																	"start": 1220,
+																	"end": 1221,
+																	"value": 1,
+																	"raw": "1"
+																},
+																"arguments": [
+																	{
+																		"type": "Identifier",
+																		"start": 1222,
+																		"end": 1223,
+																		"name": "e"
+																	}
+																],
+																"optional": false
+															}
+														}
+													}
+												]
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " and its spaced postfix in an index whose body opens as a type",
+							"start": 1134,
+							"end": 1198
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1232,
+					"end": 1258,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1238,
+							"end": 1257,
+							"id": {
+								"type": "Identifier",
+								"start": 1238,
+								"end": 1240,
+								"name": "b8"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1243,
+								"end": 1257,
+								"callee": {
+									"type": "Identifier",
+									"start": 1243,
+									"end": 1244,
+									"name": "f"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 1255,
+										"end": 1256,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 1244,
+									"end": 1254,
+									"params": [
+										{
+											"type": "TSIndexedAccessType",
+											"start": 1245,
+											"end": 1253,
+											"objectType": {
+												"type": "TSTypeReference",
+												"start": 1245,
+												"end": 1246,
+												"typeName": {
+													"type": "Identifier",
+													"start": 1245,
+													"end": 1246,
+													"name": "A"
+												}
+											},
+											"indexType": {
+												"type": "TSLiteralType",
+												"start": 1247,
+												"end": 1252,
+												"literal": {
+													"type": "UnaryExpression",
+													"start": 1247,
+													"end": 1252,
+													"operator": "-",
+													"prefix": true,
+													"argument": {
+														"type": "MemberExpression",
+														"start": 1248,
+														"end": 1252,
+														"object": {
+															"type": "Literal",
+															"start": 1248,
+															"end": 1249,
+															"value": 1,
+															"raw": "1"
+														},
+														"property": {
+															"type": "Identifier",
+															"start": 1251,
+															"end": 1252,
+															"name": "x"
+														},
+														"computed": false,
+														"optional": false
+													}
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1260,
+					"end": 1289,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1266,
+							"end": 1288,
+							"id": {
+								"type": "Identifier",
+								"start": 1266,
+								"end": 1268,
+								"name": "b9"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1271,
+								"end": 1288,
+								"callee": {
+									"type": "Identifier",
+									"start": 1271,
+									"end": 1272,
+									"name": "f"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 1286,
+										"end": 1287,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 1272,
+									"end": 1285,
+									"params": [
+										{
+											"type": "TSIndexedAccessType",
+											"start": 1273,
+											"end": 1284,
+											"objectType": {
+												"type": "TSTypeReference",
+												"start": 1273,
+												"end": 1274,
+												"typeName": {
+													"type": "Identifier",
+													"start": 1273,
+													"end": 1274,
+													"name": "A"
+												}
+											},
+											"indexType": {
+												"type": "TSIndexedAccessType",
+												"start": 1275,
+												"end": 1283,
+												"objectType": {
+													"type": "TSTypeReference",
+													"start": 1275,
+													"end": 1276,
+													"typeName": {
+														"type": "Identifier",
+														"start": 1275,
+														"end": 1276,
+														"name": "A"
+													}
+												},
+												"indexType": {
+													"type": "TSLiteralType",
+													"start": 1277,
+													"end": 1282,
+													"literal": {
+														"type": "UnaryExpression",
+														"start": 1277,
+														"end": 1282,
+														"operator": "-",
+														"prefix": true,
+														"argument": {
+															"type": "TaggedTemplateExpression",
+															"start": 1278,
+															"end": 1282,
+															"tag": {
+																"type": "Literal",
+																"start": 1278,
+																"end": 1279,
+																"value": 1,
+																"raw": "1"
+															},
+															"quasi": {
+																"type": "TemplateLiteral",
+																"start": 1279,
+																"end": 1282,
+																"expressions": [],
+																"quasis": [
+																	{
+																		"type": "TemplateElement",
+																		"start": 1280,
+																		"end": 1281,
+																		"value": {
+																			"raw": "t",
+																			"cooked": "t"
+																		},
+																		"tail": true
+																	}
+																]
+															}
+														}
+													}
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1445,
+					"end": 1472,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1451,
+							"end": 1471,
+							"id": {
+								"type": "Identifier",
+								"start": 1451,
+								"end": 1453,
+								"name": "c1"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 1456,
+								"end": 1471,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 1456,
+									"end": 1467,
+									"left": {
+										"type": "Identifier",
+										"start": 1456,
+										"end": 1457,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "ImportExpression",
+										"start": 1458,
+										"end": 1467,
+										"source": {
+											"type": "Identifier",
+											"start": 1465,
+											"end": 1466,
+											"name": "c"
+										}
+									}
+								},
+								"operator": ">",
+								"right": {
+									"type": "Identifier",
+									"start": 1469,
+									"end": 1470,
+									"name": "x"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An import head that is no import type: tsc reads a generic call, acorn-typescript a",
+							"start": 1292,
+							"end": 1378
+						},
+						{
+							"type": "Line",
+							"value": " comparison chain over a dynamic import or the meta-property.",
+							"start": 1380,
+							"end": 1443
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1474,
+					"end": 1509,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1480,
+							"end": 1508,
+							"id": {
+								"type": "Identifier",
+								"start": 1480,
+								"end": 1482,
+								"name": "c2"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 1485,
+								"end": 1508,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 1485,
+									"end": 1490,
+									"left": {
+										"type": "Identifier",
+										"start": 1485,
+										"end": 1486,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 1489,
+										"end": 1490,
+										"name": "b"
+									}
+								},
+								"operator": "|",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 1493,
+									"end": 1508,
+									"left": {
+										"type": "ImportExpression",
+										"start": 1493,
+										"end": 1502,
+										"source": {
+											"type": "Identifier",
+											"start": 1500,
+											"end": 1501,
+											"name": "c"
+										}
+									},
+									"operator": ">",
+									"right": {
+										"type": "Identifier",
+										"start": 1506,
+										"end": 1507,
+										"name": "x"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1511,
+					"end": 1540,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1517,
+							"end": 1539,
+							"id": {
+								"type": "Identifier",
+								"start": 1517,
+								"end": 1519,
+								"name": "c3"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 1522,
+								"end": 1539,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 1522,
+									"end": 1535,
+									"left": {
+										"type": "Identifier",
+										"start": 1522,
+										"end": 1523,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "MetaProperty",
+										"start": 1524,
+										"end": 1535,
+										"meta": {
+											"type": "Identifier",
+											"start": 1524,
+											"end": 1530,
+											"name": "import"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 1531,
+											"end": 1535,
+											"name": "meta"
+										}
+									}
+								},
+								"operator": ">",
+								"right": {
+									"type": "Identifier",
+									"start": 1537,
+									"end": 1538,
+									"name": "x"
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1717,
+					"end": 1742,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1723,
+							"end": 1741,
+							"id": {
+								"type": "Identifier",
+								"start": 1723,
+								"end": 1725,
+								"name": "d1"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 1728,
+								"end": 1741,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 1728,
+									"end": 1734,
+									"left": {
+										"type": "Identifier",
+										"start": 1728,
+										"end": 1729,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "TSInstantiationExpression",
+										"start": 1730,
+										"end": 1734,
+										"expression": {
+											"type": "Identifier",
+											"start": 1730,
+											"end": 1731,
+											"name": "A"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 1731,
+											"end": 1734,
+											"params": [
+												{
+													"type": "TSTypeReference",
+													"start": 1732,
+													"end": 1733,
+													"typeName": {
+														"type": "Identifier",
+														"start": 1732,
+														"end": 1733,
+														"name": "B"
+													}
+												}
+											]
+										}
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 1735,
+									"end": 1741,
+									"left": {
+										"type": "Identifier",
+										"start": 1735,
+										"end": 1736,
+										"name": "C"
+									},
+									"operator": ">>",
+									"right": {
+										"type": "Identifier",
+										"start": 1739,
+										"end": 1740,
+										"name": "x"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A second list behind a nested one: acorn-typescript reads a comparison chain over",
+							"start": 1543,
+							"end": 1627
+						},
+						{
+							"type": "Line",
+							"value": " an instantiation, tsc rejects the first line and reads another chain in the second.",
+							"start": 1629,
+							"end": 1715
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1744,
+					"end": 1773,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1750,
+							"end": 1772,
+							"id": {
+								"type": "Identifier",
+								"start": 1750,
+								"end": 1752,
+								"name": "d2"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 1755,
+								"end": 1772,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 1755,
+									"end": 1768,
+									"left": {
+										"type": "BinaryExpression",
+										"start": 1755,
+										"end": 1763,
+										"left": {
+											"type": "BinaryExpression",
+											"start": 1755,
+											"end": 1761,
+											"left": {
+												"type": "Identifier",
+												"start": 1755,
+												"end": 1756,
+												"name": "f"
+											},
+											"operator": "<",
+											"right": {
+												"type": "TSInstantiationExpression",
+												"start": 1757,
+												"end": 1761,
+												"expression": {
+													"type": "Identifier",
+													"start": 1757,
+													"end": 1758,
+													"name": "A"
+												},
+												"typeArguments": {
+													"type": "TSTypeParameterInstantiation",
+													"start": 1758,
+													"end": 1761,
+													"params": [
+														{
+															"type": "TSTypeReference",
+															"start": 1759,
+															"end": 1760,
+															"typeName": {
+																"type": "Identifier",
+																"start": 1759,
+																"end": 1760,
+																"name": "B"
+															}
+														}
+													]
+												}
+											}
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 1762,
+											"end": 1763,
+											"name": "C"
+										}
+									},
+									"operator": ">",
+									"right": {
+										"type": "UnaryExpression",
+										"start": 1765,
+										"end": 1768,
+										"operator": "+",
+										"prefix": true,
+										"argument": {
+											"type": "Literal",
+											"start": 1767,
+											"end": 1768,
+											"value": 1,
+											"raw": "1"
+										}
+									}
+								},
+								"operator": ">",
+								"right": {
+									"type": "Identifier",
+									"start": 1770,
+									"end": 1771,
+									"name": "x"
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1897,
+					"end": 1933,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1903,
+							"end": 1932,
+							"id": {
+								"type": "Identifier",
+								"start": 1903,
+								"end": 1905,
+								"name": "d3"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1908,
+								"end": 1932,
+								"callee": {
+									"type": "Identifier",
+									"start": 1908,
+									"end": 1909,
+									"name": "g"
+								},
+								"arguments": [
+									{
+										"type": "BinaryExpression",
+										"start": 1910,
+										"end": 1924,
+										"left": {
+											"type": "Identifier",
+											"start": 1910,
+											"end": 1911,
+											"name": "f"
+										},
+										"operator": "<",
+										"right": {
+											"type": "TSInstantiationExpression",
+											"start": 1912,
+											"end": 1924,
+											"expression": {
+												"type": "TSInstantiationExpression",
+												"start": 1912,
+												"end": 1921,
+												"expression": {
+													"type": "Identifier",
+													"start": 1912,
+													"end": 1918,
+													"name": "string"
+												},
+												"typeArguments": {
+													"type": "TSTypeParameterInstantiation",
+													"start": 1918,
+													"end": 1921,
+													"params": [
+														{
+															"type": "TSTypeReference",
+															"start": 1919,
+															"end": 1920,
+															"typeName": {
+																"type": "Identifier",
+																"start": 1919,
+																"end": 1920,
+																"name": "C"
+															}
+														}
+													]
+												}
+											},
+											"typeArguments": {
+												"type": "TSTypeParameterInstantiation",
+												"start": 1921,
+												"end": 1924,
+												"params": [
+													{
+														"type": "TSTypeReference",
+														"start": 1922,
+														"end": 1923,
+														"typeName": {
+															"type": "Identifier",
+															"start": 1922,
+															"end": 1923,
+															"name": "D"
+														}
+													}
+												]
+											}
+										}
+									},
+									{
+										"type": "BinaryExpression",
+										"start": 1926,
+										"end": 1931,
+										"left": {
+											"type": "Identifier",
+											"start": 1926,
+											"end": 1927,
+											"name": "B"
+										},
+										"operator": ">",
+										"right": {
+											"type": "Identifier",
+											"start": 1929,
+											"end": 1930,
+											"name": "x"
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " behind a keyword type's own list heading the region, and inside an index where an",
+							"start": 1775,
+							"end": 1859
+						},
+						{
+							"type": "Line",
+							"value": " operand follows the second list",
+							"start": 1861,
+							"end": 1895
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1935,
+					"end": 1967,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1941,
+							"end": 1966,
+							"id": {
+								"type": "Identifier",
+								"start": 1941,
+								"end": 1943,
+								"name": "d4"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 1946,
+								"end": 1966,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 1946,
+									"end": 1962,
+									"left": {
+										"type": "Identifier",
+										"start": 1946,
+										"end": 1947,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "MemberExpression",
+										"start": 1948,
+										"end": 1962,
+										"object": {
+											"type": "Identifier",
+											"start": 1948,
+											"end": 1949,
+											"name": "A"
+										},
+										"property": {
+											"type": "BinaryExpression",
+											"start": 1950,
+											"end": 1961,
+											"left": {
+												"type": "BinaryExpression",
+												"start": 1950,
+												"end": 1956,
+												"left": {
+													"type": "TSInstantiationExpression",
+													"start": 1950,
+													"end": 1954,
+													"expression": {
+														"type": "Identifier",
+														"start": 1950,
+														"end": 1951,
+														"name": "b"
+													},
+													"typeArguments": {
+														"type": "TSTypeParameterInstantiation",
+														"start": 1951,
+														"end": 1954,
+														"params": [
+															{
+																"type": "TSTypeReference",
+																"start": 1952,
+																"end": 1953,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 1952,
+																	"end": 1953,
+																	"name": "C"
+																}
+															}
+														]
+													}
+												},
+												"operator": "<",
+												"right": {
+													"type": "Identifier",
+													"start": 1955,
+													"end": 1956,
+													"name": "D"
+												}
+											},
+											"operator": ">",
+											"right": {
+												"type": "UnaryExpression",
+												"start": 1958,
+												"end": 1961,
+												"operator": "+",
+												"prefix": true,
+												"argument": {
+													"type": "Literal",
+													"start": 1960,
+													"end": 1961,
+													"value": 1,
+													"raw": "1"
+												}
+											}
+										},
+										"computed": true,
+										"optional": false
+									}
+								},
+								"operator": ">",
+								"right": {
+									"type": "Identifier",
+									"start": 1964,
+									"end": 1965,
+									"name": "x"
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1969,
+					"end": 2003,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1975,
+							"end": 2002,
+							"id": {
+								"type": "Identifier",
+								"start": 1975,
+								"end": 1977,
+								"name": "d5"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 1980,
+								"end": 2002,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 1980,
+									"end": 1998,
+									"left": {
+										"type": "Identifier",
+										"start": 1980,
+										"end": 1981,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "MemberExpression",
+										"start": 1982,
+										"end": 1998,
+										"object": {
+											"type": "Identifier",
+											"start": 1982,
+											"end": 1983,
+											"name": "A"
+										},
+										"property": {
+											"type": "BinaryExpression",
+											"start": 1984,
+											"end": 1997,
+											"left": {
+												"type": "BinaryExpression",
+												"start": 1984,
+												"end": 1992,
+												"left": {
+													"type": "TSInstantiationExpression",
+													"start": 1984,
+													"end": 1990,
+													"expression": {
+														"type": "Identifier",
+														"start": 1985,
+														"end": 1986,
+														"name": "b"
+													},
+													"typeArguments": {
+														"type": "TSTypeParameterInstantiation",
+														"start": 1987,
+														"end": 1990,
+														"params": [
+															{
+																"type": "TSTypeReference",
+																"start": 1988,
+																"end": 1989,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 1988,
+																	"end": 1989,
+																	"name": "C"
+																}
+															}
+														]
+													}
+												},
+												"operator": "<",
+												"right": {
+													"type": "Identifier",
+													"start": 1991,
+													"end": 1992,
+													"name": "D"
+												}
+											},
+											"operator": ">",
+											"right": {
+												"type": "UnaryExpression",
+												"start": 1994,
+												"end": 1997,
+												"operator": "+",
+												"prefix": true,
+												"argument": {
+													"type": "Literal",
+													"start": 1996,
+													"end": 1997,
+													"value": 1,
+													"raw": "1"
+												}
+											}
+										},
+										"computed": true,
+										"optional": false
+									}
+								},
+								"operator": ">",
+								"right": {
+									"type": "Identifier",
+									"start": 2000,
+									"end": 2001,
+									"name": "x"
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 2168,
+					"end": 2209,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 2174,
+							"end": 2208,
+							"id": {
+								"type": "Identifier",
+								"start": 2174,
+								"end": 2176,
+								"name": "e1"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 2179,
+								"end": 2208,
+								"callee": {
+									"type": "Identifier",
+									"start": 2179,
+									"end": 2180,
+									"name": "f"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 2206,
+										"end": 2207,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 2180,
+									"end": 2205,
+									"params": [
+										{
+											"type": "TSUnionType",
+											"start": 2181,
+											"end": 2204,
+											"types": [
+												{
+													"type": "TSTypeReference",
+													"start": 2181,
+													"end": 2182,
+													"typeName": {
+														"type": "Identifier",
+														"start": 2181,
+														"end": 2182,
+														"name": "A"
+													}
+												},
+												{
+													"type": "TSImportType",
+													"start": 2185,
+													"end": 2204,
+													"argument": {
+														"type": "Literal",
+														"start": 2192,
+														"end": 2195,
+														"value": "m",
+														"raw": "'m'"
+													},
+													"qualifier": {
+														"type": "Identifier",
+														"start": 2197,
+														"end": 2198,
+														"name": "B"
+													},
+													"typeArguments": {
+														"type": "TSTypeParameterInstantiation",
+														"start": 2201,
+														"end": 2204,
+														"params": [
+															{
+																"type": "TSTypeReference",
+																"start": 2202,
+																"end": 2203,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 2202,
+																	"end": 2203,
+																	"name": "C"
+																}
+															}
+														]
+													}
+												}
+											]
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An import type's list past a line break: acorn-typescript takes it and reads a",
+							"start": 2006,
+							"end": 2087
+						},
+						{
+							"type": "Line",
+							"value": " generic call, tsc ends the type at the break and reads a comparison chain.",
+							"start": 2089,
+							"end": 2166
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 2484,
+					"end": 2520,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 2490,
+							"end": 2519,
+							"id": {
+								"type": "Identifier",
+								"start": 2490,
+								"end": 2492,
+								"name": "f1"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 2495,
+								"end": 2519,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 2495,
+									"end": 2515,
+									"left": {
+										"type": "Identifier",
+										"start": 2495,
+										"end": 2496,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "MemberExpression",
+										"start": 2497,
+										"end": 2515,
+										"object": {
+											"type": "Identifier",
+											"start": 2497,
+											"end": 2498,
+											"name": "A"
+										},
+										"property": {
+											"type": "MemberExpression",
+											"start": 2499,
+											"end": 2514,
+											"object": {
+												"type": "Identifier",
+												"start": 2499,
+												"end": 2500,
+												"name": "A"
+											},
+											"property": {
+												"type": "ArrowFunctionExpression",
+												"start": 2501,
+												"end": 2513,
+												"id": null,
+												"expression": true,
+												"generator": false,
+												"async": false,
+												"params": [
+													{
+														"type": "AssignmentPattern",
+														"start": 2502,
+														"end": 2507,
+														"left": {
+															"type": "Identifier",
+															"start": 2502,
+															"end": 2503,
+															"name": "a"
+														},
+														"right": {
+															"type": "Literal",
+															"start": 2506,
+															"end": 2507,
+															"value": 1,
+															"raw": "1"
+														}
+													}
+												],
+												"body": {
+													"type": "Literal",
+													"start": 2512,
+													"end": 2513,
+													"value": 0,
+													"raw": "0"
+												}
+											},
+											"computed": true,
+											"optional": false
+										},
+										"computed": true,
+										"optional": false
+									}
+								},
+								"operator": ">",
+								"right": {
+									"type": "Identifier",
+									"start": 2517,
+									"end": 2518,
+									"name": "x"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Two more tokens the parsers part on, in an index whose body opens as a type: an arrow",
+							"start": 2212,
+							"end": 2300
+						},
+						{
+							"type": "Line",
+							"value": " function's parameter default (a function type to tsc, an arrow function to",
+							"start": 2302,
+							"end": 2379
+						},
+						{
+							"type": "Line",
+							"value": " acorn-typescript) and a meta-property (a type reference to acorn-typescript, an error",
+							"start": 2381,
+							"end": 2469
+						},
+						{
+							"type": "Line",
+							"value": " to tsc).",
+							"start": 2471,
+							"end": 2482
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 2522,
+					"end": 2557,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 2528,
+							"end": 2556,
+							"id": {
+								"type": "Identifier",
+								"start": 2528,
+								"end": 2530,
+								"name": "f2"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 2533,
+								"end": 2556,
+								"callee": {
+									"type": "Identifier",
+									"start": 2533,
+									"end": 2534,
+									"name": "f"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 2554,
+										"end": 2555,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 2534,
+									"end": 2553,
+									"params": [
+										{
+											"type": "TSIndexedAccessType",
+											"start": 2535,
+											"end": 2552,
+											"objectType": {
+												"type": "TSTypeReference",
+												"start": 2535,
+												"end": 2536,
+												"typeName": {
+													"type": "Identifier",
+													"start": 2535,
+													"end": 2536,
+													"name": "A"
+												}
+											},
+											"indexType": {
+												"type": "TSUnionType",
+												"start": 2537,
+												"end": 2551,
+												"types": [
+													{
+														"type": "TSTypeReference",
+														"start": 2537,
+														"end": 2538,
+														"typeName": {
+															"type": "Identifier",
+															"start": 2537,
+															"end": 2538,
+															"name": "B"
+														}
+													},
+													{
+														"type": "TSTypeReference",
+														"start": 2541,
+														"end": 2551,
+														"typeName": {
+															"type": "TSQualifiedName",
+															"start": 2541,
+															"end": 2551,
+															"left": {
+																"type": "Identifier",
+																"start": 2541,
+																"end": 2544,
+																"name": "new"
+															},
+															"right": {
+																"type": "Identifier",
+																"start": 2545,
+																"end": 2551,
+																"name": "target"
+															}
+														}
+													}
+												]
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
