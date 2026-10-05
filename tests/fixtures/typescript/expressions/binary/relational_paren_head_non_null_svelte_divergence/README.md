@@ -10,8 +10,10 @@ backs off, and it reads the comparison chain `a < !b > (t, u)`.
 tsv follows **tsc** to the region and rejects there. The `(` head's body grade
 refuses only what the compiler ABANDONS, and a `!` is a token its type grammar
 carries; accepting the claim instead would need a type node no acorn-typescript wire
-has, for a construct that is an error in every `.ts` file — an unconditional, local
-error, which tsv's parser rejects rather than defers. `expected_svelte.json` records
+has, for a construct that is an error in every `.ts` file — the representability floor
+of the reject-vs-defer line
+([conformance_tsc.md](../../../../../../docs/conformance_tsc.md#the-reject-vs-defer-line)),
+so tsv's parser rejects rather than defers. `expected_svelte.json` records
 what acorn-typescript keeps; `tsv_rejects.txt` pins tsv's own error.
 
 The **shell-free** spelling is a different cell: `a < !b > (t, u)` opens the region

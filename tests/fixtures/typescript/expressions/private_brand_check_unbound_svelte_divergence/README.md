@@ -14,10 +14,12 @@ error down the whole tree carrying a list of names, extended at each `ClassBody`
 body's `PrivateBoundIdentifiers`; the `in` production returns `false` unless the list
 already contains the name. So the question is not "is this inside a class body" but "did an
 enclosing class body **declare** this name" — and the Script rule even carries a direct-eval
-carve-out, `PerformEval` re-running it against the *caller's* private environment. There is
-no reading of it a parser can answer from the production's own context, which is precisely
-the bucket tsv defers to a future diagnostics layer rather than answering in the parser (see
-[CLAUDE.md §Strictness](../../../../../CLAUDE.md#strictness-module-strict-script-by-directive)).
+carve-out, `PerformEval` re-running it against the *caller's* private environment. It is a
+**Static Semantics: Early Errors** rule (on *Script* and *Module*), not a production, so tsv
+defers it to a future diagnostics layer (see
+[CLAUDE.md §Strictness](../../../../../CLAUDE.md#strictness-module-strict-script-by-directive))
+— and there is no reading of it a parser can answer from the production's own context in
+any case.
 
 The oracles split along that same line, and tsv sides with the two that read the grammar:
 

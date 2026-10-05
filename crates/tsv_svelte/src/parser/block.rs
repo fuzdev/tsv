@@ -436,7 +436,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         self.rewind_embedded_parses(mark);
         // Leading whitespace only, and `expr_offset` is already the first non-whitespace byte:
         // this slice ends at the head's SECOND `as`, so its trailing run may be a line
-        // comment's own text (`Parser::parse_ts_expression`).
+        // comment's own text (`SvelteParser::parse_ts_expression`).
         self.parse_ts_expression(iterable.trim_start_matches(is_svelte_ws), expr_offset)
     }
 
@@ -616,7 +616,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Calculate leading whitespace and adjust offset accordingly
         let leading_ws = binding.len() - binding.trim_start_matches(is_svelte_ws).len();
         // A trailing trim here cannot clip a line comment the way a head's does
-        // (`Parser::parse_ts_expression`): every sub-parse below is bounded by the grammar —
+        // (`SvelteParser::parse_ts_expression`): every sub-parse below is bounded by the grammar —
         // the pattern by its bracket or identifier run, the annotation by its own end — and a
         // comment trailing the annotation is REJECTED, as canonical rejects it.
         let trimmed = binding.trim_matches(is_svelte_ws);
@@ -791,7 +791,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             let key_str = &rest_trimmed[1..close];
             let key_offset = paren_start + 1; // after '('
             // Leading whitespace only — the trailing run may be a line comment's own text
-            // (`Parser::parse_ts_expression`).
+            // (`SvelteParser::parse_ts_expression`).
             let key_expr_str = key_str.trim_start_matches(is_svelte_ws);
             let key_expr = self.parse_ts_expression(
                 key_expr_str,
@@ -1256,7 +1256,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Parse: "key expression" — Svelte requires whitespace after the keyword. Leading
         // whitespace only — the trailing run may be a line comment's own text
-        // (`Parser::parse_ts_expression`).
+        // (`SvelteParser::parse_ts_expression`).
         let expr_str = self
             .strip_block_keyword(tag_content, "key", tag_content_start)?
             .trim_start_matches(is_svelte_ws);

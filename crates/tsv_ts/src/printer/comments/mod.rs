@@ -1053,9 +1053,9 @@ impl<'a> Printer<'a> {
     /// the blank-preserving hardline. The single statement of that rule for the two
     /// hand-rolled leading-run emitters whose surrounding loop can't route through
     /// [`push_leading_comment_run`](Self::push_leading_comment_run)
-    /// (`build_eq_comment_break_rhs`, `append_keyword_value_line_comments`) — so a run the
-    /// author glued stays glued and a multiline owned comment's own newline is never read
-    /// as an author blank line.
+    /// (`build_operator_line_comment_hang`, `append_keyword_value_line_comments`) — so a run
+    /// the author glued stays glued and a multiline owned comment's own newline is never
+    /// read as an author blank line.
     ///
     /// ⚠️ **Two states, so it belongs only where the break is already FORCED.** Both
     /// hand-rolled callers sit past a `//` that has taken the line, inside an

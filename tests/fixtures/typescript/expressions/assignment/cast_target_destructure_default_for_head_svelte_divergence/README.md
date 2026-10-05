@@ -21,10 +21,9 @@ for ([(c as T) = 1] of arr) {
 } // ❌ acorn-typescript 1.0.13 (accepted at 1.0.12)
 ```
 
-**tsc accepts** all four forms with no parse diagnostic, and prettier formats them —
-which is tsv's accept test. So tsv converts the inner `=` under assignment rules even
-inside a for-head, and the assertion survives. acorn-typescript is tsv's AST-**shape**
-target, not its correctness oracle. See
+**tsc accepts** all four forms with no parse diagnostic, so tsv converts the inner `=`
+under assignment rules even inside a for-head, and the assertion survives.
+acorn-typescript is tsv's AST-**shape** target, not its correctness oracle. See
 [conformance_svelte.md §TypeScript Corrections](../../../../../../docs/conformance_svelte.md#typescript-corrections).
 
 The **bare** (default-less) cast target in a for-head is the sibling divergence

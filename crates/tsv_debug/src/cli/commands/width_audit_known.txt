@@ -21,11 +21,11 @@
 # comment, which is exactly what that bug emitted.
 #
 # `inner` is the third component, and it exists because the two ends alone let a
-# WELD hide in the fattest shapes. `<!--…-->` alone carries 45% of the over-width
-# lines, and every one of them is a SINGLE whole comment — a forced overrun, since
-# tsv never rewraps a comment interior. So the only bug that silhouette can hide is
-# two comments welded onto one line, and `inner` separates them: neither `-->` nor
-# `*/` can occur inside the comment it closes.
+# WELD hide in the fattest shapes. `<!--…-->` alone carries the largest share of
+# the over-width lines, and every one of them is a SINGLE whole comment — a forced
+# overrun, since tsv never rewraps a comment interior. So the only bug that
+# silhouette can hide is two comments welded onto one line, and `inner` separates
+# them: neither `-->` nor `*/` can occur inside the comment it closes.
 #
 # ⚠️ Triage note: a new `inner` shape is a QUESTION, not a verdict, and a weld is the
 # LEAST likely answer. Over real JS the usual one is an ordinary JSDoc cast

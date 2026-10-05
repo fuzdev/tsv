@@ -2393,11 +2393,12 @@ impl<'a> Printer<'a> {
     /// Everything after an array type's element: the element→`[` gap and the `[]`
     /// pair.
     ///
-    /// The single suffix emitter for all four routes through
-    /// [`Self::build_array_type_doc`] — bare element, synthesized parens, expanded
-    /// parenthesized union, and paren-interior freeze. Each supplies its own closing
-    /// `)`; what follows it is this one question, so a commented suffix can't survive
-    /// on one route and be dropped on another (it was dropped on three of them).
+    /// The single suffix emitter for every route through
+    /// [`Self::build_array_type_doc`] — the expanded parenthesized union, the
+    /// paren-interior freeze, and the fall-through that prints the element bare or in
+    /// its required pair. Each route closes its own element; what follows is this one
+    /// question, so a commented suffix can't survive on one route and be dropped on
+    /// another.
     ///
     /// The element→`[` gap can hold only a **single-line block** comment: a `//` or a
     /// multiline block puts a line break in front of the `[`, and a type's array

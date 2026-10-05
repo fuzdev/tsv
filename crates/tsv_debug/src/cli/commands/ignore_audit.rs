@@ -1,17 +1,16 @@
-//! Ignore-directive honoring audit (Arm A) — the mechanized discovery of unhonored
+//! Ignore-directive honoring audit — the mechanized discovery of unhonored
 //! `// prettier-ignore` / `format-ignore` positions.
 //!
 //! ## Why this exists
 //!
 //! Recognition of the ignore directive is centralized and correct
 //! (`tsv_lang::is_format_ignore_directive`), but **consumption is a per-node opt-in the printer
-//! makes at each position** — ~15 scattered sites. A construct whose printer position is in that
+//! makes at each position**, at scattered sites. A construct whose printer position is in that
 //! set is emitted raw; any position NOT in it silently *reformats* an ignored construct, breaking
-//! the drop-in `prettier-ignore` contract. One instance is confirmed
-//! (`TSUnionType.types` — `| a1&a2` reformats to `(a1 & a2)`), and §1.3 of the ignore-honoring
-//! plan lists a dozen *suspected* positions. This audit replaces that guess-list with a computed
-//! ledger, the same way `comments:audit` (the print-once ledger) structurally guards the per-site
-//! `owned_by_node` comment model rather than trusting each site by inspection.
+//! the drop-in `prettier-ignore` contract. This audit replaces a hand-kept guess-list of
+//! *suspected* positions with a computed ledger, the same way `comments:audit` (the print-once
+//! ledger) structurally guards the per-site `owned_by_node` comment model rather than trusting
+//! each site by inspection.
 //!
 //! ## The invariant (per injected directive)
 //!
@@ -71,10 +70,10 @@
 //! keys by the node's **AST position** — `{enclosing-node-type}.{child-field}`, e.g.
 //! `TSUnionType.types`, `TSTupleType.elementTypes`, `Program.body`. Honoring is a per-*position*
 //! property (a position either has the printer opt-in or it doesn't), so the ledger is a ledger of
-//! **positions**, which is exactly what the plan's §1.3 wants. A position that honors (check 1)
-//! can still appear via a companion-check finding — `TRAILING_FROZEN` / `OVERFROZEN` / `UNSTABLE` /
-//! `UNREPARSEABLE` at the same shape — so "covered" means passing all five graded checks; the ledger names every
-//! `(kind, position)` pair that fails one.
+//! **positions**. A position that honors (check 1) can still appear via a companion-check
+//! finding — `TRAILING_FROZEN` / `OVERFROZEN` / `UNSTABLE` / `UNREPARSEABLE` at the same shape —
+//! so "covered" means passing all five graded checks; the ledger names every `(kind, position)`
+//! pair that fails one.
 //!
 //! ## Design
 //!
@@ -92,11 +91,11 @@
 //! - **JS positions only.** The TS/JS `//` directive is injected into `code_regions` — standalone
 //!   `.ts`/`.svelte.ts` (whole file) and a `.svelte` component's `<script>` / `{expr}` slots. CSS
 //!   (`/* prettier-ignore */`) and Svelte template markup (`<!-- prettier-ignore -->`) use different
-//!   directive spellings and are a deliberate follow-up (the plan's open Q (b) — CSS/Svelte parity),
-//!   the same CSS deferral `blank_audit` makes.
+//!   directive spellings and are a deliberate follow-up (CSS/Svelte parity), the same CSS deferral
+//!   `blank_audit` makes.
 //! - **Whitespace-reformatting positions only.** The perturbation is space-doubling, so a position
 //!   whose only reformatting is non-whitespace (quote normalization, paren strip) is invisible to
-//!   Arm A. Arm B (the curated control matrix) backstops specific such positions.
+//!   this audit. Curated fixtures backstop specific such positions.
 //! - **Only format fixed points are injected into.** A seed that isn't idempotent / doesn't reparse
 //!   as authored is reported once and skipped (over `tests/fixtures` these are the variant /
 //!   unformatted fixture files by design; the real yield is external corpora).

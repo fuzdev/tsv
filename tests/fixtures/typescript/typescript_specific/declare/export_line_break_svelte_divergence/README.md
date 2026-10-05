@@ -18,10 +18,13 @@ apart.
 tree it builds for the same-line spelling, so the line break simply vanishes. tsv
 rejects instead.
 
-acorn-typescript is tsv's AST-**shape** target, not its correctness oracle; for
-validity the oracle is tsc, which rejects, and prettier — the accept test — rejects
-as well. A tree that silently discards a line terminator both other oracles treat as
-fatal is worse than no tree, the same call made for the decorated sibling
+acorn-typescript is tsv's AST-**shape** target, not its correctness oracle. The break
+violates `declare`'s `[no LineTerminator here]` gate, which is part of the production,
+so tsv rejects
+([conformance_tsc.md §The reject-vs-defer line](../../../../../../docs/conformance_tsc.md#the-reject-vs-defer-line));
+tsc (TS1128) and prettier agree. A tree that silently discards a line terminator both
+other oracles treat as fatal is worse than no tree, the same call made for the decorated
+sibling
 [decorators/declare_line_break](../../decorators/declare_line_break_svelte_divergence/),
 where acorn's accepted tree is self-overlapping.
 

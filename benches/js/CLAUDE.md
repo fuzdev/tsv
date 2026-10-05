@@ -1440,8 +1440,8 @@ benches/js/
     ├── fixtures_gate.ts   # Shared per-language parse-conformance gate engine
     ├── format_config_probe.ts # Behavioral "did the pinned layout config LAND" check —
     │                      # one probe source + grading arm PER LANGUAGE, shared by prettier
-    │                      # (the baseline) and the format impls with no config-diagnostic
-    │                      # channel (biome, oxfmt); unit-tested by format_config_probe_test.ts
+    │                      # (the baseline) and every format impl (biome, oxfmt, dprint,
+    │                      # malva); unit-tested by format_config_probe_test.ts
     ├── gate_counts.ts     # Pinned gate counts — see ../../docs/gate_counts.md
     ├── harvest_stamp.ts   # Harvest freshness stamps (checkout ids + pins + view entry lists) + the HARVEST_STAMPS table
     ├── implementations.ts # Implementation registry (branches native FFI vs N-API by runtime)

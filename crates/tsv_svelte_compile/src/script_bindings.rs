@@ -375,8 +375,9 @@ fn analyze_declarator<'arena>(
             // but the binding stays UNKNOWN to the evaluator — the unwrap is the
             // emission form, not the evaluation form. The oracle evaluates a rune
             // declarator through its argument for `$state` / `$state.raw` /
-            // `$derived` only; every other rune, `$state.snapshot` included, falls
-            // to the `default` arm and yields UNKNOWN, so a `{s}` read never folds
+            // `$derived`, and gives `$derived.by`, `$props.id` and `$effect.tracking`
+            // arms of their own; `$state.snapshot` has none, so it falls to the
+            // `default` arm and yields UNKNOWN, and a `{s}` read never folds
             // (`$.escape(s)`). That holds however the argument itself evaluates —
             // a plain `let` argument does not fold either. Every destructured leaf
             // inherits that `Initial::None` (a snapshot leaf never folds), so a

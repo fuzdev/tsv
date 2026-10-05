@@ -9,8 +9,8 @@
 //! parses these fine, and the "is it assignable?" refinement is an early-error the
 //! spec layers on top. Per tsv's permissive stance (see `crates/tsv_ts/CLAUDE.md`
 //! §Sources of truth), the parser **defers** that early-error to the diagnostics
-//! layer so the formatter keeps formatting well-formed input — prettier formats all
-//! of these, so tsv must parse them.
+//! layer so the formatter keeps formatting well-formed input — tsc's parser accepts
+//! all of these and its checker raises the error (prettier formats them too).
 //!
 //! The prettier-canonical shapes ARE a fixture —
 //! `typescript/expressions/assignment/nonsimple_target_svelte_divergence`. An

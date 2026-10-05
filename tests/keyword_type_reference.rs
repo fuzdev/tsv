@@ -4,8 +4,9 @@
 //! TypeScript's type space is a separate namespace where a `TypeName` is an
 //! `IdentifierName` — reserved *statement* keywords (`break`, `default`,
 //! `function`, `case`, `switch`, `while`, …) are valid type-reference names there.
-//! tsc and prettier both accept `let x: break;` (prettier formats it), so tsv must
-//! parse it as a `TSTypeReference` whose `typeName` is a plain `Identifier`.
+//! tsc's parser accepts `let x: break;` — a `TypeName` is an `IdentifierName` — so tsv
+//! parses it (prettier formats it too), as a `TSTypeReference` whose `typeName` is a
+//! plain `Identifier`.
 //!
 //! The accepts, the AST shapes and the prettier formatting are pinned by the fixture
 //! `typescript/types/keyword_type_reference`, which is where the prettier claim belongs

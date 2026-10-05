@@ -1285,7 +1285,7 @@ impl<'a> Printer<'a> {
             parts.push(self.build_frozen_span_doc(frozen));
         } else if decl.members.is_empty() {
             // Empty enum body - handle comments inside (a fitting block comment
-            // stays inline as `enum E {/* c */}`).
+            // stays inline as `enum E { /* c */ }`).
             parts.push(self.build_empty_braces_inline_with_comments_doc(body_span));
         } else {
             // A comment trailing the opening `{` on its own line is kept on the

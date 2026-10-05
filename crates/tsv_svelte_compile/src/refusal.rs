@@ -610,10 +610,10 @@ pub enum Refusal {
     #[error("{{#snippet}} alongside a {{@const}}/<svelte:head> in the same fragment (hoist order)")]
     SnippetHoistOrder,
     /// Two `{#snippet}`s of the same name in ONE fragment — the oracle's
-    /// `Scope.declare` same-scope collision (`phases/scope.js:684-691`, reached
-    /// from the `SnippetBlock` scope visitor at `:1335`). Every fragment gets its
-    /// own scope, so the rule is per-fragment, not per-component: a second
-    /// `{#snippet a}` one fragment deeper is legal.
+    /// `Scope.declare` same-scope collision (`phases/scope.js`, reached from its
+    /// `SnippetBlock` scope visitor). Every fragment gets its own scope, so the
+    /// rule is per-fragment, not per-component: a second `{#snippet a}` one
+    /// fragment deeper is legal.
     #[error("duplicate {{#snippet}} {name} (the oracle rejects it)")]
     DuplicateSnippetName {
         /// The duplicated snippet name.

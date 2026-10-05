@@ -5,9 +5,10 @@
 //! `declare` keyword of its own, so it is an ordinary function *declaration with a
 //! body* — its ambient-context violation (tsc TS1183 "An implementation cannot be
 //! declared in ambient contexts") is a static-semantic early-error tsv **defers** to
-//! the diagnostics layer (see `crates/tsv_ts/CLAUDE.md` §Sources of truth). prettier
-//! formats it, so the formatter must parse it; tsv already accepts the sibling
-//! `export function f() {}` form, so the plain form must parse identically.
+//! the diagnostics layer (see `crates/tsv_ts/CLAUDE.md` §Sources of truth). tsc's
+//! parser accepts it and its checker raises TS1183 (prettier formats it too);
+//! tsv already accepts the sibling `export function f() {}` form, so the plain form
+//! must parse identically.
 //!
 //! The accept, the AST shape and the prettier formatting are pinned by the fixture
 //! `typescript/declarations/namespace/function_body_svelte_divergence` (an acorn

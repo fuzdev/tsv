@@ -1025,7 +1025,7 @@ impl<'a> Printer<'a> {
     /// first).
     ///
     /// The one thing the separator asks is whether the author **glued** this comment to the
-    /// previous one ([`Printer::comment_hugs_next`]), in which case the pair keeps the line
+    /// previous one ([`Self::trailing_run_hugs_previous`]), in which case the pair keeps the line
     /// it was written on. That is not the weld above — a space keeps both comments distinct,
     /// and a line comment never hugs, so nothing lands behind a `//`. Prettier keeps the
     /// glue here and splits it in an EMPTY body, which is why

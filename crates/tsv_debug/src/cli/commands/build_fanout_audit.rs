@@ -6,16 +6,17 @@ use tsv_cli::cli::input::ParserType;
 use tsv_lang::doc::arena::DocArena;
 use tsv_lang::estimated_ast_arena_capacity;
 
-/// Audit for super-linear doc-node fanout — the per-layout-candidate rebuild
+/// Audit for exponential doc-node fanout — the per-layout-candidate rebuild
 /// blowup.
 ///
 /// Builds synthetic nested inputs at increasing depth, formats each into a
-/// fresh `DocArena`, and checks that the doc-node count grows roughly linearly
-/// with nesting depth. A builder that assembles `conditional_group` candidates
-/// by *re-invoking the recursive builder* on the same nodes (instead of
-/// building once and reusing the `DocId`) makes the count grow exponentially in
-/// depth; this catches that and guards against reintroduction. The doc-node
-/// count is read directly via `format_in` into a caller-owned arena +
+/// fresh `DocArena`, and checks that the doc-node count grows no faster than
+/// cubically with nesting depth (`MAX_EXPONENT`; a linear build passes with room
+/// to spare). A builder that assembles `conditional_group` candidates by
+/// *re-invoking the recursive builder* on the same nodes (instead of building
+/// once and reusing the `DocId`) makes the count grow exponentially in depth;
+/// this catches that and guards against reintroduction. The doc-node count is
+/// read directly via `format_in` into a caller-owned arena +
 /// `borrow_nodes().len()` — no prod-code instrumentation. Pure Rust, no Deno.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "build_fanout_audit")]

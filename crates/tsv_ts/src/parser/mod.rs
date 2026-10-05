@@ -1082,10 +1082,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// tsv defers that one, exactly as it defers the `[Yield]` twin — so `async
     /// function h() { var await = 1; }` and `async function h(await) {}` parse at
-    /// Script goal. Deferring is what the repo's rule prescribes: prettier formats
-    /// both, and the bar needs non-local context (the enclosing function's
-    /// async-ness), which is the mode-dependent / non-local class tsv defers rather
-    /// than the unconditional-local class it rejects. tsc's parser agrees — its
+    /// Script goal. Deferring is what the reject-vs-defer line prescribes: the bar
+    /// is a Static Semantics early error ("…if this production has an `[Await]`
+    /// parameter"), not a production. tsc's parser agrees — its
     /// `isBindingIdentifier` deliberately admits `await`/`yield` and leaves the bar
     /// to the grammar checker (TS1359), the same bucket as TS1212 `let`. acorn
     /// rejects, but it is the shape oracle, not the validity one.

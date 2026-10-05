@@ -543,9 +543,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Enforce accessor parameter arity: a getter takes no parameters and a
     /// setter takes exactly one non-rest parameter. A faithful port of acorn's
-    /// getter/setter param checks (JS grammar, mode-independent) — these are
-    /// unconditional-local early-errors acorn rejects at parse, so tsv rejects
-    /// too for drop-in parity.
+    /// getter/setter param checks (JS grammar, mode-independent) — arities are
+    /// productions (ecma262 §sec-method-definitions), so they reject under the
+    /// reject-vs-defer line (and acorn rejects too).
     ///
     /// `allow_this_param` mirrors acorn's per-context `this`-parameter handling:
     /// an object-literal accessor excludes a leading `this` pseudo-parameter
@@ -628,10 +628,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `Identifier` / `RestElement` / `ObjectPattern` / `ArrayPattern` — a
     /// faithful port of acorn's `tsParseBindingListForSignature`. A signature has
     /// no implementation, so a default (`AssignmentPattern`, `set a(v = 1)`) or a
-    /// parameter property (`TSParameterProperty`, `m(public v)`) is an
-    /// unconditional-local grammar error acorn rejects at parse; tsv matches for
-    /// drop-in parity. Only type-member signatures (interface / type-literal
-    /// method, call, construct, accessor) call this — an *implementation*, an
+    /// parameter property (`TSParameterProperty`, `m(public v)`) is rejected for
+    /// drop-in parity with acorn — a known gap against the reject-vs-defer line
+    /// (tsc's checker raises TS2371/TS2369). Only type-member signatures (interface /
+    /// type-literal method, call, construct, accessor) call this — an *implementation*, an
     /// *ambient* declaration (`declare function f(v = 1)`, TS1039 deferred), and an
     /// *overload* keep their defaults (all acorn-accepts). Function *types* reject
     /// defaults already via their own param parser (`parse_function_type_params`).

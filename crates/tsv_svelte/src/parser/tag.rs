@@ -50,7 +50,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
         // Svelte requires whitespace after the keyword. Leading whitespace only — the
-        // trailing run may be a line comment's own text (`Parser::parse_ts_expression`).
+        // trailing run may be a line comment's own text (`SvelteParser::parse_ts_expression`).
         let expr_str = self
             .strip_block_keyword(tag_content, keyword, tag_content_start)?
             .trim_start_matches(is_svelte_ws);
@@ -212,7 +212,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             return Err(self.error_msg_at("Expected token =", eq_offset));
         };
         // The init ends at the tag's `}`, and its trailing run may be a line comment's own
-        // text, so only the LEADING run is trimmed (`Parser::parse_ts_expression`).
+        // text, so only the LEADING run is trimmed (`SvelteParser::parse_ts_expression`).
         let init_str = after_eq.trim_start_matches(is_svelte_ws);
         let init_offset = eq_offset + 1 + (after_eq.len() - init_str.len());
         let init = self.parse_ts_expression(init_str, init_offset)?;
@@ -302,7 +302,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // through to the parse below, which rejects (there is no expression).
         //
         // Leading whitespace only — the trailing run may be a line comment's own text
-        // (`Parser::parse_ts_expression`) — and that is also the whitespace-only test, since
+        // (`SvelteParser::parse_ts_expression`) — and that is also the whitespace-only test, since
         // a region of nothing but whitespace trims to empty from the front alone.
         let expr_str = rest.trim_start_matches(is_svelte_ws);
         if !expr_str.is_empty() {

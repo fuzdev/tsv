@@ -12,7 +12,7 @@ for-in head takes no using declaration and stays rejected on both sides.
 ## Why tsv Differs
 
 **tsc parses it** with no diagnostic, and prettier formats it (its `babel`,
-`typescript`, `oxc` and `meriyah` parsers all accept it), which is the accept test.
+`typescript`, `oxc` and `meriyah` parsers all accept it).
 **acorn rejects it at the oracle's pin** — the canonical parse runs acorn at
 `ecmaVersion: 2025`, and acorn reads `using` in a `for` head only from ES2026
 (`isUsingKeyword` gates on the edition); at `'latest'` the same acorn accepts every
@@ -21,10 +21,11 @@ the same reason the sibling fixtures diverge — so `expected_svelte.json` is th
 marker.
 
 The `input_invalid_using_for_in` variant leans on that pin too. The for-in head takes
-no using declaration, and tsv rejects it at parse time as the unconditional-local rule
-it is — but tsc's *parser* accepts it (TS1493 is its grammar checker's), and so does
-acorn at `'latest'`, whose for-head path hands a using declaration to its for-in branch
-without checking the kind. Once the oracle's pin reaches ES2026, acorn accepts that
+no using declaration — the proposal's `ForInOfStatement` gives its for-in
+`ForDeclaration` to `let` / `const` alone, so no production derives it — and tsv rejects
+it at parse time; but tsc's *parser* accepts it (TS1493 is its grammar checker's), and so
+does acorn at `'latest'`, whose for-head path hands a using declaration to its for-in
+branch without checking the kind. Once the oracle's pin reaches ES2026, acorn accepts that
 input, and it has to leave `input_invalid_*` for a fixture of its own: tsv rejecting
 what the canonical parser accepts (`tsv_rejects.txt`).
 

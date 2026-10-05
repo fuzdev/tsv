@@ -13,8 +13,7 @@ is layered on top as a Static Semantics early error: *"It is a Syntax Error if a
 source text is matched by this production"*
 ([ecma262 §13.2.5.1](https://tc39.es/ecma262/#sec-object-initializer-static-semantics-early-errors)).
 Per tsv's permissive-parser stance the parser defers it to the diagnostics layer,
-so the formatter keeps formatting everything well-formed — and prettier formats
-it, which is the practical accept test.
+so the formatter keeps formatting everything well-formed.
 
 **Acorn-typescript** (used by Svelte's parser) enforces the early error and rejects:
 

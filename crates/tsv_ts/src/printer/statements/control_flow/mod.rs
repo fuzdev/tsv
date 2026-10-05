@@ -39,8 +39,8 @@ use tsv_lang::source_scan::find_char_skipping_comments;
 /// `printDanglingComments` answer the questions below differently. Naming the run
 /// rather than the policies is what stops a new gap from taking the glue rule of one and
 /// the blank rule of another: they are **not** correlated (a leading run glues and
-/// drops the leading blank, a trailing run glues and keeps it, a dangling run does
-/// neither), so a flag per policy would have more states than are real.
+/// drops the leading blank, a trailing run glues and keeps it, a dangling run keeps it
+/// without gluing), so a flag per policy would have more states than are real.
 #[derive(Clone, Copy)]
 enum GapCommentRun {
     /// A **trailing** run of the thing behind it: the condition→`)` gap, where the

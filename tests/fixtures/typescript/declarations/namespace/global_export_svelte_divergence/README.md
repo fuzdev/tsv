@@ -19,7 +19,7 @@ signature in
 [conformance_svelte.md §TypeScript Corrections](../../../../../../docs/conformance_svelte.md#typescript-corrections).
 
 acorn-typescript is tsv's AST-**shape** target, not its correctness oracle; for validity
-the oracle is tsc, and the accept test is prettier. Both take these, so tsv does too.
+the oracle is tsc. Its parser takes these, so tsv does too (prettier formats them).
 
 ## The bodyless spellings are rejected, by all three
 

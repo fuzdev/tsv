@@ -162,10 +162,10 @@ fn rewrite_bindable_default<'arena>(
 ///
 /// When the component references `$$slots` (`uses_slots`), the injected
 /// sanitize_slots const owns that name, so the destructured prop deconflicts by
-/// renaming: `$$slots: $$slots_` (the oracle's `VariableDeclaration.js:56-73`
-/// rule — always the `_` suffix, unconditional; `$$events` never renames, and a
-/// user `$$slots_`/`$$events` reference or declaration is oracle-rejected input,
-/// so no second-order collision exists).
+/// renaming: `$$slots: $$slots_` (the `$props` arm of the oracle's server
+/// `VariableDeclaration` visitor — always the `_` suffix, unconditional;
+/// `$$events` never renames, and a user `$$slots_`/`$$events` reference or
+/// declaration is oracle-rejected input, so no second-order collision exists).
 pub(crate) fn rewrite_props_pattern<'arena>(
     b: &Builder<'arena>,
     id: &'arena Expression<'arena>,

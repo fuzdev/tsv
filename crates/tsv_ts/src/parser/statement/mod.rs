@@ -221,7 +221,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // `parse_function_or_overload` yields a `FunctionDeclaration` for a body
                     // and a `TSDeclareFunction` for a bodiless overload signature, exactly as
                     // at the top level. An ambient body is a static-semantic early-error (tsc
-                    // TS1183) deferred to diagnostics — prettier formats it, so tsv parses it.
+                    // TS1183) deferred to diagnostics — tsc's parser accepts it (TS1183 is
+                    // checker-raised), so it defers under the reject-vs-defer line.
                     // (A *top-level* `declare function` is dispatched separately, in
                     // `parse_declare_statement_kind`, and keeps forcing a bodiless signature.)
                     self.parse_function_declaration()

@@ -7,10 +7,10 @@ use std::path::{Path, PathBuf};
 
 /// Differential lexer harness — snapshot the raw token stream over a corpus and
 /// diff it against a golden. Capture a golden from the current lexer (`--write`),
-/// then after a lexer change re-run (`--check`) to prove token-stream identity:
-/// same `(kind, start, end,
-/// decoded)` for every token of every file. Stronger than format byte-identity — it
-/// catches token-level divergence the formatter might absorb. Pure Rust, no Deno.
+/// then after a lexer change re-run without `--write` to prove token-stream identity:
+/// same `(kind, start, end, decoded)` for every token of every file. Stronger than
+/// format byte-identity — it catches token-level divergence the formatter might
+/// absorb. Pure Rust, no Deno.
 ///
 /// Covers the **context-free** `next_token` dispatch only (a raw `next_token` loop
 /// doesn't reach the parser-driven regex / template-resume paths); those stay gated

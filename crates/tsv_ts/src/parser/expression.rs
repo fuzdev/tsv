@@ -1103,11 +1103,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// accepted with or without a trailing call**, because that narrowing argument does
     /// not reach either: a decorator is followed by `class`, a class member, or a
     /// parameter, so neither a `!` nor a `<` opening a type-argument list can be the
-    /// *next construct's* token. tsc accepts all of it with no diagnostic and prettier
-    /// formats all of it — the accept test — printing `@(x!)` and a bare `@g<number>()`,
-    /// which the printer already reproduces for free. With no call the expression is a
-    /// `TSInstantiationExpression` (acorn's `parseMaybeDecoratorArguments`), which
-    /// prettier parenthesizes like the `!` — it is no decorator member expression.
+    /// *next construct's* token. tsc accepts all of it with no diagnostic — TypeScript's
+    /// grammar admits it — and prettier formats all of it, printing `@(x!)` and a bare
+    /// `@g<number>()`, which the printer already reproduces for free. With no call the
+    /// expression is a `TSInstantiationExpression` (acorn's
+    /// `parseMaybeDecoratorArguments`), which prettier parenthesizes like the `!` — it
+    /// is no decorator member expression.
     /// See `docs/conformance_svelte.md` §TypeScript Corrections. A member's own
     /// definite-assignment `!` is unaffected (`@dec x!: number` binds the `!` to `x`,
     /// since the decorator expression ends at `dec`).

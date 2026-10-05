@@ -1,6 +1,6 @@
 /**
- * The shared "did the pinned layout config actually LAND" probe, for the two
- * format tools whose config surface reports nothing when it doesn't.
+ * The shared "did the pinned layout config actually LAND" probe, run by every
+ * formatter wrapper: the prettier baseline, biome, oxfmt, dprint and malva.
  *
  * Every formatter here is pinned to tsv's layout targets — width 100, tabs, single
  * quotes, no trailing commas — so each row wraps and rewrites the same amount of
@@ -19,9 +19,11 @@
  * So the check is BEHAVIORAL — format one source whose output differs under each
  * pinned option and read the answer back — in the spirit of `lib/swc.ts`'s
  * decorator/goal probes and `lib/yuku.ts`'s option probes. ONE probe set and one
- * grader for both tools rather than a copy per wrapper, on the rule the yuku wrapper
+ * grader for every wrapper rather than a copy each, on the rule the yuku wrapper
  * follows: a second spelling of the same question is free to drift into asking a
- * different one.
+ * different one. The two tools with a diagnostic channel run it as well, since a
+ * recognized key is not a landed value, and so does the prettier baseline
+ * (`lib/canonical.ts`).
  *
  * ⚠️ **Per LANGUAGE, not per tool.** biome's config is a stack of per-language
  * sections (`javascript.formatter`, `css.formatter`, `html.formatter`), each

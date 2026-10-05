@@ -16,9 +16,10 @@ error**, not a syntax error. The grammar production is
 `LeftHandSideExpression = AssignmentExpression`
 ([ecma262 §13.15](https://tc39.es/ecma262/#prod-AssignmentExpression)), which parses every
 shape fine; the "is it assignable?" refinement (`AssignmentTargetType`) is layered on top
-as an early error. Per tsv's permissive-parser stance the parser defers it to the
-diagnostics layer, so the formatter keeps formatting everything well-formed — and
-prettier formats every one, which is the practical accept test.
+as an early error. A Static Semantics early error is one tsv defers to the diagnostics
+layer
+([conformance_tsc.md §The reject-vs-defer line](../../../../../../docs/conformance_tsc.md#the-reject-vs-defer-line)),
+so the formatter keeps formatting everything well-formed.
 
 **Acorn-typescript** (used by Svelte's parser) enforces the early error and rejects:
 

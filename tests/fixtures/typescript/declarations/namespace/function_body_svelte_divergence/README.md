@@ -10,7 +10,8 @@ ordinary function *declaration with a body*. Its ambient-context violation — t
 **TS1183** "An implementation cannot be declared in ambient contexts" — is a
 static-semantic early error, which tsv defers to the diagnostics layer per its
 permissive-parser stance so the formatter keeps formatting everything well-formed.
-prettier formats it, which is the accept test.
+TS1183 is checker-raised, so it defers under the reject-vs-defer line
+([conformance_tsc.md](../../../../../../docs/conformance_tsc.md#the-reject-vs-defer-line)).
 
 **Acorn-typescript** (used by Svelte's parser) enforces TS1183 and rejects:
 

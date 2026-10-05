@@ -891,12 +891,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // `readonly` and `static` are the ONLY modifiers an index signature
             // accepts. An accessibility modifier (public/private/protected — tsc
             // TS1071) or a `declare`/`abstract`/`override` modifier (tsc TS1031 /
-            // TS1244-position / TS4113-position family) on an index signature is an
-            // unconditional-local grammar violation — acorn and prettier both reject
-            // it at parse, regardless of class context (`abstract` is rejected even in
-            // an abstract class, `override` even with a base class), so tsv rejects
-            // inline too. (These are distinct from the *member*-position `abstract` /
-            // `override` early-errors, which ARE context-dependent and stay deferred.)
+            // TS1244-position / TS4113-position family) on an index signature is a
+            // known gap against the reject-vs-defer line (tsc's checker raises it) —
+            // acorn and prettier both reject it at parse, regardless of class context
+            // (`abstract` is rejected even in an abstract class, `override` even with a
+            // base class), and tsv rejects inline too. (These are distinct from the
+            // *member*-position `abstract` / `override` early-errors, which ARE
+            // context-dependent and stay deferred.)
             if accessibility.is_some() {
                 return Err(
                     self.error_msg("Index signatures cannot have an accessibility modifier")
@@ -1024,8 +1025,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // was committed, but no `(params)` list follows. ecma262 gives these only a
             // `MethodDefinition`/`GeneratorMethod`/`AsyncMethod` form (always `( … )`), never a
             // `FieldDefinition`, so `get x = 1` / `async x = 1` / `*x = 1` have no valid parse.
-            // acorn + prettier + tsc (TS1005 "'(' expected") all reject; it's an
-            // unconditional-local grammar violation (invalid in every mode/goal), so tsv rejects
+            // acorn + prettier + tsc (TS1005 "'(' expected") all reject; there is no such
+            // production — a grammar violation (invalid in every mode/goal), so tsv rejects
             // inline rather than falling into `finish_property_member`, which would silently drop
             // the modifier keyword and emit a bare field (a content-loss bug).
             Err(self.error_expected_found("'('"))
@@ -1070,12 +1071,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // `readonly` and `declare` are field-only modifiers: a method / getter /
         // setter / constructor may not carry either (tsc TS1024 / TS1031; acorn and
-        // prettier both reject at parse). Unconditional-local grammar violation →
-        // reject inline. (These sit on a class *method*; the same keywords stay valid
-        // on a field — `readonly a = 1`, `declare b: number` — which never reaches
-        // this method path. `abstract` / `override` are deliberately NOT rejected
-        // here: on a member they are context-dependent early-errors — legal in an
-        // abstract class / with a base class — so tsv defers them.)
+        // prettier both reject at parse). A known gap against the reject-vs-defer line
+        // (tsc's checker raises it): tsv rejects inline. (These sit on a class
+        // *method*; the same keywords stay valid on a field — `readonly a = 1`,
+        // `declare b: number` — which never reaches this method path. `abstract` /
+        // `override` are deliberately NOT rejected here: on a member they are
+        // context-dependent early-errors — legal in an abstract class / with a base
+        // class — so tsv defers them.)
         if readonly {
             return Err(self.error_msg("Class methods cannot have the 'readonly' modifier"));
         }
@@ -1090,7 +1092,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // `async`/`*` modifiers cannot combine with `get`/`set`. `*get x() {}`,
         // `async get x() {}` (and the `set` forms) have no valid parse — acorn,
         // prettier, and tsc ("'async' modifier cannot be used here" / "'(' expected")
-        // all reject. An unconditional-local grammar violation (invalid in every
+        // all reject. No such production — a grammar violation (invalid in every
         // mode/goal) → reject inline rather than emit an accessor carrying a spurious
         // generator/async flag. (`async`/`*` methods *named* `get`/`set` — `async
         // get() {}`, `*set() {}` — keep `accessor_kind = None` and stay valid.)
@@ -1126,10 +1128,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // generator or async method (the `get`/`set` accessor forms are rejected just
         // above). acorn rejects all three at parse; prettier/tsc reject them too
         // (`constructor<T>()` is TS1092, `async constructor` is "'async' modifier
-        // cannot be used here", `*constructor` is TS1089-family). Unconditional-local
-        // grammar violations → reject inline. A *static* method named `constructor`
-        // is an ordinary method (`kind == Method`), so its type params / async / `*`
-        // stay valid.
+        // cannot be used here", `*constructor` is TS1089-family). A known gap against
+        // the reject-vs-defer line (tsc's checker raises them): tsv rejects inline. A
+        // *static* method named `constructor` is an ordinary method (`kind == Method`),
+        // so its type params / async / `*` stay valid.
         if matches!(kind, MethodKind::Constructor) {
             if type_parameters.is_some() {
                 return Err(
