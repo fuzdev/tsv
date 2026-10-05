@@ -1,4 +1,4 @@
-<!-- the call's arguments break, so the `/` after the object literal's `}` ends its line before any other `/` does -->
+<!-- an object literal's `}` ends an operand where the call's arguments break too, with no other `/` on its line -->
 <div>
 	{fn(
 		{} / 2,

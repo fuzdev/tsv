@@ -1,0 +1,1146 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 730,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 77,
+				"data": " an object literal's `}` ends an operand, so the `/` after it divides "
+			},
+			{
+				"type": "Text",
+				"start": 77,
+				"end": 78,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 78,
+				"end": 97,
+				"name": "div",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 83,
+							"end": 91,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 84,
+								"end": 90,
+								"left": {
+									"type": "ObjectExpression",
+									"start": 84,
+									"end": 86,
+									"properties": []
+								},
+								"operator": "/",
+								"right": {
+									"type": "Literal",
+									"start": 89,
+									"end": 90,
+									"value": 2,
+									"raw": "2"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 97,
+				"end": 98,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 98,
+				"end": 123,
+				"name": "div",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 103,
+							"end": 117,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 104,
+								"end": 116,
+								"left": {
+									"type": "ObjectExpression",
+									"start": 104,
+									"end": 112,
+									"properties": [
+										{
+											"type": "Property",
+											"start": 106,
+											"end": 110,
+											"method": false,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 106,
+												"end": 107,
+												"name": "a"
+											},
+											"value": {
+												"type": "Literal",
+												"start": 109,
+												"end": 110,
+												"value": 1,
+												"raw": "1"
+											},
+											"kind": "init"
+										}
+									]
+								},
+								"operator": "/",
+								"right": {
+									"type": "Literal",
+									"start": 115,
+									"end": 116,
+									"value": 2,
+									"raw": "2"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 123,
+				"end": 124,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 124,
+				"end": 147,
+				"name": "div",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 129,
+							"end": 141,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 130,
+								"end": 140,
+								"left": {
+									"type": "Identifier",
+									"start": 130,
+									"end": 131,
+									"name": "x"
+								},
+								"operator": "+",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 134,
+									"end": 140,
+									"left": {
+										"type": "ObjectExpression",
+										"start": 134,
+										"end": 136,
+										"properties": []
+									},
+									"operator": "/",
+									"right": {
+										"type": "Literal",
+										"start": 139,
+										"end": 140,
+										"value": 2,
+										"raw": "2"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 147,
+				"end": 148,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 148,
+				"end": 175,
+				"name": "div",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 153,
+							"end": 169,
+							"expression": {
+								"type": "ConditionalExpression",
+								"start": 154,
+								"end": 168,
+								"test": {
+									"type": "Identifier",
+									"start": 154,
+									"end": 155,
+									"name": "c"
+								},
+								"consequent": {
+									"type": "BinaryExpression",
+									"start": 158,
+									"end": 164,
+									"left": {
+										"type": "ObjectExpression",
+										"start": 158,
+										"end": 160,
+										"properties": []
+									},
+									"operator": "/",
+									"right": {
+										"type": "Literal",
+										"start": 163,
+										"end": 164,
+										"value": 2,
+										"raw": "2"
+									}
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 167,
+									"end": 168,
+									"name": "d"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 175,
+				"end": 176,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 176,
+				"end": 203,
+				"name": "div",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 181,
+							"end": 197,
+							"expression": {
+								"type": "ConditionalExpression",
+								"start": 182,
+								"end": 196,
+								"test": {
+									"type": "Identifier",
+									"start": 182,
+									"end": 183,
+									"name": "c"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 186,
+									"end": 187,
+									"name": "d"
+								},
+								"alternate": {
+									"type": "BinaryExpression",
+									"start": 190,
+									"end": 196,
+									"left": {
+										"type": "ObjectExpression",
+										"start": 190,
+										"end": 192,
+										"properties": []
+									},
+									"operator": "/",
+									"right": {
+										"type": "Literal",
+										"start": 195,
+										"end": 196,
+										"value": 2,
+										"raw": "2"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 203,
+				"end": 204,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 204,
+				"end": 225,
+				"name": "div",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 209,
+							"end": 219,
+							"expression": {
+								"type": "ArrayExpression",
+								"start": 210,
+								"end": 218,
+								"elements": [
+									{
+										"type": "BinaryExpression",
+										"start": 211,
+										"end": 217,
+										"left": {
+											"type": "ObjectExpression",
+											"start": 211,
+											"end": 213,
+											"properties": []
+										},
+										"operator": "/",
+										"right": {
+											"type": "Literal",
+											"start": 216,
+											"end": 217,
+											"value": 2,
+											"raw": "2"
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 225,
+				"end": 226,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 226,
+				"end": 256,
+				"name": "div",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 231,
+						"end": 249,
+						"name": "data-attr",
+						"value": {
+							"type": "ExpressionTag",
+							"start": 241,
+							"end": 249,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 242,
+								"end": 248,
+								"left": {
+									"type": "ObjectExpression",
+									"start": 242,
+									"end": 244,
+									"properties": []
+								},
+								"operator": "/",
+								"right": {
+									"type": "Literal",
+									"start": 247,
+									"end": 248,
+									"value": 2,
+									"raw": "2"
+								}
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 256,
+				"end": 257,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 257,
+				"end": 291,
+				"name": "div",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 262,
+						"end": 284,
+						"name": "data-attr",
+						"value": [
+							{
+								"start": 273,
+								"end": 275,
+								"type": "Text",
+								"raw": "a ",
+								"data": "a "
+							},
+							{
+								"type": "ExpressionTag",
+								"start": 275,
+								"end": 283,
+								"expression": {
+									"type": "BinaryExpression",
+									"start": 276,
+									"end": 282,
+									"left": {
+										"type": "ObjectExpression",
+										"start": 276,
+										"end": 278,
+										"properties": []
+									},
+									"operator": "/",
+									"right": {
+										"type": "Literal",
+										"start": 281,
+										"end": 282,
+										"value": 2,
+										"raw": "2"
+									}
+								}
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 291,
+				"end": 292,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 292,
+				"end": 324,
+				"name": "div",
+				"attributes": [
+					{
+						"start": 297,
+						"end": 317,
+						"type": "StyleDirective",
+						"name": "color",
+						"modifiers": [],
+						"value": {
+							"type": "ExpressionTag",
+							"start": 309,
+							"end": 317,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 310,
+								"end": 316,
+								"left": {
+									"type": "ObjectExpression",
+									"start": 310,
+									"end": 312,
+									"properties": []
+								},
+								"operator": "/",
+								"right": {
+									"type": "Literal",
+									"start": 315,
+									"end": 316,
+									"value": 2,
+									"raw": "2"
+								}
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 324,
+				"end": 325,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 325,
+				"end": 348,
+				"name": "div",
+				"attributes": [
+					{
+						"type": "SpreadAttribute",
+						"start": 330,
+						"end": 341,
+						"expression": {
+							"type": "BinaryExpression",
+							"start": 334,
+							"end": 340,
+							"left": {
+								"type": "ObjectExpression",
+								"start": 334,
+								"end": 336,
+								"properties": []
+							},
+							"operator": "/",
+							"right": {
+								"type": "Literal",
+								"start": 339,
+								"end": 340,
+								"value": 2,
+								"raw": "2"
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 348,
+				"end": 349,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 349,
+				"end": 370,
+				"test": {
+					"type": "BinaryExpression",
+					"start": 354,
+					"end": 360,
+					"left": {
+						"type": "ObjectExpression",
+						"start": 354,
+						"end": 356,
+						"properties": []
+					},
+					"operator": "/",
+					"right": {
+						"type": "Literal",
+						"start": 359,
+						"end": 360,
+						"value": 2,
+						"raw": "2"
+					}
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 361,
+							"end": 365,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 370,
+				"end": 371,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 371,
+				"end": 404,
+				"expression": {
+					"type": "BinaryExpression",
+					"start": 378,
+					"end": 384,
+					"left": {
+						"type": "ObjectExpression",
+						"start": 378,
+						"end": 380,
+						"properties": []
+					},
+					"operator": "/",
+					"right": {
+						"type": "Literal",
+						"start": 383,
+						"end": 384,
+						"value": 2,
+						"raw": "2"
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 393,
+							"end": 397,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 388,
+					"end": 392
+				}
+			},
+			{
+				"type": "Text",
+				"start": 404,
+				"end": 405,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 405,
+				"end": 446,
+				"expression": {
+					"type": "Identifier",
+					"start": 412,
+					"end": 417,
+					"name": "items"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 435,
+							"end": 439,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 421,
+					"end": 425
+				},
+				"key": {
+					"type": "BinaryExpression",
+					"start": 427,
+					"end": 433,
+					"left": {
+						"type": "ObjectExpression",
+						"start": 427,
+						"end": 429,
+						"properties": []
+					},
+					"operator": "/",
+					"right": {
+						"type": "Literal",
+						"start": 432,
+						"end": 433,
+						"value": 2,
+						"raw": "2"
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 446,
+				"end": 447,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "KeyBlock",
+				"start": 447,
+				"end": 470,
+				"expression": {
+					"type": "BinaryExpression",
+					"start": 453,
+					"end": 459,
+					"left": {
+						"type": "ObjectExpression",
+						"start": 453,
+						"end": 455,
+						"properties": []
+					},
+					"operator": "/",
+					"right": {
+						"type": "Literal",
+						"start": 458,
+						"end": 459,
+						"value": 2,
+						"raw": "2"
+					}
+				},
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 460,
+							"end": 464,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 470,
+				"end": 471,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SnippetBlock",
+				"start": 471,
+				"end": 509,
+				"expression": {
+					"type": "Identifier",
+					"name": "fn",
+					"start": 481,
+					"end": 483
+				},
+				"parameters": [
+					{
+						"type": "AssignmentPattern",
+						"start": 484,
+						"end": 494,
+						"left": {
+							"type": "Identifier",
+							"start": 484,
+							"end": 485,
+							"name": "a"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 488,
+							"end": 494,
+							"left": {
+								"type": "ObjectExpression",
+								"start": 488,
+								"end": 490,
+								"properties": []
+							},
+							"operator": "/",
+							"right": {
+								"type": "Literal",
+								"start": 493,
+								"end": 494,
+								"value": 2,
+								"raw": "2"
+							}
+						}
+					}
+				],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 496,
+							"end": 499,
+							"expression": {
+								"type": "Identifier",
+								"start": 497,
+								"end": 498,
+								"name": "a"
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 509,
+				"end": 510,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 510,
+				"end": 534,
+				"name": "div",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 515,
+							"end": 528,
+							"expression": {
+								"type": "TemplateLiteral",
+								"start": 516,
+								"end": 527,
+								"expressions": [
+									{
+										"type": "BinaryExpression",
+										"start": 519,
+										"end": 525,
+										"left": {
+											"type": "ObjectExpression",
+											"start": 519,
+											"end": 521,
+											"properties": []
+										},
+										"operator": "/",
+										"right": {
+											"type": "Literal",
+											"start": 524,
+											"end": 525,
+											"value": 2,
+											"raw": "2"
+										}
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 517,
+										"end": 517,
+										"value": {
+											"raw": "",
+											"cooked": ""
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 526,
+										"end": 526,
+										"value": {
+											"raw": "",
+											"cooked": ""
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 534,
+				"end": 536,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 536,
+				"end": 603,
+				"data": " a block's `}` ends none, so the `/` after it opens a regex "
+			},
+			{
+				"type": "Text",
+				"start": 603,
+				"end": 604,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 604,
+				"end": 664,
+				"name": "div",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 609,
+							"end": 611,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 611,
+							"end": 657,
+							"expression": {
+								"type": "CallExpression",
+								"start": 612,
+								"end": 656,
+								"callee": {
+									"type": "ArrowFunctionExpression",
+									"start": 613,
+									"end": 653,
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 619,
+										"end": 653,
+										"body": [
+											{
+												"type": "IfStatement",
+												"start": 623,
+												"end": 635,
+												"test": {
+													"type": "Identifier",
+													"start": 627,
+													"end": 628,
+													"name": "c"
+												},
+												"consequent": {
+													"type": "BlockStatement",
+													"start": 630,
+													"end": 635,
+													"body": []
+												},
+												"alternate": null
+											},
+											{
+												"type": "ExpressionStatement",
+												"start": 638,
+												"end": 650,
+												"expression": {
+													"type": "CallExpression",
+													"start": 638,
+													"end": 649,
+													"callee": {
+														"type": "MemberExpression",
+														"start": 638,
+														"end": 646,
+														"object": {
+															"type": "Literal",
+															"start": 638,
+															"end": 641,
+															"value": {},
+															"raw": "/}/",
+															"regex": {
+																"pattern": "}",
+																"flags": ""
+															}
+														},
+														"property": {
+															"type": "Identifier",
+															"start": 642,
+															"end": 646,
+															"name": "test"
+														},
+														"computed": false,
+														"optional": false
+													},
+													"arguments": [
+														{
+															"type": "Identifier",
+															"start": 647,
+															"end": 648,
+															"name": "a"
+														}
+													],
+													"optional": false
+												}
+											}
+										]
+									}
+								},
+								"arguments": [],
+								"optional": false
+							}
+						},
+						{
+							"type": "Text",
+							"start": 657,
+							"end": 658,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 664,
+				"end": 665,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 665,
+				"end": 729,
+				"name": "div",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 670,
+							"end": 672,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 672,
+							"end": 722,
+							"expression": {
+								"type": "CallExpression",
+								"start": 673,
+								"end": 721,
+								"callee": {
+									"type": "ArrowFunctionExpression",
+									"start": 674,
+									"end": 718,
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 680,
+										"end": 718,
+										"body": [
+											{
+												"type": "FunctionDeclaration",
+												"start": 684,
+												"end": 700,
+												"id": {
+													"type": "Identifier",
+													"start": 693,
+													"end": 695,
+													"name": "fn"
+												},
+												"expression": false,
+												"generator": false,
+												"async": false,
+												"params": [],
+												"body": {
+													"type": "BlockStatement",
+													"start": 698,
+													"end": 700,
+													"body": []
+												}
+											},
+											{
+												"type": "ExpressionStatement",
+												"start": 703,
+												"end": 715,
+												"expression": {
+													"type": "CallExpression",
+													"start": 703,
+													"end": 714,
+													"callee": {
+														"type": "MemberExpression",
+														"start": 703,
+														"end": 711,
+														"object": {
+															"type": "Literal",
+															"start": 703,
+															"end": 706,
+															"value": {},
+															"raw": "/}/",
+															"regex": {
+																"pattern": "}",
+																"flags": ""
+															}
+														},
+														"property": {
+															"type": "Identifier",
+															"start": 707,
+															"end": 711,
+															"name": "test"
+														},
+														"computed": false,
+														"optional": false
+													},
+													"arguments": [
+														{
+															"type": "Identifier",
+															"start": 712,
+															"end": 713,
+															"name": "a"
+														}
+													],
+													"optional": false
+												}
+											}
+										]
+									}
+								},
+								"arguments": [],
+								"optional": false
+							}
+						},
+						{
+							"type": "Text",
+							"start": 722,
+							"end": 723,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

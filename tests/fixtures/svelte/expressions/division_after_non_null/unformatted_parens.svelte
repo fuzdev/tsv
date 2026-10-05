@@ -9,6 +9,14 @@
 <div data-attr={(a!) / 2}></div>
 {#if (a!) / 2}text{/if}
 
+<!-- nor does it change what the `}` before it closed: an object literal, or a function or class body -->
+<div>{({})! / {} / 2}</div>
+<div>{(function () {})! / 2}</div>
+<div>{(class {})! / 2}</div>
+<div>{x + (async function () {})! / 2}</div>
+<div>{c ? x : (function () {})! / 2}</div>
+<div>{(function () {})!! / 2}</div>
+
 <!-- a prefix `!` starts none: the operator before it governs, so the `/` opens a regex -->
 <div>{!/}/.test(a)}</div>
 <div>{a && !/}/.test(b)}</div>

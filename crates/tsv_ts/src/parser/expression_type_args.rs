@@ -247,6 +247,7 @@ pub(crate) fn closes_type_arguments(bytes: &[u8], gt: usize, lower_bound: usize)
     let grammar = OperandGrammar {
         closes_type_arguments: |_, _, _| false,
         closes_statement_header,
+        ..OperandGrammar::BYTES_ONLY
     };
     let mut anchor = OperandAnchor::new(lower_bound);
     let mut headers = StatementHeaders::default();

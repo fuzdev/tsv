@@ -640,6 +640,18 @@ pub struct Printer<'a> {
     /// literal a span names has none, so an early reader's unrecorded answer is the answer
     /// it would give anyway.
     pub(crate) negative_literal_pair_targets: SpanMarks,
+    /// Spans of the function and class expressions a division's left operand ENDS on from
+    /// inside it — under a prefix operator, as the right operand of an operator that binds
+    /// at least as tightly, under an angle-bracket assertion (`!function () {} / 2`) —
+    /// which take a pair so no body's `}` prints directly before the `/`
+    /// ([`Self::mark_dividend_tail`]). Recorded by the binary chain collectors ahead of
+    /// the operand's build, read by [`Self::needs_parens_at_operand_end`], which the
+    /// position that prints the node asks and cannot see the `/` further out. Keyed by span
+    /// and never consumed,
+    /// like [`Self::continued_instantiation_targets`]. Sound because a recorded span only
+    /// ever adds a pair, and only the node's own position asks about it — which is built
+    /// inside the operand the collector records ahead of.
+    pub(crate) dividend_tail_targets: SpanMarks,
     /// Set while the FIRST type argument list of an instantiation chain printed bare is
     /// built (`f<keyof (A)><U>(x)`): tsc reads that list as the right operand of a `<`
     /// comparison, so every authored paren the decision that the chain prints bare reads
@@ -730,6 +742,7 @@ impl<'a> Printer<'a> {
             chain_has_comments: Cell::new(true),
             continued_instantiation_targets: SpanMarks::default(),
             negative_literal_pair_targets: SpanMarks::default(),
+            dividend_tail_targets: SpanMarks::default(),
             first_list_keeps_maybe_parens: Cell::new(false),
             comment_free_gap,
         }
@@ -994,6 +1007,30 @@ impl<'a> Printer<'a> {
     pub(crate) fn needs_parens(&self, expr: &internal::Expression<'_>, ctx: ParenContext) -> bool {
         needs_parens(expr, ctx, self.in_for_init.get())
             || (ctx.binds_tighter_than_a_comparison() && self.authored_pair_holds_comparison(expr))
+    }
+
+    /// [`Self::needs_parens`] at a position a division's left operand can END on — a prefix
+    /// unary's argument, a binary's right operand, an angle-bracket assertion's expression,
+    /// the three `Printer::mark_dividend_tail` descends through — where a function or class
+    /// expression recorded there takes a pair as well ([`Self::is_dividend_tail`]).
+    #[inline]
+    pub(crate) fn needs_parens_at_operand_end(
+        &self,
+        expr: &internal::Expression<'_>,
+        ctx: ParenContext,
+    ) -> bool {
+        self.needs_parens(expr, ctx) || self.is_dividend_tail(expr)
+    }
+
+    /// Whether `expr` is a function or class expression a division's left operand ends on
+    /// ([`Self::dividend_tail_targets`]).
+    #[inline]
+    pub(crate) fn is_dividend_tail(&self, expr: &internal::Expression<'_>) -> bool {
+        matches!(
+            expr.kind,
+            internal::ExpressionKind::FunctionExpression(_)
+                | internal::ExpressionKind::ClassExpression(_)
+        ) && self.dividend_tail_targets.is_marked(expr.span())
     }
 
     /// Whether the author wrote a pair around `expr` that tsc needs, because it reads

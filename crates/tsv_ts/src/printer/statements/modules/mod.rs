@@ -20,7 +20,7 @@ pub(super) use super::{Printer, build_entity_name_doc};
 
 use crate::ast::internal;
 use crate::printer::calls::PartitionedComments;
-use crate::printer::needs_parens::export_default_needs_parens;
+use crate::printer::needs_parens::{LeftmostText, export_default_needs_parens};
 use crate::printer::statements::StatementContext;
 use crate::printer::{ParenContext, needs_parens};
 use smallvec::SmallVec;
@@ -479,8 +479,10 @@ impl<'a> Printer<'a> {
                 // Mirrors prettier's `startsWithNoLookaheadToken(expr, isFunctionOrClass)`
                 // (parentheses/needs-parentheses.js). Decorated class expressions are
                 // handled by the decorated forms; the FunctionDeclaration/ClassDeclaration
-                // arms cover bare `export default function/class …`.
-                if export_default_needs_parens(expr) {
+                // arms cover bare `export default function/class …`. A frozen value is read
+                // as its verbatim slice, which carries no pair the printer would add inside.
+                let frozen = self.value_head_frozen_span(keyword_end, expr.span());
+                if export_default_needs_parens(expr, LeftmostText::of_value(frozen.is_some())) {
                     expr_doc = d.concat(&[d.text("("), expr_doc, d.text(")")]);
                 }
                 let argument_end = value_span.end;

@@ -7,7 +7,9 @@
 use crate::ast::internal::{self, BinaryOperator, Expression, ExpressionKind};
 use crate::printer::comments::{AsiOperandShell, CommentSpacing};
 use crate::printer::ignore::FrozenOperandPair;
-use crate::printer::{CommentVec, ParenContext, Printer, RunLeadingBlank};
+use crate::printer::{
+    CommentVec, ParenContext, Printer, RunLeadingBlank, class_expr_has_decorators,
+};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -359,9 +361,12 @@ impl<'a> Printer<'a> {
         // one pair either way). A *trailing* comment on such an operand still keeps both
         // pairs (the comment-holder path via `has_trailing_comments`) — that is the
         // deliberate `!((x = y) /* c */)` form, pinned by `operand_paren_comment`.
+        // A dividend tail is not one of them: its pair is this shell's when a comment leads
+        // it (`needs_paren_wrap` below), so its owned comment is counted here like any other
+        // operand's.
         // Asked three times below (the exception here, the comment-holder inner wrap,
         // and the plain path), always with the same operand + context — compute once.
-        let arg_needs_parens = self.needs_parens(
+        let arg_needs_parens = self.needs_parens_at_operand_end(
             unary.argument,
             ParenContext::UnaryArgument {
                 parent_op: unary.operator,
@@ -370,6 +375,7 @@ impl<'a> Printer<'a> {
         let operand_encloses_owned_comment =
             matches!(unary.argument.kind, ExpressionKind::SequenceExpression(_))
                 || (arg_needs_parens
+                    && !self.is_dividend_tail(unary.argument)
                     && !matches!(unary.argument.kind, ExpressionKind::BinaryExpression(_)));
         // Anchored at `leading_run_start`, not `operator_end`: the glued `//` above already
         // left the run, and counting it here would make the name a lie (it is never owned —
@@ -428,8 +434,11 @@ impl<'a> Printer<'a> {
             // needs_parens layer is redundant for a binary/logical operand — prettier
             // strips it (`!(x + y /* c */)`). Assignment/ternary operands keep their
             // parens for clarity in both formatters, so leave those untouched.
+            // Nor does a dividend tail's pair nest inside it: that pair exists to put a `)`
+            // between the body's `}` and the `/`, which the shell's own does.
             let needs_paren_wrap = arg_needs_parens
-                && !matches!(unary.argument.kind, ExpressionKind::BinaryExpression(_));
+                && !matches!(unary.argument.kind, ExpressionKind::BinaryExpression(_))
+                && !self.is_dividend_tail(unary.argument);
             let inner = if needs_paren_wrap {
                 d.parens(inner)
             } else {
@@ -523,11 +532,10 @@ impl<'a> Printer<'a> {
                 )
             } else {
                 // Non-binary that needs parens (e.g., ternary or assignment in unary/assertion)
-                d.concat(&[
-                    d.text("("),
+                self.build_operand_pair_doc(
+                    unary.argument,
                     self.build_expression_doc(unary.argument),
-                    d.text(")"),
-                ])
+                )
             }
         } else {
             // No binary reaches here: `needs_parens_unary_arg_common` matches every
@@ -1421,6 +1429,7 @@ impl<'a> Printer<'a> {
         chain_start: u32,
         ends_chain: bool,
     ) {
+        self.mark_dividend_tail(expr);
         // Recursively flatten left side if it can be chained with current operator
         match self.flattenable_left(expr) {
             Some(left_binary) => {
@@ -1523,7 +1532,7 @@ impl<'a> Printer<'a> {
         let kept_for_value_end = self.value_end_kept_pair(operand);
         let keeps_for_value_end = kept_for_value_end.is_some();
         if let Some((open, close)) = kept_for_value_end.or_else(|| {
-            if !self.needs_parens(operand, ctx) {
+            if !self.needs_parens_at_operand_end(operand, ctx) {
                 return None;
             }
             let open = self
@@ -1658,6 +1667,95 @@ impl<'a> Printer<'a> {
         flattens.then_some(left_binary)
     }
 
+    /// Record the function or class expression the printed text of a division's left
+    /// operand ENDS on, so the position that prints it gives it a pair
+    /// ([`Printer::needs_parens_at_operand_end`]): `!function () {} / 2` prints `!(function
+    /// () {}) / 2`, `a / async function () {} / 2` prints `a / (async function () {}) / 2`.
+    ///
+    /// One invariant, of which the dividend's own pair
+    /// (`needs_parens::needs_parens_binary_operand`) is the direct case: **no function or
+    /// class body's `}` prints directly before a `/` operator**. acorn, which Svelte parses
+    /// every `<script>` and template expression with, reads the `/` after such a body as a
+    /// regex wherever its tokenizer took the keyword for a statement's, and where that is
+    /// follows the tokens before the keyword rather than the operand's position — an
+    /// anonymous `async function` and a decorated class read that way after any operator.
+    /// So the rule is uniform over every function and class expression rather than a model
+    /// of acorn's contexts.
+    ///
+    /// Called by both chain collectors on every binary they visit, ahead of any operand's
+    /// build — a flattened chain's inner division is visited, never built as a node.
+    #[inline]
+    pub(in crate::printer) fn mark_dividend_tail(&self, expr: &internal::BinaryExpression<'_>) {
+        if expr.operator == BinaryOperator::Slash {
+            self.mark_tail_of_dividend(expr.left);
+        }
+    }
+
+    /// [`Self::mark_dividend_tail`]'s walk, over a division's left operand.
+    ///
+    /// It follows the operand's rightmost printed child through the three positions that
+    /// can print it bare at the end of a `/`'s left operand: a prefix unary's argument, a
+    /// binary's right operand, an angle-bracket assertion's expression — the positions
+    /// whose builders ask [`Printer::needs_parens_at_operand_end`]. Every other composite
+    /// either ends on a token of its own or takes a pair in that position (a conditional,
+    /// an arrow, an assignment, `await`, `yield`), which ends it on a `)`. The direct left
+    /// operand is not recorded: its position's own rule gives it the pair.
+    fn mark_tail_of_dividend(&self, dividend: &Expression<'_>) {
+        let mut operand = dividend;
+        let mut ctx = ParenContext::BinaryLeft {
+            parent_op: BinaryOperator::Slash,
+        };
+        loop {
+            // An operand inside a pair ends on its `)` — the dividend itself included.
+            if self.needs_parens(operand, ctx) {
+                return;
+            }
+            (operand, ctx) = match &operand.kind {
+                ExpressionKind::FunctionExpression(_) | ExpressionKind::ClassExpression(_) => {
+                    self.dividend_tail_targets.mark(operand.span());
+                    return;
+                }
+                ExpressionKind::UnaryExpression(unary) => (
+                    unary.argument,
+                    ParenContext::UnaryArgument {
+                        parent_op: unary.operator,
+                    },
+                ),
+                ExpressionKind::BinaryExpression(binary) => (
+                    binary.rebalanced_right(),
+                    ParenContext::BinaryRight {
+                        parent_op: binary.operator,
+                    },
+                ),
+                ExpressionKind::TSTypeAssertion(assertion) => {
+                    (assertion.expression, ParenContext::AngleBracketAssertion)
+                }
+                _ => return,
+            };
+        }
+    }
+
+    /// The pair a position puts around `operand`, whose doc is `inner`. A DECORATED class
+    /// takes it broken open and indented, as at a statement's start and in a heritage
+    /// clause: the decorator owns a line of its own either way. The pairs a class operand
+    /// takes are a dividend's (`(@dec class {}) / 2`) and a dividend tail's
+    /// ([`Self::mark_dividend_tail`]).
+    pub(in crate::printer) fn build_operand_pair_doc(
+        &self,
+        operand: &Expression<'_>,
+        inner: DocId,
+    ) -> DocId {
+        let decorated_class = matches!(
+            &operand.kind,
+            ExpressionKind::ClassExpression(c) if class_expr_has_decorators(c)
+        );
+        if decorated_class {
+            self.build_break_open_parens(inner)
+        } else {
+            self.d().parens(inner)
+        }
+    }
+
     /// Build operand with parens if needed for clarity
     pub(in crate::printer) fn build_binary_operand_doc(
         &self,
@@ -1665,7 +1763,6 @@ impl<'a> Printer<'a> {
         parent_op: BinaryOperator,
         is_right: bool,
     ) -> DocId {
-        let d = self.d();
         let ctx = if is_right {
             ParenContext::BinaryRight { parent_op }
         } else {
@@ -1689,10 +1786,11 @@ impl<'a> Printer<'a> {
         // A MULTI-LINE block the operand OWNS prints just inside the `(`, outside the
         // operand's own group ([`Printer::build_value_with_outermost_owned_comment`]).
         // Asked only where the pair is KEPT — see that seam's ⚠️.
-        if self.needs_parens(operand, ctx) {
-            d.parens(self.build_value_with_outermost_owned_comment(operand, || {
+        if self.needs_parens(operand, ctx) || (is_right && self.is_dividend_tail(operand)) {
+            let inner = self.build_value_with_outermost_owned_comment(operand, || {
                 self.build_chain_aware_operand_doc(operand)
-            }))
+            });
+            self.build_operand_pair_doc(operand, inner)
         } else {
             self.build_chain_aware_operand_doc(operand)
         }

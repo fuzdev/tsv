@@ -817,25 +817,55 @@ impl OperandAnchor {
         lower_bound: usize,
         grammar: OperandGrammar,
     ) -> bool {
+        self.starts_regex_resuming(
+            bytes,
+            pos,
+            lower_bound,
+            grammar,
+            &mut BracedOperandWalk::default(),
+        )
+    }
+
+    /// [`Self::starts_regex`] for a scan that asks about more than one `/` of a region:
+    /// `walk` is the scan's own, handed to the grammar's braced-operand resolver at each
+    /// ask so its walk of the region resumes instead of starting over
+    /// ([`BracedOperandWalk`]).
+    #[inline]
+    #[must_use]
+    pub fn starts_regex_resuming(
+        &self,
+        bytes: &[u8],
+        pos: usize,
+        lower_bound: usize,
+        grammar: OperandGrammar,
+        walk: &mut BracedOperandWalk,
+    ) -> bool {
         let anchor = self.at(bytes, pos, lower_bound, grammar);
         // A skipped literal ends an operand, whatever its last byte reads as.
         if self.literal_end == Some(anchor) {
             return false;
         }
-        is_regex_start_after(bytes, anchor, lower_bound, grammar.closes_type_arguments)
+        is_regex_start_after(bytes, anchor, lower_bound, grammar, walk)
     }
 }
 
-/// The two operand ends a raw byte scan cannot read from bytes, answered by the grammar
+/// The operand ends a raw byte scan cannot read from bytes, answered by the grammar
 /// that owns them — so a scan that finds where an expression ENDS before it is parsed
-/// reads each `/` the way the parser that follows it will.
+/// reads each `/` the way the reader that settles that end will.
 ///
-/// The scanning crate does not answer either: the language crate that owns the grammar
-/// supplies both (`tsv_ts::OPERAND_GRAMMAR`), and every scan at a regex boundary carries
-/// them ([`OperandAnchor::starts_regex`], [`scan_to_matching_brace`],
-/// [`scan_to_matching_paren`], [`skip_template_literal`]). A resolver must read the region
-/// the way its parser will, so the scan and the parse agree on where an expression ends by
-/// construction.
+/// The scanning crate does not answer any of them: the language crate that owns the
+/// grammar supplies them (`tsv_ts::OPERAND_GRAMMAR`), and every scan at a regex boundary
+/// carries them ([`OperandAnchor::starts_regex`], [`scan_to_matching_brace`],
+/// [`scan_to_matching_paren`], [`skip_template_literal`]).
+///
+/// Which reader that is belongs to the scan, not to the question. A `>` and a `)` are
+/// read as the grammar's own parser reads them, so the scan and the parse that follows
+/// agree on where the expression ends by construction. A `}` has a second reader: a
+/// region whose extent another parser settles — a Svelte island, which acorn parses — is
+/// scanned with that parser's reading of the `}` ([`ClosesBracedOperand`]), and there the
+/// scan agrees with it on where the region ENDS, which is not at every shape what the
+/// grammar's own parse of the region reads. A scan whose only reader is the grammar's
+/// parser leaves the `}` to the bytes ([`Self::BYTES_ONLY`]'s answer).
 ///
 /// Handed in at each ask rather than stored in the anchor: the anchor sits in the hot
 /// scan loops, and keeping it the three words it needs measured cheaper.
@@ -845,20 +875,88 @@ pub struct OperandGrammar {
     pub closes_type_arguments: ClosesTypeArguments,
     /// Whether a `)` closes a statement header ([`ClosesStatementHeader`]).
     pub closes_statement_header: ClosesStatementHeader,
+    /// Whether a `}` closes a braced operand ([`ClosesBracedOperand`]).
+    pub closes_braced_operand: ClosesBracedOperand,
+    /// How the scanned region begins, which [`Self::closes_braced_operand`] reads.
+    pub start: ScanStart,
 }
 
 impl OperandGrammar {
     /// The answers the bytes alone give: every `>` is an operator (no type arguments),
-    /// and every `)` ends an operand (no statement header is looked for).
+    /// every `)` ends an operand (no statement header is looked for), and no `}` does (no
+    /// object literal is told from a block).
     pub const BYTES_ONLY: Self = Self {
         closes_type_arguments: never,
         closes_statement_header: never,
+        closes_braced_operand: never_braced,
+        start: ScanStart::Interpolation,
     };
+
+    /// The same answers for a region that begins as `start` says.
+    #[must_use]
+    pub const fn starting(self, start: ScanStart) -> Self {
+        Self { start, ..self }
+    }
 }
 
 /// The resolver that answers no to everything ([`OperandGrammar::BYTES_ONLY`]).
 fn never(_bytes: &[u8], _at: usize, _lower_bound: usize) -> bool {
     false
+}
+
+/// [`never()`] for the braced-operand question ([`OperandGrammar::BYTES_ONLY`]).
+fn never_braced(
+    _bytes: &[u8],
+    _at: usize,
+    _lower_bound: usize,
+    _start: ScanStart,
+    _walk: &mut BracedOperandWalk,
+) -> bool {
+    false
+}
+
+/// What a [`ClosesBracedOperand`] resolver keeps between the asks of one scan: where its
+/// forward walk of the region stopped, so the next `}` the scan asks about resumes the walk
+/// instead of repeating it — which is what keeps a region holding many `} /` pairs linear.
+///
+/// The scan owns one per region, created empty, and only carries it: its contents are the
+/// resolver's ([`Self::take`] / [`Self::put`]). A scan that asks once needs none
+/// ([`OperandAnchor::starts_regex`]).
+#[derive(Default)]
+pub struct BracedOperandWalk(Option<Box<dyn std::any::Any>>);
+
+impl BracedOperandWalk {
+    /// Take out what the resolver left, when it is a `T`.
+    #[must_use]
+    pub fn take<T: std::any::Any>(&mut self) -> Option<Box<T>> {
+        self.0.take()?.downcast().ok()
+    }
+
+    /// Leave `state` for the scan's next ask.
+    pub fn put<T: std::any::Any>(&mut self, state: Box<T>) {
+        self.0 = Some(state);
+    }
+}
+
+impl std::fmt::Debug for BracedOperandWalk {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("BracedOperandWalk")
+            .field(&self.0.is_some())
+            .finish()
+    }
+}
+
+/// How a scanned region begins — the one fact about its surroundings a scan that starts
+/// mid-document cannot read from the bytes it is handed, and which the
+/// [`ClosesBracedOperand`] question turns on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ScanStart {
+    /// The region is a whole expression with nothing before it, read as a parse of its
+    /// own: its first token is the first token of that parse.
+    Expression,
+    /// The region is a template literal's interpolation, just past its `${` — what
+    /// [`skip_template_literal`] scans each `${…}` as.
+    Interpolation,
 }
 
 /// Whether the `>` at `gt` closes a **type-argument list** — `f<T> / 2`, `a.b<T> / 2`,
@@ -883,6 +981,29 @@ pub type ClosesTypeArguments = fn(bytes: &[u8], gt: usize, lower_bound: usize) -
 /// scan's lower bound, where a forward walk to the `)` may begin.
 pub type ClosesStatementHeader = fn(bytes: &[u8], rparen: usize, lower_bound: usize) -> bool;
 
+/// Whether the `}` at `rbrace` closes a **braced operand** — an object literal (`{} / 2`),
+/// or a function or class expression's body (`x + function () {} / 2`) — so that the `/`
+/// after it divides, where after every other `}` (a block statement's, an arrow body's, a
+/// function declaration's) it opens a regex (`if (c) {}⏎/re/.test(s)`).
+///
+/// The `}` is the same byte either way: the answer is a question about the `{` it closes
+/// and the tokens before that, which only a tokenizer of the region can give
+/// ([`OperandGrammar`]). The resolver walks forward from `lower_bound`, so the answer is
+/// that of the reader it models — `tsv_ts`'s models acorn, for the Svelte islands acorn
+/// parses.
+///
+/// Its arguments are the scanned bytes, the `}`'s offset, the scan's lower bound (where a
+/// forward walk to the `}` begins), how the region begins ([`ScanStart`]) and the scan's
+/// place for the resolver's walk ([`BracedOperandWalk`]). A scan asks in source order, so
+/// each ask's `}` lies past the last one's.
+pub type ClosesBracedOperand = fn(
+    bytes: &[u8],
+    rbrace: usize,
+    lower_bound: usize,
+    start: ScanStart,
+    walk: &mut BracedOperandWalk,
+) -> bool;
+
 /// Whether a `/` starts a regex literal (rather than a division operator), given
 /// `operand_end` — the caller's scan position just past the last **non-trivia**
 /// byte it consumed before reaching the `/`.
@@ -890,15 +1011,16 @@ pub type ClosesStatementHeader = fn(bytes: &[u8], rparen: usize, lower_bound: us
 /// Decided by the last non-whitespace byte at or below `operand_end`: a `/`
 /// after something that *ends* an expression (an identifier character — ASCII or
 /// not — `)`, `]`, a postfix `++`/`--`, a string/template closing quote `'` `"`
-/// `` ` ``, a numeric literal's trailing `.`, or a `>` closing a type-argument list)
-/// is division; after anything else — or with nothing significant before it — it
-/// is a regex. `lower_bound` bounds every walk. A `!` never reaches here: the anchor
-/// steps over it ([`OperandAnchor`]'s `at`).
+/// `` ` ``, a numeric literal's trailing `.`, a `>` closing a type-argument list, or a
+/// `}` closing a braced operand) is division; after anything else — or with nothing
+/// significant before it — it is a regex. `lower_bound` bounds every walk. A `!` never
+/// reaches here: the anchor steps over it ([`OperandAnchor`]'s `at`).
 ///
-/// The `>` is the one byte whose answer the bytes do not hold — `f<T> / 2` divides
-/// where `a > /re/` does not — so `closes_type_arguments` is asked about it
-/// ([`ClosesTypeArguments`]). `=>` is settled first: an arrow's body is an
-/// expression, so a `/` after it opens a regex whatever grammar is scanned.
+/// A `>` and a `}` hold no answer of their own, so `grammar` is asked about them
+/// ([`OperandGrammar`]): a `>` — `f<T> / 2` divides where `a > /re/` does not
+/// ([`ClosesTypeArguments`]; `=>` is settled first: an arrow's body is an expression, so a
+/// `/` after it opens a regex whatever grammar is scanned) — and a `}` — `{} / 2` divides
+/// where `if (c) {}⏎/re/` does not ([`ClosesBracedOperand`]).
 ///
 /// The anchor is **handed in, never derived here by looking backward from the `/`** —
 /// which is the point: `bytes[operand_end - 1]` is a byte the caller's scan already
@@ -931,7 +1053,8 @@ fn is_regex_start_after(
     bytes: &[u8],
     operand_end: usize,
     lower_bound: usize,
-    closes_type_arguments: ClosesTypeArguments,
+    grammar: OperandGrammar,
+    walk: &mut BracedOperandWalk,
 ) -> bool {
     // Nothing significant before it (start of the scanned region) → regex.
     if operand_end <= lower_bound {
@@ -961,8 +1084,11 @@ fn is_regex_start_after(
         // grammar-owning resolver says — a comparison or shift (`a > /re/`) does not.
         b'>' => {
             (j > lower_bound && bytes[j - 1] == b'=')
-                || !closes_type_arguments(bytes, j, lower_bound)
+                || !(grammar.closes_type_arguments)(bytes, j, lower_bound)
         }
+        // An object literal's `}` ends an operand (`{} / 2`), a block's does not
+        // (`if (c) {}⏎/re/`) — which only the grammar can tell apart.
+        b'}' => !(grammar.closes_braced_operand)(bytes, j, lower_bound, grammar.start, walk),
         // A numeric literal may end in its `.` (`1. / 2`), which no other token
         // can: past a digit the `.` is the literal's, and anything else before
         // it (`...` spread, a member `.` still waiting for its name) is no operand.
@@ -1244,6 +1370,8 @@ fn scan_to_matching_close<const OPEN: u8, const CLOSE: u8>(
     // The anchor `is_regex_start_after` reads, rebuilt where a `/` asks for it. A
     // template literal ends an operand, as does a skipped regex.
     let mut anchor = OperandAnchor::new(scan_start);
+    // The braced-operand resolver's walk of this region, resumed at each `}` + `/`.
+    let mut braced_walk = BracedOperandWalk::default();
     while i < end {
         // Only the hop needles can move this scan; every other byte reaches the
         // `_ => {}` arm below and is stepped over one at a time, so the walk hops
@@ -1283,7 +1411,7 @@ fn scan_to_matching_close<const OPEN: u8, const CLOSE: u8>(
         }
         if bytes[i] == b'/'
             && i + 1 < end
-            && anchor.starts_regex(bytes, i, scan_start, grammar)
+            && anchor.starts_regex_resuming(bytes, i, scan_start, grammar, &mut braced_walk)
             && let Some(past) = skip_regex_literal(bytes, i, end)
         {
             i = past;
@@ -1319,13 +1447,15 @@ fn scan_to_matching_close<const OPEN: u8, const CLOSE: u8>(
 /// `{…}` tag scanner and binding-pattern scanner) intercept `` ` `` and call this
 /// instead of delegating it to `skip_trivia`.
 ///
-/// `grammar` is handed on to each interpolation's scan ([`scan_to_matching_brace`]).
+/// `grammar` is handed on to each interpolation's scan ([`scan_to_matching_brace`]), as
+/// a region of its own kind ([`ScanStart::Interpolation`]).
 pub fn skip_template_literal(
     bytes: &[u8],
     start: usize,
     end: usize,
     grammar: OperandGrammar,
 ) -> usize {
+    let grammar = grammar.starting(ScanStart::Interpolation);
     let mut i = start + 1; // past the opening backtick
     while i < end {
         match bytes[i] {
@@ -1542,6 +1672,22 @@ mod tests {
         assert_eq!(s("`${abc"), 6); // unterminated interpolation
     }
 
+    /// [`is_regex_start_after`] for one ask, with no walk to resume.
+    fn regex_after(
+        bytes: &[u8],
+        operand_end: usize,
+        lower_bound: usize,
+        grammar: OperandGrammar,
+    ) -> bool {
+        is_regex_start_after(
+            bytes,
+            operand_end,
+            lower_bound,
+            grammar,
+            &mut BracedOperandWalk::default(),
+        )
+    }
+
     /// What a depth-tracking scanner does, in miniature: walk forward to the `/`
     /// at `slash_pos`, maintaining the `operand_end` anchor, then ask. The tests
     /// grade this composition rather than a hand-computed anchor, because the
@@ -1570,7 +1716,7 @@ mod tests {
             }
             i += 1;
         }
-        is_regex_start_after(bytes, operand_end, lower_bound, never)
+        regex_after(bytes, operand_end, lower_bound, OperandGrammar::BYTES_ONLY)
     }
 
     /// The eager statement of a glued `!` run: the `!` at `i` belongs to a run that
@@ -1658,7 +1804,7 @@ mod tests {
                         eager,
                         "{src:?}: anchor disagrees at the `/` at {i}"
                     );
-                    if is_regex_start_after(bytes, eager, 0, never)
+                    if regex_after(bytes, eager, 0, OperandGrammar::BYTES_ONLY)
                         && let Some(past) = skip_regex_literal(bytes, i, end)
                     {
                         i = past;
@@ -2118,8 +2264,8 @@ mod tests {
         let header: ClosesStatementHeader =
             |bytes, rparen, lower_bound| bytes[lower_bound..rparen].ends_with(b"if (c");
         let grammar = OperandGrammar {
-            closes_type_arguments: never,
             closes_statement_header: header,
+            ..OperandGrammar::BYTES_ONLY
         };
         let regex = |src: &str, grammar: OperandGrammar| {
             let bytes = src.as_bytes();
@@ -2138,13 +2284,89 @@ mod tests {
     #[test]
     fn is_regex_start_after_a_gt_asks_the_resolver() {
         let bytes = b"f<T> /";
-        let closes: ClosesTypeArguments = |_, gt, _| gt == 3;
+        let closes = OperandGrammar {
+            closes_type_arguments: |_, gt, _| gt == 3,
+            ..OperandGrammar::BYTES_ONLY
+        };
         // Without a type-argument grammar every `>` is an operator.
-        assert!(is_regex_start_after(bytes, 4, 0, never));
-        assert!(!is_regex_start_after(bytes, 4, 0, closes));
+        assert!(regex_after(bytes, 4, 0, OperandGrammar::BYTES_ONLY));
+        assert!(!regex_after(bytes, 4, 0, closes));
         // An arrow's `=>` opens an expression whatever the resolver says.
         let arrow = b"s => /";
-        let always: ClosesTypeArguments = |_, _, _| true;
-        assert!(is_regex_start_after(arrow, 4, 0, always));
+        let always = OperandGrammar {
+            closes_type_arguments: |_, _, _| true,
+            ..OperandGrammar::BYTES_ONLY
+        };
+        assert!(regex_after(arrow, 4, 0, always));
+    }
+
+    #[test]
+    fn is_regex_start_after_a_brace_asks_the_resolver() {
+        let bytes = b"{} /";
+        // Without a braced-operand grammar every `}` closes a block.
+        assert!(regex_after(bytes, 2, 0, OperandGrammar::BYTES_ONLY));
+        // The resolver is asked about the `}` with the region's start.
+        let expression = OperandGrammar {
+            closes_braced_operand: |_, rbrace, _, start, _| {
+                rbrace == 1 && start == ScanStart::Expression
+            },
+            ..OperandGrammar::BYTES_ONLY
+        };
+        assert!(!regex_after(
+            bytes,
+            2,
+            0,
+            expression.starting(ScanStart::Expression)
+        ));
+        assert!(regex_after(bytes, 2, 0, expression));
+    }
+
+    #[test]
+    fn a_template_interpolation_scans_as_a_region_of_its_own_kind() {
+        // The interpolation's `}` + `/` is asked of with `Interpolation`, whatever the outer
+        // scan's start.
+        let src = b"`${{} / 2}`";
+        let interpolation_only = OperandGrammar {
+            closes_braced_operand: |_, _, _, start, _| start == ScanStart::Interpolation,
+            ..OperandGrammar::BYTES_ONLY
+        };
+        let grammar = interpolation_only.starting(ScanStart::Expression);
+        assert_eq!(skip_template_literal(src, 0, src.len(), grammar), src.len());
+        // A grammar reading the `}` as a block's opens a regex at `/ 2}`, which runs to the end.
+        let src2 = b"`${{} / 2}` / 3 /";
+        assert_ne!(
+            skip_template_literal(src2, 0, src2.len(), OperandGrammar::BYTES_ONLY),
+            11
+        );
+        assert_eq!(skip_template_literal(src2, 0, src2.len(), grammar), 11);
+    }
+
+    #[test]
+    fn a_scan_hands_the_resolver_one_walk_for_its_whole_region() {
+        // The resolver finds at each ask what it left at the one before — and a nested
+        // region's scan brings a walk of its own, so the interpolation's ask finds none.
+        let resumes = OperandGrammar {
+            closes_braced_operand: |_, rbrace, _, start, walk| {
+                let mut asked = walk
+                    .take::<Vec<usize>>()
+                    .map_or_else(Vec::new, |seen| *seen);
+                let expected: &[usize] = match (start, rbrace) {
+                    (ScanStart::Expression, 1) | (ScanStart::Interpolation, _) => &[],
+                    (ScanStart::Expression, 6) => &[1],
+                    (ScanStart::Expression, _) => &[1, 6],
+                };
+                let resumed = asked == expected;
+                asked.push(rbrace);
+                walk.put(Box::new(asked));
+                resumed
+            },
+            ..OperandGrammar::BYTES_ONLY
+        }
+        .starting(ScanStart::Expression);
+        let src = b"{} / {} / `${{} / 1}` + {} / 2}";
+        assert_eq!(
+            scan_to_matching_brace(src, 0, src.len(), resumes),
+            Some(src.len() - 1)
+        );
     }
 }

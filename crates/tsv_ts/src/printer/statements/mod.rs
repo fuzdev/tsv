@@ -28,6 +28,7 @@ use super::RunLeadingBlank;
 use super::class_expr_has_decorators;
 use super::expressions::literals::format_directive;
 use super::expressions::operators::SeqLayout;
+use super::needs_parens::LeftmostText;
 use crate::ast::internal::{self, Expression, ExpressionKind, Statement, StatementKind};
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -447,7 +448,8 @@ impl<'a> Printer<'a> {
         let nested_paren = if needs_parens {
             None
         } else {
-            self.expr_stmt_nested_paren_target(stmt.expression)
+            let text = LeftmostText::of_value(frozen.is_some());
+            self.expr_stmt_nested_paren_target(stmt.expression, text)
         };
         // A frozen slice is verbatim, so the printer has no interior left to wrap:
         // the nested target's parens go around the WHOLE slice instead. Without the

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 606,
+	"end": 809,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -63,17 +63,35 @@
 			"value": " prettier-ignore",
 			"start": 555,
 			"end": 573
+		},
+		{
+			"type": "Line",
+			"value": " a bare function dividend is such a slice too: the pair the printer gives a dividend is",
+			"start": 598,
+			"end": 687
+		},
+		{
+			"type": "Line",
+			"value": " no part of a verbatim slice, which opens on the keyword",
+			"start": 689,
+			"end": 747
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 753,
+			"end": 771
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 605,
+		"end": 808,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 596,
+			"end": 799,
 			"body": [
 				{
 					"type": "ExpressionStatement",
@@ -260,6 +278,62 @@
 							"value": " interior for the printer to wrap, so the shell goes around the whole slice",
 							"start": 472,
 							"end": 549
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 749,
+					"end": 798,
+					"expression": {
+						"type": "BinaryExpression",
+						"start": 774,
+						"end": 794,
+						"left": {
+							"type": "FunctionExpression",
+							"start": 774,
+							"end": 790,
+							"id": null,
+							"expression": false,
+							"generator": false,
+							"async": false,
+							"params": [],
+							"body": {
+								"type": "BlockStatement",
+								"start": 788,
+								"end": 790,
+								"body": []
+							}
+						},
+						"operator": "/",
+						"right": {
+							"type": "Literal",
+							"start": 793,
+							"end": 794,
+							"value": 2,
+							"raw": "2"
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " prettier-ignore",
+								"start": 753,
+								"end": 771
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a bare function dividend is such a slice too: the pair the printer gives a dividend is",
+							"start": 598,
+							"end": 687
+						},
+						{
+							"type": "Line",
+							"value": " no part of a verbatim slice, which opens on the keyword",
+							"start": 689,
+							"end": 747
 						}
 					]
 				}

@@ -862,8 +862,10 @@ impl<'a> Printer<'a> {
         type_assert_span: Span,
     ) -> DocId {
         let d = self.d();
-        let expr_needs_parens =
-            self.needs_parens(type_assert.expression, ParenContext::AngleBracketAssertion);
+        let expr_needs_parens = self.needs_parens_at_operand_end(
+            type_assert.expression,
+            ParenContext::AngleBracketAssertion,
+        );
         // Cast boundary positions: `<` … type … `>` … expression. The `>` is found
         // past any comment that itself contains a `>` (`<T /* > */>`).
         let open_pos = type_assert_span.start; // the `<`
@@ -984,7 +986,7 @@ impl<'a> Printer<'a> {
             build_inner()
         };
         let expr_doc = if expr_needs_parens {
-            d.parens(inner_expr)
+            self.build_operand_pair_doc(type_assert.expression, inner_expr)
         } else {
             inner_expr
         };
@@ -1936,6 +1938,7 @@ impl<'a> Printer<'a> {
         operands: &mut DocBuf,
         operators: &mut OperatorBuf,
     ) {
+        self.mark_dividend_tail(expr);
         // Recursively flatten left side if it can be chained with current operator
         // (`flattenable_left`, shared with `collect_binary_chain_with_spans`); otherwise
         // build the operand with parens if needed.

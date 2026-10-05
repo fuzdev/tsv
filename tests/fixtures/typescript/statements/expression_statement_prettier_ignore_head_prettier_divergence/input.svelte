@@ -23,4 +23,11 @@
 		// prettier-ignore
 		{ bbb:  2 }.ccc
 	);
+
+	// a bare function dividend is such a slice too: the pair the printer gives a dividend is
+	// no part of a verbatim slice, which opens on the keyword
+	(
+		// prettier-ignore
+		function  ()  {} / 2
+	);
 </script>

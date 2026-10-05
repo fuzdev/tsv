@@ -28,6 +28,14 @@
 			? fff
 			: ggg;
 
+	// A decorated class DIVIDED keeps the shape. There the pair is the dividend's own — the
+	// one every function or class expression left of `/` takes — so it is printed once.
+	const rrr = () =>
+		(
+			@dec
+			class {}
+		) / 2;
+
 	// A frozen body whose ROOT is the class takes the same pair — it is the position's, so
 	// it rides outside the slice.
 	const hhh = () =>
@@ -57,4 +65,8 @@
 		@dec
 		class {}
 	).nnn;
+	(
+		@dec
+		class {}
+	) / 2;
 </script>

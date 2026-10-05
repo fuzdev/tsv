@@ -30,6 +30,13 @@ An **undecorated** `class {}` opens a concise body fine and stays bare in both t
 **statement** position the same leftmost rule already parenthesized the class — both are
 carried here as controls, unchanged in `output_prettier.svelte`.
 
+A decorated class **divided** (`(@dec class {}) / 2`) prints the same broken-open pair, once,
+from another owner: a function or class expression left of `/` takes a pair of its own at
+every position
+([division_after_function_parens](../../../../svelte/expressions/division_after_function_parens_prettier_divergence/)),
+so the leftmost rule finds the body already opening on a `(` and adds none. Prettier drops it
+in the arrow body like the rest, and keeps it at statement position.
+
 A frozen body whose **root** is the class takes the same pair: it belongs to the position,
 so it rides outside the slice exactly as every other required pair does. Prettier keeps the
 freeze there but loses the pair too, and adds a blank line and an orphan `;`.

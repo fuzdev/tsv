@@ -18,9 +18,9 @@
 // - `printPathNoParens`'s caller (`print/index.js`, the application layer)
 
 use crate::ast::internal::{
-    ArrowFunctionBody, AssignmentOperator, BinaryOperator, Expression, ExpressionKind,
-    LiteralValue, TSKeywordKind, TSType, TSTypeParameterInstantiation, UnaryOperator,
-    UpdateOperator,
+    ArrowFunctionBody, AssignmentOperator, BinaryExpression, BinaryOperator, Expression,
+    ExpressionKind, LiteralValue, TSKeywordKind, TSType, TSTypeParameterInstantiation,
+    UnaryOperator, UpdateOperator,
 };
 use crate::printer::chain::child_stops_optional_chain;
 use crate::printer::class_expr_has_decorators;
@@ -1197,7 +1197,32 @@ fn needs_parens_expression_statement(expr: &Expression<'_>) -> bool {
 /// positions that print first (`.left`, `.object`, `.callee`, `.test`, …) and
 /// stops at IIFE callees/tags (already parenthesized) to match prettier.
 pub(crate) fn leftmost_no_lookahead<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
-    leftmost_no_lookahead_reached(expr).0
+    leftmost_no_lookahead_reached(expr, LeftmostText::Printed).0
+}
+
+/// Which text a leftmost walk reads the first token of.
+///
+/// The two differ at one node: a function or class dividend ([`is_function_dividend`]),
+/// whose pair the binary's own builder supplies — and a verbatim slice has no builder.
+// TODO: the walks' older stops — an IIFE callee or tag, a non-LHS assignment target — rest
+// on a printed pair too, and still stand under `Frozen`: `(⏎// prettier-ignore⏎function ()
+// {}()⏎);` freezes to a line that opens on `function`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LeftmostText {
+    /// The printed form: a function or class dividend takes its own pair, so the division
+    /// opens on that `(` and the walk stops there — descending would wrap it twice.
+    Printed,
+    /// A format-ignore freeze of the walked expression: its verbatim slice stands in for
+    /// the builders, so a dividend opens on a pair only where the author wrote one. A bare
+    /// one (`function () {}   / 2`) opens on its keyword, and the walk reads through to it.
+    Frozen,
+}
+
+impl LeftmostText {
+    /// The text a value prints as: its verbatim slice when a freeze replaces its builders.
+    pub(crate) const fn of_value(frozen: bool) -> Self {
+        if frozen { Self::Frozen } else { Self::Printed }
+    }
 }
 
 /// [`leftmost_no_lookahead`], plus the one fact about *how* the walk arrived: whether
@@ -1209,14 +1234,24 @@ pub(crate) fn leftmost_no_lookahead<'a>(expr: &'a Expression<'a>) -> &'a Express
 /// so the two readings can't drift.
 pub(crate) fn leftmost_no_lookahead_reached<'a>(
     expr: &'a Expression<'a>,
+    text: LeftmostText,
 ) -> (&'a Expression<'a>, bool) {
     fn walk<'a>(
         expr: &'a Expression<'a>,
+        text: LeftmostText,
         computed_member_object: bool,
     ) -> (&'a Expression<'a>, bool) {
         match &expr.kind {
-            // Binary and logical share `BinaryExpression` here — recurse into `.left`.
-            ExpressionKind::BinaryExpression(b) => walk(b.left, false),
+            // Binary and logical share `BinaryExpression` here — recurse into `.left`, except
+            // into a function or class dividend that opens on its own pair
+            // ([`dividend_opens_on_its_pair`]).
+            ExpressionKind::BinaryExpression(b) => {
+                if dividend_opens_on_its_pair(expr, b, text) {
+                    (expr, computed_member_object)
+                } else {
+                    walk(b.left, text, false)
+                }
+            }
             // A non-LHS target that takes its own pair (`(function () {}) = 1`, `(a + b)
             // = 1`) already prints `(` first, so the walk stops there, as at an IIFE
             // callee — descending would wrap a leading function a second time. A cast
@@ -1235,41 +1270,43 @@ pub(crate) fn leftmost_no_lookahead_reached<'a>(
                 {
                     (expr, computed_member_object)
                 } else {
-                    walk(a.left, false)
+                    walk(a.left, text, false)
                 }
             }
-            ExpressionKind::MemberExpression(m) => walk(m.object, m.computed && !m.optional),
-            ExpressionKind::ConditionalExpression(c) => walk(c.test, false),
+            ExpressionKind::MemberExpression(m) => walk(m.object, text, m.computed && !m.optional),
+            ExpressionKind::ConditionalExpression(c) => walk(c.test, text, false),
             ExpressionKind::SequenceExpression(s) => s
                 .expressions
                 .first()
-                .map_or((expr, computed_member_object), |first| walk(first, false)),
+                .map_or((expr, computed_member_object), |first| {
+                    walk(first, text, false)
+                }),
             // IIFEs (`(function () {})()` / `` (function () {})`x` ``) are already
             // parenthesized by their callee/tag, so prettier stops the walk there.
             ExpressionKind::CallExpression(call) => {
                 if matches!(call.callee.kind, ExpressionKind::FunctionExpression(_)) {
                     (expr, computed_member_object)
                 } else {
-                    walk(call.callee, false)
+                    walk(call.callee, text, false)
                 }
             }
             ExpressionKind::TaggedTemplateExpression(t) => {
                 if matches!(t.tag.kind, ExpressionKind::FunctionExpression(_)) {
                     (expr, computed_member_object)
                 } else {
-                    walk(t.tag, false)
+                    walk(t.tag, text, false)
                 }
             }
             // Postfix update (`x++`) prints its argument first; prefix (`++x`) does not.
-            ExpressionKind::UpdateExpression(u) if !u.prefix => walk(u.argument, false),
-            ExpressionKind::TSAsExpression(e) => walk(e.expression, false),
-            ExpressionKind::TSSatisfiesExpression(e) => walk(e.expression, false),
-            ExpressionKind::TSNonNullExpression(e) => walk(e.expression, false),
-            ExpressionKind::TSInstantiationExpression(e) => walk(e.expression, false),
+            ExpressionKind::UpdateExpression(u) if !u.prefix => walk(u.argument, text, false),
+            ExpressionKind::TSAsExpression(e) => walk(e.expression, text, false),
+            ExpressionKind::TSSatisfiesExpression(e) => walk(e.expression, text, false),
+            ExpressionKind::TSNonNullExpression(e) => walk(e.expression, text, false),
+            ExpressionKind::TSInstantiationExpression(e) => walk(e.expression, text, false),
             _ => (expr, computed_member_object),
         }
     }
-    walk(expr, false)
+    walk(expr, text, false)
 }
 
 /// Whether `export default <expr>;` wraps the expression in parens — for either of two
@@ -1293,15 +1330,18 @@ pub(crate) fn leftmost_no_lookahead_reached<'a>(
 /// tag `(f(){}+x)`, a lower-precedence callee, …), because the printed form then
 /// starts with `(` and needs no outer paren. That avoids the double-wrap the raw
 /// walk hits — prettier's own util docstring flags it as "overzealous if there
-/// already are necessary grouping parentheses". The other descents (binary left,
-/// conditional test, cast operand, …) print the keyword bare, so they recurse
+/// already are necessary grouping parentheses". So does the binary-left descent at a
+/// function or class dividend, which takes its own pair (`export default (function () {})
+/// / 2;`) — in the text the value prints as (`text`, [`LeftmostText`]: a frozen value's
+/// verbatim slice has the pair only where the author wrote it). The other descents
+/// (conditional test, cast operand, …) print the keyword bare, so they recurse
 /// unconditionally like `leftmost_no_lookahead`.
-pub(crate) fn export_default_needs_parens(expr: &Expression<'_>) -> bool {
+pub(crate) fn export_default_needs_parens(expr: &Expression<'_>, text: LeftmostText) -> bool {
     // Two independent reasons for one pair — the value-position assignment rule below,
     // and the leftmost-token rule this function is named for.
     assignment_value_needs_parens(expr)
         || matches!(
-            export_default_leftmost(expr).kind,
+            export_default_leftmost(expr, text).kind,
             ExpressionKind::FunctionExpression(_) | ExpressionKind::ClassExpression(_)
         )
 }
@@ -1323,38 +1363,43 @@ fn assignment_value_needs_parens(expr: &Expression<'_>) -> bool {
     matches!(expr.kind, ExpressionKind::AssignmentExpression(_))
 }
 
-fn export_default_leftmost<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
+fn export_default_leftmost<'a>(expr: &'a Expression<'a>, text: LeftmostText) -> &'a Expression<'a> {
     match &expr.kind {
-        ExpressionKind::BinaryExpression(b) => export_default_leftmost(b.left),
-        ExpressionKind::AssignmentExpression(a) => export_default_leftmost(a.left),
-        ExpressionKind::ConditionalExpression(c) => export_default_leftmost(c.test),
+        // A division whose function or class dividend opens on its own pair starts with
+        // that `(`, like the paren-aware descents below: the walk stops at the division.
+        ExpressionKind::BinaryExpression(b) if dividend_opens_on_its_pair(expr, b, text) => expr,
+        ExpressionKind::BinaryExpression(b) => export_default_leftmost(b.left, text),
+        ExpressionKind::AssignmentExpression(a) => export_default_leftmost(a.left, text),
+        ExpressionKind::ConditionalExpression(c) => export_default_leftmost(c.test, text),
         // A `SequenceExpression` self-parenthesizes in `build_sequence_doc` (its printed
         // form always starts with `(`), so — like the paren-aware member/call/tag descents
         // below — the walk stops here instead of recursing to the leftmost operand.
         // Recursing would double-wrap a class/function-leftmost sequence:
         // `export default ((class {}, x))` instead of prettier's `(class {}, x)`.
         ExpressionKind::SequenceExpression(_) => expr,
-        ExpressionKind::UpdateExpression(u) if !u.prefix => export_default_leftmost(u.argument),
-        ExpressionKind::TSAsExpression(e) => export_default_leftmost(e.expression),
-        ExpressionKind::TSSatisfiesExpression(e) => export_default_leftmost(e.expression),
-        ExpressionKind::TSNonNullExpression(e) => export_default_leftmost(e.expression),
-        ExpressionKind::TSInstantiationExpression(e) => export_default_leftmost(e.expression),
+        ExpressionKind::UpdateExpression(u) if !u.prefix => {
+            export_default_leftmost(u.argument, text)
+        }
+        ExpressionKind::TSAsExpression(e) => export_default_leftmost(e.expression, text),
+        ExpressionKind::TSSatisfiesExpression(e) => export_default_leftmost(e.expression, text),
+        ExpressionKind::TSNonNullExpression(e) => export_default_leftmost(e.expression, text),
+        ExpressionKind::TSInstantiationExpression(e) => export_default_leftmost(e.expression, text),
         // Descents that cross a would-be-parenthesized child: stop there, since its
         // leading `(` already guards any inner keyword.
         ExpressionKind::MemberExpression(m)
             if !needs_parens(m.object, ParenContext::ChainBase, false) =>
         {
-            export_default_leftmost(m.object)
+            export_default_leftmost(m.object, text)
         }
         ExpressionKind::CallExpression(call)
             if !needs_parens(call.callee, ParenContext::Callee, false) =>
         {
-            export_default_leftmost(call.callee)
+            export_default_leftmost(call.callee, text)
         }
         ExpressionKind::TaggedTemplateExpression(t)
             if !needs_parens(t.tag, ParenContext::TaggedTemplateTag, false) =>
         {
-            export_default_leftmost(t.tag)
+            export_default_leftmost(t.tag, text)
         }
         _ => expr,
     }
@@ -1464,6 +1509,39 @@ fn prints_its_own_paren_pair(expr: &Expression<'_>) -> bool {
     )
 }
 
+/// Whether `expr`, the LEFT operand of `parent_op`, is a function or class expression divided
+/// — the operand [`needs_parens_binary_operand`] always parenthesizes, since acorn reads the
+/// `/` after a bare one's body as a regex wherever its tokenizer takes the keyword for a
+/// statement's.
+fn is_function_dividend(expr: &Expression<'_>, parent_op: BinaryOperator) -> bool {
+    parent_op == BinaryOperator::Slash
+        && matches!(
+            expr.kind,
+            ExpressionKind::FunctionExpression(_) | ExpressionKind::ClassExpression(_)
+        )
+}
+
+/// Whether the division `expr` opens, in the text a leftmost walk reads ([`LeftmostText`]),
+/// on the `(` of a pair around its function or class dividend ([`is_function_dividend`]) —
+/// so the walk stops at the division, as at an IIFE callee, where descending to the keyword
+/// would wrap it a second time (`((function () {})) / 2;`, `export default ((function () {})
+/// / 2);`).
+///
+/// The printed form always has that pair. A frozen slice has it where the author wrote it,
+/// which the spans say: the division's begins at the `(` the parser erased from its left
+/// operand, so a dividend starting later than its division sits inside one.
+fn dividend_opens_on_its_pair(
+    expr: &Expression<'_>,
+    binary: &BinaryExpression<'_>,
+    text: LeftmostText,
+) -> bool {
+    is_function_dividend(binary.left, binary.operator)
+        && match text {
+            LeftmostText::Printed => true,
+            LeftmostText::Frozen => binary.left.span().start > expr.span().start,
+        }
+}
+
 /// Binary operand: `<expr> op y` or `x op <expr>`. `in_for_init` is the ambient
 /// for-init flag, read only by the instantiation-tail walk below (it asks the
 /// printed shape of the operand's own children).
@@ -1504,6 +1582,26 @@ fn needs_parens_binary_operand(
             ExpressionKind::UnaryExpression(_) | ExpressionKind::TSTypeAssertion(_)
         )
     {
+        return true;
+    }
+
+    // A function or class expression as the left operand of `/` keeps its pair — `(function
+    // () {}) / 2`, `(class {}) / 2` — in every position, async, generator, named and decorated
+    // forms included. The grammar reads a bare `function () {} / 2` as a division, but acorn
+    // (the parser Svelte runs over every `<script>` and template expression) decides each `/`
+    // by a token-context heuristic: where its tokenizer takes the keyword for a statement's —
+    // among them a template expression's first token, an anonymous `async function`, a
+    // decorated class, a `yield` or `await` operand, a conditional's alternate outside any
+    // `(…)`, object literal or `${…}` — it reads the `/` after the body as a regex, and the
+    // document no longer parses. One rule over every function and class expression rather
+    // than acorn's positions: the pair is right by the grammar wherever it lands, and only a
+    // model of acorn's context stack could say where it is not needed. (acorn-typescript has
+    // a misread of its own the pair can meet — an empty object type before a `)`, `(function
+    // (): {} {}) / 2` — tracked apart from this rule.) Prettier strips the pair everywhere, a
+    // cataloged divergence. This is the direct case of one invariant — no function or class
+    // body's `}` prints directly before a `/` — whose indirect case, a body the left operand
+    // ENDS on (`!function () {} / 2`), is `Printer::mark_dividend_tail`.
+    if !is_right && is_function_dividend(expr, parent_op) {
         return true;
     }
 

@@ -801,9 +801,16 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         let content_start = brace_start + 1; // Skip "{"
 
-        // Find the matching closing `}` (skips strings/comments/regex).
-        let Some(content_end) = scan_to_matching_brace(self.source.as_bytes(), content_start)
-        else {
+        // Find the matching closing `}` (skips strings/comments/regex), scanning from past
+        // the `...`: Svelte hands acorn the expression after it as a fresh parse, so the
+        // spread is no token of the island's (`{...function () {} / 2}` reads a regex).
+        let dots = brace_interior_start(self.source, brace_start);
+        let scan_start = if self.source[dots..].starts_with("...") {
+            dots + "...".len()
+        } else {
+            content_start
+        };
+        let Some(content_end) = scan_to_matching_brace(self.source.as_bytes(), scan_start) else {
             return Err(self.error_unclosed_at("spread attribute", start));
         };
         let end = content_end + 1; // Include the closing '}'

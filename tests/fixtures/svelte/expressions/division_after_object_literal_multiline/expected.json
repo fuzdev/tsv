@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 244,
+	"end": 242,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,20 +10,20 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 118,
-				"data": " the call's arguments break, so the `/` after the object literal's `}` ends its line before any other `/` does "
+				"end": 116,
+				"data": " an object literal's `}` ends an operand where the call's arguments break too, with no other `/` on its line "
 			},
 			{
 				"type": "Text",
-				"start": 118,
-				"end": 119,
+				"start": 116,
+				"end": 117,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 119,
-				"end": 243,
+				"start": 117,
+				"end": 241,
 				"name": "div",
 				"attributes": [],
 				"fragment": {
@@ -31,49 +31,49 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 124,
-							"end": 126,
+							"start": 122,
+							"end": 124,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 126,
-							"end": 236,
+							"start": 124,
+							"end": 234,
 							"expression": {
 								"type": "CallExpression",
-								"start": 127,
-								"end": 235,
+								"start": 125,
+								"end": 233,
 								"callee": {
 									"type": "Identifier",
-									"start": 127,
-									"end": 129,
+									"start": 125,
+									"end": 127,
 									"name": "fn"
 								},
 								"arguments": [
 									{
 										"type": "BinaryExpression",
-										"start": 133,
-										"end": 139,
+										"start": 131,
+										"end": 137,
 										"left": {
 											"type": "ObjectExpression",
-											"start": 133,
-											"end": 135,
+											"start": 131,
+											"end": 133,
 											"properties": []
 										},
 										"operator": "/",
 										"right": {
 											"type": "Literal",
-											"start": 138,
-											"end": 139,
+											"start": 136,
+											"end": 137,
 											"value": 2,
 											"raw": "2"
 										}
 									},
 									{
 										"type": "Identifier",
-										"start": 143,
-										"end": 232,
+										"start": 141,
+										"end": 230,
 										"name": "veryLongArgumentNameThatForcesTheCallArgumentsToBreakAcrossLinesInThisFixtureCaseAbcdefgh"
 									}
 								],
@@ -82,8 +82,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 236,
-							"end": 237,
+							"start": 234,
+							"end": 235,
 							"raw": "\n",
 							"data": "\n"
 						}

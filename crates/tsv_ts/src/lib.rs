@@ -1365,13 +1365,39 @@ pub fn closes_statement_header(bytes: &[u8], rparen: usize, lower_bound: usize) 
 /// The TypeScript grammar's answers to the operand ends a raw byte scan cannot read
 /// ([`closes_type_arguments`], [`closes_statement_header`]).
 ///
-/// The raw scans that find where an expression ENDS before it is parsed (`tsv_svelte`'s
-/// `{…}` island matcher, this crate's arrow-head lookahead and the printer's paren scan)
-/// take it, so each reads a `/` the way the parser that follows will.
+/// The raw scans that find where an expression ENDS before this crate's parser reads it
+/// (the arrow-head lookahead and the printer's paren scan) take it, so each reads a `/` the
+/// way that parser will. It leaves a `}` to the bytes — after every one a `/` opens a regex
+/// — since the reader that tells an object literal's `}` from a block's is acorn's
+/// tokenizer, and these scans have no acorn parse behind them
+/// ([`ACORN_ISLAND_GRAMMAR`]).
+// TODO: after a `}` these scans read a regex where the grammar divides, so an arrow head
+// whose default divides a braced operand ahead of a `)` is rejected:
+// `f((a = {} / (2 / 1)) => a);`.
 pub const OPERAND_GRAMMAR: tsv_lang::source_scan::OperandGrammar =
     tsv_lang::source_scan::OperandGrammar {
         closes_type_arguments,
         closes_statement_header,
+        ..tsv_lang::source_scan::OperandGrammar::BYTES_ONLY
+    };
+
+/// [`OPERAND_GRAMMAR`] plus acorn's reading of a `}` — the grammar for a scan that finds
+/// where a Svelte island ends.
+///
+/// Svelte hands each island's expression to acorn as a parse of its own, so the island
+/// ends where acorn's tokenizer says it does: a `/` after an object literal's `}`, or after
+/// a function or class body acorn takes for an expression's, divides, and the scan must not
+/// read a regex there and run past the island's own `}`. The `}` question is answered by a
+/// walk that keeps acorn's token contexts, which are a tokenizer's heuristic and not the
+/// grammar's reading (`parser/expression_braced_operand.rs`) — which is why only a scan
+/// whose region acorn will parse takes this grammar. It scans a whole expression
+/// (`ScanStart::Expression`); a template literal's interpolations are scanned as their own
+/// kind by the scan itself.
+pub const ACORN_ISLAND_GRAMMAR: tsv_lang::source_scan::OperandGrammar =
+    tsv_lang::source_scan::OperandGrammar {
+        closes_braced_operand: parser::closes_braced_operand,
+        start: tsv_lang::source_scan::ScanStart::Expression,
+        ..OPERAND_GRAMMAR
     };
 
 // The ECMAScript identifier grammar, for embedders that read an identifier out of

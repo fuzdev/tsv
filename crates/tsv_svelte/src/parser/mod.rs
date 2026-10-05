@@ -493,9 +493,9 @@ pub(crate) fn match_bracket(
         // template (`` `${`x`}` ``), so a pattern default like `{ a = `${`"`}` }`
         // would swallow past the closing bracket. Gated on `profile.strings` (the
         // JS binding-pattern callers), matching where `skip_trivia` treats `` ` ``
-        // as a string.
+        // as a string. An interpolation is acorn's to parse, like every island.
         if profile.strings && bytes[i] == b'`' {
-            i = skip_template_literal(bytes, i, end, tsv_ts::OPERAND_GRAMMAR);
+            i = skip_template_literal(bytes, i, end, tsv_ts::ACORN_ISLAND_GRAMMAR);
             continue;
         }
         if let Some(past) = skip_trivia(bytes, i, end, profile) {

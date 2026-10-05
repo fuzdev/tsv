@@ -16,7 +16,9 @@
 use super::Printer;
 use crate::ast::internal::{self, Expression, ExpressionKind};
 use crate::printer::is_string_literal;
-use crate::printer::needs_parens::{leftmost_no_lookahead, leftmost_no_lookahead_reached};
+use crate::printer::needs_parens::{
+    LeftmostText, leftmost_no_lookahead, leftmost_no_lookahead_reached,
+};
 use tsv_lang::Span;
 
 /// Strip only `as`/`satisfies` casts from the head of a statement expression,
@@ -119,12 +121,16 @@ impl<'a> Printer<'a> {
     /// Asked only where the whole expression isn't already wrapped. Two callers, one
     /// question: the ordinary path hands the span to `expr_stmt_paren_target` for the
     /// matching node's doc builder to consume, and the format-ignore path — which has no
-    /// interior to hand it to — reads it as "the frozen slice needs a shell".
+    /// interior to hand it to — reads it as "the frozen slice needs a shell". `text` says
+    /// which of the two asks ([`LeftmostText`]): a function or class dividend prints its
+    /// own pair and is no target (`(function () {}) / 2;`), where the frozen slice of the
+    /// same division opens on the keyword and takes the shell.
     pub(in crate::printer::statements) fn expr_stmt_nested_paren_target(
         &self,
         expression: &Expression<'_>,
+        text: LeftmostText,
     ) -> Option<Span> {
-        let leftmost = leftmost_no_lookahead(expression);
+        let leftmost = leftmost_no_lookahead_reached(expression, text).0;
         if matches!(
             leftmost.kind,
             ExpressionKind::ObjectExpression(_)
@@ -175,7 +181,8 @@ impl<'a> Printer<'a> {
         &self,
         expression: &Expression<'_>,
     ) -> Option<Span> {
-        let (leftmost, is_computed_member_object) = leftmost_no_lookahead_reached(expression);
+        let (leftmost, is_computed_member_object) =
+            leftmost_no_lookahead_reached(expression, LeftmostText::Printed);
         let ExpressionKind::Identifier(id) = &leftmost.kind else {
             return None;
         };

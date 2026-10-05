@@ -19,10 +19,15 @@ comment here
 When the parens are **redundant** tsv drops them and the directive leads the statement, matching
 prettier ([paren_dropped head](../expression_statement_paren_dropped_prettier_ignore_head/)).
 
-The last case is the one where those two regimes meet: the parens are redundant around the
-*printed* expression but the frozen slice's leftmost token (`{`) would reparse as a block, and a
-verbatim slice has no interior for the printer to wrap. tsv therefore keeps the author's parens
-around the whole slice. Prettier drops them and emits `{ bbb:  2 }.ccc;`, which does not reparse.
+The last two cases are the ones where those two regimes meet: the parens are redundant around
+the *printed* expression but the frozen slice's leftmost token (`{`, `function`) would reparse
+as a block or a declaration, and a verbatim slice has no interior for the printer to wrap. tsv
+therefore keeps the author's parens around the whole slice. Prettier drops them and emits
+`{ bbb:  2 }.ccc;` and `function  ()  {} / 2;`, which do not reparse. The division is the case
+whose unfrozen form opens on a pair of its own — tsv prints `(function () {}) / 2;`, the
+dividend's pair
+([division_after_function_parens](../../../svelte/expressions/division_after_function_parens_prettier_divergence/))
+— which a verbatim slice does not carry.
 
 ## Reason
 

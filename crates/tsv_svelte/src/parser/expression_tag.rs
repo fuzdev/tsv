@@ -176,11 +176,15 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 ///
 /// A thin wrapper over `tsv_lang::source_scan::scan_to_matching_brace` (the shared
 /// expression-context balanced-brace scanner, which the `${…}` template-interpolation
-/// skip also uses) with `end = bytes.len()` and the TypeScript grammar's answers to the
-/// operand ends bytes cannot settle (`tsv_ts::OPERAND_GRAMMAR`: whether a `>` closes a
-/// type-argument list, whether a `)` closes a statement header) — every island is parsed
-/// by `tsv_ts`, so its end must be found by the rules that parser reads `f<T> / 2` and
-/// `if (c)!/re/` with, or the scan misreads a `/` and runs past the island's `}`.
+/// skip also uses) with `end = bytes.len()` and the answers to the operand ends bytes
+/// cannot settle (`tsv_ts::ACORN_ISLAND_GRAMMAR`), so the scan does not misread a `/` and
+/// run past the island's `}`. Whether a `>` closes a type-argument list and whether a `)`
+/// closes a statement header are answered as `tsv_ts`, which parses the island, reads
+/// them (`f<T> / 2`, `if (c)!/re/`). Whether a `}` closes a braced operand (`{} / 2`) is
+/// answered as acorn's tokenizer reads it, since Svelte hands every island's expression
+/// to acorn as a parse of its own and the island ends where acorn says: a leading
+/// `function` there reads as a statement's keyword, so `{function () {} / 2}` reads the
+/// `/` as a regex.
 /// The lexer's quoted-attribute arm takes it too, so no brace scan in the crate can be
 /// handed a different rule.
 #[inline]
@@ -189,20 +193,20 @@ pub(crate) fn scan_to_matching_brace(bytes: &[u8], scan_start: usize) -> Option<
         bytes,
         scan_start,
         bytes.len(),
-        tsv_ts::OPERAND_GRAMMAR,
+        tsv_ts::ACORN_ISLAND_GRAMMAR,
     )
 }
 
 /// [`scan_to_matching_brace`]'s paren twin, `tsv_lang::source_scan::scan_to_matching_paren`
-/// with the same TypeScript resolver — for a paren that delimits an EXPRESSION, which may
-/// hold a regex literal (`{#each xs as item (/[)]/.test(s))}`), unlike a binding
-/// pattern's brackets (`match_bracket`). `scan_start` is the first byte inside the `(`.
+/// with the same grammar — for a paren that delimits an EXPRESSION, which may hold a regex
+/// literal (`{#each xs as item (/[)]/.test(s))}`), unlike a binding pattern's brackets
+/// (`match_bracket`). `scan_start` is the first byte inside the `(`.
 pub(crate) fn scan_to_matching_paren(bytes: &[u8], scan_start: usize) -> Option<usize> {
     tsv_lang::source_scan::scan_to_matching_paren(
         bytes,
         scan_start,
         bytes.len(),
-        tsv_ts::OPERAND_GRAMMAR,
+        tsv_ts::ACORN_ISLAND_GRAMMAR,
     )
 }
 
@@ -246,4 +250,85 @@ fn head_keyword_end(bytes: &[u8], start: usize) -> usize {
         }
     }
     word_end
+}
+
+#[cfg(test)]
+mod tests {
+    use bumpalo::Bump;
+
+    fn parses(source: &str) -> bool {
+        let arena = Bump::new();
+        crate::parse(source, &arena).is_ok()
+    }
+
+    /// Every island scan begins as a whole expression (`tsv_ts::ACORN_ISLAND_GRAMMAR`): Svelte
+    /// hands acorn each island as a fresh parse, so a leading `function` reads as a
+    /// statement's keyword and the `/` after its body opens a regex, which here runs through
+    /// the island's `}` to the closing tag's `/`. Each verdict is Svelte's.
+    ///
+    /// The positions are the scan's entry points: the plain brace scan (a text tag, an
+    /// attribute or directive value, a quoted attribute's tag), the head scan past a
+    /// keyword, a spread's scan past its `...` (and the whitespace Svelte allows before
+    /// it), and an `{#each}` key's paren scan.
+    #[test]
+    fn an_island_scan_begins_as_a_whole_expression() {
+        for (open, close) in [
+            ("<div>{", "}</div>"),
+            ("<div data-attr={", "}></div>"),
+            ("<div data-attr=\"a {", "}\"></div>"),
+            ("<div style:color={", "}></div>"),
+            ("<div {...", "}></div>"),
+            ("<div { ...", "}></div>"),
+            ("<div {\n...", "}></div>"),
+            ("{#if ", "}text{/if}"),
+            ("{#if a}text{:else if ", "}text{/if}"),
+            ("{#each ", " as item}text{/each}"),
+            ("{#each xs as item (", ")}text{/each}"),
+            ("{#key ", "}text{/key}"),
+            ("{#await ", "}text{/await}"),
+        ] {
+            let island = |expression: &str| format!("{open}{expression}{close}");
+            for leading in ["function () {} / 2", "class {} / 2"] {
+                assert!(!parses(&island(leading)), "{}", island(leading));
+            }
+            for operand in ["(function () {}) / 2", "x + function () {} / 2", "{} / 2"] {
+                assert!(parses(&island(operand)), "{}", island(operand));
+            }
+        }
+    }
+
+    /// A binding pattern's template literal is scanned as an island's is: an object
+    /// literal's `}` in its interpolation ends an operand. Each verdict is Svelte's.
+    #[test]
+    fn a_binding_pattern_template_reads_a_brace_as_an_island_does() {
+        for source in [
+            "{#each xs as { a = `${{} / 2}` }}x{/each}",
+            "{#each xs as { a = `${x + function () {} / 2}` }}x{/each}",
+            "{#each xs as [a = `${{} / 2}`]}x{/each}",
+            "{#await p then { a = `${{} / 2}` }}x{/await}",
+        ] {
+            assert!(parses(source), "{source}");
+        }
+    }
+
+    /// A template literal nested in an interpolation, a `} /` at every level: each level is
+    /// scanned once. A scan that asked again about a nested template's `} /` every time it
+    /// passed the template would double its work per level, and this depth would not finish.
+    #[test]
+    fn nested_templates_are_scanned_once_per_level() {
+        let mut expression = String::from("{} / 1");
+        for _ in 0..40 {
+            expression = format!("`${{{expression}}}` + {{}} / 1");
+        }
+        assert!(parses(&format!("<div>{{{expression}}}</div>")));
+    }
+
+    /// One island holding a great many `}` + `/` pairs: the scan asks about each and the
+    /// walk behind the answers resumes from the last, so the island is walked once. Walked
+    /// from its start at each pair, this many would not finish.
+    #[test]
+    fn an_island_of_many_braced_operands_is_scanned_once() {
+        let elements = vec!["{} / 1"; 100_000].join(", ");
+        assert!(parses(&format!("<div>{{[{elements}]}}</div>")));
+    }
 }
