@@ -1250,8 +1250,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// The optional call is the only position that takes type arguments this way. A
     /// decorator's look identical (`@g<T>()`) but DO stand alone — `@a.b<T>` is a
     /// `TSInstantiationExpression` — so the decorator reads them through
-    /// `parse_type_parameter_instantiation` directly, as do the other standalone
-    /// positions (`parse_instantiation_expression`, the `new` callee arm).
+    /// `parse_type_parameter_instantiation` directly. Both read the list committed: a
+    /// `<` behind `?.` or a decorator has no operator reading to fall back to, which
+    /// the other standalone positions have (`parse_instantiation_expression`, the
+    /// `new` callee arm — [`Parser::parse_type_arguments_or_rewind`]).
     fn parse_type_arguments_before_call(
         &mut self,
     ) -> Result<TSTypeParameterInstantiation<'arena>, ParseError> {
@@ -1559,15 +1561,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // arguments). A `<` that isn't type args stops the chain either way.
                     let consume = self.is_type_arguments_start(TypeArgScan::Parse)
                         && (mode == SubscriptMode::Normal || self.is_type_args_followed_by_call());
-                    if consume {
-                        left = self.parse_instantiation_expression(left, start)?;
-                        // An instantiation expression can't be followed by a property
-                        // access (`f<T>.x`); a call or tagged template, which the loop
-                        // below flattens into the expression, stays valid.
-                        self.reject_instantiation_follower()?;
-                    } else {
+                    if !consume {
                         break;
                     }
+                    // The lookahead admitted a list; where its tail turns out to be
+                    // none, the `<` is handed back and the binary loop reads it.
+                    let Some(instantiation) = self.parse_instantiation_expression(left, start)?
+                    else {
+                        break;
+                    };
+                    left = instantiation;
+                    // An instantiation expression can't be followed by a property
+                    // access (`f<T>.x`); a call or tagged template, which the loop
+                    // below flattens into the expression, stays valid.
+                    self.reject_instantiation_follower()?;
                 }
                 TokenKind::Bang if !self.had_line_terminator => {
                     // TypeScript non-null assertion: `expr!`.
@@ -2218,21 +2225,26 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse a TypeScript instantiation expression `expr<Type>` from an
-    /// already-parsed `left` operand whose parse began at `start`.
+    /// already-parsed `left` operand whose parse began at `start`, or hand the `<`
+    /// back (`None`) where it opens no list after all.
     ///
     /// The caller gates this on `is_type_arguments_start(TypeArgScan::Parse)`: when `<`
     /// follows an expression it could be type arguments (`f<number>`, `arr<T, U>`) or a
-    /// comparison (`a < b`), and that lookahead disambiguates before we commit.
+    /// comparison (`a < b`), and that lookahead disambiguates before the list is read —
+    /// for the list's first argument, which is as far as it grades
+    /// ([`Parser::parse_type_arguments_or_rewind`]).
     fn parse_instantiation_expression(
         &mut self,
         left: &'arena Expression<'arena>,
         start: u32,
-    ) -> Result<&'arena Expression<'arena>, ParseError> {
+    ) -> Result<Option<&'arena Expression<'arena>>, ParseError> {
         // Parse type parameter instantiation: <T, U>
-        let type_args = self.parse_type_parameter_instantiation()?;
+        let Some(type_args) = self.parse_type_arguments_or_rewind()? else {
+            return Ok(None);
+        };
         let end = type_args.span.end;
 
-        Ok(alloc_expr(
+        Ok(Some(alloc_expr(
             self.arena,
             Expression {
                 span: Span::new(start, end),
@@ -2241,7 +2253,131 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     type_arguments: type_args,
                 }),
             },
-        ))
+        )))
+    }
+
+    /// Parse the type-argument list at the current `<`, which the lookahead admitted
+    /// ([`Parser::is_type_arguments_start`]) — or, where the tokens behind its first
+    /// argument turn out to spell no list, rewind and hand the `<` back (`None`) for
+    /// the caller to leave to the binary loop as the comparison operator.
+    ///
+    /// **Why the list is tried rather than committed.** The lookahead grades a list's
+    /// FIRST argument and matches delimiters behind its first `,`, so what stands past
+    /// that separator is a question nobody has asked: `<b, c + d>(e)`,
+    /// `<400, q: c>(d - e)` and `<b, hi = c>(d + 1)` all pass it, and each is the tail
+    /// of two comparisons in comma siblings — call arguments, array elements, object
+    /// properties, a declarator list, parameter defaults, enum members. tsc and
+    /// acorn-typescript read those as comparisons because both parse the list for real
+    /// and back off it (`parseTypeArgumentsInExpression` under `tryParse`,
+    /// `tsTryParseAndCatch`); so does this.
+    ///
+    /// **What is tried is the tail alone.** The `<` and the first argument are parsed
+    /// committed ([`Parser::parse_type_argument_list_head`]), as is a list with no
+    /// separator at all: that is the part the lookahead DID grade, and several of its
+    /// answers are deliberate claims — regions it keeps for the type parse to reject
+    /// loudly, because the chain they would otherwise be has no printed form every
+    /// parser reads back as the input (`docs/conformance_svelte.md` §TypeScript
+    /// Corrections). Rewinding on any failure would hand those back as chains. An
+    /// error in the head therefore stays the list's own.
+    ///
+    /// **Where the fallback is refused.** A tail that fails is abandoned only where the
+    /// operator reading is one tsv can print back: the printer rewrites some of the
+    /// tokens the list stopped on, and a rewrite that completes the list turns two
+    /// comparisons into a generic call. Those failures stay hard errors
+    /// ([`Parser::printed_tail_could_complete_type_arguments`]), as does a **goal
+    /// gate**, whose mark the format fallback reads off the error the parse ends on
+    /// ([`ParseError::is_goal_gated`]): the operator reading may fail short of the
+    /// `import.meta` the gate fired on, and the rewind of a speculation around this
+    /// one drops the error kept here.
+    ///
+    /// A `<` abandoned once is remembered with the context it was read in, and asked
+    /// again in that context answers at once
+    /// (`Parser::abandoned_type_argument_lists`). Its error is kept for the case where
+    /// the operator reading fails as well
+    /// (`Parser::prefer_abandoned_type_arguments_error`).
+    ///
+    /// Only the positions with an operator reading come here — the subscript loop and
+    /// the `new` callee. Behind `?.` and in a decorator a `<` is a list or nothing, so
+    /// those read theirs committed.
+    pub(super) fn parse_type_arguments_or_rewind(
+        &mut self,
+    ) -> Result<Option<TSTypeParameterInstantiation<'arena>>, ParseError> {
+        let lt = self.current.start;
+        if self.type_arguments_abandoned_at(lt) {
+            return Ok(None);
+        }
+        let checkpoint = self.checkpoint();
+        let (start, first) = self.parse_type_argument_list_head()?;
+        if !self.check(&TokenKind::Comma) {
+            // no separator: the lookahead graded everything this list holds
+            return self.parse_type_argument_list_tail(start, first).map(Some);
+        }
+        match self.parse_type_argument_list_tail(start, first) {
+            Ok(type_arguments) => Ok(Some(type_arguments)),
+            Err(error)
+                if error.is_goal_gated() || self.printed_tail_could_complete_type_arguments() =>
+            {
+                Err(error)
+            }
+            Err(error) => {
+                self.rewind(checkpoint);
+                self.abandon_type_arguments(lt, error);
+                Ok(None)
+            }
+        }
+    }
+
+    /// Whether the PRINTED form of a type-argument list's tail could spell the list
+    /// that its source does not — asked where the tail has just failed, with the
+    /// parser still standing on the token the type grammar stopped at.
+    ///
+    /// Abandoning the list reads its tokens as two comparisons, and the formatter then
+    /// prints them. Most tokens between the `<` and the `>` print as written, so a tail
+    /// that is no list in the source is none in the output. The printer's rewrites are
+    /// the exception, and the ones refused are those that can be read off where the
+    /// type grammar stopped:
+    ///
+    /// - **at a `=>`** — an arrow function's bare parameter, which prints in a paren
+    ///   pair, and `(c) => d` is a function type: `fn(a < b, c => c > (d, e))` would
+    ///   print as the generic call `a<b, (c) => c>(d, e)`;
+    /// - **at a `.` or a `<` right behind a `)`** — a paren shell, which the printer
+    ///   strips where it is redundant, leaving a name that takes what the parenthesized
+    ///   type could not: `(c).d` prints as the qualified name `c.d`, and
+    ///   `(c) < d >> (e)` as a nested list closed with the outer one. Those two tokens
+    ///   are all a name continues with where a parenthesized type stops, so behind a
+    ///   `)` the fallback is taken at every other (`(c & d) !== 0 && e > (f, g)`,
+    ///   `(c)(d) > (e, f)`);
+    /// - **at a `[` or a `<` past a line break** — the break ends a type, and the
+    ///   printer folds it: `c⏎[d]` prints as the indexed access `c[d]`, `c⏎<d>` as the
+    ///   reference `c<d>` with its own argument list.
+    ///
+    /// It asks where the list stopped, and never whether the rewritten tokens would
+    /// reach the `>` or whether the printer strips the pair at all, so it also refuses
+    /// tails no rewrite completes (`fn(a < b, c => c + 1 > (d, e))`,
+    /// `fn(a < b, (c | d).e > (f, g))`). That errs toward the loud answer: a rejection
+    /// the author can write around, against a second program printed in silence.
+    // TODO: a shell behind a PREFIX operator is the same rewrite and is not read here,
+    // wherever it stands in the tail: `fn(a < b, typeof (c) > (d, e))` and
+    // `fn(a < b, -(1) > (d, e))` stop AT the `(`, parse as comparisons, print as
+    // `typeof c` / `-1`, and read back as a generic call. Telling that `(` from a
+    // call's needs the token ahead of it, which the parser does not keep.
+    fn printed_tail_could_complete_type_arguments(&self) -> bool {
+        // whether the token before the one the list stopped at is a `)`
+        let behind_paren = || {
+            self.prev_end
+                .checked_sub(1)
+                .and_then(|before| self.source.as_bytes().get(before))
+                == Some(&b')')
+        };
+        match self.current_kind() {
+            TokenKind::Arrow => true,
+            TokenKind::BracketOpen => self.had_line_terminator,
+            TokenKind::LessThan | TokenKind::LeftShift => {
+                self.had_line_terminator || behind_paren()
+            }
+            TokenKind::Dot => behind_paren(),
+            _ => false,
+        }
     }
 
     /// Flatten a `foo<T>` `TSInstantiationExpression` operand into its inner
@@ -2771,7 +2907,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 _ if self.check_less_than_in_type()
                     && self.is_type_arguments_start(TypeArgScan::Parse) =>
                 {
-                    let ta = self.parse_type_parameter_instantiation()?;
+                    // A tail that is no list leaves the `<` to compare the
+                    // argument-less `new` with what follows (`new A < b`).
+                    let Some(ta) = self.parse_type_arguments_or_rewind()? else {
+                        break;
+                    };
                     if matches!(
                         self.current_kind(),
                         TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead

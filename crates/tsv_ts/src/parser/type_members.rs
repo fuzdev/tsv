@@ -196,7 +196,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Property key: identifier, keyword, string literal, number literal, or computed [expr]
         // Keywords are valid property names in type literals: { class: string }
         let (computed, key) = if self.eat(TokenKind::BracketOpen)? {
-            (true, self.parse_computed_member_key()?)
+            // The key is an expression standing in a type, and its brackets are its
+            // grouping: `ComputedPropertyName : [ AssignmentExpression[+In] ]`
+            // (ecma262), whatever the type itself stands in — a `for` header, a
+            // conditional's consequent. An object literal's key takes the same from
+            // the literal's own braces.
+            self.enter_grouping();
+            let key = self.parse_computed_member_key()?;
+            self.exit_grouping();
+            (true, key)
         } else if self.current_is_identifier_or_keyword() {
             (
                 false,

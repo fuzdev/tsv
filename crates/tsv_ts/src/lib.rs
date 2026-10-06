@@ -597,7 +597,7 @@ fn with_embedding_parser<'arena, T>(
 ) -> Result<T> {
     let mut parser = parser::Parser::with_base_offset(source, base_offset, arena);
     parser.prime()?;
-    f(&mut parser)
+    f(&mut parser).map_err(|error| parser.prefer_abandoned_type_arguments_error(error))
 }
 
 /// Parse embedded TypeScript with grouping parens preserved.

@@ -1,0 +1,1024 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 545,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 36,
+				"end": 38,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 38,
+				"end": 129,
+				"data": " a `<` in one comma sibling, a `>` ahead of a paren in a later one, no list between "
+			},
+			{
+				"type": "Text",
+				"start": 129,
+				"end": 130,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 130,
+				"end": 178,
+				"name": "Comp",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 136,
+						"end": 175,
+						"name": "prop",
+						"value": {
+							"type": "ExpressionTag",
+							"start": 141,
+							"end": 175,
+							"expression": {
+								"type": "ObjectExpression",
+								"start": 142,
+								"end": 174,
+								"properties": [
+									{
+										"type": "Property",
+										"start": 144,
+										"end": 152,
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 144,
+											"end": 145,
+											"name": "p"
+										},
+										"value": {
+											"type": "BinaryExpression",
+											"start": 147,
+											"end": 152,
+											"left": {
+												"type": "Identifier",
+												"start": 147,
+												"end": 148,
+												"name": "a"
+											},
+											"operator": "<",
+											"right": {
+												"type": "Identifier",
+												"start": 151,
+												"end": 152,
+												"name": "b"
+											}
+										},
+										"kind": "init"
+									},
+									{
+										"type": "Property",
+										"start": 154,
+										"end": 172,
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 154,
+											"end": 155,
+											"name": "q"
+										},
+										"value": {
+											"type": "BinaryExpression",
+											"start": 157,
+											"end": 172,
+											"left": {
+												"type": "Identifier",
+												"start": 157,
+												"end": 158,
+												"name": "c"
+											},
+											"operator": ">",
+											"right": {
+												"type": "BinaryExpression",
+												"start": 161,
+												"end": 172,
+												"left": {
+													"type": "BinaryExpression",
+													"start": 162,
+													"end": 167,
+													"left": {
+														"type": "Identifier",
+														"start": 162,
+														"end": 163,
+														"name": "d"
+													},
+													"operator": "-",
+													"right": {
+														"type": "Identifier",
+														"start": 166,
+														"end": 167,
+														"name": "e"
+													}
+												},
+												"operator": "*",
+												"right": {
+													"type": "Literal",
+													"start": 171,
+													"end": 172,
+													"value": 2,
+													"raw": "2"
+												}
+											}
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 178,
+				"end": 179,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 179,
+				"end": 233,
+				"name": "div",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 184,
+						"end": 221,
+						"name": "data-attr",
+						"value": {
+							"type": "ExpressionTag",
+							"start": 194,
+							"end": 221,
+							"expression": {
+								"type": "CallExpression",
+								"start": 195,
+								"end": 220,
+								"callee": {
+									"type": "Identifier",
+									"start": 195,
+									"end": 197,
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "BinaryExpression",
+										"start": 198,
+										"end": 203,
+										"left": {
+											"type": "Identifier",
+											"start": 198,
+											"end": 199,
+											"name": "a"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 202,
+											"end": 203,
+											"name": "b"
+										}
+									},
+									{
+										"type": "BinaryExpression",
+										"start": 205,
+										"end": 219,
+										"left": {
+											"type": "BinaryExpression",
+											"start": 205,
+											"end": 210,
+											"left": {
+												"type": "Identifier",
+												"start": 205,
+												"end": 206,
+												"name": "c"
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 209,
+												"end": 210,
+												"name": "d"
+											}
+										},
+										"operator": ">",
+										"right": {
+											"type": "SequenceExpression",
+											"start": 214,
+											"end": 218,
+											"expressions": [
+												{
+													"type": "Identifier",
+													"start": 214,
+													"end": 215,
+													"name": "e"
+												},
+												{
+													"type": "Identifier",
+													"start": 217,
+													"end": 218,
+													"name": "f"
+												}
+											]
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 222,
+							"end": 227,
+							"raw": "block",
+							"data": "block"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 233,
+				"end": 234,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 234,
+				"end": 271,
+				"name": "p",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 237,
+							"end": 267,
+							"expression": {
+								"type": "CallExpression",
+								"start": 238,
+								"end": 266,
+								"callee": {
+									"type": "Identifier",
+									"start": 238,
+									"end": 240,
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "BinaryExpression",
+										"start": 241,
+										"end": 246,
+										"left": {
+											"type": "Identifier",
+											"start": 241,
+											"end": 242,
+											"name": "a"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 245,
+											"end": 246,
+											"name": "b"
+										}
+									},
+									{
+										"type": "BinaryExpression",
+										"start": 248,
+										"end": 265,
+										"left": {
+											"type": "CallExpression",
+											"start": 248,
+											"end": 251,
+											"callee": {
+												"type": "Identifier",
+												"start": 248,
+												"end": 249,
+												"name": "c"
+											},
+											"arguments": [],
+											"optional": false
+										},
+										"operator": ">",
+										"right": {
+											"type": "BinaryExpression",
+											"start": 254,
+											"end": 265,
+											"left": {
+												"type": "BinaryExpression",
+												"start": 255,
+												"end": 260,
+												"left": {
+													"type": "Identifier",
+													"start": 255,
+													"end": 256,
+													"name": "d"
+												},
+												"operator": "-",
+												"right": {
+													"type": "Identifier",
+													"start": 259,
+													"end": 260,
+													"name": "e"
+												}
+											},
+											"operator": "*",
+											"right": {
+												"type": "Literal",
+												"start": 264,
+												"end": 265,
+												"value": 2,
+												"raw": "2"
+											}
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 271,
+				"end": 273,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 273,
+				"end": 324,
+				"test": {
+					"type": "CallExpression",
+					"start": 278,
+					"end": 303,
+					"callee": {
+						"type": "Identifier",
+						"start": 278,
+						"end": 280,
+						"name": "fn"
+					},
+					"arguments": [
+						{
+							"type": "BinaryExpression",
+							"start": 281,
+							"end": 286,
+							"left": {
+								"type": "Identifier",
+								"start": 281,
+								"end": 282,
+								"name": "a"
+							},
+							"operator": "<",
+							"right": {
+								"type": "Identifier",
+								"start": 285,
+								"end": 286,
+								"name": "b"
+							}
+						},
+						{
+							"type": "BinaryExpression",
+							"start": 288,
+							"end": 302,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 288,
+								"end": 293,
+								"left": {
+									"type": "Identifier",
+									"start": 288,
+									"end": 289,
+									"name": "c"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 292,
+									"end": 293,
+									"name": "d"
+								}
+							},
+							"operator": ">",
+							"right": {
+								"type": "SequenceExpression",
+								"start": 297,
+								"end": 301,
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 297,
+										"end": 298,
+										"name": "e"
+									},
+									{
+										"type": "Identifier",
+										"start": 300,
+										"end": 301,
+										"name": "f"
+									}
+								]
+							}
+						}
+					],
+					"optional": false
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 304,
+							"end": 306,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 306,
+							"end": 318,
+							"name": "p",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 309,
+										"end": 314,
+										"raw": "text1",
+										"data": "text1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 318,
+							"end": 319,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 324,
+				"end": 326,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 326,
+				"end": 388,
+				"expression": {
+					"type": "ArrayExpression",
+					"start": 333,
+					"end": 356,
+					"elements": [
+						{
+							"type": "BinaryExpression",
+							"start": 334,
+							"end": 339,
+							"left": {
+								"type": "Identifier",
+								"start": 334,
+								"end": 335,
+								"name": "a"
+							},
+							"operator": "<",
+							"right": {
+								"type": "Identifier",
+								"start": 338,
+								"end": 339,
+								"name": "b"
+							}
+						},
+						{
+							"type": "BinaryExpression",
+							"start": 341,
+							"end": 355,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 341,
+								"end": 346,
+								"left": {
+									"type": "Identifier",
+									"start": 341,
+									"end": 342,
+									"name": "c"
+								},
+								"operator": "*",
+								"right": {
+									"type": "Identifier",
+									"start": 345,
+									"end": 346,
+									"name": "d"
+								}
+							},
+							"operator": ">",
+							"right": {
+								"type": "SequenceExpression",
+								"start": 350,
+								"end": 354,
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 350,
+										"end": 351,
+										"name": "e"
+									},
+									{
+										"type": "Identifier",
+										"start": 353,
+										"end": 354,
+										"name": "f"
+									}
+								]
+							}
+						}
+					]
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 365,
+							"end": 367,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 367,
+							"end": 380,
+							"name": "p",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 370,
+										"end": 376,
+										"expression": {
+											"type": "Identifier",
+											"start": 371,
+											"end": 375,
+											"name": "item"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 380,
+							"end": 381,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 360,
+					"end": 364
+				}
+			},
+			{
+				"type": "Text",
+				"start": 388,
+				"end": 390,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 390,
+				"end": 471,
+				"test": {
+					"type": "Identifier",
+					"start": 395,
+					"end": 399,
+					"name": "cond"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 400,
+							"end": 402,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ConstTag",
+							"start": 402,
+							"end": 449,
+							"declaration": {
+								"type": "VariableDeclaration",
+								"kind": "const",
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"id": {
+											"type": "Identifier",
+											"name": "obj",
+											"start": 410,
+											"end": 413
+										},
+										"init": {
+											"type": "ObjectExpression",
+											"start": 416,
+											"end": 448,
+											"properties": [
+												{
+													"type": "Property",
+													"start": 418,
+													"end": 426,
+													"method": false,
+													"shorthand": false,
+													"computed": false,
+													"key": {
+														"type": "Identifier",
+														"start": 418,
+														"end": 419,
+														"name": "p"
+													},
+													"value": {
+														"type": "BinaryExpression",
+														"start": 421,
+														"end": 426,
+														"left": {
+															"type": "Identifier",
+															"start": 421,
+															"end": 422,
+															"name": "a"
+														},
+														"operator": "<",
+														"right": {
+															"type": "Identifier",
+															"start": 425,
+															"end": 426,
+															"name": "b"
+														}
+													},
+													"kind": "init"
+												},
+												{
+													"type": "Property",
+													"start": 428,
+													"end": 446,
+													"method": false,
+													"shorthand": false,
+													"computed": false,
+													"key": {
+														"type": "Identifier",
+														"start": 428,
+														"end": 429,
+														"name": "q"
+													},
+													"value": {
+														"type": "BinaryExpression",
+														"start": 431,
+														"end": 446,
+														"left": {
+															"type": "Identifier",
+															"start": 431,
+															"end": 432,
+															"name": "c"
+														},
+														"operator": ">",
+														"right": {
+															"type": "BinaryExpression",
+															"start": 435,
+															"end": 446,
+															"left": {
+																"type": "BinaryExpression",
+																"start": 436,
+																"end": 441,
+																"left": {
+																	"type": "Identifier",
+																	"start": 436,
+																	"end": 437,
+																	"name": "d"
+																},
+																"operator": "-",
+																"right": {
+																	"type": "Identifier",
+																	"start": 440,
+																	"end": 441,
+																	"name": "e"
+																}
+															},
+															"operator": "*",
+															"right": {
+																"type": "Literal",
+																"start": 445,
+																"end": 446,
+																"value": 2,
+																"raw": "2"
+															}
+														}
+													},
+													"kind": "init"
+												}
+											]
+										},
+										"start": 410,
+										"end": 448
+									}
+								],
+								"start": 404,
+								"end": 448
+							}
+						},
+						{
+							"type": "Text",
+							"start": 449,
+							"end": 451,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 451,
+							"end": 465,
+							"name": "p",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 454,
+										"end": 461,
+										"expression": {
+											"type": "MemberExpression",
+											"start": 455,
+											"end": 460,
+											"object": {
+												"type": "Identifier",
+												"start": 455,
+												"end": 458,
+												"name": "obj"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 459,
+												"end": 460,
+												"name": "p"
+											},
+											"computed": false,
+											"optional": false
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 465,
+							"end": 466,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 471,
+				"end": 473,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 473,
+				"end": 544,
+				"name": "button",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 481,
+						"end": 529,
+						"name": "onclick",
+						"value": {
+							"type": "ExpressionTag",
+							"start": 489,
+							"end": 529,
+							"expression": {
+								"type": "ArrowFunctionExpression",
+								"start": 490,
+								"end": 528,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "CallExpression",
+									"start": 496,
+									"end": 528,
+									"callee": {
+										"type": "Identifier",
+										"start": 496,
+										"end": 498,
+										"name": "fn"
+									},
+									"arguments": [
+										{
+											"type": "BinaryExpression",
+											"start": 499,
+											"end": 504,
+											"left": {
+												"type": "Identifier",
+												"start": 499,
+												"end": 500,
+												"name": "a"
+											},
+											"operator": "<",
+											"right": {
+												"type": "Identifier",
+												"start": 503,
+												"end": 504,
+												"name": "b"
+											}
+										},
+										{
+											"type": "ArrowFunctionExpression",
+											"start": 506,
+											"end": 527,
+											"id": null,
+											"expression": true,
+											"generator": false,
+											"async": false,
+											"params": [
+												{
+													"type": "Identifier",
+													"start": 507,
+													"end": 508,
+													"name": "c"
+												}
+											],
+											"body": {
+												"type": "BinaryExpression",
+												"start": 513,
+												"end": 527,
+												"left": {
+													"type": "BinaryExpression",
+													"start": 513,
+													"end": 518,
+													"left": {
+														"type": "Identifier",
+														"start": 513,
+														"end": 514,
+														"name": "c"
+													},
+													"operator": "+",
+													"right": {
+														"type": "Identifier",
+														"start": 517,
+														"end": 518,
+														"name": "d"
+													}
+												},
+												"operator": ">",
+												"right": {
+													"type": "SequenceExpression",
+													"start": 522,
+													"end": 526,
+													"expressions": [
+														{
+															"type": "Identifier",
+															"start": 522,
+															"end": 523,
+															"name": "e"
+														},
+														{
+															"type": "Identifier",
+															"start": 525,
+															"end": 526,
+															"name": "f"
+														}
+													]
+												}
+											}
+										}
+									],
+									"optional": false
+								}
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 530,
+							"end": 535,
+							"raw": "text2",
+							"data": "text2"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 36,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 27,
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 20,
+					"end": 26,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 24,
+							"end": 25,
+							"id": {
+								"type": "Identifier",
+								"start": 24,
+								"end": 25,
+								"name": "a"
+							},
+							"init": null
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -1111,8 +1111,8 @@ assignment's right side, and `true` again inside any bracket, in a function or
 class body and in a `yield` argument. acorn-typescript (and Babel) commit to the
 annotation as soon as one type followed by `=>` parses and then fail to find the
 ternary's `:` — all five of tsc's own `parserArrowFunctionExpression8–12` corpus
-files reject. tsv follows tsc by the same mechanism: the one speculative parse in
-its grammar (`Parser::parse_arrow_or_rewind`, from a `Parser::checkpoint`), taken
+files reject. tsv follows tsc by the same mechanism: a speculative parse
+(`Parser::parse_arrow_or_rewind`, from a `Parser::checkpoint`), taken
 for an annotated parenthesized, generic or async head parsed directly in a
 consequent — and rewound on a failed parse as well as on a refused annotation, which
 is what reads `a ? (b + c) : d => e` (a head tsc never takes for a signature) as the
@@ -1289,7 +1289,22 @@ where it keeps it. Three families are the exception, and all are **tsc's own**:
   outside a paren-headed region — postfix (`a < b! > (t, u)`), behind a bar
   (`f<A | b!>(x)`), on an import type (`f<import('m').B!>(x)`), and at any depth inside
   an index (`f<A[!b]>(x)`, `f<A[B | c!]>(x)`): tsc reads a generic call, tsv follows
-  acorn-typescript's chain. Printed, that chain takes its paren pair wherever the reading
+  acorn-typescript's chain. Past a list's first separator the same holds, for the `!`
+  and for the other types the compiler's parser alone reads there — a function type
+  whose parameter holds a default, and an import of no string
+  (`fn(a < b, c! > (d, e))`, `fn(a < b, !c > (d, e))`, `fn(a < b, (c = 1) => c > (d, e))`,
+  `fn(a < b, import(c) > (d, e))`): tsc reads the generic call `a<b, c!>(d, e)` and its
+  checker refuses the type as syntax, tsv's type grammar has no node for any of them, so
+  the tail of the list fails and the `<` is the comparison acorn-typescript reads (*A
+  type-argument list tried past its first separator*, below). The line prints as
+  written, each parser reading the output as it read the input — except that a pair
+  behind the `>` which no comparison needs is stripped like any other
+  (`c! > (d)` prints as `c! > d`), and the compiler then reads the comparisons too. The
+  same fallback takes acorn-typescript's comparisons where the compiler's recovering list
+  parse claims the region and rejects the line — an argument-less `new`, an
+  angle-bracket assertion or a parenthesized sequence left of the `>`
+  (`fn(a < b, new C > (d))` prints as `fn(a < b, new C() > d)`) — an over-acceptance of
+  input tsc refuses. Printed, that chain takes its paren pair wherever the reading
   of the printed form finds a region (`(f < A[B | c!]) > x`), and the compiler reads the
   paired form as the comparison it spells — the same split, met from the pair's side.
   Inside an index that opens as no type the chain takes no pair the source did not have
@@ -1468,6 +1483,75 @@ The **printer** side of both entries is unaffected: a chain whose region opens o
 bracketed head — or on a paren shell the printer keeps — takes a paren pair around the
 `>`'s left operand whatever the region grades as, so tsv never emits one of these bare
 ([conformance_prettier_ts.md §Relational chain type-argument parens](./conformance_prettier_ts.md)).
+
+**A type-argument list tried past its first separator** — `fn(a < b, c + d > (e, f))`,
+`x = { p: a < b, q: c > (d - e) * 2 }`, `const p = a < b, q = c > (d, e)`. A `<` in one
+comma sibling and a `>` ahead of a `(` or a template in a later one are a type-argument
+list only where the tokens between them spell one, and tsc and acorn-typescript both find
+out by parsing the list and backing off it. tsv's lookahead grades the list's FIRST
+argument and matches delimiters behind its first `,`, so the parser tries the list from a
+checkpoint (`Parser::parse_type_arguments_or_rewind`): the `<` and the first argument are
+read committed — a failure there is the list's own, which is what keeps every region
+above claimed — and where the type grammar stops past the separator, the parse rewinds
+and the `<` is the comparison operator both oracles read. That takes every carrier of
+comma siblings: call and `new` arguments, array elements, a sequence, object properties,
+a declarator list, parameter and destructuring defaults, enum members —
+[relational_sibling_value_tail](../tests/fixtures/typescript/expressions/binary/relational_sibling_value_tail/),
+and in a template
+[svelte/expressions/relational_sibling_value_tail](../tests/fixtures/svelte/expressions/relational_sibling_value_tail/).
+It is taken where the `<` has an operator reading at all — behind an operand, and behind
+an argument-less `new` — and not behind `?.` or in a decorator, where a `<` is a list or
+nothing.
+
+The fallback is **refused where the printer's own rewrite of the abandoned tokens could
+complete the list** — a **known over-rejection**, of the printed form's kind. Most
+tokens between the `<` and the `>` print as written, so a tail that is no list in the
+source is none in the output. The printer's rewrites are the exception, and the ones
+refused are those that can be read off where the type grammar stopped:
+
+- **at a `=>`** — an arrow function's bare parameter prints in a paren pair, and
+  `(c) => c` is a function type: `fn(a < b, c => c > (d, e))` would print as the generic
+  call `a<b, (c) => c>(d, e)`, as would the arrow standing as a sibling between the two
+  comparisons (`fn(a < b, c => d, e > (f, g))`);
+- **at a `.` or a `<` right behind a `)`** — a paren shell the printer strips, where the
+  name left bare takes the member or the list behind it (`(c).d` prints as the qualified
+  name `c.d`, `(c) < d >> (e, f)` as a nested list closed with the outer one). Those two
+  tokens are all a name continues with where a parenthesized type stops, so a pair ahead
+  of any other token is no refusal: `fn(a < b, (c & d) !== 0 && e > (f, g))` and
+  `fn(a < b, (c)(d) > (e, f))` are two comparisons;
+- **at a `[` or a `<` past a line break** — the break ends a type and the printer folds
+  it (`c⏎[d]` prints as the indexed access `c[d]`, `c⏎<d>` as the reference `c<d>` with
+  its own argument list).
+
+Each would print two comparisons as a line every parser reads as a call, so the list's
+error stands instead —
+[relational_sibling_value_tail_refused](../tests/fixtures/typescript/expressions/binary/relational_sibling_value_tail_refused_svelte_divergence/).
+The refusal asks where the list stopped, and never whether the rewritten tokens would
+reach the `>` or whether the printer strips the pair at all, so it is wider than the
+hazard (`fn(a < b, c => c + 1 > (d, e))` and `fn(a < b, (c | d).e > (f, g))` are refused
+with the rest), and narrower in one place: a shell behind a PREFIX operator stops the
+list AT its `(`, which reads there as a call's. Wherever such a shell stands in the tail
+— `fn(a < b, typeof (c) > (d, e))`, `fn(a < b, -(1) > (d, e))`, the operator glued to it
+(`typeof(c)`), in a sibling between the two comparisons, behind an arrow, inside an
+object or an array — the line parses, prints with the shell stripped, and reads back as
+a generic call: a **known gap**. The pairs the printer ADDS are not read either. A
+number's member access prints in one (`5..toFixed()` as `(5).toFixed()`), which is then
+a shell ahead of a `.`, so that output is rejected on a second pass; and the pair around
+an assignment or an arrow function's conditional body
+(`fn(a < b, c = d, e > (f, g))` prints `(c = d)`) is text the compiler's recovering list
+parse claims and rejects, where tsv and acorn-typescript read the two comparisons back.
+One oracle split runs the other way from the non-null type's: a negative number behind a
+postfix (`fn(a < b, -1(c) > (d, e))`, `-5..x`) is a literal type to acorn-typescript
+alone, which reads a generic call where tsv reads the compiler's comparisons. An arrow
+function behind a token the list stopped at first is no part of any of this
+(`x = { p: a < b, q: c => c > (d, e) }` stops at the `:`).
+The refused comparisons need no token changed to be written: the first from its other
+side (`fn(b > a, c => c > (d, e))`), either one hoisted into a variable, or a `function`
+expression in the arrow's place. `a_tail_the_printer_would_complete_stays_rejected` and
+its neighbors in
+[type_arguments_tail_fallback.rs](../tests/type_arguments_tail_fallback.rs) pin both
+sides line by line, with which error is reported where the operator reading fails as
+well: the one that reached further into the source.
 
 #### Import-phase proposals
 

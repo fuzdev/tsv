@@ -1,0 +1,663 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 752,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Two comparisons in comma siblings, to tsc and to acorn-typescript alike, which",
+			"start": 20,
+			"end": 101
+		},
+		{
+			"type": "Line",
+			"value": " `expected_svelte.json` records and tsv rejects: between the `<` and the `>` the",
+			"start": 103,
+			"end": 185
+		},
+		{
+			"type": "Line",
+			"value": " printed form of each line would spell a type-argument list, so the line would read",
+			"start": 187,
+			"end": 272
+		},
+		{
+			"type": "Line",
+			"value": " back as a generic call.",
+			"start": 274,
+			"end": 300
+		},
+		{
+			"type": "Line",
+			"value": " an arrow function's bare parameter, which prints in a paren pair: a function type",
+			"start": 303,
+			"end": 387
+		},
+		{
+			"type": "Line",
+			"value": " a paren shell the printer strips, leaving a name that takes a member or a list",
+			"start": 490,
+			"end": 571
+		},
+		{
+			"type": "Line",
+			"value": " a line break ahead of a `[`, which the printer folds into an indexed access",
+			"start": 633,
+			"end": 711
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 751,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 742,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 389,
+					"end": 421,
+					"expression": {
+						"type": "CallExpression",
+						"start": 389,
+						"end": 420,
+						"callee": {
+							"type": "Identifier",
+							"start": 389,
+							"end": 391,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 392,
+								"end": 397,
+								"left": {
+									"type": "Identifier",
+									"start": 392,
+									"end": 393,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 396,
+									"end": 397,
+									"name": "b"
+								}
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 399,
+								"end": 419,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 399,
+										"end": 400,
+										"name": "c"
+									}
+								],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 404,
+									"end": 419,
+									"left": {
+										"type": "Identifier",
+										"start": 404,
+										"end": 405,
+										"name": "c"
+									},
+									"operator": ">",
+									"right": {
+										"type": "BinaryExpression",
+										"start": 408,
+										"end": 419,
+										"left": {
+											"type": "BinaryExpression",
+											"start": 409,
+											"end": 414,
+											"left": {
+												"type": "Identifier",
+												"start": 409,
+												"end": 410,
+												"name": "d"
+											},
+											"operator": "-",
+											"right": {
+												"type": "Identifier",
+												"start": 413,
+												"end": 414,
+												"name": "e"
+											}
+										},
+										"operator": "*",
+										"right": {
+											"type": "Literal",
+											"start": 418,
+											"end": 419,
+											"value": 2,
+											"raw": "2"
+										}
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Two comparisons in comma siblings, to tsc and to acorn-typescript alike, which",
+							"start": 20,
+							"end": 101
+						},
+						{
+							"type": "Line",
+							"value": " `expected_svelte.json` records and tsv rejects: between the `<` and the `>` the",
+							"start": 103,
+							"end": 185
+						},
+						{
+							"type": "Line",
+							"value": " printed form of each line would spell a type-argument list, so the line would read",
+							"start": 187,
+							"end": 272
+						},
+						{
+							"type": "Line",
+							"value": " back as a generic call.",
+							"start": 274,
+							"end": 300
+						},
+						{
+							"type": "Line",
+							"value": " an arrow function's bare parameter, which prints in a paren pair: a function type",
+							"start": 303,
+							"end": 387
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 423,
+					"end": 453,
+					"expression": {
+						"type": "CallExpression",
+						"start": 423,
+						"end": 452,
+						"callee": {
+							"type": "Identifier",
+							"start": 423,
+							"end": 425,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 426,
+								"end": 431,
+								"left": {
+									"type": "Identifier",
+									"start": 426,
+									"end": 427,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 430,
+									"end": 431,
+									"name": "b"
+								}
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 433,
+								"end": 439,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 433,
+										"end": 434,
+										"name": "c"
+									}
+								],
+								"body": {
+									"type": "Identifier",
+									"start": 438,
+									"end": 439,
+									"name": "d"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 441,
+								"end": 451,
+								"left": {
+									"type": "Identifier",
+									"start": 441,
+									"end": 442,
+									"name": "e"
+								},
+								"operator": ">",
+								"right": {
+									"type": "SequenceExpression",
+									"start": 446,
+									"end": 450,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 446,
+											"end": 447,
+											"name": "f"
+										},
+										{
+											"type": "Identifier",
+											"start": 449,
+											"end": 450,
+											"name": "g"
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 455,
+					"end": 487,
+					"expression": {
+						"type": "CallExpression",
+						"start": 455,
+						"end": 486,
+						"callee": {
+							"type": "Identifier",
+							"start": 455,
+							"end": 457,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 458,
+								"end": 463,
+								"left": {
+									"type": "Identifier",
+									"start": 458,
+									"end": 459,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 462,
+									"end": 463,
+									"name": "b"
+								}
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 465,
+								"end": 473,
+								"elements": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 466,
+										"end": 472,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 466,
+												"end": 467,
+												"name": "c"
+											}
+										],
+										"body": {
+											"type": "Identifier",
+											"start": 471,
+											"end": 472,
+											"name": "d"
+										}
+									}
+								]
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 475,
+								"end": 485,
+								"left": {
+									"type": "Identifier",
+									"start": 475,
+									"end": 476,
+									"name": "e"
+								},
+								"operator": ">",
+								"right": {
+									"type": "SequenceExpression",
+									"start": 480,
+									"end": 484,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 480,
+											"end": 481,
+											"name": "f"
+										},
+										{
+											"type": "Identifier",
+											"start": 483,
+											"end": 484,
+											"name": "g"
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 573,
+					"end": 599,
+					"expression": {
+						"type": "CallExpression",
+						"start": 573,
+						"end": 598,
+						"callee": {
+							"type": "Identifier",
+							"start": 573,
+							"end": 575,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 576,
+								"end": 581,
+								"left": {
+									"type": "Identifier",
+									"start": 576,
+									"end": 577,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 580,
+									"end": 581,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 583,
+								"end": 597,
+								"left": {
+									"type": "MemberExpression",
+									"start": 583,
+									"end": 588,
+									"object": {
+										"type": "Identifier",
+										"start": 584,
+										"end": 585,
+										"name": "c"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 587,
+										"end": 588,
+										"name": "d"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"operator": ">",
+								"right": {
+									"type": "SequenceExpression",
+									"start": 592,
+									"end": 596,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 592,
+											"end": 593,
+											"name": "e"
+										},
+										{
+											"type": "Identifier",
+											"start": 595,
+											"end": 596,
+											"name": "f"
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a paren shell the printer strips, leaving a name that takes a member or a list",
+							"start": 490,
+							"end": 571
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 601,
+					"end": 630,
+					"expression": {
+						"type": "CallExpression",
+						"start": 601,
+						"end": 629,
+						"callee": {
+							"type": "Identifier",
+							"start": 601,
+							"end": 603,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 604,
+								"end": 609,
+								"left": {
+									"type": "Identifier",
+									"start": 604,
+									"end": 605,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 608,
+									"end": 609,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 611,
+								"end": 628,
+								"left": {
+									"type": "Identifier",
+									"start": 612,
+									"end": 613,
+									"name": "c"
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 617,
+									"end": 628,
+									"left": {
+										"type": "Identifier",
+										"start": 617,
+										"end": 618,
+										"name": "d"
+									},
+									"operator": ">>",
+									"right": {
+										"type": "SequenceExpression",
+										"start": 623,
+										"end": 627,
+										"expressions": [
+											{
+												"type": "Identifier",
+												"start": 623,
+												"end": 624,
+												"name": "e"
+											},
+											{
+												"type": "Identifier",
+												"start": 626,
+												"end": 627,
+												"name": "f"
+											}
+										]
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 713,
+					"end": 741,
+					"expression": {
+						"type": "CallExpression",
+						"start": 713,
+						"end": 740,
+						"callee": {
+							"type": "Identifier",
+							"start": 713,
+							"end": 715,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 716,
+								"end": 721,
+								"left": {
+									"type": "Identifier",
+									"start": 716,
+									"end": 717,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 720,
+									"end": 721,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 723,
+								"end": 739,
+								"left": {
+									"type": "MemberExpression",
+									"start": 723,
+									"end": 730,
+									"object": {
+										"type": "Identifier",
+										"start": 723,
+										"end": 724,
+										"name": "c"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 728,
+										"end": 729,
+										"name": "d"
+									},
+									"computed": true,
+									"optional": false
+								},
+								"operator": ">",
+								"right": {
+									"type": "SequenceExpression",
+									"start": 734,
+									"end": 738,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 734,
+											"end": 735,
+											"name": "e"
+										},
+										{
+											"type": "Identifier",
+											"start": 737,
+											"end": 738,
+											"name": "f"
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a line break ahead of a `[`, which the printer folds into an indexed access",
+							"start": 633,
+							"end": 711
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

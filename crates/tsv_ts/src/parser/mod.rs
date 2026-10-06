@@ -6,6 +6,7 @@ use crate::lexer::escapes::{LegacyEscape, find_legacy_escape};
 use crate::lexer::{KeywordKind, Lexer, LexerCheckpoint, Token, TokenKind, is_es_line_terminator};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
+use std::collections::BTreeSet;
 use tsv_lang::{ParseError, Span};
 
 // Import parsing implementations
@@ -225,11 +226,14 @@ pub(super) struct GroupingParen {
     pub(super) open: u32,
 }
 
-/// The parser state [`Parser::rewind`] restores after the grammar's one
-/// speculative parse ([`Parser::parse_arrow_or_rewind`]): the lexer cursor, the
+/// The parser state [`Parser::rewind`] restores after one of the grammar's
+/// speculative parses ([`Parser::parse_arrow_or_rewind`],
+/// [`Parser::parse_type_arguments_or_rewind`]): the lexer cursor, the
 /// one-token window with its decoded values and line-terminator flags, `prev_end`,
-/// a peek's stored lexer error, the comment ledger's length, the grouping depth and the
-/// open `<` regions that are read against it ([`Parser::lt_regions`]).
+/// a peek's stored lexer error, the comment ledger's length, the grouping depth, the
+/// open `<` regions that are read against it ([`Parser::lt_regions`]) and the error
+/// kept from an abandoned type-argument list
+/// ([`Parser::abandoned_type_arguments_error`]).
 /// Context flags (`allow_in`, `in_await`, …) are not carried — their combinators
 /// restore them on every path — and neither are arena nodes, which an abandoned
 /// parse simply leaves unreachable.
@@ -245,7 +249,24 @@ pub(super) struct GroupingParen {
 /// `record_grouping_parens` is combinator-restored. `grouping_parens` is deliberately
 /// not carried: an entry an abandoned parse leaves names a `(`…`)` pair that is in the
 /// source however the rest is read, so it can only ever mark a target the real parse
-/// also sees wrapped.
+/// also sees wrapped. These are deliberately not carried either, each a fact about the
+/// source that outlives the reading that found it:
+///
+/// - `abandoned_type_argument_lists` — which `<` open no type-argument list, in which
+///   context. Surviving the rewind is its whole purpose
+///   ([`Parser::abandoned_type_argument_lists`]).
+/// - `await_name_operand` — where a name `await` stood at this goal. It is read once,
+///   against the position of the error the whole parse ends on, and the tokens an
+///   abandoned parse read are the ones its re-read reads.
+/// - `preserved_a_paren` — set by a pair an abandoned parse wrapped; it may over-report,
+///   which costs its one reader a second parse.
+///
+/// A comment's `owned_by_node` is written through the ledger rather than appended to it,
+/// so truncating the ledger does not undo a claim on a comment drained AHEAD of the
+/// checkpoint — one glued to the token the parser had peeked.
+/// [`Parser::parse_type_arguments_or_rewind`] cannot leave such a claim: that token
+/// opens the list's first argument, which is read as a type, and the type grammar
+/// claims no comment.
 pub(super) struct Checkpoint<'arena> {
     lexer: LexerCheckpoint,
     current: Token,
@@ -259,6 +280,7 @@ pub(super) struct Checkpoint<'arena> {
     comments_len: usize,
     grouping_depth: u32,
     lt_regions: LtRegions,
+    abandoned_type_arguments_error: Option<ParseError>,
 }
 
 #[expect(clippy::struct_excessive_bools)]
@@ -410,7 +432,7 @@ pub struct Parser<'a, 'arena> {
     /// `BinaryExpression::may_close_type_arguments`, where the hazard, tsc's recovering
     /// list parse, is stated. What a region is, and where one ends: [`LtRegion`].
     ///
-    /// Carried by [`Checkpoint`], since the speculative arrow head may open one.
+    /// Carried by [`Checkpoint`], since a speculative parse may open one.
     lt_regions: LtRegions,
     /// What [`Parser::lt_regions`] is reset to where a statement (or a class member)
     /// begins: the regions a **body** inherited. A statement's own regions die with it — a
@@ -420,6 +442,35 @@ pub struct Parser<'a, 'arena> {
     /// (`x < (() => { return (a > b); })`). [`Parser::with_lt_region_inherited`] hands the
     /// open regions down and restores both on the way out.
     lt_regions_statement_base: LtRegions,
+    /// The `<` tokens (their offsets in [`Parser::source`]) that
+    /// [`Parser::parse_type_arguments_or_rewind`] tried as a type-argument list and
+    /// abandoned, each with the context it was read in — asked again at one of them in
+    /// that context, it hands the `<` back at once.
+    ///
+    /// **Why it exists.** An expression inside a type inside a tried list is read by
+    /// the abandoned list and again by the operator reading that replaces it (a type
+    /// literal's computed key, an import type's options). A list tried inside such an
+    /// expression would then be tried once per reading of every list around it, which
+    /// doubles the work at each level of nesting; remembered, it is tried once.
+    ///
+    /// **Its contract.** An entry says *the list at this `<` fails past its first
+    /// separator when read in this context*. The tokens from a `<` on are the same on
+    /// every read, so the context is all a second read can differ in — and it does
+    /// differ, because the reading that replaces an abandoned one may open or close a
+    /// function scope over the same tokens: an arrow head is tried under the arrow's
+    /// own function context and re-read as a grouped expression under the enclosing
+    /// one, and a function type's parameter annotation, read under the enclosing
+    /// context, is re-read as an arrow function's. So the key holds every flag the
+    /// expressions in a list inherit ([`Parser::type_arguments_context_key`]), and a
+    /// read in another context tries the list again.
+    abandoned_type_argument_lists: BTreeSet<(u32, u8)>,
+    /// The error of the abandoned type-argument list that reached furthest into the
+    /// source, kept for the case where the operator reading fails too: the parse then
+    /// reports whichever error reached further
+    /// ([`Parser::prefer_abandoned_type_arguments_error`]). Carried by [`Checkpoint`],
+    /// so a list abandoned inside a parse that is itself abandoned leaves nothing
+    /// behind.
+    abandoned_type_arguments_error: Option<ParseError>,
     /// The syntactic goal symbol (`Script` vs `Module`) this parse runs against.
     /// Fixed for the whole parse — embedders (Svelte) and the standalone
     /// `parse`/`format` default to `Module`; `parse_with_goal` overrides it.
@@ -655,6 +706,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             arrow_return_type_barred_at: None, // Not inside a conditional consequent
             lt_regions: LtRegions::default(), // No `<` region open
             lt_regions_statement_base: LtRegions::default(), // The top level inherits none
+            abandoned_type_argument_lists: BTreeSet::new(), // No list tried yet
+            abandoned_type_arguments_error: None,
             goal,
             // Module top level is `[+Await]` (`ModuleItem[+Await]`); Script top
             // level is `[~Await]` (`ScriptBody[~Await]`).
@@ -1381,10 +1434,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.arrow_return_type_barred_at == Some(self.grouping_depth)
     }
 
-    /// Take the state [`Parser::rewind`] returns to. The grammar's one speculative
-    /// parse — [`Parser::parse_arrow_or_rewind`], the arrow head in a conditional's
-    /// consequent — takes it at the head and hands it back if the arrow it read
-    /// turns out not to be one.
+    /// Take the state [`Parser::rewind`] returns to. Each of the grammar's speculative
+    /// parses takes it at the token it may have to un-read and hands it back if what
+    /// it read turns out not to be there: [`Parser::parse_arrow_or_rewind`] at an
+    /// arrow head in a conditional's consequent,
+    /// [`Parser::parse_type_arguments_or_rewind`] at the `<` of a type-argument list
+    /// the lookahead admitted.
     #[must_use]
     pub(super) fn checkpoint(&self) -> Checkpoint<'arena> {
         // An expression head is never between the constrained-infer handoff's set
@@ -1404,6 +1459,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             comments_len: self.comments.len(),
             grouping_depth: self.grouping_depth,
             lt_regions: self.lt_regions,
+            abandoned_type_arguments_error: self.abandoned_type_arguments_error.clone(),
         }
     }
 
@@ -1428,6 +1484,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             comments_len,
             grouping_depth,
             lt_regions,
+            abandoned_type_arguments_error,
         } = checkpoint;
         self.lexer.rewind(lexer);
         self.current = current;
@@ -1441,9 +1498,95 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.comments.truncate(comments_len);
         self.grouping_depth = grouping_depth;
         self.lt_regions = lt_regions;
+        self.abandoned_type_arguments_error = abandoned_type_arguments_error;
         // Whatever the abandoned parse's type grammar was handing to itself is not
         // for the re-parse to receive (`checkpoint` asserts it was empty).
         self.pending_conditional_extends = None;
+    }
+
+    /// Whether the `<` at `lt` (an offset in [`Parser::source`]) is one a type-argument
+    /// list was tried at and abandoned ([`Parser::abandoned_type_argument_lists`]).
+    #[inline]
+    pub(super) fn type_arguments_abandoned_at(&self, lt: u32) -> bool {
+        // empty for every document that abandons no list, which is nearly all of them
+        !self.abandoned_type_argument_lists.is_empty()
+            && self
+                .abandoned_type_argument_lists
+                .contains(&(lt, self.type_arguments_context_key()))
+    }
+
+    /// The context a type-argument list is read in, as one key: every flag that the
+    /// expressions inside its types inherit — a type literal's computed key, an import
+    /// type's options, a default or a key in a signature's binding pattern — and that
+    /// decides whether they parse
+    /// ([`Parser::abandoned_type_argument_lists`]). That is the scope the list stands
+    /// in: `[Await]`, `[Yield]`, strictness, and whether the code is ambient.
+    ///
+    /// The flags left out decide nothing for a list. The gates read against
+    /// [`Parser::grouping_depth`] — `in` as an operator, `as` as an assertion, an
+    /// arrow function's barred return type — are not inherited by anything tsc or
+    /// acorn-typescript reads as a type: a computed key opens a grouping of its own,
+    /// an import type's options are an object literal in its own braces, and a
+    /// default or a key in a signature's binding pattern stands in the pattern's
+    /// delimiters. (Options that are no object literal make no import type to either;
+    /// a tail that holds them and fails on a gate is read as the comparisons both
+    /// read.) The type-context pair is reset at every argument
+    /// ([`Parser::with_full_type_context`]), and `record_grouping_parens` and
+    /// `in_await_if_module` only record. A context flag added to the parser belongs
+    /// here if an expression's parse reads it.
+    fn type_arguments_context_key(&self) -> u8 {
+        [
+            self.in_await,
+            self.in_yield,
+            self.strict,
+            self.in_ambient_context,
+        ]
+        .iter()
+        .fold(0, |key, &flag| (key << 1) | u8::from(flag))
+    }
+
+    /// Record the type-argument list at `lt` as abandoned, with the error it failed
+    /// on. Called AFTER the rewind that abandons it. That rewind restores the error
+    /// kept before the list was tried, so the error of a list abandoned inside this one
+    /// is dropped with it; it is kept again only where the reading that replaces this
+    /// list tries that `<` again, which a remembered answer does not.
+    pub(super) fn abandon_type_arguments(&mut self, lt: u32, error: ParseError) {
+        // the rewind has run: every context flag is back to what the list was tried in
+        self.abandoned_type_argument_lists
+            .insert((lt, self.type_arguments_context_key()));
+        // (a positionless error orders below every position, so it never displaces one)
+        let reaches_further = match &self.abandoned_type_arguments_error {
+            Some(kept) => error.position() > kept.position(),
+            None => true,
+        };
+        if reaches_further {
+            self.abandoned_type_arguments_error = Some(error);
+        }
+    }
+
+    /// The error a failed parse reports: `error`, unless an abandoned type-argument
+    /// list's own error reached at least as far into the source
+    /// ([`Parser::abandoned_type_arguments_error`]).
+    ///
+    /// A list that is abandoned was a guess, and the `<` is then read as the operator
+    /// it may equally be. Where that reading fails as well, the error that reached
+    /// further is the one about the text the author more plausibly wrote — a missing
+    /// `)` at the end of two comparisons, rather than a `:` no type takes at their
+    /// start — and on a tie the list's, the first reading tried. A **goal gate** is
+    /// reported as it stands: the format fallback reads its mark, not its position
+    /// ([`ParseError::is_goal_gated`]).
+    pub(crate) fn prefer_abandoned_type_arguments_error(
+        &mut self,
+        error: ParseError,
+    ) -> ParseError {
+        match (self.abandoned_type_arguments_error.take(), error.position()) {
+            (Some(kept), Some(reached))
+                if !error.is_goal_gated() && kept.position().is_some_and(|k| k >= reached) =>
+            {
+                kept
+            }
+            _ => error,
+        }
     }
 
     /// Run `f` with the function-like scope's `[Await]` and `[Yield]` contexts
@@ -1482,8 +1625,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// which a nested scope does reset). It is a combinator and not a bare
     /// assignment for the reason [`Parser::checkpoint`] states: the checkpoint
     /// carries no context flags, on the promise that every one of them is restored
-    /// by its own combinator — a hand-rolled save/restore pair would leak past the
-    /// one speculative parse.
+    /// by its own combinator — a hand-rolled save/restore pair would leak past a
+    /// speculative parse.
     pub(super) fn with_strict_scope<T>(
         &mut self,
         f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
@@ -2851,7 +2994,7 @@ fn parse_with<'arena, T>(
 ) -> Result<T, ParseError> {
     let mut parser = Parser::new_with_goal(source, goal, arena);
     parser.prime()?;
-    f(&mut parser)
+    f(&mut parser).map_err(|error| parser.prefer_abandoned_type_arguments_error(error))
 }
 
 /// [`parse_typescript`] against an explicit goal symbol. `parse_typescript` is

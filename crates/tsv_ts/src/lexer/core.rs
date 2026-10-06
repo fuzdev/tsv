@@ -505,10 +505,10 @@ impl<'a> Lexer<'a> {
         self.had_line_terminator
     }
 
-    /// The cursor state a later [`Lexer::rewind`] returns to — the parser's one
-    /// speculative parse (`Parser::parse_arrow_or_rewind`) takes it before the arrow
-    /// head it may have to un-read. Everything a token advances except the decode
-    /// scratch, which the rewind marks stale instead (see `rewind`).
+    /// The cursor state a later [`Lexer::rewind`] returns to — a speculative parse
+    /// (`Parser::parse_arrow_or_rewind`, `Parser::parse_type_arguments_or_rewind`)
+    /// takes it before the tokens it may have to un-read. Everything a token advances
+    /// except the decode scratch, which the rewind marks stale instead (see `rewind`).
     #[must_use]
     pub fn checkpoint(&self) -> LexerCheckpoint {
         LexerCheckpoint {

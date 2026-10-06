@@ -186,8 +186,11 @@ use tsv_lang::source_scan::{
 /// [`Relex`]: TypeArgScan::Relex
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum TypeArgScan {
-    /// What the PARSER commits to: the input's own bytes, line terminators and parens and
-    /// all.
+    /// What the PARSER reads a list at: the input's own bytes, line terminators and parens
+    /// and all. It grades the list's FIRST argument, and that is as far as the parser
+    /// commits on its answer: behind the first `,` this reading matches delimiters and
+    /// nothing more, so the parser tries the tail and reads the `<` as the operator where
+    /// it is none (`Parser::parse_type_arguments_or_rewind`).
     Parse,
     /// What the PRINTED form would re-lex as, which is the printer's question. Never decides
     /// a parse; it only records whether a paren pair has to stand between two tokens (see
@@ -241,6 +244,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// parser always asks [`TypeArgScan::Parse`]; the one [`TypeArgScan::Relex`] asker is a
     /// `>` reducing over a `<` left operand, recording on that `<` node whether its PRINTED
     /// form would re-lex as a type-argument list.
+    ///
+    /// A `true` under [`TypeArgScan::Parse`] is the whole answer for a list of one
+    /// argument, and for the first argument of any list. Past a `,` at the list's own level
+    /// it means only that a matching `>` with a committing follower exists — what stands
+    /// there is ungraded — so a caller with an operator reading to fall back to reads the
+    /// tail speculatively (`Parser::parse_type_arguments_or_rewind`).
     pub(super) fn is_type_arguments_start(&self, scan: TypeArgScan) -> bool {
         self.is_type_arguments_start_at(self.current.start as usize, scan)
     }
@@ -299,9 +308,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 /// that meets `f<T> / 2` reads the division the parser will, instead of opening a regex
 /// at `/ 2` and running past the expression's end.
 ///
-/// It asks the parser's own question from the other end. The parser tries a list at a
-/// `<` that follows an operand (the subscript loop, `new C<T>`, a type reference) and
-/// commits on [`type_arg_head_commits`] under [`TypeArgScan::Parse`], so this walks
+/// It asks the parser's own LOOKAHEAD question from the other end. The parser tries a
+/// list at a `<` that follows an operand (the subscript loop, `new C<T>`, a type
+/// reference) where [`type_arg_head_commits`] admits one under [`TypeArgScan::Parse`], so
+/// this walks
 /// `lower_bound..gt` for such a `<` — its position read by the same operand rule the
 /// scanners use ([`OperandAnchor`]), comments and strings stepped over — and answers for
 /// the one whose [`matching_angle_close`] is `gt`. At most one `<` can close there: a
@@ -314,6 +324,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 ///
 /// Asked only for a `/` right after a `>`, which real code almost never writes, so the
 /// walk's cost is paid there alone.
+// TODO: this answers for the lookahead alone, and the parser goes on to TRY the tail
+// of a list that has a separator (`Parser::parse_type_arguments_or_rewind`). Behind a tail
+// it abandons the two disagree: `fn(a < b, c + d >⏎/x/.test(e))` is a comparison with a
+// regex to the parser, and a list closed ahead of a division to this scan (the line break
+// is what makes the lookahead commit there). A raw scan that meets a delimiter inside
+// that regex then ends early — a Svelte tag cut at the `}` of `>⏎/}/` — which the parse
+// of the cut slice reports. A scan cannot run the type grammar; recording the `<` the
+// parser abandoned, where the same scan runs after a parse, would let it agree.
 // TODO: the walk is O(gt - lower_bound) per ask, so a region holding many `> /` pairs
 // (`a > /x/ > /x/ > …`) pays it quadratically. Nothing real has the shape; a scan that
 // recorded each operand-position `<` as it passed would make it linear.
@@ -1017,8 +1035,13 @@ fn type_arg_region_walk(
                 // arguments. Each is confirmed by scanning for the matching `>` — which
                 // rejects a trailing identifier, so `a < b > c` stays a comparison. (`,` is
                 // neutral to the scan, so starting at `pos` is equivalent to starting past
-                // the separator.) Inside a nested region a `>` closes nothing and a `,`
-                // separates nothing: the body is a comparison or a sequence, never a type.
+                // the separator.) Behind a `,` that scan is ALL this walk does: it matches
+                // delimiters and grades no argument, so `<b, c + d>(e)` and
+                // `<b, q: c>(d)` commit here, and it is the parser that finds the tail is
+                // no list and reads two comparisons
+                // (`Parser::parse_type_arguments_or_rewind`). Inside a nested region a `>`
+                // closes nothing and a `,` separates nothing: the body is a comparison or
+                // a sequence, never a type.
                 b'>' | b',' => {
                     return frames.is_empty() && scan_for_closing_angle_bracket(bytes, pos, scan);
                 }

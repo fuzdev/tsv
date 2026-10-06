@@ -1765,24 +1765,47 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Unlike parse_type_parameters, this parses actual types, not type parameter declarations.
     /// Used for TSInstantiationExpression and other type argument contexts.
+    ///
+    /// The list is read in the halves the expression-level lookahead grades apart
+    /// — [`Self::parse_type_argument_list_head`] and
+    /// [`Self::parse_type_argument_list_tail`] — which this runs back to back, committed.
+    /// The one caller that tells them apart is `Parser::parse_type_arguments_or_rewind`.
     pub(in crate::parser) fn parse_type_parameter_instantiation(
         &mut self,
     ) -> Result<TSTypeParameterInstantiation<'arena>, ParseError> {
+        let (start, first) = self.parse_type_argument_list_head()?;
+        self.parse_type_argument_list_tail(start, first)
+    }
+
+    /// The head of a type-argument list: its `<` and its FIRST argument. Returns where
+    /// the list starts and that argument, for [`Self::parse_type_argument_list_tail`].
+    ///
+    /// This is the half `Parser::is_type_arguments_start` grades before an expression
+    /// commits to a list, so an error here is the list's own.
+    pub(in crate::parser) fn parse_type_argument_list_head(
+        &mut self,
+    ) -> Result<(u32, &'arena TSType<'arena>), ParseError> {
         let start = self.current_pos().0 as u32;
         self.expect_less_than_in_type()?;
+        Ok((start, self.parse_type()?))
+    }
 
+    /// The tail of a type-argument list, behind the first argument
+    /// [`Self::parse_type_argument_list_head`] read: each `,` with the argument it
+    /// separates (a trailing one with none), and the closing `>`.
+    pub(in crate::parser) fn parse_type_argument_list_tail(
+        &mut self,
+        start: u32,
+        first: &'arena TSType<'arena>,
+    ) -> Result<TSTypeParameterInstantiation<'arena>, ParseError> {
         let mut params = self.bvec();
-        loop {
-            let ts_type = self.parse_type()?;
-            params.push(ts_type);
-
-            if !self.eat(TokenKind::Comma)? {
-                break;
-            }
+        params.push(first);
+        while self.eat(TokenKind::Comma)? {
             // Handle trailing comma
             if self.check_greater_than_in_type() {
                 break;
             }
+            params.push(self.parse_type()?);
         }
 
         let end = self.greater_than_end_in_type()?;
