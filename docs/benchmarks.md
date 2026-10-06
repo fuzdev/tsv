@@ -462,7 +462,7 @@ Things the published numbers measure that aren't quite what they look like.
   there) — and `JSON.stringify` of it is **128,567 chars against oxc's 128,570**,
   a payload ratio of 1.000. Its JS API carries two traps `lib/yuku.ts`
   `parse_yuku` defuses, reached by BOTH rows since one `YukuImplementation` drives
-  both bindings:
+  both cores:
   - **`parse()` is LAZY.** It returns memoized getters over the binary buffer the
     Zig side produced; the JS AST decodes only when `.program` is read. Forcing it
     costs **1.69x** (native) / **1.91x** (wasm) in the harness path — an unforced
@@ -625,23 +625,27 @@ prettier. Load-bearing on two axes:
   `getConfigDiagnostics()` is non-empty — else a renamed key would silently leave an
   option at its default and skew the row — and, since a recognized key is not a
   landed value, it also runs the shared behavioral probe.
-- **yuku-parser (NAPI) / @yuku-parser/wasm (WASM)** — a JS/TS parser written in
-  Zig; **TypeScript, JS only** — no Svelte, no CSS, no formatter, so it contributes
-  two rows to `parse/typescript` and nothing else. One engine behind two bindings,
-  pinned at one version — the last this package pairing exists at
-  (`benches/js/package.json`'s `//yuku` note has what a move past it takes). Its
-  default AST is span-only and padded exactly like oxc's (`decorators: []` /
+- **yuku-parser (NAPI) / yuku-parser on @yuku-core/wasm (WASM)** — a JS/TS parser
+  written in Zig; **TypeScript, JS only** — no Svelte, no CSS, no formatter, so it
+  contributes two rows to `parse/typescript` and nothing else. One JS package over
+  two cores: `yuku-parser` holds `parse` and the tree decoder and loads its native
+  core by default; the wasm row hands the same `parse` the core from
+  `@yuku-core/wasm`. Its default AST is span-only and padded exactly like oxc's (`decorators: []` /
   `typeAnnotation: null` / `optional: false`, no per-node `loc`). That payload match,
   and the two JS-API traps `lib/yuku.ts` must defuse — `parse()` is **lazy**, the
   parser is **error-tolerant** — are in [Fairness caveats](#fairness-caveats). **One
-  `YukuImplementation` drives both bindings** (constructed twice, the row name
-  selecting the specifier): they expose the identical module surface, so a wrapper
-  per binding would be a copy free to drift, which is exactly how the oxc WASI row
-  broke. That's the difference from `oxc.ts`/`oxc_wasm.ts`, whose two packages
-  genuinely differ. Unlike oxc's wasi binding the wasm package declares no
-  `cpu`/`os`, so it installs as an ordinary dep everywhere and needs no
+  `YukuImplementation` drives both cores** (constructed twice, the row name
+  selecting the core): the module, options and decoder are one object either way,
+  so a wrapper per core would be a copy free to drift, which is exactly how the oxc
+  WASI row broke. That's the difference from `oxc.ts`/`oxc_wasm.ts`, whose two
+  packages genuinely differ. A third trap is the `core` option itself — an unknown
+  key is ignored silently, so the wrapper asserts at init that a parse handed the
+  wasm core calls it; otherwise the wasm row could time the native engine. Both
+  cores are yuku's shared engine and carry its analyzer too, so their binary-size
+  rows are not parse-only builds. Unlike oxc's wasi binding the wasm package
+  declares no `cpu`/`os`, so it installs as an ordinary dep everywhere and needs no
   force-fetch. The **N-API row is excluded from the conformance surface** — its
-  native binding faults the host process on that corpus's escaped-identifier
+  native core faults the host process on that corpus's escaped-identifier
   fixtures (../benches/js/CLAUDE.md §Known Issues); the wasm row carries the engine
   there, and both rows run on perf.
 - **rsvelte-fmt (native binary)** — the other Rust-native Svelte formatter;

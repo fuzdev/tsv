@@ -360,7 +360,7 @@ export async function init_implementations(
 	const oxc = new OxcImplementation(versions.oxc);
 	const oxc_wasm = new OxcWasmImplementation(versions.oxc_wasm);
 	const tsc = new TscImplementation();
-	// One class, two bindings — see lib/yuku.ts.
+	// One class, two cores — see lib/yuku.ts.
 	const yuku = new YukuImplementation('yuku-parser', versions.yuku);
 	const yuku_wasm = new YukuImplementation('yuku-parser-wasm', versions.yuku);
 	const biome = new BiomeImplementation(versions.biome);
@@ -953,8 +953,9 @@ export function get_alternative_versions(
 		// reports the binding it actually loads.
 		oxc_parser_wasm: impls.oxc_wasm?.versions.binding,
 		oxfmt: impls.oxc?.versions.oxfmt,
-		// Two packages over one engine, pinned at one version (`package.json` `//yuku`)
-		// — reported separately so a skewed local install is visible rather than implied.
+		// One engine as two cores (`yuku-parser`'s native one, `@yuku-core/wasm`),
+		// released together upstream — reported separately so a skewed local install
+		// is visible rather than implied.
 		yuku_parser: impls.yuku?.version,
 		yuku_parser_wasm: impls.yuku_wasm?.version,
 		biome: impls.biome?.versions.wasm,

@@ -1,36 +1,43 @@
 /**
- * yuku-parser implementation wrapper — both bindings.
+ * yuku-parser implementation wrapper — both cores.
  *
- * yuku is a JS/TS parser written in Zig, shipped as two npm packages over one
- * engine: `yuku-parser` (N-API) and `@yuku-parser/wasm`. Parse only — it has no
- * formatter, no Svelte, and no CSS, so it contributes rows to `parse/typescript`
- * alone, exactly where oxc-parser sits.
+ * yuku is a JS/TS parser written in Zig. ONE npm package, `yuku-parser`, holds the
+ * whole JS surface — `parse` and the decoder that turns the engine's binary result
+ * into a tree — and runs on a CORE it is handed: the native one it loads by default
+ * (an N-API addon, from its `yuku-core` dependency) or the WebAssembly one from
+ * `@yuku-core/wasm`, passed as the `core` option. Parse only — it has no formatter,
+ * no Svelte, and no CSS, so it contributes rows to `parse/typescript` alone, exactly
+ * where oxc-parser sits.
  *
- * **One class drives both bindings.** They expose the identical module surface and
- * carry the identical hazards, so a per-binding wrapper would be a copy free to
- * drift — which is precisely how the oxc WASI binding once fabricated a 100%
- * coverage row (CLAUDE.md §Known Issues). Where oxc needs two files because its two
- * packages genuinely differ (`oxc.ts` / `oxc_wasm.ts` — different entry points, a
- * consume-once getter on one side), yuku needs one.
+ * **One class drives both cores.** The module, the options and the decoder are the
+ * same object either way, so the two rows differ in the engine call alone and carry
+ * the identical hazards — a per-core wrapper would be a copy free to drift, which is
+ * precisely how the oxc WASI binding once fabricated a 100% coverage row (CLAUDE.md
+ * §Known Issues). Where oxc needs two files because its two packages genuinely
+ * differ (`oxc.ts` / `oxc_wasm.ts` — different entry points, a consume-once getter
+ * on one side), yuku needs one.
  *
- * The wasm package is driven through raw `WebAssembly` + manual linear-memory
- * copies — no wasm-bindgen, no WASI — so unlike the oxc WASM binding one entry
- * point works under all three runtimes. It instantiates at import time (top-level
- * `await`), which puts its setup in `init()` where every other impl's setup lives.
- * Its parse path encodes the source into linear memory, calls in, then copies the
- * result buffer back out — a boundary tax of the same shape `tsv-wasm` pays, and
- * the reason that row belongs beside `tsv-wasm-json-no-locations` and `oxc-parser-wasm` rather
- * than beside the native ones.
+ * The wasm core is raw `WebAssembly` + manual linear-memory copies — no
+ * wasm-bindgen, no WASI — so unlike the oxc WASM binding one entry point works
+ * under all three runtimes. `load()` compiles and instantiates it (async, in
+ * `init()` where every other impl's setup lives). Its parse path copies the
+ * encoded source into linear memory, calls in, then copies the result buffer back
+ * out — a boundary tax of the same shape `tsv-wasm` pays, and the reason that row
+ * belongs beside `tsv-wasm-json-no-locations` and `oxc-parser-wasm` rather than
+ * beside the native ones. ⚠ Both cores are yuku's SHARED engine: each also carries
+ * the analyzer its sibling packages run on, so their size rows are not parse-only
+ * builds (`lib/binary_sizes.ts`).
  *
- * ⚠ **The native binding is not memory-safe on adversarial input, so the N-API row
+ * ⚠ **The native core is not memory-safe on adversarial input, so the N-API row
  * is excluded from the CONFORMANCE surface** (`get_benchmark_tasks`). An identifier
  * built from a long run of BRACED unicode escapes — `var _` + `'\u{11A01}'` ×75,
  * i.e. once the decoded identifier passes ~300 bytes — SEGFAULTS the host process
  * inside the Zig parse call on every run; one escape fewer sits on the boundary and
- * parses cleanly on one run, faults on the next.
+ * throws an ordinary `ParseFailed` on most runs, faults on the rest.
  * Non-braced escapes (`\uXXXX`) and literal non-ASCII identifiers are unaffected at
- * any length, as is the wasm binding (the overrun stays inside linear memory, and
- * it parses the same inputs cleanly). test262's
+ * any length, as is the wasm core at these lengths (the overrun stays inside linear
+ * memory, and it parses the same inputs cleanly; several times longer it throws a
+ * catchable `RuntimeError` and stays usable — no corpus file is that long). test262's
  * `language/identifiers/part-unicode-*-{,class-}escaped.js` fixtures are exactly
  * this shape, and they live only in the conformance corpus — real code has no such
  * identifiers, so both rows stay on the perf corpus.
@@ -62,35 +69,57 @@ interface YukuParseResult {
 	diagnostics: YukuDiagnostic[];
 }
 
+/**
+ * A loaded yuku core — opaque here: the wrapper only hands it back to `parse`.
+ * Branded so nothing but a loader's result is assignable to the `core` option.
+ */
+interface YukuCore {
+	readonly __yuku_core: unique symbol;
+}
+
 /** yuku's parse options (the subset the bench pins). */
 interface YukuParseOptions {
+	/** The engine to parse on; absent = the native core `yuku-parser` loads itself. */
+	core?: YukuCore;
 	sourceType?: 'script' | 'module' | 'commonjs';
 	lang?: 'js' | 'ts' | 'jsx' | 'tsx' | 'dts';
 	preserveParens?: boolean;
 	semanticErrors?: boolean;
 	attachComments?: boolean;
+	tokens?: boolean;
 }
 
-/** The module surface both yuku packages expose (identical across the two). */
+/** The `yuku-parser` module surface (the one module both rows call). */
 interface YukuParserModule {
 	parse: (source: string, options?: YukuParseOptions) => YukuParseResult;
 }
 
-/** The two npm packages over one engine: bench row name → module specifier. */
-const YUKU_BINDINGS = {
-	'yuku-parser': 'yuku-parser',
-	'yuku-parser-wasm': '@yuku-parser/wasm'
+/** The `@yuku-core/wasm` module surface. */
+interface YukuWasmCoreModule {
+	load: () => Promise<YukuCore>;
+}
+
+/**
+ * The two cores under the one `yuku-parser` module: bench row name → how the row's
+ * core is obtained. `null` is the native core, which `parse` loads (once, memoized
+ * upstream) when no `core` is passed — the row deliberately takes that default path
+ * rather than importing `yuku-core` itself, since it is what an install of
+ * `yuku-parser` runs and `yuku-core` is not a dependency this harness declares.
+ */
+const YUKU_CORES = {
+	'yuku-parser': null,
+	'yuku-parser-wasm': '@yuku-core/wasm'
 } as const;
 
 /**
- * Which yuku binding a `YukuImplementation` drives — also its bench row name,
+ * Which yuku core a `YukuImplementation` drives — also its bench row name,
  * which keeps the shipped package name (`yuku-parser`) rather than shortening to
  * a bare tool name.
  */
-export type YukuBinding = keyof typeof YUKU_BINDINGS;
+export type YukuBinding = keyof typeof YUKU_CORES;
 
 /**
- * The pinned option set, shared by both bindings.
+ * The pinned option set, shared by both cores (a wasm row adds its `core` to a copy).
  *
  * Every value is set explicitly even where it matches yuku's current default, so
  * an upstream default change can't silently skew the rows — the same rule the
@@ -113,18 +142,21 @@ export type YukuBinding = keyof typeof YUKU_BINDINGS;
  * - `attachComments: false` — payload match: neither oxc's `.program` nor tsv's
  *   wire AST carries comments (verified — tsv's wire `Program` has no `comments`
  *   key), so hanging them on nodes would be work the other rows never do.
+ * - `tokens: false` — likewise: no opponent row returns a token list.
  */
 const PARSE_OPTIONS: YukuParseOptions = {
 	sourceType: 'module',
 	lang: 'ts',
 	preserveParens: true,
 	semanticErrors: false,
-	attachComments: false
+	attachComments: false,
+	tokens: false
 };
 
 /**
- * Drive a yuku binding for one file, applying the two corrections that make the
- * row honest.
+ * Drive `yuku-parser` on one core for one file, applying the two corrections that
+ * make the row honest. `options` is the row's pinned bag — `PARSE_OPTIONS`, plus the
+ * wasm row's `core`.
  *
  * ⚠ **`parse()` is LAZY.** It returns memoized getters over the binary buffer the
  * Zig side produced; the JS AST is built only when `.program` is read. Forcing it
@@ -148,16 +180,14 @@ const PARSE_OPTIONS: YukuParseOptions = {
  */
 function parse_yuku(
 	parser: YukuParserModule,
+	options: YukuParseOptions,
 	source: string,
 	goal: ParseGoal | undefined
 ): unknown {
 	// A test262 goal overrides the pinned `module` so yuku is scored at the goal the
 	// test declares, like tsv/acorn/oxc — otherwise a script-goal `await`-identifier
 	// test reads as a failure.
-	const result = parser.parse(
-		source,
-		goal ? { ...PARSE_OPTIONS, sourceType: goal } : PARSE_OPTIONS
-	);
+	const result = parser.parse(source, goal ? { ...options, sourceType: goal } : options);
 
 	const diagnostics = result.diagnostics;
 	if (diagnostics.some((d) => d.severity === 'error')) {
@@ -209,7 +239,11 @@ function parse_yuku(
  * no module syntax by definition — but it means a yuku script-goal accept is a
  * weaker claim than a tsv one.
  */
-function assert_options_land(parser: YukuParserModule, binding: YukuBinding): void {
+function assert_options_land(
+	parser: YukuParserModule,
+	pinned: YukuParseOptions,
+	binding: YukuBinding
+): void {
 	const fail = (option: string, detail: string): never => {
 		throw new Error(
 			`${binding}: option '${option}' did not land — ${detail}, so the pinned options are not ` +
@@ -219,22 +253,58 @@ function assert_options_land(parser: YukuParserModule, binding: YukuBinding): vo
 	const rejects = (source: string, options: YukuParseOptions): boolean =>
 		parser.parse(source, options).diagnostics.some((d) => d.severity === 'error');
 
-	if (rejects('const enum E { A }\ntype T = string;\nlet x: T;', PARSE_OPTIONS)) {
+	if (rejects('const enum E { A }\ntype T = string;\nlet x: T;', pinned)) {
 		fail('lang', "TypeScript-only syntax was rejected under `lang: 'ts'`");
 	}
 
 	const await_binding = 'var await = 1;';
-	if (!rejects(await_binding, PARSE_OPTIONS)) {
+	if (!rejects(await_binding, pinned)) {
 		fail('sourceType', '`var await` parsed cleanly at the pinned `module` goal');
 	}
-	if (rejects(await_binding, { ...PARSE_OPTIONS, sourceType: 'script' })) {
+	if (rejects(await_binding, { ...pinned, sourceType: 'script' })) {
 		fail('sourceType', "`var await` was rejected at `sourceType: 'script'`");
 	}
 }
 
 /**
- * yuku-parser, driving either of its two bindings — the N-API row (the same
- * binding mechanism `oxc-parser` uses, under all three runtimes) or the WASM row.
+ * Assert at init that the wasm row's `core` REACHES the parser.
+ *
+ * The same silent-option hazard as `assert_options_land`, with a worse failure: a
+ * renamed `core` key would be ignored, `parse` would load its default NATIVE core,
+ * and the row would publish the native engine's throughput under the wasm label —
+ * with a clean accept set, so `check_variant_parity` could not see it. No output
+ * distinguishes the two cores (upstream's claim is byte-identical results), so the
+ * check counts calls instead: the row's core is wrapped for one parse, and that
+ * parse must go through it. The native row passes no `core` — the default is the
+ * thing it measures — so there is nothing to assert there.
+ */
+function assert_core_lands(
+	parser: YukuParserModule,
+	pinned: YukuParseOptions,
+	binding: YukuBinding
+): void {
+	if (!pinned.core) return;
+	const real = pinned.core as unknown as { parse: (...args: unknown[]) => unknown };
+	let calls = 0;
+	const counting = {
+		...real,
+		parse: (...args: unknown[]): unknown => {
+			calls++;
+			return real.parse(...args);
+		}
+	} as unknown as YukuCore;
+	parser.parse('let x;', { ...pinned, core: counting });
+	if (calls === 0) {
+		throw new Error(
+			`${binding}: option 'core' did not land — a parse handed the WebAssembly core never ` +
+				`called it, so the row would time the native engine under a wasm label (upstream rename?)`
+		);
+	}
+}
+
+/**
+ * yuku-parser on either of its two cores — the N-API row (the same binding
+ * mechanism `oxc-parser` uses, under all three runtimes) or the WASM row.
  *
  * Supports:
  * - Parse: TypeScript, JS (NOT Svelte, NOT CSS)
@@ -242,14 +312,16 @@ function assert_options_land(parser: YukuParserModule, binding: YukuBinding): vo
  */
 export class YukuImplementation extends BaseImplementation {
 	/**
-	 * Which of the two bindings this instance drives — the specifier it imports,
-	 * the version it reports, and the label its errors carry. A wrapper-local
+	 * Which of the two cores this instance drives — the core it loads, the version
+	 * it reports, and the label its errors carry. A wrapper-local
 	 * selector, not a shared identity: no impl declares a name to the harness,
 	 * which keys everything on the ROW names `get_benchmark_tasks` registers.
 	 */
 	readonly name: YukuBinding;
 	readonly versions: YukuVersions;
 	private _parser: YukuParserModule | null = null;
+	/** The row's pinned options — `PARSE_OPTIONS`, plus the wasm row's loaded `core`. */
+	private _options: YukuParseOptions = PARSE_OPTIONS;
 
 	readonly parse_languages: ReadonlyArray<Language> = ['typescript'];
 	/** yuku ships no formatter. */
@@ -262,18 +334,27 @@ export class YukuImplementation extends BaseImplementation {
 	}
 
 	/**
-	 * The version of THIS binding's package. The two are pinned at one version
-	 * (`package.json` `//yuku`), but each is reported from its own package so a skewed
-	 * local install is visible in the report rather than implied.
+	 * The version of the package that carries THIS row's engine: `yuku-parser` (which
+	 * pins its native core exactly) or `@yuku-core/wasm`. Upstream releases them
+	 * together, but each is reported from its own package so a skewed local install
+	 * is visible in the report rather than implied.
 	 */
 	get version(): string {
 		return this.name === 'yuku-parser' ? this.versions.parser : this.versions.wasm;
 	}
 
 	async init(): Promise<void> {
-		const parser = (await import(YUKU_BINDINGS[this.name])) as YukuParserModule;
-		assert_options_land(parser, this.name);
+		const parser = (await import('yuku-parser')) as YukuParserModule;
+		const core_specifier = YUKU_CORES[this.name];
+		let options = PARSE_OPTIONS;
+		if (core_specifier !== null) {
+			const { load } = (await import(core_specifier)) as YukuWasmCoreModule;
+			options = { ...PARSE_OPTIONS, core: await load() };
+		}
+		assert_options_land(parser, options, this.name);
+		assert_core_lands(parser, options, this.name);
 		this._parser = parser;
+		this._options = options;
 		// The option probes above read the raw module's diagnostics; this asks the ROW's
 		// call, which is where an error-tolerant parser's diagnostics become the throw
 		// the harness counts — see `lib/reject_probe.ts`.
@@ -288,7 +369,7 @@ export class YukuImplementation extends BaseImplementation {
 		if (!this.supports_parse_language(language)) {
 			throw new Error(`${this.name} does not support ${language}`);
 		}
-		return parse_yuku(this._parser, source, goal);
+		return parse_yuku(this._parser, this._options, source, goal);
 	}
 
 	format(_source: string, _language: Language): string {
@@ -297,5 +378,6 @@ export class YukuImplementation extends BaseImplementation {
 
 	dispose(): void {
 		this._parser = null;
+		this._options = PARSE_OPTIONS;
 	}
 }

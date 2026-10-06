@@ -1609,17 +1609,20 @@ state) shows in the coverage report and skip counts without `--verbose`.
   via `js_sys` (measurably faster than a `serde_wasm_bindgen`-built object graph).
   Rust-side parse-vs-write timing: `cargo run --release -p tsv_debug -- json_profile
   <paths>`; `wasm_json_probe.ts` covers the end-to-end view including the JS boundary.
-- **The yuku-parser N-API binding SEGFAULTS on long braced-escape identifiers, so
+- **yuku's native core (the `yuku-parser` N-API row) SEGFAULTS on long braced-escape identifiers, so
   its row is conformance-excluded.** An identifier built from a run of braced unicode
   escapes faults the host process inside the Zig parse call once the decoded
   identifier passes ~300 bytes — `parse('var _' + '\u{11A01}'.repeat(75) + ';')`
   crashes on every run. One escape fewer sits ON the boundary and is no control: the
-  same call in a fresh process parses cleanly on one run and faults on the next (at an
-  earlier pin it threw an ordinary `ParseFailed` instead). Non-braced escapes
+  same call in a fresh process throws an ordinary `ParseFailed` on most runs and faults
+  on the rest. Non-braced escapes
   (`\uXXXX`) and literal non-ASCII identifiers are unaffected at any length, and so
-  is the wasm binding (the overrun stays inside linear memory; it parses the same
-  inputs cleanly — itself a variant-parity divergence, except the process dies before
-  `check_variant_parity` can report it). test262's
+  is the wasm core at these lengths (the overrun stays inside linear memory; it parses
+  the same inputs cleanly — itself a variant-parity divergence, except the process dies
+  before `check_variant_parity` can report it). Several times longer and the wasm
+  overrun leaves linear memory too: the call throws a `RuntimeError` — an ordinary
+  catchable reject, and the core parses correctly afterwards — which no file in either
+  corpus reaches. test262's
   `language/identifiers/part-unicode-*-{,class-}escaped.js` are exactly this shape,
   so the conformance corpus kills the whole run mid-preflight; the perf corpus has no
   such identifiers. A skip list is not a workaround: **which** files of that family
@@ -1629,8 +1632,7 @@ state) shows in the coverage report and skip counts without `--verbose`.
   the conformance report's `**Excluded here:**` line — a disclosure whose claim is
   CHECKED against the registry (§Report files), so re-adding the row without
   updating the table fails the run. The fault survives at the pinned version
-  (`repeat(75)` faults on every run) and in upstream's `yuku-core` layout past it
-  (`package.json` `//yuku`); on a yuku bump, re-probe rather than assume — run the
+  (`repeat(75)` faults on every run); on a yuku bump, re-probe rather than assume — run the
   `repeat(75)` call in a child process a handful of times, and only if it never faults
   re-add the row and run `deno task bench:conformance`.
 - **The oxc WASI binding's `errors` getter is CONSUME-ONCE.** On

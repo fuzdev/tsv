@@ -32,14 +32,14 @@ export interface TscVersions {
 }
 
 /**
- * yuku-parser implementation versions. Two npm packages, one Zig engine behind
- * two bindings — pinned at one version (`package.json` `//yuku`), but both are read
- * so a skewed local install shows up in the report instead of hiding.
+ * yuku-parser implementation versions. One Zig engine as two cores — the native one
+ * `yuku-parser` pins exactly, and `@yuku-core/wasm` — released together upstream, but
+ * both are read so a skewed local install shows up in the report instead of hiding.
  */
 export interface YukuVersions {
 	/** The N-API package (`yuku-parser`) */
 	parser: string;
-	/** The WASM package (`@yuku-parser/wasm`) */
+	/** The WASM core package (`@yuku-core/wasm`) */
 	wasm: string;
 }
 
@@ -279,7 +279,7 @@ export async function load_all_versions(): Promise<AllVersions> {
 		},
 		yuku: {
 			parser: dep_version(deps, 'yuku-parser'),
-			wasm: dep_version(deps, '@yuku-parser/wasm')
+			wasm: dep_version(deps, '@yuku-core/wasm')
 		},
 		biome: {
 			js_api: dep_version(deps, '@biomejs/js-api'),

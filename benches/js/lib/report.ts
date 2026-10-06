@@ -714,7 +714,7 @@ export function alternative_version_parts(versions: AlternativeVersionInfo): str
 		...binding_pair_version_parts(
 			'yuku-parser',
 			versions.yuku_parser,
-			'@yuku-parser/wasm',
+			'@yuku-core/wasm',
 			versions.yuku_parser_wasm
 		)
 	);

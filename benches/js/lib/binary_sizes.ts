@@ -332,10 +332,14 @@ export async function collect_binary_sizes(
 	// size a scope difference and read as an engine one. The emitted `vs tsv` ratio
 	// does NOT make that pairing — every row anchors on the full build (see
 	// `build_display_entries`), so the parse-only rows are listed for the reader to
-	// pair up, same as for `oxc-parser` and `dprint`. The wasm package is a plain dep
-	// on every host (no `cpu: wasm32` metadata), so unlike oxc's wasi binding it
-	// needs no force-fetch to be present.
-	// Either binding present means the engine ran — one pair of size rows covers both.
+	// pair up, same as for `oxc-parser` and `dprint`. ⚠ Neither artifact is a
+	// parse-only build either: both are yuku's shared CORE (the addon under
+	// `@yuku-core/binding-<triple>`, the module in `@yuku-core/wasm`), which also
+	// carries the analyzer its sibling packages run on, so a reader pairing them with
+	// the parse-only tsv rows is still comparing a wider scope on yuku's side. The
+	// wasm package is a plain dep on every host (no `cpu: wasm32` metadata), so unlike
+	// oxc's wasi binding it needs no force-fetch to be present.
+	// Either core present means the engine ran — one pair of size rows covers both.
 	if (impls.yuku || impls.yuku_wasm) {
 		const { os: npm_os, arch: npm_arch } = get_npm_platform();
 
@@ -343,7 +347,7 @@ export async function collect_binary_sizes(
 			staged,
 			LABELS.yuku_parser_napi,
 			'native',
-			napi_binding_dirs(node_modules, '@yuku-parser/binding', npm_os, npm_arch),
+			napi_binding_dirs(node_modules, '@yuku-core/binding', npm_os, npm_arch),
 			'.node'
 		);
 
@@ -351,7 +355,7 @@ export async function collect_binary_sizes(
 			staged,
 			LABELS.yuku_parser_wasm,
 			'wasm',
-			[`${node_modules}/@yuku-parser/wasm`],
+			[`${node_modules}/@yuku-core/wasm`],
 			'.wasm'
 		);
 	}
