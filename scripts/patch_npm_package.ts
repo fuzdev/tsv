@@ -70,6 +70,7 @@ import {
 } from './npm_facade.ts';
 import { NPM_SHARED_METADATA } from './npm_metadata.ts';
 import { format_size, gzip_size } from './size.ts';
+import { stage_file } from './stage_file.ts';
 
 const variant = Deno.args[0];
 if (variant !== 'format' && variant !== 'parse' && variant !== 'all') {
@@ -763,10 +764,10 @@ console.log(`Created ${pkg_root}/${browser_dts}`);
 // 5. Copy the variant README and the repo LICENSE into the package root.
 
 const readme_src = `crates/tsv_wasm/README_${variant}.md`;
-Deno.copyFileSync(readme_src, `${pkg_root}/README.md`);
+stage_file(readme_src, `${pkg_root}/README.md`);
 console.log(`Copied ${readme_src} → ${pkg_root}/README.md`);
 
-Deno.copyFileSync('LICENSE', `${pkg_root}/LICENSE`);
+stage_file('LICENSE', `${pkg_root}/LICENSE`);
 console.log(`Copied LICENSE → ${pkg_root}/LICENSE`);
 
 // The facade the entries import — its parse half (with the reconstruction helper
@@ -774,13 +775,13 @@ console.log(`Copied LICENSE → ${pkg_root}/LICENSE`);
 // variants only.
 const families = { format: has_format_exports, parse: has_parse_exports };
 for (const { published, source } of facade_files(families)) {
-	Deno.copyFileSync(source, `${pkg_root}/${published}`);
+	stage_file(source, `${pkg_root}/${published}`);
 	console.log(`Copied ${source} → ${pkg_root}/${published}`);
 }
 
 if (variant === 'all') {
 	// The full-tool package ships the CLI (`tsv` bin); the subsets stay pure libraries.
-	Deno.copyFileSync(`crates/tsv_wasm/npm/${cli_file}`, `${pkg_root}/${cli_file}`);
+	stage_file(`crates/tsv_wasm/npm/${cli_file}`, `${pkg_root}/${cli_file}`);
 	console.log(`Copied crates/tsv_wasm/npm/${cli_file} → ${pkg_root}/${cli_file}`);
 }
 

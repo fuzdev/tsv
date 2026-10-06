@@ -31,7 +31,9 @@
  *
  * Staleness here has two lags — the `target/` build behind the sources, and the
  * staged copy behind the build — and comparing the staged file's mtime directly
- * against the SOURCES catches both with one check.
+ * against the SOURCES catches both with one check. That reads a staged file's
+ * mtime as when it was staged, which a plain copy does not promise on every
+ * platform — the staging scripts copy through `scripts/stage_file.ts`, which does.
  *
  * Each check names the crates and/or individual files that feed one staged
  * artifact; when crates are named, the workspace `Cargo.toml` + `Cargo.lock`

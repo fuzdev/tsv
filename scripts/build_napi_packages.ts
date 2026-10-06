@@ -36,6 +36,7 @@ import { cli_binary_name, host_triple } from './napi_host.ts';
 import { ALL_FAMILIES, LOCATIONS_EXPORT, facade_files } from './npm_facade.ts';
 import { NPM_SHARED_METADATA } from './npm_metadata.ts';
 import { format_size } from './size.ts';
+import { stage_file } from './stage_file.ts';
 
 const { values: args } = parseArgs({
 	options: {
@@ -120,7 +121,7 @@ for (const [from, to] of [
 	['crates/tsv_wasm/npm/cli.js', 'cli.js'],
 	['LICENSE', 'LICENSE']
 ]) {
-	Deno.copyFileSync(from, `${loader_dir}/${to}`);
+	stage_file(from, `${loader_dir}/${to}`);
 }
 
 write_pkg(loader_dir, {
@@ -189,7 +190,7 @@ const platform_dir = `crates/tsv_napi/pkg/${triple}`;
 Deno.mkdirSync(platform_dir, { recursive: true });
 const copy_built = (what: string, from: string, to: string, build_command: string): void => {
 	try {
-		Deno.copyFileSync(from, to);
+		stage_file(from, to);
 	} catch (e) {
 		console.error(`FAIL: cannot read ${what} at ${from} — run '${build_command}' first`);
 		console.error(String(e));
@@ -208,7 +209,7 @@ if (Deno.build.os !== 'windows') {
 	// entries (the loader's bin.js) — this binary must carry its own x-bit
 	Deno.chmodSync(`${platform_dir}/${cli_binary}`, 0o755);
 }
-Deno.copyFileSync('LICENSE', `${platform_dir}/LICENSE`);
+stage_file('LICENSE', `${platform_dir}/LICENSE`);
 Deno.writeTextFileSync(
 	`${platform_dir}/README.md`,
 	`# @fuzdev/tsv-${triple}\n\n` +
