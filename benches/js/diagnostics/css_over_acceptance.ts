@@ -97,8 +97,8 @@ const STAMP_PATH = HARVEST_STAMPS['css-rejects'].path;
 // the stamp. Only `--pin-only` skips: the profile is the point of a default run.
 //
 // Each source checkout is stamped by COMMIT, `../wpt` included. Its harvest count
-// pin is stamped too but cannot stand in for the commit: wpt supplies 22127 of the
-// 22449 CSS files, and an edit to an existing test moves content without moving the
+// pin is stamped too but cannot stand in for the commit: wpt supplies nearly all of the
+// corpus's CSS files, and an edit to an existing test moves content without moving the
 // count — so a wpt pull would re-run `bench:harvest:wpt`, rewrite the cache, and
 // leave this grade stamped fresh over a corpus that changed under it. The
 // conformance view's ENTRY LIST is stamped too (the whole view's, not only the

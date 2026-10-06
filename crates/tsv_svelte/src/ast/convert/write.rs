@@ -21,8 +21,8 @@
 //! the line (1-based, one line rule for the whole document) and column (0-based,
 //! UTF-16 code units) of those same offsets. That is a superset of Svelte's own wire, which
 //! carries `loc` on acorn-parsed nodes only, and it reproduces none of Svelte's
-//! `loc` quirks (the destructure column shift, the `_ as ` line swallow, acorn's
-//! second line class, the tag-position `Program.loc`).
+//! `loc` quirks (the `_ as ` line swallow, acorn's second line class, the
+//! tag-position `Program.loc`).
 //! Almost everything else fuses too:
 //!
 //! - **Root comments, `<svelte:options>`** (scalar props + `customElement`),
@@ -1159,7 +1159,7 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
 /// `const_declarator_end`), declaration `end = tag.span.end - 1`
 /// (`parser.index - 1`, the byte before the closing `}`). The comment-free
 /// document fuses directly; a document with template comments builds one attach per
-/// canonical acorn parse — `read_pattern`'s synthetic `(pattern = 1)` for the id (plus
+/// canonical acorn parse — `read_pattern`'s synthetic `pattern = 1` for the id (plus
 /// its `: T` annotation's own, when typed) and `read_expression`'s for the init — so a
 /// comment in one window can never reach another's tree.
 fn write_const_tag(w: &mut JsonWriter, tag: &internal::ConstTag<'_>, ctx: &Ctx<'_>) {

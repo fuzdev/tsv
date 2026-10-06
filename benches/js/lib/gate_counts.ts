@@ -102,7 +102,7 @@ export const GATE_CHECKOUT_IDS: Record<
 	// `../svelte` feeds the conformance view alone (its `tests` tree); its
 	// `packages/svelte/src` is the snapshot's `svelte` collection.
 	'../svelte': {
-		hash: '7bc0a70fe',
+		hash: '10fdca7d7',
 		pins: ['SVELTE_FIXTURES_PINS', 'SVELTE_REJECTS_PIN', 'CSS_REJECTS_PIN']
 	},
 	'../acorn-typescript': { hash: '923b213', pins: ['TS_FIXTURES_PINS'] },
@@ -113,7 +113,7 @@ export const GATE_CHECKOUT_IDS: Record<
 	// Both prettier suites are Svelte-language inputs in the conformance view —
 	// prettier's `tests/format/html` and the plugin's `test` are `.html` files the
 	// loader reads as Svelte — so both feed {@link SVELTE_REJECTS_PIN} as well as
-	// the CSS and corpus pins: of its 142 rejects, 40 come from ../prettier and 7
+	// the CSS and corpus pins: of its 144 rejects, 40 come from ../prettier and 7
 	// from ../prettier-plugin-svelte. A pin lists EVERY checkout it was measured
 	// over, not just the one it is named after; `gate_counts_test.ts` grades that
 	// each pin names at least one, which cannot see a missing second.
@@ -175,8 +175,14 @@ export const SVELTE_FIXTURES_PINS: GatePins = {
 	// `svelte_meta_invalid_placement`) is a parse error in tsv as it is in the oracle, so
 	// `compiler-errors/samples/window-{duplicate,inside-block,inside-element}` are parity
 	// rejects.
-	scanned: 3445,
-	both_accept: 3350,
+	//
+	// 3445 → 3469 scanned, 3350 → 3372 both-accept: the checkout and the oracle moved together
+	// to the next release tag, adding 24 graded inputs. Two are that release's own new parse
+	// errors — a second `{:else}`, and an `{:else if}` after an `{:else}`
+	// (`compiler-errors/samples/{each-block-duplicate-else,if-block-else-before-else-if}`) —
+	// which tsv rejects too, so they are parity rejects; the other 22 parse in both.
+	scanned: 3469,
+	both_accept: 3372,
 	over_acceptance: 13
 };
 
@@ -1251,8 +1257,8 @@ export const TS_REPO_REJECTS_PIN = 519;
 /**
  * bench:harvest:prettier-jsx — exact count of the conformance view's Prettier `.js`
  * fixtures that Prettier's own babel parser reads as JSX (`ast_has_jsx`), the
- * out-of-scope set the view drops. Measured 2026-09-22: ../prettier at 1dcd0b05d,
- * oracle prettier@3.9.6, 39 of the 795 JS-suite files the validity filter keeps.
+ * out-of-scope set the view drops. Measured 2026-10-06: ../prettier at 1dcd0b05d,
+ * oracle prettier@3.9.9, 39 of the 795 JS-suite files the validity filter keeps.
  * Fewer = the oracle stopped seeing JSX (a broken import, or babel's JSX plugin off);
  * more = it started reading plain JS as JSX — either way the cache would move a
  * number every parser shares. Re-derived by `bench:pins:suites` (see there).
@@ -1260,11 +1266,9 @@ export const TS_REPO_REJECTS_PIN = 519;
 export const PRETTIER_JSX_PIN = 39;
 
 /**
- * bench:harvest:svelte-rejects — exact reject count. Measured 2026-09-16: ../svelte
- * at 7bc0a70fe, ../prettier at 1dcd0b05d, ../prettier-plugin-svelte at 7809486,
- * oracle svelte@5.57.0, 142 of 4761 conformance-view Svelte files (4763 before the
- * conformance view's Prettier filter dropped `html/yaml/`'s two front-matter documents,
- * neither a reject).
+ * bench:harvest:svelte-rejects — exact reject count. Measured 2026-10-06: ../svelte
+ * at 10fdca7d7, ../prettier at 1dcd0b05d, ../prettier-plugin-svelte at 7809486,
+ * oracle svelte@5.57.2, 144 of 4787 conformance-view Svelte files.
  * Fewer = the svelte/compiler oracle stopped rejecting (broken import/config);
  * more = it started rejecting wholesale — either way the cache would corrupt the
  * published coverage number. Re-derived by `bench:pins:suites` (see there).
@@ -1272,7 +1276,7 @@ export const PRETTIER_JSX_PIN = 39;
  * Moves with THREE checkout commits in {@link GATE_CHECKOUT_IDS}, not just the
  * one it is named after: the Svelte-language conformance corpus is the svelte
  * suite plus both prettier suites' `.html` (which the loader reads as Svelte), and
- * the split of the 142 is 95 / 40 / 7. The harvest stamps all three, so a pull of
+ * the split of the 144 is 97 / 40 / 7. The harvest stamps all three, so a pull of
  * any of them re-grades this pin rather than leaving it describing the previous
  * corpus.
  *
@@ -1281,8 +1285,14 @@ export const PRETTIER_JSX_PIN = 39;
  * the suite's own fixtures for those fixes (`css/samples/namespaced-type-selector`,
  * `print/samples/css-namespaced-type-selector`, `parser-modern/samples/css-nth-of-minified`)
  * left the list. The same pull's 47 new suite inputs all parse.
+ *
+ * 142 → 144: the oracle moved to svelte@5.57.2, which rejects a block continuation landing
+ * on a slot already taken — a second `{:else}`, an `{:else if}` after an `{:else}` — where
+ * it used to overwrite the first branch. The suite's two fixtures for that error
+ * (`compiler-errors/samples/each-block-duplicate-else`, `…/if-block-else-before-else-if`)
+ * joined the list; the pull's other new suite inputs all parse.
  */
-export const SVELTE_REJECTS_PIN = 142;
+export const SVELTE_REJECTS_PIN = 144;
 
 /**
  * The conformance CSS corpus's REJECT count — files `svelte/compiler`'s `parseCss`
@@ -1307,8 +1317,9 @@ export const SVELTE_REJECTS_PIN = 142;
  * consumes the list), but graded and STAMPED like the harvests: `deno task
  * css:over-acceptance:pin` is a `bench:pins:suites` leg, so it is re-derived on
  * the same cadence as its siblings; the full `css:over-acceptance` profile grades it
- * too, and stamps the same three checkout commits. Measured 2026-09-22: ../prettier at 1dcd0b05d, ../svelte at 7bc0a70fe,
- * ../wpt at 7437c7bc7, oracle svelte@5.57.0, 207 of 22449 conformance-view CSS files.
+ * too, and stamps the same three checkout commits. Measured 2026-10-06: ../prettier at 1dcd0b05d, ../svelte at 10fdca7d7,
+ * ../wpt at 7437c7bc7, oracle svelte@5.57.2, 207 of 22450 conformance-view CSS files (the
+ * count held across that oracle move: the checkout's one new CSS file parses).
  *
  * 229 → 207 with no checkout or oracle moving: the conformance view's own filters
  * tightened. The Prettier CSS suite lost its front-matter (`css/yaml/`, all but the

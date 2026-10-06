@@ -2166,10 +2166,10 @@ fn next_line_terminator(bytes: &[u8], from: usize) -> Option<(usize, usize)> {
 /// and [`line_terminator_len`]'s pairing is free to take it as one.
 ///
 /// ⚠️ **The line is the DOCUMENT's**, and that is a deliberate departure from `onComment`,
-/// which measures it out of whatever string its caller handed acorn. For four of Svelte's
-/// readers that string is manufactured — a `<script>` body's prefix blanked to spaces, a
-/// block pattern's `(pattern = 1)` wrapper, an annotation's `_ as ` insert, a `{#snippet}`
-/// head's blanked prelude — so on the one line where the manufacture ends, Svelte dedents by
+/// which measures it out of whatever string its caller handed acorn. For two of Svelte's
+/// readers that string is manufactured — a `<script>` body's prefix blanked to spaces, and
+/// an annotation's `_ as ` insert where it swallows the newline before the binding's colon
+/// — so on the one line where the manufacture ends, Svelte dedents by
 /// a run the document does not hold. tsv reads the author's own run there, as it does
 /// everywhere else; the two agree on every other line. Cataloged in `docs/conformance_svelte.md`
 /// §Comment Attachment Differences. The document's first line opens past a leading byte-order

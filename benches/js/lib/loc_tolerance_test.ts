@@ -93,7 +93,7 @@ const root_of = (nodes: Node[], rest = {}): Node => ({
 	...rest
 });
 
-// --- 1. destructure_column ---------------------------------------------------------
+// --- no row: a destructure's column ---------------------------------------------------
 
 /** `{#each xs as <pattern>}{a}{/each}` behind `prefix`, the context typed by `context`. */
 function each_with_context(prefix: string, pattern: string, context: string): [string, Node] {
@@ -108,36 +108,19 @@ function each_with_context(prefix: string, pattern: string, context: string): [s
 
 const CONTEXT_START_COLUMN = 'fragment.nodes[0].context.loc.start.column';
 
-Deno.test('destructure_column: a destructure off line 1 reads one column right', () => {
-	const [source, root] = each_with_context('\n', '{ a, b }', 'ObjectPattern');
-	const column = lf_point(source, at(source, '{ a')).column;
-	strictEqual(
-		classify(source, root, CONTEXT_START_COLUMN, { column: column + 1 }),
-		'destructure_column'
-	);
+// Svelte reads a destructured block binding at the document's own column, so a shift
+// there is a finding like any other — on the pattern, on line 1 or off it, and on a
+// comment inside it.
+Deno.test('a destructured binding one column off is no row', () => {
+	for (const prefix of ['', '\n']) {
+		const [source, root] = each_with_context(prefix, '{ a, b }', 'ObjectPattern');
+		const column = lf_point(source, at(source, '{ a')).column;
+		strictEqual(classify(source, root, CONTEXT_START_COLUMN, { column: column + 1 }), null);
+		strictEqual(classify(source, root, CONTEXT_START_COLUMN, { column: column - 1 }), null);
+	}
 });
 
-Deno.test('destructure_column: mutants do not classify', () => {
-	const [source, root] = each_with_context('\n', '{ a, b }', 'ObjectPattern');
-	const column = lf_point(source, at(source, '{ a')).column;
-	strictEqual(classify(source, root, CONTEXT_START_COLUMN, { column: column + 2 }), null);
-	strictEqual(classify(source, root, CONTEXT_START_COLUMN, { column: column - 1 }), null);
-	// tsv's own value off the definition is never excused
-	strictEqual(
-		classify(source, root, CONTEXT_START_COLUMN, { column: column + 1 }, { ours: column - 1 }),
-		null
-	);
-	// on line 1 Svelte's compensation lands: no shift to excuse
-	const [line_one, line_one_root] = each_with_context('', '{ a, b }', 'ObjectPattern');
-	const first = lf_point(line_one, at(line_one, '{ a')).column;
-	strictEqual(classify(line_one, line_one_root, CONTEXT_START_COLUMN, { column: first + 1 }), null);
-	// a plain identifier binding is no destructure
-	const [plain, plain_root] = each_with_context('\n', 'item', 'Identifier');
-	const item = lf_point(plain, at(plain, 'item')).column;
-	strictEqual(classify(plain, plain_root, CONTEXT_START_COLUMN, { column: item + 1 }), null);
-});
-
-Deno.test('destructure_column: a root comment inside the pattern, and only inside it', () => {
+Deno.test('a root comment inside a destructured binding one column off is no row', () => {
 	const source = '\n{#each xs as { a /* c */ }}{a}{/each} /* d */';
 	const p = at(source, '{ a');
 	const each = node(source, 'EachBlock', 1, at(source, '{/each}') + 7, {
@@ -150,10 +133,7 @@ Deno.test('destructure_column: a root comment inside the pattern, and only insid
 		});
 	const root = root_of([each], { comments: [comment('/* c */'), comment('/* d */')] });
 	const inside = lf_point(source, at(source, '/* c */')).column;
-	strictEqual(
-		classify(source, root, 'comments[0].loc.start.column', { column: inside + 1 }),
-		'destructure_column'
-	);
+	strictEqual(classify(source, root, 'comments[0].loc.start.column', { column: inside + 1 }), null);
 	const outside = lf_point(source, at(source, '/* d */')).column;
 	strictEqual(
 		classify(source, root, 'comments[1].loc.start.column', { column: outside + 1 }),
@@ -161,7 +141,7 @@ Deno.test('destructure_column: a root comment inside the pattern, and only insid
 	);
 });
 
-// --- 2. annotation_swallow ---------------------------------------------------------
+// --- 1. annotation_swallow ---------------------------------------------------------
 
 /** `{#each xs as x<gap>: T}{x}{/each}`, the annotation starting at its colon. */
 function each_with_annotation(gap: string): [string, Node] {
@@ -213,7 +193,7 @@ Deno.test('annotation_swallow: mutants do not classify', () => {
 	);
 });
 
-// --- 3. two_line_classes -----------------------------------------------------------
+// --- 2. two_line_classes -----------------------------------------------------------
 
 const SCRIPT = '<script>\nlet a = 1;\u2028let b = 2;\n</script>\n';
 
@@ -327,7 +307,40 @@ Deno.test('two_line_classes: island mutants outside the band do not classify', (
 	);
 });
 
-// --- 4. program_at_tag -------------------------------------------------------------
+Deno.test('two_line_classes: under a swallow, the colon line is the one it was joined onto', () => {
+	// two lone terminators ahead, then a binding whose `_ as ` swallows the newline before
+	// its colon: acorn counts the terminators, loses the swallowed line, and measures the
+	// type's column from the binding's line
+	const prefix = '<p>\u2028\u2029</p>\n';
+	const source = `${prefix}{#each xs as x\n: T}{x}{/each}`;
+	const x = at(source, 'x', 1);
+	const colon = at(source, ':');
+	const t = at(source, 'T');
+	const annotation = node(source, 'TSTypeAnnotation', colon, colon + 3, {
+		typeAnnotation: node(source, 'TSTypeReference', t, t + 1)
+	});
+	const each = node(source, 'EachBlock', prefix.length, source.length, {
+		expression: node(source, 'Identifier', at(source, 'xs'), at(source, 'xs') + 2),
+		context: node(source, 'Identifier', x, x + 1, { typeAnnotation: annotation })
+	});
+	const root = root_of([node(source, 'RegularElement', 0, prefix.length - 1), each]);
+	const leaf = 'fragment.nodes[1].context.typeAnnotation.typeAnnotation.loc.start';
+	const ours = lf_point(source, t);
+	const joined = t - prefix.length;
+	// LF line 3, less the swallowed one, plus the two terminators
+	strictEqual(ours.line, 3);
+	strictEqual(
+		classify(source, root, `${leaf}.line`, { line: 4, column: joined }),
+		'two_line_classes'
+	);
+	// the column from the colon's own line is not one acorn can give under the swallow
+	strictEqual(classify(source, root, `${leaf}.line`, { line: 4, column: ours.column }), null);
+	// past the full count, and below the swallowed one
+	strictEqual(classify(source, root, `${leaf}.line`, { line: 6, column: joined }), null);
+	strictEqual(classify(source, root, `${leaf}.line`, { line: 1, column: joined }), null);
+});
+
+// --- 3. program_at_tag -------------------------------------------------------------
 
 const PROGRAM = '<div></div>\n\t<script>\nlet a;\n</script>';
 
@@ -358,7 +371,7 @@ Deno.test('program_at_tag: mutants do not classify', () => {
 	);
 });
 
-// --- 5. typed_destructure_end ------------------------------------------------------
+// --- 4. typed_destructure_end ------------------------------------------------------
 
 /** `{#each xs as { a }: T}…` behind `prefix`, the pattern's `end` widened over `: T`. */
 function typed_destructure(prefix: string): [string, Node, number] {
@@ -383,20 +396,23 @@ Deno.test('typed_destructure_end: loc.end stays at the bracket', () => {
 		classify(source, root, CONTEXT_END_COLUMN, lf_point(source, colon)),
 		'typed_destructure_end'
 	);
-	// off line 1 the bracket also carries row 1's shift
+	// off line 1 the bracket is where the document has it too
 	const [off, off_root, off_colon] = typed_destructure('\n');
-	const shifted = lf_point(off, off_colon);
-	shifted.column += 1;
-	strictEqual(classify(off, off_root, CONTEXT_END_COLUMN, shifted), 'typed_destructure_end');
+	strictEqual(
+		classify(off, off_root, CONTEXT_END_COLUMN, lf_point(off, off_colon)),
+		'typed_destructure_end'
+	);
 });
 
 Deno.test('typed_destructure_end: mutants do not classify', () => {
 	const [source, root, colon] = typed_destructure('');
 	const p = lf_point(source, colon);
 	strictEqual(classify(source, root, CONTEXT_END_COLUMN, { column: p.column + 1 }), null);
-	// off line 1, the unshifted bracket is not Svelte's value
+	// off line 1, a bracket one column right is not Svelte's value
 	const [off, off_root, off_colon] = typed_destructure('\n');
-	strictEqual(classify(off, off_root, CONTEXT_END_COLUMN, lf_point(off, off_colon)), null);
+	const shifted = lf_point(off, off_colon);
+	shifted.column += 1;
+	strictEqual(classify(off, off_root, CONTEXT_END_COLUMN, shifted), null);
 	// an untyped destructure's end is never widened
 	const [plain, plain_root] = each_with_context('', '{ a }', 'ObjectPattern');
 	strictEqual(
@@ -405,7 +421,7 @@ Deno.test('typed_destructure_end: mutants do not classify', () => {
 	);
 });
 
-// --- 6. each_as_stale_loc ----------------------------------------------------------
+// --- 5. each_as_stale_loc ----------------------------------------------------------
 
 /**
  * `{#each contents ?? [] as section}{section}{/each}` under `lang="ts"` — the expression
@@ -494,12 +510,15 @@ Deno.test('no row applies to a TypeScript or CSS document', () => {
 		),
 		null
 	);
-	// the destructure shift, exactly as the Svelte row reads it, under the other languages
-	const [source, root] = each_with_context('\n', '{ a, b }', 'ObjectPattern');
-	const column = lf_point(source, at(source, '{ a')).column;
+	// the typed destructure's end, exactly as the Svelte row reads it, under the other languages
+	const [source, root, colon] = typed_destructure('');
+	strictEqual(
+		classify(source, root, CONTEXT_END_COLUMN, lf_point(source, colon)),
+		'typed_destructure_end'
+	);
 	for (const language of ['typescript', 'css'] as const) {
 		strictEqual(
-			classify(source, root, CONTEXT_START_COLUMN, { column: column + 1 }, { language }),
+			classify(source, root, CONTEXT_END_COLUMN, lf_point(source, colon), { language }),
 			null
 		);
 	}

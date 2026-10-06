@@ -550,9 +550,9 @@ export const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 	},
 	{
 		// Svelte's `onComment` dedents a multi-line block comment by the `[ \t]` run opening
-		// its line IN THE STRING ACORN WAS HANDED, and four readers manufacture that string
-		// (`read_script`'s blanked prefix, `read_pattern`'s `(pattern = 1)`, the `_ as `
-		// insert, the `{#snippet}` prelude) — so on the line a manufacture ends, Svelte
+		// its line IN THE STRING ACORN WAS HANDED, and two readers manufacture that string
+		// (`read_script`'s blanked prefix, and the `_ as ` insert where it swallows the
+		// newline before a binding's colon) — so on the line a manufacture ends, Svelte
 		// measures a run the document does not hold. tsv measures the document's line. Gated
 		// on both values being a uniform dedent of the comment's own text (ours by exactly
 		// the document run) and on the comment opening on such a line, so any other `value`

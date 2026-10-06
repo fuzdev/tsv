@@ -4,7 +4,7 @@
 //! A typed Svelte block binding (`{#each xs as { a }: T}`, `{:then v: T}`, `{:catch e: E}`,
 //! `{@const { a }: T = x}`) is **two** acorn parses, and each attaches its own comments.
 //!
-//! Svelte's `read_pattern` parses the pattern as a synthetic `(pattern = 1)` expression, and
+//! Svelte's `read_pattern` parses the pattern as a synthetic `pattern = 1` expression, and
 //! `read_type_annotation` then parses the `: T` separately through its `_ as ` trick
 //! (`svelte/packages/svelte/src/compiler/phases/1-parse/read/context.js`). `add_comments`
 //! runs once per parse, over that parse's own comments, so a comment written inside the

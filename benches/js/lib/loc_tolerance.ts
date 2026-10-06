@@ -7,37 +7,35 @@
  * module doc). Svelte's wire departs from it in the places below, none reproduced and each
  * cataloged in docs/conformance_svelte.md §Svelte Template Corrections:
  *
- * 1. `destructure_column` — a destructured block binding (`{#each … as {…}}`, `{:then}`,
- *    `{:catch}`, `{@const}`) whose pattern opens off line 1 reads one column right on that
- *    opening line, its nodes and the comments inside it alike (`read_pattern` parses
- *    `(pattern = 1)` and drops one blank to compensate, which lands only on line 1).
- * 2. `annotation_swallow` — a newline in the four UTF-16 units before a block binding's `:`
+ * 1. `annotation_swallow` — a newline in the four UTF-16 units before a block binding's `:`
  *    is overwritten by `read_type_annotation`'s synthetic `_ as `, so the annotation's
  *    nodes sit that many lines higher, and on the colon's line measure their column from
  *    the line the rewrite began on.
- * 3. `two_line_classes` — acorn-parsed nodes count ECMAScript's terminators (a lone CR,
+ * 2. `two_line_classes` — acorn-parsed nodes count ECMAScript's terminators (a lone CR,
  *    U+2028, U+2029) where the rest of the document counts LF alone.
- * 4. `program_at_tag` — `read_script` stamps a `<script>`'s `Program.loc` at the tag while
+ * 3. `program_at_tag` — `read_script` stamps a `<script>`'s `Program.loc` at the tag while
  *    its `start`/`end` are the content's.
- * 5. `typed_destructure_end` — a typed destructured block binding's `end` is widened over
+ * 4. `typed_destructure_end` — a typed destructured block binding's `end` is widened over
  *    the annotation while its `loc.end` stays at the bracket.
- * 6. `each_as_stale_loc` — under `lang="ts"`, an `{#each}` expression's `end` is unwound
- *    from the `as` expression while its `loc.end` is not.
+ * 5. `each_as_stale_loc` — under `lang="ts"`, an `{#each}` expression acorn parsed has its
+ *    `end` unwound from the `as` expression while its `loc.end` is not.
  *
  * Each row is a predicate over the canonical tree, the source and the difference itself,
  * and each requires the oracle to hold a value Svelte's model gives — so a row cannot
  * excuse a difference somewhere else, or a different difference at the same place. Rows
- * 1, 2, 4 and 5 compute that value exactly. Row 6 requires the oracle's point to name the
+ * 1, 3 and 4 compute that value exactly. Row 5 requires the oracle's point to name the
  * end of the `as` type Svelte's acorn read swallowed: past the `as` keyword, at or before
- * the context's end, on a token boundary. Row 3 is exact for a `<script>`'s nodes and its
+ * the context's end, on a token boundary. Row 2 is exact for a `<script>`'s nodes and its
  * comments (Svelte hands acorn the document with every unit ahead of the content blanked
  * but `\n`, so the count is the LF lines before the content plus every ECMAScript
- * terminator inside it) and a band for a template island, where Svelte hands acorn a
- * prefix the comparator does not model: the oracle's line must lie between the LF count
+ * terminator inside it) and a band for a template island, where which of the terminators
+ * ahead of it acorn counted depends on the document (Svelte seeds acorn with its own LF
+ * position when the document holds LF breaks alone, and lets acorn count from the
+ * document's start otherwise): the oracle's line must lie between the LF count
  * and the full ECMAScript count from the document start, and its column must be the LF
  * column or one measured from a lone terminator on the same LF line — evaluated at the
- * offsets row 5 and row 6 read too, admitting row 1's +1 column inside a row-1 slot and
- * row 2's swallowed lines under a row-2 swallow, since those rows compose with it. The
+ * offsets row 4 and row 5 read too, admitting row 1's swallowed lines and its joined
+ * colon line under a row-1 swallow, since those rows compose with it. The
  * band's residual is deliberate: an island position one line off inside the band reads
  * as tolerated, because naming the exact line needs the island's own start — a per-island
  * model of the prefix Svelte prepares, which the comparator deliberately does not carry.
@@ -64,7 +62,6 @@ import type { Language } from './types.ts';
 
 /** One tolerance row. */
 export type LocRow =
-	| 'destructure_column'
 	| 'annotation_swallow'
 	| 'two_line_classes'
 	| 'program_at_tag'
@@ -73,7 +70,6 @@ export type LocRow =
 
 /** The rows in table order — the order the comparator's summary prints them in. */
 export const LOC_ROWS: readonly LocRow[] = [
-	'destructure_column',
 	'annotation_swallow',
 	'two_line_classes',
 	'program_at_tag',
@@ -415,26 +411,27 @@ function script_point(
 /**
  * Whether `(line, column)` is a point acorn can give `offset` in a template island, over
  * any prefix Svelte hands it: the line between the LF count and the full ECMAScript count
- * from the document start (less `line_slack`, row 2's swallowed lines), the column the LF
- * column or one measured from a lone terminator on the same LF line (or one more, under
- * `column_slack`, row 1's shift).
+ * from the document start (less row 1's swallowed lines, under `swallow`), the column the
+ * LF column or one measured from a lone terminator on the same LF line — where, on the
+ * colon's line of a swallow, that line is the one the rewrite joined it onto.
  */
 function in_island_band(
 	offset: number,
 	line: number,
 	column: number,
 	doc: Document,
-	column_slack: 0 | 1,
-	line_slack: number
+	swallow: Swallow | null
 ): boolean {
 	const lf = line_index(offset, doc.starts);
 	const below = count_below(offset, doc.ecmascript_only);
-	if (line < lf + 1 - line_slack || line > lf + 1 + below) return false;
-	const columns = [offset - doc.starts[lf]];
-	for (let k = count_below(doc.starts[lf], doc.ecmascript_only); k < below; k++) {
+	if (line < lf + 1 - (swallow?.erased ?? 0) || line > lf + 1 + below) return false;
+	const line_start =
+		swallow !== null && lf === swallow.colon_line ? doc.starts[swallow.base_line] : doc.starts[lf];
+	const columns = [offset - line_start];
+	for (let k = count_below(line_start, doc.ecmascript_only); k < below; k++) {
 		columns.push(offset - (doc.ecmascript_only[k] + 1));
 	}
-	return columns.some((c) => column === c || column === c + column_slack);
+	return columns.includes(column);
 }
 
 /** The `<script>` content holding the owner at `owner_path`, if it sits in one. */
@@ -599,33 +596,7 @@ export function classify_loc_difference(
 	const found = find_slot(owner_path, ctx.canonical_root);
 	const is_root_comment = /^comments\[\d+\]$/.test(owner_path);
 
-	// 1. destructure_column
-	if (field === 'column' && canonical === ours + 1) {
-		const pattern_line = (pattern: Node) => line_index(pattern.start, doc.starts);
-		const shifted = (pattern: Node): boolean =>
-			is_destructure(pattern) &&
-			pattern_line(pattern) > 0 &&
-			line_index(offset, doc.starts) === pattern_line(pattern);
-		if (
-			found !== null &&
-			!found.rest.startsWith('typeAnnotation') &&
-			offset <= bare_end(found.slot.pattern) &&
-			shifted(found.slot.pattern)
-		) {
-			return 'destructure_column';
-		}
-		if (
-			is_root_comment &&
-			slots_of(ctx, doc).some(
-				({ pattern }) =>
-					shifted(pattern) && owner!.start >= pattern.start && owner!.end <= bare_end(pattern)
-			)
-		) {
-			return 'destructure_column';
-		}
-	}
-
-	// 2. annotation_swallow
+	// 1. annotation_swallow
 	const swallowed = (pattern: Node): boolean => {
 		const s = swallow_of(pattern, doc);
 		return s !== null && canonical === swallowed_point(offset, s, doc.starts)[field];
@@ -642,7 +613,7 @@ export function classify_loc_difference(
 		}
 	}
 
-	// 4. program_at_tag
+	// 3. program_at_tag
 	const program = /^(instance|module)\.content$/.exec(owner_path);
 	if (program) {
 		const script = (ctx.canonical_root as Node)[program[1]] as Node | null;
@@ -652,7 +623,7 @@ export function classify_loc_difference(
 		}
 	}
 
-	// 5. typed_destructure_end
+	// 4. typed_destructure_end
 	if (found !== null && found.rest === '' && side === 'end') {
 		const pattern = found.slot.pattern;
 		const annotation = pattern.typeAnnotation as Node | undefined;
@@ -661,15 +632,11 @@ export function classify_loc_difference(
 			typeof annotation?.start === 'number' &&
 			pattern.end === annotation.end
 		) {
-			const p = point(annotation.start, doc.starts);
-			const start_line = line_index(pattern.start, doc.starts) + 1;
-			// the bracket inherits row 1's shift when it closes on an opening line past line 1
-			if (start_line > 1 && p.line === start_line) p.column += 1;
-			if (canonical === p[field]) return 'typed_destructure_end';
+			if (canonical === point(annotation.start, doc.starts)[field]) return 'typed_destructure_end';
 		}
 	}
 
-	// 6. each_as_stale_loc — the `{#each}` expression's `loc.end`, which Svelte (under
+	// 5. each_as_stale_loc — the `{#each}` expression's `loc.end`, which Svelte (under
 	// `lang="ts"` alone) leaves at the end of the `as` type its acorn read swallowed: the
 	// oracle's point must sit past
 	// the `as` keyword, at or before the context's end, on a token boundary (the `as` test
@@ -689,7 +656,7 @@ export function classify_loc_difference(
 		}
 	}
 
-	// 3. two_line_classes — last, and only on an acorn-counted position behind a terminator
+	// 2. two_line_classes — last, and only on an acorn-counted position behind a terminator
 	// the two classes disagree on (a position carrying `character` was counted by Svelte's
 	// own LF locator, so it is never one)
 	if (oracle === null || oracle.character !== undefined) return null;
@@ -702,25 +669,20 @@ export function classify_loc_difference(
 	}
 	// a template island: the band, at every offset a row composing with this one reads
 	const offsets = [offset];
-	let column_slack: 0 | 1 = 0;
-	let line_slack = 0;
+	let swallow: Swallow | null = null;
 	if (found !== null) {
 		const pattern = found.slot.pattern;
 		const in_annotation = found.rest.startsWith('typeAnnotation');
-		// row 5: the slot's `loc.end` at its annotation's start
+		// row 4: the slot's `loc.end` at its annotation's start
 		if (found.rest === '' && side === 'end' && typeof pattern.typeAnnotation?.start === 'number') {
 			offsets.push(pattern.typeAnnotation.start);
 		}
-		// row 1: one column right inside a destructure
-		if (is_destructure(pattern) && !in_annotation) column_slack = 1;
-		// row 2: the lines the `_ as ` rewrite erased
-		if (in_annotation) line_slack = swallow_of(pattern, doc)?.erased ?? 0;
+		// row 1: the lines the `_ as ` rewrite erased, and the line it joined the colon's onto
+		if (in_annotation) swallow = swallow_of(pattern, doc);
 	}
-	// row 6: the `{#each}` expression's `loc.end` past its `as`
+	// row 5: the `{#each}` expression's `loc.end` past its `as`
 	if (typeof context_end === 'number') offsets.push(context_end, bare_end(each_block!.context));
-	return offsets.some((o) =>
-		in_island_band(o, oracle.line, oracle.column, doc, column_slack, line_slack)
-	)
+	return offsets.some((o) => in_island_band(o, oracle.line, oracle.column, doc, swallow))
 		? 'two_line_classes'
 		: null;
 }

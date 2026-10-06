@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 419,
+	"end": 422,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,86 +12,86 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " a `defer`-phased import answers its own `(` like every other call shape — the phase",
+			"value": " a `source`-phased import answers its own `(` like every other call shape — the phase",
 			"start": 20,
-			"end": 106
+			"end": 107
 		},
 		{
 			"type": "Line",
 			"value": " only changes the head, not the gap",
-			"start": 108,
-			"end": 145
+			"start": 109,
+			"end": 146
 		},
 		{
 			"type": "Line",
 			"value": " c1",
-			"start": 171,
-			"end": 176
+			"start": 173,
+			"end": 178
 		},
 		{
 			"type": "Line",
 			"value": " an author blank BELOW the pulled comment survives — the blank is authorship, not",
-			"start": 191,
-			"end": 274
+			"start": 193,
+			"end": 276
 		},
 		{
 			"type": "Line",
 			"value": " the container's leading gap (the blank ABOVE one stays erased, against the delimiter)",
-			"start": 276,
-			"end": 364
+			"start": 278,
+			"end": 366
 		},
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 390,
-			"end": 395
+			"start": 393,
+			"end": 398
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 418,
+		"end": 421,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 409,
+			"end": 412,
 			"body": [
 				{
 					"type": "VariableDeclaration",
-					"start": 147,
-					"end": 188,
+					"start": 148,
+					"end": 190,
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 153,
-							"end": 187,
+							"start": 154,
+							"end": 189,
 							"id": {
 								"type": "Identifier",
-								"start": 153,
-								"end": 154,
+								"start": 154,
+								"end": 155,
 								"name": "a"
 							},
 							"init": {
 								"type": "ImportExpression",
-								"start": 157,
-								"end": 187,
+								"start": 158,
+								"end": 189,
 								"source": {
 									"type": "Literal",
-									"start": 179,
-									"end": 184,
+									"start": 181,
+									"end": 186,
 									"value": "./a",
 									"raw": "'./a'",
 									"leadingComments": [
 										{
 											"type": "Line",
 											"value": " c1",
-											"start": 171,
-											"end": 176
+											"start": 173,
+											"end": 178
 										}
 									]
 								},
-								"phase": "defer"
+								"phase": "source"
 							}
 						}
 					],
@@ -99,53 +99,53 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " a `defer`-phased import answers its own `(` like every other call shape — the phase",
+							"value": " a `source`-phased import answers its own `(` like every other call shape — the phase",
 							"start": 20,
-							"end": 106
+							"end": 107
 						},
 						{
 							"type": "Line",
 							"value": " only changes the head, not the gap",
-							"start": 108,
-							"end": 145
+							"start": 109,
+							"end": 146
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 366,
-					"end": 408,
+					"start": 368,
+					"end": 411,
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 372,
-							"end": 407,
+							"start": 374,
+							"end": 410,
 							"id": {
 								"type": "Identifier",
-								"start": 372,
-								"end": 373,
+								"start": 374,
+								"end": 375,
 								"name": "b"
 							},
 							"init": {
 								"type": "ImportExpression",
-								"start": 376,
-								"end": 407,
+								"start": 378,
+								"end": 410,
 								"source": {
 									"type": "Literal",
-									"start": 399,
-									"end": 404,
+									"start": 402,
+									"end": 407,
 									"value": "./b",
 									"raw": "'./b'",
 									"leadingComments": [
 										{
 											"type": "Line",
 											"value": " c2",
-											"start": 390,
-											"end": 395
+											"start": 393,
+											"end": 398
 										}
 									]
 								},
-								"phase": "defer"
+								"phase": "source"
 							}
 						}
 					],
@@ -154,14 +154,14 @@
 						{
 							"type": "Line",
 							"value": " an author blank BELOW the pulled comment survives — the blank is authorship, not",
-							"start": 191,
-							"end": 274
+							"start": 193,
+							"end": 276
 						},
 						{
 							"type": "Line",
 							"value": " the container's leading gap (the blank ABOVE one stays erased, against the delimiter)",
-							"start": 276,
-							"end": 364
+							"start": 278,
+							"end": 366
 						}
 					]
 				}

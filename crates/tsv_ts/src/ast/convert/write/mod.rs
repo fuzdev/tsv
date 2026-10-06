@@ -156,7 +156,7 @@ fn write_identifier_expression_with_character_in(
 /// A trailing `: T` is Svelte's second parse, so it is a second comment island:
 /// `comments` is `Attach` for a comment-carrying destructure pattern
 /// (`{@const { b = /* c */ 1 } = expr}`), whose canonical parse is a synthetic
-/// `(pattern = 1)` acorn expression whose comment attach covers the pattern
+/// `pattern = 1` acorn expression whose comment attach covers the pattern
 /// subtree, and the annotation attaches under `annotation_comments` instead — see
 /// `Ctx::annotation_comments`.
 #[inline]

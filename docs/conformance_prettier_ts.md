@@ -731,15 +731,18 @@ The **source-phase imports** and **import defer** proposals (`import source x
 from 'mod'` / `import.source('mod')`, `import defer * as ns from 'mod'` /
 `import.defer('mod')`) are a tsv-native parser divergence — acorn rejects them, so
 they are **not** in the "Prettier rejects valid input" set below (that set is keyed
-on acorn *accepting* the input). Prettier diverges one way:
+on acorn *accepting* the input). Prettier diverges on the `source` phase, both spellings:
 
 - **`import source` — printer throws.** Prettier's `typescript` parser reads
   `source` as a binding name and throws (`'=' expected`). tsv parses and keeps the
   statement stable.
+- **`import.source(…)` — printer throws.** The same parser rejects the dynamic form
+  (`'source' is not a valid meta-property for keyword 'import'`). tsv parses and keeps
+  the call stable.
 
 The `import defer` phase is preserved by both formatters (no divergence), and the dynamic
-`import.source(…)` / `import.defer(…)` forms have none either — prettier formats them
-identically to tsv. Every entry in this family is fixturable: a canonical-parser *rejection*
+`import.defer(…)` form has none of its own either — prettier formats it as it does an
+unphased `import(…)`. Every entry in this family is fixturable: a canonical-parser *rejection*
 is representable (`expected_ours.json` + `expected_svelte.json` holding the parse-failure
 marker — see
 [conformance_svelte.md §Import-phase proposals](./conformance_svelte.md#import-phase-proposals)),
@@ -751,7 +754,9 @@ each claim here is pinned by a fixture. The remaining printer round-trips stay i
 live-pinned by
 [source_phase](../tests/fixtures/typescript/modules/imports/source_phase_svelte_prettier_divergence/),
 whose `prettier_rejects.txt` carries the expected-error substring while
-`expected_svelte.json` carries acorn's rejection — both oracles failing in one fixture.
+`expected_svelte.json` carries acorn's rejection — both oracles failing in one fixture —
+and the `import.source(…)` throw the same way by
+[import_source_open_paren_comment](../tests/fixtures/typescript/expressions/calls/import_source_open_paren_comment_svelte_prettier_divergence/).
 See
 [conformance_svelte.md §Import-phase proposals](./conformance_svelte.md#import-phase-proposals)
 and [conformance_test262.md](./conformance_test262.md).

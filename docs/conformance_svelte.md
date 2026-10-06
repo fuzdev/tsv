@@ -382,7 +382,9 @@ inputs, so the corpus AST differential is the regression oracle.
 
 - **each-`as` stale `loc.end`** (`loc` tolerance row `each_as_stale_loc`; corpus oracles
   `svelte.dev` DocsContents.svelte, ConsoleLine.svelte). Under `lang="ts"`,
-  Svelte parses `{#each contents ?? [] as section}` by letting the TS parser
+  Svelte parses an `{#each}` head it hands to acorn — any expression but a plain
+  identifier or member chain, which it reads itself — such as
+  `{#each contents ?? [] as section}` by letting the TS parser
   read `contents ?? [] as section` as an as-expression, then unwraps it —
   patching the expression's `end` _offset_ back to `contents ?? []` but leaving
   `loc.end` at the as-expression's end (the column after `section`). tsv's
@@ -429,17 +431,13 @@ inputs, so the corpus AST differential is the regression oracle.
   Svelte's wire departs from that in the places below — none reproduced, each graded
   as a named tolerance in the corpus `loc` comparison rather than matched (the
   each-`as` stale `loc.end` above is one more):
-  - **the destructure column shift** — a destructured block binding off line 1 reads
-    one column right on its opening line, its nodes and the comments in it alike
-    (`read_pattern` parses `(pattern = 1)` and drops one blank to compensate, which
-    lands only on line 1);
   - **the `_ as ` line swallow** — a newline in the four UTF-16 units before a block
     binding's `:` is overwritten by `read_type_annotation`'s synthetic `_ as `, so the
     annotation's nodes sit that many lines higher;
-  - **two line classes** — acorn-parsed nodes count ECMAScript's terminators (a lone
-    `<CR>`, `<LS>`, `<PS>`), seeded per parse from the prefix Svelte prepared, where
-    the rest counts `\n` alone (graded exactly inside a `<script>`, whose prefix is the
-    document's LF lines, and within a band in a template island);
+  - **two line classes** — in a document holding a lone `<CR>`, `<LS>` or `<PS>`,
+    acorn-parsed nodes count ECMAScript's terminators where the rest counts `\n` alone
+    (graded exactly inside a `<script>`, whose prefix is the document's LF lines, and
+    within a band in a template island);
   - **`Program.loc` at the tag** — `read_script` stamps a `<script>`'s `Program.loc`
     at the tag (for its sourcemaps) while `start`/`end` are the content's;
   - **the typed destructure's `loc.end`** at the bracket, above.
@@ -518,55 +516,38 @@ value). One case is corrected:
   the matched half of the reader is
   [static_attribute_grammar](../tests/fixtures/svelte/script/static_attribute_grammar/).
 
-### Block Continuation Corrections
+### Block Continuation Clauses
 
 Svelte reads a `{:…}` continuation with one function, `next`
-(`1-parse/state/tag.js`), which dispatches on the open block. Its `{#await}` arm
-guards each clause — `if (block.then) e.block_duplicate_clause(start, '{:then}')`,
-and the same for `{:catch}` — but its `{#if}` and `{#each}` arms assign
-`block.alternate = create_fragment()` / `block.fallback = create_fragment()`
-**unguarded**. So a repeated `{:else}` parses, replacing the alternate outright:
-`{#if cond}text1{:else}text2{:else}text3{/if}` yields an AST holding `text1` and
-`text3` only, and prettier, printing from that AST, emits the loss. tsv rejects every
-spelling that reaches those two unguarded assignments instead:
+(`1-parse/state/tag.js`), which dispatches on the open block and guards every clause a
+block can hold once: `if (block.then) e.block_duplicate_clause(start, '{:then}')`, the
+same for `{:catch}`, and the same for `{#if}`'s alternate and `{#each}`'s fallback. A
+continuation that would land on a slot already taken is a parse error, so no reading
+drops a branch of the author's markup. tsv rejects the same documents — this section is
+a **match**, not a correction — and the verdicts are pinned as `input_invalid_*` files:
 
-- **Duplicated `{:else}`** — reproducing the overwrite means a formatter that
-  silently deletes a branch of the author's markup, and no reading of the input
-  keeps those bytes, so rejecting is the only lossless answer. Svelte itself takes
-  that view one block over, which makes the gap an inconsistency in the reader
-  rather than a designed behavior; tsv applies the `{#await}` rule uniformly.
-  Three spellings reach the same unguarded assignment and each is pinned with the
-  canonical AST *including* its missing branch, so the argument dies loudly if
-  Svelte ever adds the guard: `{#if}`'s repeated `{:else}`
-  (`Duplicate {:else} clause`,
-  [if/else_duplicate](../tests/fixtures/svelte/blocks/if/else_duplicate_svelte_divergence/)),
-  an `{:else if}` following an `{:else}` on the same block
-  (`{:else if} cannot follow {:else}` — not the duplicate wording, since that one is
-  the block's *first* `{:else if}` and only the alternate it lands on is taken,
-  [if/elseif_after_else](../tests/fixtures/svelte/blocks/if/elseif_after_else_svelte_divergence/)),
-  and `{#each}`'s repeated `{:else}`
-  (`Duplicate {:else} clause`,
-  [each/else_duplicate](../tests/fixtures/svelte/blocks/each/else_duplicate_svelte_divergence/)).
-  A continuation that is neither (`{:catch}` after an `{:else}`) takes the
-  misplaced-continuation error in canonical's wording (`Expected token {:else} or
-  {:else if}`), since canonical rejects it too and the verdict already matches.
+- `{#if}`: a repeated `{:else}`, and an `{:else if}` following an `{:else}`, beside
+  [if/else](../tests/fixtures/svelte/blocks/if/else/);
+- `{#each}`: a repeated `{:else}`, beside
+  [each/else](../tests/fixtures/svelte/blocks/each/else/);
+- `{#await}`: the duplicate `{:then}` / `{:catch}` spellings beside
+  [then_catch](../tests/fixtures/svelte/blocks/await/then_catch/),
+  [then_shorthand](../tests/fixtures/svelte/blocks/await/then_shorthand/),
+  [catch_shorthand](../tests/fixtures/svelte/blocks/await/catch_shorthand/) and
+  [then_shorthand_catch](../tests/fixtures/svelte/blocks/await/then_shorthand_catch/).
 
-The `{#await}` arm is **matched**, not corrected — the permissive reading there
-(overwriting `then` / `catch` exactly the way canonical's `{:else}` does) is what
-canonical rejects; the
-duplicate-clause verdicts are pinned as `input_invalid_*` files beside the
-[then_catch](../tests/fixtures/svelte/blocks/await/then_catch/),
-[then_shorthand](../tests/fixtures/svelte/blocks/await/then_shorthand/),
-[catch_shorthand](../tests/fixtures/svelte/blocks/await/catch_shorthand/) and
-[then_shorthand_catch](../tests/fixtures/svelte/blocks/await/then_shorthand_catch/)
-fixtures.
+A continuation that is not the block's own (`{:catch}` after an `{:else}`) takes the
+misplaced-continuation error in canonical's wording (`Expected token {:else} or
+{:else if}`).
 
-The wording of every rejection above is pinned by
-[`tests/svelte_block_continuation_clause.rs`](../tests/svelte_block_continuation_clause.rs),
-not by the fixtures: `input_invalid_*` asserts only *that* both parsers reject, and
-`tsv_rejects.txt` — which does pin a substring — is valid only in a `_svelte_divergence`
-directory, i.e. one where canonical *accepts*. So the `{#await}` half has no fixture
-vehicle for its message at all.
+Only the **wording** differs, and it is tsv's own. Canonical reports every one of these
+as the named clause appearing more than once. tsv keeps two messages apart: a repeat
+(`Duplicate {:else} clause`) and a *different* clause arriving at a slot its predecessor
+took (`{:else if} cannot follow {:else}` — that `{:else if}` is the block's first, so
+calling it a duplicate would name a clause the author wrote once). `input_invalid_*`
+asserts only *that* both parsers reject, so the messages are pinned by
+[`tests/svelte_block_continuation_clause.rs`](../tests/svelte_block_continuation_clause.rs)
+rather than by the fixtures.
 
 ### TypeScript Corrections
 
@@ -1561,7 +1542,7 @@ phase to both static and dynamic imports:
 - `import source x from 'mod'` / `import.source('mod')` — phase `'source'` — [source_phase](../tests/fixtures/typescript/modules/imports/source_phase_svelte_prettier_divergence/), which pins BOTH oracles failing in one fixture: `expected_svelte.json` for acorn's rejection, `prettier_rejects.txt` for prettier's throw (`'=' expected.` — it reads `source` as an ordinary default binding)
 - `import defer * as ns from 'mod'` / `import.defer('mod')` — phase `'defer'`
 
-The **dynamic** (expression) spelling of both phases is pinned separately by [import_phase_open_paren_comment](../tests/fixtures/typescript/expressions/calls/import_phase_open_paren_comment_svelte_prettier_divergence/), where the two oracles part: acorn still rejects `import.source(…)` (so the parser claim is `expected_ours.json` + a parse-failure `expected_svelte.json`), while prettier *parses* it and only relocates its `(`-line comment — so that half has a live oracle and an `output_prettier.svelte`.
+The **dynamic** (expression) spelling of each phase is pinned separately, and acorn rejects both (so the parser claim is `expected_ours.json` + a parse-failure `expected_svelte.json`). For `import.defer(…)` the two oracles part — prettier *parses* it and only relocates its `(`-line comment, so that half has a live oracle and an `output_prettier.svelte`: [import_phase_open_paren_comment](../tests/fixtures/typescript/expressions/calls/import_phase_open_paren_comment_svelte_prettier_divergence/). For `import.source(…)` prettier throws as well, pinned by `prettier_rejects.txt`: [import_source_open_paren_comment](../tests/fixtures/typescript/expressions/calls/import_source_open_paren_comment_svelte_prettier_divergence/).
 
 acorn-typescript implements neither (`import source x` → `Unexpected token`,
 `import.source(…)` → `The only valid meta property for import is 'import.meta'`),
@@ -1771,7 +1752,7 @@ because regex bodies are opaque, so it does not meet this section's bar and will
 - each-`as` stale `loc.end` — TS-mode as-expression unwrap patches the expression's `end` offset but not `loc.end`
 - Block-annotation `?:` rewrite — `read_type_annotation`'s `.replace(/\?\s*:/g, ':')` edits the string acorn measures positions in, so an optional member in a block binding's `: T` loses `optional` and shifts every later offset one byte short (see §TypeScript Corrections)
 - Block-annotation expression tail — `read_type_annotation` parses the annotation as the tail of a synthetic `_ as` *expression*, so an `as` / `satisfies` chain keeps only its last type, any other operator tail leaves the annotation with no type at all, and in `{#each}` an operator tail swallows the `(key)` as a call. It should read a type (see §TypeScript Corrections)
-- Manufactured-line comment dedent — `onComment` measures a multi-line block comment's indentation in the string the reader handed acorn (a blanked `<script>` prefix, `(pattern = 1)`, `_ as `, the blanked `{#snippet}` prelude), so on the line a manufacture ends the `value` is dedented by a run the document does not hold. It should read the document's line (see §Comment Attachment Differences)
+- Manufactured-line comment dedent — `onComment` measures a multi-line block comment's indentation in the string the reader handed acorn (a blanked `<script>` prefix, an annotation's `_ as ` over a swallowed newline), so on the line a manufacture ends the `value` is dedented by a run the document does not hold. It should read the document's line (see §Comment Attachment Differences)
 
 ### Comment Attachment Differences
 
@@ -1786,18 +1767,17 @@ because regex bodies are opaque, so it does not meet this section's bar and will
 
 - **TypeScript `{#each}` head drops its expression's leading-comment attachment.** Under `lang="ts"` acorn-typescript reads even a bare `items as item` head as a `TSAsExpression`, so **every** TS each head — assertion or not — takes canonical's type-assertion unwind, which rebuilds the expression from the node acorn produced and discards the `leadingComments` attached to the node it drops. Whether the attachment survives is then incidental to the authored line layout: a same-line comment loses it, one on its own line keeps it. tsv attaches it to the surviving node in every case, the same verdict as the `remove_parens` loss below; a non-TS component takes no unwind and both parsers attach ([syntax/comments/expr_block_each](../tests/fixtures/svelte/syntax/comments/expr_block_each/)). Also a `_prettier_divergence` — see [conformance_prettier_svelte.md §Svelte: each-head comments under `lang="ts"`](./conformance_prettier_svelte.md#svelte-each-head-comments-under-langts).
   - [each/type_assertion_comment_svelte_prettier_divergence](../tests/fixtures/svelte/blocks/each/type_assertion_comment_svelte_prettier_divergence/)
-  - **The same unwind's other consequence: it DUPLICATES what the discarded parse scanned.** Its `onComment` has already pushed into the shared `root.comments` before the node is thrown away, and the re-read after the rewind pushes the same comments again; `add_comments` re-filters the whole accumulated array, so both copies attach too. The trigger is how far that speculative parse reached, not where the comment sits: a comment **inside the binding pattern** always doubles (the pattern *is* the `as` type it read), while one **inside the key parens** doubles only with a `, index` ahead of it (the comma makes the parse a sequence expression that runs on through the key) — with no index the same comment is listed once. tsv answers the `as` question directly (`tsv_ts::TopLevelAs`) rather than speculating, so there is no discarded parse and each comment exists once. Same mechanism as the no-`as` head above, which needs no `lang="ts"` to reach it. ⚠️ The copies can also disagree in `value`: the speculative parse read the **raw template** where the surviving `read_pattern` parse reads its manufactured `(pattern = 1)` source, so a multi-line block comment inside the binding pattern is dedented twice, differently — on a tab-indented head, `\t{#each [1] as {/* a⏎\tb */ a } }` gives canonical `[" a\nb ", " a\n\tb "]` for one span (the raw-template pass strips the head's tab, the manufactured pass sees a space there and strips nothing). tsv's single copy is measured on the document's line, so it is the raw-template pass's (`" a\nb "`, canonical's first) — the surviving parse's value is the manufactured-line dedent divergence below.
+  - **The same unwind's other consequence: it DUPLICATES what the discarded parse scanned.** Its `onComment` has already pushed into the shared `root.comments` before the node is thrown away, and the re-read after the rewind pushes the same comments again; `add_comments` re-filters the whole accumulated array, so both copies attach too. The trigger is how far that speculative parse reached, not where the comment sits: a comment **inside the binding pattern** always doubles (the pattern *is* the `as` type it read), while one **inside the key parens** doubles only with a `, index` ahead of it (the comma makes the parse a sequence expression that runs on through the key) — with no index the same comment is listed once. tsv answers the `as` question directly (`tsv_ts::TopLevelAs`) rather than speculating, so there is no discarded parse and each comment exists once. Same mechanism as the no-`as` head above, which needs no `lang="ts"` to reach it.
     - [each/ts_head_comment_duplication_svelte_prettier_divergence](../tests/fixtures/svelte/blocks/each/ts_head_comment_duplication_svelte_prettier_divergence/) — both triggers plus both null controls (the index-less key, and an `{#if}` head, which takes no unwind)
 
 - **`{@const}` with a type annotation duplicates every comment from the `:` to the tag close.** Svelte's `read_type_annotation` tricks acorn into parsing the annotation by building `_ as <annotation> = <init>`; that parse is an `AssignmentExpression`, so the reader's own "gets mangled — fix it" branch **re-parses** the slice up to the `=`. The first parse is discarded, but its `onComment` has already pushed everything it scanned into the shared `root.comments`, and the two real parses then push their own copies — order [pass 1: all, pass 2: annotation region, pass 3: init region]. `add_comments` re-filters the *whole accumulated* array rather than its own parse's pushes, so the duplicates are attached as well. The trigger is the annotation's **presence**, not a comment's position: an *init* comment is doubled too when the binding carries an annotation, and listed once when it does not. tsv parses the annotation as part of the binding, once, so each comment exists once and attaches once; the formatter matches prettier on every shape. At corpus scale the copies are admitted by the matcher `comment_dedup` only as copies — an array longer on the canonical side by exactly its repeated spans, a root `comments[i]` that is tsv's i-th distinct comment — so a comment tsv drops is never read as one.
   - **The two copies need not land on the same NODE, so the duplication can be an attachment tsv has nowhere.** `add_comments` walks with the whole accumulated array as its queue, so at a **union seam** the copies split rather than stacking: `{@const a: A /* c */ | B = expr}` gives `A` a `trailingComments` (the gap to the comment is acorn's own `/^[,) \t]*$/`) and then `B` a `leadingComments`, where a comment leading the whole type gives one node `[c, c]`. The seam is not what produces it — the same comment at the same seam in a plain `<script>` (`let a: A /* c */ | B;`), which Svelte reads once, is attached to `A` alone by **both** parsers, which is tsv's answer inside the tag too.
-  - **The two copies of a multi-line block comment can also carry two different `value`s.** acorn's `onComment` dedents such a comment by the `[ \t]` run opening its line **in the string acorn was handed**, and the discarded parse was handed a different one from the surviving parse (the discarded pass reads the `_ as ` manufactured source; the surviving init parse reads the raw template). So the duplication is not always a duplicate: `[pass 1: all]` can list an *init* comment dedented against the annotation's synthetic source and `[pass 3: init region]` the same comment dedented against the init's own. tsv emits one value, measured on the document's line — for an init comment, the copy the surviving init parse made, since that parse read the raw template. A comment inside the annotation itself is the manufactured-line dedent divergence below.
+  - **The two copies of a multi-line block comment can also carry two different `value`s.** acorn's `onComment` dedents such a comment by the `[ \t]` run opening its line **in the string acorn was handed**, and the discarded parse was handed a different one from the surviving parse (the discarded pass reads the `_ as ` manufactured source, where a newline swallowed before the colon joins the colon's line onto the binding's; the surviving init parse reads the raw template). So the duplication is not always a duplicate: `[pass 1: all]` can list an *init* comment dedented against the binding's line and `[pass 3: init region]` the same comment dedented against its own (`\t{@const a⏎\t\t: T = /* i⏎\t\t j */ e}` — Svelte `[" i\n\t j ", " i\n j "]`). tsv emits one value, measured on the document's line — for an init comment, the copy the surviving init parse made, since that parse read the raw template. A comment inside the annotation itself is the manufactured-line dedent divergence below.
   - [const_annotation_comment_svelte_divergence](../tests/fixtures/svelte/tags/const/const_annotation_comment_svelte_divergence/)
 
-- **A multi-line block comment opening on a manufactured line is dedented by the document's line, not by the string acorn was handed.** acorn's `onComment` (`1-parse/acorn.js`) dedents a multi-line block comment: it takes the `[ \t]` run opening the comment's line and strips one copy of it from the start of every line of the `value`. The dedent itself is deliberate — esrap prints `value` back — and tsv keeps it, with Svelte's own two line-terminator classes (a `\n`-only walk-back to the line start, an `m`-mode `^` strip; pinned by [comment_dedent_line_terminators.rs](../tests/comment_dedent_line_terminators.rs)). What it measures is the accident: Svelte reads the run **in the string its reader handed acorn**, and four readers hand acorn a rewritten one — `read_script` blanks everything ahead of a `<script>` body with `replace(/[^\n]/g, ' ')`; `read_pattern` blanks the prefix, drops its first space and wraps the binding as `(pattern = 1)`; `read_type_annotation` blanks the prefix and writes `_ as ` over the five UTF-16 code units ending at the colon, swallowing any `\n` among them; a `{#snippet}` head blanks only the non-whitespace (`replace(/\S/g, ' ')`). On the one line where that manufacture ends — the `<script>` tag's line, a destructuring or typed block binding's head, a `{@const x:` annotation, a `{#snippet}` head — Svelte therefore dedents by a run the document does not hold. It goes both ways: an indented head's tab reads to Svelte as a blanked space, so the tab survives into its `value` where tsv strips it (`\t{@const a: /*⏎\t c */ T = e}` — Svelte `"\n\t c "`, tsv `"\n c "`), and a column-0 `<script>`'s eight blanked columns strip eight spaces the author typed where the document's line opens with no run at all (`<script>/*⏎        c */` — Svelte `"\nc "`, tsv `"\n        c "`). The run is an artifact of how each reader built acorn's input, and reproducing it meant modeling every reader's string — the blankings in JS's units (one space per UTF-16 code unit, `\S` as JS's class), the dropped space, the swallowed newline. tsv measures the run on the **document's** line — the same walk-back and the same `[ \t]` class over the author's bytes — so the comment's `value` is the one it gets on every other line, where the two parsers agree. The comments and their spans are the same in both; only the `value` differs, and the formatter, which reads the source, is unaffected. Reach is small: both formatters move these heads (a script's first statement below its tag, a pattern one property per line, a snippet's params broken), so the trigger survives only in unformatted or `prettier-ignore`-frozen code. Graded at corpus scale by the `corpus:compare:parse` matcher `manufactured_line_comment_dedent`, which admits a `value` difference only when ours is exactly the document-line dedent of the comment's own text, canonical's is a uniform `[ \t]` dedent of the same text (or none), and the comment opens on a line holding a `<script>` tag or a binding / snippet head.
-  - [syntax/comments/head_multiline_comment_dedent_svelte_divergence](../tests/fixtures/svelte/syntax/comments/head_multiline_comment_dedent_svelte_divergence/) — the three template readers behind `<!-- prettier-ignore -->`, with a raw-template `{@const}` init and `{expr}` as the controls
-  - [tags/const/const_annotation_comment_svelte_divergence](../tests/fixtures/svelte/tags/const/const_annotation_comment_svelte_divergence/) — `a5`, the one spelling that is a format fixed point unfrozen (an unbroken annotation head over a tab-indented body)
-  - The `<script>` reader cannot be a fixture (prettier reformats a script body through an ignore directive, and both formatters put its first statement below the tag); it is pinned, with the template spellings no formatter leaves standing, by [comment_dedent_document_line.rs](../tests/comment_dedent_document_line.rs)
+- **A multi-line block comment opening on a manufactured line is dedented by the document's line, not by the string acorn was handed.** acorn's `onComment` (`1-parse/acorn.js`) dedents a multi-line block comment: it takes the `[ \t]` run opening the comment's line and strips one copy of it from the start of every line of the `value`. The dedent itself is deliberate — esrap prints `value` back — and tsv keeps it, with Svelte's own two line-terminator classes (a `\n`-only walk-back to the line start, an `m`-mode `^` strip; pinned by [comment_dedent_line_terminators.rs](../tests/comment_dedent_line_terminators.rs)). What it measures is the accident: Svelte reads the run **in the string its reader handed acorn**, and two readers hand acorn one the document does not hold — `read_script` blanks everything ahead of a `<script>` body with `replace(/[^\n]/g, ' ')`, and `read_type_annotation` writes `_ as ` over the five UTF-16 code units ending at a block binding's colon, swallowing any `\n` among them. On the one line where that manufacture ends, Svelte therefore dedents by a run the document does not hold. It goes three ways: an indented `<script>` tag's tab reads to Svelte as a blanked space, so the tab survives into its `value` where tsv strips it (`\t<script>/* a⏎\t b */` — Svelte `" a\n\t b "`, tsv `" a\n b "`); a column-0 `<script>`'s eight blanked columns strip eight spaces the author typed where the document's line opens with no run at all (`<script>/*⏎        c */` — Svelte `"\nc "`, tsv `"\n        c "`); and a swallowed newline joins the colon's line onto the binding's, so Svelte measures the BINDING line's run and the two differ whenever those lines are not indented alike (`\t{#each xs as x⏎\t\t: /* a⏎\t\t b */ T}` — Svelte `" a\n\t b "`, tsv `" a\n b "`). The run is an artifact of how each reader built acorn's input, and reproducing it meant modeling that string — the blanking in JS's units (one space per UTF-16 code unit), the swallowed newline. tsv measures the run on the **document's** line — the same walk-back and the same `[ \t]` class over the author's bytes — so the comment's `value` is the one it gets on every other line, where the two parsers agree. The comments and their spans are the same in both; only the `value` differs, and the formatter, which reads the source, is unaffected. Reach is small: both formatters move these heads (a script's first statement below its tag, an annotation head joined back onto one line), so the trigger survives only in unformatted code. Graded at corpus scale by the `corpus:compare:parse` matcher `manufactured_line_comment_dedent`, which admits a `value` difference only when ours is exactly the document-line dedent of the comment's own text, canonical's is a uniform `[ \t]` dedent of the same text (or none), and the comment opens on a line holding a `<script>` tag or a binding / snippet head.
+  - Neither spelling can be a fixture — prettier reformats a script body through an ignore directive, both formatters put its first statement below the tag, and both join the annotation head — so the divergence is pinned by [comment_dedent_document_line.rs](../tests/comment_dedent_document_line.rs), each row beside the value the oracle gives
+  - The readers that hand acorn the template itself are the **matched** half — a destructuring binding, a `{#snippet}` head, an annotation whose `_ as ` swallows no newline — pinned against the oracle, behind `<!-- prettier-ignore -->`, by [syntax/comments/head_multiline_comment_dedent](../tests/fixtures/svelte/syntax/comments/head_multiline_comment_dedent/)
 
 - **Leading HTML comment duplicated onto every later lifted root.** A leading fragment HTML comment (`<!-- @component … -->`) before a `<script module>` + instance `<script>` pair is attached to *both* the module Program and the instance Program. tsv attaches it once, to the nearest (module) script Program; the comment is also a `Comment` node in the fragment in both parsers, so nothing is lost. The mechanism is that a lifted `<script>` / `<style>` is never appended to the fragment, so canonical's backwards walk (`1-parse/state/element.js`) steps over one as if it were absent — which means a **`<style>` is a second root too**, in both directions: `<!-- c --><script/><style/>` gives canonical the comment on the instance *and* on the stylesheet, and `<!-- c --><style/><script/>` likewise. tsv stops the walk at the hole the lifted tag leaves between two fragment nodes, so the nearest root keeps it in every arrangement. (With a single lifted root there is nothing to copy onto and tsv matches Svelte.) The corpus matcher `svelte_lifted_root_comment_duplication` replays canonical's walk from the root carrying the copy — back over whitespace-only text and the other lifted roots' spans to the `Comment` it copies — and admits the copy only when that walk stepped over at least one other root, so the nearest root's copy, the one tsv owes, is never excused, not even by an earlier comment with the same text. The three arrangements are pinned as controls in [svelte_preceding_comment.rs](../tests/svelte_preceding_comment.rs), which also pins the gap-class rule this stance shares a reader with.
   - [leading_html_comment_instance_duplication_svelte_divergence](../tests/fixtures/svelte/script/leading_html_comment_instance_duplication_svelte_divergence/)

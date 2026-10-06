@@ -293,8 +293,8 @@ fn a_script_program_loc_follows_its_content_span() {
     );
 }
 
-/// The shapes Svelte gives a `loc` of its own, where tsv's follows the definition instead:
-/// a destructured block binding off line 1, its typed form whose `end` is widened to the
+/// Block bindings follow the definition in every shape — a destructure off line 1, and the
+/// two Svelte gives a `loc` of its own: the typed destructure whose `end` is widened to the
 /// annotation, and a newline in the four units before a binding's colon.
 #[test]
 fn block_bindings_follow_the_definition() {

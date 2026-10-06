@@ -49,8 +49,8 @@ What separates this crate from `tsv_ts` / `tsv_css`:
   `<svelte:options>`, root and attached comments, and every acorn and `<style>` node — gets
   `loc` immediately after `end`, from one `\n`-only line table (`locate-character`'s rule)
   shared by every island. A superset of Svelte's wire, which gives `loc` to acorn-parsed nodes
-  only, and none of Svelte's `loc` quirks reproduced (acorn's ECMAScript count per island, the
-  destructure column shift, the `_ as ` line swallow, the tag-position `Program.loc`). Graded by
+  only, and none of Svelte's `loc` quirks reproduced (acorn's ECMAScript line count on the
+  nodes it parses, the `_ as ` line swallow, the tag-position `Program.loc`). Graded by
   [`tests/loc_definition.rs`](../../tests/loc_definition.rs); the model:
   [docs/architecture.md §`loc` lines](../../docs/architecture.md#loc-lines-one-rule-per-document).
 - ⚠️ **Some wire nodes are Svelte's own construction, not acorn's** — and in Svelte's wire they

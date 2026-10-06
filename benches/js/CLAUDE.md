@@ -373,10 +373,10 @@ tables.
      - A differing line or column is a finding unless a **tolerance row** claims it
        (`lib/loc_tolerance.ts`, Svelte only — TypeScript `loc` is exact against acorn). The rows
        are Svelte's own `loc` departures from the definition, each cataloged in
-       `docs/conformance_svelte.md` and recognized by structure — a block-binding slot, the
-       `_ as ` window before its colon, a lone terminator ahead of the position, the `<script>`
+       `docs/conformance_svelte.md` and recognized by structure — the `_ as ` window before a
+       block binding's colon, a lone terminator ahead of the position, the `<script>`
        program, the typed destructure's `end`, the `{#each}` expression — and by a value
-       Svelte's model gives: exactly for `destructure_column`, `annotation_swallow`,
+       Svelte's model gives: exactly for `annotation_swallow`,
        `program_at_tag` and `typed_destructure_end`; for `each_as_stale_loc` the end of the `as`
        type its acorn read swallowed; for `two_line_classes` the exact count inside a
        `<script>` and a band in a template island (a line one off inside the band is the

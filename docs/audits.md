@@ -356,22 +356,16 @@ both need the canonical parser, so they are conformance-tier at best. Standing f
   `{#each}` binding bases): a sanctioned divergence, so those variants are excused, not fixed.
   Svelte's `onComment` strips the comment line's own indentation from every line of a
   multiline block comment's `value` (`1-parse/acorn.js`), but it measures that line in the string its reader handed acorn, and
-  four readers manufacture that string (a blanked `<script>` prefix, `(pattern = 1)`, `_ as `,
-  the `{#snippet}` prelude). tsv measures the document's line — a deliberate divergence on the
-  one line a manufacture ends, cataloged in
+  two readers hand it one the document does not hold (a blanked `<script>` prefix, and an
+  annotation's `_ as `, which can swallow the newline before the colon). tsv measures the
+  document's line — a deliberate divergence on the one line a manufacture ends, cataloged in
   [conformance_svelte.md §Comment Attachment Differences](./conformance_svelte.md#comment-attachment-differences)
   — so those variants classify under the `manufactured_line_comment_dedent` matcher, which
   admits a `value` only as an exact document-line dedent against canonical's uniform one.
-  Pinned by [comment_dedent_document_line.rs](../tests/comment_dedent_document_line.rs), the
-  frozen
-  [head_multiline_comment_dedent_svelte_divergence](../tests/fixtures/svelte/syntax/comments/head_multiline_comment_dedent_svelte_divergence/)
-  fixture (the template readers, kept alive behind `<!-- prettier-ignore -->`), and
-  [const_annotation_comment_svelte_divergence](../tests/fixtures/svelte/tags/const/const_annotation_comment_svelte_divergence/)
-  (the one spelling that is a fixed point unfrozen). The census reaches it only where a
-  fixture already holds a multi-line block comment opening on a manufactured line, which
-  formatting normally moves off it; `read_script` cannot be a fixture at all (prettier
-  reformats a script's body through an ignore directive, and both formatters move its content
-  off the tag's line), so there the Rust test is the sole pin.
+  Pinned by [comment_dedent_document_line.rs](../tests/comment_dedent_document_line.rs) alone:
+  formatting moves a comment off both lines (a script's content off the tag's line, an
+  annotation head back onto one line), and prettier reformats a script's body through an
+  ignore directive, so no fixture can hold either.
 
   The sibling it retired was a **comment extent clipped at a trimmed slice boundary**: bounded
   head readers handed their interior to the sub-parse whitespace-trimmed at BOTH ends, so a `//`
@@ -1233,7 +1227,7 @@ learn first.
 **`LOCKED_TRANSITIVE` — the pin with no sibling.** The lockfile also pins what no literal
 names: the oracle's own transitive dependencies, which float on THEIR declared ranges. Today
 that is `esrap`, the printer that emits the JS `svelte.compile()` returns and therefore the
-effective oracle for every compile fixture — which svelte depends on as `^2.2.12`, a caret.
+effective oracle for every compile fixture — which svelte depends on by a caret range.
 Without the lock the compile oracle's output can change with no version in this repo
 changing and no pin site able to see it — esrap 2.3.1 did exactly that, ceasing to drop a
 string-literal specifier's `as` alias and silently staling committed fixtures with

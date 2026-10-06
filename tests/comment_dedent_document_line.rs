@@ -5,21 +5,22 @@
 //!
 //! `onComment` (`svelte/packages/svelte/src/compiler/phases/1-parse/acorn.js`) dedents a
 //! multi-line block comment by the `[ \t]` run its line opens with. Svelte reads that run out of
-//! the string its reader handed acorn, and four readers manufacture that string — `read_script`
-//! blanks the prefix, `read_pattern` wraps the binding as `(pattern = 1)`,
-//! `read_type_annotation` writes `_ as ` over the colon, and a `{#snippet}` head blanks the
-//! non-whitespace — so on the line a manufacture ends, Svelte measures a run the document does
-//! not hold. tsv measures the document's line there too. That difference is cataloged in
-//! `docs/conformance_svelte.md` §Comment Attachment Differences, and its template readers are
-//! pinned against the oracle by the `<!-- prettier-ignore -->`-frozen fixture
-//! `tests/fixtures/svelte/syntax/comments/head_multiline_comment_dedent_svelte_divergence`.
+//! the string its reader handed acorn, and two readers hand it one the document does not hold:
+//! `read_script` blanks everything ahead of a `<script>` body, and `read_type_annotation` writes
+//! `_ as ` over the five units ending at a block binding's colon — which, when a newline is
+//! among them, joins the colon's line onto the one above. On the line such a manufacture ends,
+//! Svelte measures a run the document does not hold; tsv measures the document's line there
+//! too. That difference is cataloged in `docs/conformance_svelte.md` §Comment Attachment
+//! Differences. Every other reader hands acorn the template itself (`read_pattern`, a
+//! `{#snippet}` head, an annotation whose `_ as ` swallows no newline), so there the two
+//! parsers agree — pinned against the oracle by the `<!-- prettier-ignore -->`-frozen fixture
+//! `tests/fixtures/svelte/syntax/comments/head_multiline_comment_dedent`.
 //!
 //! **Why a test rather than a fixture.** The trigger is a comment that OPENS on the manufactured
-//! line, and unfrozen formatting moves it off that line in every shape below: a `<script>`'s
-//! first statement goes on a line of its own (and prettier reformats a script body through an
-//! ignore directive, so no fixture can hold the `<script>` reader at all), a destructuring
-//! pattern expands one property per line, and an annotation head the formatter joins back onto
-//! one line no longer carries the newline the `_ as ` would swallow.
+//! line, and formatting moves it off that line in both shapes: a `<script>`'s first statement
+//! goes on a line of its own (and prettier reformats a script body through an ignore directive,
+//! so no fixture can hold the `<script>` reader at all), and an annotation head the formatter
+//! joins back onto one line no longer carries the newline the `_ as ` would swallow.
 //!
 //! `tests/comment_dedent_line_terminators.rs` is the sibling for the other thing this dedent
 //! reads two ways: which line-terminator class each of its two steps takes.
@@ -106,15 +107,16 @@ fn collect_attached(node: &serde_json::Value, start: Option<u64>, found: &mut Ve
     }
 }
 
-/// On the line a manufacture ends, the run is the document's — once per reader, each with the
+/// On the line a manufacture ends, the run is the document's — per reader, each with the
 /// value Svelte gives instead noted beside it (transcribed from the live modern Svelte parser
 /// via `cargo run -p tsv_debug canonical_parse`).
 ///
 /// The rows come in both directions, because the manufactured run can be shorter or longer
-/// than the document's: an indented head's tab reads to Svelte as a blanked space, so Svelte
-/// strips nothing where tsv strips the tab; and a column-0 `<script>`'s eight blanked columns
-/// strip eight spaces Svelte sees and tsv does not, where the document line opens with no run
-/// at all.
+/// than the document's: an indented `<script>` tag's tab reads to Svelte as a blanked space, so
+/// Svelte strips nothing where tsv strips the tab; a column-0 `<script>`'s eight blanked
+/// columns strip eight spaces Svelte sees and tsv does not, where the document line opens with
+/// no run at all; and a swallowed newline hands Svelte the BINDING's line, whose run is the
+/// colon line's only when the two happen to be indented alike.
 #[test]
 fn the_dedent_reads_the_documents_line_on_a_manufactured_line() {
     for (label, src, expected) in [
@@ -130,30 +132,21 @@ fn the_dedent_reads_the_documents_line_on_a_manufactured_line() {
             "\t<script>/* a1\n\t a2 */ let a;\n\t</script>\n",
             " a1\n a2 ",
         ),
-        // Svelte: `"\n\t c1 "` — `read_pattern`'s prefix is blanked.
-        (
-            "destructuring pattern",
-            "{#if c}\n\t{@const { a = /*\n\t c1 */ 1 } = expr}\n{/if}\n",
-            "\n c1 ",
-        ),
-        // Svelte: `"\n\t c1 "` — `{#snippet}`'s prelude keeps the tab and blanks past it.
-        (
-            "snippet head",
-            "{#if c}\n\t{#snippet s(a = /*\n\t c1 */ 1)}{/snippet}\n{/if}\n",
-            "\n c1 ",
-        ),
-        // Svelte: `"\n\t c1 "` — `read_type_annotation`'s prefix is blanked up to its `_ as `.
-        (
-            "annotation, unbroken head",
-            "<script lang=\"ts\"></script>\n{#if c}\n\t{@const a5: /*\n\t c1 */ T = e}\n{/if}\n",
-            "\n c1 ",
-        ),
         // Svelte: `" a1\n\t a2 "` — the `_ as ` swallows the `\n` before the colon, so acorn's
-        // line opens back on the binding's; the document's line is the colon's own.
+        // line opens back on the binding's, whose one tab leaves the continuation's second
+        // standing; the document's line is the colon's own, and its two tabs come off.
         (
-            "annotation, newline before the colon",
+            "annotation, newline before a deeper colon line",
             "<script lang=\"ts\">\n\tlet xs = [1];\n</script>\n{#if xs}\n\
-             \t{#each xs as x\n\t: /* a1\n\t a2 */ number}{x}{/each}\n{/if}\n",
+             \t{#each xs as x\n\t\t: /* a1\n\t\t a2 */ number}{x}{/each}\n{/if}\n",
+            " a1\n a2 ",
+        ),
+        // Svelte: `" a1\n\t a2 "` — the other way round: the binding line's two tabs match
+        // nothing on a continuation line that opens with one, so Svelte strips nothing.
+        (
+            "annotation, newline before a shallower colon line",
+            "<script lang=\"ts\">\n\tlet xs = [1];\n</script>\n{#if xs}\n\
+             \t\t{#each xs as x\n\t: /* a1\n\t a2 */ number}{x}{/each}\n{/if}\n",
             " a1\n a2 ",
         ),
     ] {
@@ -164,13 +157,35 @@ fn the_dedent_reads_the_documents_line_on_a_manufactured_line() {
 /// The controls: every line that is not a manufacture's last reads the same in both parsers,
 /// so these are matches with the oracle, transcribed like the rows above.
 ///
-/// - `read_expression` hands acorn the raw template, so the line acorn measured IS the
-///   document's;
-/// - past a manufacture's last line the string acorn was handed is the document again, so a
-///   destructure or a `{#snippet}` head broken across lines takes the document's `\t\t`.
+/// - `read_expression`, `read_pattern` and a `{#snippet}` head hand acorn the template itself,
+///   so the line acorn measured IS the document's — on the head's first line and past it;
+/// - an annotation whose `_ as ` swallows no newline leaves its line's opening run alone;
+/// - and one that does swallow a newline still agrees when the binding's line and the colon's
+///   open with the same run, which is why the rows above need two indentations.
 #[test]
 fn the_dedent_matches_svelte_off_a_manufactured_line() {
     for (label, src, expected) in [
+        (
+            "destructuring pattern, comment on the head's first line",
+            "{#if c}\n\t{@const { a = /*\n\t c1 */ 1 } = expr}\n{/if}\n",
+            "\n c1 ",
+        ),
+        (
+            "snippet head, comment on the head's first line",
+            "{#if c}\n\t{#snippet s(a = /*\n\t c1 */ 1)}{/snippet}\n{/if}\n",
+            "\n c1 ",
+        ),
+        (
+            "annotation, unbroken head",
+            "<script lang=\"ts\"></script>\n{#if c}\n\t{@const a5: /*\n\t c1 */ T = e}\n{/if}\n",
+            "\n c1 ",
+        ),
+        (
+            "annotation, newline before a colon line indented like the binding's",
+            "<script lang=\"ts\">\n\tlet xs = [1];\n</script>\n{#if xs}\n\
+             \t{#each xs as x\n\t: /* a1\n\t a2 */ number}{x}{/each}\n{/if}\n",
+            " a1\n a2 ",
+        ),
         (
             "raw template, `{@const}` init",
             "{#if a}\n\t{@const b = /* a1\n\t a2 */ 1}\n\t{b}\n{/if}\n",

@@ -111,7 +111,7 @@ const SIDECAR_LOCK_PATH = 'crates/tsv_debug/src/deno/deno.lock';
  *
  * `esrap` is why this exists. It PRINTS the JS that svelte's `compile()`
  * returns, so it is the effective oracle for every compile fixture, yet
- * Svelte depends on it by a caret range (`^2.2.12`). Before the lockfile the
+ * Svelte depends on it by a caret range. Before the lockfile the
  * compile oracle's output could change with no version in this repo changing and
  * no pin site able to see it, which is exactly what happened: esrap 2.3.1
  * stopped dropping a string-literal specifier's `as` alias and silently staled
@@ -124,7 +124,7 @@ const SIDECAR_LOCK_PATH = 'crates/tsv_debug/src/deno/deno.lock';
  * the same change.
  */
 const LOCKED_TRANSITIVE: Record<string, string> = {
-	esrap: '2.3.7'
+	esrap: '2.4.0'
 };
 
 const escape_regex = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -155,7 +155,7 @@ const drifted: string[] = [];
  * Versions the sidecar lockfile resolves for `name`.
  *
  * Lock keys are `name@version`, optionally suffixed with the peer resolution
- * that disambiguates a duplicate (`prettier-plugin-svelte@4.1.1_prettier@3.9.6_svelte@5.57.0`),
+ * that disambiguates a duplicate (`prettier-plugin-svelte@4.1.1_prettier@3.9.9_svelte@5.57.2`),
  * and a scoped name carries its own leading `@`. Returns every match so the
  * caller can distinguish absent (0) from a genuinely duplicated package (>1) —
  * two copies of the oracle's printer in one tree would make "the pinned version"

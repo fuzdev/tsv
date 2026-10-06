@@ -130,7 +130,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Else branch (`{:else}`)
 - Else-if branch (`{:else if cond}`)
 - Else-if chains (multiple)
-- A block's alternate is filled once — a second `{:else}`, or an `{:else if}` following an `{:else}`, is rejected. Svelte's reader replaces `block.alternate` unguarded and loses the first branch's markup; tsv declines that content loss. See [conformance_svelte.md](./conformance_svelte.md) §Block Continuation Corrections
+- A block's alternate is filled once — a second `{:else}`, or an `{:else if}` following an `{:else}`, is rejected, as Svelte's reader rejects it. See [conformance_svelte.md](./conformance_svelte.md) §Block Continuation Clauses
 - Nested if blocks
 - If with expressions only
 - If with mixed content
@@ -141,7 +141,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - With index (`{#each items as item, i}`)
 - With key (`{#each items as item (item.id)}`)
 - With index and key (`{#each items as item, i (key)}`)
-- Each else (`{:else}`) — filled once, like an if block's alternate: a second `{:else}` is rejected rather than replacing `block.fallback`. See [conformance_svelte.md](./conformance_svelte.md) §Block Continuation Corrections
+- Each else (`{:else}`) — filled once, like an if block's alternate: a second `{:else}` is rejected, as Svelte's reader rejects it. See [conformance_svelte.md](./conformance_svelte.md) §Block Continuation Clauses
 - Destructuring - object (`{#each items as { a, b }}`) — spaced braces match prettier; the lone divergence is the empty pattern (`{}`), see [conformance_prettier_svelte.md](./conformance_prettier_svelte.md)
 - Destructuring - array (`{#each items as [a, b]}`)
 - Destructuring with rest (`{#each items as {a, ...rest}}`)

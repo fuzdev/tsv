@@ -3,7 +3,7 @@
 A `{#await … then PATTERN}`, `{:then PATTERN}` or `{:catch PATTERN}` value may hold a
 **member expression** as a destructuring target (`{#await p then [a.e]}`,
 `{:catch { k: a.g }}`). Svelte's `read_pattern` parses the pattern as the left side of an
-assignment (`(${pattern} = 1)`), and a member expression is a valid
+assignment (`${pattern} = 1`), and a member expression is a valid
 `DestructuringAssignmentTarget`, so Svelte's parser accepts every case here. tsv matches the
 canonical AST and formats the document as a fixed point.
 

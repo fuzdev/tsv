@@ -10,15 +10,16 @@ preparation:
 | `<script>` (`read_script`) | prefix blanked with `replace(/[^\n]/g, ' ')` + content |
 | `{expr}`, an attribute value (`read_expression`) | the **raw** template |
 | `{@const}`'s init (`read_expression`) | the raw template |
-| a pattern binding — `{@const}`'s id, a destructured `{#each … as { … }}` (`read_pattern`) | blanked prefix + `(pattern = 1)` |
-| a trailing `: T` (`read_type_annotation`) | blanked prefix + `_ as ` + raw rest |
-| `{#snippet}` parameters | prefix `replace(/\S/g, ' ')` — whitespace survives |
+| a pattern binding — `{@const}`'s id, a destructured `{#each … as { … }}` (`read_pattern`) | the raw template up to the pattern's end + ` = 1` |
+| a trailing `: T` (`read_type_annotation`) | the raw prefix + `_ as ` over the units before the colon + raw rest |
+| `{#snippet}` parameters | the raw template up to the parameters' end + ` => {}` |
 
 The fixture pins the spans: each terminator is three UTF-8 bytes and one UTF-16 code
 unit, in every island.
 
-Svelte's own `loc` counts the ECMAScript terminators inside acorn-parsed islands —
-seeded per parse from each prepared source — and `\n` alone everywhere else. tsv's
+Svelte's own `loc` counts the ECMAScript terminators for acorn-parsed nodes — in a
+document that holds one, every terminator ahead of the node in the source acorn
+received — and `\n` alone everywhere else. tsv's
 does not reproduce that: a Svelte document counts `\n` alone for every `loc` in it,
 so none of these terminators opens a line. That is graded by
 [`tests/loc_definition.rs`](../../../../../loc_definition.rs), whose fixture walk

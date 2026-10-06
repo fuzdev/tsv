@@ -43,7 +43,7 @@ pub(in crate::parser) enum AssignableContext {
     Binding,
     /// A Svelte block or tag pattern — an `{#each}` context, a `{:then}` / `{:catch}`
     /// value, a `{@const}` id. Svelte reads each as the LEFT side of an assignment
-    /// (`read_pattern` parses `(${pattern} = 1)`; `{@const}` parses `id = init`), so a
+    /// (`read_pattern` parses `${pattern} = 1`; `{@const}` parses `id = init`), so a
     /// member expression and a parenthesized target are the
     /// `DestructuringAssignmentTarget`s it admits, and tsv accepts both to match its
     /// AST. Every other target is graded as `Binding` grades it.

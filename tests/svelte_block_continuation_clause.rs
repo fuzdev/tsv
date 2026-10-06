@@ -11,21 +11,19 @@
 //! `input_invalid_*` asserts only that both parsers reject, and `tsv_rejects.txt` pins a
 //! message but requires a `_svelte_divergence` directory — one where the canonical parser
 //! *accepts*. So for the duplicate-clause family, which canonical rejects too, the message
-//! is unpinned by construction: the `{#await}` cases are `input_invalid_*` files that stay
-//! green no matter what tsv says, and the two `{:else}` fixtures pin their own substring
-//! but nothing relates them or covers the `{#each}` and shorthand-head spellings. This
-//! file is that pin — a relation between rejections rather than one document's bytes.
+//! is unpinned by construction: every case is an `input_invalid_*` file that stays green
+//! no matter what tsv says. This file is that pin — a relation between rejections rather
+//! than one document's bytes.
 //!
 //! The distinction it exists to keep is between two different rule violations that land on
 //! the same slot: a **repeat** (`Duplicate {:then} clause found`) versus a *different*
 //! clause arriving at a slot its predecessor took (`{:else if} cannot follow {:else}`).
 //! Collapsing the second into the first names a clause the author wrote exactly once.
 //!
-//! Verdict parity with canonical is fixture-side:
+//! Verdict parity with canonical is fixture-side — both parsers reject every spelling:
 //! `svelte/blocks/await/{then_catch,then_shorthand,catch_shorthand,then_shorthand_catch}/input_invalid_duplicate_*`
-//! for `{#await}` (both parsers reject) and the `_svelte_divergence` trio under
-//! `svelte/blocks/{if,each}/` for `{:else}` (canonical accepts and silently drops a branch
-//! — see `docs/conformance_svelte.md` §Block Continuation Corrections).
+//! for `{#await}`, and `svelte/blocks/{if,each}/else/input_invalid_{duplicate_else,else_if_after_else}`
+//! for `{:else}` (see `docs/conformance_svelte.md` §Block Continuation Clauses).
 
 fn parse_error(source: &str) -> Option<String> {
     let arena = bumpalo::Bump::new();

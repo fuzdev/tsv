@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1111,
+	"end": 897,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -18,7 +18,7 @@
 				"type": "IfBlock",
 				"elseif": false,
 				"start": 238,
-				"end": 1110,
+				"end": 896,
 				"test": {
 					"type": "Identifier",
 					"start": 243,
@@ -333,101 +333,27 @@
 						{
 							"type": "Text",
 							"start": 605,
-							"end": 607,
-							"raw": "\n\t",
-							"data": "\n\t"
-						},
-						{
-							"type": "Comment",
-							"start": 607,
-							"end": 785,
-							"data": " the dedent reads the source acorn was handed, and for an annotation Svelte blanks\n\t\tthe prefix to spaces, so the tab opening the line below is not indentation it can see "
-						},
-						{
-							"type": "Text",
-							"start": 785,
-							"end": 787,
-							"raw": "\n\t",
-							"data": "\n\t"
-						},
-						{
-							"type": "ConstTag",
-							"start": 787,
-							"end": 819,
-							"declaration": {
-								"type": "VariableDeclaration",
-								"kind": "const",
-								"declarations": [
-									{
-										"type": "VariableDeclarator",
-										"id": {
-											"type": "Identifier",
-											"name": "a5",
-											"start": 795,
-											"end": 797,
-											"typeAnnotation": {
-												"type": "TSTypeAnnotation",
-												"start": 797,
-												"end": 811,
-												"typeAnnotation": {
-													"type": "TSTypeReference",
-													"start": 810,
-													"end": 811,
-													"typeName": {
-														"type": "Identifier",
-														"start": 810,
-														"end": 811,
-														"name": "T"
-													},
-													"leadingComments": [
-														{
-															"type": "Block",
-															"value": "\n c5 ",
-															"start": 799,
-															"end": 809
-														}
-													]
-												}
-											}
-										},
-										"init": {
-											"type": "Identifier",
-											"start": 814,
-											"end": 818,
-											"name": "expr"
-										},
-										"start": 795,
-										"end": 818
-									}
-								],
-								"start": 789,
-								"end": 818
-							}
-						},
-						{
-							"type": "Text",
-							"start": 819,
-							"end": 822,
+							"end": 608,
 							"raw": "\n\n\t",
 							"data": "\n\n\t"
 						},
 						{
 							"type": "Comment",
-							"start": 822,
-							"end": 1068,
+							"start": 608,
+							"end": 854,
 							"data": " at a union seam the two copies land on DIFFERENT nodes, so the duplication is\n\t\tan attachment tsv has nowhere rather than a longer list: canonical trails `A`\n\t\twith one copy and leads `B` with the other, where a1's single node takes both "
 						},
 						{
 							"type": "Text",
-							"start": 1068,
-							"end": 1070,
+							"start": 854,
+							"end": 856,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "ConstTag",
-							"start": 1070,
-							"end": 1104,
+							"start": 856,
+							"end": 890,
 							"declaration": {
 								"type": "VariableDeclaration",
 								"kind": "const",
@@ -437,44 +363,44 @@
 										"id": {
 											"type": "Identifier",
 											"name": "a6",
-											"start": 1078,
-											"end": 1080,
+											"start": 864,
+											"end": 866,
 											"typeAnnotation": {
 												"type": "TSTypeAnnotation",
-												"start": 1080,
-												"end": 1096,
+												"start": 866,
+												"end": 882,
 												"typeAnnotation": {
 													"type": "TSUnionType",
-													"start": 1082,
-													"end": 1096,
+													"start": 868,
+													"end": 882,
 													"types": [
 														{
 															"type": "TSTypeReference",
-															"start": 1082,
-															"end": 1083,
+															"start": 868,
+															"end": 869,
 															"typeName": {
 																"type": "Identifier",
-																"start": 1082,
-																"end": 1083,
+																"start": 868,
+																"end": 869,
 																"name": "A"
 															},
 															"trailingComments": [
 																{
 																	"type": "Block",
 																	"value": " c6 ",
-																	"start": 1084,
-																	"end": 1092
+																	"start": 870,
+																	"end": 878
 																}
 															]
 														},
 														{
 															"type": "TSTypeReference",
-															"start": 1095,
-															"end": 1096,
+															"start": 881,
+															"end": 882,
 															"typeName": {
 																"type": "Identifier",
-																"start": 1095,
-																"end": 1096,
+																"start": 881,
+																"end": 882,
 																"name": "B"
 															}
 														}
@@ -484,22 +410,22 @@
 										},
 										"init": {
 											"type": "Identifier",
-											"start": 1099,
-											"end": 1103,
+											"start": 885,
+											"end": 889,
 											"name": "expr"
 										},
-										"start": 1078,
-										"end": 1103
+										"start": 864,
+										"end": 889
 									}
 								],
-								"start": 1072,
-								"end": 1103
+								"start": 858,
+								"end": 889
 							}
 						},
 						{
 							"type": "Text",
-							"start": 1104,
-							"end": 1105,
+							"start": 890,
+							"end": 891,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -555,15 +481,9 @@
 		},
 		{
 			"type": "Block",
-			"value": "\n c5 ",
-			"start": 799,
-			"end": 809
-		},
-		{
-			"type": "Block",
 			"value": " c6 ",
-			"start": 1084,
-			"end": 1092
+			"start": 870,
+			"end": 878
 		}
 	],
 	"instance": {

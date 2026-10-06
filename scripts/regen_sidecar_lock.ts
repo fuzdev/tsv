@@ -6,7 +6,7 @@
  * oracle's own transitive dependencies — above all `esrap`, the printer that
  * emits the JS `svelte.compile()` returns and therefore the effective oracle for
  * every compile fixture. Nothing else in the repo pins it: svelte depends on
- * `esrap@^2.2.12`, a caret.
+ * it by a caret range.
  *
  * Because the lock is frozen at runtime it can only be rewritten deliberately,
  * here. Run this after bumping any canonical pin in `sidecar.ts`, then:

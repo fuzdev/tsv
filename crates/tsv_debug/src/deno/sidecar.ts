@@ -14,7 +14,7 @@
 // ⚠ These literals pin only what the sidecar imports DIRECTLY. The oracle's own
 // dependencies float on THEIR declared ranges, and one of them — `esrap`, which
 // PRINTS the JS `compile()` returns — is the effective oracle for every compile
-// fixture (svelte depends on it as `^2.2.12`, a caret). That is what
+// fixture (svelte depends on it by a caret range). That is what
 // `crates/tsv_debug/src/deno/deno.lock` exists to pin: the sidecar resolves
 // against it FROZEN, so the whole transitive tree is fixed rather than just the
 // five names here.
@@ -25,20 +25,20 @@
 // expected_server.js). The command sequence lives in one place, docs/benchmarks.md
 // §"Canonical baseline is coupled"; follow it rather than a copy here.
 //
-// NOTE: Requires deno.json with "acorn": "npm:acorn@8.16.0" import map
+// NOTE: Requires deno.json with "acorn": "npm:acorn@8.19.0" import map
 // to ensure @sveltejs/acorn-typescript uses the same acorn instance.
 const VERSIONS = {
-	prettier: '3.9.6',
+	prettier: '3.9.9',
 	'prettier-plugin-svelte': '4.1.1',
-	svelte: '5.57.0',
-	acorn: '8.16.0',
+	svelte: '5.57.2',
+	acorn: '8.19.0',
 	'@sveltejs/acorn-typescript': '1.0.13'
 } as const;
 
 // TODO verify there's not a better solution to use deno.json here, see the above NOTE too
 // Imports are like this because these don't have the deno.json when used by the release binary.
 // deno-lint-ignore no-import-prefix
-import * as prettier from 'npm:prettier@3.9.6';
+import * as prettier from 'npm:prettier@3.9.9';
 // deno-lint-ignore no-import-prefix
 import prettierPluginSvelte from 'npm:prettier-plugin-svelte@4.1.1';
 // deno-lint-ignore no-import-prefix
@@ -46,9 +46,9 @@ import {
 	compile as svelteCompile,
 	parse as svelteParse,
 	parseCss
-} from 'npm:svelte@5.57.0/compiler';
+} from 'npm:svelte@5.57.2/compiler';
 // deno-lint-ignore no-import-prefix
-import * as acorn from 'npm:acorn@8.16.0';
+import * as acorn from 'npm:acorn@8.19.0';
 // deno-lint-ignore no-import-prefix
 import { tsPlugin } from 'npm:@sveltejs/acorn-typescript@1.0.13';
 // deno-lint-ignore no-import-prefix

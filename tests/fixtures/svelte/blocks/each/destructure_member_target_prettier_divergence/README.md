@@ -2,7 +2,7 @@
 
 An `{#each … as PATTERN}` context may hold a **member expression** as a destructuring
 target (`{#each xs as [a.b]}`, `{#each xs as { k: a.c, ...a.d }}`). Svelte's `read_pattern`
-parses the pattern as the left side of an assignment (`(${pattern} = 1)`), and a member
+parses the pattern as the left side of an assignment (`${pattern} = 1`), and a member
 expression is a valid `DestructuringAssignmentTarget`, so Svelte's parser accepts every case
 here. tsv matches the canonical AST and formats the document as a fixed point.
 

@@ -675,11 +675,10 @@ everywhere else, CRLF included (one ECMAScript break holding one LF). The BOM re
 functions of the span on the same table.
 
 That is a **superset** of Svelte's wire, which carries `loc` on acorn-parsed nodes only, and
-it reproduces none of Svelte's `loc` quirks: the one-column shift a destructured block
-binding takes off line 1 (`read_pattern`'s synthetic `(`), the newline its `_ as ` swallows
-before a binding's colon, acorn's ECMAScript count inside islands seeded per parse, the
-`<script>` `Program.loc` stamped at the tag, and the typed destructure's `loc.end` left at its
-bracket. Each is a cataloged difference from Svelte
+it reproduces none of Svelte's `loc` quirks: the newline its `_ as ` swallows
+before a binding's colon, acorn's ECMAScript line count on the nodes it parses, the
+`<script>` `Program.loc` stamped at the tag, the typed destructure's `loc.end` left at its
+bracket, and an `{#each}` expression's `loc.end` left past its `as`. Each is a cataloged difference from Svelte
 ([conformance_svelte.md](./conformance_svelte.md)), graded at corpus scale as a named
 tolerance.
 
@@ -697,9 +696,9 @@ and `deno task check:loc` holds the two equal over every fixture input.
 
 **The comment `value` is measured on the document too.** acorn's `onComment` dedents a
 multi-line block comment by the `[ \t]` run opening the comment's line, and Svelte reads that
-run *in the string its reader handed acorn* — which four readers manufacture (`read_script`'s
-blanked prefix, `read_pattern`'s `(pattern = 1)`, `read_type_annotation`'s `_ as `, the
-`{#snippet}` head's blanked prelude). tsv keeps the dedent but reads the run on the document's
+run *in the string its reader handed acorn* — which two readers manufacture (`read_script`'s
+blanked prefix, and `read_type_annotation`'s `_ as `, which can swallow the newline before a
+binding's colon). tsv keeps the dedent but reads the run on the document's
 own line (`Comment::wire_value` → `tsv_lang::printing::strip_comment_indentation`), so the
 parse records nothing about how Svelte prepared each island and both comment emitters — the
 root `comments` array and the attached `leadingComments` / `trailingComments` copies — answer

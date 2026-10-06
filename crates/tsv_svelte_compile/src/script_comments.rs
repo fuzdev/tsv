@@ -194,7 +194,7 @@ pub(crate) fn collect_script_comments(
 /// oracle DROPS most of them, but its printer (esrap) KEEPS one whose comment
 /// index it re-seeks BACKWARD over a preceding block-bearing statement — the "open
 /// half" of the module-comment class. The rule, established by probe against the
-/// pinned oracle (esrap 2.2.12), is bidirectionally exact — keeping a comment the
+/// pinned oracle, is bidirectionally exact — keeping a comment the
 /// oracle drops over-emits, dropping one it keeps under-emits, both MISMATCHES with
 /// no safe direction — so it is stated precisely:
 ///
@@ -775,7 +775,7 @@ fn census_expr(expr: &Expression<'_>, census: &mut BlockCensus) {
 /// buys a conservative safety margin, not a claim that every kind drops.
 ///
 /// ⚠️ This TRUE/FALSE split is keyed to the **pinned** oracle's `reset_comment_index`
-/// behavior (esrap 2.2.12, via the pinned Svelte compiler). If that pin moves, re-probe
+/// behavior (esrap's, via the pinned Svelte compiler). If that pin moves, re-probe
 /// the split against the new oracle rather than assuming it carries over.
 ///
 /// Exhaustively matched so a new [`FragmentNode`] variant fails compilation here

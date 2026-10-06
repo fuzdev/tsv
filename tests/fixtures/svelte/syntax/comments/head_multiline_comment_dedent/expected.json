@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1451,
+	"end": 1036,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,40 +10,40 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 1063,
-				"data": "\n\tEach case opens a multiline block comment on the line where one of Svelte's MANUFACTURED\n\tsources ends. acorn's `onComment` dedents it by the indentation of its line in the string\n\tacorn was handed, and these readers hand it a rewritten one: a block binding's `: T` reads\n\t`<spaces>_ as T`, a destructuring binding reads `<spaces>(pattern = 1)`, and a `{#snippet}`\n\thead reads a prelude that blanks only the NON-whitespace. Svelte therefore measures a run\n\tthe document does not hold, and the tab the author wrote survives into its `value`. tsv\n\tmeasures the line the document holds, so the tab comes off.\n\t`{@const b = ...}` and `{expr ...}` are the controls: acorn reads those out of the raw\n\ttemplate, so both parsers measure the document's own line and agree.\n\tThe `prettier-ignore` is what keeps the triggers alive. Both formatters reflow every one of\n\tthese heads onto a line the manufacture no longer reaches, so an unfrozen spelling of this\n\tfile turns each case into a control. The `lang=\"ts\"` is for the `{#each xs as x: T}`\n\tannotation alone.\n"
+				"end": 648,
+				"data": "\n\tEach case opens a multiline block comment on the first line of a block head — beside a\n\tbinding's `: T`, inside a destructuring binding, in a `{#snippet}` parameter list. acorn's\n\t`onComment` dedents such a comment by the indentation of the line it opens on, and that\n\tline is the document's: the tab the author wrote comes off the continuation line of\n\tevery `value`, in both parsers. `{@const b = ...}` and `{expr ...}` are the plain cases\n\tbeside them.\n\tThe `prettier-ignore` is what keeps the comments on those lines — both formatters reflow\n\tevery one of these heads. The `lang=\"ts\"` is for the `{#each xs as x: T}` annotation alone.\n"
 			},
 			{
 				"type": "Text",
-				"start": 1063,
-				"end": 1064,
+				"start": 648,
+				"end": 649,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "Text",
-				"start": 1151,
-				"end": 1153,
+				"start": 736,
+				"end": 738,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 1153,
-				"end": 1177,
+				"start": 738,
+				"end": 762,
 				"data": " prettier-ignore "
 			},
 			{
 				"type": "Text",
-				"start": 1177,
-				"end": 1178,
+				"start": 762,
+				"end": 763,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 1178,
-				"end": 1450,
+				"start": 763,
+				"end": 1035,
 				"name": "div",
 				"attributes": [],
 				"fragment": {
@@ -51,19 +51,19 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1183,
-							"end": 1185,
+							"start": 768,
+							"end": 770,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "EachBlock",
-							"start": 1185,
-							"end": 1229,
+							"start": 770,
+							"end": 814,
 							"expression": {
 								"type": "Identifier",
-								"start": 1192,
-								"end": 1194,
+								"start": 777,
+								"end": 779,
 								"name": "xs"
 							},
 							"body": {
@@ -71,12 +71,12 @@
 								"nodes": [
 									{
 										"type": "ExpressionTag",
-										"start": 1219,
-										"end": 1222,
+										"start": 804,
+										"end": 807,
 										"expression": {
 											"type": "Identifier",
-											"start": 1220,
-											"end": 1221,
+											"start": 805,
+											"end": 806,
 											"name": "x"
 										}
 									}
@@ -85,22 +85,22 @@
 							"context": {
 								"type": "Identifier",
 								"name": "x",
-								"start": 1198,
-								"end": 1199,
+								"start": 783,
+								"end": 784,
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
-									"start": 1199,
-									"end": 1218,
+									"start": 784,
+									"end": 803,
 									"typeAnnotation": {
 										"type": "TSNumberKeyword",
-										"start": 1212,
-										"end": 1218,
+										"start": 797,
+										"end": 803,
 										"leadingComments": [
 											{
 												"type": "Block",
 												"value": "\n c1 ",
-												"start": 1201,
-												"end": 1211
+												"start": 786,
+												"end": 796
 											}
 										]
 									}
@@ -109,20 +109,20 @@
 						},
 						{
 							"type": "Text",
-							"start": 1229,
-							"end": 1231,
+							"start": 814,
+							"end": 816,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "IfBlock",
 							"elseif": false,
-							"start": 1231,
-							"end": 1330,
+							"start": 816,
+							"end": 915,
 							"test": {
 								"type": "Identifier",
-								"start": 1236,
-								"end": 1240,
+								"start": 821,
+								"end": 825,
 								"name": "expr"
 							},
 							"consequent": {
@@ -130,15 +130,15 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 1241,
-										"end": 1244,
+										"start": 826,
+										"end": 829,
 										"raw": "\n\t\t",
 										"data": "\n\t\t"
 									},
 									{
 										"type": "ConstTag",
-										"start": 1244,
-										"end": 1285,
+										"start": 829,
+										"end": 870,
 										"declaration": {
 											"type": "VariableDeclaration",
 											"kind": "const",
@@ -147,44 +147,44 @@
 													"type": "VariableDeclarator",
 													"id": {
 														"type": "ObjectPattern",
-														"start": 1252,
-														"end": 1273,
+														"start": 837,
+														"end": 858,
 														"properties": [
 															{
 																"type": "Property",
-																"start": 1254,
-																"end": 1271,
+																"start": 839,
+																"end": 856,
 																"method": false,
 																"shorthand": true,
 																"computed": false,
 																"key": {
 																	"type": "Identifier",
-																	"start": 1254,
-																	"end": 1255,
+																	"start": 839,
+																	"end": 840,
 																	"name": "a"
 																},
 																"value": {
 																	"type": "AssignmentPattern",
-																	"start": 1254,
-																	"end": 1271,
+																	"start": 839,
+																	"end": 856,
 																	"left": {
 																		"type": "Identifier",
-																		"start": 1254,
-																		"end": 1255,
+																		"start": 839,
+																		"end": 840,
 																		"name": "a"
 																	},
 																	"right": {
 																		"type": "Literal",
-																		"start": 1270,
-																		"end": 1271,
+																		"start": 855,
+																		"end": 856,
 																		"value": 1,
 																		"raw": "1",
 																		"leadingComments": [
 																			{
 																				"type": "Block",
 																				"value": "\n c2 ",
-																				"start": 1258,
-																				"end": 1269
+																				"start": 843,
+																				"end": 854
 																			}
 																		]
 																	}
@@ -195,26 +195,26 @@
 													},
 													"init": {
 														"type": "ObjectExpression",
-														"start": 1276,
-														"end": 1284,
+														"start": 861,
+														"end": 869,
 														"properties": [
 															{
 																"type": "Property",
-																"start": 1278,
-																"end": 1282,
+																"start": 863,
+																"end": 867,
 																"method": false,
 																"shorthand": false,
 																"computed": false,
 																"key": {
 																	"type": "Identifier",
-																	"start": 1278,
-																	"end": 1279,
+																	"start": 863,
+																	"end": 864,
 																	"name": "a"
 																},
 																"value": {
 																	"type": "Literal",
-																	"start": 1281,
-																	"end": 1282,
+																	"start": 866,
+																	"end": 867,
 																	"value": 1,
 																	"raw": "1"
 																},
@@ -222,25 +222,25 @@
 															}
 														]
 													},
-													"start": 1252,
-													"end": 1284
+													"start": 837,
+													"end": 869
 												}
 											],
-											"start": 1246,
-											"end": 1284
+											"start": 831,
+											"end": 869
 										}
 									},
 									{
 										"type": "Text",
-										"start": 1285,
-										"end": 1288,
+										"start": 870,
+										"end": 873,
 										"raw": "\n\t\t",
 										"data": "\n\t\t"
 									},
 									{
 										"type": "ConstTag",
-										"start": 1288,
-										"end": 1314,
+										"start": 873,
+										"end": 899,
 										"declaration": {
 											"type": "VariableDeclaration",
 											"kind": "const",
@@ -250,65 +250,65 @@
 													"id": {
 														"type": "Identifier",
 														"name": "b",
-														"start": 1296,
-														"end": 1297
+														"start": 881,
+														"end": 882
 													},
 													"init": {
 														"type": "Literal",
-														"start": 1312,
-														"end": 1313,
+														"start": 897,
+														"end": 898,
 														"value": 1,
 														"raw": "1",
 														"leadingComments": [
 															{
 																"type": "Block",
 																"value": "\n c3 ",
-																"start": 1300,
-																"end": 1311
+																"start": 885,
+																"end": 896
 															}
 														]
 													},
-													"start": 1296,
-													"end": 1313
+													"start": 881,
+													"end": 898
 												}
 											],
-											"start": 1290,
-											"end": 1313
+											"start": 875,
+											"end": 898
 										}
 									},
 									{
 										"type": "Text",
-										"start": 1314,
-										"end": 1317,
+										"start": 899,
+										"end": 902,
 										"raw": "\n\t\t",
 										"data": "\n\t\t"
 									},
 									{
 										"type": "ExpressionTag",
-										"start": 1317,
-										"end": 1320,
+										"start": 902,
+										"end": 905,
 										"expression": {
 											"type": "Identifier",
-											"start": 1318,
-											"end": 1319,
+											"start": 903,
+											"end": 904,
 											"name": "a"
 										}
 									},
 									{
 										"type": "ExpressionTag",
-										"start": 1320,
-										"end": 1323,
+										"start": 905,
+										"end": 908,
 										"expression": {
 											"type": "Identifier",
-											"start": 1321,
-											"end": 1322,
+											"start": 906,
+											"end": 907,
 											"name": "b"
 										}
 									},
 									{
 										"type": "Text",
-										"start": 1323,
-										"end": 1325,
+										"start": 908,
+										"end": 910,
 										"raw": "\n\t",
 										"data": "\n\t"
 									}
@@ -318,61 +318,61 @@
 						},
 						{
 							"type": "Text",
-							"start": 1330,
-							"end": 1332,
+							"start": 915,
+							"end": 917,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "AwaitBlock",
-							"start": 1332,
-							"end": 1379,
+							"start": 917,
+							"end": 964,
 							"expression": {
 								"type": "Identifier",
-								"start": 1340,
-								"end": 1341,
+								"start": 925,
+								"end": 926,
 								"name": "p"
 							},
 							"value": {
 								"type": "ObjectPattern",
-								"start": 1347,
-								"end": 1367,
+								"start": 932,
+								"end": 952,
 								"properties": [
 									{
 										"type": "Property",
-										"start": 1349,
-										"end": 1365,
+										"start": 934,
+										"end": 950,
 										"method": false,
 										"shorthand": true,
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 1349,
-											"end": 1350,
+											"start": 934,
+											"end": 935,
 											"name": "c"
 										},
 										"value": {
 											"type": "AssignmentPattern",
-											"start": 1349,
-											"end": 1365,
+											"start": 934,
+											"end": 950,
 											"left": {
 												"type": "Identifier",
-												"start": 1349,
-												"end": 1350,
+												"start": 934,
+												"end": 935,
 												"name": "c"
 											},
 											"right": {
 												"type": "Literal",
-												"start": 1364,
-												"end": 1365,
+												"start": 949,
+												"end": 950,
 												"value": 1,
 												"raw": "1",
 												"leadingComments": [
 													{
 														"type": "Block",
 														"value": "\n c4 ",
-														"start": 1353,
-														"end": 1363
+														"start": 938,
+														"end": 948
 													}
 												]
 											}
@@ -388,12 +388,12 @@
 								"nodes": [
 									{
 										"type": "ExpressionTag",
-										"start": 1368,
-										"end": 1371,
+										"start": 953,
+										"end": 956,
 										"expression": {
 											"type": "Identifier",
-											"start": 1369,
-											"end": 1370,
+											"start": 954,
+											"end": 955,
 											"name": "c"
 										}
 									}
@@ -403,44 +403,44 @@
 						},
 						{
 							"type": "Text",
-							"start": 1379,
-							"end": 1381,
+							"start": 964,
+							"end": 966,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "SnippetBlock",
-							"start": 1381,
-							"end": 1424,
+							"start": 966,
+							"end": 1009,
 							"expression": {
 								"type": "Identifier",
 								"name": "s",
-								"start": 1391,
-								"end": 1392
+								"start": 976,
+								"end": 977
 							},
 							"parameters": [
 								{
 									"type": "AssignmentPattern",
-									"start": 1393,
-									"end": 1409,
+									"start": 978,
+									"end": 994,
 									"left": {
 										"type": "Identifier",
-										"start": 1393,
-										"end": 1394,
+										"start": 978,
+										"end": 979,
 										"name": "d"
 									},
 									"right": {
 										"type": "Literal",
-										"start": 1408,
-										"end": 1409,
+										"start": 993,
+										"end": 994,
 										"value": 1,
 										"raw": "1",
 										"leadingComments": [
 											{
 												"type": "Block",
 												"value": "\n c5 ",
-												"start": 1397,
-												"end": 1407
+												"start": 982,
+												"end": 992
 											}
 										]
 									}
@@ -451,12 +451,12 @@
 								"nodes": [
 									{
 										"type": "ExpressionTag",
-										"start": 1411,
-										"end": 1414,
+										"start": 996,
+										"end": 999,
 										"expression": {
 											"type": "Identifier",
-											"start": 1412,
-											"end": 1413,
+											"start": 997,
+											"end": 998,
 											"name": "d"
 										}
 									}
@@ -465,34 +465,34 @@
 						},
 						{
 							"type": "Text",
-							"start": 1424,
-							"end": 1426,
+							"start": 1009,
+							"end": 1011,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 1426,
-							"end": 1443,
+							"start": 1011,
+							"end": 1028,
 							"expression": {
 								"type": "Identifier",
-								"start": 1427,
-								"end": 1431,
+								"start": 1012,
+								"end": 1016,
 								"name": "expr",
 								"trailingComments": [
 									{
 										"type": "Block",
 										"value": "\n c6 ",
-										"start": 1432,
-										"end": 1442
+										"start": 1017,
+										"end": 1027
 									}
 								]
 							}
 						},
 						{
 							"type": "Text",
-							"start": 1443,
-							"end": 1444,
+							"start": 1028,
+							"end": 1029,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -506,69 +506,69 @@
 		{
 			"type": "Block",
 			"value": "\n c1 ",
-			"start": 1201,
-			"end": 1211
+			"start": 786,
+			"end": 796
 		},
 		{
 			"type": "Block",
 			"value": "\n c2 ",
-			"start": 1258,
-			"end": 1269
+			"start": 843,
+			"end": 854
 		},
 		{
 			"type": "Block",
 			"value": "\n c3 ",
-			"start": 1300,
-			"end": 1311
+			"start": 885,
+			"end": 896
 		},
 		{
 			"type": "Block",
 			"value": "\n c4 ",
-			"start": 1353,
-			"end": 1363
+			"start": 938,
+			"end": 948
 		},
 		{
 			"type": "Block",
 			"value": "\n c5 ",
-			"start": 1397,
-			"end": 1407
+			"start": 982,
+			"end": 992
 		},
 		{
 			"type": "Block",
 			"value": "\n c6 ",
-			"start": 1432,
-			"end": 1442
+			"start": 1017,
+			"end": 1027
 		}
 	],
 	"instance": {
 		"type": "Script",
-		"start": 1064,
-		"end": 1151,
+		"start": 649,
+		"end": 736,
 		"context": "default",
 		"content": {
 			"type": "Program",
-			"start": 1082,
-			"end": 1142,
+			"start": 667,
+			"end": 727,
 			"body": [
 				{
 					"type": "VariableDeclaration",
-					"start": 1084,
-					"end": 1097,
+					"start": 669,
+					"end": 682,
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 1088,
-							"end": 1096,
+							"start": 673,
+							"end": 681,
 							"id": {
 								"type": "Identifier",
-								"start": 1088,
-								"end": 1092,
+								"start": 673,
+								"end": 677,
 								"name": "expr"
 							},
 							"init": {
 								"type": "Literal",
-								"start": 1095,
-								"end": 1096,
+								"start": 680,
+								"end": 681,
 								"value": 1,
 								"raw": "1"
 							}
@@ -578,28 +578,28 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 1099,
-					"end": 1112,
+					"start": 684,
+					"end": 697,
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 1103,
-							"end": 1111,
+							"start": 688,
+							"end": 696,
 							"id": {
 								"type": "Identifier",
-								"start": 1103,
-								"end": 1105,
+								"start": 688,
+								"end": 690,
 								"name": "xs"
 							},
 							"init": {
 								"type": "ArrayExpression",
-								"start": 1108,
-								"end": 1111,
+								"start": 693,
+								"end": 696,
 								"elements": [
 									{
 										"type": "Literal",
-										"start": 1109,
-										"end": 1110,
+										"start": 694,
+										"end": 695,
 										"value": 1,
 										"raw": "1"
 									}
@@ -611,37 +611,37 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 1114,
-					"end": 1141,
+					"start": 699,
+					"end": 726,
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 1118,
-							"end": 1140,
+							"start": 703,
+							"end": 725,
 							"id": {
 								"type": "Identifier",
-								"start": 1118,
-								"end": 1119,
+								"start": 703,
+								"end": 704,
 								"name": "p"
 							},
 							"init": {
 								"type": "CallExpression",
-								"start": 1122,
-								"end": 1140,
+								"start": 707,
+								"end": 725,
 								"callee": {
 									"type": "MemberExpression",
-									"start": 1122,
-									"end": 1137,
+									"start": 707,
+									"end": 722,
 									"object": {
 										"type": "Identifier",
-										"start": 1122,
-										"end": 1129,
+										"start": 707,
+										"end": 714,
 										"name": "Promise"
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 1130,
-										"end": 1137,
+										"start": 715,
+										"end": 722,
 										"name": "resolve"
 									},
 									"computed": false,
@@ -650,8 +650,8 @@
 								"arguments": [
 									{
 										"type": "Literal",
-										"start": 1138,
-										"end": 1139,
+										"start": 723,
+										"end": 724,
 										"value": 1,
 										"raw": "1"
 									}
@@ -667,20 +667,20 @@
 			"leadingComments": [
 				{
 					"type": "Line",
-					"value": "\n\tEach case opens a multiline block comment on the line where one of Svelte's MANUFACTURED\n\tsources ends. acorn's `onComment` dedents it by the indentation of its line in the string\n\tacorn was handed, and these readers hand it a rewritten one: a block binding's `: T` reads\n\t`<spaces>_ as T`, a destructuring binding reads `<spaces>(pattern = 1)`, and a `{#snippet}`\n\thead reads a prelude that blanks only the NON-whitespace. Svelte therefore measures a run\n\tthe document does not hold, and the tab the author wrote survives into its `value`. tsv\n\tmeasures the line the document holds, so the tab comes off.\n\t`{@const b = ...}` and `{expr ...}` are the controls: acorn reads those out of the raw\n\ttemplate, so both parsers measure the document's own line and agree.\n\tThe `prettier-ignore` is what keeps the triggers alive. Both formatters reflow every one of\n\tthese heads onto a line the manufacture no longer reaches, so an unfrozen spelling of this\n\tfile turns each case into a control. The `lang=\"ts\"` is for the `{#each xs as x: T}`\n\tannotation alone.\n"
+					"value": "\n\tEach case opens a multiline block comment on the first line of a block head — beside a\n\tbinding's `: T`, inside a destructuring binding, in a `{#snippet}` parameter list. acorn's\n\t`onComment` dedents such a comment by the indentation of the line it opens on, and that\n\tline is the document's: the tab the author wrote comes off the continuation line of\n\tevery `value`, in both parsers. `{@const b = ...}` and `{expr ...}` are the plain cases\n\tbeside them.\n\tThe `prettier-ignore` is what keeps the comments on those lines — both formatters reflow\n\tevery one of these heads. The `lang=\"ts\"` is for the `{#each xs as x: T}` annotation alone.\n"
 				}
 			]
 		},
 		"attributes": [
 			{
 				"type": "Attribute",
-				"start": 1072,
-				"end": 1081,
+				"start": 657,
+				"end": 666,
 				"name": "lang",
 				"value": [
 					{
-						"start": 1078,
-						"end": 1080,
+						"start": 663,
+						"end": 665,
 						"type": "Text",
 						"raw": "ts",
 						"data": "ts"

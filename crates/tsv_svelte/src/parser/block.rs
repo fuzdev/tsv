@@ -953,18 +953,16 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     /// Reject a second `{:else}` / `{:else if}` once the block's alternate is taken.
     ///
-    /// Canonical's `next` (`1-parse/state/tag.js`) writes `block.alternate` /
-    /// `block.fallback` **unguarded**, so a repeat continuation replaces the fragment
-    /// and the first branch's markup is gone from the AST — unlike its own `{#await}`
-    /// arm, which raises `block_duplicate_clause` for exactly this. tsv applies the
-    /// `{#await}` rule to all three continuations: reproducing the overwrite means a
-    /// formatter that silently deletes a branch of the author's document.
+    /// Canonical's `next` (`1-parse/state/tag.js`) guards the slot the same way —
+    /// `block_duplicate_clause` once `block.alternate` / `block.fallback` is set, as for
+    /// `{#await}`'s `{:then}` / `{:catch}` — because writing it again would replace the
+    /// fragment and drop the first branch's markup from the AST.
     ///
-    /// A deliberate over-rejection, cataloged in `docs/conformance_svelte.md`
-    /// §Block Continuation Corrections. Called where the alternate has just been
+    /// A matched verdict (`docs/conformance_svelte.md` §Block Continuation Clauses);
+    /// only the wording below is tsv's own. Called where the alternate has just been
     /// parsed, so the current token — the stray `{:` — carries the error's position.
     /// Any other continuation keyword (`{:catch}` after an `{:else}`) is left alone:
-    /// canonical rejects those too, so the verdict already matches.
+    /// it takes the misplaced-continuation error instead.
     ///
     /// The two spellings take different messages because only one of them is a
     /// **repeat**: a second `{:else}` is a duplicate, while an `{:else if}` after an

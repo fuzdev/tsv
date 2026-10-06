@@ -219,7 +219,7 @@ fn comment_ending_at<'a>(template_comments: &[&'a Comment], end: u32) -> Option<
 /// takes it directly (see [`attach_const_tag_init`] for that split).
 ///
 /// A typed binding is **two** acorn parses, so it is two islands: canonical parses a
-/// destructure as a synthetic `(pattern = 1)` expression (`read_pattern`) and its trailing
+/// destructure as a synthetic `pattern = 1` expression (`read_pattern`) and its trailing
 /// `: T` with a second, separately padded one (`read_type_annotation`'s `_ as ` trick), and
 /// `add_comments` runs once per parse over that parse's own comments. A comment inside the
 /// pattern therefore attaches within the pattern subtree or nowhere — never to the
@@ -300,7 +300,7 @@ pub(super) fn pattern_comment_window(pattern: &tsv_ts::ast::internal::Expression
 /// Canonical Svelte runs an acorn parse per island, each with its own comment attach — the
 /// id (two islands with a `: T` annotation, the pattern then the type; see
 /// [`attach_binding_pattern`]) and the init: `read_pattern` parses a destructure id as a
-/// synthetic `(pattern = 1)` expression (so an id-internal comment attaches inside the
+/// synthetic `pattern = 1` expression (so an id-internal comment attaches inside the
 /// pattern subtree — e.g. a destructure default's literal), and `read_expression` parses
 /// the init (comments from after the id through the tag close attach in the init subtree).
 /// Comments *between* the pattern and the `=` are a canonical parse error, so the id and
