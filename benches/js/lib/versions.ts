@@ -33,8 +33,8 @@ export interface TscVersions {
 
 /**
  * yuku-parser implementation versions. Two npm packages, one Zig engine behind
- * two bindings — they version in lockstep upstream, but both are read so a
- * skewed local install shows up in the report instead of hiding.
+ * two bindings — pinned at one version (`package.json` `//yuku`), but both are read
+ * so a skewed local install shows up in the report instead of hiding.
  */
 export interface YukuVersions {
 	/** The N-API package (`yuku-parser`) */

@@ -953,8 +953,8 @@ export function get_alternative_versions(
 		// reports the binding it actually loads.
 		oxc_parser_wasm: impls.oxc_wasm?.versions.binding,
 		oxfmt: impls.oxc?.versions.oxfmt,
-		// Two packages over one engine, versioned in lockstep upstream — reported
-		// separately so a skewed local install is visible rather than implied.
+		// Two packages over one engine, pinned at one version (`package.json` `//yuku`)
+		// — reported separately so a skewed local install is visible rather than implied.
 		yuku_parser: impls.yuku?.version,
 		yuku_parser_wasm: impls.yuku_wasm?.version,
 		biome: impls.biome?.versions.wasm,

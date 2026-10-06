@@ -26,7 +26,8 @@
  * is excluded from the CONFORMANCE surface** (`get_benchmark_tasks`). An identifier
  * built from a long run of BRACED unicode escapes — `var _` + `'\u{11A01}'` ×75,
  * i.e. once the decoded identifier passes ~300 bytes — SEGFAULTS the host process
- * inside the Zig parse call; one escape fewer throws an ordinary `ParseFailed`.
+ * inside the Zig parse call on every run; one escape fewer sits on the boundary and
+ * parses cleanly on one run, faults on the next.
  * Non-braced escapes (`\uXXXX`) and literal non-ASCII identifiers are unaffected at
  * any length, as is the wasm binding (the overrun stays inside linear memory, and
  * it parses the same inputs cleanly). test262's
@@ -261,9 +262,9 @@ export class YukuImplementation extends BaseImplementation {
 	}
 
 	/**
-	 * The version of THIS binding's package. The two ship in lockstep upstream, but
-	 * each is reported from its own package so a skewed local install is visible in
-	 * the report rather than implied.
+	 * The version of THIS binding's package. The two are pinned at one version
+	 * (`package.json` `//yuku`), but each is reported from its own package so a skewed
+	 * local install is visible in the report rather than implied.
 	 */
 	get version(): string {
 		return this.name === 'yuku-parser' ? this.versions.parser : this.versions.wasm;

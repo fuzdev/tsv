@@ -628,11 +628,12 @@ prettier. Load-bearing on two axes:
 - **yuku-parser (NAPI) / @yuku-parser/wasm (WASM)** — a JS/TS parser written in
   Zig; **TypeScript, JS only** — no Svelte, no CSS, no formatter, so it contributes
   two rows to `parse/typescript` and nothing else. One engine behind two bindings,
-  versioned in lockstep (bump both together). Its default AST is span-only and
-  padded exactly like oxc's (`decorators: []` / `typeAnnotation: null` / `optional:
-  false`, no per-node `loc`). That payload match, and the two JS-API traps
-  `lib/yuku.ts` must defuse — `parse()` is **lazy**, the parser is
-  **error-tolerant** — are in [Fairness caveats](#fairness-caveats). **One
+  pinned at one version — the last this package pairing exists at
+  (`benches/js/package.json`'s `//yuku` note has what a move past it takes). Its
+  default AST is span-only and padded exactly like oxc's (`decorators: []` /
+  `typeAnnotation: null` / `optional: false`, no per-node `loc`). That payload match,
+  and the two JS-API traps `lib/yuku.ts` must defuse — `parse()` is **lazy**, the
+  parser is **error-tolerant** — are in [Fairness caveats](#fairness-caveats). **One
   `YukuImplementation` drives both bindings** (constructed twice, the row name
   selecting the specifier): they expose the identical module surface, so a wrapper
   per binding would be a copy free to drift, which is exactly how the oxc WASI row

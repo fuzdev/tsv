@@ -1613,7 +1613,9 @@ state) shows in the coverage report and skip counts without `--verbose`.
   its row is conformance-excluded.** An identifier built from a run of braced unicode
   escapes faults the host process inside the Zig parse call once the decoded
   identifier passes ~300 bytes — `parse('var _' + '\u{11A01}'.repeat(75) + ';')`
-  crashes, `repeat(74)` throws an ordinary `ParseFailed`. Non-braced escapes
+  crashes on every run. One escape fewer sits ON the boundary and is no control: the
+  same call in a fresh process parses cleanly on one run and faults on the next (at an
+  earlier pin it threw an ordinary `ParseFailed` instead). Non-braced escapes
   (`\uXXXX`) and literal non-ASCII identifiers are unaffected at any length, and so
   is the wasm binding (the overrun stays inside linear memory; it parses the same
   inputs cleanly — itself a variant-parity divergence, except the process dies before
@@ -1626,9 +1628,11 @@ state) shows in the coverage report and skip counts without `--verbose`.
   (`get_benchmark_tasks`, keyed on `BenchmarkTaskOptions.corpus_kind`), disclosed in
   the conformance report's `**Excluded here:**` line — a disclosure whose claim is
   CHECKED against the registry (§Report files), so re-adding the row without
-  updating the table fails the run. The fault survives at the pinned version (the
-  `repeat(74)`/`repeat(75)` boundary reproduces as written); on a yuku bump, re-probe rather
-  than assume — re-add the row and run `deno task bench:conformance`.
+  updating the table fails the run. The fault survives at the pinned version
+  (`repeat(75)` faults on every run) and in upstream's `yuku-core` layout past it
+  (`package.json` `//yuku`); on a yuku bump, re-probe rather than assume — run the
+  `repeat(75)` call in a child process a handful of times, and only if it never faults
+  re-add the row and run `deno task bench:conformance`.
 - **The oxc WASI binding's `errors` getter is CONSUME-ONCE.** On
   `@oxc-parser/binding-wasm32-wasi`, the first access to `result.errors` returns the
   real error array; every later access returns `[]` (the native `oxc-parser` package
@@ -1688,7 +1692,11 @@ state) shows in the coverage report and skip counts without `--verbose`.
   by two `new Promise((r) => setTimeout(r, 50))` — the first resolves, the second
   never does. Independent of oxfmt version (reproduced with 0.28.0, 0.50.0, 0.53.0,
   0.57.0 on Deno 2.8.3), so the regression is on the Deno / napi-rs side; re-test the
-  repro before ever removing the workaround. In `bench.ts` oxfmt is invoked
+  repro before ever removing the workaround. ⚠ It does NOT reproduce on Deno 2.9.7 —
+  every timer in the repro fires, at the oxfmt pin on either side of a bump — so the
+  runtime no longer forces the workaround; bringing a cooldown back is now a
+  methodology choice (it would have to be uniform across the three runtimes, below),
+  not a bug dodge. In `bench.ts` oxfmt is invoked
   per-iteration during the `format/*` loops; the leak shows up at the next inter-task
   `await wait(cooldown_ms)`, which never fires. Workaround: `cooldown_ms: 0` in
   `run_benchmark_group`'s `Benchmark` config. Async measurement loops (`prettier`,
