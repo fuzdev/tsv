@@ -1,0 +1,233 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 338,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A script with no `lang` keeps a quoted class field key quoted, the same as a TypeScript one.",
+			"start": 10,
+			"end": 105
+		},
+		{
+			"type": "Line",
+			"value": " A JSDoc-typed field with no initializer is the form a type-checked script treats differently",
+			"start": 107,
+			"end": 202
+		},
+		{
+			"type": "Line",
+			"value": " by spelling.",
+			"start": 204,
+			"end": 219
+		},
+		{
+			"type": "Block",
+			"value": "* @type {string} ",
+			"start": 287,
+			"end": 308
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 337,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 328,
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 221,
+					"end": 327,
+					"id": {
+						"type": "Identifier",
+						"start": 227,
+						"end": 228,
+						"name": "A"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 229,
+						"end": 327,
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 233,
+								"end": 241,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Literal",
+									"start": 233,
+									"end": 236,
+									"value": "a",
+									"raw": "'a'"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 239,
+									"end": 240,
+									"value": 1,
+									"raw": "1"
+								}
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 244,
+								"end": 248,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Literal",
+									"start": 244,
+									"end": 247,
+									"value": "b",
+									"raw": "'b'"
+								},
+								"value": null
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 251,
+								"end": 266,
+								"static": true,
+								"computed": false,
+								"key": {
+									"type": "Literal",
+									"start": 258,
+									"end": 261,
+									"value": "c",
+									"raw": "'c'"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 264,
+									"end": 265,
+									"value": 2,
+									"raw": "2"
+								}
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 269,
+								"end": 284,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Literal",
+									"start": 269,
+									"end": 273,
+									"value": "fn",
+									"raw": "'fn'"
+								},
+								"value": {
+									"type": "ArrowFunctionExpression",
+									"start": 276,
+									"end": 283,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "Literal",
+										"start": 282,
+										"end": 283,
+										"value": 3,
+										"raw": "3"
+									}
+								}
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 311,
+								"end": 315,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Literal",
+									"start": 311,
+									"end": 314,
+									"value": "d",
+									"raw": "'d'"
+								},
+								"value": null,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {string} ",
+										"start": 287,
+										"end": 308
+									}
+								]
+							},
+							{
+								"type": "MethodDefinition",
+								"start": 318,
+								"end": 324,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 318,
+									"end": 319,
+									"name": "m"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 319,
+									"end": 324,
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 322,
+										"end": 324,
+										"body": []
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A script with no `lang` keeps a quoted class field key quoted, the same as a TypeScript one.",
+							"start": 10,
+							"end": 105
+						},
+						{
+							"type": "Line",
+							"value": " A JSDoc-typed field with no initializer is the form a type-checked script treats differently",
+							"start": 107,
+							"end": 202
+						},
+						{
+							"type": "Line",
+							"value": " by spelling.",
+							"start": 204,
+							"end": 219
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

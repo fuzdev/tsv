@@ -54,6 +54,7 @@ The fixture-pinned `◆prettier_bug` cases — where Prettier produces output th
 - A hoisted section (`<script>`, `<style>`, `<svelte:options>`) glued between two texts that the join lets complete a character reference (`x&amp<script>…</script>;y`, which renders `x&;y`) — prints the join as written, `x&amp;y`, which renders `x&y`, a content change; idempotent on its own output, so nothing reveals it — [lifted_run_glued_entity](../tests/fixtures/svelte/script/ordering/lifted_run_glued_entity_prettier_divergence/), [lifted_run_glued_entity_long](../tests/fixtures/svelte/script/ordering/lifted_run_glued_entity_long_prettier_divergence/)
 - `//` comment in a `<pre>` / `<textarea>` attribute list — ejects the comment out of the element (`</pre> // c`, `</textarea // c⏎>`), so it renders as page text or is dropped on the next pass; non-idempotent either way — [ws_sensitive_attr_comment_line](../tests/fixtures/svelte/elements/ws_sensitive_attr_comment_line_prettier_divergence/); in a special element's head there it lands inside the closing tag (`</svelte:element // c`), which does not parse — [pre_special_element_comment](../tests/fixtures/svelte/elements/pre_special_element_comment_prettier_divergence/)
 - Whitespace-only content of an inline element, a component or a special element inside `<pre>` — deletes the rendered run (`<pre>a<b>   </b>c</pre>` → `<pre>a<b></b>c</pre>`), a content change — [pre_special_element_whitespace_only](../tests/fixtures/svelte/elements/pre_special_element_whitespace_only_prettier_divergence/)
+- Quoted auto-accessor key (`accessor 'a': string`) — unquotes it; tsc's `strictPropertyInitialization` check exempts a string-named field and not an identifier-named one, so the bare `accessor a: string` is `TS2564` where the quoted spelling checks clean — formatting creates a type error, and prettier is idempotent on its own output, so nothing reveals it — [field_key_quoted_accessor_abstract](../tests/fixtures/typescript/declarations/class/field_key_quoted_accessor_abstract_prettier_divergence/); in a Svelte template expression it unquotes every class field key the same way (`{new (class { 'a': string })()}`), with the same result — [class_field_key_quoted](../tests/fixtures/svelte/expressions/class_field_key_quoted_prettier_divergence/)
 - Constrained `infer … extends` operand parens — strips required parens → output fails to re-parse — [constrained_extends_parens](../tests/fixtures/typescript/types/infer/constrained_extends_parens_prettier_divergence/)
 - Negative literal type sign comment (`-/* c */ 1`) — *adds* parens to hold the comment (`-(/* c */ 1)`), but no such type exists: `-` is a negative literal type only when the next token is a numeric/bigint literal → output fails to re-parse — [negative_literal_sign_comment](../tests/fixtures/typescript/types/negative_literal_sign_comment_prettier_divergence/)
 - Negative literal type as an array element or indexed-access object (`(-1)[]`, `(-1)[K]`) — strips the pair; tsc reads the stripped text as the same type, but acorn-typescript (and so Svelte) reads the literal with its expression parser, so `-1[]` fails to re-parse — a compiling component stops compiling, and prettier's own next pass over it throws — and `-1[K]` is the different tree `-(1[K])` — [negative_literal_postfix_parens](../tests/fixtures/typescript/types/negative_literal_postfix_parens_prettier_divergence/), [negative_literal_postfix_parens_comment](../tests/fixtures/typescript/types/negative_literal_postfix_parens_comment_prettier_divergence/)
@@ -633,9 +634,10 @@ non-whitespace instance, and it produces no catalog entry because both formatter
 `a ?? b ?? c` and `a ?? (b ?? c)` are one document — prettier says so by *rebalancing* the tree at
 parse time (`rebalanceLogicalTree`), tsv by reading a rebalanced view per rule
 (`BinaryExpression::rebalanced_right`). There is no held spelling and so no dual-stable
-remainder: a redundant paren carries no authoring signal either formatter honors. (The one
-paren pair tsv does hold per authoring is held for soundness, not as a signal — item 8 of the
-[remainder](#the-dual-stable-remainder-enumerated).) What there is
+remainder: a redundant paren carries no authoring signal either formatter honors. (Non-whitespace
+spellings are held per authoring all the same, and not as layout signals: a clarity paren pair,
+for soundness, and a class field key's quotes, by a rule keyed on the position — items 8 and 9
+of the [remainder](#the-dual-stable-remainder-enumerated).) What there is
 instead is a standing gate, since a rule left on the raw `binary.right` is invisible on every
 paren-free authoring — [audits.md §Paren-Authoring
 Independence](./audits.md#paren-authoring-independence-audit-parenaudit).
@@ -667,7 +669,7 @@ one document. That source differs per language, and so does how much is left for
 | language | who supplies the equivalence | who supplies the canonical form | what is left to taste |
 | --- | --- | --- | --- |
 | CSS | the spec (Syntax 3 tokenization, "not significant here") | often the spec too (CSS Variables 1 mandates `--x: ;`) | little — see [CSS §Empty custom-property value](./conformance_prettier_css.md#css-values) |
-| TypeScript | the grammar (no significant whitespace) | prettier, and tsv follows it | one held signal: the object literal's `{`→first-property newline |
+| TypeScript | the grammar (no significant whitespace) | prettier, and tsv follows it | one held whitespace signal: the object literal's `{`→first-property newline |
 | Svelte | the **compiler** (`clean_nodes`), not the spec | **nobody** | everything — hence the exclusion set |
 
 **Svelte is the hard case, and that is structural rather than accidental.** `clean_nodes`
@@ -789,6 +791,18 @@ here converges.
    sound side —
    [conformance_prettier_ts.md §TypeScript (Relational chain type-argument parens)](./conformance_prettier_ts.md),
    [relational_region_inner_gt_clarity_pair](../tests/fixtures/typescript/expressions/binary/relational_region_inner_gt_clarity_pair_prettier_divergence/).
+9. **TypeScript: a class field key's quotes.** `'a' = 1` and `a = 1` are both fixed points, as
+   are the two spellings of every other field form. For an annotated instance field with no
+   initializer the pair is not one document at all — tsc's `strictPropertyInitialization` check
+   reads a string-named field and an identifier-named one differently — so there nothing is
+   held. Where the check does not reach (an initialized, optional, definite, `static`, ambient
+   or `abstract` field) the two spellings are one program and tsv keeps both anyway: a **taste**
+   exclusion, the cost of a rule keyed on the position rather than on the checker's reach.
+   Prettier holds the same pair for a plain field and converges an auto-accessor, an abstract
+   field and any field in a Svelte template expression onto the bare spelling —
+   [conformance_prettier_ts.md §TypeScript (Class field key quotes)](./conformance_prettier_ts.md),
+   [field_key_quoted](../tests/fixtures/typescript/declarations/class/field_key_quoted/),
+   [field_key_quoted_accessor_abstract](../tests/fixtures/typescript/declarations/class/field_key_quoted_accessor_abstract_prettier_divergence/).
 
 #### What enforces this, and where the enforcement is blind
 

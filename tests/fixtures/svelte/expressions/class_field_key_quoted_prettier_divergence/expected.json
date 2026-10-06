@@ -1,0 +1,413 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 298,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 40,
+				"end": 42,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 42,
+				"end": 126,
+				"data": " A class expression in a template expression keeps a quoted field key quoted "
+			},
+			{
+				"type": "Text",
+				"start": 126,
+				"end": 127,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 127,
+				"end": 212,
+				"name": "p",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 130,
+							"end": 132,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 132,
+							"end": 207,
+							"expression": {
+								"type": "MemberExpression",
+								"start": 133,
+								"end": 206,
+								"object": {
+									"type": "NewExpression",
+									"start": 133,
+									"end": 204,
+									"callee": {
+										"type": "ClassExpression",
+										"start": 138,
+										"end": 201,
+										"id": null,
+										"superClass": null,
+										"body": {
+											"type": "ClassBody",
+											"start": 144,
+											"end": 201,
+											"body": [
+												{
+													"type": "PropertyDefinition",
+													"start": 148,
+													"end": 160,
+													"static": false,
+													"computed": false,
+													"key": {
+														"type": "Literal",
+														"start": 148,
+														"end": 151,
+														"value": "a",
+														"raw": "'a'"
+													},
+													"typeAnnotation": {
+														"type": "TSTypeAnnotation",
+														"start": 151,
+														"end": 159,
+														"typeAnnotation": {
+															"type": "TSStringKeyword",
+															"start": 153,
+															"end": 159
+														}
+													},
+													"value": null
+												},
+												{
+													"type": "PropertyDefinition",
+													"start": 163,
+													"end": 171,
+													"static": false,
+													"computed": false,
+													"key": {
+														"type": "Literal",
+														"start": 163,
+														"end": 166,
+														"value": "b",
+														"raw": "'b'"
+													},
+													"value": {
+														"type": "Literal",
+														"start": 169,
+														"end": 170,
+														"value": 1,
+														"raw": "1"
+													}
+												},
+												{
+													"type": "PropertyDefinition",
+													"start": 174,
+													"end": 189,
+													"static": true,
+													"computed": false,
+													"key": {
+														"type": "Literal",
+														"start": 181,
+														"end": 184,
+														"value": "c",
+														"raw": "'c'"
+													},
+													"value": {
+														"type": "Literal",
+														"start": 187,
+														"end": 188,
+														"value": 2,
+														"raw": "2"
+													}
+												},
+												{
+													"type": "MethodDefinition",
+													"start": 192,
+													"end": 198,
+													"static": false,
+													"computed": false,
+													"key": {
+														"type": "Identifier",
+														"start": 192,
+														"end": 193,
+														"name": "m"
+													},
+													"kind": "method",
+													"value": {
+														"type": "FunctionExpression",
+														"start": 193,
+														"end": 198,
+														"id": null,
+														"expression": false,
+														"generator": false,
+														"async": false,
+														"params": [],
+														"body": {
+															"type": "BlockStatement",
+															"start": 196,
+															"end": 198,
+															"body": []
+														}
+													}
+												}
+											]
+										}
+									},
+									"arguments": []
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 205,
+									"end": 206,
+									"name": "b"
+								},
+								"computed": false,
+								"optional": false
+							}
+						},
+						{
+							"type": "Text",
+							"start": 207,
+							"end": 208,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 212,
+				"end": 213,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 213,
+				"end": 297,
+				"test": {
+					"type": "Identifier",
+					"start": 218,
+					"end": 219,
+					"name": "x"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 220,
+							"end": 222,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ConstTag",
+							"start": 222,
+							"end": 256,
+							"declaration": {
+								"type": "VariableDeclaration",
+								"kind": "const",
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"id": {
+											"type": "Identifier",
+											"name": "C",
+											"start": 230,
+											"end": 231
+										},
+										"init": {
+											"type": "ClassExpression",
+											"start": 234,
+											"end": 255,
+											"id": null,
+											"superClass": null,
+											"body": {
+												"type": "ClassBody",
+												"start": 240,
+												"end": 255,
+												"body": [
+													{
+														"type": "PropertyDefinition",
+														"start": 244,
+														"end": 252,
+														"static": false,
+														"computed": false,
+														"key": {
+															"type": "Literal",
+															"start": 244,
+															"end": 247,
+															"value": "a",
+															"raw": "'a'"
+														},
+														"value": {
+															"type": "Literal",
+															"start": 250,
+															"end": 251,
+															"value": 1,
+															"raw": "1"
+														}
+													}
+												]
+											}
+										},
+										"start": 230,
+										"end": 255
+									}
+								],
+								"start": 224,
+								"end": 255
+							}
+						},
+						{
+							"type": "Text",
+							"start": 256,
+							"end": 258,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 258,
+							"end": 291,
+							"name": "p",
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 261,
+									"end": 282,
+									"name": "data-attr",
+									"value": {
+										"type": "ExpressionTag",
+										"start": 271,
+										"end": 282,
+										"expression": {
+											"type": "MemberExpression",
+											"start": 272,
+											"end": 281,
+											"object": {
+												"type": "NewExpression",
+												"start": 272,
+												"end": 279,
+												"callee": {
+													"type": "Identifier",
+													"start": 276,
+													"end": 277,
+													"name": "C"
+												},
+												"arguments": []
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 280,
+												"end": 281,
+												"name": "a"
+											},
+											"computed": false,
+											"optional": false
+										}
+									}
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 283,
+										"end": 287,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 291,
+							"end": 292,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"alternate": null
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 40,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 31,
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 20,
+					"end": 30,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 24,
+							"end": 29,
+							"id": {
+								"type": "Identifier",
+								"start": 24,
+								"end": 25,
+								"name": "x"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 28,
+								"end": 29,
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

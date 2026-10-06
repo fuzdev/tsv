@@ -31,12 +31,13 @@ import type { Language } from '../types.ts';
 function make_context(
 	ours: string,
 	prettier: string,
-	language: Language = 'svelte'
+	language: Language = 'svelte',
+	source: string = prettier // simplification: source ≈ prettier, for a pattern that never reads it
 ): DetectionContext {
 	const diff = diff_lines(prettier, ours);
 	const hunks = extract_hunks(diff);
 	const ctx: DetectionContext = {
-		source: prettier, // simplification: source ≈ prettier for detection
+		source,
 		ours,
 		prettier,
 		diff,
@@ -2222,47 +2223,183 @@ Deno.test(
 	}
 );
 
-// ─── field_key_unquote ────────────────────────────────────────────────────
+// ─── field_key_quoted ─────────────────────────────────────────────────────
 
-Deno.test('field_key_unquote: positive - annotated field key unquoted', () => {
-	// The corpus shape (typescript/class/quoted-property.ts): prettier keeps the class
-	// field key quoted, tsv unquotes it.
-	const ours = 'class User {\n\tusername: string;\n}';
-	const prettier = "class User {\n\t'username': string;\n}";
-	const ctx = make_context(ours, prettier, 'typescript');
-	const match = run_pattern('field_key_unquote', ctx);
+// The pattern reads the source (a KEPT key was written quoted), so these contexts carry
+// one: tsv's own output, which is a fixed point, unless a case names another.
+
+Deno.test('field_key_quoted: positive - auto-accessor key kept quoted', () => {
+	const ours = "class A {\n\taccessor 'a': string;\n\tstatic accessor 'c' = 2;\n}";
+	const prettier = 'class A {\n\taccessor a: string;\n\tstatic accessor c = 2;\n}';
+	const ctx = make_context(ours, prettier, 'typescript', ours);
+	const match = run_pattern('field_key_quoted', ctx);
 	assertNotEquals(match, null);
-	assertEquals(match!.pattern, 'field_key_unquote');
+	assertEquals(match!.pattern, 'field_key_quoted');
 	assertEquals(match!.confidence, 'certain');
 });
 
-Deno.test('field_key_unquote: positive - init + static field keys unquoted', () => {
-	const ours = 'class C {\n\tx = 1;\n\tstatic total = 3;\n}';
-	const prettier = "class C {\n\t'x' = 1;\n\tstatic 'total' = 3;\n}";
-	const ctx = make_context(ours, prettier, 'svelte');
-	const match = run_pattern('field_key_unquote', ctx);
+Deno.test('field_key_quoted: positive - abstract and decorated field keys kept quoted', () => {
+	const ours =
+		"abstract class B {\n\tabstract readonly 'b': number;\n\t@dec accessor 'd': string;\n}";
+	const prettier =
+		'abstract class B {\n\tabstract readonly b: number;\n\t@dec accessor d: string;\n}';
+	const ctx = make_context(ours, prettier, 'svelte', ours);
+	const match = run_pattern('field_key_quoted', ctx);
 	assertNotEquals(match, null);
 });
 
-Deno.test('field_key_unquote: negative - enum key (reverse direction)', () => {
-	// The enum case is the OPPOSITE direction — prettier unquotes the enum member key,
-	// tsv keeps it quoted (`'b'` is a value/initializer, never line-initial). Must not be
-	// claimed, or a real enum-key gap would be masked.
-	const ours = "enum E {\n\t'b' = 'b'\n}";
-	const prettier = "enum E {\n\tb = 'b'\n}";
-	const ctx = make_context(ours, prettier, 'typescript');
-	const match = run_pattern('field_key_unquote', ctx);
-	assertEquals(match, null);
+Deno.test('field_key_quoted: positive - plain field keys of a .js file kept quoted', () => {
+	// The corpus shape (js/quote-props/classes.js): prettier's `babel` parser unquotes
+	// every class field key, tsv keeps the quotes. Each shape alone, so each must be
+	// claimed by itself — the first is the value that spells its own key.
+	const cases: Array<[string, string]> = [
+		["class C {\n\tc1 = 'c1';\n\t'c2' = 'c2';\n}", "class C {\n\tc1 = 'c1';\n\tc2 = 'c2';\n}"],
+		["class C {\n\t'a' = 1;\n}", 'class C {\n\ta = 1;\n}'],
+		["class C {\n\t'b';\n}", 'class C {\n\tb;\n}'],
+		["class C {\n\tstatic 'd' = 1;\n}", 'class C {\n\tstatic d = 1;\n}']
+	];
+	for (const [ours, prettier] of cases) {
+		const ctx = make_context(ours, prettier, 'typescript', ours);
+		assertNotEquals(run_pattern('field_key_quoted', ctx), null);
+	}
 });
 
-Deno.test('field_key_unquote: negative - field value change is not a key unquote', () => {
-	// The field KEY (`greeting`) is unquoted on both sides; only a quoted VALUE differs.
-	// The detector keys on the member-line-initial key, never a value, so this is not claimed.
-	const ours = "class C {\n\tgreeting = 'hi';\n}";
-	const prettier = "class C {\n\tgreeting = 'hello';\n}";
-	const ctx = make_context(ours, prettier, 'typescript');
-	const match = run_pattern('field_key_unquote', ctx);
-	assertEquals(match, null);
+Deno.test('field_key_quoted: positive - a double-quoted source spelling', () => {
+	const ours = "class C {\n\taccessor 'a' = 1;\n}";
+	const prettier = 'class C {\n\taccessor a = 1;\n}';
+	const ctx = make_context(ours, prettier, 'typescript', 'class C { accessor "a" = 1 }');
+	assertNotEquals(run_pattern('field_key_quoted', ctx), null);
+});
+
+Deno.test('field_key_quoted: negative - enum member key (same direction)', () => {
+	// Prettier unquotes an enum member key too and tsv keeps it — the SAME direction as a
+	// field key, but another construct. A member ends in `,` or nothing, never `;`, so the
+	// bare arm does not claim it; claiming it would mask that difference.
+	for (const tail of ['', ',']) {
+		const ours = `enum E {\n\t'a' = 'a',\n\t'b' = 'b'${tail}\n}`;
+		const prettier = `enum E {\n\ta = 'a',\n\tb = 'b'${tail}\n}`;
+		const ctx = make_context(ours, prettier, 'typescript', ours);
+		assertEquals(run_pattern('field_key_quoted', ctx), null);
+	}
+});
+
+Deno.test('field_key_quoted: negative - object, type-member and method keys', () => {
+	const cases: Array<[string, string]> = [
+		// object property
+		["const o = {\n\t'a': 1,\n\t'b': 2\n};", 'const o = {\n\ta: 1,\n\tb: 2\n};'],
+		// interface member (a `:` tail, which the bare arm never takes)
+		["interface I {\n\t'a': string;\n}", 'interface I {\n\ta: string;\n}'],
+		// class method key
+		["class C {\n\t'm'() {}\n}", 'class C {\n\tm() {}\n}'],
+		// plain annotated field: prettier's TypeScript parsers keep it, so the bare arm has
+		// no `:` tail to claim one with
+		["class C {\n\t'a': string;\n}", 'class C {\n\ta: string;\n}']
+	];
+	for (const [ours, prettier] of cases) {
+		const ctx = make_context(ours, prettier, 'typescript', ours);
+		assertEquals(run_pattern('field_key_quoted', ctx), null);
+	}
+});
+
+Deno.test('field_key_quoted: negative - the reverse direction is not claimed', () => {
+	// tsv unquoting a field key prettier keeps quoted would be a regression, not this
+	// divergence.
+	const ours = 'class C {\n\taccessor a: string;\n\tb = 1;\n}';
+	const prettier = "class C {\n\taccessor 'a': string;\n\t'b' = 1;\n}";
+	const ctx = make_context(ours, prettier, 'typescript', prettier);
+	assertEquals(run_pattern('field_key_quoted', ctx), null);
+});
+
+Deno.test('field_key_quoted: negative - a line-initial string VALUE is not a key', () => {
+	// An assignment that breaks after its `=` puts the string value at line start, and the
+	// value may spell its own target (`kind = 'kind'`). That is a layout difference, not a
+	// kept key: prettier's line is not tsv's line with one pair of quotes dropped.
+	const cases: Array<[string, string]> = [
+		["class C {\n\tkind =\n\t\t'kind';\n}", "class C {\n\tkind = 'kind';\n}"],
+		["class C {\n\tstatic kind =\n\t\t'kind';\n}", "class C {\n\tstatic kind = 'kind';\n}"],
+		["kind =\n\t'kind';", "kind = 'kind';"]
+	];
+	for (const [ours, prettier] of cases) {
+		const ctx = make_context(ours, prettier, 'typescript', ours);
+		assertEquals(run_pattern('field_key_quoted', ctx), null);
+	}
+});
+
+Deno.test('field_key_quoted: negative - anything else moving on the key line', () => {
+	// The divergence drops one pair of quotes and nothing else, so a line that also
+	// re-spaces its value, breaks after its `=`, re-spells its type, changes or reorders
+	// its modifiers, loses a comment, carries a second quoted key, or names another member
+	// is not claimed.
+	const cases: Array<[string, string]> = [
+		["class C {\n\t'a' = f(1,2);\n}", 'class C {\n\ta = f(1, 2);\n}'],
+		["class C {\n\t'a';\n}", 'class C {\n\ta = 1;\n}'],
+		["class C {\n\taccessor 'a' =\n\t\tb;\n}", 'class C {\n\taccessor a = b;\n}'],
+		["class C {\n\taccessor 'a': Array<string>;\n}", 'class C {\n\taccessor a: string[];\n}'],
+		[
+			"abstract class C {\n\tabstract 'a': string;\n}",
+			'abstract class C {\n\tabstract readonly a: string;\n}'
+		],
+		["class C {\n\tstatic accessor 'a' = 1;\n}", 'class C {\n\taccessor static a = 1;\n}'],
+		["class C {\n\tstatic accessor 'a' = 1;\n}", 'class C {\n\tdeclare a: string;\n}'],
+		["class C {\n\taccessor 'a' = 1; // c\n}", 'class C {\n\taccessor a = 1;\n}'],
+		["class C {\n\taccessor 'a' = { 'b': 1 };\n}", 'class C {\n\taccessor a = { b: 1 };\n}'],
+		["class C {\n\taccessor 'a': string;\n\tx = 1;\n}", 'class C {\n\tprivate a;\n\tx = 1;\n}'],
+		// a METHOD key is not a field key: both formatters unquote it, so a kept one is a bug
+		[
+			"abstract class C {\n\tabstract 'm'?(): void;\n}",
+			'abstract class C {\n\tabstract m?(): void;\n}'
+		]
+	];
+	for (const [ours, prettier] of cases) {
+		const ctx = make_context(ours, prettier, 'typescript', ours);
+		assertEquals(run_pattern('field_key_quoted', ctx), null);
+	}
+});
+
+Deno.test('field_key_quoted: negative - another changed line in the same hunk', () => {
+	// The whole hunk must be this divergence. A value that wraps differently under a kept
+	// key, or an unrelated neighbour that moved, leaves the hunk unexplained.
+	const cases: Array<[string, string]> = [
+		[
+			"class C {\n\taccessor 'a' =\n\t\tf(1,\n\t\t\t2);\n}",
+			'class C {\n\taccessor a =\n\t\tf(1, 2);\n}'
+		],
+		[
+			"class C {\n\taccessor 'a': string;\n\tb = f(1,2);\n}",
+			'class C {\n\taccessor a: string;\n\tb = f(1, 2);\n}'
+		]
+	];
+	for (const [ours, prettier] of cases) {
+		const ctx = make_context(ours, prettier, 'typescript', ours);
+		assertEquals(run_pattern('field_key_quoted', ctx), null);
+	}
+});
+
+Deno.test('field_key_quoted: negative - a key the source never spelled as a string', () => {
+	// A kept key was written quoted. Here the source is bare, so tsv would have ADDED the
+	// quotes — a formatter bug, not this divergence.
+	const cases: Array<[string, string, string]> = [
+		["class C {\n\t'a' = 1;\n}", 'class C {\n\ta = 1;\n}', 'class C { a = 1 }'],
+		[
+			"class C {\n\taccessor 'a' = 1;\n}",
+			'class C {\n\taccessor a = 1;\n}',
+			'class C { accessor a = 1 }'
+		],
+		["'foo';\nx();", 'foo;\nx();', 'foo;\nx();']
+	];
+	for (const [ours, prettier, source] of cases) {
+		const ctx = make_context(ours, prettier, 'typescript', source);
+		assertEquals(run_pattern('field_key_quoted', ctx), null);
+	}
+});
+
+Deno.test('field_key_quoted: negative - field value change is not a key difference', () => {
+	// The field KEY is quoted on both sides; only the VALUE differs, so prettier's line is
+	// not tsv's line minus a pair of quotes.
+	const ours = "class C {\n\t'a' = 'x';\n}";
+	const prettier = "class C {\n\t'a' = 'y';\n}";
+	const ctx = make_context(ours, prettier, 'typescript', ours);
+	assertEquals(run_pattern('field_key_quoted', ctx), null);
 });
 
 // ─── single_type_param_comma ──────────────────────────────────────────────

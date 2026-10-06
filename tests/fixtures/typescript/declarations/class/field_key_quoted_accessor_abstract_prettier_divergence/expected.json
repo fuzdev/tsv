@@ -1,0 +1,301 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 389,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An auto-accessor is a field: its quoted key keeps its quotes",
+			"start": 20,
+			"end": 83
+		},
+		{
+			"type": "Line",
+			"value": " An abstract field and an abstract auto-accessor are fields too",
+			"start": 200,
+			"end": 265
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 388,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 379,
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 85,
+					"end": 197,
+					"id": {
+						"type": "Identifier",
+						"start": 91,
+						"end": 92,
+						"name": "A"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 93,
+						"end": 197,
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 97,
+								"end": 118,
+								"accessor": true,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Literal",
+									"start": 106,
+									"end": 109,
+									"value": "a",
+									"raw": "'a'"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 109,
+									"end": 117,
+									"typeAnnotation": {
+										"type": "TSStringKeyword",
+										"start": 111,
+										"end": 117
+									}
+								},
+								"value": null
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 121,
+								"end": 138,
+								"accessor": true,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Literal",
+									"start": 130,
+									"end": 133,
+									"value": "b",
+									"raw": "'b'"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 136,
+									"end": 137,
+									"value": 1,
+									"raw": "1"
+								}
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 141,
+								"end": 165,
+								"static": true,
+								"accessor": true,
+								"computed": false,
+								"key": {
+									"type": "Literal",
+									"start": 157,
+									"end": 160,
+									"value": "c",
+									"raw": "'c'"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 163,
+									"end": 164,
+									"value": 2,
+									"raw": "2"
+								}
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 168,
+								"end": 194,
+								"accessor": true,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Literal",
+									"start": 182,
+									"end": 185,
+									"value": "d",
+									"raw": "'d'"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 185,
+									"end": 193,
+									"typeAnnotation": {
+										"type": "TSStringKeyword",
+										"start": 187,
+										"end": 193
+									}
+								},
+								"value": null,
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 168,
+										"end": 172,
+										"expression": {
+											"type": "Identifier",
+											"start": 169,
+											"end": 172,
+											"name": "dec"
+										}
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An auto-accessor is a field: its quoted key keeps its quotes",
+							"start": 20,
+							"end": 83
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 267,
+					"end": 378,
+					"abstract": true,
+					"id": {
+						"type": "Identifier",
+						"start": 282,
+						"end": 283,
+						"name": "B"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 284,
+						"end": 378,
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 288,
+								"end": 309,
+								"abstract": true,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Literal",
+									"start": 297,
+									"end": 300,
+									"value": "a",
+									"raw": "'a'"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 300,
+									"end": 308,
+									"typeAnnotation": {
+										"type": "TSStringKeyword",
+										"start": 302,
+										"end": 308
+									}
+								},
+								"value": null
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 312,
+								"end": 342,
+								"abstract": true,
+								"readonly": true,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Literal",
+									"start": 330,
+									"end": 333,
+									"value": "b",
+									"raw": "'b'"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 333,
+									"end": 341,
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 335,
+										"end": 341
+									}
+								},
+								"value": null
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 345,
+								"end": 375,
+								"abstract": true,
+								"accessor": true,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Literal",
+									"start": 363,
+									"end": 366,
+									"value": "c",
+									"raw": "'c'"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 366,
+									"end": 374,
+									"typeAnnotation": {
+										"type": "TSStringKeyword",
+										"start": 368,
+										"end": 374
+									}
+								},
+								"value": null
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An abstract field and an abstract auto-accessor are fields too",
+							"start": 200,
+							"end": 265
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

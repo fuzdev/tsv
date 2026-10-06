@@ -374,6 +374,34 @@ impl<'a> Printer<'a> {
         ])
     }
 
+    /// Build a Doc for a non-computed class **field** key.
+    ///
+    /// A string-literal key keeps its quotes whatever it spells: it prints as any string
+    /// literal does ([`Self::build_string_literal_doc`] — the quote style normalizes,
+    /// `"a"` → `'a'`, and no other escape is re-spelled) and is never unquoted. A field's
+    /// spelling is not interchangeable the way an object key's is — under
+    /// `strictPropertyInitialization` tsc exempts a string-named field from the
+    /// definite-assignment check it applies to an identifier-named one, so
+    /// `'a': string;` checks clean where `a: string;` is an error. The rule is the
+    /// position's, not the check's: it holds for every field form (initialized,
+    /// optional, `static`, `declare`, `abstract`, an auto-accessor), including those
+    /// the check skips.
+    ///
+    /// A method, `get` / `set` accessor or constructor key is not a field key and takes the
+    /// object-key rule ([`Self::build_property_key_doc`]), which unquotes a valid
+    /// identifier.
+    fn build_field_key_doc(&self, key: &internal::Expression<'_>) -> DocId {
+        match &key.kind {
+            internal::ExpressionKind::Literal(
+                lit @ internal::Literal {
+                    value: internal::LiteralValue::String(_),
+                    ..
+                },
+            ) => self.build_string_literal_doc(lit),
+            _ => self.build_expression_doc(key),
+        }
+    }
+
     /// Build a Doc for a property definition
     fn build_property_definition_doc(&self, prop: &internal::PropertyDefinition<'_>) -> DocId {
         let d = self.d();
@@ -448,11 +476,7 @@ impl<'a> Printer<'a> {
         } else {
             self.push_pre_name_comments_doc(&mut parts, cursor, key_start);
             key_region_end = prop.key.span().end;
-            // A non-computed field key is unquoted when it is a valid identifier,
-            // the same rule as an object property key (`'x' = 1` → `x = 1`). Prettier
-            // leaves class field keys quoted — a cataloged divergence (tsv is
-            // consistent with its own object/type/interface unquoting).
-            parts.push(self.build_property_key_doc(&prop.key));
+            parts.push(self.build_field_key_doc(&prop.key));
         }
 
         // The modifier's marker byte, derived once so the freeze below and the emission

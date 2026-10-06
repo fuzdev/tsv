@@ -4030,61 +4030,98 @@ const template_embedded_verbatim: DivergencePattern = {
 	}
 };
 
-const field_key_unquote: DivergencePattern = {
-	id: 'field_key_unquote',
-	description: 'Class field key unquoted; prettier keeps a valid-identifier field key quoted',
+const field_key_quoted: DivergencePattern = {
+	id: 'field_key_quoted',
+	description:
+		'Quoted class field key kept; prettier unquotes an auto-accessor or abstract field key, and every field key of a `.js` file or a Svelte template expression',
 	languages: ['typescript', 'svelte'],
 	conformance_sections: ['TypeScript'],
-	fixtures: ['typescript/declarations/class/field_key_unquote_prettier_divergence'],
-	// Unquoting only drops the surrounding `'`, a char SAFETY already excludes, so this
+	fixtures: [
+		'typescript/declarations/class/field_key_quoted_accessor_abstract_prettier_divergence'
+	],
+	// Keeping the quotes only keeps a `'` pair, a char SAFETY already excludes, so this
 	// pattern never moves the semantic char count — `may_alter_char_frequency` stays false.
 	detect(ctx) {
 		if (ctx.language !== 'typescript' && ctx.language !== 'svelte') return null;
 
-		// tsv unquotes a valid-identifier CLASS FIELD key (`'x' = 1` → `x = 1`, `'count': T`
-		// → `count: T`, `static 'total'` → `static total`); prettier unquotes class
-		// method/accessor keys but keeps FIELD keys quoted. Object / type-literal / interface
-		// keys agree (both unquote → no hunk), so a prettier-quoted → ours-unquoted key hunk is
-		// only ever this class-field case.
+		// tsv keeps a quoted class FIELD key quoted. Prettier's TypeScript parsers keep a
+		// plain field's quotes too, so the only hunks are the field forms its guard misses:
 		//
-		// The quoted key is anchored at member-line start (after leading whitespace + optional
-		// field modifiers), so a quoted *value* (`b = 'b'`, `const a = 'x'`) and the
-		// reverse-direction enum case (prettier unquotes an enum key, tsv keeps it quoted —
-		// its `'b'` is never line-initial) are excluded. ASCII-ident only: the astral ES2015
-		// key (`'𐊧'`) is the separate `property_key_es2015_ident` divergence; numeric /
-		// non-ident keys (`'0a'`, `'x-y'`, `'0'`) stay quoted in both. The quoted key is
-		// followed by a field terminator — `=` (init), `:` (annotation), `?` (optional), or a
-		// bare `;` / end (field declaration).
-		const field_modifiers =
-			'(?:(?:static|readonly|public|private|protected|declare|abstract|accessor|override)\\s+)*';
-		const quoted_field_key = new RegExp(
-			`^\\s*${field_modifiers}'([A-Za-z_$][A-Za-z0-9_$]*)'\\s*(?:[=:?;]|$)`
+		// - keyword arm — an auto-accessor or an abstract field (`accessor 'a': T` →
+		//   `accessor a: T`, `abstract 'a': T` → `abstract a: T`), under any other modifier
+		//   and an inline decorator. The `accessor` / `abstract` keyword is what makes the
+		//   line a class member, so any FIELD tail is accepted — `:`, `=` or `;`, behind an
+		//   optional `?` / `!` — and a method's `(` is not (`abstract 'm'?(): void;`).
+		// - bare arm — a `.js` file or a Svelte template expression, where prettier unquotes
+		//   every field key (`'a' = 1;` → `a = 1;`, `'b';` → `b;`, under `static`). Nothing
+		//   on the line says "class", so the arm takes only the JavaScript field tails (`=`
+		//   or a bare `;`) and requires the line to END in `;` — an annotated field of a
+		//   template expression (`'a': T;`) is left unexplained rather than taken on a tail
+		//   an interface or type-literal member shares.
+		//
+		// Both arms anchor the quoted key at line start. That alone does not make the string
+		// a key — a string VALUE opens its own line whenever an assignment breaks after its
+		// `=` — so the proof is the pair: prettier's line must be tsv's line with the key's
+		// quotes dropped and nothing else moved. The bare arm's `;` is what excludes the
+		// same-direction enum case (prettier unquotes an enum member key, tsv keeps it; a
+		// member ends in `,` or nothing) — a separate, uncataloged difference this pattern
+		// must not absorb. An object property and an annotated type member carry `:` and a
+		// method key `(`, so none of them reaches the bare arm; a type member with no
+		// annotation (`'a';`) is the one line that shares a bare field's shape, and it is
+		// kept out only by both formatters unquoting it. ASCII identifiers only.
+		const decorators = '(?:@[\\w$.]+(?:\\([^)]*\\))?\\s+)*';
+		const modifier =
+			'(?:static|readonly|public|private|protected|declare|abstract|accessor|override)';
+		// Captures: the line up to the key, the modifier run, the key, the rest of the line.
+		const keyword_field_key = new RegExp(
+			`^(\\s*${decorators}((?:${modifier}\\s+)+))'([A-Za-z_$][A-Za-z0-9_$]*)'(\\s*[?!]?\\s*(?:[:=;].*)?)$`
 		);
+		// Captures: the line up to the key, the key, the rest of the line.
+		const bare_field_key = /^(\s*(?:static\s+)?)'([A-Za-z_$][A-Za-z0-9_$]*)'(\s*(?:=.*)?;)$/;
 
-		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
-			for (const p_line of hunk.removed_lines) {
-				const m = quoted_field_key.exec(p_line);
-				if (!m) continue;
-				const ident = m[1];
-				// The same field key, unquoted, must appear line-initial on an ours line (the
-				// quoted form gone) — proving tsv dropped the quotes rather than some unrelated
-				// edit removing the line.
-				const bare = new RegExp(`^\\s*${field_modifiers}${ident}\\s*(?:[=:?;]|$)`);
-				const unquoted_on_ours = hunk.added_lines.some(
-					(o) => bare.test(o) && !o.includes(`'${ident}'`)
-				);
-				if (unquoted_on_ours) return true;
+		// tsv's line with the key's one pair of quotes dropped, or `null` for a line that
+		// holds no kept field key. The line's VALUE may well spell the key as a string
+		// (`'b' = 'b';`), so the caller compares the whole line.
+		const unquote_field_key = (o_line: string): { key: string; unquoted: string } | null => {
+			const keyword = keyword_field_key.exec(o_line);
+			if (keyword && /\b(?:accessor|abstract)\b/.test(keyword[2])) {
+				return { key: keyword[3], unquoted: keyword[1] + keyword[3] + keyword[4] };
 			}
-			return false;
-		});
+			const bare = bare_field_key.exec(o_line);
+			return bare ? { key: bare[2], unquoted: bare[1] + bare[2] + bare[3] } : null;
+		};
+		// A KEPT key was written quoted. Necessary, not sufficient — the string may be a
+		// value elsewhere in the source — but a source that never spells it rules the
+		// claim out: there tsv would have ADDED the quotes.
+		const source_spells_string = (key: string): boolean =>
+			ctx.source.includes(`'${key}'`) || ctx.source.includes(`"${key}"`);
+
+		// The WHOLE hunk must be this divergence: prettier's changed lines are tsv's, in
+		// order, each with one pair of quotes dropped. A hunk that also moves another line
+		// — the continuation of a value that wraps under a kept key, an unrelated
+		// neighbour — holds a difference this pattern cannot vouch for.
+		const hunk_indices = find_matching_hunks(
+			ctx.hunks,
+			(hunk) =>
+				hunk.added_lines.length > 0 &&
+				hunk.added_lines.length === hunk.removed_lines.length &&
+				hunk.added_lines.every((o_line, i) => {
+					const kept = unquote_field_key(o_line);
+					return (
+						kept !== null &&
+						kept.unquoted === hunk.removed_lines[i] &&
+						source_spells_string(kept.key)
+					);
+				})
+		);
 
 		if (hunk_indices.length > 0) {
 			return {
-				pattern: 'field_key_unquote',
+				pattern: 'field_key_quoted',
 				confidence: 'certain',
 				hunk_indices,
 				reason:
-					'Class field key unquoted (tsv unquotes a valid-identifier class field key; prettier keeps it quoted)'
+					'Quoted class field key kept (prettier unquotes an auto-accessor or abstract field key, and every field key of a `.js` file or a Svelte template expression)'
 			};
 		}
 		return null;
@@ -4334,7 +4371,7 @@ export const PATTERNS: DivergencePattern[] = [
 	// 3. Feature-specific patterns
 	template_literal_width,
 	template_embedded_verbatim,
-	field_key_unquote,
+	field_key_quoted,
 	block_expression_logical,
 	member_expression_call,
 	member_chain_hug_convergence,

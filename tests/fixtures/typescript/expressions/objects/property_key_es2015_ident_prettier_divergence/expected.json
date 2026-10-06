@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 459,
+	"end": 420,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -30,26 +30,26 @@
 		},
 		{
 			"type": "Line",
-			"value": " A class field key unquotes the same way; prettier keeps class field keys quoted.",
+			"value": " A class method key unquotes the same way.",
 			"start": 258,
-			"end": 341
+			"end": 302
 		},
 		{
 			"type": "Line",
 			"value": " A key that is not a valid identifier stays quoted.",
-			"start": 367,
-			"end": 420
+			"start": 328,
+			"end": 381
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 458,
+		"end": 419,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 449,
+			"end": 410,
 			"body": [
 				{
 					"type": "VariableDeclaration",
@@ -205,38 +205,48 @@
 				},
 				{
 					"type": "ClassDeclaration",
-					"start": 343,
-					"end": 365,
+					"start": 304,
+					"end": 326,
 					"id": {
 						"type": "Identifier",
-						"start": 349,
-						"end": 350,
+						"start": 310,
+						"end": 311,
 						"name": "C"
 					},
 					"superClass": null,
 					"body": {
 						"type": "ClassBody",
-						"start": 351,
-						"end": 365,
+						"start": 312,
+						"end": 326,
 						"body": [
 							{
-								"type": "PropertyDefinition",
-								"start": 355,
-								"end": 362,
+								"type": "MethodDefinition",
+								"start": 316,
+								"end": 323,
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
-									"start": 355,
-									"end": 357,
+									"start": 316,
+									"end": 318,
 									"name": "𐊧"
 								},
+								"kind": "method",
 								"value": {
-									"type": "Literal",
-									"start": 360,
-									"end": 361,
-									"value": 1,
-									"raw": "1"
+									"type": "FunctionExpression",
+									"start": 318,
+									"end": 323,
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 321,
+										"end": 323,
+										"body": []
+									}
 								}
 							}
 						]
@@ -244,50 +254,50 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " A class field key unquotes the same way; prettier keeps class field keys quoted.",
+							"value": " A class method key unquotes the same way.",
 							"start": 258,
-							"end": 341
+							"end": 302
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 422,
-					"end": 448,
+					"start": 383,
+					"end": 409,
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 428,
-							"end": 447,
+							"start": 389,
+							"end": 408,
 							"id": {
 								"type": "Identifier",
-								"start": 428,
-								"end": 433,
+								"start": 389,
+								"end": 394,
 								"name": "digit"
 							},
 							"init": {
 								"type": "ObjectExpression",
-								"start": 436,
-								"end": 447,
+								"start": 397,
+								"end": 408,
 								"properties": [
 									{
 										"type": "Property",
-										"start": 438,
-										"end": 445,
+										"start": 399,
+										"end": 406,
 										"method": false,
 										"shorthand": false,
 										"computed": false,
 										"key": {
 											"type": "Literal",
-											"start": 438,
-											"end": 442,
+											"start": 399,
+											"end": 403,
 											"value": "0a",
 											"raw": "'0a'"
 										},
 										"value": {
 											"type": "Literal",
-											"start": 444,
-											"end": 445,
+											"start": 405,
+											"end": 406,
 											"value": 2,
 											"raw": "2"
 										},
@@ -302,8 +312,8 @@
 						{
 							"type": "Line",
 							"value": " A key that is not a valid identifier stays quoted.",
-							"start": 367,
-							"end": 420
+							"start": 328,
+							"end": 381
 						}
 					]
 				}

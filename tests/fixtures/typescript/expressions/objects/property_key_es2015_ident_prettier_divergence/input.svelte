@@ -7,9 +7,9 @@
 	interface I {
 		𐊧: number;
 	}
-	// A class field key unquotes the same way; prettier keeps class field keys quoted.
+	// A class method key unquotes the same way.
 	class C {
-		𐊧 = 1;
+		𐊧() {}
 	}
 	// A key that is not a valid identifier stays quoted.
 	const digit = { '0a': 2 };

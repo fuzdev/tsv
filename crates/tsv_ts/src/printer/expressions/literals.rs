@@ -354,8 +354,8 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for a string literal, emitting the verbatim source slice when
     /// the formatter wouldn't change it (no quote swap) and allocating only on the
-    /// quote-swap path. Shared by string literal *values* and quoted object /
-    /// import-attribute *keys*.
+    /// quote-swap path. Shared by string literal *values* and quoted *keys* (object,
+    /// import-attribute, class field).
     pub(in crate::printer) fn build_string_literal_doc(
         &self,
         lit: &internal::Literal<'_>,
