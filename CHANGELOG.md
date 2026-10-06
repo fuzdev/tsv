@@ -11,7 +11,9 @@ Each `## Unreleased` section must be non-empty and carry a
 `## Unreleased` (reset to `bump: patch`) for the next cycle.
 
 ## Unreleased
-<!-- bump: minor -->
+<!-- bump: patch -->
+
+## 0.6.0
 
 - **breaking** feat: parsing returns the span-only AST by default — `start`/`end` on every
   node, no `loc` and no Svelte `name_loc` — in every package and both CLIs, like acorn's
