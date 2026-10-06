@@ -503,7 +503,6 @@ impl<'a> Printer<'a> {
                         after_close,
                         span.end,
                         false,
-                        false,
                         TerminatorGap::ListClaims,
                     );
                     parts.push(d.text(";"));
@@ -524,7 +523,6 @@ impl<'a> Printer<'a> {
                     &mut parts,
                     argument_end,
                     span.end,
-                    false,
                     false,
                     TerminatorGap::ListClaims,
                 );

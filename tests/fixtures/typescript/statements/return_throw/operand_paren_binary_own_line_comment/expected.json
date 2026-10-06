@@ -1,0 +1,1248 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1774,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A comment on its own line between a binary `return`/`throw` operand and the `)` of the",
+			"start": 10,
+			"end": 99
+		},
+		{
+			"type": "Line",
+			"value": " operand's grouping parens keeps that line, inside the parens.",
+			"start": 101,
+			"end": 165
+		},
+		{
+			"type": "Line",
+			"value": " a line comment",
+			"start": 168,
+			"end": 185
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 228,
+			"end": 233
+		},
+		{
+			"type": "Line",
+			"value": " a block comment",
+			"start": 244,
+			"end": 262
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 305,
+			"end": 313
+		},
+		{
+			"type": "Line",
+			"value": " throw is restricted the same way",
+			"start": 324,
+			"end": 359
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 401,
+			"end": 406
+		},
+		{
+			"type": "Line",
+			"value": " a run: one comment trails the operand's line, the next owns a line",
+			"start": 417,
+			"end": 486
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 526,
+			"end": 531
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 535,
+			"end": 540
+		},
+		{
+			"type": "Line",
+			"value": " a pair written on one line keeps that line",
+			"start": 551,
+			"end": 596
+		},
+		{
+			"type": "Block",
+			"value": " c6 ",
+			"start": 638,
+			"end": 646
+		},
+		{
+			"type": "Block",
+			"value": " c7 ",
+			"start": 647,
+			"end": 655
+		},
+		{
+			"type": "Line",
+			"value": " a blank line above the comment survives",
+			"start": 666,
+			"end": 708
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 751,
+			"end": 756
+		},
+		{
+			"type": "Line",
+			"value": " a block comment spanning lines",
+			"start": 767,
+			"end": 800
+		},
+		{
+			"type": "Block",
+			"value": " c9\nc10 ",
+			"start": 842,
+			"end": 857
+		},
+		{
+			"type": "Line",
+			"value": " an operand that breaks",
+			"start": 868,
+			"end": 893
+		},
+		{
+			"type": "Line",
+			"value": " c11",
+			"start": 1058,
+			"end": 1064
+		},
+		{
+			"type": "Line",
+			"value": " a method carrier",
+			"start": 1075,
+			"end": 1094
+		},
+		{
+			"type": "Block",
+			"value": " c12 ",
+			"start": 1154,
+			"end": 1163
+		},
+		{
+			"type": "Line",
+			"value": " an arrow carrier",
+			"start": 1180,
+			"end": 1199
+		},
+		{
+			"type": "Line",
+			"value": " c13",
+			"start": 1253,
+			"end": 1259
+		},
+		{
+			"type": "Line",
+			"value": " a clause body",
+			"start": 1271,
+			"end": 1287
+		},
+		{
+			"type": "Line",
+			"value": " c14",
+			"start": 1346,
+			"end": 1352
+		},
+		{
+			"type": "Line",
+			"value": " a comment past the `)` is outside the parens and trails the `;`",
+			"start": 1377,
+			"end": 1443
+		},
+		{
+			"type": "Line",
+			"value": " c15",
+			"start": 1487,
+			"end": 1493
+		},
+		{
+			"type": "Line",
+			"value": " c16",
+			"start": 1499,
+			"end": 1505
+		},
+		{
+			"type": "Line",
+			"value": " a block comment trails the operand's line, the next comment owns a line",
+			"start": 1511,
+			"end": 1585
+		},
+		{
+			"type": "Block",
+			"value": " c17 ",
+			"start": 1626,
+			"end": 1635
+		},
+		{
+			"type": "Line",
+			"value": " c18",
+			"start": 1639,
+			"end": 1645
+		},
+		{
+			"type": "Line",
+			"value": " a statement follows after a blank line",
+			"start": 1656,
+			"end": 1697
+		},
+		{
+			"type": "Line",
+			"value": " c19",
+			"start": 1740,
+			"end": 1746
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1773,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 1764,
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 187,
+					"end": 241,
+					"id": {
+						"type": "Identifier",
+						"start": 196,
+						"end": 199,
+						"name": "fn1"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 202,
+						"end": 241,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 206,
+								"end": 238,
+								"argument": {
+									"type": "LogicalExpression",
+									"start": 218,
+									"end": 224,
+									"left": {
+										"type": "Identifier",
+										"start": 218,
+										"end": 219,
+										"name": "a"
+									},
+									"operator": "&&",
+									"right": {
+										"type": "Identifier",
+										"start": 223,
+										"end": 224,
+										"name": "b"
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c1",
+										"start": 228,
+										"end": 233
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment on its own line between a binary `return`/`throw` operand and the `)` of the",
+							"start": 10,
+							"end": 99
+						},
+						{
+							"type": "Line",
+							"value": " operand's grouping parens keeps that line, inside the parens.",
+							"start": 101,
+							"end": 165
+						},
+						{
+							"type": "Line",
+							"value": " a line comment",
+							"start": 168,
+							"end": 185
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 264,
+					"end": 321,
+					"id": {
+						"type": "Identifier",
+						"start": 273,
+						"end": 276,
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 279,
+						"end": 321,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 283,
+								"end": 318,
+								"argument": {
+									"type": "LogicalExpression",
+									"start": 295,
+									"end": 301,
+									"left": {
+										"type": "Identifier",
+										"start": 295,
+										"end": 296,
+										"name": "a"
+									},
+									"operator": "&&",
+									"right": {
+										"type": "Identifier",
+										"start": 300,
+										"end": 301,
+										"name": "b"
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 305,
+										"end": 313
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block comment",
+							"start": 244,
+							"end": 262
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 361,
+					"end": 414,
+					"id": {
+						"type": "Identifier",
+						"start": 370,
+						"end": 373,
+						"name": "fn3"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 376,
+						"end": 414,
+						"body": [
+							{
+								"type": "ThrowStatement",
+								"start": 380,
+								"end": 411,
+								"argument": {
+									"type": "LogicalExpression",
+									"start": 391,
+									"end": 397,
+									"left": {
+										"type": "Identifier",
+										"start": 391,
+										"end": 392,
+										"name": "a"
+									},
+									"operator": "||",
+									"right": {
+										"type": "Identifier",
+										"start": 396,
+										"end": 397,
+										"name": "b"
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c3",
+										"start": 401,
+										"end": 406
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " throw is restricted the same way",
+							"start": 324,
+							"end": 359
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 488,
+					"end": 548,
+					"id": {
+						"type": "Identifier",
+						"start": 497,
+						"end": 500,
+						"name": "fn4"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 503,
+						"end": 548,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 507,
+								"end": 545,
+								"argument": {
+									"type": "LogicalExpression",
+									"start": 519,
+									"end": 525,
+									"left": {
+										"type": "Identifier",
+										"start": 519,
+										"end": 520,
+										"name": "a"
+									},
+									"operator": "??",
+									"right": {
+										"type": "Identifier",
+										"start": 524,
+										"end": 525,
+										"name": "b"
+									},
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c4",
+											"start": 526,
+											"end": 531
+										}
+									]
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c5",
+										"start": 535,
+										"end": 540
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a run: one comment trails the operand's line, the next owns a line",
+							"start": 417,
+							"end": 486
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 598,
+					"end": 663,
+					"id": {
+						"type": "Identifier",
+						"start": 607,
+						"end": 610,
+						"name": "fn5"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 613,
+						"end": 663,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 617,
+								"end": 660,
+								"argument": {
+									"type": "BinaryExpression",
+									"start": 629,
+									"end": 634,
+									"left": {
+										"type": "Identifier",
+										"start": 629,
+										"end": 630,
+										"name": "a"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 633,
+										"end": 634,
+										"name": "b"
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c6 ",
+										"start": 638,
+										"end": 646
+									},
+									{
+										"type": "Block",
+										"value": " c7 ",
+										"start": 647,
+										"end": 655
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a pair written on one line keeps that line",
+							"start": 551,
+							"end": 596
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 710,
+					"end": 764,
+					"id": {
+						"type": "Identifier",
+						"start": 719,
+						"end": 722,
+						"name": "fn6"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 725,
+						"end": 764,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 729,
+								"end": 761,
+								"argument": {
+									"type": "BinaryExpression",
+									"start": 741,
+									"end": 746,
+									"left": {
+										"type": "Identifier",
+										"start": 741,
+										"end": 742,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 745,
+										"end": 746,
+										"name": "b"
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c8",
+										"start": 751,
+										"end": 756
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a blank line above the comment survives",
+							"start": 666,
+							"end": 708
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 802,
+					"end": 865,
+					"id": {
+						"type": "Identifier",
+						"start": 811,
+						"end": 814,
+						"name": "fn7"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 817,
+						"end": 865,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 821,
+								"end": 862,
+								"argument": {
+									"type": "BinaryExpression",
+									"start": 833,
+									"end": 838,
+									"left": {
+										"type": "Identifier",
+										"start": 833,
+										"end": 834,
+										"name": "a"
+									},
+									"operator": "|",
+									"right": {
+										"type": "Identifier",
+										"start": 837,
+										"end": 838,
+										"name": "b"
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c9\nc10 ",
+										"start": 842,
+										"end": 857
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block comment spanning lines",
+							"start": 767,
+							"end": 800
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 895,
+					"end": 1072,
+					"id": {
+						"type": "Identifier",
+						"start": 904,
+						"end": 907,
+						"name": "fn8"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 910,
+						"end": 1072,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 914,
+								"end": 1069,
+								"argument": {
+									"type": "LogicalExpression",
+									"start": 926,
+									"end": 1054,
+									"left": {
+										"type": "Identifier",
+										"start": 926,
+										"end": 978,
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									"operator": "&&",
+									"right": {
+										"type": "Identifier",
+										"start": 985,
+										"end": 1054,
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c11",
+										"start": 1058,
+										"end": 1064
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an operand that breaks",
+							"start": 868,
+							"end": 893
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1096,
+					"end": 1177,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1102,
+							"end": 1176,
+							"id": {
+								"type": "Identifier",
+								"start": 1102,
+								"end": 1105,
+								"name": "obj"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 1108,
+								"end": 1176,
+								"properties": [
+									{
+										"type": "Property",
+										"start": 1112,
+										"end": 1173,
+										"method": true,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 1112,
+											"end": 1113,
+											"name": "m"
+										},
+										"value": {
+											"type": "FunctionExpression",
+											"start": 1113,
+											"end": 1173,
+											"id": null,
+											"expression": false,
+											"generator": false,
+											"async": false,
+											"params": [],
+											"body": {
+												"type": "BlockStatement",
+												"start": 1116,
+												"end": 1173,
+												"body": [
+													{
+														"type": "ThrowStatement",
+														"start": 1121,
+														"end": 1169,
+														"argument": {
+															"type": "LogicalExpression",
+															"start": 1133,
+															"end": 1149,
+															"left": {
+																"type": "MemberExpression",
+																"start": 1133,
+																"end": 1139,
+																"object": {
+																	"type": "ThisExpression",
+																	"start": 1133,
+																	"end": 1137
+																},
+																"property": {
+																	"type": "Identifier",
+																	"start": 1138,
+																	"end": 1139,
+																	"name": "a"
+																},
+																"computed": false,
+																"optional": false
+															},
+															"operator": "&&",
+															"right": {
+																"type": "MemberExpression",
+																"start": 1143,
+																"end": 1149,
+																"object": {
+																	"type": "ThisExpression",
+																	"start": 1143,
+																	"end": 1147
+																},
+																"property": {
+																	"type": "Identifier",
+																	"start": 1148,
+																	"end": 1149,
+																	"name": "b"
+																},
+																"computed": false,
+																"optional": false
+															}
+														},
+														"trailingComments": [
+															{
+																"type": "Block",
+																"value": " c12 ",
+																"start": 1154,
+																"end": 1163
+															}
+														]
+													}
+												]
+											}
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a method carrier",
+							"start": 1075,
+							"end": 1094
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1201,
+					"end": 1268,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1207,
+							"end": 1267,
+							"id": {
+								"type": "Identifier",
+								"start": 1207,
+								"end": 1210,
+								"name": "fn9"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 1213,
+								"end": 1267,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 1219,
+									"end": 1267,
+									"body": [
+										{
+											"type": "ReturnStatement",
+											"start": 1223,
+											"end": 1264,
+											"argument": {
+												"type": "BinaryExpression",
+												"start": 1235,
+												"end": 1249,
+												"left": {
+													"type": "Identifier",
+													"start": 1235,
+													"end": 1236,
+													"name": "a"
+												},
+												"operator": "instanceof",
+												"right": {
+													"type": "Identifier",
+													"start": 1248,
+													"end": 1249,
+													"name": "b"
+												}
+											},
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " c13",
+													"start": 1253,
+													"end": 1259
+												}
+											]
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an arrow carrier",
+							"start": 1180,
+							"end": 1199
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 1289,
+					"end": 1374,
+					"id": {
+						"type": "Identifier",
+						"start": 1298,
+						"end": 1302,
+						"name": "fn10"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 1305,
+						"end": 1374,
+						"body": [
+							{
+								"type": "IfStatement",
+								"start": 1309,
+								"end": 1371,
+								"test": {
+									"type": "Identifier",
+									"start": 1313,
+									"end": 1317,
+									"name": "cond"
+								},
+								"consequent": {
+									"type": "ReturnStatement",
+									"start": 1322,
+									"end": 1358,
+									"argument": {
+										"type": "LogicalExpression",
+										"start": 1335,
+										"end": 1341,
+										"left": {
+											"type": "Identifier",
+											"start": 1335,
+											"end": 1336,
+											"name": "a"
+										},
+										"operator": "&&",
+										"right": {
+											"type": "Identifier",
+											"start": 1340,
+											"end": 1341,
+											"name": "b"
+										}
+									}
+								},
+								"alternate": {
+									"type": "ExpressionStatement",
+									"start": 1366,
+									"end": 1371,
+									"expression": {
+										"type": "CallExpression",
+										"start": 1366,
+										"end": 1370,
+										"callee": {
+											"type": "Identifier",
+											"start": 1366,
+											"end": 1368,
+											"name": "fn"
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c14",
+											"start": 1346,
+											"end": 1352
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a clause body",
+							"start": 1271,
+							"end": 1287
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 1445,
+					"end": 1508,
+					"id": {
+						"type": "Identifier",
+						"start": 1454,
+						"end": 1458,
+						"name": "fn11"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 1461,
+						"end": 1508,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 1465,
+								"end": 1498,
+								"argument": {
+									"type": "BinaryExpression",
+									"start": 1477,
+									"end": 1483,
+									"left": {
+										"type": "Identifier",
+										"start": 1477,
+										"end": 1478,
+										"name": "a"
+									},
+									"operator": "in",
+									"right": {
+										"type": "Identifier",
+										"start": 1482,
+										"end": 1483,
+										"name": "b"
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c15",
+										"start": 1487,
+										"end": 1493
+									},
+									{
+										"type": "Line",
+										"value": " c16",
+										"start": 1499,
+										"end": 1505
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a comment past the `)` is outside the parens and trails the `;`",
+							"start": 1377,
+							"end": 1443
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 1587,
+					"end": 1653,
+					"id": {
+						"type": "Identifier",
+						"start": 1596,
+						"end": 1600,
+						"name": "fn12"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 1603,
+						"end": 1653,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 1607,
+								"end": 1650,
+								"argument": {
+									"type": "LogicalExpression",
+									"start": 1619,
+									"end": 1625,
+									"left": {
+										"type": "Identifier",
+										"start": 1619,
+										"end": 1620,
+										"name": "a"
+									},
+									"operator": "&&",
+									"right": {
+										"type": "Identifier",
+										"start": 1624,
+										"end": 1625,
+										"name": "b"
+									},
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c17 ",
+											"start": 1626,
+											"end": 1635
+										}
+									]
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c18",
+										"start": 1639,
+										"end": 1645
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block comment trails the operand's line, the next comment owns a line",
+							"start": 1511,
+							"end": 1585
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 1699,
+					"end": 1763,
+					"id": {
+						"type": "Identifier",
+						"start": 1708,
+						"end": 1712,
+						"name": "fn13"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 1715,
+						"end": 1763,
+						"body": [
+							{
+								"type": "ThrowStatement",
+								"start": 1719,
+								"end": 1751,
+								"argument": {
+									"type": "LogicalExpression",
+									"start": 1730,
+									"end": 1736,
+									"left": {
+										"type": "Identifier",
+										"start": 1730,
+										"end": 1731,
+										"name": "a"
+									},
+									"operator": "||",
+									"right": {
+										"type": "Identifier",
+										"start": 1735,
+										"end": 1736,
+										"name": "b"
+									}
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 1755,
+								"end": 1760,
+								"expression": {
+									"type": "CallExpression",
+									"start": 1755,
+									"end": 1759,
+									"callee": {
+										"type": "Identifier",
+										"start": 1755,
+										"end": 1757,
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c19",
+										"start": 1740,
+										"end": 1746
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a statement follows after a blank line",
+							"start": 1656,
+							"end": 1697
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

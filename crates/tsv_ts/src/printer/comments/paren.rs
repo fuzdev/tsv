@@ -654,9 +654,11 @@ impl<'a> Printer<'a> {
     /// `import =`, keeps a same-line trailing block before the `;`).
     ///
     /// Statement terminators that move the block *after* the `;` — `export default`, and
-    /// return/throw's non-hanging paths — use `split_terminator_gap_comments` instead.
-    /// return/throw's hanging layout uses **both**: this method for the region inside the
-    /// retained parens, then that one for anything past the `)`.
+    /// the return/throw paths that print no pair around the run — use
+    /// `split_terminator_gap_comments` instead. The pairs a return/throw argument prints —
+    /// the hanging layout's retained parens, and a binary argument's conditional pair when
+    /// a run holds it open — use **both**: this method for the region inside the pair,
+    /// then that one for anything past the `)`.
     ///
     /// ⚠️ **A run that DEFERS is counted** ([`Printer::deferred_paren_runs`]). The pair this
     /// gap sat in is gone from the output (or, for a sequence, closes before the run), so
@@ -668,12 +670,16 @@ impl<'a> Printer<'a> {
     /// (`docs/comments.md` §Trailing and dangling runs), so the list reads the count
     /// around each element ([`Self::build_list_element_doc`]) and breaks, flushing the run
     /// at the element's comma: `f(⏎\tx + y * z, // c⏎\t1⏎)`.
+    ///
+    /// Returns whether the run deferred — the report a caller reads when its own layout
+    /// has to hold the run (the `return` / `throw` binary operand, whose conditional pair
+    /// is printed open around one).
     pub(crate) fn append_trailing_paren_comments(
         &self,
         parts: &mut DocBuf,
         argument_end: u32,
         span_end: u32,
-    ) {
+    ) -> bool {
         // Whether anything has been deferred yet — a `//`, or an own-line comment.
         let mut deferred_run = false;
         // What physically precedes the next comment: an **in-source** cursor, so it
@@ -704,6 +710,7 @@ impl<'a> Printer<'a> {
             self.deferred_paren_runs
                 .set(self.deferred_paren_runs.get() + 1);
         }
+        deferred_run
     }
 
     /// Build one element of a comma LIST, and end it with a flush-scoped break when its
@@ -801,20 +808,16 @@ impl<'a> Printer<'a> {
     /// comments are pushed into `parts`; the rest are returned.
     ///
     /// Caller idiom: `let after = self.split_terminator_gap_comments(parts, arg_end,
-    /// span_end, keep_operand_line_inline); parts.push(";"); parts.extend(after);`.
+    /// span_end, operand_parens_printed, gap); parts.push(";"); parts.extend(after);`.
     /// Used by return/throw, `export default`, and `export =` — the terminator callers
     /// whose argument may be parenthesized (unlike the expression-statement/var/
     /// class-property terminators, whose operand parens are consumed by inner printers —
     /// they use `push_semicolon_with_gap_comments`).
     ///
-    /// `keep_operand_line_inline` is set by callers that render the operand inside
-    /// conditional grouping parens (the binary return/throw path). A same-line **line**
-    /// comment still enclosed by a stripped grouping paren (`return (a && b // c\n);`) is
-    /// operand-attached: keeping it after the `;` would float it out of the parens
-    /// (a #18837 over-reach). With the flag set it stays inline before the `)` (pushed to
-    /// `parts`); the caller must force the group to break so the line comment never lands
-    /// on the flat `expr // c;` path (which would swallow the `;`). Callers that render the
-    /// operand bare (no parens) leave the flag `false` — there's nothing to keep it inside.
+    /// A **line** comment is never held back: one written inside a grouping paren the
+    /// caller prints is that caller's to keep inside the pair, ahead of this split — the
+    /// hanging form and the binary operand's conditional pair both open around it and
+    /// start this split at their `)` (`return (⏎\ta && b // c⏎);`).
     ///
     /// `clause_tail` is the statement CONTAINER's deferral fact
     /// (`StatementContext::clause_tail`): `Some(dedent)` when the statement is a
@@ -829,7 +832,6 @@ impl<'a> Printer<'a> {
         parts: &mut DocBuf,
         argument_end: u32,
         span_end: u32,
-        keep_operand_line_inline: bool,
         operand_parens_printed: bool,
         gap: TerminatorGap,
     ) -> DocBuf {
@@ -860,13 +862,6 @@ impl<'a> Printer<'a> {
                 same_line && self.gap_has_close_paren(comment.span.end, span_end);
             if comment.is_block && operand_enclosed && operand_parens_printed {
                 // Operand-attached (inside stripped parens): `return (x /* c */);`.
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
-            } else if !comment.is_block && operand_enclosed && keep_operand_line_inline {
-                // Operand-attached line comment (inside stripped parens):
-                // `return (a && b // c\n);`. Stays inline before the `)`. Emitted as
-                // plain text — the caller's forced break means the following softline
-                // becomes the newline before `)`, so the comment never swallows it.
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
             } else if same_line {

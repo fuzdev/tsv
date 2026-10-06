@@ -114,8 +114,8 @@ impl<'a> Printer<'a> {
         // form, with nothing leading it: the terminator gap below would carry it past the
         // `)` and the `;`, onto a line that may already hold a `//` — and two `//`s sharing
         // an output line MERGE into one (the second delimiter becomes text). The binaryish
-        // and sequence arms already keep such a comment inside their parens
-        // (`keep_operand_line_inline`); asking here is what makes every operand answer alike.
+        // and sequence arms keep such a comment inside the parens they print themselves;
+        // asking here is what makes every operand answer alike.
         if self.argument_has_own_line_comment(keyword_start, arg)
             || (!self.operand_arm_keeps_line_comment_inside(keyword, arg)
                 && self.operand_parens_hold_line_comment(arg.span().end, span_end))
@@ -176,7 +176,6 @@ impl<'a> Printer<'a> {
                     &mut parts,
                     argument_end,
                     span_end,
-                    false,
                     keyword == "return",
                     gap,
                 )
@@ -217,14 +216,7 @@ impl<'a> Printer<'a> {
             // the in-paren comment is already inside `seq_doc`.
             let after_start = grouping_close.saturating_add(1).min(span_end);
             let after = if self.has_comments_to_emit_between(after_start, span_end) {
-                self.split_terminator_gap_comments(
-                    &mut parts,
-                    after_start,
-                    span_end,
-                    false,
-                    true,
-                    gap,
-                )
+                self.split_terminator_gap_comments(&mut parts, after_start, span_end, true, gap)
             } else {
                 DocBuf::new()
             };
@@ -270,7 +262,6 @@ impl<'a> Printer<'a> {
                 &mut result_parts,
                 argument_end,
                 span_end,
-                false,
                 false,
                 gap,
             );
@@ -552,7 +543,7 @@ impl<'a> Printer<'a> {
             self.build_restricted_production_paren_doc(keyword, keyword_end, arg, span_end);
         let mut parts: DocBuf = smallvec![hanging];
         let after = if self.has_comments_to_emit_between(boundary, span_end) {
-            self.split_terminator_gap_comments(&mut parts, boundary, span_end, false, true, gap)
+            self.split_terminator_gap_comments(&mut parts, boundary, span_end, true, gap)
         } else {
             DocBuf::new()
         };
@@ -561,34 +552,15 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Where a *retained* grouping paren around a statement's operand closes, if the
-    /// source has one at all — the boundary between what prints inside those parens and
-    /// what trails the `;`.
-    ///
-    /// It is the **last** `)` before the `;`, not the first. Everything between the
-    /// operand's end and the `;` is closing parens, comments and whitespace, so the
-    /// outermost wrapper is the one that closes last. Taking the first would misread a
-    /// paren *this printer itself adds*: the assignment clarity parens put a `)` before
-    /// the comment on the second pass (`return (⏎(x = y) /* t */⏎);`), the comment would
-    /// then read as outside the group, and it would float one line further out on every
-    /// pass. The scan skips comments because a `)` may sit inside one.
-    ///
-    /// `None` means no paren was authored — an own-line comment inside a chain forces the
-    /// break with none present — so there is no inside to speak of, and the caller uses the
-    /// operand's end as the boundary instead.
-    ///
-    /// The returned position doubles as both bounds: the `)` byte itself can't start a
-    /// comment, so the in-paren scan (end-inclusive) and the past-paren scan
-    /// (start-inclusive) split the gap at it without overlapping.
     /// Whether the operand's own arm below already keeps a `//` inside the parens it
     /// prints, so the hanging form must not preempt it.
     ///
-    /// Two do. The **binaryish** arm renders its operand inside `ifBreak` parens and sets
-    /// `keep_operand_line_inline`; the **`return` sequence** arm builds through the
-    /// value-position sequence printer, which takes the grouping `)` and emits the comment
-    /// inside it — and breaks per operand, a layout the hanging form does not reproduce.
-    /// `throw`'s sequence is not one of them: it falls through to the generic arm, whose
-    /// `build_sequence_doc` pair the terminator gap floats the comment past.
+    /// Two do. The **binaryish** arm prints a pair of its own around a `//` written before
+    /// the `)` ([`Self::build_binary_paren_doc`]); the **`return` sequence** arm builds
+    /// through the value-position sequence printer, which takes the grouping `)` and emits
+    /// the comment inside it — and breaks per operand, a layout the hanging form does not
+    /// reproduce. `throw`'s sequence is not one of them: it falls through to the generic
+    /// arm, whose `build_sequence_doc` pair the terminator gap floats the comment past.
     ///
     // TODO: the two sequence layouts disagree — per operand here, one line inside the
     // hanging parens (every keyword, including `return` once a *leading* own-line comment
@@ -622,6 +594,25 @@ impl<'a> Printer<'a> {
             .is_some_and(|close| self.has_line_comments_between(argument_end, close))
     }
 
+    /// Where a *retained* grouping paren around a statement's operand closes, if the
+    /// source has one at all — the boundary between what prints inside those parens and
+    /// what trails the `;`.
+    ///
+    /// It is the **last** `)` before the `;`, not the first. Everything between the
+    /// operand's end and the `;` is closing parens, comments and whitespace, so the
+    /// outermost wrapper is the one that closes last. Taking the first would misread a
+    /// paren *this printer itself adds*: the assignment clarity parens put a `)` before
+    /// the comment on the second pass (`return (⏎(x = y) /* t */⏎);`), the comment would
+    /// then read as outside the group, and it would float one line further out on every
+    /// pass. The scan skips comments because a `)` may sit inside one.
+    ///
+    /// `None` means no paren was authored — an own-line comment inside a chain forces the
+    /// break with none present — so there is no inside to speak of, and the caller uses the
+    /// operand's end as the boundary instead.
+    ///
+    /// The returned position doubles as both bounds: the `)` byte itself can't start a
+    /// comment, so the in-paren scan (end-inclusive) and the past-paren scan
+    /// (start-inclusive) split the gap at it without overlapping.
     pub(in crate::printer) fn retained_grouping_close(
         &self,
         argument_end: u32,
@@ -682,6 +673,11 @@ impl<'a> Printer<'a> {
     /// `breakParent` (bundled with every `hardline`) up through all ancestor groups.
     /// Our renderer's `will_break` can't see through `IfBreak` nodes, so we detect
     /// hardlines in the expression doc and force the group to break explicitly.
+    ///
+    /// A comment the author wrote between the operand and the `)` of grouping parens
+    /// around it stays inside the pair this prints, and holds it open, unless it is a
+    /// single-line block trailing the operand's line — the same whether the statement
+    /// ends in a `;` or ASI ends it at that `)`.
     fn build_binary_paren_doc(
         &self,
         keyword: &'static str,
@@ -699,53 +695,91 @@ impl<'a> Printer<'a> {
             raw_expr_doc
         };
 
-        // Find trailing comments between expression end and semicolon. The scan
-        // skips comments so a `;` inside one (`a + b /* ; */ /* c */;`) isn't
-        // mistaken for the statement's terminator, which would drop the comments
-        // after it. Bounded by `span_end` (the statement's own end): under ASI
-        // there is no `;` within the statement, so the scan must not wander past
-        // it into the enclosing source and find a later terminator (the object
-        // literal's `};`, the next statement's `;`) — that would pull the
-        // statement's own trailing comment into this gap AND leave it for the
-        // block's trailing-comment emitter too, printing it twice.
+        // The terminator gap runs from the operand's end to the statement's `;` — or, where
+        // ASI ended the statement, to the statement's own end, which is then just past the
+        // author's closing `)`. The scan skips comments so a `;` inside one
+        // (`a + b /* ; */ /* c */;`) isn't mistaken for the statement's terminator, which
+        // would drop the comments after it. It is bounded by `span_end` (the statement's
+        // own end): under ASI there is no `;` within the statement, so the scan must not
+        // wander past it into the enclosing source and find a later terminator (the object
+        // literal's `};`, the next statement's `;`) — that would pull the statement's own
+        // trailing comment into this gap AND leave it for the block's trailing-comment
+        // emitter too, printing it twice.
         let expr_end = span.end;
-        let semicolon_pos = find_char_skipping_comments(
+        let gap_end = find_char_skipping_comments(
             self.source.as_bytes(),
             expr_end as usize,
             span_end as usize,
             b';',
         )
-        .map_or(expr_end, |p| p as u32);
+        .map_or(span_end, |p| p as u32);
 
-        // Split the trailing comments: an operand-attached block (inside stripped
-        // parens, `return (a + b /* c */);`) stays inside the parens before the `;`,
-        // while a statement-trailing comment trails *after* the `;` (prettier 3.9:
-        // `return a + b; /* c */`). An operand-attached *line* comment
-        // (`return (a && b // c\n);`) likewise stays inside the parens — it forces the
-        // break so it never lands on the flat `expr // c;` path. See
-        // `split_terminator_gap_comments`.
-        // Axis-free: the rule looks only at LINE comments, and ownership binds only a block
-        // comment (`owned ⇒ is_block`), so skipping and counting give the same answer.
-        let has_operand_line_comment = self
-            .comments_to_emit_between(expr_end, semicolon_pos)
-            .any(|c| !c.is_block && self.gap_has_close_paren(c.span.end, semicolon_pos));
+        // The author's grouping `)` splits the gap: what sits before it was written inside
+        // the pair, what sits past it trails the statement. A run inside the pair that
+        // cannot print on the flat path — a `//`, a comment on a line of its own, or a
+        // block whose own text spans a line — HOLDS the pair: it is printed open and the
+        // run prints inside it, where it was written, through the emitter the hanging
+        // form uses for the same region ([`Self::build_restricted_production_paren_doc`]).
+        // Only the region past the `)` is then the terminator split's.
+        //
+        // ⚠️ "The run defers" and "the pair is held" are one reading — the emitter's own
+        // report plus the multi-line test. A deferred doc on the flat arm would carry the
+        // comment past the `;`, out of the pair it was written in.
         let mut inline_trailing = DocBuf::new();
-        let after_semi = self.split_terminator_gap_comments(
-            &mut inline_trailing,
-            expr_end,
-            semicolon_pos,
-            true,
-            true,
-            gap,
-        );
+        let mut held_close = None;
+        if let Some(close) = self.retained_grouping_close(expr_end, gap_end) {
+            let deferred =
+                self.append_trailing_paren_comments(&mut inline_trailing, expr_end, close);
+            if deferred || self.has_multiline_block_comments_on_page_between(expr_end, close) {
+                held_close = Some(close);
+            } else {
+                // The run is single-line blocks on the operand's line alone, which the
+                // split below places by its own rule. Nothing built for it is on the page
+                // or counted: a comment doc is recorded where it renders, and only a run
+                // that defers is counted.
+                inline_trailing.clear();
+            }
+        }
+        let after_semi = if let Some(close) = held_close {
+            // Nothing past the last `)` is enclosed by it, so the split holds nothing back
+            // ahead of the `;`.
+            let mut before_semi = DocBuf::new();
+            let after =
+                self.split_terminator_gap_comments(&mut before_semi, close, gap_end, false, gap);
+            debug_assert!(before_semi.is_empty());
+            after
+        } else {
+            // No pair, or a pair whose run is same-line single-line blocks alone. Such a
+            // block does not hold the pair open: it stays before the `)` when the operand
+            // breaks (`return (⏎\ta +⏎\tb /* c */⏎);`) and before the `;` when it fits,
+            // while a comment written past the `)` trails *after* the `;`
+            // (`return a + b; /* c */`). See `split_terminator_gap_comments`.
+            self.split_terminator_gap_comments(&mut inline_trailing, expr_end, gap_end, true, gap)
+        };
         let trailing_comments_doc = d.concat(&inline_trailing);
+
+        // A held pair is printed with break POINTS — the hanging form's shape
+        // ([`Self::build_hanging_paren_doc`]) — rather than as a group told to break: a
+        // host that flattens soft breaks (a Svelte block head inside a
+        // whitespace-sensitive element) keeps hard lines alone, and under it the
+        // conditional pair below takes its flat arm and carries the run out of the pair.
+        // Nothing trails the `(` here: a `//` there leads the operand on a line of its
+        // own, which takes the hanging form before this arm is reached.
+        if held_close.is_some() {
+            let body = d.concat(&[d.group(expr_doc), trailing_comments_doc]);
+            let mut held_parts: DocBuf = smallvec![
+                self.build_hanging_paren_doc(keyword, body, None),
+                d.text(";"),
+            ];
+            held_parts.extend(after_semi);
+            return d.concat(&held_parts);
+        }
 
         // When the expression contains hardlines (e.g., multi-line callback in a
         // chain), the group must break to produce parens. In Prettier, hardline
         // includes breakParent which propagateBreaks cascades up. Our will_break
-        // can't see through IfBreak, so we check the expression doc directly. An
-        // operand-attached line comment must also break (it sits inside the parens).
-        let force_break = d.will_break(expr_doc) || has_operand_line_comment;
+        // can't see through IfBreak, so we check the expression doc directly.
+        let force_break = d.will_break(expr_doc);
 
         // Broken: keyword (\n  expr\n);
         // Flat: keyword expr;

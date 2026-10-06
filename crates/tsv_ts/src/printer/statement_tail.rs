@@ -310,9 +310,9 @@ impl<'a> Printer<'a> {
     ///   in its `;` at [`Self::node_terminator_claim_end`], and the `;` position a caller
     ///   passes there as the span end itself (the parenthesized `return` / `throw` binary,
     ///   whose `;` a comment-skipping scan found). The one other `end` is a statement's own
-    ///   end under ASI — or, at that binary's ASI fallback, its argument's end, which is the
-    ///   floor itself — and it never holds a `;` (one right there is a terminator the parser
-    ///   would have taken), so the gate answers it only through `end == floor`.
+    ///   end under ASI — that binary's too, where no `;` is found — and it never holds a `;`
+    ///   (one right there is a terminator the parser would have taken), so the gate answers
+    ///   it only through `end == floor`.
     ///
     /// Anything else — whitespace, a `/`, a non-ASCII byte, a gap with no `;` behind it —
     /// takes the walk, which is exact for every input; this gate only ever answers where the

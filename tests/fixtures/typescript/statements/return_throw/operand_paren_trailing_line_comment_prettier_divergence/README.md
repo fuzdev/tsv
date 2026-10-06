@@ -21,10 +21,10 @@ are the information-losing relocation
 names as its deciding test.
 
 The rule was already tsv's answer at the **binaryish** and **sequence**
-operands, whose printers keep such a comment inside their own parens
-(`keep_operand_line_inline`); the plain, call and assignment operands were the
-holdouts, and one question answered two ways is what this fixture closes. The
-same retention holds at the `await`/`yield` operand shell
+operands, whose printers keep such a comment inside their own parens; the
+plain, call and assignment operands were the holdouts, and one question
+answered two ways is what this fixture closes. The same retention holds at the
+`await`/`yield` operand shell
 ([redundant_operand_paren_comment](../../../expressions/await_yield/redundant_operand_paren_comment_prettier_divergence/)).
 
 An operand with **no** authored parens is untouched — there is no shell to keep
