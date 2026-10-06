@@ -6,8 +6,8 @@ use std::fs;
 use std::process::Command;
 
 use crate::common::{
-    FORMATTED_TS, UNFORMATTED_TS, built_tsv, canonical_display, git_repo, temp_dir, to_posix, tsv,
-    tsv_in_dir,
+    FORMATTED_TS, UNFORMATTED_TS, built_tsv, canonical_display, git_repo, loose_dir, temp_dir,
+    to_posix, tsv, tsv_in_dir,
 };
 #[cfg(unix)]
 use crate::common::{mode_bits_are_enforced, set_mode};
@@ -483,7 +483,7 @@ fn test_format_prettierignore_outside_repo_warns() {
     // `.prettierignore`, so a prettier user's `.prettierignore` is silently
     // skipped. Discovery is unchanged (the would-be-ignored file stays in scope),
     // but we DO warn, pointing at the rename / `git init` fixes. Fires in `--list`.
-    let dir = temp_dir("prettierignore_outside_repo_warns");
+    let dir = loose_dir("prettierignore_outside_repo_warns");
     fs::write(dir.join(".prettierignore"), "ignored.ts\n").unwrap();
     fs::write(dir.join("ignored.ts"), UNFORMATTED_TS).unwrap();
     fs::write(dir.join("keep.ts"), UNFORMATTED_TS).unwrap();
@@ -517,7 +517,7 @@ fn test_format_prettierignore_outside_repo_warns() {
 fn test_format_prettierignore_outside_repo_no_warn_with_formatignore() {
     // a sibling `.formatignore` means the native file was adopted, so the
     // `.prettierignore` is vestigial — no warning. And `.formatignore` IS honored.
-    let dir = temp_dir("prettierignore_outside_repo_formatignore");
+    let dir = loose_dir("prettierignore_outside_repo_formatignore");
     fs::write(dir.join(".prettierignore"), "p.ts\n").unwrap();
     fs::write(dir.join(".formatignore"), "f.ts\n").unwrap();
     fs::write(dir.join("p.ts"), UNFORMATTED_TS).unwrap();
@@ -689,7 +689,7 @@ fn test_format_nested_prettierignore_outside_repo_does_not_warn() {
     // `.formatignore`-only at every depth — so a nested `.prettierignore` here is not
     // read (no warning, not honored). Inside a repo it WOULD be read hierarchically
     // (see test_format_nested_prettierignore_in_repo_is_honored).
-    let dir = temp_dir("nested_prettierignore_outside_repo");
+    let dir = loose_dir("nested_prettierignore_outside_repo");
     fs::create_dir_all(dir.join("sub")).unwrap();
     fs::write(dir.join("sub/.prettierignore"), "x.ts\n").unwrap();
     fs::write(dir.join("sub/x.ts"), UNFORMATTED_TS).unwrap();

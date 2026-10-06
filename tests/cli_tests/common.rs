@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Once, OnceLock};
 
+use crate::outside_git_tree::assert_outside_git_tree;
+
 /// Run the tsv binary with the given arguments.
 /// Test helper; panicking on spawn failure is the desired behavior.
 #[allow(clippy::expect_used)]
@@ -56,6 +58,15 @@ pub(crate) fn temp_dir(name: &str) -> TempTree {
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).expect("Failed to create temp dir");
     TempTree(dir)
+}
+
+/// A [`temp_dir`] for a test of the **outside-a-repo** regime, which no tree can opt into:
+/// it holds only where no ancestor carries a `.git` entry, so the precondition is asserted
+/// here rather than left for the regime's own assertions to fail on.
+pub(crate) fn loose_dir(name: &str) -> TempTree {
+    let dir = temp_dir(name);
+    assert_outside_git_tree(&dir);
+    dir
 }
 
 /// Separators normalized to `/`, the spelling an expectation here is written in. The

@@ -4,6 +4,8 @@
 //!
 //! - `common` — the shared helpers: the binary builder, the spawn wrappers, the temp-tree
 //!   guard, the file-mode probe and guard, and the source constants.
+//! - `outside_git_tree` — the outside-a-repo precondition `common::loose_dir` asserts, shared
+//!   with `discovery_parity.rs` (`tests/support/`).
 //! - `top_level` — argv and dispatch: unknown and missing commands, `--version`, the help text.
 //! - `parse` — `tsv parse` on every input arm, its flags and its refusals.
 //! - `format_single` — `tsv format --content` / `--stdin`: the single-input routes.
@@ -16,6 +18,8 @@ mod common;
 mod format_paths;
 mod format_single;
 mod ignore_files;
+#[path = "../support/outside_git_tree.rs"]
+mod outside_git_tree;
 mod parse;
 #[cfg(unix)]
 mod pipes;

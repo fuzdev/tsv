@@ -32,6 +32,9 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
 use tsv_cli::cli::discover::discover_files;
 
+#[path = "support/outside_git_tree.rs"]
+mod outside_git_tree;
+
 /// A unique temp dir path (no temp-dir dependency), mirroring the git_oracle harness.
 fn fresh_dir(tag: &str) -> PathBuf {
     static SEQ: AtomicU32 = AtomicU32::new(0);
@@ -183,6 +186,10 @@ fn expected_list(case: &Value) -> Vec<String> {
 
 #[test]
 fn discovery_matches_shared_scenarios() {
+    // a scenario with no `.git` at its root takes its regime from the temp dir's own
+    // ancestors, so the table is gradeable only where none of them is a git tree
+    outside_git_tree::assert_outside_git_tree(&std::env::temp_dir());
+
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/tests/discovery/scenarios.json"

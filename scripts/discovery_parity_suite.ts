@@ -21,10 +21,19 @@
  * which is the drift this table exists to remove.
  */
 
-import { describe, it } from 'node:test';
+import { before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	realpathSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -72,6 +81,26 @@ export const register_discovery_parity_suite = (
 		const table = JSON.parse(
 			readFileSync(new URL('../tests/discovery/scenarios.json', import.meta.url), 'utf-8')
 		);
+
+		// A scenario with no `.git` at its root takes its regime from the temp dir's own
+		// ancestors, so the table is gradeable only where none of them is a git tree: a
+		// stray `.git` up there fails here by name, instead of in each outside-a-repo
+		// scenario by its symptoms. The native harnesses' twin, with the full rationale, is
+		// `tests/support/outside_git_tree.rs`.
+		before(() => {
+			const temp = realpathSync(tmpdir());
+			let dir = temp;
+			for (;;) {
+				const marker = join(dir, '.git');
+				assert.ok(
+					!existsSync(marker),
+					`${temp} is inside a git tree: ${marker} exists, so tsv reads every scenario tree as part of a repo. Remove it (an empty \`.git\` directory is enough to count), or point TMPDIR at a directory no git tree encloses.`
+				);
+				const parent = dirname(dir);
+				if (parent === dir) break; // filesystem root
+				dir = parent;
+			}
+		});
 
 		for (const scenario of table.scenarios) {
 			const skip = process.platform === 'win32' && holds_symlinks(scenario.tree);
