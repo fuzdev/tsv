@@ -281,7 +281,8 @@ deno task build:wasm:parse:deno      # deno WASM, parse-only → pkg/parse/deno/
 deno task build:wasm:all:deno        # deno WASM, full (benches) → pkg/all/deno/
 deno task build:npm:format           # publishable npm package → pkg/format/npm/ (also :parse; :all adds the tsv bin)
 
-# Or directly
+# Or directly (the cargo-built `build:*` tasks above also STAMP their artifact for the `:run` freshness guards —
+# deno.json `//build:stamped`; a bare `cargo build` does not)
 cargo build -p tsv_ffi --release
 wasm-pack build crates/tsv_wasm --target deno --release --out-dir pkg/all/deno
 wasm-pack build crates/tsv_wasm --target deno --release --out-dir pkg/parse/deno -- --no-default-features --features parse

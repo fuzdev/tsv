@@ -39,7 +39,15 @@
  * deliberate stale run stays possible and stays visible in the output.
  *
  * Running this on the build-first tasks is harmless: a freshly built artifact
- * is newer than its sources, so the check passes silently.
+ * is newer than its sources, so the check passes silently. For a cargo-built
+ * artifact that holds only because the build tasks STAMP it
+ * (`scripts/cargo_build.ts`, `deno task build:stamped`): cargo keys `Cargo.lock`
+ * and a manifest by content, so one rewritten to something already built makes the
+ * build a no-op that re-links the cached artifact under its original date — older
+ * than the file this guard compares it to. The stamp dates the artifact at cargo's
+ * last confirmation instead, which is also what makes every `rebuild:` hint below
+ * able to clear the refusal it is printed under. A bare `cargo build` does not
+ * stamp, so after one the hint is still the remedy.
  */
 
 import { readdir, stat } from 'node:fs/promises';

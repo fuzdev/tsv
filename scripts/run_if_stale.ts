@@ -10,7 +10,8 @@
  * when it is FRESH. Same mtime discipline, opposite ends. (The third family
  * member is `scripts/check_staged_freshness.ts`, the same abort posture over
  * the STAGED npm packages the `test:npm:*:run` / `test:napi:npm:run` tasks
- * consume.)
+ * consume; and `scripts/cargo_build.ts` is what lets all of them read one meaning
+ * from a cargo-built artifact's mtime, by dating it at the build.)
  *
  * Freshness inputs (newest mtime wins): every `*.rs` and `Cargo.toml` under the
  * crates that feed the WASM bundle (`benches/js/lib/tsv_artifacts.ts`'s

@@ -1096,7 +1096,13 @@ FFI + `pkg/all/deno`; Node: N-API + `pkg/all/nodejs`, the pair `check_executed_a
 for bench and smoke alike; the corpus tools run no WASM, so they guard `native_artifact_check()`
 alone), it compares their mtimes against the crate sources feeding them (plus the workspace
 `Cargo.lock`, so dependency bumps trip it too) and **aborts (exit 1)** if any is stale or missing.
-The build-first tasks rebuild first, so they pass for free. `BENCH_STALE_OK=1` downgrades a
+The build-first tasks rebuild first, so they pass for free — for a cargo-built artifact because
+the build tasks **stamp** it (`deno task build:stamped`, `scripts/cargo_build.ts`): cargo keys
+`Cargo.lock` and a manifest by content, so one rewritten to something already built (a version
+bump restored and re-applied, a `git reset`, a branch switched away and back) makes the build a
+no-op that re-links the cached artifact under its original date, older than the file the guard
+compares it to. The stamp dates it at cargo's last confirmation, so the `rebuild:` task a refusal
+names always clears it; a bare `cargo build` does not stamp. `BENCH_STALE_OK=1` downgrades a
 _stale_ artifact to a `⚠` warning (a _missing_ one stays fatal); see the module doc for why stale
 is a hard error by default.
 
