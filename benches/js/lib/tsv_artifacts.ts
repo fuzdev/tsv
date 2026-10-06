@@ -56,7 +56,8 @@ export type BinaryKind = 'wasm' | 'native' | 'js';
  * WASM bundle (the `IgnoreStack` export), not `tsv_ffi` / `tsv_napi`, so they
  * live in `WASM_CRATES`. Sharing them would false-stale the native checks: a
  * `tsv_discover` edit never rebuilds the FFI (it's not in its dependency
- * graph), so the guard could never clear on a rebuild.
+ * graph), so the guard would demand a rebuild that compiles nothing — one that
+ * clears it only because the build tasks stamp (`scripts/cargo_build.ts`).
  *
  * Deliberately excludes the dev-tooling crates (`tsv_debug`, `tsv_cli`): they
  * don't feed the measured artifacts, and including them would force wasm

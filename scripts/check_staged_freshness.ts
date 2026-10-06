@@ -50,7 +50,11 @@ import { join, relative } from 'node:path';
 import { env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-import { fmt_mtime, newest_source_mtime } from '../benches/js/lib/check_artifact_freshness.ts';
+import {
+	fmt_mtime,
+	newest_source_mtime,
+	newest_workspace_file_mtime
+} from '../benches/js/lib/check_artifact_freshness.ts';
 import {
 	CORE_CRATES,
 	WASM_CRATES,
@@ -102,14 +106,8 @@ export async function staged_staleness(check: StagedCheck): Promise<StagedStalen
 	let newest = { ms: 0, path: '' };
 	if (check.crates.length > 0) {
 		newest = { ...(await newest_source_mtime(check.crates)) };
-		for (const workspace_file of ['Cargo.toml', 'Cargo.lock']) {
-			try {
-				const st = await stat(`${ROOT}${workspace_file}`);
-				if (st.mtimeMs > newest.ms) newest = { ms: st.mtimeMs, path: workspace_file };
-			} catch {
-				// no lockfile (fresh clone pre-build) — the crate sources govern
-			}
-		}
+		const workspace = await newest_workspace_file_mtime();
+		if (workspace.ms > newest.ms) newest = workspace;
 	}
 	for (const file of check.files) {
 		let st;

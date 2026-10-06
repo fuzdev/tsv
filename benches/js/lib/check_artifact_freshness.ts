@@ -62,8 +62,17 @@ import { CORE_CRATES, TSV_ARTIFACTS, wasm_bundle_path } from './tsv_artifacts.ts
 /** Absolute path to the workspace `crates/` directory. */
 const CRATES_DIR = fileURLToPath(new URL('../../../crates', import.meta.url));
 
-/** Absolute path to the workspace `Cargo.lock` (dependency bumps must also trip staleness). */
-const CARGO_LOCK = fileURLToPath(new URL('../../../Cargo.lock', import.meta.url));
+/** Absolute path to the workspace root, with its trailing separator. */
+const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
+
+/**
+ * The workspace-level files every cargo build reads beside its crates' own sources:
+ * the root manifest (every `[profile.*]`, the workspace dependencies, the version) and
+ * the lockfile (what those dependencies resolved to). Stated once, for every mtime
+ * guard — a profile edit that staled one guard's artifact and not another's is two
+ * guards disagreeing about what a build is made of.
+ */
+const WORKSPACE_BUILD_FILES = ['Cargo.toml', 'Cargo.lock'];
 
 export interface ArtifactCheck {
 	/** Human-readable label used in messages, e.g. `FFI (release)`. */
@@ -151,15 +160,29 @@ export async function newest_source_mtime(crates: readonly string[]): Promise<So
 	return newest;
 }
 
+/**
+ * Newest mtime across `WORKSPACE_BUILD_FILES`, labeled by file name (`ms: 0` when
+ * none exists). The floor every cargo-built artifact is dated against, whatever
+ * crates feed it.
+ */
+export async function newest_workspace_file_mtime(): Promise<SourceMtime> {
+	let newest: SourceMtime = { ms: 0, path: '' };
+	for (const file of WORKSPACE_BUILD_FILES) {
+		try {
+			const st = await stat(`${ROOT}${file}`);
+			if (st.mtimeMs > newest.ms) newest = { ms: st.mtimeMs, path: file };
+		} catch {
+			// no lockfile (fresh clone pre-build) — the crate sources govern
+		}
+	}
+	return newest;
+}
+
 /** Every check whose artifact is missing or older than the sources feeding it. */
 async function find_stale(checks: readonly ArtifactCheck[]): Promise<StaleArtifact[]> {
 	let core = await newest_source_mtime(CORE_CRATES);
-	try {
-		const lock = await stat(CARGO_LOCK);
-		if (lock.mtimeMs > core.ms) core = { ms: lock.mtimeMs, path: 'Cargo.lock' };
-	} catch {
-		// no lockfile (fresh clone pre-build) — the missing-artifact check governs
-	}
+	const workspace = await newest_workspace_file_mtime();
+	if (workspace.ms > core.ms) core = workspace;
 
 	const stale: StaleArtifact[] = [];
 	for (const check of checks) {

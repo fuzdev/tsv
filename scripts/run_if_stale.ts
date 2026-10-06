@@ -43,6 +43,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
 	newest_source_mtime,
+	newest_workspace_file_mtime,
 	type SourceMtime
 } from '../benches/js/lib/check_artifact_freshness.ts';
 import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/tsv_artifacts.ts';
@@ -51,21 +52,12 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
 const newest_source = async (): Promise<SourceMtime> => {
 	// Copy — newest_source_mtime memoizes its result object; don't mutate the cache.
-	const newest = { ...(await newest_source_mtime([...CORE_CRATES, ...WASM_CRATES])) };
-	const consider = async (path: string, label: string): Promise<void> => {
-		try {
-			const st = await stat(path);
-			if (st.isFile() && st.mtimeMs > newest.ms) {
-				newest.ms = st.mtimeMs;
-				newest.path = label;
-			}
-		} catch {
-			// optional input (e.g. no Cargo.lock in a fresh clone) — ignore
-		}
-	};
-	await consider(`${ROOT}Cargo.toml`, 'Cargo.toml');
-	await consider(`${ROOT}Cargo.lock`, 'Cargo.lock');
-	await consider(`${ROOT}deno.json`, 'deno.json');
+	let newest = { ...(await newest_source_mtime([...CORE_CRATES, ...WASM_CRATES])) };
+	const workspace = await newest_workspace_file_mtime();
+	if (workspace.ms > newest.ms) newest = workspace;
+	// the wrapped command's own flags live in deno.json, so editing a build task re-runs it
+	const tasks = await stat(`${ROOT}deno.json`);
+	if (tasks.mtimeMs > newest.ms) newest = { ms: tasks.mtimeMs, path: 'deno.json' };
 	return newest;
 };
 

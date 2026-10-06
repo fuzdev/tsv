@@ -1095,7 +1095,9 @@ before a run touches the executed artifacts (the runtime's native binding + WASM
 FFI + `pkg/all/deno`; Node: N-API + `pkg/all/nodejs`, the pair `check_executed_artifacts` composes
 for bench and smoke alike; the corpus tools run no WASM, so they guard `native_artifact_check()`
 alone), it compares their mtimes against the crate sources feeding them (plus the workspace
-`Cargo.lock`, so dependency bumps trip it too) and **aborts (exit 1)** if any is stale or missing.
+`Cargo.toml` and `Cargo.lock`, so a profile edit or a dependency bump trips it too — one list,
+`newest_workspace_file_mtime`, for this guard and its two siblings) and **aborts (exit 1)** if any
+is stale or missing.
 The build-first tasks rebuild first, so they pass for free — for a cargo-built artifact because
 the build tasks **stamp** it (`deno task build:stamped`, `scripts/cargo_build.ts`): cargo keys
 `Cargo.lock` and a manifest by content, so one rewritten to something already built (a version
