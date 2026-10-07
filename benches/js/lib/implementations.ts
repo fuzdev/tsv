@@ -179,7 +179,9 @@ export interface InitializedImplementations extends ImplementationSet {
 	 * ⚠ Read for SHAPE only. Never hand this to `get_benchmark_tasks` directly — a
 	 * task built from it closes over an impl whose `init()` never ran, so running
 	 * one calls into a null binding. `get_defined_rows` is the safe accessor: it
-	 * returns names, not closures.
+	 * returns names, not closures. (`init_row_task` asks the registry of a
+	 * constructed set too, on the same terms made safe the other way: it initializes
+	 * one slot and returns that slot's task alone.)
 	 */
 	complete: ImplementationSet;
 }
@@ -324,15 +326,15 @@ export async function init_implementations(
 	// Load all versions once from package.json
 	const versions = await load_all_versions();
 
-	// The native path is runtime-specific: Deno loads the C-FFI library via
-	// Deno.dlopen; Node/Bun load the N-API addon via process.dlopen. Same engine,
-	// different binding boundary — one is instantiated per runtime.
-	const is_deno = current_runtime() === 'deno';
-	const native_label = is_deno ? 'Native (FFI)' : 'Native (N-API)';
+	const native_label = current_runtime() === 'deno' ? 'Native (FFI)' : 'Native (N-API)';
 
-	const canonical = new CanonicalImplementation(versions.canonical);
-	const native = is_deno ? new NativeImplementation() : new NapiImplementation();
-	const wasm = new WasmImplementation();
+	// Constructed up front, one `new` per slot, so the two views below are visibly
+	// the SAME set read two ways: `complete` is every instance, the returned bag is
+	// the subset whose `init()` took. Inlining these into the `optional(...)` calls
+	// would leave a failed impl's instance unreachable, and with it the only
+	// non-hand-written answer to which rows its absence removed (`complete`).
+	const complete = construct_implementations(versions);
+	const { canonical, native, wasm } = complete;
 
 	logger('Initializing implementations...');
 
@@ -351,26 +353,20 @@ export async function init_implementations(
 		missing_label?: string
 	) => init_optional(impl, key, label, logger, unavailable, missing_label);
 
-	// Constructed up front, one `new` per slot, so the two views below are visibly
-	// the SAME set read two ways: `complete` is every instance, the returned bag is
-	// the subset whose `init()` took. Inlining these into the `optional(...)` calls
-	// would leave a failed impl's instance unreachable, and with it the only
-	// non-hand-written answer to which rows its absence removed (`complete`).
-	const oxc = new OxcImplementation(versions.oxc);
-	const oxc_wasm = new OxcWasmImplementation(versions.oxc_wasm);
-	const tsc = new TscImplementation();
-	// One class, two cores — see lib/yuku.ts.
-	const yuku = new YukuImplementation('yuku-parser', versions.yuku);
-	const yuku_wasm = new YukuImplementation('yuku-parser-wasm', versions.yuku);
-	const biome = new BiomeImplementation(versions.biome);
-	const dprint = new DprintImplementation(versions.dprint);
-	const malva = new MalvaImplementation(versions.malva);
-	const rsvelte = new RsvelteImplementation(versions.rsvelte);
-	// A different package from rsvelte-fmt above — the N-API addon, which unlike
-	// the fmt CLI does have an in-process API. See lib/rsvelte_parse.ts.
-	const rsvelte_parse = new RsvelteParseImplementation(versions.rsvelte_parse);
-	const swc = new SwcImplementation(versions.swc);
-	const postcss = new PostcssImplementation(versions.postcss);
+	const {
+		oxc,
+		oxc_wasm,
+		tsc,
+		yuku,
+		yuku_wasm,
+		biome,
+		dprint,
+		malva,
+		rsvelte,
+		rsvelte_parse,
+		swc,
+		postcss
+	} = complete;
 
 	const oxc_impl = await optional(oxc, 'oxc', 'OXC (oxc-parser + oxfmt)', 'OXC');
 	const oxc_wasm_impl = await optional(oxc_wasm, 'oxc_wasm', 'OXC WASM (oxc-parser)', 'OXC WASM');
@@ -436,25 +432,95 @@ export async function init_implementations(
 		swc: swc_impl,
 		unavailable,
 		// Every instance, initialized or not — see `InitializedImplementations.complete`.
-		complete: {
-			versions,
-			canonical,
-			native,
-			wasm,
-			oxc,
-			oxc_wasm,
-			tsc,
-			yuku,
-			yuku_wasm,
-			biome,
-			dprint,
-			malva,
-			postcss,
-			rsvelte,
-			rsvelte_parse,
-			swc
-		}
+		complete
 	};
+}
+
+/**
+ * Every impl slot, CONSTRUCTED and nothing more: no engine is loaded until a slot's
+ * `init()` runs. The two callers read it opposite ways — `init_implementations`
+ * initializes every slot (and keeps this as its `complete` view), `init_row_task`
+ * exactly one.
+ */
+function construct_implementations(versions: AllVersions): ConstructedImplementations {
+	return {
+		versions,
+		canonical: new CanonicalImplementation(versions.canonical),
+		// The native path is runtime-specific: Deno loads the C-FFI library via
+		// Deno.dlopen; Node/Bun load the N-API addon via process.dlopen. Same engine,
+		// different binding boundary — one is instantiated per runtime.
+		native: current_runtime() === 'deno' ? new NativeImplementation() : new NapiImplementation(),
+		wasm: new WasmImplementation(),
+		oxc: new OxcImplementation(versions.oxc),
+		oxc_wasm: new OxcWasmImplementation(versions.oxc_wasm),
+		tsc: new TscImplementation(),
+		// One class, two cores — see lib/yuku.ts.
+		yuku: new YukuImplementation('yuku-parser', versions.yuku),
+		yuku_wasm: new YukuImplementation('yuku-parser-wasm', versions.yuku),
+		biome: new BiomeImplementation(versions.biome),
+		dprint: new DprintImplementation(versions.dprint),
+		malva: new MalvaImplementation(versions.malva),
+		postcss: new PostcssImplementation(versions.postcss),
+		rsvelte: new RsvelteImplementation(versions.rsvelte),
+		// A different package from rsvelte-fmt above — the N-API addon, which unlike
+		// the fmt CLI does have an in-process API. See lib/rsvelte_parse.ts.
+		rsvelte_parse: new RsvelteParseImplementation(versions.rsvelte_parse),
+		swc: new SwcImplementation(versions.swc)
+	};
+}
+
+/** `ImplementationSet` with every slot filled — what construction (not init) yields. */
+type ConstructedImplementations = {
+	[K in keyof ImplementationSet]-?: NonNullable<ImplementationSet[K]>;
+};
+
+/** One timed row, by the identities the registry gives it. */
+export interface RowIdentity {
+	operation: 'parse' | 'format';
+	language: Language;
+	/** The row's name within its group — `BenchmarkTask.name`. */
+	name: string;
+	/** The slot behind it — `BenchmarkTask.impl`. */
+	impl: ImplKey;
+}
+
+/**
+ * Load the ONE implementation a timed row runs, and return that row's task.
+ *
+ * The process-isolation half of the registry: a row is timed in a process of its
+ * own (`bench_row.ts`), and that process must hold no engine but the row's. Every
+ * slot is constructed (construction loads nothing) so the same `get_benchmark_tasks`
+ * the pre-flight asked can be asked here — one registry, so a row cannot mean one
+ * call in pre-flight and another when timed — and then exactly one slot is
+ * initialized, narrowed to the row (`InitScope`). The other rows' closures are
+ * built and dropped unrun, as in `get_defined_cells`.
+ *
+ * No freshness guard and no `unavailable` list: the pre-flight process ran both
+ * for this run, and a row is only planned if its impl loaded there. A load failure
+ * here is therefore a real error, and throws.
+ *
+ * @param row - the row, as the pre-flight's registry named it
+ * @param options - the run's registry options, the same ones pre-flight passed
+ * @returns the row's task and the implementation behind it
+ * @throws if the impl fails to load or the registry no longer defines the row
+ */
+export async function init_row_task(
+	row: RowIdentity,
+	options: BenchmarkTaskOptions
+): Promise<{ task: BenchmarkTask; impl: TsvImplementation }> {
+	const impls = construct_implementations(await load_all_versions());
+	const impl: TsvImplementation = impls[row.impl];
+	await impl.init({ operation: row.operation, language: row.language });
+	const task = get_benchmark_tasks(impls, row.operation, row.language, options).find(
+		(t) => t.name === row.name && t.impl === row.impl
+	);
+	if (!task) {
+		throw new Error(
+			`${row.operation}/${row.language} defines no row '${row.name}' backed by '${row.impl}' — ` +
+				`the registry changed between pre-flight and this process`
+		);
+	}
+	return { task, impl };
 }
 
 /** A benchmark task definition */
@@ -481,12 +547,13 @@ export interface BenchmarkTask {
 	 * with no in-process API, where a timed row would be dominated by process
 	 * spawn rather than format work (`rsvelte-fmt` — see `lib/rsvelte.ts`).
 	 *
-	 * `bench.ts` honors this in four places, and all four are load-bearing: the
-	 * task is excluded from the timed loop, from the per-group **intersection**
-	 * (so a file it rejects can't shrink the corpus the real rows are timed on),
-	 * and from the perf 100%-coverage hard-fail (its sub-100% coverage IS the
-	 * metric, not a regression); its row is then synthesized with null timing so
-	 * the coverage still reaches the report.
+	 * The bench honors this in four places, and all four are load-bearing: the
+	 * pre-flight (`bench_preflight.ts`) plans no timed row for the task, keeps it
+	 * out of the per-group **intersection** (so a file it rejects can't shrink the
+	 * corpus the real rows are timed on), and exempts it from the perf
+	 * 100%-coverage hard-fail (its sub-100% coverage IS the metric, not a
+	 * regression); the report (`bench.ts`) then synthesizes its row with null
+	 * timing so the coverage still reaches it.
 	 */
 	coverage_only?: boolean;
 	/** The benchmark function - processes all files once. `goal` (TS-only, from
@@ -627,7 +694,7 @@ export function get_benchmark_tasks(
 		//
 		// PERF-ONLY: a consumer-cost row, and the parse it runs is the default row's, so on
 		// the coverage surface it would add nothing. Its absence there is disclosed
-		// (`SURFACE_DISCLOSURES` in bench.ts).
+		// (`SURFACE_DISCLOSURES` in bench_preflight.ts).
 		const locations_enabled = options.corpus_kind !== 'conformance';
 		add(
 			'native',

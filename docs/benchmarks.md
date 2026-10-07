@@ -321,45 +321,70 @@ Things the published numbers measure that aren't quite what they look like.
   and `span_only` on CSS (`parseCss` emits no `loc`); tsv's `+locations` rows are
   `drop_in` on TypeScript (acorn-exact) and `drop_in_superset` on Svelte and CSS, where
   their `loc` on every positioned object is a superset of the oracle's.
-- **Task order, and the inter-task heap settle.** Within a group the tasks run
-  sequentially in registration order (canonical first, then tsv's rows, then the
-  alternatives) with the timing library's inter-task cooldown disabled — a
-  workaround for an oxfmt × Deno timer-wheel hang, applied uniformly so a
-  runtime-conditional settle can't bias the cross-runtime ratios (../benches/js/CLAUDE.md
-  §Known Issues). Back-to-back tasks share a heap, so without a control the garbage
-  one task leaves behind is collected on the *next* task's clock and a fixed order
-  turns that carryover into a systematic per-position effect. So each task's untimed
-  `setup` forces a major GC (`settle_heap` in `bench.ts`), and every task — the
-  first one after pre-flight included — begins its warmup from a comparable heap.
-  One impl gets more than a GC there: biome's wasm linear memory leaks per call
+- **Every row is timed in a process of its own.** A timed run is several processes
+  of one runtime (../benches/js/CLAUDE.md §Process model): an orchestrator that holds
+  nothing measured, one pre-flight process that loads the corpus and every tool to
+  learn what each accepts and then exits, and — for every row, several times over —
+  a fresh process that loads that row's one engine and its file set, warms, times
+  and exits. Timed back to back in ONE process, as this bench once ran, the rows
+  moved each other's numbers, and not only through leftover garbage: engines that
+  share code shape each other's type feedback (prettier's svelte plugin, the
+  `svelte/compiler` row and the `acorn-typescript` row all run the same `acorn`),
+  the collector sizes its young generation from whatever has been allocating (and
+  the rows differ by orders of magnitude there — prettier allocates heavily, a
+  native or wasm tsv row barely touches the JS heap), and a wasm instance one row
+  grew stays grown for the next. A forced collection between rows resets where a
+  row starts, not the regime it runs in, and a fixed order turns all of it into a
+  per-position effect. A process per row removes the shared state rather than
+  bounding it.
+
+  **Passes.** One process is one draw, so each row is timed in several
+  (`BENCH_PASSES`, default 3) and its statistics pool them. A group's passes run back
+  to back, each in a different order — the registration order, its reverse, then both
+  started further round the list — because what a fixed order would still carry from
+  one row to the next is the machine itself: the row after a two-minute sweep starts
+  on a hotter package than the row after a five-second one. The order is a balance,
+  not a randomization, and what is left of the effect is published: each row carries
+  `pass_spread` (its slowest pass median over its fastest), and the report carries
+  `process_noise`, the same comparison over every pass pair of every row — a
+  process-level A/A, and the bound to read a small ratio against.
+
+  **The warmup starts from a settled heap.** Before it warms, a row's process forces a
+  major GC, so the warmup begins from the heap its engine and file set occupy rather
+  than from the garbage loading them left (`settle_heap` in `bench_row.ts`; recorded
+  per row as `settled_heap_bytes`). This is deliberately NOT the same knob as the
+  per-iteration hook below: it normalizes where a row *starts* without touching the
+  measured workload's own GC profile, which is why it is always on where that one is
+  off. It needs `--expose-gc` (every timed `bench:*:run` task passes it, and a row's
+  process is started with the same flags); without the flag it silently no-ops, so
+  the run prints a ⚠ before the timed phase rather than publishing numbers with the
+  control quietly gone.
+
+  **One impl gets more than a GC.** biome's wasm linear memory leaks per call
   (`Workspace.openFile` retains ~4.5 B per source byte and `closeFile` frees
   nothing) and never shrinks, so a GC settles nothing and a TypeScript row on Node
-  tripled its sweep time once the process passed ~1 GB — `lib/biome.ts` therefore
-  re-instantiates the wasm module once the sweeps it has run have grown its
-  linear memory by more than 16 MiB (`RESET_GROWTH_BYTES`), checked in the same
-  untimed `setup` slot and between every two sweeps (~10 ms a swap, outside every
-  timer) — so the svelte and TypeScript rows start every sweep on a fresh instance,
-  the css row every ~4 sweeps, and a millisecond-sweep `BENCH_LIMIT` row almost never
-  (there, a 70 MB instantiation per sweep out-churns the collector). Keyed on
-  growth, not on a size, because the cost of a grown heap is runtime-dependent: on
-  V8 the sweep time is flat to at least 974 MB, but on JSC bun's svelte row, flat
-  in a bare process, climbs with the buffer's size after the group's prettier-class
-  tasks have run in the same process (~0.4–1.2 ms per MB) and falls back at each
-  reset, so a size budget put a sawtooth inside the timed window and the row
-  published flagged (cv 8.6% under a 320 MB budget against cv 1.4% with a reset
-  before every sweep, same context — `benches/js/diagnostics/biome_heap_probe.ts`).
-  A fresh instance's slower first sweep costs a few percent, paid on every sweep of
-  every runtime alike — the GC's footing (a settled heap per sweep) for the one heap
-  a GC cannot settle; the leak itself is disclosed rather than measured.
+  tripled its sweep time once the process passed ~1 GB — a size one pass of that row
+  reaches in its own process, so isolation does not retire this. `lib/biome.ts`
+  therefore re-instantiates the wasm module once the sweeps it has run have grown its
+  linear memory by more than 16 MiB (`RESET_GROWTH_BYTES`), checked before the warmup
+  and between every two sweeps (~10 ms a swap, outside every timer) — so the svelte
+  and TypeScript rows start every sweep on a fresh instance, the css row every ~4
+  sweeps, and a millisecond-sweep `BENCH_LIMIT` row almost never (there, a 70 MB
+  instantiation per sweep out-churns the collector). Keyed on growth, not on a size,
+  because the cost of a grown heap is runtime-dependent: on V8 the sweep time is flat
+  to at least 974 MB, while on JSC it climbed with the buffer's size when the row
+  shared a process with prettier-class rows (`benches/js/diagnostics/biome_heap_probe.ts`,
+  whose `--prelude` reproduces that shared process). A fresh instance's slower first
+  sweep costs a few percent, paid on every sweep of every runtime alike — the GC's
+  footing (a settled heap per sweep) for the one heap a GC cannot settle; the leak
+  itself is disclosed rather than measured.
 
-  The settle is deliberately NOT the same knob as the per-iteration hook below: it
-  normalizes where a task *starts* without touching the measured workload's own GC
-  profile, which is why it is always on where that one is off. It needs
-  `--expose-gc` (every timed `bench:*:run` task passes it); without the flag it
-  silently no-ops, so the run prints a ⚠ before the timed phase rather than
-  publishing numbers with the control quietly gone. Nothing here randomizes or
-  interleaves task order — the settle bounds the carryover rather than eliminating
-  order as a variable.
+  **What isolation costs.** Wall time: every pass of every row pays its own start-up,
+  engine load and warmup, and a slow row is floor-bound in each pass. And it measures
+  an engine alone in a process, which is not how every consumer runs it — a formatter
+  called from an editor host or a build shares its process with whatever else is
+  loaded. That is the right trade for a comparison: a number that depends on the
+  row's process-mates is a fact about the roster, not about the tool.
 - **Measurement stability is disclosed, not assumed.** Every published `Nx` divides
   two means, so it inherits both means' noise. A per-runtime report carries a **§Unstable Rows**
   section for any row whose cv (`std_dev / mean`, post-outlier-removal) reaches 10%,
@@ -367,13 +392,19 @@ Things the published numbers measure that aren't quite what they look like.
   smaller than the combined cv of the two rows they divide. Both are reading aids,
   not significance tests — the Welch test lives in `benchmark_baseline_compare` and
   needs `--compare-baseline`, which a plain `deno task bench` never runs.
-  Calibration: across the committed reports cv runs median 1.0% / p90 3.1%, so 10% is
-  ~3× the p90 rather than a round number (the live rows are each committed report's
-  §Unstable Rows; a value restated here only goes stale).
+  Calibration: across the reports the threshold was set against, cv ran median 1.0% /
+  p90 3.1%, so 10% is ~3× the p90 rather than a round number (the live rows are each
+  committed report's §Unstable Rows; a value restated here only goes stale). Those
+  reports timed every row once, in one shared process; a row's cv now pools several
+  fresh processes and so includes the variation between them, which is the larger and
+  the more honest figure — re-derive the calibration from a refreshed report's
+  `entries[].cv` and `process_noise` before moving the threshold.
 
   The cleaned cv is not the whole test: a row is also unstable on its RAW cv (a second
-  mode the MAD cleaner deleted) or on a `drift` past 5% (the second half of its
-  timings against the first). One refresh's `format/typescript/biome-wasm` under Node
+  mode the MAD cleaner deleted), on a `drift` past 5% (within one pass, the second half
+  of its timings against the first), or on a `pass_spread` past 5% (its passes — fresh
+  processes of the same row — sat at different levels, which every in-process reading
+  reports as quiet). One refresh's `format/typescript/biome-wasm` under Node
   ran four ~4.9 s sweeps and three ~12.5 s ones as biome's wasm heap leaked past
   ~1 GB, and the cleaner's keep-closest fallback published a mean that was neither
   mode; at most other sample counts the same row would have cleaned to a cv under 6%
@@ -389,13 +420,13 @@ Things the published numbers measure that aren't quite what they look like.
   ~1.00x — confirming "no difference" rather than overturning a reading). The
   within-noise half also needs ten cleaned timings a side before it will call a cell
   quiet, and prints `n` for each: sample count varies by two orders of magnitude
-  across one table (a microsecond row gets four figures; a multi-second row gets the
-  iteration floor — 8, or 16 on the canonical rows, the denominator of every ratio),
-  and a cv from a handful of timings that happen to agree is not evidence of quiet.
-  That leaves the multi-second alternative rows (oxfmt on svelte and typescript, at
-  n=8) unclassified, while the canonical rows' floor of 16 clears the ten-timing bar
-  — a floor on RAW timings, where the bar reads cleaned ones, so it clears it at the
-  outlier ratios these rows show rather than by construction.
+  across one table (a microsecond row gets four figures; a multi-second row gets its
+  sweep floor — 8 per pass, every row alike, so its pooled count is 8 times the
+  passes), and a cv from a handful of timings that happen to agree is not evidence
+  of quiet. At the default three passes every row clears the ten-timing bar — a
+  floor on RAW timings, where the bar reads cleaned ones, so it clears it at the
+  outlier ratios these rows show rather than by construction; a one-pass run
+  (`BENCH_PASSES=1`) leaves its multi-second rows unclassified.
 - **Per-iteration forced GC** — off by default (`BENCH_GC=1` makes the bench call
   `globalThis.gc()` between every iteration), and not a uniform bias. Measured on a
   BENCH_LIMIT=20 / 500ms / WARMUP=2 sample: low-allocation paths are penalized heavily (`tsv-internal` 1.4–1.7× slower with the
@@ -805,10 +836,11 @@ speed numbers live; this row answers only "what does it accept."
 `--no-native-js` / `--no-native-css` escape-hatch docs. A ts or css row would
 re-measure oxfmt's acceptance through a spawn, adding no information.
 
-**What the flag must be honored by** — four places in `bench.ts`, each
-load-bearing:
+**What the flag must be honored by** — four places, three in the pre-flight process
+(`bench_preflight.ts`) and one in the report (`bench.ts`), each load-bearing:
 
-1. The **timed loop** skips it (`group_setups` stores the timed tasks only).
+1. The **timed phase** skips it (pre-flight plans no timed row for it, so no process
+   is ever started to time it).
 2. The per-group **intersection** skips it — otherwise a file only it rejects would
    drop out of the set every real row is timed on, letting a non-participant move
    the published numbers.

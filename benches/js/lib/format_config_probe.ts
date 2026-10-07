@@ -109,7 +109,7 @@ export const FORMAT_CONFIG_PROBES: Readonly<Record<Language, string>> = {
  * question it asks only exists on a BROKEN construct: an assertion that grades
  * nothing passes every run, so "the probe stopped discriminating" must fail loudly
  * rather than read as a pass (the same posture as `check_variant_parity`'s digest
- * guard in `bench.ts`).
+ * guard in `bench_preflight.ts`).
  *
  * @param tool - the tool's row-facing name, so the throw names who failed
  * @param language - which probe `output` came from, and which arm grades it

@@ -42,16 +42,22 @@ const GLUE_IMPORT_MODULE = './biome_wasm_bg.js';
  *
  * Why every sweep on a full-corpus row (measured with `diagnostics/biome_heap_probe.ts`):
  * what a growing heap costs is RUNTIME-dependent. On V8 (node, deno) the sweep time stays
- * flat as the heap grows, until Node's external memory passes ~1 GB. On JSC (bun) it is
- * flat in a bare process, but inside the bench process — after the prettier-class tasks
- * of the same group leave a large live JS heap — it CLIMBS with the buffer's size and
- * falls back at each swap, so a size budget that let a swap land inside the timed window
- * published a sawtooth the §Unstable Rows check flagged. The mechanism is not pinned
- * down. The swap's own price is a fresh instance's slower first sweep, a few percent on
- * a full-corpus row and most visible on the css row, which has no slope to buy off; the
- * swap itself runs in the untimed slots. The threshold can't rise to spare css: a svelte
- * sweep's ~30 MB is its ceiling, and a higher one brings bun's svelte sawtooth back.
+ * flat as the heap grows, until Node's external memory passes ~1 GB — which the
+ * TypeScript row's leak reaches inside ONE pass of its own process, so a process per
+ * row does not retire the rule. On JSC (bun) it is flat in a bare process, but in a
+ * process shared with prettier-class tasks — which is how the bench timed a group
+ * before every row got a process of its own, those tasks leaving a large live JS heap
+ * behind — it CLIMBS with the buffer's size and falls back at each swap, so a size
+ * budget that let a swap land inside the timed window published a sawtooth the
+ * §Unstable Rows check flagged. The mechanism is not pinned down. The swap's own price
+ * is a fresh instance's slower first sweep, a few percent on a full-corpus row and most
+ * visible on the css row, which has no slope to buy off; the swap itself runs in the
+ * untimed slots.
  */
+// TODO: re-measure under process isolation. The JSC slope was read in a shared process,
+// and it is what held this threshold under a svelte sweep's ~30 MB; if a row's own
+// process shows none, the threshold can rise toward the V8 step and spare the svelte
+// and css rows their per-sweep swap.
 export const RESET_GROWTH_BYTES = 16 * 1024 * 1024;
 
 /**

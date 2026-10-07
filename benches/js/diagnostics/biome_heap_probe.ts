@@ -25,14 +25,16 @@
  * and `process.memoryUsage()` (rss / heapUsed / external). No GC is forced between
  * sweeps, like the bench's timed loop. Human table → stderr; `--json` → stdout.
  *
- * `--prelude <rows>` reproduces the bench's PROCESS context instead of a bare one: the
- * whole implementation set is initialized the way `bench.ts` does it, and the named
- * format rows of the same group (`prettier`, `tsv`, `tsv-wasm`, `oxfmt` — the tasks the
- * bench times ahead of `biome-wasm` in `format/<lang>`) each sweep the corpus
- * `--prelude-sweeps` times (default 4) in the bench's order, with the bench's untimed
- * major GC (`settle_heap`) between tasks, before the biome sweeps begin. Isolated, the
- * row can be flat while the bench's reading of it is not; this is how to tell whether
- * what the earlier tasks leave in the JS heap is the difference.
+ * `--prelude <rows>` reproduces a SHARED process instead of a bare one — how the bench
+ * timed a group before every row got a process of its own (`bench.ts` §Process model),
+ * and the control that shows what sharing costs: the whole implementation set is
+ * initialized, and the named format rows of the same group (`prettier`, `tsv`,
+ * `tsv-wasm`, `oxfmt` — the rows registered ahead of `biome-wasm` in `format/<lang>`)
+ * each sweep the corpus `--prelude-sweeps` times (default 4) in registration order,
+ * with an untimed major GC (`settle_heap`) between them, before the biome sweeps
+ * begin. Bare, the row can be flat while its reading among process-mates is not; this
+ * is how to tell whether what the earlier rows leave in the JS heap is the difference.
+ * The bench's own reading of the row is the BARE one.
  *
  * Flags: `--regime never|every|budget` (default budget), `--sweeps N` (default 30),
  * `--lang svelte|typescript|css` (default svelte), `--prelude a,b,c`,
@@ -47,14 +49,16 @@
  *   after `--prelude prettier`    never              every              budget
  *     bun                         1402 ms, 1249→1617 (drift +12%)   1046 ms cv 1.4%   1217 ms cv 8.6%
  *   after the whole group, budget: bun 1349 ms cv 9.1% (sawtooth, resets at sweeps 10 and 19);
- *     node 1156 ms cv 1.6% — flat, and equal to node's bench row.
+ *     node 1156 ms cv 1.6% — flat, and equal to the row the shared-process bench published.
  *
  * So the wasm heap's growth is free on V8 at any size reached here, and free on JSC in
- * a bare process — but inside the bench's process, after prettier-class tasks, bun's
+ * a bare process — but in a shared process, after prettier-class rows, bun's
  * sweep time is a slope in the buffer's size that a reset restores, which the 320 MB
  * size budget those runs measured (`budget` above) let into the timed window; the
  * growth-keyed rule that replaced it resets these rows before every sweep.
- * `RESET_GROWTH_BYTES` restates the numbers beside the rule they size.
+ * `RESET_GROWTH_BYTES` restates the numbers beside the rule they size. The same rows
+ * read differently bare and shared on node too (1034 vs 1156 ms above), which is the
+ * effect a process per row removes.
  */
 
 import { argv, memoryUsage } from 'node:process';
@@ -140,7 +144,10 @@ for await (const file of loader.stream(() => {})) all.push(file);
 const files = group_by_language(all)[language];
 const bytes = files.reduce((sum, f) => sum + f.bytes, 0);
 
-/** The bench's inter-task settle (`settle_heap`): a major GC, or nothing without `--expose-gc`. */
+/**
+ * The settle between prelude rows — the major GC a shared-process bench ran between
+ * its tasks — or nothing without `--expose-gc`.
+ */
 const settle_heap = (): void => {
 	globalThis.gc?.();
 };

@@ -9,6 +9,7 @@ import { PrettierCache, prettier_cache_enabled } from './prettier_cache.ts';
 import {
 	BaseImplementation,
 	CANONICAL_PARSER_ROWS,
+	type InitScope,
 	type Language,
 	LANGUAGE_EXTENSIONS,
 	LANGUAGE_PRETTIER_PARSERS,
@@ -96,29 +97,57 @@ export class CanonicalImplementation extends BaseImplementation {
 		return this.#prettier;
 	}
 
-	async init(): Promise<void> {
+	/**
+	 * Load the oracles and prove them. Unscoped, that is all five modules and every
+	 * probe — what pre-flight and the gates want. With a `scope` (a timed row's own
+	 * process) it is only what that row calls, probed on that row's language alone:
+	 *
+	 * | row                  | loads                                         |
+	 * | -------------------- | --------------------------------------------- |
+	 * | parse / typescript   | acorn + acorn-typescript                      |
+	 * | parse / svelte, css  | svelte/compiler                               |
+	 * | format / typescript, css | prettier                                  |
+	 * | format / svelte      | prettier + prettier-plugin-svelte (which imports svelte/compiler itself) |
+	 *
+	 * This impl is three engines behind one slot, and they share code: the plugin
+	 * formats through the same `svelte/compiler` instance the `parse/svelte` row
+	 * times, and that compiler parses through the same `acorn` the `parse/typescript`
+	 * row extends. Loading all of it into a row's process would leave prettier's
+	 * probes shaping the type feedback of code the row is about to be timed on.
+	 */
+	async init(scope?: InitScope): Promise<void> {
 		// Before the first format call: without it the svelte plugin echoes an embedded
 		// block it failed on and returns normally (`lib/reject_probe.ts`).
 		surface_embedded_format_errors();
 
+		const formats = scope === undefined || scope.operation === 'format';
+		const parses = scope === undefined || scope.operation === 'parse';
+		const languages: ReadonlyArray<Language> = scope === undefined ? LANGUAGES : [scope.language];
+		const needs_prettier = formats;
+		const needs_plugin = formats && languages.includes('svelte');
+		const needs_svelte = parses && (languages.includes('svelte') || languages.includes('css'));
+		const needs_acorn = parses && languages.includes('typescript');
+
 		// Load dependencies in parallel
 		const [prettier_mod, prettier_svelte_mod, svelte_mod, acorn_mod, acorn_ts_mod] =
 			await Promise.all([
-				import('prettier'),
-				import('prettier-plugin-svelte'),
-				import('svelte/compiler'),
-				import('acorn'),
-				import('@sveltejs/acorn-typescript')
+				needs_prettier ? import('prettier') : null,
+				needs_plugin ? import('prettier-plugin-svelte') : null,
+				needs_svelte ? import('svelte/compiler') : null,
+				needs_acorn ? import('acorn') : null,
+				needs_acorn ? import('@sveltejs/acorn-typescript') : null
 			]);
-		this.#prettier = prettier_mod as PrettierModule;
+		this.#prettier = prettier_mod as PrettierModule | null;
 		this.#prettier_svelte = prettier_svelte_mod;
 		// Hoisted once so the bench's timed loop doesn't allocate a fresh plugins
 		// array per format call (the other option fields vary per call and stay inline).
-		this.#svelte_plugins = [prettier_svelte_mod];
+		this.#svelte_plugins = prettier_svelte_mod ? [prettier_svelte_mod] : [];
 		this.#svelte_compiler = svelte_mod;
 		// Create TypeScript parser once (acorn.Parser.extend is expensive)
-		// deno-lint-ignore no-explicit-any
-		this.#acorn_ts_parser = acorn_mod.Parser.extend(acorn_ts_mod.tsPlugin() as any);
+		if (acorn_mod && acorn_ts_mod) {
+			// deno-lint-ignore no-explicit-any
+			this.#acorn_ts_parser = acorn_mod.Parser.extend(acorn_ts_mod.tsPlugin() as any);
+		}
 
 		// Build the parse table once — see `#parse_fns`. Each closure keeps its own
 		// null check: it costs nothing and leaves the closure self-describing.
@@ -155,26 +184,34 @@ export class CanonicalImplementation extends BaseImplementation {
 		// — it is what every other row is a ratio against, and the oracle
 		// `corpus:compare:format` and the conformance driver grade tsv against — so the
 		// contaminated unit is the whole run.
-		for (const language of LANGUAGES) {
-			assert_format_config_landed(
-				'prettier',
-				language,
-				await this.format_async(FORMAT_CONFIG_PROBES[language], language)
-			);
-			// And that a syntax error still THROWS on each of the three printers. The
-			// svelte pass is the one with teeth: it fails if the embedded-block fallback
-			// above ever stops being switched off, which would hand the baseline free
-			// files in its timed sweep — the denominator of every published `Nx`.
-			await assert_tool_rejects_invalid_async('prettier', 'format_async', language, (source) =>
-				this.format_async(source, language)
-			);
-			// The three oracle parsers, on the same terms: each reference row's accept is
-			// "it did not throw", and on the conformance surface that accept set is what
-			// the published coverage is graded against.
-			// At every goal: an explicit one re-parses TypeScript past the default parser.
-			assert_parser_rejects_invalid(CANONICAL_PARSER_ROWS[language], [language], (s, l, goal) =>
-				this.parse(s, l, goal)
-			);
+		//
+		// A scoped init asks only its own row's question — the probe is that row's call
+		// on that row's language, so it proves what the process is about to time and
+		// runs nothing else through the engine first.
+		for (const language of languages) {
+			if (formats) {
+				assert_format_config_landed(
+					'prettier',
+					language,
+					await this.format_async(FORMAT_CONFIG_PROBES[language], language)
+				);
+				// And that a syntax error still THROWS on each of the three printers. The
+				// svelte pass is the one with teeth: it fails if the embedded-block fallback
+				// above ever stops being switched off, which would hand the baseline free
+				// files in its timed sweep — the denominator of every published `Nx`.
+				await assert_tool_rejects_invalid_async('prettier', 'format_async', language, (source) =>
+					this.format_async(source, language)
+				);
+			}
+			if (parses) {
+				// The three oracle parsers, on the same terms: each reference row's accept is
+				// "it did not throw", and on the conformance surface that accept set is what
+				// the published coverage is graded against.
+				// At every goal: an explicit one re-parses TypeScript past the default parser.
+				assert_parser_rejects_invalid(CANONICAL_PARSER_ROWS[language], [language], (s, l, goal) =>
+					this.parse(s, l, goal)
+				);
+			}
 		}
 	}
 
@@ -210,7 +247,11 @@ export class CanonicalImplementation extends BaseImplementation {
 	}
 
 	async format_async(source: string, language: Language, source_path?: string): Promise<string> {
-		if (!this.#prettier_svelte) throw new Error('Prettier Svelte plugin not initialized');
+		// Asked of the language that needs it: a scoped init (`init`) loads the plugin for
+		// a svelte row alone, and prettier itself is checked at the call below.
+		if (language === 'svelte' && !this.#prettier_svelte) {
+			throw new Error('Prettier Svelte plugin not initialized');
+		}
 
 		const plugins = language === 'svelte' ? this.#svelte_plugins : NO_PLUGINS;
 

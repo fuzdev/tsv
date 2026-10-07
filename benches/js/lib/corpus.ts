@@ -19,8 +19,8 @@
  *   the parse-conformance suites (Svelte's compiler tests, the wpt-css harvest
  *   cache, test262 graded positives). Deliberately EXCLUDES the `real` perf tier,
  *   so the conformance coverage surface and the perf corpus are mutually exclusive:
- *   `perf` is the "every in-scope tool must fully process it" corpus (`bench.ts`
- *   hard-fails an unlisted failure there — see `perf_omit.ts`), `conformance` is
+ *   `perf` is the "every in-scope tool must fully process it" corpus (the bench's
+ *   pre-flight hard-fails an unlisted failure there — see `perf_omit.ts`), `conformance` is
  *   where sub-100% coverage is the metric. The per-tool parse coverage surface
  *   (`deno task bench:conformance`).
  * - `robustness` — the real-code robustness sweeps' scope (`audit:corpus`,
@@ -839,7 +839,7 @@ const TIERS_BY_VIEW: Record<CorpusView, CorpusTier[]> = {
 	gates: ['real', 'framework', 'third_party', 'prettier_fixture'],
 	// deliberately NO snapshot tier: the conformance coverage surface and the perf corpus
 	// are mutually exclusive sets. perf is the "every in-scope tool must fully
-	// process it" corpus (bench.ts hard-fails an unlisted failure); conformance is
+	// process it" corpus (the bench's pre-flight hard-fails an unlisted failure); conformance is
 	// the hard-cases-only surface where sub-100% coverage is the measurement.
 	conformance: ['prettier_fixture', 'suite'],
 	// The real-code robustness sweeps: the WHOLE snapshot AND the live working trees'
@@ -940,7 +940,7 @@ interface LoadedExclusionCache {
  * fails open on an absent one — the conformance corpus stays un-filtered (the
  * pre-harvest numbers), disclosed in its log — because most graders it serves are
  * untouched by the caches (neither holds a CSS path). The run that PUBLISHES the
- * coverage refuses instead (`bench.ts`'s `enforce_exclusion_caches`).
+ * coverage refuses instead (`bench_preflight.ts`'s `enforce_exclusion_caches`).
  */
 async function load_path_set(cache: string): Promise<Set<string> | null> {
 	const cache_path = resolve(cache);
