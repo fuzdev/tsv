@@ -140,6 +140,16 @@ delta on the same row is the detector.
   `tsv_wasm_bg.wasm`, different JS glue) — Deno the `deno` target, Node the `nodejs`
   target — both with the full export set incl. `parse_internal_*`. The shipped web
   bundle is deliberately not used (it curates `parse_internal_*` out).
+- **tsv's rows call the packages' published API over each binding.** The three wrappers
+  (`ffi.ts`, `napi.ts`, `wasm.ts`) hand their flat exports to `lib/tsv_api.ts`, which builds
+  the packages' own facade over them (`crates/tsv_wasm/npm/api.js` + `api_parse.js`, wired as
+  each package's entry wires it), so `parse` / `parse_with_locations` / `format` are a
+  consumer's `parse_<lang>(source)` / `parse_<lang>(source, {locations: true})` /
+  `format_<lang>(source)`, argument checks included — every third-party row pays its own
+  package's front door, and so do these. `parse_internal` stays the raw bench-only export.
+  The C FFI ships in no package, so its facade is the one tsv would publish;
+  `diagnostics/facade_probe.ts` prices the facade against the flat exports
+  (../../docs/benchmarks.md §Fairness caveats).
 
 **Dependencies: `package.json` is the source of truth.** Both runtimes consume one `node_modules`:
 Deno via `"nodeModulesDir": "manual"` in `deno.json`, Node directly. No jsr or remote deps —
@@ -896,7 +906,8 @@ declares them optional and degrades on an older report, which makes the drift si
 loud.
 
 **tsv's rows are named for the packages' API.** `tsv` (the native binding — FFI under Deno,
-N-API under Node/Bun) and `tsv-wasm` are each package's default call: the span-only parse in the
+N-API under Node/Bun) and `tsv-wasm` are each package's default call, made through the packages'
+facade (`lib/tsv_api.ts`): the span-only parse in the
 `parse/*` groups, the format in the `format/*` groups. So a row is identified by `group` + `name`,
 never `name` alone. A variant is named for what it adds — `+locations` for the option
 (`{locations: true}`: the default parse plus `loc` rebuilt in JS; perf surface only), `-internal`
@@ -1522,6 +1533,9 @@ benches/js/
     │                      # themselves along two DECLARED axes — root + DeclarationPolicy)
     ├── tsc.ts             # tsc wrapper (parse-only, conformance surface only) + the shared
     │                      # `typescript` loader and parse call the harvest reuses
+    ├── tsv_api.ts         # The packages' published API over one tsv engine: the shipped facade
+    │                      # (`crates/tsv_wasm/npm/api.js` + `api_parse.js`) built over a binding's flat
+    │                      # exports, and `TsvBinding`, the base the three wrappers (ffi/napi/wasm) share
     ├── tsv_artifacts.ts   # The measured tsv artifacts: crate lists + per-build path/label/rebuild, read by
     │                      # the freshness guard, run_if_stale and the size table alike — and the path
     │                      # BUILDERS the three loaders (ffi/napi/wasm) resolve from, so what a guard
@@ -1612,7 +1626,8 @@ state) shows in the coverage report and skip counts without `--verbose`.
   internal AST in one walk, no intermediate `serde_json::Value` or typed public tree
   ([../../docs/architecture.md §Closed Scope, Open
   Convention](../../docs/architecture.md#closed-scope-open-convention)). They differ
-  only at the boundary: native crosses via FFI copy + `JSON.parse` in JS; WASM
+  only at the boundary: native crosses via FFI copy + `JSON.parse` in JS (the packages'
+  facade runs it — `lib/tsv_api.ts`); WASM
   decodes the string across the boundary and runs the engine's `JSON.parse` from Rust
   via `js_sys` (measurably faster than a `serde_wasm_bindgen`-built object graph).
   Rust-side parse-vs-write timing: `cargo run --release -p tsv_debug -- json_profile
@@ -1763,4 +1778,5 @@ Documented above, though they live here: the parse-conformance gates
 | `wasm_json_probe.ts` | splits parse cost into pure-parse vs materialization for native + WASM, isolating JS-side `JSON.parse` | — |
 | `wasm_format_probe.ts` | WASM **format** wall-time A/B at single-digit-% resolution (paired discipline: interleaved pairs, in-run A/A noise floor, byte-identity gate) | — |
 | `wasm_memory_probe.ts` | WASM **linear-memory high-water** for `format()` — the axis the wall-time probe can't see, and the gate for doc-IR memory work. `--cold` (per-file cold-start peak) or default steady-state | — |
+| `facade_probe.ts` | what the packages' facade costs per call over the flat exports beneath it, per binding × operation × language, and what separates a `tsv-wasm` row from the staged `@fuzdev/tsv-wasm` entry (which needs `deno task build:npm:all`). Same paired discipline (rotated interleaved arms, in-run A/A floor, byte-identity gate) over three sets — the perf corpus, its smallest tenth, one minimal source — plus the facade's one O(source) step (`isWellFormed`) priced alone. Runs under **all three runtimes** (its own load path, not `init_implementations`) | — |
 | `biome_heap_probe.ts` | does biome's sweep time move with its leaked wasm linear memory, per runtime? N consecutive full sweeps of one format row under a reset regime (`never` / `every` / the production rule), wall beside heap size, grow count and JSC's own heap stats per sweep; `--prelude prettier,oxfmt,…` first runs the group's earlier tasks in the same process, which is the state that decides the answer on bun. Runs under **node and bun** (not `deno task`: `node --expose-gc --disable-warning=ExperimentalWarning …` / `bun --expose-gc …`); what sized `RESET_GROWTH_BYTES` | — |

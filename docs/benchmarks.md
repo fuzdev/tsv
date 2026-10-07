@@ -198,10 +198,9 @@ Things the published numbers measure that aren't quite what they look like.
   loop, so a cold one-shot consumer pays a first-call allocation the warm
   per-call figure doesn't include — negligible next to process/module startup,
   but the warm number is a warm number. That binding is also the one piece of
-  glue in the table the harness AUTHORS: `lib/ffi.ts` is written for this bench,
-  where every other row — tsv's own N-API and WASM rows included — runs the glue
-  its package ships. Under Node and Bun the native row is the shipped N-API addon,
-  which is the row the site's headlines read.
+  marshalling glue in the table the harness AUTHORS: `lib/ffi.ts` is written for
+  this bench, and no npm package ships the C FFI. Under Node and Bun the native row
+  is the shipped N-API addon, which is the row the site's headlines read.
   (b) The async impls (`prettier`, `oxfmt`) are `await`ed per file
   (`process_corpus_async`), carrying a per-file microtask cost the sync impls
   skip. The opt-in **`tsv-forced-async`** control row (`BENCH_FORCED_ASYNC=1` —
@@ -217,9 +216,43 @@ Things the published numbers measure that aren't quite what they look like.
   `prettier` and `oxfmt` are async-only — the tax can be measured, not removed.
   (c) Task return values are discarded uniformly for all impls; the FFI/WASM/async
   boundaries block dead-code elimination, so no impl's work is optimized away.
+- **tsv's rows call the packages' published API, not the engine exports beneath
+  it.** Every tsv npm package publishes through one hand-written facade
+  (`crates/tsv_wasm/npm/api.js` + `api_parse.js`): per call it checks the source is
+  a well-formed UTF-16 string, reads the options bag, rethrows a parse failure as
+  the typed `SyntaxError`, and over the native engine runs the `JSON.parse`. The
+  `tsv` / `tsv-wasm` rows and their `+locations` siblings time that facade over each
+  binding (`lib/tsv_api.ts`), wired as the package's entry wires it — so a row is
+  the call a consumer makes (`parse_<lang>(source)`, `parse_<lang>(source,
+  {locations: true})`, `format_<lang>(source)`) and pays its own front door, as
+  every third-party row pays its package's. The `-internal` rows stay on the raw
+  export: bench-only, published by no package, behind no facade.
+
+  Three distances from an installed package remain, each deliberate. The facade is
+  imported from the source tree — the files the packages stage verbatim, not a
+  staged copy. The WASM rows run it over the runtime's own wasm-bindgen target
+  (`deno` / `nodejs`) where `@fuzdev/tsv-wasm` ships the `web` target's glue: the
+  same engine and the same facade, and the package's bundle curates out the
+  `parse_internal_*` the `-internal` row needs. And under Deno the native row is
+  the C FFI, which no package ships, so the facade over it is the one tsv would
+  publish — taken so `tsv` means the published API over the runtime's native
+  binding under all three runtimes.
+
+  `diagnostics/facade_probe.ts` prices each of these: the row against the flat
+  exports per binding, operation and language, and the staged `@fuzdev/tsv-wasm`
+  entry against the row. The facade's cost is a fixed amount on the order of a
+  hundred nanoseconds a call plus one O(source) step — `String.prototype.isWellFormed`,
+  which a runtime answers at once for a one-byte string and scans for a two-byte one
+  (a source holding any character outside Latin-1) — so its share is largest on the
+  fastest operation, format, and under the runtime whose scan is slowest. That is
+  Node: there the facade reads one to three percent of a format sweep and about half
+  that of a parse sweep, where under Bun and Deno, whose scan is several times
+  faster, it stays under one percent of every sweep. The staged entry reads inside
+  the row's own noise floor under Node and Deno and about a percent slower than the
+  row under Bun, the one place the target's glue shows.
 - **`tsv-wasm` is measured on the full build.** The WASM bench loads
-  `pkg/all/deno` (`pkg/all/nodejs` under Node/Bun; the default both-features artifact, ~2.7 MB — what
-  `@fuzdev/tsv-wasm` ships) for _both_ parse and format, while subset consumers
+  `pkg/all/deno` (`pkg/all/nodejs` under Node/Bun; the default both-features build, ~2.7 MB — the
+  engine `@fuzdev/tsv-wasm` ships, behind that target's glue) for _both_ parse and format, while subset consumers
   ship the smaller `@fuzdev/tsv-format-wasm` (~2.5 MB, no convert layer) or
   `@fuzdev/tsv-parse-wasm` (~1.0 MB, no printers). Same story natively: the perf
   row loads the full `libtsv_ffi` (the full N-API addon under Node/Bun), while the Binary Sizes table also lists the
@@ -428,11 +461,12 @@ Things the published numbers measure that aren't quite what they look like.
     `parse/typescript` ratio against `tsv`. The `oxc-parser` row
     times oxc's default path only; an `oxc-parser-raw` row would price the other.
 - **The `+locations` rows price `{locations: true}`, and they are not opponents of
-  tsv's own rows.** `tsv+locations` and its wasm sibling run the
-  default row's exact call (`JSON.parse` included), then rebuild `loc` on every node with
-  the shipped `reconstruct_locations` (`crates/tsv_wasm/npm/locations.js`, the source
-  every parse-capable package bundles), the line-table build inside the timed region —
-  exactly what the packages' `{locations: true}` runs. The language is always named
+  tsv's own rows.** `tsv+locations` and its wasm sibling call the published
+  `parse_<lang>(source, {locations: true})`: the default row's parse (`JSON.parse`
+  included), then the facade's own call of the shipped `reconstruct_locations`
+  (`crates/tsv_wasm/npm/locations.js`, the source every parse-capable package bundles)
+  over that tree, the line-table build inside the timed region. The facade names the
+  export's language to the helper
   (`create_locator` refuses a missing one; the line rule and the Svelte stamping both
   key on it), every language has the pair, and they are perf-only: their
   parse is the default row's, so a coverage table would learn nothing from them. Read them

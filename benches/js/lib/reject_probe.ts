@@ -212,6 +212,7 @@ export async function assert_tool_rejects_invalid_async(
 /** The operations a tsv binding exposes, each of which is a published row. */
 export interface RejectProbeTarget {
 	parse(source: string, language: Language, goal?: ParseGoal): unknown;
+	parse_with_locations(source: string, language: Language, goal?: ParseGoal): unknown;
 	parse_internal(source: string, language: Language, goal?: ParseGoal): void;
 	format(source: string, language: Language): string;
 }
@@ -245,6 +246,7 @@ export function assert_binding_reports_rejection(binding: string, impl: RejectPr
 			const at = `${language}${goal ? `, ${goal}` : ''}`;
 			operations.push(
 				[`parse[${at}]`, () => impl.parse(source, language, goal)],
+				[`parse_with_locations[${at}]`, () => impl.parse_with_locations(source, language, goal)],
 				[`parse_internal[${at}]`, () => impl.parse_internal(source, language, goal)]
 			);
 		}

@@ -390,8 +390,8 @@ every corpus file before grading tsv's `loc` against the canonical parser's. The
 suites grade the wiring — `{locations: true}` is exactly this reconstruction of the default
 parse — and `scripts/test_napi_npm.ts` deep-equals `cli.js`'s `parse --locations` against
 the native binary's. The bench's `tsv+locations` /
-`tsv-wasm+locations` rows run the shipped helper over the perf corpus,
-timing what `{locations: true}` costs over the default.
+`tsv-wasm+locations` rows call `parse_<lang>(source, {locations: true})` through this
+facade over the perf corpus, timing what the option costs over the default.
 
 ⚠️ **Two implementations of one definition are each other's drift check, not an oracle.**
 A definition that is itself wrong makes both halves wrong the same way, and the

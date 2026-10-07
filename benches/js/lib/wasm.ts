@@ -9,13 +9,19 @@
  *  - Node/Bun: the `nodejs` target (CommonJS; self-initializing on require)
  * The shipped `@fuzdev/tsv-wasm` (web) bundle is deliberately NOT used here — it
  * curates out `parse_internal_*`, which the `tsv-wasm-internal` row needs.
+ *
+ * The `parse` and `format` rows call the published API over these exports — the
+ * packages' facade, wired as the staged `index.js` wires it over the web-target glue
+ * (`parse_<lang>`, which materializes engine-side, beside `parse_<lang>_json`). So what
+ * stands between these rows and the package is the wasm-bindgen TARGET's glue alone:
+ * same engine, same facade. See `lib/tsv_api.ts`.
  */
 
 import { stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { wasm_target } from './runtime.ts';
 import { wasm_bundle_dir } from './tsv_artifacts.ts';
-import { BaseImplementation, goal_for, type Language, LANGUAGES, type ParseGoal } from './types.ts';
+import { TsvBinding } from './tsv_api.ts';
 import { assert_binding_reports_rejection } from './reject_probe.ts';
 import { assert_binding_emits_span_only } from './locations_probe.ts';
 
@@ -23,55 +29,27 @@ import { assert_binding_emits_span_only } from './locations_probe.ts';
  * WASM module function signatures — the raw wasm-bindgen exports, flat like the two
  * native bindings': each takes the source type as a trailing OPTIONAL string
  * (`'script'` / `'module'`; omitted = none named). Svelte and CSS REJECT a set one
- * rather than ignoring it, so the wrappers below withhold it for them. `parse_<lang>`
- * returns the span-only wire as an object, `JSON.parse`d engine-side via `js_sys`.
+ * rather than ignoring it (`crates/tsv_wasm/src/lib.rs`'s `wasm_source_type`), so
+ * `TsvBinding` withholds it for them. `parse_<lang>`
+ * returns the span-only wire as an object, `JSON.parse`d engine-side via `js_sys`;
+ * `parse_<lang>_json` returns the wire string itself.
  */
 interface WasmModule {
 	parse_svelte: (source: string, source_type?: string) => unknown;
+	parse_svelte_json: (source: string, source_type?: string) => string;
 	parse_internal_svelte: (source: string, source_type?: string) => void;
 	format_svelte: (source: string, source_type?: string) => string;
 	parse_typescript: (source: string, source_type?: string) => unknown;
+	parse_typescript_json: (source: string, source_type?: string) => string;
 	parse_internal_typescript: (source: string, source_type?: string) => void;
 	format_typescript: (source: string, source_type?: string) => string;
 	parse_css: (source: string, source_type?: string) => unknown;
+	parse_css_json: (source: string, source_type?: string) => string;
 	parse_internal_css: (source: string, source_type?: string) => void;
 	format_css: (source: string, source_type?: string) => string;
 }
 
-/**
- * The per-language export tables, resolved ONCE in `init()`.
- *
- * The native siblings' `FfiTables` / `NapiTables` for the same reason: these were
- * getters returning a fresh object literal, so every timed call allocated one —
- * harness-side allocation charged to whichever row it sat under, which belongs to
- * no impl.
- */
-interface WasmTables {
-	/** The span-only wire — the one parse wire every tsv binding emits. */
-	parse: Record<Language, (source: string, source_type?: string) => unknown>;
-	parse_internal: Record<Language, (source: string, source_type?: string) => void>;
-	format: Record<Language, (source: string, source_type?: string) => string>;
-}
-
-export class WasmImplementation extends BaseImplementation {
-	private _module: WasmModule | null = null;
-	private _tables: WasmTables | null = null;
-
-	readonly parse_languages = LANGUAGES;
-	readonly format_languages = LANGUAGES;
-
-	/** Get initialized module or throw */
-	private get module(): WasmModule {
-		if (!this._module) throw new Error('WASM module not initialized');
-		return this._module;
-	}
-
-	/** The per-language export tables, or throw if `init()` hasn't run. */
-	private get tables(): WasmTables {
-		if (!this._tables) throw new Error('WASM module not initialized');
-		return this._tables;
-	}
-
+export class WasmImplementation extends TsvBinding {
 	async init(): Promise<void> {
 		// The same directory the freshness guard resolves — both sides go through
 		// `tsv_artifacts.ts`'s `wasm_bundle_dir`, so the bundle guarded is the bundle
@@ -94,7 +72,7 @@ export class WasmImplementation extends BaseImplementation {
 		// The deno target is ESM with an explicit `default()` initializer; the
 		// nodejs target is CommonJS and self-initializes on require. Load each in
 		// its native module system (both resolve to `any`), then read the same
-		// function names off both into the typed `WasmModule` shape below.
+		// function names off both through the typed `WasmModule` shape.
 		let module: WasmModule;
 		if (target === 'deno') {
 			const esm = await import(wasm_path);
@@ -106,44 +84,39 @@ export class WasmImplementation extends BaseImplementation {
 			module = createRequire(import.meta.url)(wasm_path);
 		}
 
-		this._module = {
-			parse_svelte: module.parse_svelte,
-			parse_internal_svelte: module.parse_internal_svelte,
-			format_svelte: module.format_svelte,
-			parse_typescript: module.parse_typescript,
-			parse_internal_typescript: module.parse_internal_typescript,
-			format_typescript: module.format_typescript,
-			parse_css: module.parse_css,
-			parse_internal_css: module.parse_internal_css,
-			format_css: module.format_css
-		};
-
-		// Resolve every export table once — see `WasmTables`.
-		this._tables = {
+		// The bundle's flat exports, with `parse_<lang>` beside `parse_<lang>_json` as
+		// the facade's parse engine — the staged `index.js`'s own wiring.
+		this.bind({
 			parse: {
-				svelte: this._module.parse_svelte,
-				typescript: this._module.parse_typescript,
-				css: this._module.parse_css
+				svelte: module.parse_svelte,
+				typescript: module.parse_typescript,
+				css: module.parse_css
 			},
-			parse_internal: {
-				svelte: this._module.parse_internal_svelte,
-				typescript: this._module.parse_internal_typescript,
-				css: this._module.parse_internal_css
+			parse_json: {
+				svelte: module.parse_svelte_json,
+				typescript: module.parse_typescript_json,
+				css: module.parse_css_json
 			},
 			format: {
-				svelte: this._module.format_svelte,
-				typescript: this._module.format_typescript,
-				css: this._module.format_css
+				svelte: module.format_svelte,
+				typescript: module.format_typescript,
+				css: module.format_css
+			},
+			parse_internal: {
+				svelte: module.parse_internal_svelte,
+				typescript: module.parse_internal_typescript,
+				css: module.parse_internal_css
 			}
-		};
+		});
 
 		// Fairness guard for the parse rows: the wasm parse fns must return a
 		// js_sys-materialized OBJECT (the engine runs the host's JSON.parse from
 		// Rust). If a glue/build regression ever handed back the raw JSON string
 		// instead, the timed `tsv-wasm` parse rows would silently skip
 		// materialization and read artificially fast vs their native sibling. Probe
-		// once here, outside any timed loop.
-		const probe = this._module.parse_typescript('const x = 1;');
+		// once here, outside any timed loop — and on the raw export, since the facade
+		// passes through whatever the engine's `parse` returns.
+		const probe = module.parse_typescript('const x = 1;');
 		if (typeof probe !== 'object' || probe === null) {
 			throw new Error(
 				`tsv-wasm parse returned a ${typeof probe} — expected a materialized AST object`
@@ -165,27 +138,5 @@ export class WasmImplementation extends BaseImplementation {
 			{ path: wasm_path, rebuild: `deno task build:wasm:all:${target}` },
 			this
 		);
-	}
-
-	// `goal_for` withholds the goal for svelte/css, which REJECT a set one rather than
-	// ignoring it (`crates/tsv_wasm/src/lib.rs`'s `wasm_source_type`). The same helper
-	// the two native wrappers use; see its doc in `lib/types.ts`.
-	parse(source: string, language: Language, goal?: ParseGoal): unknown {
-		return this.tables.parse[language](source, goal_for(language, goal));
-	}
-
-	parse_internal(source: string, language: Language, goal?: ParseGoal): void {
-		this.tables.parse_internal[language](source, goal_for(language, goal));
-	}
-
-	// No source type: the shipped default on every surface, and the one that reaches
-	// the module-then-script fallback (`tsv_ts::parse_with_goal_or_fallback`).
-	format(source: string, language: Language): string {
-		return this.tables.format[language](source);
-	}
-
-	dispose(): void {
-		this._module = null;
-		this._tables = null;
 	}
 }

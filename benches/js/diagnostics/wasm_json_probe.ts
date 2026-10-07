@@ -9,7 +9,9 @@
  *
  * Both share the parse; they differ in materialization. This splits total
  * into parse vs materialization for each, and isolates the JS-side
- * JSON.parse cost.
+ * JSON.parse cost. Both JSON paths are the bench rows' own calls, so they run
+ * through the packages' facade (`lib/tsv_api.ts`), whose argument checks land in
+ * the materialization share; `diagnostics/facade_probe.ts` prices those alone.
  *
  * Run: deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys \
  *   benches/js/diagnostics/wasm_json_probe.ts 2>&1 >/dev/null

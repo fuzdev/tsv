@@ -37,7 +37,6 @@ import { RsvelteParseImplementation } from './rsvelte_parse.ts';
 import { SwcImplementation } from './swc.ts';
 import type { AlternativeVersionInfo } from './report.ts';
 import { type AllVersions, load_all_versions } from './versions.ts';
-import { reconstruct_locations } from '../../../crates/tsv_wasm/npm/locations.js';
 
 /**
  * One optional implementation that failed to initialize on this machine — an
@@ -602,11 +601,13 @@ export function get_benchmark_tasks(
 		// Native + WASM parsers: the span-only wire (`start`/`end` offsets, no per-node
 		// `loc`) — the one parse wire every tsv binding emits, `JSON.parse`d into objects.
 		// The payload-matched opponent to oxc-parser and yuku-parser, whose default ASTs
-		// are also span-only. Materialized in JS for the native binding and engine-side
-		// (via `js_sys`) for wasm, as each package's facade does. A package's default call
-		// takes the bare row name, as every third-party row does and as the format rows
-		// do, and a variant is named for its option (`+locations` below); no row times a
-		// loc-bearing wire, which no binding ships.
+		// are also span-only. Each row is the package's published `parse_<lang>(source)`
+		// over its binding — the facade's argument checks included, as every third-party
+		// row pays its own front door (`lib/tsv_api.ts`) — materialized by the facade for
+		// the native binding and engine-side (via `js_sys`) for wasm. A package's default
+		// call takes the bare row name, as every third-party row does and as the format
+		// rows do, and a variant is named for its option (`+locations` below); no row
+		// times a loc-bearing wire, which no binding ships.
 		add('native', true, 'tsv', 'native', (source, _language, goal) =>
 			impls.native.parse(source, language, goal)
 		);
@@ -614,16 +615,15 @@ export function get_benchmark_tasks(
 			impls.wasm.parse(source, language, goal)
 		);
 
-		// The span-only wire PLUS `loc` reconstructed in JS over the whole tree — what
-		// `{locations: true}` costs over the default, since the packages' facade runs
-		// exactly this: the same parse (`JSON.parse` included), then the SHIPPED helper
-		// (`crates/tsv_wasm/npm/locations.js`, the source every parse-capable package
-		// bundles) with its line-table build inside the timed region.
+		// The span-only wire PLUS `loc` reconstructed in JS over the whole tree — the
+		// published `parse_<lang>(source, {locations: true})`, so what the option costs
+		// over the default: the same parse, then the facade's own call of the SHIPPED
+		// helper (`crates/tsv_wasm/npm/locations.js`, the source every parse-capable
+		// package bundles), its line-table build inside the timed region.
 		//
-		// ⚠ The language is NAMED, never left to a default: `create_locator` refuses a
-		// missing one, and the line rule and the Svelte stamping (`name_loc`, the
-		// `character` field) both key on it, so a Svelte row timed under another language
-		// would time a different walk than a Svelte consumer runs.
+		// The facade names the language to the helper (the export's own), so a Svelte
+		// row times the walk a Svelte consumer runs: the line rule and the Svelte
+		// stamping (`name_loc`, the `character` field) both key on it.
 		//
 		// PERF-ONLY: a consumer-cost row, and the parse it runs is the default row's, so on
 		// the coverage surface it would add nothing. Its absence there is disclosed
@@ -634,19 +634,18 @@ export function get_benchmark_tasks(
 			locations_enabled,
 			'tsv+locations',
 			'native-locations',
-			(source, _language, goal) =>
-				reconstruct_locations(impls.native.parse(source, language, goal), source, { language })
+			(source, _language, goal) => impls.native.parse_with_locations(source, language, goal)
 		);
 		add(
 			'wasm',
 			locations_enabled,
 			'tsv-wasm+locations',
 			'wasm-locations',
-			(source, _language, goal) =>
-				reconstruct_locations(impls.wasm.parse(source, language, goal), source, { language })
+			(source, _language, goal) => impls.wasm.parse_with_locations(source, language, goal)
 		);
 
-		// Internal parsing variants (no JSON serialization) - shows JSON overhead
+		// Internal parsing variants (no JSON serialization, and no facade: the export is
+		// bench-only, published by no package) - shows JSON overhead
 		add('native', true, 'tsv-internal', 'native-internal', (source, _language, goal) =>
 			impls.native.parse_internal(source, language, goal)
 		);

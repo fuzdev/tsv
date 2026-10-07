@@ -2,10 +2,15 @@
  * FFI bindings to native tsv library
  *
  * Uses Deno.dlopen to call the Rust library directly for maximum performance.
+ *
+ * The `parse` and `format` rows call the published API over these entry points — the
+ * packages' facade, taken over `call_ffi` as it is over the N-API addon (the wire
+ * string handed over, so the facade runs the `JSON.parse`). No npm package ships the
+ * C FFI, so this is the facade tsv WOULD publish over it; see `lib/tsv_api.ts`.
  */
 
 import { ffi_library_path } from './tsv_artifacts.ts';
-import { BaseImplementation, goal_for, type Language, LANGUAGES, type ParseGoal } from './types.ts';
+import { type EngineFn, TsvBinding } from './tsv_api.ts';
 import { assert_binding_reports_rejection } from './reject_probe.ts';
 import { assert_binding_emits_span_only } from './locations_probe.ts';
 
@@ -81,9 +86,20 @@ const GOAL_SCRIPT = 1;
 const GOAL_UNSPECIFIED = 2;
 
 /** The parse exports' code for `goal`: they refuse `UNSPECIFIED`, so an unset goal
- * is the module default the AST's `sourceType` would claim anyway. */
-const parse_source_type_code = (goal: ParseGoal | undefined): number =>
+ * is the module default the AST's `sourceType` would claim anyway. A `string` since
+ * that is how the facade hands a source type to an engine (`EngineFn`), already
+ * graded to `'script'` or `'module'`. */
+const parse_source_type_code = (goal: string | undefined): number =>
 	goal === 'script' ? GOAL_SCRIPT : GOAL_MODULE;
+
+/** The format exports' code for `source_type`: an unset one stays unset. The format
+ * rows name none — the shipped default on every surface (`tsv format <path>`, an
+ * editor's bare `format_typescript`), and the only code that reaches the
+ * module-then-script fallback. Every corpus the perf surface measures is module-valid,
+ * so the retry never runs there; the format-conformance corpus is where it earns its
+ * keep. */
+const format_source_type_code = (source_type: string | undefined): number =>
+	source_type === undefined ? GOAL_UNSPECIFIED : parse_source_type_code(source_type);
 
 type FfiFn = (
 	source: Deno.PointerValue,
@@ -124,21 +140,6 @@ interface MarshalState {
 	result_buffer: Uint8Array;
 }
 
-/**
- * The per-language symbol tables, resolved ONCE in `init()`.
- *
- * These were getters returning a fresh object literal, so every timed call
- * allocated one — harness-side allocation charged to whichever row it sat under,
- * which belongs to no impl. Same reason `lib/canonical.ts` hoists its prettier
- * plugins array out of the per-call path.
- */
-interface FfiTables {
-	/** The span-only wire — the one parse wire every tsv binding emits. */
-	parse: Record<Language, FfiFn>;
-	parse_internal: Record<Language, FfiFn>;
-	format: Record<Language, FfiFn>;
-}
-
 /** Grow-only sizing: double `current` until it holds `needed`. */
 const next_capacity = (needed: number, current: number): number => {
 	let cap = current;
@@ -148,15 +149,11 @@ const next_capacity = (needed: number, current: number): number => {
 
 const INITIAL_BUFFER_CAPACITY = 1 << 16;
 
-export class NativeImplementation extends BaseImplementation {
+export class NativeImplementation extends TsvBinding {
 	private _lib: Deno.DynamicLibrary<typeof symbols> | null = null;
 	private _marshal: MarshalState | null = null;
-	private _tables: FfiTables | null = null;
 	private encoder = new TextEncoder();
 	private decoder = new TextDecoder();
-
-	readonly parse_languages = LANGUAGES;
-	readonly format_languages = LANGUAGES;
 
 	/** Get initialized library or throw */
 	private get lib(): Deno.DynamicLibrary<typeof symbols> {
@@ -167,12 +164,6 @@ export class NativeImplementation extends BaseImplementation {
 	/** Get symbols with proper typing */
 	private get symbols(): LibSymbols {
 		return this.lib.symbols;
-	}
-
-	/** The per-language symbol tables, or throw if `init()` hasn't run. */
-	private get tables(): FfiTables {
-		if (!this._tables) throw new Error('Native library not initialized');
-		return this._tables;
 	}
 
 	async init(): Promise<void> {
@@ -207,24 +198,34 @@ export class NativeImplementation extends BaseImplementation {
 			result_buffer: new Uint8Array(new ArrayBuffer(INITIAL_BUFFER_CAPACITY))
 		};
 
-		// Resolve every symbol table once — see `FfiTables`.
-		this._tables = {
-			parse: {
-				svelte: this.symbols.tsv_parse_svelte as FfiFn,
-				typescript: this.symbols.tsv_parse_typescript as FfiFn,
-				css: this.symbols.tsv_parse_css as FfiFn
-			},
-			parse_internal: {
-				svelte: this.symbols.tsv_parse_internal_svelte as FfiFn,
-				typescript: this.symbols.tsv_parse_internal_typescript as FfiFn,
-				css: this.symbols.tsv_parse_internal_css as FfiFn
+		// Every entry point as a flat `(source, source_type?) => string` — the shape the
+		// other two bindings export — with the parse entry points (the span-only wire, as
+		// a string) as the facade's parse engine. A `parse_internal` payload is empty.
+		const parse =
+			(fn: FfiFn): EngineFn<string> =>
+			(source, source_type) =>
+				this.call_ffi(fn, source, parse_source_type_code(source_type));
+		const format =
+			(fn: FfiFn): EngineFn<string> =>
+			(source, source_type) =>
+				this.call_ffi(fn, source, format_source_type_code(source_type));
+		this.bind({
+			parse_json: {
+				svelte: parse(this.symbols.tsv_parse_svelte as FfiFn),
+				typescript: parse(this.symbols.tsv_parse_typescript as FfiFn),
+				css: parse(this.symbols.tsv_parse_css as FfiFn)
 			},
 			format: {
-				svelte: this.symbols.tsv_format_svelte as FfiFn,
-				typescript: this.symbols.tsv_format_typescript as FfiFn,
-				css: this.symbols.tsv_format_css as FfiFn
+				svelte: format(this.symbols.tsv_format_svelte as FfiFn),
+				typescript: format(this.symbols.tsv_format_typescript as FfiFn),
+				css: format(this.symbols.tsv_format_css as FfiFn)
+			},
+			parse_internal: {
+				svelte: parse(this.symbols.tsv_parse_internal_svelte as FfiFn),
+				typescript: parse(this.symbols.tsv_parse_internal_typescript as FfiFn),
+				css: parse(this.symbols.tsv_parse_internal_css as FfiFn)
 			}
-		};
+		});
 
 		// This binding returns a payload either way, so the `out_status` word is the
 		// only thing that tells a refusal from a formatted file. Prove it still
@@ -318,42 +319,12 @@ export class NativeImplementation extends BaseImplementation {
 		return result;
 	}
 
-	// `goal_for` withholds the goal for svelte/css, which REJECT a script code
-	// rather than ignoring it (`tsv_ffi`'s `ffi_source_type`). One shared helper for all
-	// three wrappers — see its doc in `lib/types.ts`.
-	parse(source: string, language: Language, goal?: ParseGoal): unknown {
-		return JSON.parse(
-			this.call_ffi(
-				this.tables.parse[language],
-				source,
-				parse_source_type_code(goal_for(language, goal))
-			)
-		);
-	}
-
-	parse_internal(source: string, language: Language, goal?: ParseGoal): void {
-		this.call_ffi(
-			this.tables.parse_internal[language],
-			source,
-			parse_source_type_code(goal_for(language, goal))
-		);
-	}
-
-	// The format rows name NO source type — the shipped default on every surface
-	// (`tsv format <path>`, an editor's bare `format_typescript`), and the only code
-	// that reaches the module-then-script fallback. Every corpus the perf surface
-	// measures is module-valid, so the retry never runs there; the format-conformance
-	// corpus is where it earns its keep.
-	format(source: string, language: Language): string {
-		return this.call_ffi(this.tables.format[language], source, GOAL_UNSPECIFIED);
-	}
-
-	dispose(): void {
+	override dispose(): void {
+		super.dispose();
 		if (this._lib) {
 			this._lib.close();
 			this._lib = null;
 		}
 		this._marshal = null;
-		this._tables = null;
 	}
 }
