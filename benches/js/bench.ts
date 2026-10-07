@@ -122,7 +122,7 @@ import {
 	generate_group_files_markdown,
 	generate_group_throughput_markdown,
 	generate_json_overhead_note,
-	generate_reconstruct_note,
+	generate_locations_note,
 	generate_skipped_files_markdown,
 	generate_skipped_files_report,
 	generate_summary_report,
@@ -670,23 +670,23 @@ const SURFACE_DISCLOSURES: ReadonlyArray<SurfaceDisclosure> = [
 			'The WASM binding runs the same engine and carries the row; both are measured on the perf ' +
 			'corpus.\n'
 	},
-	// The two `+reconstruct` rows, one entry each because the claim is checked per row:
-	// consumer-cost rows whose parse IS the span-only row's, so on a coverage surface
+	// The two `+locations` rows, one entry each because the claim is checked per row:
+	// consumer-cost rows whose parse IS the default row's, so on a coverage surface
 	// they would add nothing but a duplicate of that row's coverage.
 	{
-		row: 'tsv-json-no-locations+reconstruct',
+		row: 'tsv+locations',
 		direction: 'excluded',
 		prose:
-			'**Excluded here:** tsv-json-no-locations+reconstruct — the span-only wire plus `loc` ' +
-			'reconstructed in JS, a consumer-cost row measured on the perf corpus. The parse it runs is ' +
-			'tsv-json-no-locations’, so its coverage is that row’s.\n'
+			'**Excluded here:** tsv+locations — the default span-only parse plus `loc` ' +
+			'reconstructed in JS (`{locations: true}`), a consumer-cost row measured on the perf ' +
+			'corpus. The parse it runs is tsv’s, so its coverage is that row’s.\n'
 	},
 	{
-		row: 'tsv-wasm-json-no-locations+reconstruct',
+		row: 'tsv-wasm+locations',
 		direction: 'excluded',
 		prose:
-			'**Excluded here:** tsv-wasm-json-no-locations+reconstruct — the same consumer-cost row over ' +
-			'the WASM binding; its coverage is tsv-wasm-json-no-locations’.\n'
+			'**Excluded here:** tsv-wasm+locations — the same consumer-cost row over the WASM ' +
+			'binding; its coverage is tsv-wasm’s.\n'
 	},
 	{
 		// The mirror-image disclosure: a row present ONLY here needs saying as much
@@ -847,7 +847,7 @@ if (untiered_rows.length > 0) {
 //
 
 //
-// Per-impl tracking maps (keyed by tracking_key, e.g. `parse/svelte/native-span`).
+// Per-impl tracking maps (keyed by tracking_key, e.g. `parse/svelte/native`).
 //
 // Populated by the **untimed pre-flight pass** before each group's timed
 // bench run. The pre-flight records each impl's success/skip set; the timed
@@ -1173,14 +1173,16 @@ async function enforce_css_reject_pin(full_corpus: boolean): Promise<void> {
 }
 
 /**
- * A NATIVE tsv row — `tsv` and its `tsv-<variant>` rows — as opposed to the
- * `tsv-wasm` family, which shares the `tsv-` prefix since the WASM package took its
- * kebab-case name. The wasm rows are the SIBLINGS these predicates derive, never a
- * base: the prefix test alone would pair `tsv-wasm-internal` with a `tsv-wasm-wasm-internal`
- * that no row defines.
+ * A NATIVE tsv row — `tsv` and its variants, `tsv-<variant>` or `tsv+<option>` — as
+ * opposed to the `tsv-wasm` family, which shares the `tsv-` prefix since the WASM
+ * package took its kebab-case name. The wasm rows are the SIBLINGS these predicates
+ * derive, never a base: the prefix test alone would pair `tsv-wasm-internal` with a
+ * `tsv-wasm-wasm-internal` that no row defines.
  */
 const is_native_tsv_row = (name: string): boolean =>
-	name === 'tsv' || (name.startsWith('tsv-') && !name.startsWith('tsv-wasm'));
+	name === 'tsv' ||
+	name.startsWith('tsv+') ||
+	(name.startsWith('tsv-') && !name.startsWith('tsv-wasm'));
 
 /**
  * The task name that runs the SAME ENGINE as `name`, or `null` when it has no
@@ -2469,9 +2471,13 @@ interface BaselineVersions extends ReportVersions {
  *
  * 20: `payload` is keyed on the row IN ITS GROUP'S LANGUAGE and gains
  * `drop_in_superset`: the CSS oracle row reads `span_only` (`parseCss` emits no `loc`),
- * and the `+reconstruct` rows read `drop_in_superset` on Svelte and CSS, where their
+ * and the `+locations` rows read `drop_in_superset` on Svelte and CSS, where their
  * `loc` on every positioned object is a superset of the oracle's. A consumer that
- * matched 19's tiers by row name alone called both pairs matched.
+ * matched 19's tiers by row name alone called both pairs matched. tsv's parse rows
+ * are also named for the packages' API from 20: the default parse is `tsv` /
+ * `tsv-wasm` (the format rows' names, in the parse groups) and `{locations: true}`
+ * is `tsv+locations` / `tsv-wasm+locations`, so a row name identifies a row only
+ * together with its group.
  */
 const REPORT_SCHEMA_VERSION = 20;
 
@@ -3065,8 +3071,8 @@ function generate_markdown_report(data: Baseline, groups: GroupResults[]): strin
 		}
 		// Consumer-side `{locations: true}` cost note, computed from this run's rows and
 		// sitting with the parse comparison since it's about the span-only wire.
-		const reconstruct_note = generate_reconstruct_note(groups);
-		if (reconstruct_note) lines.push(reconstruct_note, '');
+		const locations_note = generate_locations_note(groups);
+		if (locations_note) lines.push(locations_note, '');
 	}
 
 	// Stability disclosure — see `UNSTABLE_CV_THRESHOLD`. Sits with the other

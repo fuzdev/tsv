@@ -131,7 +131,7 @@ export class NapiImplementation extends BaseImplementation {
 		assert_binding_reports_rejection('tsv (N-API)', this);
 
 		// The parse wire is span-only — prove this artifact emits it, so a stale addon
-		// whose parse still emits `loc` can't be timed under the span rows' label.
+		// whose parse still emits `loc` can't be timed as the span-only default.
 		// See `lib/locations_probe.ts`.
 		assert_binding_emits_span_only('tsv (N-API)', { path, rebuild: 'deno task build:napi' }, this);
 	}

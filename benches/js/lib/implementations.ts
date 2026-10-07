@@ -70,7 +70,7 @@ export interface InitFailure {
  * "why is this column blank?" holds a row name and nothing else. `impl` alone
  * could not answer that: it is an init-line label (`OXC WASM`, `Biome`) that
  * matches no row (`oxc-parser-wasm`, `biome-wasm`), and one impl can back several
- * rows (`native` backs four; `oxc` backs `oxc-parser` AND `oxfmt`).
+ * rows (`native` backs `tsv` and its variants; `oxc` backs `oxc-parser` AND `oxfmt`).
  *
  * Empty `rows` is meaningful, not a bug: the impl failed but defines no row on
  * THIS surface (a `tsc` failure costs the perf surface nothing), so the machine is
@@ -465,14 +465,15 @@ export interface BenchmarkTask {
 	/**
 	 * The implementation slot backing this row.
 	 *
-	 * A row's name is its public identity; this is the internal one, and recording
-	 * it here is what lets a load failure be attributed to the rows it removed
-	 * without a hand-written map (`get_defined_rows` → `unavailable_with_rows`).
-	 * Many-to-one on purpose: `native` backs four parse rows, `oxc` backs
-	 * `oxc-parser` and `oxfmt`.
+	 * A row's name is its public identity (within its group: `tsv` names the default
+	 * row of the parse groups and of the format groups alike); this is the internal
+	 * one, and recording it here is what lets a load failure be attributed to the rows
+	 * it removed without a hand-written map (`get_defined_rows` →
+	 * `unavailable_with_rows`). Many-to-one on purpose: `native` backs `tsv` and its
+	 * variants, `oxc` backs `oxc-parser` and `oxfmt`.
 	 */
 	impl: ImplKey;
-	/** Key for corpus size tracking (e.g., "parse/svelte/native-span") */
+	/** Key for corpus size tracking (e.g., "parse/svelte/native") */
 	tracking_key: string;
 	/** Whether this benchmark runs async */
 	is_async: boolean;
@@ -602,13 +603,14 @@ export function get_benchmark_tasks(
 		// `loc`) — the one parse wire every tsv binding emits, `JSON.parse`d into objects.
 		// The payload-matched opponent to oxc-parser and yuku-parser, whose default ASTs
 		// are also span-only. Materialized in JS for the native binding and engine-side
-		// (via `js_sys`) for wasm, as each package's facade does. Rows are named by wire
-		// and never renamed, so the span rows keep their `-no-locations` names; no row
-		// times the loc-bearing wire, which no binding ships.
-		add('native', true, 'tsv-json-no-locations', 'native-span', (source, _language, goal) =>
+		// (via `js_sys`) for wasm, as each package's facade does. A package's default call
+		// takes the bare row name, as every third-party row does and as the format rows
+		// do, and a variant is named for its option (`+locations` below); no row times a
+		// loc-bearing wire, which no binding ships.
+		add('native', true, 'tsv', 'native', (source, _language, goal) =>
 			impls.native.parse(source, language, goal)
 		);
-		add('wasm', true, 'tsv-wasm-json-no-locations', 'wasm-span', (source, _language, goal) =>
+		add('wasm', true, 'tsv-wasm', 'wasm', (source, _language, goal) =>
 			impls.wasm.parse(source, language, goal)
 		);
 
@@ -623,23 +625,23 @@ export function get_benchmark_tasks(
 		// `character` field) both key on it, so a Svelte row timed under another language
 		// would time a different walk than a Svelte consumer runs.
 		//
-		// PERF-ONLY: a consumer-cost row, and the parse it runs is the span row's, so on
+		// PERF-ONLY: a consumer-cost row, and the parse it runs is the default row's, so on
 		// the coverage surface it would add nothing. Its absence there is disclosed
 		// (`SURFACE_DISCLOSURES` in bench.ts).
-		const reconstruct_enabled = options.corpus_kind !== 'conformance';
+		const locations_enabled = options.corpus_kind !== 'conformance';
 		add(
 			'native',
-			reconstruct_enabled,
-			'tsv-json-no-locations+reconstruct',
-			'native-span-reconstruct',
+			locations_enabled,
+			'tsv+locations',
+			'native-locations',
 			(source, _language, goal) =>
 				reconstruct_locations(impls.native.parse(source, language, goal), source, { language })
 		);
 		add(
 			'wasm',
-			reconstruct_enabled,
-			'tsv-wasm-json-no-locations+reconstruct',
-			'wasm-span-reconstruct',
+			locations_enabled,
+			'tsv-wasm+locations',
+			'wasm-locations',
 			(source, _language, goal) =>
 				reconstruct_locations(impls.wasm.parse(source, language, goal), source, { language })
 		);
@@ -654,7 +656,7 @@ export function get_benchmark_tasks(
 
 		// OXC parser (TypeScript/JS only) — default mode: serializes to JSON in Rust
 		// then JSON.parses in JS, eagerly materializing the full AST (the like-for-like
-		// opponent to tsv-json-no-locations). There is intentionally no `oxc-parser-lazy`
+		// opponent to tsv's default parse rows). There is intentionally no `oxc-parser-lazy`
 		// row: oxc's `experimentalLazy` raw transfer is setup-dominated in every runtime
 		// (measures buffer copy, not parse speed) — see `lib/oxc.ts` and
 		// docs/benchmarks.md §Fairness caveats.
@@ -697,7 +699,7 @@ export function get_benchmark_tasks(
 
 		// yuku-parser, N-API and WASM (TypeScript/JS only) — a Zig parser whose
 		// default AST is span-only and padded exactly like oxc's, so both rows are
-		// payload-matched to the oxc pair and to `tsv-json-no-locations`. The wrapper
+		// payload-matched to the oxc pair and to tsv's default parse rows. The wrapper
 		// forces yuku's LAZY materialization and reads its diagnostics — without
 		// either, the row would report an unearned throughput at a fabricated 100%
 		// coverage. See lib/yuku.ts + docs/benchmarks.md §Fairness caveats.
@@ -724,10 +726,10 @@ export function get_benchmark_tasks(
 
 		// rsvelte's parser (Svelte only) — the ONLY third-party engine on this surface;
 		// the rest of the group is `svelte/compiler` (the oracle) and tsv's own
-		// variants. `parse()` returns JSON the caller parses — the mechanism tsv's span
+		// variants. `parse()` returns JSON the caller parses — the mechanism tsv's default
 		// rows measure — but not the same payload: rsvelte emits Svelte's own wire,
-		// `loc` on the acorn-parsed nodes plus `name_loc`, where `tsv-json-no-locations`
-		// carries no `loc` and its `+reconstruct` sibling a `loc` on every node, so
+		// `loc` on the acorn-parsed nodes plus `name_loc`, where tsv's default row
+		// carries no `loc` and its `+locations` sibling a `loc` on every node, so
 		// neither tsv row is payload-matched to it (report.ts discloses each row's
 		// payload tier). It also claims tsv's own drop-in contract, which makes the row
 		// a conformance datum as much as a speed one. See lib/rsvelte_parse.ts.
@@ -742,7 +744,7 @@ export function get_benchmark_tasks(
 		// reductions differ (tsv's wire carries no per-node `loc` at all; rsvelte drops
 		// `loc` from every JS node but keeps `name_loc` and the root comments' `loc`,
 		// -29% at 0.3.14 with `modern: true` — re-measure on a pin bump), so this
-		// row is NOT payload-matched to `tsv-json-no-locations` and is deliberately
+		// row is NOT payload-matched to tsv's default row and is deliberately
 		// absent from report.ts's curated payload-matched lines.
 		add(
 			'rsvelte_parse',
@@ -871,7 +873,7 @@ export interface DefinedRow {
  *
  * Returns plain data, never tasks: a task built from `complete` closes over an
  * uninitialized impl, so the closures must not escape this function. Deduped by
- * name — a row spans several languages (`tsv-json-no-locations` is in all three) and this
+ * name — a row spans several languages (`tsv-internal` is in all three) and this
  * answers about rows, not cells.
  */
 export function get_defined_rows(

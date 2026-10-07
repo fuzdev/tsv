@@ -193,7 +193,7 @@ Things the published numbers measure that aren't quite what they look like.
   buffers, so the boundary cost is the encode/copy itself, not per-call
   allocation); `tsv-wasm` marshals strings across the JS↔WASM boundary. prettier
   pays no such tax — so the published `tsv` / `tsv-wasm` format numbers are
-  _conservative_ (the parse analogue is the `tsv-internal` vs `tsv-json-no-locations` gap).
+  _conservative_ (the parse analogue is the gap between `tsv-internal` and `tsv`'s parse row).
   One nuance cuts the other way: the persistent buffers amortize across the warm
   loop, so a cold one-shot consumer pays a first-call allocation the warm
   per-call figure doesn't include — negligible next to process/module startup,
@@ -285,7 +285,7 @@ Things the published numbers measure that aren't quite what they look like.
   keyed on the row in its group's language, since one row name can carry different
   products in different groups: two rows of a group are payload-matched iff their tiers
   are equal and not `own_shape`. The canonical row is `drop_in` on TypeScript and Svelte
-  and `span_only` on CSS (`parseCss` emits no `loc`); tsv's `+reconstruct` rows are
+  and `span_only` on CSS (`parseCss` emits no `loc`); tsv's `+locations` rows are
   `drop_in` on TypeScript (acorn-exact) and `drop_in_superset` on Svelte and CSS, where
   their `loc` on every positioned object is a superset of the oracle's.
 - **Task order, and the inter-task heap settle.** Within a group the tasks run
@@ -379,8 +379,8 @@ Things the published numbers measure that aren't quite what they look like.
   oxc-parser's _default_ mode (what we call), the AST is serialized to a JSON
   string in Rust and deserialized in JS — the native package's `index.js`
   `wrap()` runs `JSON.parse` on `.program` access (verified: `typeof program ===
-  'object'`), exactly the model `tsv-json-no-locations` uses (Rust → JSON string →
-  FFI → `JSON.parse`) and `tsv-wasm-json-no-locations` uses (Rust → JSON string →
+  'object'`), exactly the model `tsv`'s parse row uses (Rust → JSON string →
+  FFI → `JSON.parse`) and `tsv-wasm`'s uses (Rust → JSON string →
   boundary decode → engine `JSON.parse` via `js_sys`). And both deliverables are
   span-only — tsv's wire, the one every binding ships, carries `start`/`end` and no
   per-node `loc`, as oxc's default AST does (oxc pads `decorators`/`optional`/
@@ -390,7 +390,7 @@ Things the published numbers measure that aren't quite what they look like.
   Svelte drop-in shape carries is a view tsv computes on request (`{locations: true}`,
   reconstructed in JS) rather than a wire it ships — measured on the loc-bearing Rust
   emitter: 46–48% of TS wire bytes and ~61% of its `JSON.parse` time, three nested
-  objects per node — and the `+reconstruct` rows below price it. Three further
+  objects per node — and the `+locations` rows below price it. Three further
   non-obvious points:
   - **The WASI binding (`oxc-parser-wasm`) does _not_ wrap**, so `.program` is
     the raw unparsed JSON _string_ — `lib/oxc_wasm.ts` runs it through the native
@@ -425,36 +425,36 @@ Things the published numbers measure that aren't quite what they look like.
     JSON. A probe over fuz_util's `src/lib` `.ts` files at oxc-parser 0.150.0 measured
     it ~2.8x faster with `.program` materialized (10.8 vs 30.7 ms per sweep; 16.1 vs
     36.8 ms with a full AST walk) — enough to likely reverse the published native
-    `parse/typescript` ratio against `tsv-json-no-locations`. The `oxc-parser` row
+    `parse/typescript` ratio against `tsv`. The `oxc-parser` row
     times oxc's default path only; an `oxc-parser-raw` row would price the other.
-- **The `+reconstruct` rows price `{locations: true}`, and they are not opponents of
-  tsv's own rows.** `tsv-json-no-locations+reconstruct` and its wasm sibling run the
-  span row's exact call (`JSON.parse` included), then rebuild `loc` on every node with
+- **The `+locations` rows price `{locations: true}`, and they are not opponents of
+  tsv's own rows.** `tsv+locations` and its wasm sibling run the
+  default row's exact call (`JSON.parse` included), then rebuild `loc` on every node with
   the shipped `reconstruct_locations` (`crates/tsv_wasm/npm/locations.js`, the source
   every parse-capable package bundles), the line-table build inside the timed region —
   exactly what the packages' `{locations: true}` runs. The language is always named
   (`create_locator` refuses a missing one; the line rule and the Svelte stamping both
   key on it), every language has the pair, and they are perf-only: their
-  parse is the span row's, so a coverage table would learn nothing from them. Read them
-  against `tsv-json-no-locations` / `tsv-wasm-json-no-locations`: the report's
+  parse is the default row's, so a coverage table would learn nothing from them. Read them
+  against `tsv` / `tsv-wasm`: the report's
   `{locations: true}` cost note computes that ratio from the run's own rows. The
   reconstructed tree is the tree `tsv parse --locations` writes, in every language:
   tsv's Rust writer and `locations.js` implement one `loc` definition, held equal over
   the fixture tree by `deno task check:loc`. On TypeScript that is acorn's AST exactly,
-  so `+reconstruct` against the canonical parser is the payload-matched canonical read
+  so `+locations` against the canonical parser is the payload-matched canonical read
   (a curated line under the TypeScript and Svelte parse groups); on Svelte it is a
   superset of Svelte's own `loc` (every positioned object carries one, where Svelte's wire
   gives `loc` only to acorn-parsed nodes), as that line's note says. CSS gets no such line:
-  `parseCss` emits no `loc`, so there the span row's own bar is the payload-matched read.
-- **The canonical parse baselines carry `loc`; tsv's span rows do not.** The
+  `parseCss` emits no `loc`, so there the default row's own bar is the payload-matched read.
+- **The canonical parse baselines carry `loc`; tsv's default rows do not.** The
   `acorn-typescript` row runs acorn with `locations: true` (Svelte's configuration of
   it — `lib/canonical.ts`), and `svelte/compiler` emits Svelte's own sparse `loc`, so
   the parse groups' bars compare a span-only tree against a loc-bearing one on
   TypeScript and Svelte. The report says so beside every canonical parse cell, and the
-  `+reconstruct` vs canonical line is the read with `loc` on both sides.
+  `+locations` vs canonical line is the read with `loc` on both sides.
 - **The `yuku-parser` rows need two corrections to be honest, and both are
   load-bearing.** yuku is payload-matched to oxc (span-only AST, same padding
-  fields), so read it against `oxc-parser` / `tsv-json-no-locations`. **Both halves of
+  fields), so read it against `oxc-parser` / `tsv`. **Both halves of
   that are measured, not inferred**: on a 15.7 KB TS
   file the forced tree is 1,318 plain objects at depth 24 with **zero accessor
   properties** anywhere — so nothing stays lazy behind `.program`, and a deep walk
@@ -467,7 +467,7 @@ Things the published numbers measure that aren't quite what they look like.
     Zig side produced; the JS AST decodes only when `.program` is read. Forcing it
     costs **1.69x** (native) / **1.91x** (wasm) in the harness path — an unforced
     row would publish that much more throughput for a tree nobody built, and
-    wouldn't be measuring the deliverable `oxc-parser` and `tsv-json-no-locations` produce. The
+    wouldn't be measuring the deliverable `oxc-parser` and `tsv` produce. The
     wrapper returns `result.program`; never "simplify" that to `return result`.
   - **The parser is ERROR-TOLERANT — it never throws.** An invalid file yields an
     empty AST plus `diagnostics`, so without reading them every file counts as
@@ -654,11 +654,11 @@ prettier. Load-bearing on two axes:
   third-party engine on the `parse/svelte` surface**: the rest of that group is
   `svelte/compiler` (the oracle) and tsv's own variants, so without it tsv is
   measured against its own reference and nothing else. Two rows. `rsvelte-parse` matches
-  tsv's span rows in **mechanism** (each returns a compact JSON string the caller
+  tsv's default parse rows in **mechanism** (each returns a compact JSON string the caller
   `JSON.parse`s, so both pay the same serialize + boundary + parse cost) but not in
   **payload**: it emits Svelte's own wire — `loc` on the acorn-parsed nodes plus
-  `name_loc` — where `tsv-json-no-locations` carries no `loc` at all and its
-  `+reconstruct` sibling a `loc` on every positioned object. Neither tsv row is
+  `name_loc` — where `tsv` carries no `loc` at all and its
+  `+locations` sibling a `loc` on every positioned object. Neither tsv row is
   payload-matched to it, so it gets no curated comparison line; the report's fairness
   note beside its cell states which side carries the extra `loc`.
   Because rsvelte claims the same drop-in contract tsv does, the row is a

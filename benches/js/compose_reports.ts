@@ -506,8 +506,14 @@ const machine = sources.find((s) => s.machine)?.machine ?? null;
  * per UNORDERED pair of present runtimes rather than per non-base runtime against
  * the base — the site anchors its ratio columns on node, so the bun/node pair had
  * no classification at all.
+ *
+ * 16: no field moved, but `rows[].name` did: tsv's parse rows are named for the
+ * packages' API — `tsv` / `tsv-wasm` for the default parse and `tsv+locations` /
+ * `tsv-wasm+locations` for `{locations: true}` — so `tsv` and `tsv-wasm` name a row
+ * in the parse groups as well as the format ones, and a consumer must key a row on
+ * `group` + `name`, never `name` alone.
  */
-const COMBINED_SCHEMA_VERSION = 15;
+const COMBINED_SCHEMA_VERSION = 16;
 
 // JSON: metadata + provenance per source + the comparison rows.
 /**

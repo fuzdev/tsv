@@ -2,11 +2,11 @@
  * The shared "is the parse wire still SPAN-ONLY" probe, for tsv's three front-ends.
  *
  * Every tsv binding emits one parse wire: `start`/`end` offsets, no per-node `loc`
- * (Svelte also no `name_loc`). The bench's span rows (`tsv-json-no-locations`,
- * `tsv-wasm-json-no-locations`) publish that wire, and their `+reconstruct` siblings
+ * (Svelte also no `name_loc`). The bench's default parse rows (`tsv`, `tsv-wasm`)
+ * publish that wire, and their `+locations` siblings
  * time what `{locations: true}` adds over it — and nothing in a timed sweep can tell
  * that wire from a loc-bearing one: both are a successful parse returning an AST, so an
- * artifact still emitting `loc` is timed as usual and published under the span label,
+ * artifact still emitting `loc` is timed as usual and published as the span-only default,
  * with a reconstruction running over a tree that already had `loc`. A stale binding
  * whose parse still emits `loc` does exactly this.
  *
@@ -92,7 +92,7 @@ export function assert_span_only(
 		throw new Error(
 			`${binding}: ${operation}() returned an AST carrying ${kept} \`loc\` / \`name_loc\` ` +
 				`key${kept === 1 ? '' : 's'} — the artifact at ${artifact.path} still emits the ` +
-				`loc-bearing wire, so the span rows would time it under the wrong label. Rebuild ` +
+				`loc-bearing wire, so the default parse rows would time it as span-only. Rebuild ` +
 				`it: '${artifact.rebuild}'. See lib/locations_probe.ts.`
 		);
 	}

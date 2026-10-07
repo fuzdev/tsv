@@ -140,7 +140,7 @@ export class WasmImplementation extends BaseImplementation {
 		// Fairness guard for the parse rows: the wasm parse fns must return a
 		// js_sys-materialized OBJECT (the engine runs the host's JSON.parse from
 		// Rust). If a glue/build regression ever handed back the raw JSON string
-		// instead, the timed `tsv-wasm-json-no-locations` rows would silently skip
+		// instead, the timed `tsv-wasm` parse rows would silently skip
 		// materialization and read artificially fast vs their native sibling. Probe
 		// once here, outside any timed loop.
 		const probe = this._module.parse_typescript('const x = 1;');

@@ -21,11 +21,11 @@
  * coverage-only *formatter* row — already cites this same package, for the
  * opposite reason: it has no format export.)
  *
- * **Mechanism-matched to tsv's span rows, not payload-matched.** `parse()` returns
+ * **Mechanism-matched to tsv's default parse rows, not payload-matched.** `parse()` returns
  * the AST as a JSON string that the caller `JSON.parse`s — exactly what tsv's FFI/WASM
  * parse rows do. The payload differs: this is Svelte's own wire, `loc` on the
- * acorn-parsed nodes plus `name_loc`, where tsv's span row carries no `loc` and its
- * `+reconstruct` row a `loc` on every node — so the report discloses the pairing
+ * acorn-parsed nodes plus `name_loc`, where tsv's default row carries no `loc` and its
+ * `+locations` row a `loc` on every node — so the report discloses the pairing
  * rather than claiming it (`report.ts`'s `RSVELTE_PARSE_NOTE`).
  * With `modern: true` its root keys are identical to `svelte/compiler`'s modern
  * `Root` (`comments, css, end, fragment, instance, js, options, start, type`) and
@@ -176,7 +176,7 @@ export class RsvelteParseImplementation extends BaseImplementation {
 		}
 		// `parse()` hands back JSON; the `JSON.parse` is the caller's cost in the
 		// real consumer too, and including it is what makes this mechanism-matched
-		// to tsv's span rows (which pay the identical boundary + parse cost).
+		// to tsv's default parse rows (which pay the identical boundary + parse cost).
 		return JSON.parse(this._native.parse(source, PARSE_OPTIONS));
 	}
 

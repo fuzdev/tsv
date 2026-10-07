@@ -572,7 +572,7 @@ describe(`raw engine parse failure (tsv_wasm.js): ${pkg_dir}`, () => {
 // tree every parse returns. These assert the shipped package's wiring end to end; whether
 // the reconstruction equals the Rust `loc` emitter is `deno task check:loc`'s (every
 // fixture document) and `tests/loc_definition.rs`'s, which grade the engine itself, and
-// at corpus scale the bench's `+reconstruct` rows run it too.
+// at corpus scale the bench's `+locations` rows run it too.
 describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => {
 	it('`{locations: true}` is the reconstruction of the default parse', () => {
 		const ts = 'const x = 1;\nconst y = 2;\n';

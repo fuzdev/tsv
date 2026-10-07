@@ -895,6 +895,14 @@ field and version note for version note, so a new top-level field here is a chan
 declares them optional and degrades on an older report, which makes the drift silent rather than
 loud.
 
+**tsv's rows are named for the packages' API.** `tsv` (the native binding — FFI under Deno,
+N-API under Node/Bun) and `tsv-wasm` are each package's default call: the span-only parse in the
+`parse/*` groups, the format in the `format/*` groups. So a row is identified by `group` + `name`,
+never `name` alone. A variant is named for what it adds — `+locations` for the option
+(`{locations: true}`: the default parse plus `loc` rebuilt in JS; perf surface only), `-internal`
+for the bench-only parse that hands JS nothing. Third-party rows read the same way: the package's
+name for its default call, a suffix for an option (`rsvelte-parse-skip-expr-loc`).
+
 **The report JSON** (per-runtime schema version `bench.ts` `REPORT_SCHEMA_VERSION` — a committed
 report says which version wrote it, and lags the schema until the next refresh; the combined
 compose report carries its own version; coverage-only runs add `coverage_by_source`) carries,
@@ -986,7 +994,7 @@ reading `entries[]` as speeds must skip a row with null `ops_per_second`, not tr
   file); a group nothing failed is listed with zeroes, and the `.md` prints the same fact as an
   **Omitted from every row's timed set** line under the group.
 - per parse `entries[]` row, a `payload` tier (`report.ts` `PayloadTier`: `drop_in`,
-  `drop_in_superset` — the `+reconstruct` rows on Svelte and CSS, a `loc` on every positioned
+  `drop_in_superset` — the `+locations` rows on Svelte and CSS, a `loc` on every positioned
   object where the oracle's is sparser — `span_only`, `own_shape`, `none`), so a consumer building
   an `Nx` from two rows of a group can say whether their products match. Keyed on the row IN ITS
   GROUP'S LANGUAGE, since `svelte/compiler` is a `loc`-bearing oracle on Svelte and a `loc`-free one
@@ -1015,7 +1023,7 @@ lives only in the run's output.
 oracle) and tsv's own `native` + `wasm`. A load failure in any of them throws out of
 `init_implementations` (`init_required`) instead, and their slots are correspondingly
 non-`undefined` in `ImplementationSet` — a broken tree, not a machine coming up short (otherwise a
-present-but-unloadable wasm bundle would publish with every `tsv-wasm-*` row silently gone behind
+present-but-unloadable wasm bundle would publish with every `tsv-wasm` row silently gone behind
 one ⚠ line). The division of labour with the freshness guard: `check_artifact_freshness` makes a
 MISSING artifact fatal; a present-yet-unloadable one surfaces only here. The expected-`unavailable`
 set is never tsv on any runtime, so nothing legitimate is refused.
@@ -1024,7 +1032,7 @@ set is never tsv on any runtime, so nothing legitimate is refused.
 publishes is a row name (`entries[].name`, `variant_parity.impl`/`.sibling`, `report.ts`'s
 `DISPLAY_ORDER`), so a consumer asking "is this blank cell a load failure?" holds a row name —
 which the init LABEL matches for no impl whose label differs from its row (`Biome` vs
-`biome-wasm`), and cannot match at all where one impl backs several rows (`native` backs four;
+`biome-wasm`), and cannot match at all where one impl backs several rows (`native` backs `tsv` and its variants;
 `oxc` backs `oxc-parser` and `oxfmt`). `rows` is DERIVED, never mapped: `init_implementations`
 keeps each failed impl's constructed-but-uninitialized instance in `complete`, and
 `get_defined_rows` asks the one task registry against that set (sound because the gates it
@@ -1079,7 +1087,7 @@ All three WARN rather than throw: an absent row understates a table, where a sta
 `SURFACE_DISCLOSURES` sentence asserts something false.
 
 A **fourth** row list in the same module is deliberately unchecked: the curated payload-matched
-lines in `generate_summary_report` (`tsv-json-no-locations` vs `oxc-parser`, and the rest). Its
+lines in `generate_summary_report` (`tsv` vs `oxc-parser`, and the rest). Its
 membership is an ARGUMENT — this tsv wire and that opponent emit the same product — not a
 completeness claim: most rows have no payload-matched partner and never will, so a guard there
 could only be a warning nobody clears. A new impl still has to be considered against it; `swc` and
@@ -1111,8 +1119,8 @@ is a hard error by default.
 **Behind the override: the span-only wire is probed at init.** An mtime can only
 say an artifact is old, not what it does, and a stale binding whose `parse_<lang>` still
 returns the loc-bearing wire would pass it — under
-`BENCH_STALE_OK=1` the span rows would time it under the span-only label, and the
-`+reconstruct` rows would rebuild `loc` over a tree that already had it. So each tsv
+`BENCH_STALE_OK=1` the default parse rows would time it as the span-only wire, and the
+`+locations` rows would rebuild `loc` over a tree that already had it. So each tsv
 binding's `init()` parses a fixed source per language through the row's own call and
 requires the AST to carry no `loc` / `name_loc` and numeric root offsets
 (`lib/locations_probe.ts` `assert_binding_emits_span_only`). A failure names the
@@ -1464,8 +1472,8 @@ benches/js/
     │                      # binding ships
     ├── locations_probe.ts # Behavioral "is the parse wire still SPAN-ONLY" check, asked at each
     │                      # tsv binding's init: no `loc` / `name_loc`, numeric root offsets, so
-    │                      # a binding still emitting `loc` can't be timed under the span rows'
-    │                      # label; unit-tested by locations_probe_test.ts
+    │                      # a binding still emitting `loc` can't be timed as the span-only
+    │                      # default; unit-tested by locations_probe_test.ts
     ├── malva.ts           # malva WASM wrapper (CSS only; dprint's CSS plugin, shared formatter host)
     ├── napi.ts            # process.dlopen bindings (NapiImplementation — Node/Bun native)
     ├── oxc.ts             # OXC native wrappers (oxc-parser + oxfmt)
@@ -1559,7 +1567,7 @@ most universal-tsv failures are unsupported-syntax fixtures (SCSS in `.css`, JSX
 size so rare / impl-specific failures land at the top, and the `Failed in:` line
 collapses to `all tsv variants` when the failure set is exactly the tsv rows the run
 registered in that language's groups (derived from the task tracking — which rows exist
-varies by surface). All labels use display names (`tsv-json-no-locations`, `acorn-typescript`) rather than
+varies by surface). All labels use display names (`tsv-internal`, `acorn-typescript`) rather than
 internal trackingKeys. An impl failing on many files (e.g. WASM panics corrupting internal
 state) shows in the coverage report and skip counts without `--verbose`.
 
@@ -1597,8 +1605,8 @@ state) shows in the coverage report and skip counts without `--verbose`.
   diff the sorted `.safety[].path` lists before/after (a real regression is a _new
   path_, not a count bump); a change scoped to one printer/crate can't lose content
   in unrelated languages.
-- **Parse benchmark overhead**: JSON materialization, not parsing, dominates the
-  `-json` rows (see `results/report.<runtime>.md` for current ratios). Use
+- **Parse benchmark overhead**: JSON materialization, not parsing, dominates tsv's
+  default parse rows (see `results/report.<runtime>.md` for current ratios). Use
   `tsv-internal` for raw parse speed. Both the native and WASM rows go through
   `convert_ast_json_string` — the span-only wire-JSON writer emitting directly from the
   internal AST in one walk, no intermediate `serde_json::Value` or typed public tree

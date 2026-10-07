@@ -21,7 +21,7 @@
  *
  * **Not payload-matched.** postcss's `Root` is a CSSOM-ish tree with `nodes` and
  * `raws`, not the `parseCss` shape tsv is a drop-in for, so a ratio against
- * `tsv-json-no-locations` compares two different products. Same disclosure class as the oxc and
+ * tsv's parse row compares two different products. Same disclosure class as the oxc and
  * swc rows.
  *
  * `css-tree` was evaluated for this slot and rejected: it parses an unclosed block
