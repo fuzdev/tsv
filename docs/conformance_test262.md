@@ -17,9 +17,9 @@ changes — at minimum per release. Counts below are from a snapshot of ~49k
 discovered tests (48,274 graded after skips).
 
 - Positive (should parse) — 43,739 passed, 0 failed
-- Negative (should reject) — 1,943 passed, 2,592 failed
+- Negative (should reject) — 2,096 passed, 2,439 failed
 
-- **Overall**: 45,682/48,274 (94.6%)
+- **Overall**: 45,835/48,274 (94.9%)
 - **Positive pass rate**: 100% — every test tsv grades and that should parse does,
   graded through every run the test declares (see [Strictness and the goal
   axis](#design-decision-module-strict-script-by-directive-annex-b-out))
@@ -375,10 +375,10 @@ Processing: 49136/49136
 
 Results:
   Positive tests: 43739 passed, 0 failed
-  Negative tests: 1943 passed, 2592 failed
+  Negative tests: 2096 passed, 2439 failed
   Skipped:        862 (Annex B: 790, runtime: 38, resolution: 34)
 
-Pass rate: 45682/48274 (94.6%)
+Pass rate: 45835/48274 (94.9%)
 ```
 
 ### Verbose (Failures)
