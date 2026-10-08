@@ -103,6 +103,7 @@ import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.ts';
 import { BenchmarkStats } from '@fuzdev/fuz_util/benchmark_stats.ts';
 import {
 	stats_confidence_interval_from_summary,
+	stats_min_max,
 	stats_outliers_mad
 } from '@fuzdev/fuz_util/stats.ts';
 import type { BenchmarkResult } from '@fuzdev/fuz_util/benchmark_types.ts';
@@ -116,7 +117,13 @@ import { mkdirSync, rmSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import process, { argv, exit, pid } from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { BenchChildError, kill_running_child, run_bench_child } from './lib/bench_child.ts';
+import {
+	BenchChildError,
+	type ChildScript,
+	kill_running_child,
+	PREFLIGHT_DEADLINE_MS,
+	run_bench_child
+} from './lib/bench_child.ts';
 import {
 	BASELINE_DIR,
 	BENCH_DURATION,
@@ -138,16 +145,24 @@ import {
 	TASK_OPTIONS
 } from './lib/bench_config.ts';
 import {
+	median_of,
 	pass_order,
 	type PassSummary,
 	type PassTimings,
 	type ProcessNoise,
 	summarize_passes,
 	summarize_process_noise,
+	RAW_CV_SAMPLE_CEILING,
+	row_deadline_ms,
+	sample_sd,
 	t_critical_95,
-	warmup_iterations_for
+	UNSTABLE_CV_THRESHOLD,
+	UNSTABLE_DRIFT_THRESHOLD,
+	UNSTABLE_PASS_SPREAD_THRESHOLD,
+	unstable_readings
 } from './lib/bench_plan.ts';
 import type {
+	ChildSpec,
 	PreflightGroup,
 	PreflightRow,
 	PreflightSnapshot,
@@ -305,10 +320,11 @@ let keep_run_dir = false;
  * hang is named here and recorded in the report (`exit_hangs`).
  */
 async function run_child<TResult>(
-	script: Parameters<typeof run_bench_child>[0],
-	spec: Parameters<typeof run_bench_child>[1],
+	script: ChildScript,
+	spec: ChildSpec,
 	spec_path: string,
-	label: string
+	label: string,
+	deadline_ms: number
 ): Promise<TResult> {
 	try {
 		const { result, exit_hung } = await run_bench_child<TResult>(
@@ -316,7 +332,8 @@ async function run_child<TResult>(
 			spec,
 			spec_path,
 			RUN_DIR,
-			label
+			label,
+			deadline_ms
 		);
 		if (exit_hung) {
 			exit_hangs.push(label);
@@ -356,6 +373,14 @@ process.on('exit', () => {
 process.on('SIGINT', () => exit(130));
 process.on('SIGTERM', () => exit(143));
 
+// What labels the report — when the run started, and the commit and tsv version it
+// measures — read now, before anything is built into a measurement: a run is hours
+// long, and a checkout or commit during it would otherwise label the report with
+// the tree as it stood at the end.
+const run_started = new Date().toISOString();
+const run_commit = await get_git_commit();
+const tsv_version = await get_tsv_version();
+
 //
 // Pre-flight
 //
@@ -369,7 +394,8 @@ const snapshot = await run_child<PreflightSnapshot>(
 	'bench_preflight.ts',
 	preflight_spec,
 	`${RUN_DIR}/preflight.spec.json`,
-	'pre-flight'
+	'pre-flight',
+	PREFLIGHT_DEADLINE_MS
 );
 
 //
@@ -500,7 +526,7 @@ const pass_min_iterations = Math.max(
 interface TimedRow {
 	/** The row's passes, pooled — `lib/bench_plan.ts` `summarize_passes`. */
 	summary: PassSummary;
-	/** Warmup sweeps each pass ran. */
+	/** The fewest warmup sweeps any pass ran. */
 	warmup_iterations: number;
 	/** The median, over the passes, of the heap each pass's warmup began from. */
 	settled_heap_bytes: number;
@@ -531,17 +557,27 @@ function time_row_pass(group: PreflightGroup, row: PreflightRow, pass: number): 
 		files_digest: timed.digest,
 		script_only: timed.script_only,
 		duration_ms: BENCH_DURATION,
-		// Sized by TIME from the row's own pre-flight sweep, once, so every pass of the
-		// row — and the same row under another runtime — warms by one rule.
-		warmup_iterations: warmup_iterations_for(timed.preflight_ms, BENCH_WARMUP, BENCH_WARMUP_MS),
+		// One rule for every pass of every row on every runtime — a sweep floor and a
+		// wall-time floor, whichever ends later (`bench_row.ts` `warm_up`) — keyed on
+		// nothing a row measured, in this process or another.
+		warmup_iterations: BENCH_WARMUP,
+		warmup_ms: BENCH_WARMUP_MS,
 		min_iterations: pass_min_iterations,
-		gc_each_iteration: BENCH_GC
+		gc_each_iteration: BENCH_GC,
+		artifacts: snapshot.artifacts
 	};
 	return run_child<RowResult>(
 		'bench_row.ts',
 		spec,
 		`${RUN_DIR}/row_${id}.spec.json`,
-		`${group.name}/${row.name} (pass ${pass + 1}/${BENCH_PASSES})`
+		`${group.name}/${row.name} (pass ${pass + 1}/${BENCH_PASSES})`,
+		row_deadline_ms({
+			sweep_ms: timed.preflight_ms,
+			warmup_ms: spec.warmup_ms,
+			warmup_iterations: spec.warmup_iterations,
+			duration_ms: spec.duration_ms,
+			min_iterations: spec.min_iterations
+		})
 	);
 }
 
@@ -581,14 +617,14 @@ function pooled_stats(summary: PassSummary, outliers_ns: number[]): BenchmarkSta
 	if (summary.pass_mean_ns.length === 1) return stats;
 	const { mean_ns, cleaned_ns } = summary;
 	const n = cleaned_ns.length;
-	const std_dev_ns =
-		n < 2 ? 0 : Math.sqrt(cleaned_ns.reduce((a, t) => a + (t - mean_ns) ** 2, 0) / (n - 1));
+	const std_dev_ns = sample_sd(cleaned_ns, mean_ns);
 	return Object.assign(stats, {
 		mean_ns,
 		ops_per_second: 1e9 / mean_ns,
 		std_dev_ns,
 		cv: std_dev_ns / mean_ns,
-		min_ns: Math.min(...cleaned_ns),
+		// not `Math.min(...)`: a pooled sample of fast sweeps passes the engines' argument limits
+		min_ns: stats_min_max(cleaned_ns).min,
 		confidence_interval_ns: stats_confidence_interval_from_summary(
 			mean_ns,
 			summary.pass_mean_sd_ns!,
@@ -635,12 +671,12 @@ async function time_group(group: PreflightGroup): Promise<void> {
 		const row_passes = passes.get(row.tracking_key)!;
 		const cleaned = row_passes.map((p) => clean_pass(p.timings_ns));
 		const summary = summarize_passes(cleaned);
-		const heaps = row_passes.map((p) => p.settled_heap_bytes).sort((a, b) => a - b);
 		timed_rows.set(row.tracking_key, {
 			summary,
-			// one protocol per row, so every pass reports the same count
-			warmup_iterations: row_passes[0].warmup_iterations,
-			settled_heap_bytes: heaps[Math.floor(heaps.length / 2)]
+			// the fewest any pass ran — each warms to the same count and wall-time floor,
+			// so the passes differ only where the floor needed more sweeps
+			warmup_iterations: Math.min(...row_passes.map((p) => p.warmup_iterations)),
+			settled_heap_bytes: median_of(row_passes.map((p) => p.settled_heap_bytes))
 		});
 		return {
 			name: row.name,
@@ -711,64 +747,16 @@ if (process_noise !== null) {
 }
 
 /**
- * The coefficient-of-variation above which a timed row's number is disclosed as
- * UNSTABLE rather than published bare.
+ * Timed rows whose measurement was too noisy to read at face value, worst first —
+ * by `lib/bench_plan.ts` `unstable_readings`, the one definition this report and the
+ * combined one (`compose_reports.ts`) share.
  *
  * Every other shortfall this report can carry says so — `unavailable`,
  * `binary_sizes_absent`, `suppressed_noise`, `output_digest_ungraded`, the `⚠ files`
- * per-group note. How stable the timing itself was is the one property that never
- * did, and it is the property every published `Nx` rests on.
- *
- * 10% is ~3× the measured p90. Across the three committed perf reports (128 timed
- * rows) cv runs median 1.0%, p90 3.1% — so ordinary variation is nowhere near this,
- * and a row that trips it is doing something other than varying (the live rows are the
- * per-runtime reports' §Unstable Rows; a restated value here would only go stale — the
- * calibration figures are `entries[].cv` in the committed reports). Deliberately tighter
- * than `benchmark_baseline_compare`'s 30% noise gate, which answers a different
- * question (is a REGRESSION real) on a run this one never makes: that path needs
- * `--compare-baseline`, so a plain `deno task bench` reaches no stability check at all.
- */
-const UNSTABLE_CV_THRESHOLD = 0.1;
-
-/**
- * The `|drift|` past which a row is unstable regardless of its cv (see
- * `BaselineEntry.drift`). 5% is well outside stationary variation (a stationary
- * row's two half-medians agree to well under 1% at any sample count the bench
- * reaches) and well inside the regime this exists for: the case that motivated it
- * stepped +25–45% mid-row and, at most sample counts, published a cleaned cv under 6%.
- */
-const UNSTABLE_DRIFT_THRESHOLD = 0.05;
-
-/**
- * Below this many raw timings the RAW cv also trips a row. With few samples one
- * deviant sweep is a real share of the measurement — and is exactly what the MAD
- * cleaner's keep-closest fallback blends into the mean — so a raw cv past the
- * threshold there is the disclosure the cleaned cv withheld. With hundreds of
- * samples the raw cv is dominated by isolated pauses (one 80 ms GC among 600 × 8 ms
- * sweeps reads 35%) that the cleaner rightly removes and the upper percentiles
- * already report; there the drift statistic, not the raw cv, is the drift detector.
- */
-const RAW_CV_SAMPLE_CEILING = 30;
-
-/**
- * The `pass_spread` past which a row is unstable regardless of the rest (see
- * `BaselineEntry.pass_spread`): the row's passes — fresh processes of the same
- * thing — sat further apart than this, so its level depends on the process it was
- * drawn in, and the pooled mean sits between levels rather than on one.
- *
- * The same 5% as `UNSTABLE_DRIFT_THRESHOLD`, and for the same kind of reason: both
- * are a level shift read from medians, one inside a process and one between two.
- */
-// TODO: calibrate against `process_noise` once full runs under all three runtimes
-// exist — the threshold wants to sit well clear of the run's own p95.
-const UNSTABLE_PASS_SPREAD_THRESHOLD = 0.05;
-
-/**
- * Timed rows whose measurement was too noisy to read at face value, worst first.
- *
- * Ratios are the report's product and each one divides two of these means, so an
- * unstable row silently widens every comparison it appears in — including the
- * cross-runtime table, whose whole subject is small per-runtime deltas.
+ * per-group note. How stable the timing itself was is the property every published
+ * `Nx` rests on, and each ratio divides two of these means, so an unstable row
+ * silently widens every comparison it appears in — including the cross-runtime
+ * table, whose whole subject is small per-runtime deltas.
  */
 function unstable_rows(data: Baseline): Array<{
 	label: string;
@@ -779,37 +767,32 @@ function unstable_rows(data: Baseline): Array<{
 	samples: number | null;
 	raw_samples: number | null;
 }> {
-	// Four readings, any one of which trips the row: the cleaned cv (ordinary noise),
-	// the RAW cv (a second mode the cleaner deleted), the drift (a cost that moved
-	// while a process was measured) and the pass spread (a level that differs between
-	// processes). The cleaned cv alone was blind to the last three — a bimodal row can
-	// clean to a quiet cv over a mean that is neither mode.
 	return data.entries
-		.filter(
-			(e) =>
-				e.cv !== null &&
-				(e.cv >= UNSTABLE_CV_THRESHOLD ||
-					(e.cv_raw !== null &&
-						e.cv_raw >= UNSTABLE_CV_THRESHOLD &&
-						e.raw_sample_size !== null &&
-						e.raw_sample_size < RAW_CV_SAMPLE_CEILING) ||
-					(e.drift !== null && Math.abs(e.drift) >= UNSTABLE_DRIFT_THRESHOLD) ||
-					(e.pass_spread !== null && e.pass_spread >= UNSTABLE_PASS_SPREAD_THRESHOLD))
-		)
-		.map((e) => ({
-			label: `${e.group}/${e.name}`,
-			cv: e.cv as number,
-			cv_raw: e.cv_raw,
-			drift: e.drift,
-			pass_spread: e.pass_spread,
-			samples: e.sample_size ?? null,
-			raw_samples: e.raw_sample_size ?? null
-		}))
-		.sort(
-			(a, b) =>
-				Math.max(b.cv, b.cv_raw ?? 0, Math.abs(b.drift ?? 0), b.pass_spread ?? 0) -
-				Math.max(a.cv, a.cv_raw ?? 0, Math.abs(a.drift ?? 0), a.pass_spread ?? 0)
-		);
+		.flatMap((e) => {
+			// a coverage-only row was timed on nothing, so it has no stability to read
+			if (e.cv === null) return [];
+			const tripped = unstable_readings({
+				cv: e.cv,
+				cv_raw: e.cv_raw,
+				drift: e.drift,
+				pass_spread: e.pass_spread,
+				raw_samples_per_pass:
+					e.raw_sample_size === null ? null : e.raw_sample_size / (e.passes ?? 1)
+			});
+			if (tripped.length === 0) return [];
+			const row = {
+				label: `${e.group}/${e.name}`,
+				cv: e.cv,
+				cv_raw: e.cv_raw,
+				drift: e.drift,
+				pass_spread: e.pass_spread,
+				samples: e.sample_size ?? null,
+				raw_samples: e.raw_sample_size ?? null
+			};
+			return [{ row, worst: Math.max(...tripped) }];
+		})
+		.sort((a, b) => b.worst - a.worst)
+		.map(({ row }) => row);
 }
 
 //
@@ -865,7 +848,10 @@ interface BaselineEntry {
 	 * The protocol ONE PASS of this row ran under — its warmup sweeps and its sweep
 	 * floor — so two runtimes that ran one row differently would be legible as two
 	 * protocols rather than as one ratio. Per pass: a floor-bound row's
-	 * `raw_sample_size` is `min_iterations × passes`. `null` on a coverage-only row.
+	 * `raw_sample_size` is `min_iterations × passes`. `warmup_iterations` is the fewest
+	 * warmup sweeps any pass ran: each pass warms for a count AND a wall-time floor
+	 * (`BENCH_WARMUP_MS`), so a fast row's count is what the floor took, and it can
+	 * differ a little between passes. `null` on a coverage-only row.
 	 */
 	warmup_iterations: number | null;
 	min_iterations: number | null;
@@ -1034,8 +1020,11 @@ interface BaselineVersions extends ReportVersions {
  * `std_dev_ns` are over every pass's cleaned sweeps around that mean, so they include
  * the variation between processes; `min_iterations` and `warmup_iterations` are per
  * pass, so a floor-bound row's `raw_sample_size` is `min_iterations × passes` where
- * it was `min_iterations`; `drift` is the within-pass drift furthest from zero
- * (a shift between passes is `pass_spread`'s); and `settled_heap_bytes` is the heap
+ * it was `min_iterations`; `warmup_iterations` is the fewest any pass ran, since a
+ * pass now warms for a wall-time floor (`BENCH_WARMUP_MS`) as well as a count, in a
+ * process that starts cold; `drift` is the within-pass drift furthest from zero
+ * (a shift between passes is `pass_spread`'s); `timestamp` is when the run started,
+ * as the commit is read; and `settled_heap_bytes` is the heap
  * of the row's own process, the median over its passes. The canonical rows no longer
  * carry a higher sweep floor than the rest — every row's floor is the same per pass.
  */
@@ -1057,7 +1046,9 @@ interface Baseline {
 	 * Since `version` 6.
 	 */
 	corpus_kind: CorpusKind;
+	/** When the run STARTED (from `version` 21; its end before), beside the commit it measured. */
 	timestamp: string;
+	/** HEAD when the run started — the commit its artifacts were built from. */
 	git_commit: string | null;
 	/**
 	 * The machine that produced this report — CPU model, OS/arch, and the
@@ -1375,9 +1366,8 @@ async function build_results_data(
 					drift: timed.summary.drift,
 					raw_sample_size: result.timings_ns.length,
 					outlier_ratio: result.stats.outlier_ratio,
-					// The sweeps each pass actually warmed for (`RowResult.warmup_iterations`):
-					// a `reset_heap` row warms outside the timing library's loop, whose own
-					// count is 0 for it.
+					// The sweeps the passes actually warmed for (`RowResult.warmup_iterations`):
+					// every row warms outside the timing library's loop, whose own count is 0.
 					warmup_iterations: timed.warmup_iterations,
 					min_iterations: result.budget.min_iterations,
 					passes: timed.summary.pass_mean_ns.length,
@@ -1405,8 +1395,8 @@ async function build_results_data(
 		version: REPORT_SCHEMA_VERSION,
 		runtime: RUNTIME,
 		corpus_kind: CORPUS_MODE,
-		timestamp: new Date().toISOString(),
-		git_commit: await get_git_commit(),
+		timestamp: run_started,
+		git_commit: run_commit,
 		machine: current_machine(),
 		corpus,
 		corpus_sources: snapshot.corpus_sources,
@@ -1666,7 +1656,7 @@ function generate_markdown_report(data: Baseline, groups: GroupResults[]): strin
 			`${unstable.length} timed row(s) were not stable: a cv past ` +
 				`${(UNSTABLE_CV_THRESHOLD * 100).toFixed(0)}% (std_dev / mean — \`cv\` after outlier ` +
 				`removal; \`cv (raw)\` before it, which counts only under ${RAW_CV_SAMPLE_CEILING} raw ` +
-				`samples, where one deviant sweep is a real share of the row), a drift past ` +
+				`samples a pass, where one deviant sweep is a real share of the row), a drift past ` +
 				`${(UNSTABLE_DRIFT_THRESHOLD * 100).toFixed(0)}% (within one pass, the median of the second ` +
 				`half of the timings against the first's — a cost that moved WHILE the row was measured, ` +
 				`which the cleaned cv cannot see: a second mode is deleted or blended, not reported; the ` +
@@ -1921,7 +1911,7 @@ const collected_sizes = snapshot.binary_sizes;
 const binary_sizes = collected_sizes.sizes;
 
 // Build results data (used by all output paths and always saved)
-const versions: BaselineVersions = { tsv: await get_tsv_version(), ...snapshot.versions };
+const versions: BaselineVersions = { tsv: tsv_version, ...snapshot.versions };
 const results_data = await build_results_data(
 	all_group_results,
 	snapshot.corpus,

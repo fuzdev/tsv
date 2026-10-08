@@ -16,6 +16,7 @@
  */
 
 import { env, exit } from 'node:process';
+import { DRIFT_MIN_SAMPLES } from './bench_plan.ts';
 import { current_runtime } from './runtime.ts';
 
 /** The JS runtime executing this bench — labels the report siblings
@@ -47,25 +48,26 @@ export const IS_LIMITED = MAX_FILES_PER_LANGUAGE !== undefined || FILE_FILTER !=
  */
 export const ALLOW_MISSING = env.BENCH_ALLOW_MISSING === '1';
 
-/** Warmup iteration floor (default: 3, every row — see `warmup_iterations_for`) */
+/** Warmup sweep floor per pass (default: 3, every row — see `bench_row.ts` `warm_up`) */
 export const BENCH_WARMUP = env_int('BENCH_WARMUP') ?? 3;
 
 /**
- * Warmup DURATION floor per row in ms (default: 5000). Warmup is an iteration
+ * Warmup DURATION floor per pass in ms (default: 5000). Warmup is an iteration
  * count in the timing library, so a fixed count warms a 25 ms row for 75 ms and a
  * 13 s row for 39 s: the fast rows entered their measured window with the JIT
  * still tiering, read as a negative `drift` on every runtime — median −1.9% on
  * rows under 50 ms — and a mean biased slow by about half of it, on exactly the
- * rows the ratios favor. Sizing warmup by TIME from the row's own pre-flight sweep
- * evens that out. The floor is 5 s, not 1 s, because tier-up is a wall-time
+ * rows the ratios favor. So a row's process warms for at least this long as well
+ * as for `BENCH_WARMUP` sweeps (`bench_row.ts` `warm_up`) — a floor on the clock
+ * itself, in a process that starts its row cold. The floor is 5 s, not 1 s, because tier-up is a wall-time
  * process and JSC's takes seconds: at a 1 s floor V8's rows settled (deno / node
  * fast-row drift −1.9% → −0.7…−1.0%) while bun's json and yuku rows still read
  * −6…−9% — a synthetic JSON.parse loop shows none of it, so it is the per-file
  * JS paths tiering, not the heap — and at 5 s the same rows read −0.2…+0.7%
  * (a CSS parse row: −9.0% → −0.2%). One floor on every runtime, since a
  * per-runtime warmup would be a second protocol on the rows this bench compares
- * across runtimes; the price is ~2.5 min of wall per runtime on the rows whose
- * three sweeps fall short of it, and the multi-second rows are unchanged.
+ * across runtimes; the price is this floor per pass on every row whose sweep count
+ * falls short of it, and the multi-second rows are unchanged.
  */
 export const BENCH_WARMUP_MS = env_int('BENCH_WARMUP_MS') ?? 5000;
 
@@ -100,14 +102,14 @@ export const BENCH_PASSES = Math.max(1, env_int('BENCH_PASSES') ?? 3);
  * The sweep floor of ONE pass, every row alike. Fast rows are duration-bound (they
  * reach `BENCH_DURATION` long before any floor); the floor exists for the
  * multi-second rows, where the duration budget alone would leave a handful of
- * sweeps. Eight, because that is what the within-pass drift reading needs
+ * sweeps. Exactly what the within-pass drift reading needs
  * (`DRIFT_MIN_SAMPLES` in `lib/bench_plan.ts`): with four a side no single deviant
  * sweep can be a half's median — and the multi-second rows are exactly the ones a
  * leak or a heap tipping over degrades, so nulling the reading there would blind
  * the detector where it matters most. A row's pooled sample count is therefore at
  * least this times `BENCH_PASSES`.
  */
-export const PASS_MIN_ITERATIONS = 8;
+export const PASS_MIN_ITERATIONS = DRIFT_MIN_SAMPLES;
 
 /**
  * Include the `tsv-forced-async` control row (default off). Same native engine

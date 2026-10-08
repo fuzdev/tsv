@@ -23,11 +23,12 @@
  *
  * In order, before the clock:
  *
- * 1. the file set is read and checked against the digest pre-flight recorded;
+ * 1. the file set is read and checked against the digest pre-flight recorded, and
+ *    the executed artifacts against the bytes pre-flight graded;
  * 2. the row's engine is loaded and probed on the row's own call (`init_row_task`);
  * 3. a full collection, so the warmup starts from the heap those two left and not
  *    from their garbage (`settled_heap_bytes` records where);
- * 4. the warmup sweeps.
+ * 4. the warmup sweeps — a count AND a wall-time floor (`warm_up`).
  *
  * @module
  */
@@ -39,16 +40,17 @@ declare global {
 
 import { Benchmark } from '@fuzdev/fuz_util/benchmark.ts';
 import { Buffer } from 'node:buffer';
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { exit, memoryUsage } from 'node:process';
 import {
+	file_set_digest,
 	read_child_spec,
 	type RowResult,
 	type RowSpec,
 	write_child_result
 } from './lib/bench_protocol.ts';
 import { assert_output_present, suppress_stderr_noise } from './lib/bench_sweep.ts';
+import { assert_artifacts_unchanged } from './lib/check_artifact_freshness.ts';
 import { init_row_task } from './lib/implementations.ts';
 import type { SourceFile } from './lib/types.ts';
 
@@ -59,40 +61,48 @@ const label = `${row.operation}/${row.language}/${row.name}`;
 // before any engine loads — see `suppress_stderr_noise`
 const suppressed_noise = suppress_stderr_noise();
 
-const loaded = JSON.parse(readFileSync(spec.file_set, 'utf8')) as SourceFile[];
-const digest = createHash('sha1')
-	.update(
-		loaded
-			.map((f) => f.path)
-			.sort()
-			.join('\n')
-	)
-	.digest('hex')
-	.slice(0, 12);
-if (digest !== spec.files_digest) {
-	throw new Error(
-		`${label}: the file set at ${spec.file_set} is not the one pre-flight planned ` +
-			`(digest ${digest}, expected ${spec.files_digest})`
-	);
-}
-// Each file is rebuilt once, ahead of the sweep, so the timed loop pays nothing per file:
-//
-// - its CONTENT is decoded again from its UTF-8 bytes, so it is held as a file read
-//   holds it — as pre-flight held it, and as a consumer does. One `JSON.parse` over the
-//   whole set is not that under JSC: when any file of the set holds a character past
-//   Latin-1, bun returns EVERY string of the parse in its 16-bit form, ASCII files
-//   included (on the perf TypeScript set, 368 of 1068 strings 8-bit read from disk,
-//   none after the parse), and a row timed on those measured up to ~1.5% slower. V8
-//   keeps the narrow form either way, so without this the cost fell on one runtime's
-//   column alone.
-// - a file the row accepted only at the Script goal is replayed there — at its own
-//   goal the call throws, and here a throw is a harness failure rather than a skip.
-const script_only = new Set(spec.script_only);
-const files: SourceFile[] = loaded.map((f): SourceFile => ({
-	...f,
-	content: Buffer.from(f.content, 'utf8').toString('utf8'),
-	...(script_only.has(f.path) ? { goal: 'script' } : {})
-}));
+/**
+ * The row's timed set, read back from the file pre-flight wrote and checked against
+ * the digest it recorded. Inside a function so the set as `JSON.parse` returned it is
+ * garbage once this returns: only the rebuilt files outlive it, and the heap the row
+ * is timed in holds the set once.
+ *
+ * Each file is rebuilt once, ahead of the sweep, so the timed loop pays nothing per file:
+ *
+ * - its CONTENT is decoded again from its UTF-8 bytes, so it is held as a file read
+ *   holds it — as pre-flight held it, and as a consumer does. One `JSON.parse` over the
+ *   whole set is not that under JSC: when any file of the set holds a character past
+ *   Latin-1, bun returns EVERY string of the parse in its 16-bit form, ASCII files
+ *   included, and a row timed on those measured up to ~1.5% slower. V8 keeps the
+ *   narrow form either way, so without this the cost fell on one runtime's column
+ *   alone. The round trip is the identity for any string a UTF-8 file read produced;
+ *   one that is not (a lone surrogate) fails here rather than being timed altered.
+ * - a file the row accepted only at the Script goal is replayed there — at its own
+ *   goal the call throws, and here a throw is a harness failure rather than a skip.
+ */
+const load_file_set = (): SourceFile[] => {
+	const loaded = JSON.parse(readFileSync(spec.file_set, 'utf8')) as SourceFile[];
+	const digest = file_set_digest(loaded);
+	if (digest !== spec.files_digest) {
+		throw new Error(
+			`${label}: the file set at ${spec.file_set} is not the one pre-flight planned ` +
+				`(digest ${digest}, expected ${spec.files_digest})`
+		);
+	}
+	const script_only = new Set(spec.script_only);
+	return loaded.map((f): SourceFile => {
+		const content = Buffer.from(f.content, 'utf8').toString('utf8');
+		if (content !== f.content) {
+			throw new Error(`${label}: ${f.path} does not survive a UTF-8 round trip`);
+		}
+		return { ...f, content, ...(script_only.has(f.path) ? { goal: 'script' } : {}) };
+	});
+};
+const files = load_file_set();
+
+// Before anything loads: the artifacts are the ones pre-flight graded, not a build
+// that landed in this checkout since (`assert_artifacts_unchanged`).
+assert_artifacts_unchanged(spec.artifacts);
 
 const { task, impl } = await init_row_task(row, spec.task_options);
 
@@ -137,9 +147,39 @@ const settle_heap = (): void => {
 // with every sweep of this one pass.
 const reset_heap = impl.reset_heap ? (): void => impl.reset_heap!() : undefined;
 
+/**
+ * The warmup: at least `spec.warmup_iterations` sweeps AND at least `spec.warmup_ms`
+ * of wall time, whichever ends later. Returns the sweeps it ran.
+ *
+ * Neither floor is keyed on anything a row measured, here or in another process, so
+ * it is one rule for every pass of every row on every runtime. The wall-time floor is
+ * what keeps a fast row from entering its window still tiering — this process starts
+ * its row cold, and JSC keeps tiering for seconds of wall time — and the sweep floor
+ * gives a slow row a few sweeps of warmup however long one takes. The count the two
+ * land on is the reading, published per row (`warmup_iterations`).
+ *
+ * Run in the task's `setup` (untimed — the library excludes it) rather than by the
+ * library's warmup loop, which has neither a clock nor a between-sweeps hook: a
+ * `reset_heap` row is offered its reset after every warmup sweep, so its first timed
+ * sweep starts on the footing every later one gets from `on_iteration` (the impl
+ * decides whether a reset is due), instead of on every warmup sweep's leak at once.
+ */
+const warm_up = async (): Promise<number> => {
+	reset_heap?.();
+	const start = performance.now();
+	let sweeps = 0;
+	while (sweeps < spec.warmup_iterations || performance.now() - start < spec.warmup_ms) {
+		await sweep();
+		reset_heap?.();
+		sweeps++;
+	}
+	return sweeps;
+};
+
 const bench = new Benchmark({
 	duration_ms: spec.duration_ms,
-	warmup_iterations: spec.warmup_iterations,
+	// `warm_up` instead, from the task's `setup`
+	warmup_iterations: 0,
 	min_iterations: spec.min_iterations,
 	// One task, so there is no next task to cool down for — and no timer may be
 	// awaited here regardless: oxfmt's async napi binding stalls Deno's timer wheel
@@ -157,31 +197,16 @@ const bench = new Benchmark({
 			: undefined
 });
 
-// Untimed (the library excludes `setup`). A `reset_heap` row WARMS here as well:
-// the library's warmup loop has no between-sweeps hook, so its warmup sweeps would
-// pile their leak onto the first timed sweep with no reset offered in between.
-// Warming in `setup`, with `reset_heap` after every sweep, gives the first timed
-// sweep the footing every later one gets from `on_iteration` (the impl decides
-// whether a reset is due). The library then warms 0 times, and the result carries
-// the count actually run.
-if (reset_heap) {
-	bench.add({
-		name: task.name,
-		warmup_iterations: 0,
-		setup: async () => {
-			settle_heap();
-			reset_heap();
-			for (let i = 0; i < spec.warmup_iterations; i++) {
-				await sweep();
-				reset_heap();
-			}
-		},
-		fn: sweep,
-		async: task.is_async
-	});
-} else {
-	bench.add({ name: task.name, setup: settle_heap, fn: sweep, async: task.is_async });
-}
+let warmup_sweeps = 0;
+bench.add({
+	name: task.name,
+	setup: async () => {
+		settle_heap();
+		warmup_sweeps = await warm_up();
+	},
+	fn: sweep,
+	async: task.is_async
+});
 
 const [measured] = await bench.run();
 
@@ -189,7 +214,7 @@ const result: RowResult = {
 	timings_ns: measured.timings_ns,
 	budget: measured.budget,
 	total_time_ms: measured.total_time_ms,
-	warmup_iterations: reset_heap ? spec.warmup_iterations : measured.budget.warmup_iterations,
+	warmup_iterations: warmup_sweeps,
 	settled_heap_bytes,
 	suppressed_noise: Object.fromEntries(suppressed_noise)
 };

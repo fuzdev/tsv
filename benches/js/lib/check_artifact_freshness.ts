@@ -50,6 +50,8 @@
  * stamp, so after one the hint is still the remedy.
  */
 
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { env, exit } from 'node:process';
@@ -312,6 +314,64 @@ export function native_artifact_check(): ArtifactCheck {
  */
 export async function check_executed_artifacts(): Promise<void> {
 	await check_artifact_freshness(executed_artifact_checks());
+}
+
+/**
+ * What one executed artifact WAS when a run's pre-flight graded it — its bytes'
+ * digest — so a later process of the run can prove it loads the same file.
+ */
+export interface ArtifactIdentity {
+	label: string;
+	path: string;
+	/** sha1 of the file's bytes. */
+	sha1: string;
+}
+
+/**
+ * The identity of every artifact this runtime executes (`executed_artifact_checks`),
+ * read from disk now. By content, not mtime: the build tasks re-stamp an artifact's
+ * date on a cargo no-op (`deno task build:stamped`), so a `build:bench` that rebuilt
+ * nothing would otherwise read as a different binary.
+ *
+ * @throws if an artifact is missing — the freshness guard has already required them
+ */
+export function executed_artifact_identities(): ArtifactIdentity[] {
+	return executed_artifact_checks().map(({ label, path }) => ({
+		label,
+		path,
+		sha1: createHash('sha1').update(readFileSync(path)).digest('hex')
+	}));
+}
+
+/**
+ * Throw unless every artifact in `expected` still has the bytes it had then.
+ *
+ * A bench run is hours of fresh processes, each loading the artifacts from disk
+ * again, so a build in the same checkout partway through (a `cargo build`, a
+ * `build:bench`) would have the later passes time a binary the pre-flight never
+ * graded — its accept sets, its byte parity, the size rows — with nothing to say so.
+ * Each timed row's process asks this before it loads anything.
+ *
+ * @throws if any artifact changed or is gone, naming each
+ */
+export function assert_artifacts_unchanged(expected: readonly ArtifactIdentity[]): void {
+	const changed: string[] = [];
+	for (const artifact of expected) {
+		let sha1: string;
+		try {
+			sha1 = createHash('sha1').update(readFileSync(artifact.path)).digest('hex');
+		} catch {
+			changed.push(`${artifact.label} (${artifact.path}) is gone`);
+			continue;
+		}
+		if (sha1 !== artifact.sha1) changed.push(`${artifact.label} (${artifact.path}) was rebuilt`);
+	}
+	if (changed.length > 0) {
+		throw new Error(
+			`an artifact changed since this run's pre-flight graded it — ${changed.join('; ')}. ` +
+				`A build ran in this checkout mid-run; re-run the bench once it is done.`
+		);
+	}
 }
 
 /** The checks `check_executed_artifacts` runs — the runtime's native binding + its `all` bundle. */

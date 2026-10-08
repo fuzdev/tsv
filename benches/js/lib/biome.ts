@@ -6,7 +6,13 @@
 
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { BaseImplementation, type Language, LANGUAGE_EXTENSIONS, LANGUAGES } from './types.ts';
+import {
+	BaseImplementation,
+	type InitScope,
+	type Language,
+	LANGUAGE_EXTENSIONS,
+	LANGUAGES
+} from './types.ts';
 import type { BiomeVersions } from './versions.ts';
 // Type-only — `import type` is erased, so referencing `Biome` here does NOT load
 // the package at this module's import. The value imports are deferred to `init()`
@@ -206,7 +212,7 @@ export class BiomeImplementation extends BaseImplementation {
 		this.versions = versions;
 	}
 
-	async init(): Promise<void> {
+	async init(scope?: InitScope): Promise<void> {
 		// Load the glue + js-api lazily (not as static top-level imports) so a
 		// load-time failure throws HERE, inside init_implementations' per-impl
 		// try/catch (and is skipped), instead of throwing during this module's
@@ -251,7 +257,11 @@ export class BiomeImplementation extends BaseImplementation {
 		// the TypeScript and CSS rows too. Deliberate — the alternative is a row
 		// publishing a number produced at biome's own defaults — and disclosed rather
 		// than silent: `unavailable[].rows` names every row the failure removed.
-		for (const language of this.format_languages) {
+		//
+		// A timed row's process (`scope`) probes its own language alone: the three
+		// languages share one wasm instance, and the others' format paths have no
+		// business warming it ahead of the clock (`InitScope`).
+		for (const language of scope === undefined ? this.format_languages : [scope.language]) {
 			assert_format_config_landed(
 				'biome',
 				language,

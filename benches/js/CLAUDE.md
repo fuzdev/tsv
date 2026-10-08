@@ -100,22 +100,23 @@ delta on the same row is the detector.
     sibling's (the site publishes both from this directory).
   - **`mixed_machine`** — the siblings' hardware identity disagrees; cross-runtime ratios are only
     meaningful on same-box siblings.
-  - **`within_noise`** — per-runtime cells whose difference is smaller than the combined cv of the
-    two means they divide. A ratio inherits both means' noise while printing neither, so the cells
-    that are NOT a runtime effect are named — a reading aid, not a significance test (that is
-    `benchmark_baseline_compare`'s Welch job, on a run the composer never sees). It needs ten
-    cleaned timings a side (printing `n` for the ones it calls), classifies every PAIR of present
-    runtimes (the site anchors its columns on node, so a base-only classification would leave the
-    bun/node column ungraded), and never names a row listed under `unstable_cells`.
+  - **`within_noise`** — per-runtime cells whose difference is smaller than the combined noise of
+    the two means they divide. A ratio inherits both means' noise while printing neither, so the
+    cells that are NOT a runtime effect are named — a reading aid, not a significance test (that is
+    `benchmark_baseline_compare`'s Welch job, on a run the composer never sees). A side timed in
+    several passes is read on its PASS MEANS (their spread is the error its mean is made of — its
+    pooled `cv` is one sweep's spread, larger, and would call real differences noise), needing three
+    passes; a one-pass or older sibling is read on its cleaned `cv`, needing ten sweeps. Each entry
+    names its `basis` and prints `n` in that unit. It classifies every PAIR of present runtimes (the
+    site anchors its columns on node, so a base-only classification would leave the bun/node column
+    ungraded), and never names a row listed under `unstable_cells`.
   - **`unstable_cells`** — per-runtime measurements whose cleaned or raw cv passed 10%, whose
     `drift` passed 5%, or whose `pass_spread` passed 5%, marked `⚠` in the tables and on stderr.
     Collected AHEAD of the sample gate: a measured 48% on five timings needs no minimum n to be
-    believed. The bench drives a row's sample count from a duration budget over a sweep floor per
-    pass, so it spans two orders of magnitude inside one table, and a sibling from a one-pass run
-    (or one written before rows were pooled over passes) sits under ten on its slow rows — and
-    `within_noise` consumes cv in the direction where an UNDERestimate is expensive: it would
-    report a real runtime difference as "no difference", the one verdict a reader cannot check
-    against the table.
+    believed. `within_noise` consumes its estimate in the direction where an OVERestimate is
+    expensive — it would report a real runtime difference as "no difference", the one verdict a
+    reader cannot check against the table — so a thin estimate leaves a cell unclassified, while an
+    unstable one is named here.
   - **unequal file sets** (`⚠ files a/b/c`) — each runtime times the files *its* impls passed
     preflight on, so unequal counts mean a sliver of the ratio is file-set, not runtime.
   - **`partial_rows`** — rows one sibling measured and another doesn't carry at all, with no
@@ -736,7 +737,7 @@ Environment variables (any runtime's `:run`):
 | `BENCH_PASSES=2` | fresh processes each row is timed in (3) |
 | `BENCH_DURATION=10000` | ms per PASS of a row (5000; conformance mode 15000) |
 | `BENCH_WARMUP=10` | warmup iteration FLOOR per pass (3) |
-| `BENCH_WARMUP_MS=2000` | every pass also warms at least this many ms (5000), sized from the row's own pre-flight sweep |
+| `BENCH_WARMUP_MS=2000` | every pass also warms at least this many ms of wall time (5000) |
 | `BENCH_MODE=union` | per-impl iteration (intersection) |
 | `BENCH_CORPUS=conformance` | corpus/surface selector (perf) |
 | `BENCH_STALE_OK=1` | run despite stale artifacts (off) |
@@ -747,8 +748,11 @@ Environment variables (any runtime's `:run`):
 
 Warmup is time-floored because a fixed count left fast rows still tiering inside the measured
 window (negative drift on every runtime), and JSC keeps tiering for seconds, so 1 s was not enough
-for bun. One protocol per row on every runtime, no tier keyed on a row's own timing — per pass: a
-sweep floor of 8, a 5 s budget, warmup ≥ 5 s — and every row runs `BENCH_PASSES` passes.
+for bun. A pass warms for `BENCH_WARMUP` sweeps and `BENCH_WARMUP_MS` of wall time, whichever ends
+later (`bench_row.ts` `warm_up`) — neither keyed on anything a row measured, in its own process or
+pre-flight's. One protocol per row on every runtime, no tier keyed on a row's own timing — per pass:
+a sweep floor of 8, the `BENCH_DURATION` budget, warmup ≥ 5 s and ≥ 3 sweeps — and every row runs
+`BENCH_PASSES` passes.
 
 #### Process model
 
@@ -765,16 +769,19 @@ A timed run is **several processes of one runtime**, started one at a time by `b
   generation from whatever has been allocating, and a wasm heap one row grew stays grown for the
   next. A forced collection between rows resets where a row starts, not the regime it runs in. A
   row's process loads only what the row calls — `init_row_task` (`lib/implementations.ts`)
-  initializes one slot, and the two multi-engine impls narrow further (`InitScope`: `canonical`
-  loads prettier OR svelte/compiler OR acorn, `oxc` loads oxc-parser OR oxfmt), probing only the
-  row's own call.
+  initializes one slot, narrowed to the row (`InitScope`): the two multi-engine impls load one
+  engine (`canonical` prettier OR svelte/compiler OR acorn, `oxc` oxc-parser OR oxfmt), and they,
+  tsv's bindings and biome probe only the row's own call on its language (a tsv row names its
+  binding call — `BenchmarkTask.binding_call` — since the default parse and `{locations: true}`
+  share one facade call) — an init probe of another export, or of the row's under another option,
+  would run it through the call sites the row is about to be timed on.
 - **Why pre-flight is its own process.** It needs everything loaded, which is a large resident
   heap; it exits before the first row is timed, so the timed rows run on a machine that holds
   neither the corpus nor a dozen engines.
 - **Passes.** Each row is timed in `BENCH_PASSES` fresh processes. A group's passes run back to
   back, each taking its rows in a different order (`lib/bench_plan.ts` `pass_order`: the
   registration order, its reverse, then both started further round the list), so no row keeps one
-  neighbour — what a fixed order would still carry between rows is the machine itself (the row
+  predecessor — what a fixed order would still carry between rows is the machine itself (the row
   after a long sweep starts hotter). A row's statistics pool its passes (`summarize_passes`;
   how, under [Report files](#report-files)).
 - **What the passes publish.** Per row `pass_spread` — its slowest pass mean over its fastest —
@@ -791,6 +798,11 @@ A timed run is **several processes of one runtime**, started one at a time by `b
   again from its UTF-8 bytes, so it holds the strings as a file read does: under JSC one
   `JSON.parse` of a set with any non-Latin-1 file returns every string 16-bit, which timed up to
   ~1.5% slower on bun alone.
+- **A build mid-run ends the run.** Every pass loads the artifacts from disk again, so pre-flight
+  records the bytes of the ones it graded (a sha1 per executed artifact — by content, since a
+  no-op `build:bench` re-stamps mtimes) and each row's process checks them before it loads
+  anything (`assert_artifacts_unchanged`, `lib/check_artifact_freshness.ts`): a later pass would
+  otherwise time a binary pre-flight never graded. Don't build in this checkout while it runs.
 - **A failed child ends the run** with no report written: the child has already said why, and the
   orchestrator names which child it was and prints the command that re-runs it alone against its
   spec. The run's directory is then KEPT (its spec and file set are what that command reads);
@@ -800,7 +812,10 @@ A timed run is **several processes of one runtime**, started one at a time by `b
   is left — and teardown has deadlocked (once, a Node row: result written, then parked on futexes
   inside `exit(0)`). The orchestrator awaits each child, looking for its result once a second, and
   kills one still running `EXIT_GRACE_MS` (30 s) after reporting; the report names it in
-  `exit_hangs`. Any other way a child ends without exit 0 still ends the run.
+  `exit_hangs`. Any other way a child ends without exit 0 still ends the run — a row that hangs
+  BEFORE reporting included, once it passes its deadline: three times what its warmup and window
+  floors cost at its pre-flight sweep time, plus five minutes for start-up (`lib/bench_plan.ts`
+  `row_deadline_ms`), so a stalled row ends the run in minutes rather than hours.
 - **Interrupting** stops the run at once, whether the signal reaches the whole foreground group
   (Ctrl-C) or the orchestrator alone, which takes the child in flight down with it.
 - **Deno permissions** live in one place, `lib/bench_child.ts`: the `bench:deno:run` task grants
@@ -1037,8 +1052,8 @@ compares sweeps, as before, and raises its sweep floor to ten for them).
 below, once tipped Node into a slower regime mid-row) has its second mode deleted or blended by the
 MAD cleaner, so `cv` can read quiet over a mean that is neither mode; `drift` — the median of the
 second half of a pass's timings against the first's — sees it, and its SIGN is the mechanism
-(negative still warming up, positive degrading). Warmup is sized by time (≥ `BENCH_WARMUP_MS` from
-the row's pre-flight sweep), so a fast row doesn't enter its window still tiering; there is no
+(negative still warming up, positive degrading). Warmup is floored by time (≥ `BENCH_WARMUP_MS` of
+wall per pass), so a fast row doesn't enter its window still tiering; there is no
 timing-keyed tier, and no row carries a different floor from the rest.
 
 **Why `pass_spread`.** The readings above are all taken inside a process, and a row whose LEVEL
@@ -1076,13 +1091,13 @@ grows with every sweep of one pass.
   svelte sweep's growth. `diagnostics/biome_heap_probe.ts` holds the measurements (its `--prelude`
   reproduces the shared process); `lib/biome.ts`'s `RESET_GROWTH_BYTES` the rule, with a TODO to
   re-measure whether an isolated row still needs it that low.
-- Such a row also WARMS in its `setup` (the library warming 0 times and the row carrying the
-  harness's count), because the library's warmup loop has no between-sweeps hook to offer the
-  reset in. That is the honest footing: every row starts each sweep from a settled heap, and
-  biome's is the one a GC cannot settle.
+- Every row WARMS in its `setup` (the library warming 0 times and the row carrying the count it
+  ran), because the library's warmup loop has neither a clock nor a between-sweeps hook — and this
+  row's reset is offered after each warmup sweep. That is the honest footing: every row starts each
+  sweep from a settled heap, and biome's is the one a GC cannot settle.
 
 **§Unstable Rows** trips on cleaned cv ≥ 10%, |drift| ≥ 5%, pass spread ≥ 5%, or raw cv ≥ 10% on a row under 30 raw
-samples (with hundreds of samples the raw cv is dominated by isolated GC pauses the cleaner rightly
+samples a pass (with hundreds of samples the raw cv is dominated by isolated GC pauses the cleaner rightly
 removes — one 80 ms pause among 600 × 8 ms sweeps reads 35% — so there the median drift is the
 detector, not the raw cv). ⚠ A longer `BENCH_DURATION` is NOT the answer to an unstable row: a
 drifting row's mean keeps moving with n, and at most sample counts the cleaner erases the

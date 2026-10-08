@@ -53,7 +53,13 @@
  */
 
 import { env } from 'node:process';
-import { type Language, LANGUAGES, type ParseGoal } from './types.ts';
+import {
+	type BindingCall,
+	type InitScope,
+	type Language,
+	LANGUAGES,
+	type ParseGoal
+} from './types.ts';
 
 /**
  * Make prettier-plugin-svelte REPORT an embedded block it could not format, instead
@@ -235,22 +241,49 @@ export interface RejectProbeTarget {
  * generated export, and the goal selects the source-type code the call hands it — the
  * unset one being `format`'s module-then-script fallback, which no other code reaches.
  *
+ * A timed row's process passes its `scope`, and is then probed on that row's
+ * language and call alone: every other export, or the same export under another
+ * option, is one more shape through the facade's shared call sites before the clock
+ * starts, which is the cross-row type feedback the row's own process exists to keep
+ * out. The unscoped pre-flight has already graded the whole matrix on the same
+ * artifact this run.
+ *
  * @param binding - the row-facing name, so the throw names which one failed
  * @param impl - the binding, called through its own methods so each keeps its receiver
+ * @param scope - the timed row the process is for — see `InitScope`
  */
-export function assert_binding_reports_rejection(binding: string, impl: RejectProbeTarget): void {
+export function assert_binding_reports_rejection(
+	binding: string,
+	impl: RejectProbeTarget,
+	scope?: InitScope
+): void {
+	const probed = (call: BindingCall, operation: 'parse' | 'format'): boolean =>
+		scope === undefined ||
+		(scope.call === undefined ? scope.operation === operation : scope.call === call);
 	const operations: Array<[string, () => unknown]> = [];
-	for (const language of LANGUAGES) {
+	for (const language of scope === undefined ? LANGUAGES : [scope.language]) {
 		const source = INVALID_SOURCES[language];
 		for (const goal of probe_goals(language)) {
 			const at = `${language}${goal ? `, ${goal}` : ''}`;
-			operations.push(
-				[`parse[${at}]`, () => impl.parse(source, language, goal)],
-				[`parse_with_locations[${at}]`, () => impl.parse_with_locations(source, language, goal)],
-				[`parse_internal[${at}]`, () => impl.parse_internal(source, language, goal)]
-			);
+			if (probed('parse', 'parse')) {
+				operations.push([`parse[${at}]`, () => impl.parse(source, language, goal)]);
+			}
+			if (probed('parse_with_locations', 'parse')) {
+				operations.push([
+					`parse_with_locations[${at}]`,
+					() => impl.parse_with_locations(source, language, goal)
+				]);
+			}
+			if (probed('parse_internal', 'parse')) {
+				operations.push([
+					`parse_internal[${at}]`,
+					() => impl.parse_internal(source, language, goal)
+				]);
+			}
 		}
-		operations.push([`format[${language}]`, () => impl.format(source, language)]);
+		if (probed('format', 'format')) {
+			operations.push([`format[${language}]`, () => impl.format(source, language)]);
+		}
 	}
 	for (const [operation, run] of operations) {
 		let accepted = false;

@@ -109,11 +109,13 @@ export class CanonicalImplementation extends BaseImplementation {
 	 * | format / typescript, css | prettier                                  |
 	 * | format / svelte      | prettier + prettier-plugin-svelte (which imports svelte/compiler itself) |
 	 *
-	 * This impl is three engines behind one slot, and they share code: the plugin
-	 * formats through the same `svelte/compiler` instance the `parse/svelte` row
-	 * times, and that compiler parses through the same `acorn` the `parse/typescript`
-	 * row extends. Loading all of it into a row's process would leave prettier's
-	 * probes shaping the type feedback of code the row is about to be timed on.
+	 * This impl is three engines behind one slot, and they share code: the
+	 * `svelte/compiler` the `parse/svelte` row times parses through the same `acorn`
+	 * the `parse/typescript` row extends. (The plugin `require`s its own copy of the
+	 * compiler — the CJS bundle, a separate instance — so the format row shares no
+	 * code with the parse rows, only the heap.) Loading all of it into a row's process
+	 * would leave the other rows' probes shaping the type feedback of code the row is
+	 * about to be timed on, and their allocations sizing its collector.
 	 */
 	async init(scope?: InitScope): Promise<void> {
 		// Before the first format call: without it the svelte plugin echoes an embedded

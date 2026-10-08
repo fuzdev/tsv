@@ -392,7 +392,7 @@ Things the published numbers measure that aren't quite what they look like.
   two means, so it inherits both means' noise. A per-runtime report carries a **§Unstable Rows**
   section for any row whose cv (`std_dev / mean`, post-outlier-removal) reaches 10%,
   and the cross-runtime report names the **within-noise** deltas whose difference is
-  smaller than the combined cv of the two rows they divide. Both are reading aids,
+  smaller than the combined noise of the two rows they divide. Both are reading aids,
   not significance tests — the Welch test lives in `benchmark_baseline_compare` and
   needs `--compare-baseline`, which a plain `deno task bench` never runs.
   Calibration: across the reports the threshold was set against, cv ran median 1.0% /
@@ -414,22 +414,22 @@ Things the published numbers measure that aren't quite what they look like.
   with no flag at all — hence the raw readings, and why a longer window is not the fix
   (it moves a drifting row's answer rather than converging it). The drift's sign is
   the mechanism — negative, the row got faster while measured (under-warmed);
-  positive, slower (degrading) — which is also why warmup is sized by time
+  positive, slower (degrading) — which is also why warmup is floored by time
   (`BENCH_WARMUP_MS`): a fixed three sweeps left every fast row still tiering inside
   its window, a negative drift on all three runtimes.
 
   Every pair of runtimes is classified, and the cells that land inside their noise
   are the combined report's **Within noise** line (a handful per refresh, each at
-  ~1.00x — confirming "no difference" rather than overturning a reading). The
-  within-noise half also needs ten cleaned timings a side before it will call a cell
-  quiet, and prints `n` for each: sample count varies by two orders of magnitude
-  across one table (a microsecond row gets four figures; a multi-second row gets its
-  sweep floor — 8 per pass, every row alike, so its pooled count is 8 times the
-  passes), and a cv from a handful of timings that happen to agree is not evidence
-  of quiet. At the default three passes every row clears the ten-timing bar — a
-  floor on RAW timings, where the bar reads cleaned ones, so it clears it at the
-  outlier ratios these rows show rather than by construction; a one-pass run
-  (`BENCH_PASSES=1`) leaves its multi-second rows unclassified.
+  ~1.00x — confirming "no difference" rather than overturning a reading). A row timed
+  in several passes is read there on its PASS MEANS: its published mean is their
+  mean, so their spread is the error it carries, where its pooled cv is one sweep's
+  spread — larger, and it would call real runtime differences noise. Three passes a
+  side are needed before a cell is called quiet. A one-pass sibling (`BENCH_PASSES=1`,
+  or a report from before passes) has only its sweeps, and is read on its cleaned cv
+  behind ten cleaned timings a side: sample count varies by two orders of magnitude
+  across one table (a multi-second row gets its sweep floor of 8), and a cv from a
+  handful of timings that happen to agree is not evidence of quiet. Each cell prints
+  the `n` it was read from, in its own unit.
 - **Per-iteration forced GC** — off by default (`BENCH_GC=1` makes the bench call
   `globalThis.gc()` between every iteration), and not a uniform bias. Measured on a
   BENCH_LIMIT=20 / 500ms / WARMUP=2 sample: low-allocation paths are penalized heavily (`tsv-internal` 1.4–1.7× slower with the

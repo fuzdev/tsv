@@ -11,6 +11,7 @@
  */
 
 import {
+	type BindingCall,
 	CANONICAL_PARSER_ROWS,
 	type Language,
 	LANGUAGES,
@@ -510,8 +511,8 @@ export async function init_row_task(
 	options: BenchmarkTaskOptions
 ): Promise<{ task: BenchmarkTask; impl: TsvImplementation }> {
 	const impls = construct_implementations(await load_all_versions());
-	const impl: TsvImplementation = impls[row.impl];
-	await impl.init({ operation: row.operation, language: row.language });
+	// Asked before init: what the registry defines is a construction-time fact (see
+	// `get_defined_rows`), and the row's call is part of what its init is scoped to.
 	const task = get_benchmark_tasks(impls, row.operation, row.language, options).find(
 		(t) => t.name === row.name && t.impl === row.impl
 	);
@@ -521,6 +522,8 @@ export async function init_row_task(
 				`the registry changed between pre-flight and this process`
 		);
 	}
+	const impl: TsvImplementation = impls[row.impl];
+	await impl.init({ operation: row.operation, language: row.language, call: task.binding_call });
 	return { task, impl };
 }
 
@@ -557,6 +560,12 @@ export interface BenchmarkTask {
 	 * timing so the coverage still reaches it.
 	 */
 	coverage_only?: boolean;
+	/**
+	 * For a tsv row, the binding call it times — handed to its impl's scoped `init`
+	 * (`InitScope.call`) so the row's process probes that call and no other. Absent
+	 * for every other row.
+	 */
+	binding_call?: BindingCall;
 	/** The benchmark function - processes all files once. `goal` (TS-only, from
 	 * the conformance surface's test262 files) selects the parse goal; parse tasks
 	 * forward it, format tasks ignore it. */
@@ -617,7 +626,7 @@ export function get_benchmark_tasks(
 		name: string,
 		key: string,
 		run: BenchmarkTask['run'],
-		extra?: Pick<BenchmarkTask, 'coverage_only'>
+		extra?: Pick<BenchmarkTask, 'coverage_only' | 'binding_call'>
 	): void => {
 		if (!enabled) return;
 		tasks.push({
@@ -641,7 +650,8 @@ export function get_benchmark_tasks(
 		enabled: unknown,
 		name: string,
 		key: string,
-		run_async: NonNullable<BenchmarkTask['run_async']>
+		run_async: NonNullable<BenchmarkTask['run_async']>,
+		extra?: Pick<BenchmarkTask, 'binding_call'>
 	): void => {
 		if (!enabled) return;
 		tasks.push({
@@ -652,7 +662,8 @@ export function get_benchmark_tasks(
 			run: () => {
 				throw new Error(`${name} is async — use run_async`);
 			},
-			run_async
+			run_async,
+			...extra
 		});
 	};
 
@@ -676,11 +687,22 @@ export function get_benchmark_tasks(
 		// call takes the bare row name, as every third-party row does and as the format
 		// rows do, and a variant is named for its option (`+locations` below); no row
 		// times a loc-bearing wire, which no binding ships.
-		add('native', true, 'tsv', 'native', (source, _language, goal) =>
-			impls.native.parse(source, language, goal)
+		const parse_call = { binding_call: 'parse' } as const;
+		add(
+			'native',
+			true,
+			'tsv',
+			'native',
+			(source, _language, goal) => impls.native.parse(source, language, goal),
+			parse_call
 		);
-		add('wasm', true, 'tsv-wasm', 'wasm', (source, _language, goal) =>
-			impls.wasm.parse(source, language, goal)
+		add(
+			'wasm',
+			true,
+			'tsv-wasm',
+			'wasm',
+			(source, _language, goal) => impls.wasm.parse(source, language, goal),
+			parse_call
 		);
 
 		// The span-only wire PLUS `loc` reconstructed in JS over the whole tree — the
@@ -697,28 +719,42 @@ export function get_benchmark_tasks(
 		// the coverage surface it would add nothing. Its absence there is disclosed
 		// (`SURFACE_DISCLOSURES` in bench_preflight.ts).
 		const locations_enabled = options.corpus_kind !== 'conformance';
+		const locations_call = { binding_call: 'parse_with_locations' } as const;
 		add(
 			'native',
 			locations_enabled,
 			'tsv+locations',
 			'native-locations',
-			(source, _language, goal) => impls.native.parse_with_locations(source, language, goal)
+			(source, _language, goal) => impls.native.parse_with_locations(source, language, goal),
+			locations_call
 		);
 		add(
 			'wasm',
 			locations_enabled,
 			'tsv-wasm+locations',
 			'wasm-locations',
-			(source, _language, goal) => impls.wasm.parse_with_locations(source, language, goal)
+			(source, _language, goal) => impls.wasm.parse_with_locations(source, language, goal),
+			locations_call
 		);
 
 		// Internal parsing variants (no JSON serialization, and no facade: the export is
 		// bench-only, published by no package) - shows JSON overhead
-		add('native', true, 'tsv-internal', 'native-internal', (source, _language, goal) =>
-			impls.native.parse_internal(source, language, goal)
+		const internal_call = { binding_call: 'parse_internal' } as const;
+		add(
+			'native',
+			true,
+			'tsv-internal',
+			'native-internal',
+			(source, _language, goal) => impls.native.parse_internal(source, language, goal),
+			internal_call
 		);
-		add('wasm', true, 'tsv-wasm-internal', 'wasm-internal', (source, _language, goal) =>
-			impls.wasm.parse_internal(source, language, goal)
+		add(
+			'wasm',
+			true,
+			'tsv-wasm-internal',
+			'wasm-internal',
+			(source, _language, goal) => impls.wasm.parse_internal(source, language, goal),
+			internal_call
 		);
 
 		// OXC parser (TypeScript/JS only) — default mode: serializes to JSON in Rust
@@ -856,8 +892,23 @@ export function get_benchmark_tasks(
 		);
 
 		// Native + WASM formatters
-		add('native', true, 'tsv', 'native', (source) => impls.native.format(source, language));
-		add('wasm', true, 'tsv-wasm', 'wasm', (source) => impls.wasm.format(source, language));
+		const format_call = { binding_call: 'format' } as const;
+		add(
+			'native',
+			true,
+			'tsv',
+			'native',
+			(source) => impls.native.format(source, language),
+			format_call
+		);
+		add(
+			'wasm',
+			true,
+			'tsv-wasm',
+			'wasm',
+			(source) => impls.wasm.format(source, language),
+			format_call
+		);
 
 		// Forced-async control (opt-in). Same native engine as `tsv`, routed through
 		// the awaited async path so the `tsv` vs `tsv-forced-async` delta measures the
@@ -869,7 +920,8 @@ export function get_benchmark_tasks(
 			options.forced_async,
 			'tsv-forced-async',
 			'native-forced-async',
-			(source, language) => Promise.resolve(impls.native.format(source, language))
+			(source, language) => Promise.resolve(impls.native.format(source, language)),
+			format_call
 		);
 
 		// OXC formatter (TypeScript/JS/CSS only) - async

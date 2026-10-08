@@ -16,8 +16,9 @@
  * Every row is timed in a process of its own, so no row's engine shares a heap with
  * another's. What a fixed order would still carry between rows is the machine: the
  * row that follows a two-minute sweep starts on a hotter package than the one that
- * follows a five-second one. So no two passes share an order, and no row keeps one
- * neighbour throughout:
+ * follows a five-second one. So no two passes share an order (in a group of three
+ * rows or more), and no row keeps one predecessor throughout — its neighbours, a
+ * reversal keeps, so what moves is which side of the row each one runs on:
  *
  * - even passes run the registration order, odd passes its reverse — a row's
  *   predecessor in one is its successor in the next;
@@ -43,22 +44,37 @@ export const pass_order = <T>(rows: ReadonlyArray<T>, pass: number, passes: numb
 	return [...base.slice(shift), ...base.slice(0, shift)];
 };
 
+/** How many times its expected wall a row may take — see `row_deadline_ms`. */
+export const ROW_DEADLINE_SLACK = 3;
+
 /**
- * Warmup sweeps for a row: the iteration floor, or as many sweeps as it takes to
- * warm for `floor_ms`, whichever is more — sized from the row's cold pre-flight
- * sweep, which over-estimates a warm sweep and so under-counts a little (fine: the
- * floor is a floor). A row with no pre-flight time gets the iteration floor.
- *
- * Sized once, from the pre-flight, rather than by each pass's own process: every
- * pass of a row then runs one protocol, and so does the same row on another runtime.
+ * The fixed part of a row's deadline, in ms: runtime start-up, the file set's read,
+ * and the engine's load and init probes — none of which the pre-flight sweep prices.
  */
-export const warmup_iterations_for = (
-	preflight_ms: number,
-	floor: number,
-	floor_ms: number
-): number => {
-	if (preflight_ms <= 0) return floor;
-	return Math.max(floor, Math.ceil(floor_ms / preflight_ms));
+export const ROW_DEADLINE_ALLOWANCE_MS = 5 * 60_000;
+
+/**
+ * How long one child of the run may take before it is stopped, in ms — a bound on a
+ * hang, not a shape on a measurement, so it is generous: `ROW_DEADLINE_SLACK` times
+ * the row's expected wall, plus `ROW_DEADLINE_ALLOWANCE_MS` for start-up and engine
+ * load.
+ *
+ * A row's expected wall is its warmup (at least `warmup_ms`, and at least
+ * `warmup_iterations` sweeps) plus its timed window (at least `duration_ms`, and at
+ * least `min_iterations` sweeps, one more sweep to finish the window it overran),
+ * each sweep priced at the row's pre-flight sweep (`sweep_ms`) — a cold one, so an
+ * over-estimate, which is the direction a deadline wants.
+ */
+export const row_deadline_ms = (row: {
+	sweep_ms: number;
+	warmup_ms: number;
+	warmup_iterations: number;
+	duration_ms: number;
+	min_iterations: number;
+}): number => {
+	const warmup = Math.max(row.warmup_ms, row.warmup_iterations * row.sweep_ms);
+	const timed = Math.max(row.duration_ms, row.min_iterations * row.sweep_ms) + row.sweep_ms;
+	return ROW_DEADLINE_SLACK * (warmup + timed) + ROW_DEADLINE_ALLOWANCE_MS;
 };
 
 /**
@@ -72,7 +88,15 @@ export const DRIFT_MIN_SAMPLES = 8;
 
 const mean_of = (xs: ReadonlyArray<number>): number => xs.reduce((a, b) => a + b, 0) / xs.length;
 
-const median_of = (xs: ReadonlyArray<number>): number => {
+/**
+ * The sample standard deviation of `xs` (Bessel-corrected) about `mean` (theirs by
+ * default) — `0` below two values, which carry no spread.
+ */
+export const sample_sd = (xs: ReadonlyArray<number>, mean = mean_of(xs)): number =>
+	xs.length < 2 ? 0 : Math.sqrt(xs.reduce((a, x) => a + (x - mean) ** 2, 0) / (xs.length - 1));
+
+/** The median of `xs` — the mean of the two middle values when their count is even. */
+export const median_of = (xs: ReadonlyArray<number>): number => {
 	const sorted = [...xs].sort((a, b) => a - b);
 	const mid = Math.floor(sorted.length / 2);
 	return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
@@ -192,12 +216,7 @@ export const summarize_passes = (passes: ReadonlyArray<PassTimings>): PassSummar
 		cleaned_ns: passes.flatMap((p) => p.cleaned_ns),
 		mean_ns,
 		pass_mean_ns,
-		pass_mean_sd_ns:
-			passes.length < 2
-				? null
-				: Math.sqrt(
-						pass_mean_ns.reduce((a, m) => a + (m - mean_ns) ** 2, 0) / (pass_mean_ns.length - 1)
-					),
+		pass_mean_sd_ns: passes.length < 2 ? null : sample_sd(pass_mean_ns, mean_ns),
 		cv_raw: raw_timing_stats(timings_ns).cv_raw,
 		drift,
 		pass_spread: fastest > 0 ? Math.max(...pass_mean_ns) / fastest - 1 : 0
@@ -262,4 +281,93 @@ export const summarize_process_noise = (
 		p95: quantile_of(deviations, 0.95),
 		max: Math.max(...deviations)
 	};
+};
+
+/**
+ * The coefficient of variation at or past which a timed row is UNSTABLE — disclosed
+ * rather than published bare, by the per-runtime report (`bench.ts` §Unstable Rows)
+ * and the combined one (`compose_reports.ts` `unstable_cells`) alike, from this one
+ * definition.
+ *
+ * Ratios are the reports' product and each divides two means, so an unstable row
+ * silently widens every comparison it appears in. 10% is about three times the p90 of
+ * the cleaned cv across the reports it was set against — so ordinary variation sits
+ * nowhere near it, and a row that trips it is doing something other than varying.
+ * Deliberately tighter than `benchmark_baseline_compare`'s 30% noise gate, which
+ * answers another question (is a REGRESSION real) on a run a plain `deno task bench`
+ * never makes.
+ */
+// TODO: re-derive the calibration from the pass-pooled reports — a row's cv now
+// includes the variation between its processes, which the reports it was set against
+// (one shared process) did not.
+export const UNSTABLE_CV_THRESHOLD = 0.1;
+
+/**
+ * The `|drift|` at or past which a row is unstable regardless of its cv. 5% is well
+ * outside stationary variation (a stationary row's two half-medians agree to well
+ * under 1% at any sample count the bench reaches) and well inside the regime this
+ * exists for: a row that stepped +25–45% mid-measurement published a cleaned cv
+ * under 6% at most sample counts.
+ */
+export const UNSTABLE_DRIFT_THRESHOLD = 0.05;
+
+/**
+ * The `pass_spread` at or past which a row is unstable regardless of the rest: its
+ * passes — fresh processes of the same thing — sat further apart than this, so its
+ * level depends on the process it was drawn in. The same 5% as the drift's, for the
+ * same kind of reason: both are a level shift, one inside a process (read from
+ * medians) and one between two (read from the passes' cleaned means).
+ */
+// TODO: calibrate against `process_noise` once full runs under all three runtimes
+// exist — the threshold wants to sit well clear of the run's own p95.
+export const UNSTABLE_PASS_SPREAD_THRESHOLD = 0.05;
+
+/**
+ * Below this many raw timings PER PASS the RAW cv also trips a row — per pass, since
+ * the question is about one process's series, and a pooled count would move the line
+ * with the pass count. With few samples one deviant sweep is a real share of the
+ * measurement, and exactly what the MAD cleaner's keep-closest fallback blends into
+ * the mean, so a raw cv past the threshold is the disclosure the cleaned cv withheld.
+ * With hundreds the raw cv is dominated by isolated pauses (one 80 ms GC among 600 ×
+ * 8 ms sweeps reads 35%) that the cleaner rightly removes; there the drift is the
+ * detector.
+ */
+export const RAW_CV_SAMPLE_CEILING = 30;
+
+/** The stability readings a row carries, each `null` where its report lacks it. */
+export interface StabilityReadings {
+	cv: number | null;
+	cv_raw: number | null;
+	drift: number | null;
+	pass_spread: number | null;
+	/** Raw timings per pass — the pooled count over the pass count (one, before passes). */
+	raw_samples_per_pass: number | null;
+}
+
+/**
+ * The readings that make a row unstable, each as a magnitude — empty for a stable
+ * row. Four, any one of which trips it: the cleaned cv (ordinary noise), the RAW cv on
+ * a thin pass (a second mode the cleaner deleted), the drift (a cost that moved while
+ * a process measured it) and the pass spread (a level that differs between
+ * processes). The cleaned cv alone is blind to the last three — a bimodal row can
+ * clean to a quiet cv over a mean that is neither mode.
+ */
+export const unstable_readings = (r: StabilityReadings): number[] => {
+	const tripped: number[] = [];
+	if (r.cv !== null && r.cv >= UNSTABLE_CV_THRESHOLD) tripped.push(r.cv);
+	if (
+		r.cv_raw !== null &&
+		r.cv_raw >= UNSTABLE_CV_THRESHOLD &&
+		r.raw_samples_per_pass !== null &&
+		r.raw_samples_per_pass < RAW_CV_SAMPLE_CEILING
+	) {
+		tripped.push(r.cv_raw);
+	}
+	if (r.drift !== null && Math.abs(r.drift) >= UNSTABLE_DRIFT_THRESHOLD) {
+		tripped.push(Math.abs(r.drift));
+	}
+	if (r.pass_spread !== null && r.pass_spread >= UNSTABLE_PASS_SPREAD_THRESHOLD) {
+		tripped.push(r.pass_spread);
+	}
+	return tripped;
 };

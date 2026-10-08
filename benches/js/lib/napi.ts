@@ -31,8 +31,7 @@
 import { stat } from 'node:fs/promises';
 import { napi_library_path } from './tsv_artifacts.ts';
 import { TsvBinding } from './tsv_api.ts';
-import { assert_binding_reports_rejection } from './reject_probe.ts';
-import { assert_binding_emits_span_only } from './locations_probe.ts';
+import type { InitScope } from './types.ts';
 
 /**
  * The N-API addon's exported functions (snake_case `js_name`s, matching WASM/FFI).
@@ -66,7 +65,7 @@ export function get_napi_library_path(): string {
 }
 
 export class NapiImplementation extends TsvBinding {
-	async init(): Promise<void> {
+	async init(scope?: InitScope): Promise<void> {
 		const path = get_napi_library_path();
 		try {
 			await stat(path);
@@ -101,12 +100,9 @@ export class NapiImplementation extends TsvBinding {
 		});
 
 		// The addon throws natively today; probed anyway so the three bindings can't
-		// come to disagree about what surfacing a refusal MEANS — see `lib/reject_probe.ts`.
-		assert_binding_reports_rejection('tsv (N-API)', this);
-
-		// The parse wire is span-only — prove this artifact emits it, so a stale addon
-		// whose parse still emits `loc` can't be timed as the span-only default.
-		// See `lib/locations_probe.ts`.
-		assert_binding_emits_span_only('tsv (N-API)', { path, rebuild: 'deno task build:napi' }, this);
+		// come to disagree about what surfacing a refusal MEANS. And the parse wire is
+		// span-only, so a stale addon whose parse still emits `loc` can't be timed as the
+		// span-only default.
+		this.probe('tsv (N-API)', { path, rebuild: 'deno task build:napi' }, scope);
 	}
 }

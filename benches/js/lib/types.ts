@@ -146,16 +146,30 @@ export interface SourceFile {
  *
  * A timed row is measured in a process of its own (`bench_row.ts`) so that no other
  * engine's code, type feedback or allocation shares its heap — and an impl whose
- * `init` loads more than its row needs would put the confound straight back:
- * `canonical` fronts prettier, svelte/compiler and acorn, and `oxc` fronts
- * oxc-parser and oxfmt. Those two honor the scope (loading, and probing, only what
- * the row calls); every other impl is one engine and ignores it. Without a scope
- * `init` loads everything, which is what pre-flight and every gate want.
+ * `init` loads or probes more than its row needs would put the confound straight
+ * back. `canonical` (prettier, svelte/compiler and acorn) and `oxc` (oxc-parser and
+ * oxfmt) load only what the row calls; tsv's three bindings (`TsvBinding.probe`) load
+ * one engine but probe only the row's own call (`call`) on its language, and biome
+ * only its language, since every other export they probe goes through the same call
+ * sites first. The rest
+ * ignore it — one call per engine, except rsvelte-parse, which probes both of its
+ * option rows over the one native `parse`. Without a scope `init` loads and probes
+ * everything, which is what pre-flight and every gate want.
  */
 export interface InitScope {
 	operation: 'parse' | 'format';
 	language: Language;
+	/**
+	 * For a tsv row, the one binding call it times (`BenchmarkTask.binding_call`):
+	 * the default parse and `{locations: true}` share the facade's `parse_<lang>`, so
+	 * the operation alone would still probe the row's call site with the other's
+	 * options first. Absent for every other row.
+	 */
+	call?: BindingCall;
 }
+
+/** One of a tsv binding's published calls — the one a tsv row times (`InitScope.call`). */
+export type BindingCall = 'parse' | 'parse_with_locations' | 'parse_internal' | 'format';
 
 /** Common interface for parser/formatter implementations */
 export interface TsvImplementation {

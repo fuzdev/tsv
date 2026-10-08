@@ -23,11 +23,12 @@ import { current_runtime } from './runtime.ts';
 export type ChildScript = 'bench_preflight.ts' | 'bench_row.ts';
 
 /**
- * How long one child may run before the run gives up on it, in ms. Far above any
- * real child (the slowest row's pass is minutes): this bounds a hang, it does not
- * shape a measurement.
+ * How long the pre-flight child may run before the run gives up on it, in ms. Far
+ * above any real pre-flight: this bounds a hang, it does not shape a measurement. A
+ * timed row's own deadline is priced from what it will run (`lib/bench_plan.ts`
+ * `row_deadline_ms`), so a row that hangs before reporting stops the run in minutes.
  */
-const CHILD_TIMEOUT_MS = 2 * 60 * 60_000;
+export const PREFLIGHT_DEADLINE_MS = 2 * 60 * 60_000;
 
 /**
  * How long a child that has written its result may take to exit, in ms, before it is
@@ -38,9 +39,9 @@ const CHILD_TIMEOUT_MS = 2 * 60 * 60_000;
  * all that is left is process teardown — which can deadlock. Seen once under Node
  * (a `format/svelte/biome-wasm` row, on a busy machine): result written, then the
  * main thread and the last V8 platform worker parked on futexes inside `exit(0)`
- * with every other thread joined, for good; 0 of 40 isolated re-runs of the same
- * spec repeated it. A run is on the order of a thousand child exits, so a rare hang
- * is a likely one, and without this it would hold the run for `CHILD_TIMEOUT_MS`.
+ * with every other thread joined, for good, and isolated re-runs of the same spec
+ * never repeated it. A run is hundreds of child exits, so a rare hang is a likely
+ * one, and without this it would hold the run until the child's deadline.
  * Far above any real teardown, and charged only to a child that hangs.
  */
 const EXIT_GRACE_MS = 30_000;
@@ -161,15 +162,17 @@ const shell_quote = (arg: string): string =>
  * @param spec_path - where to write it, inside `write_dir`
  * @param write_dir - the one directory a child may write to — the run's own
  * @param label - what the child is, for an error
+ * @param deadline_ms - how long the child may run before it is stopped and the run ends
  * @returns the child's result, parsed, and whether its exit hung
- * @throws `BenchChildError` if the child cannot be started, is ended by a signal or the timeout, exits non-zero, or leaves no readable result
+ * @throws `BenchChildError` if the child cannot be started, is ended by a signal or its deadline, exits non-zero, or leaves no readable result
  */
 export const run_bench_child = async <TResult>(
 	script: ChildScript,
 	spec: ChildSpec,
 	spec_path: string,
 	write_dir: string,
-	label: string
+	label: string,
+	deadline_ms: number
 ): Promise<BenchChildOutcome<TResult>> => {
 	writeFileSync(spec_path, JSON.stringify(spec));
 	// so a child that exits cleanly without reporting can never be read as the last
@@ -194,11 +197,14 @@ export const run_bench_child = async <TResult>(
 				if (reported_at === null && existsSync(spec.result_path)) reported_at = now;
 				if (reported_at !== null && now - reported_at > EXIT_GRACE_MS) {
 					exit_hung = true;
-					child.kill('SIGKILL');
-				} else if (now - started > CHILD_TIMEOUT_MS) {
+				} else if (now - started > deadline_ms) {
 					timed_out = true;
-					child.kill('SIGKILL');
+				} else {
+					return;
 				}
+				// once: the `exit` event below ends the wait
+				clearInterval(poll);
+				child.kill('SIGKILL');
 			}, POLL_MS);
 			child.once('error', (error) => {
 				clearInterval(poll);
@@ -214,7 +220,8 @@ export const run_bench_child = async <TResult>(
 	if ('error' in exited) throw fail(`${label} could not be started: ${exited.error.message}`);
 	if (timed_out) {
 		throw fail(
-			`${label} was still running after ${CHILD_TIMEOUT_MS / 60_000} minutes and was stopped`
+			`${label} was still running after ${Math.round(deadline_ms / 60_000)} minutes, its ` +
+				`deadline, and was stopped`
 		);
 	}
 	if (!exit_hung) {

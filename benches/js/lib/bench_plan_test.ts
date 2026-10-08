@@ -8,11 +8,16 @@ import assert from 'node:assert';
 import {
 	DRIFT_MIN_SAMPLES,
 	pass_order,
+	RAW_CV_SAMPLE_CEILING,
 	raw_timing_stats,
+	ROW_DEADLINE_ALLOWANCE_MS,
+	ROW_DEADLINE_SLACK,
+	row_deadline_ms,
 	summarize_passes,
 	summarize_process_noise,
 	t_critical_95,
-	warmup_iterations_for
+	UNSTABLE_CV_THRESHOLD,
+	unstable_readings
 } from './bench_plan.ts';
 
 const ROWS = ['a', 'b', 'c', 'd', 'e', 'f'];
@@ -64,10 +69,49 @@ Deno.test('a one-row or empty group has the only order there is', () => {
 	assert.deepStrictEqual(pass_order([], 1, 3), []);
 });
 
-Deno.test('warmup is the iteration floor or the time floor, whichever is more', () => {
-	assert.strictEqual(warmup_iterations_for(25, 3, 5000), 200);
-	assert.strictEqual(warmup_iterations_for(13_000, 3, 5000), 3);
-	assert.strictEqual(warmup_iterations_for(0, 3, 5000), 3);
+Deno.test('a row deadline prices the warmup and window floors at the pre-flight sweep', () => {
+	const row = { warmup_ms: 5000, warmup_iterations: 3, duration_ms: 5000, min_iterations: 8 };
+	// a fast row is time-bound on both sides
+	assert.strictEqual(
+		row_deadline_ms({ ...row, sweep_ms: 10 }),
+		ROW_DEADLINE_SLACK * (5000 + 5010) + ROW_DEADLINE_ALLOWANCE_MS
+	);
+	// a 13 s row is sweep-bound on both, plus the sweep that finishes its window
+	assert.strictEqual(
+		row_deadline_ms({ ...row, sweep_ms: 13_000 }),
+		ROW_DEADLINE_SLACK * (3 * 13_000 + 9 * 13_000) + ROW_DEADLINE_ALLOWANCE_MS
+	);
+});
+
+Deno.test('a row is unstable on any one of its four readings, each at its own threshold', () => {
+	const quiet = {
+		cv: 0.01,
+		cv_raw: 0.02,
+		drift: 0.001,
+		pass_spread: 0.01,
+		raw_samples_per_pass: 8
+	};
+	assert.deepStrictEqual(unstable_readings(quiet), []);
+	assert.deepStrictEqual(unstable_readings({ ...quiet, cv: UNSTABLE_CV_THRESHOLD }), [0.1]);
+	assert.deepStrictEqual(unstable_readings({ ...quiet, drift: -0.06 }), [0.06]);
+	assert.deepStrictEqual(unstable_readings({ ...quiet, pass_spread: 0.05 }), [0.05]);
+	// the raw cv counts only on a thin pass
+	assert.deepStrictEqual(unstable_readings({ ...quiet, cv_raw: 0.3 }), [0.3]);
+	assert.deepStrictEqual(
+		unstable_readings({ ...quiet, cv_raw: 0.3, raw_samples_per_pass: RAW_CV_SAMPLE_CEILING }),
+		[]
+	);
+	// absent readings are silence
+	assert.deepStrictEqual(
+		unstable_readings({
+			cv: null,
+			cv_raw: null,
+			drift: null,
+			pass_spread: null,
+			raw_samples_per_pass: null
+		}),
+		[]
+	);
 });
 
 Deno.test('drift is null below the per-pass floor and reads a level shift above it', () => {

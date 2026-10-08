@@ -23,7 +23,8 @@
  * that no longer holds any of it.
  *
  * Nothing here is timed for publication. The one clock reading it keeps is each
- * row's cold sweep (`PreflightTimedRow.preflight_ms`), which sizes that row's warmup.
+ * row's cold sweep (`PreflightTimedRow.preflight_ms`), which prices the deadline of
+ * that row's timed processes (`lib/bench_plan.ts` `row_deadline_ms`).
  *
  * @module
  */
@@ -45,6 +46,7 @@ import {
 	USE_INTERSECTION
 } from './lib/bench_config.ts';
 import {
+	file_set_digest,
 	type PreflightGroup,
 	type PreflightSnapshot,
 	type PreflightSpec,
@@ -56,6 +58,7 @@ import { create_logger, empty_output_error, suppress_stderr_noise } from './lib/
 import { collect_binary_sizes } from './lib/binary_sizes.ts';
 import {
 	check_executed_artifacts,
+	executed_artifact_identities,
 	warn_stale_reported_artifacts
 } from './lib/check_artifact_freshness.ts';
 import { check_node_modules } from './lib/check_node_modules.ts';
@@ -205,6 +208,9 @@ if (total_files === 0) {
 // — is `check_executed_artifacts`'s subject; override with BENCH_STALE_OK=1.
 await check_executed_artifacts();
 await warn_stale_reported_artifacts();
+// What those artifacts ARE, read before anything loads them — the bytes every timed
+// row's process must find again (`RowSpec.artifacts`).
+const artifacts = executed_artifact_identities();
 
 // Friendly preflight: the canonical impls (prettier + svelte/compiler) resolve
 // from the harness `node_modules`; without it, init fails with an opaque
@@ -469,8 +475,8 @@ const effective_corpus_size: Map<string, { processed: number; total: number }> =
 /** Effective corpus bytes per benchmark — used for honest throughput math. */
 const effective_corpus_bytes: Map<string, number> = new Map();
 /**
- * Wall-clock ms for one preflight pass per task (iterating every file once).
- * Sizes each task's warmup by time (`warmup_iterations_for`).
+ * Wall-clock ms for one preflight pass per task (iterating every file once) — what
+ * prices the deadline of the task's timed processes (`PreflightTimedRow.preflight_ms`).
  */
 const preflight_elapsed_ms: Map<string, number> = new Map();
 /**
@@ -1194,7 +1200,6 @@ async function run_preflight(
 		// row it doesn't grade: `null` here means no hashing happens at all.
 		const digests = byte_graded_names.has(task.name) ? new Map<string, string>() : null;
 		let bytes = 0;
-		let digest_ms = 0;
 		const start_ms = performance.now();
 		for (const file of files) {
 			// ONLY the impl call belongs inside the skip-recording try. Anything else
@@ -1240,13 +1245,7 @@ async function run_preflight(
 			if (at_script) script_only.add(file.path);
 			bytes += file.bytes;
 			if (digests !== null) {
-				// Digesting is HARNESS work — JSON.stringify + sha1 over the wire, ~+50% of
-				// a parse sweep on the TS corpus — so it is timed out of the sweep that
-				// sizes the row's warmup (`preflight_elapsed_ms`); charged in, it would
-				// shorten the warmup of tsv's byte-graded rows alone.
-				const digest_start_ms = performance.now();
 				const digest = output_digest(result);
-				digest_ms += performance.now() - digest_start_ms;
 				if (digest !== null) {
 					digests.set(file.path, digest);
 				} else if (result !== undefined && result !== null) {
@@ -1259,7 +1258,9 @@ async function run_preflight(
 				}
 			}
 		}
-		const elapsed_ms = performance.now() - start_ms - digest_ms;
+		// digesting included (JSON.stringify + sha1, harness work): this prices a
+		// deadline, where an over-estimate is the safe side
+		const elapsed_ms = performance.now() - start_ms;
 		successful_files.set(task.tracking_key, success);
 		if (script_only.size > 0) script_only_files.set(task.tracking_key, script_only);
 		if (digests !== null) output_digests.set(task.tracking_key, digests);
@@ -1283,31 +1284,21 @@ const written_file_sets: Map<SourceFile[], { path: string; digest: string }> = n
 
 /**
  * Write one timed file set into the run's scratch directory and return where, with
- * the digest of its sorted paths — see `PreflightTimedRow.file_set`.
+ * its digest (`file_set_digest`) — see `PreflightTimedRow.file_set`.
  *
  * The files are written whole, contents included, rather than as paths for the
  * timed process to read back: not every `SourceFile` is a file on disk (a harvested
  * stylesheet is cut out of a cache), and a row must be timed on the very strings
  * pre-flight ran it on. `JSON.stringify` escapes a lone surrogate rather than
- * replacing it, so every string reads back identical.
+ * replacing it, so every string reads back identical (and the row's process refuses
+ * one its own UTF-8 re-decode would alter — `bench_row.ts`).
  */
 function write_file_set(task_files: SourceFile[]): { path: string; digest: string } {
 	const existing = written_file_sets.get(task_files);
 	if (existing) return existing;
 	const path = `${spec.run_dir}/file_set_${written_file_sets.size}.json`;
 	writeFileSync(path, JSON.stringify(task_files));
-	const written = {
-		path,
-		digest: createHash('sha1')
-			.update(
-				task_files
-					.map((f) => f.path)
-					.sort()
-					.join('\n')
-			)
-			.digest('hex')
-			.slice(0, 12)
-	};
+	const written = { path, digest: file_set_digest(task_files) };
 	written_file_sets.set(task_files, written);
 	return written;
 }
@@ -1559,7 +1550,8 @@ const snapshot: PreflightSnapshot = {
 	omissions: build_omissions() ?? null,
 	output_digest_ungraded: serialize_ungraded_digests(),
 	variant_parity: variant_parity_findings,
-	suppressed_noise: Object.fromEntries(suppressed_noise)
+	suppressed_noise: Object.fromEntries(suppressed_noise),
+	artifacts
 };
 write_child_result(spec, snapshot);
 
