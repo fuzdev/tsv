@@ -6,7 +6,7 @@
 
 **Corpus kind:** conformance — fixtures-only corpus (disjoint from perf; a suite with a validity oracle or harness filtered to what it calls valid), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)
 
-**Date:** 2026-10-07T02:29:20.741Z — tsv 0.6.0 (3a8e53d7)
+**Date:** 2026-10-08T15:46:31.802Z — tsv 0.6.0 (3acd0be7)
 
 **Corpus:** 4643 Svelte (1.1 MB), 53323 TypeScript (70.8 MB), 22450 CSS (7.7 MB) — 80416 files, 79.5 MB total
 
