@@ -4,10 +4,10 @@
 
 **Runtimes:** deno, node, bun — each runtime’s full report is its `report.<runtime>.{json,md}` sibling.
 
-- `deno` 2.9.7: 3acd0be7 @ 2026-10-08T13:39:45.082Z (tsv 0.6.0) — corpora 63d1790f2
-- `node` 24.14.1: 3acd0be7 @ 2026-10-08T14:22:06.374Z (tsv 0.6.0) — corpora 63d1790f2
-- `bun` 1.4.2: 3acd0be7 @ 2026-10-08T15:05:59.589Z (tsv 0.6.0) — corpora 63d1790f2
-- `conformance` (node, coverage-only): 3acd0be7 @ 2026-10-08T15:46:31.802Z (tsv 0.6.0)
+- `deno` 2.9.7: b24d1494 @ 2026-10-08T13:39:45.082Z (tsv 0.6.0) — corpora 63d1790f2
+- `node` 24.14.1: b24d1494 @ 2026-10-08T14:22:06.374Z (tsv 0.6.0) — corpora 63d1790f2
+- `bun` 1.4.2: b24d1494 @ 2026-10-08T15:05:59.589Z (tsv 0.6.0) — corpora 63d1790f2
+- `conformance` (node, coverage-only): b24d1494 @ 2026-10-08T15:46:31.802Z (tsv 0.6.0)
 
 **Machine:** AMD Ryzen 5 PRO 7530U with Radeon Graphics · linux/x86_64
 

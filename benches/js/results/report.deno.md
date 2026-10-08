@@ -6,7 +6,7 @@
 
 **Corpus kind:** perf — real-world code only (fixture suites excluded)
 
-**Date:** 2026-10-08T13:39:45.082Z — tsv 0.6.0 (3acd0be7)
+**Date:** 2026-10-08T13:39:45.082Z — tsv 0.6.0 (b24d1494)
 
 **Corpus:** 929 Svelte (2.4 MB), 2596 TypeScript (18.4 MB), 55 CSS (0.4 MB) — 3580 files, 21.2 MB total
 

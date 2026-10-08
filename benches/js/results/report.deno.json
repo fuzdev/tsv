@@ -3,7 +3,7 @@
 	"runtime": "deno",
 	"corpus_kind": "perf",
 	"timestamp": "2026-10-08T13:39:45.082Z",
-	"git_commit": "3acd0be7",
+	"git_commit": "b24d1494",
 	"machine": {
 		"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 		"os": "linux",

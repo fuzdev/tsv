@@ -9,7 +9,7 @@
 	],
 	"mixed_vintage": false,
 	"conformance_vintage": {
-		"git_commit": "3acd0be7",
+		"git_commit": "b24d1494",
 		"timestamp": "2026-10-08T15:46:31.802Z",
 		"tsv": "0.6.0",
 		"stale": false
@@ -153,7 +153,7 @@
 		{
 			"runtime": "deno",
 			"timestamp": "2026-10-08T13:39:45.082Z",
-			"git_commit": "3acd0be7",
+			"git_commit": "b24d1494",
 			"tsv": "0.6.0",
 			"corpus_snapshot": "63d1790f2473b8aa2eb27c0147dda8e89ee0a5bd",
 			"machine": {
@@ -167,7 +167,7 @@
 		{
 			"runtime": "node",
 			"timestamp": "2026-10-08T14:22:06.374Z",
-			"git_commit": "3acd0be7",
+			"git_commit": "b24d1494",
 			"tsv": "0.6.0",
 			"corpus_snapshot": "63d1790f2473b8aa2eb27c0147dda8e89ee0a5bd",
 			"machine": {
@@ -181,7 +181,7 @@
 		{
 			"runtime": "bun",
 			"timestamp": "2026-10-08T15:05:59.589Z",
-			"git_commit": "3acd0be7",
+			"git_commit": "b24d1494",
 			"tsv": "0.6.0",
 			"corpus_snapshot": "63d1790f2473b8aa2eb27c0147dda8e89ee0a5bd",
 			"machine": {
