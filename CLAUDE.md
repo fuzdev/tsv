@@ -383,6 +383,8 @@ Divergence detection identifies the known differences documented in the `conform
 
 **Cross-runtime.** One harness runs under **Deno, Node, and Bun**, each emitting its own runtime-labeled report (`report.{deno,node,bun}.{json,md}`, never merged); `deno task bench:compose` folds them into the combined `report.{json,md}` (what tsv.fuz.dev consumes). The native row is **FFI** under Deno, **N-API** under Node/Bun; all else is shared runtime-neutral code. ./benches/js/CLAUDE.md §Cross-Runtime.
 
+**A process per row.** A timed run is several processes of one runtime: `bench.ts` orchestrates and holds nothing measured; one pre-flight process (`bench_preflight.ts`) loads the corpus and every tool to learn what each accepts, then exits; and every row is timed in a fresh process of its own (`bench_row.ts`) that loads that row's one engine — `BENCH_PASSES` times over (default 3), each pass taking a group's rows in a different order, the row's statistics pooling its passes. Rows timed back to back in one process moved each other's numbers (shared type feedback, the collector's sizing, grown wasm heaps), so nothing measured shares a process any more; each row publishes `pass_spread` and the report `process_noise`, the process-level A/A the passes give for free. ./benches/js/CLAUDE.md §Process model.
+
 **Perf vs conformance surfaces.** `bench:perf` measures a **real-world-only** corpus (app + framework source from the pinned `../corpora` snapshot, named by the report's `corpus_snapshot`) — the throughput headline; every in-scope tool must fully process every file or the run fails (`benches/js/lib/perf_omit.ts`), so coverage is 100% by construction. `bench:conformance` measures per-tool **parse coverage** over a **disjoint, fixtures-only** corpus (prettier suites + svelte compiler tests + the wpt-css/test262/tsc-corpus harvests) — **coverage-only and node-only by design** (no timed phase; runtime-invariant). Each set excludes what its own oracle calls invalid (the Svelte and tsc sets: what their canonical parser rejects; the prettier suites: what Prettier's specs and markers call invalid, plus harness files and the `.js` fixtures Prettier's parser reads as JSX; JS/TS suites are read module-then-script, approximating Prettier's own module-then-CommonJS retry), so each scores its oracle at 100% by construction, and the report splits coverage **per corpus source** (a group aggregate blends corpora — `parse/typescript` is mostly test262, i.e. ECMAScript). Coverage counts accepts and so rewards permissiveness; the opposite axis has inverted profiles, not gates: `deno task ts-repo:over-acceptance` (per-tool accepts over files tsc's parser rejects) and `deno task css:over-acceptance` (over files `parseCss` rejects; its reject-count pin makes movement in the deliberately unfiltered CSS reference row's grammar visible — the pin alone is `css:over-acceptance:pin`, a stamped `bench:pins:suites` leg, also graded by the coverage run). `deno task bench` = perf across all three runtimes + compose + the node coverage run. Correctness gates keep their own corpus scope. ./benches/js/CLAUDE.md §Corpus.
 
 ```bash
@@ -419,8 +421,8 @@ deno task bench:harvest:svelte-styles # the PERF-view CSS cache: stamped on the 
 
 deno task bench:deno:run -- --verbose   # per-file skip detail (counts always shown; paths/errors opt-in)
 
-# Env vars (any runtime): BENCH_LIMIT, BENCH_FILTER, BENCH_DURATION, BENCH_WARMUP, BENCH_MODE,
-# BENCH_CORPUS, BENCH_STALE_OK, BENCH_FORCED_ASYNC — semantics + defaults in ./benches/js/CLAUDE.md
+# Env vars (any runtime): BENCH_LIMIT, BENCH_FILTER, BENCH_PASSES, BENCH_DURATION, BENCH_WARMUP,
+# BENCH_MODE, BENCH_CORPUS, BENCH_STALE_OK, BENCH_FORCED_ASYNC — semantics + defaults in ./benches/js/CLAUDE.md
 BENCH_FILTER=zzz BENCH_LIMIT=10 deno task bench:deno:run
 ```
 

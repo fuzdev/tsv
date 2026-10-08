@@ -100,21 +100,23 @@ delta on the same row is the detector.
     sibling's (the site publishes both from this directory).
   - **`mixed_machine`** — the siblings' hardware identity disagrees; cross-runtime ratios are only
     meaningful on same-box siblings.
-  - **`within_noise`** — per-runtime cells whose difference is smaller than the combined cv of the
-    two means they divide. A ratio inherits both means' noise while printing neither, so the cells
-    that are NOT a runtime effect are named — a reading aid, not a significance test (that is
-    `benchmark_baseline_compare`'s Welch job, on a run the composer never sees). It needs ten
-    cleaned timings a side (printing `n` for the ones it calls), classifies every PAIR of present
-    runtimes (the site anchors its columns on node, so a base-only classification would leave the
-    bun/node column ungraded), and never names a row listed under `unstable_cells`.
-  - **`unstable_cells`** — per-runtime measurements whose cleaned or raw cv passed 10% or whose
-    `drift` passed 5%, marked `⚠` in the tables and on stderr. Collected AHEAD of the sample gate:
-    a measured 48% on five timings needs no minimum n to be believed. The bench floors iterations
-    at 8 (16 on the canonical rows) and drives the rest from `duration_ms`, so sample count spans
-    two orders of magnitude inside one table and many rows sit under ten — and `within_noise`
-    consumes cv in the direction where an UNDERestimate is expensive: it would report a real
-    runtime difference as "no difference", the one verdict a reader cannot check against the
-    table.
+  - **`within_noise`** — per-runtime cells whose difference is smaller than the combined noise of
+    the two means they divide. A ratio inherits both means' noise while printing neither, so the
+    cells that are NOT a runtime effect are named — a reading aid, not a significance test (that is
+    `benchmark_baseline_compare`'s Welch job, on a run the composer never sees). A side timed in
+    several passes is read on its PASS MEANS (their spread is the error its mean is made of — its
+    pooled `cv` is one sweep's spread, larger, and would call real differences noise), needing three
+    passes; a one-pass or older sibling is read on its cleaned `cv`, needing ten sweeps. Each entry
+    names its `basis` and prints `n` in that unit. It classifies every PAIR of present runtimes (the
+    site anchors its columns on node, so a base-only classification would leave the bun/node column
+    ungraded), and never names a row listed under `unstable_cells`.
+  - **`unstable_cells`** — per-runtime measurements whose cleaned or raw cv passed 10%, whose
+    `drift` passed 5%, or whose `pass_spread` passed 5%, marked `⚠` in the tables and on stderr.
+    Collected AHEAD of the sample gate: a measured 48% on five timings needs no minimum n to be
+    believed. `within_noise` consumes its estimate in the direction where an OVERestimate is
+    expensive — it would report a real runtime difference as "no difference", the one verdict a
+    reader cannot check against the table — so a thin estimate leaves a cell unclassified, while an
+    unstable one is named here.
   - **unequal file sets** (`⚠ files a/b/c`) — each runtime times the files *its* impls passed
     preflight on, so unequal counts mean a sliver of the ratio is file-set, not runtime.
   - **`partial_rows`** — rows one sibling measured and another doesn't carry at all, with no
@@ -125,6 +127,8 @@ delta on the same row is the detector.
 - **One bench body, runtime-detected.** `bench.ts` detects the runtime
   (`lib/runtime.ts` `current_runtime()`) and selects the runtime-specific artifacts.
   No forked entry; `bench:node:run` is just `node benches/js/bench.ts` plus runtime flags (`--expose-gc`).
+  The processes it starts ([Process model](#process-model)) are the same runtime, started with its
+  flags.
 - **Portable shared modules.** Shared/entry modules use `node:` builtins (Deno
   supports them) + `@fuzdev/fuz_util` helpers (`fs_search`, `fs_exists`,
   `spawn_out`, `to_file_path`) — **no `Deno.*`, no `@std/*`**. The only genuinely
@@ -730,9 +734,10 @@ Environment variables (any runtime's `:run`):
 | --- | --- |
 | `BENCH_LIMIT=5` | files per language (all) |
 | `BENCH_FILTER=zzz` | path pattern (none) |
-| `BENCH_DURATION=10000` | ms per benchmark (5000; conformance mode 15000) |
-| `BENCH_WARMUP=10` | warmup iteration FLOOR (3) |
-| `BENCH_WARMUP_MS=2000` | every row also warms at least this many ms (5000), sized from its own pre-flight sweep |
+| `BENCH_PASSES=2` | fresh processes each row is timed in (3) |
+| `BENCH_DURATION=10000` | ms per PASS of a row (5000; conformance mode 15000) |
+| `BENCH_WARMUP=10` | warmup iteration FLOOR per pass (3) |
+| `BENCH_WARMUP_MS=2000` | every pass also warms at least this many ms of wall time (5000) |
 | `BENCH_MODE=union` | per-impl iteration (intersection) |
 | `BENCH_CORPUS=conformance` | corpus/surface selector (perf) |
 | `BENCH_STALE_OK=1` | run despite stale artifacts (off) |
@@ -743,8 +748,84 @@ Environment variables (any runtime's `:run`):
 
 Warmup is time-floored because a fixed count left fast rows still tiering inside the measured
 window (negative drift on every runtime), and JSC keeps tiering for seconds, so 1 s was not enough
-for bun. One protocol per row on every runtime, no slow-task tier: floor 8 iterations (16 on the
-canonical rows), 5 s budget, warmup ≥ 5 s.
+for bun. A pass warms for `BENCH_WARMUP` sweeps and `BENCH_WARMUP_MS` of wall time, whichever ends
+later (`bench_row.ts` `warm_up`) — neither keyed on anything a row measured, in its own process or
+pre-flight's. One protocol per row on every runtime, no tier keyed on a row's own timing — per pass:
+a sweep floor of 8, the `BENCH_DURATION` budget, warmup ≥ 5 s and ≥ 3 sweeps — and every row runs
+`BENCH_PASSES` passes.
+
+#### Process model
+
+A timed run is **several processes of one runtime**, started one at a time by `bench.ts`:
+
+| Process | Script | Holds | Does |
+| --- | --- | --- | --- |
+| orchestrator | `bench.ts` | no engine, no corpus | starts the others one at a time and awaits each; pools the timings; writes the report |
+| pre-flight (one) | `bench_preflight.ts` | the corpus + every implementation | runs every row once per file untimed, grades the run's standing claims (perf coverage, the conformance pins, byte parity between tsv's bindings), writes each group's timed file set and a snapshot — then exits |
+| row (one per row per pass) | `bench_row.ts` | ONE engine + that row's file set | warms, times its sweeps, reports, exits |
+
+- **Why a process per row.** Timed back to back in one process, the rows moved each other's
+  numbers: engines that share code shape each other's type feedback, the collector sizes its young
+  generation from whatever has been allocating, and a wasm heap one row grew stays grown for the
+  next. A forced collection between rows resets where a row starts, not the regime it runs in. A
+  row's process loads only what the row calls — `init_row_task` (`lib/implementations.ts`)
+  initializes one slot, narrowed to the row (`InitScope`): the two multi-engine impls load one
+  engine (`canonical` prettier OR svelte/compiler OR acorn, `oxc` oxc-parser OR oxfmt), and they,
+  tsv's bindings and biome probe only the row's own call on its language (a tsv row names its
+  binding call — `BenchmarkTask.binding_call` — since the default parse and `{locations: true}`
+  share one facade call) — an init probe of another export, or of the row's under another option,
+  would run it through the call sites the row is about to be timed on.
+- **Why pre-flight is its own process.** It needs everything loaded, which is a large resident
+  heap; it exits before the first row is timed, so the timed rows run on a machine that holds
+  neither the corpus nor a dozen engines.
+- **Passes.** Each row is timed in `BENCH_PASSES` fresh processes. A group's passes run back to
+  back, each taking its rows in a different order (`lib/bench_plan.ts` `pass_order`: the
+  registration order, its reverse, then both started further round the list), so no row keeps one
+  predecessor — what a fixed order would still carry between rows is the machine itself (the row
+  after a long sweep starts hotter). A row's statistics pool its passes (`summarize_passes`;
+  how, under [Report files](#report-files)).
+- **What the passes publish.** Per row `pass_spread` — its slowest pass mean over its fastest —
+  which is the reading no single process can make: a level that depends on the process the row was
+  drawn in publishes a quiet `cv` from any one process. For the run, `process_noise` — the same
+  comparison over every pass pair of every row, a process-level A/A for free.
+- **How they talk.** A child is started on the path of a JSON spec and writes one JSON result to
+  the path the spec names (`lib/bench_protocol.ts`), under the run's scratch directory
+  `results/.run-<report tag>-<pid>/` (one per run, so concurrent runs never share one; created
+  empty, removed on a clean exit, gitignored). stdin and stdout stay the terminal's. A timed file
+  set is written whole — contents included — by the pre-flight process, so a row sweeps
+  byte-for-byte what pre-flight accepted, a harvested stylesheet that exists in no file on disk
+  included, and loads no corpus machinery to do it. The row's process decodes each file's content
+  again from its UTF-8 bytes, so it holds the strings as a file read does: under JSC one
+  `JSON.parse` of a set with any non-Latin-1 file returns every string 16-bit, which timed up to
+  ~1.5% slower on bun alone.
+- **A build mid-run ends the run.** Every pass loads the artifacts from disk again, so pre-flight
+  records the bytes of the ones it graded (a sha1 per executed artifact — by content, since a
+  no-op `build:bench` re-stamps mtimes) and each row's process checks them before it loads
+  anything (`assert_artifacts_unchanged`, `lib/check_artifact_freshness.ts`): a later pass would
+  otherwise time a binary pre-flight never graded. Don't build in this checkout while it runs.
+- **A failed child ends the run** with no report written: the child has already said why, and the
+  orchestrator names which child it was and prints the command that re-runs it alone against its
+  spec. The run's directory is then KEPT (its spec and file set are what that command reads);
+  `deno task bench:clean` removes it.
+- **A child that hangs after reporting** is killed and its result kept. A child's result is its
+  last act, renamed into place whole, so once it exists the measurement is done and only teardown
+  is left — and teardown has deadlocked (once, a Node row: result written, then parked on futexes
+  inside `exit(0)`). The orchestrator awaits each child, looking for its result once a second, and
+  kills one still running `EXIT_GRACE_MS` (30 s) after reporting; the report names it in
+  `exit_hangs`. Any other way a child ends without exit 0 still ends the run — a row that hangs
+  BEFORE reporting included, once it passes its deadline: three times what its warmup and window
+  floors cost at its pre-flight sweep time, plus five minutes for start-up (`lib/bench_plan.ts`
+  `row_deadline_ms`), so a stalled row ends the run in minutes rather than hours.
+- **Interrupting** stops the run at once, whether the signal reaches the whole foreground group
+  (Ctrl-C) or the orchestrator alone, which takes the child in flight down with it.
+- **Deno permissions** live in one place, `lib/bench_child.ts`: the `bench:deno:run` task grants
+  the orchestrator only what it does itself (read, write `results/`, run `deno` and `git`), since
+  Deno hands a child none of its parent's permissions. A child may write only the run's directory;
+  only pre-flight may spawn (git, gzip, deno, rsvelte-fmt) or reach the network — a timed row's
+  process can do neither, so a row that tried would fail rather than be measured doing it.
+- **Wall time** is several times the one-process run's: every pass of every row pays its own
+  start-up, engine load and warmup, and slow rows are floor-bound in each pass. `BENCH_PASSES` is
+  the dial; `BENCH_PASSES=1` is a single draw per row with no spread to report.
 
 `deno task bench` regenerates EVERY committed artifact the site consumes, reusing the node
 artifacts the perf half just built for the coverage run. It FAILS FAST if node or bun isn't
@@ -882,7 +963,7 @@ upstream RELEASES gives `pins:audit` no version to fail on, so they could go sta
 `pins:audit:checkouts` names them when they move). The stamps are what make the leg
 cost under a second when nothing has moved. Two of the pins have a second grader:
 `TEST262_POSITIVES_PIN` (its Rust twin, in `conformance:test262`) and
-`CSS_REJECTS_PIN` (the conformance coverage run, `bench.ts` `enforce_css_reject_pin`
+`CSS_REJECTS_PIN` (the conformance coverage run, `bench_preflight.ts` `enforce_css_reject_pin`
 — the oracle row's `parse/css` skips ARE the reject set). The two exclusion-cache
 pins, `SVELTE_REJECTS_PIN` and `PRETTIER_JSX_PIN`, get a weaker check from the same
 run: it refuses to publish over a cache whose size is not its pin, or an absent one
@@ -931,60 +1012,92 @@ beyond timing stats:
   from `version` 15, `files_iterated_digest` (a hash of that set's sorted paths — what
   `compose_reports.ts` compares across runtimes, since equal counts never proved equal sets); the
   RAW-timing stability readings `cv_raw` / `drift` / `raw_sample_size` / `outlier_ratio` beside the
-  cleaned `cv`; the protocol the row ran under (`warmup_iterations` / `min_iterations`); and, from
-  `version` 18, `settled_heap_bytes`.
+  cleaned `cv`; the protocol ONE PASS of the row ran under (`warmup_iterations` /
+  `min_iterations`); from `version` 18, `settled_heap_bytes`; and, from `version` 21, `passes`,
+  `pass_mean_ns` (each pass's mean sweep, over its own cleaned sweeps) and `pass_spread`.
+- top-level, from `version` 21: `process_noise` (`pairs`, `median`, `p95`, `max`) — how far two
+  fresh processes of the same row sat apart, over every pass pair of every timed row. `null` on a
+  coverage-only run and on a one-pass run.
+- top-level, from `version` 21: `exit_hangs` — the children killed after writing their result
+  because they hung in teardown ([Process model](#process-model)); their results stand. `[]` when
+  healthy.
+
+**Every timing statistic is over the row's passes** ([Process model](#process-model)), each
+family over the set it means across processes (`bench.ts` `pooled_stats`):
+
+- **The mean** (`mean_ns`, `ops_per_second`) is the passes' own means weighted EQUALLY, each pass
+  cleaned of outliers on its own (`pass_mean_ns`). Per pass, because the cleaner is for transients
+  inside a process: over the pooled series it reads a level shift between two passes as outliers
+  and trims a minority pass in part or whole. Equally, because each pass is one draw of the process
+  the row runs in — weighting by sweep count would make a duration-bound row's mean the harmonic
+  mean of its passes, leaning toward the faster draw.
+- **The dispersion** (`std_dev_ns`, `cv`) and `min_ns` are over every pass's cleaned sweeps around
+  that mean, so `cv` includes the variation BETWEEN processes; `cv_raw`, the percentiles,
+  `max_ns` and `raw_sample_size` are over every raw sweep (a floor-bound row's `raw_sample_size` is
+  `min_iterations × passes`).
+- **Not pooled:** `drift` is taken within each pass and the row carries the pass furthest from zero
+  (a level shift between two passes is not a cost that moved while a process was measured — that
+  is `pass_spread`'s), and `settled_heap_bytes` is the median over the passes.
+
+**`--compare-baseline` reads pass means.** Its Welch test treats its samples as independent draws,
+and the sweeps of one process are not — they share that process's level — so with several passes
+each row is compared on its pass means (n = passes, the sd between them), and a level that only
+moved between processes no longer reads as a significant regression. A few passes then need a
+larger difference to call one real, which is what a few processes can honestly tell apart. The
+within-pass noise the library's cv gate no longer sees is printed beside the comparison from the
+§Unstable Rows readings, and so is a pass count that differs from the baseline's (a one-pass run
+compares sweeps, as before, and raises its sweep floor to ten for them).
 
 **Why the raw readings.** A row whose cost moved WHILE it was measured (biome's wasm heap leak,
 below, once tipped Node into a slower regime mid-row) has its second mode deleted or blended by the
 MAD cleaner, so `cv` can read quiet over a mean that is neither mode; `drift` — the median of the
-second half of the timings against the first's — sees it, and its SIGN is the mechanism (negative
-still warming up, positive degrading). Warmup is sized by time (≥ `BENCH_WARMUP_MS` from the row's
-pre-flight sweep), so a fast row doesn't enter its window still tiering; there is no timing-keyed
-slow-task tier — the one per-row floor difference is the canonical rows'
-`CANONICAL_MIN_ITERATIONS` of 16, keyed on the row name so it is the same protocol on every
-runtime.
+second half of a pass's timings against the first's — sees it, and its SIGN is the mechanism
+(negative still warming up, positive degrading). Warmup is floored by time (≥ `BENCH_WARMUP_MS` of
+wall per pass), so a fast row doesn't enter its window still tiering; there is no
+timing-keyed tier, and no row carries a different floor from the rest.
+
+**Why `pass_spread`.** The readings above are all taken inside a process, and a row whose LEVEL
+depends on the process it runs in reads quiet in every one of them: bun's allocation-heavy pure-JS
+rows (prettier, postcss) have sat at two levels a tenth apart from one run to the next, each with
+a quiet `cv`. One process per row per pass draws that level several times in one run, and the
+spread between the draws is published instead of hidden.
 
 **`settled_heap_bytes`** is the JS heap (`heapUsed`) the row's warmup began from, read straight
-after the inter-task collection — a diagnostic. JSC schedules its next collection in proportion to
-the live heap, so an allocation-heavy pure-JS row (prettier, postcss) under bun runs up to ~15%
-faster from a larger settled heap; V8 rows do not move with it. It is a CONTROL rather than the
-explanation: those bun rows sit at one of two levels ~10–14% apart across runs, each with a quiet
-`cv`, while this field reproduces to the MB — so equal readings rule the heap out, and the two
-levels remain run-to-run variance the per-run stability checks cannot see (read a bun pure-JS cell
-as ±15%). Compare it first when one bun row reads differently in two runs — across runs of ONE
-runtime only: JSC's `heapUsed` counts the memory its heap answers for (wasm linear memories,
-buffers) and V8's does not, so the same harness reads ~1–1.5 GB under bun and ~140 MB under
-node/deno.
+after a full collection in the row's own process — its engine and its file set, nothing else — a
+diagnostic. JSC schedules its next collection in proportion to the live heap, so an
+allocation-heavy pure-JS row under bun can run measurably faster from a larger settled heap; V8
+rows do not move with it. Compare it first when one bun row reads differently in two runs: equal
+readings rule the heap out. Across runs of ONE runtime only — JSC's `heapUsed` counts the memory
+its heap answers for (wasm linear memories, buffers) and V8's does not.
 
 **One impl is reset between sweeps.** biome's `Workspace.openFile` retains ~4.5 B of wasm linear
 memory per source byte on every call and `closeFile` frees nothing (a genuine upstream leak, not a
 cache), and linear memory never shrinks, so `lib/biome.ts` re-instantiates the module once the
 sweeps it has run have grown its memory by more than 16 MiB (`RESET_GROWTH_BYTES`), offered in the
-untimed slots (the per-task `setup` beside the major GC every task gets, after each warmup sweep,
-and `on_iteration` between two timed sweeps) at ~10 ms a swap, 0% of any timing. So the svelte
-(+30 MB a sweep) and TypeScript (+117 MB) rows start EVERY sweep on a fresh instance, the css row
-(+4 MB) every ~4, and a millisecond-sweep `BENCH_LIMIT` row almost never (a 70 MB instantiation per
-millisecond sweep out-churns the collector; a probe read a 40x slowdown when the swap was
-unconditional).
+untimed slots of the row's process (its `setup` beside the major GC every row gets, after each
+warmup sweep, and `on_iteration` between two timed sweeps) at ~10 ms a swap, 0% of any timing. So
+the svelte (+30 MB a sweep) and TypeScript (+117 MB) rows start EVERY sweep on a fresh instance,
+the css row (+4 MB) every ~4, and a millisecond-sweep `BENCH_LIMIT` row almost never (a 70 MB
+instantiation per millisecond sweep out-churns the collector; a probe read a 40x slowdown when the
+swap was unconditional). The leak is the engine's own, so a process per row does not remove it: it
+grows with every sweep of one pass.
 
 - **Growth rather than a size**, because a grown heap's cost is runtime-dependent. On V8 it is a
-  STEP (sweep time flat to at least 974 MB on node, bare and inside the bench's process alike;
-  Node's external memory past ~1 GB is where it triples). On JSC it is a SLOPE only the bench's
-  process shows: bun's svelte row is flat in a bare process (857 ms to a 974 MB heap, cv 1.0%), but
-  after the group's prettier-class tasks have run it climbs ~0.4–1.2 ms per MB of buffer and falls
-  back at each reset, so a 320 MB size budget put a sawtooth inside the window (1217 ms at cv 8.6%,
-  drift past ±5% either way depending on where the resets landed; the TypeScript row's cv 3–4% the
-  same shape under the threshold) where a reset before every sweep reads 1046 ms at cv 1.4% in the
-  same context, for a fresh instance's first-sweep price of a few percent, paid on every runtime
-  alike. `diagnostics/biome_heap_probe.ts` holds the measurement; `lib/biome.ts`'s
-  `RESET_GROWTH_BYTES` the rule.
-- Such a row also WARMS in its `setup` (the library warming 0 times and the row carrying the
-  harness's count), because the library's warmup loop has no between-sweeps hook to offer the
-  reset in. That is the honest footing: every in-process impl starts each sweep from a settled
-  heap, and biome's is the one a GC cannot settle.
+  STEP (sweep time flat to at least 974 MB on node; Node's external memory past ~1 GB is where it
+  triples — which the TypeScript row's leak reaches inside one pass). On JSC it was a SLOPE only a
+  SHARED process showed: bun's svelte row is flat in a bare process, but among prettier-class
+  process-mates — how the bench timed a group before every row got its own process — it climbed
+  with the buffer's size and fell back at each reset, which is what set the threshold under one
+  svelte sweep's growth. `diagnostics/biome_heap_probe.ts` holds the measurements (its `--prelude`
+  reproduces the shared process); `lib/biome.ts`'s `RESET_GROWTH_BYTES` the rule, with a TODO to
+  re-measure whether an isolated row still needs it that low.
+- Every row WARMS in its `setup` (the library warming 0 times and the row carrying the count it
+  ran), because the library's warmup loop has neither a clock nor a between-sweeps hook — and this
+  row's reset is offered after each warmup sweep. That is the honest footing: every row starts each
+  sweep from a settled heap, and biome's is the one a GC cannot settle.
 
-**§Unstable Rows** trips on cleaned cv ≥ 10%, |drift| ≥ 5%, or raw cv ≥ 10% on a row under 30 raw
-samples (with hundreds of samples the raw cv is dominated by isolated GC pauses the cleaner rightly
+**§Unstable Rows** trips on cleaned cv ≥ 10%, |drift| ≥ 5%, pass spread ≥ 5%, or raw cv ≥ 10% on a row under 30 raw
+samples a pass (with hundreds of samples the raw cv is dominated by isolated GC pauses the cleaner rightly
 removes — one 80 ms pause among 600 × 8 ms sweeps reads 35% — so there the median drift is the
 detector, not the raw cv). ⚠ A longer `BENCH_DURATION` is NOT the answer to an unstable row: a
 drifting row's mean keeps moving with n, and at most sample counts the cleaner erases the
@@ -1059,10 +1172,11 @@ variant listed there usually just means its optional build task wasn't run; a th
 means its package shipped nothing where `binary_sizes.ts` looked; a `js bundle` label means
 `deno bundle` failed or was unreachable (`lib/canonical_bundles.ts`). `report.<runtime>.md`
 renders coverage/iterated as prose; the per-entry numbers, `suppressed_noise`, `variant_parity`,
-`unavailable`, and `binary_sizes_absent` are JSON-only.
+`unavailable`, `binary_sizes_absent` and `exit_hangs` are JSON-only (`process_noise` is the md's
+**Isolation:** line).
 
 The conformance report's **Excluded here:** / **Added here:** disclosures are authored prose whose
-CLAIM is checked: `surface_disclosure_lines` (bench.ts) throws if the table says a row is excluded
+CLAIM is checked: `surface_disclosure_lines` (bench_preflight.ts) throws if the table says a row is excluded
 and this surface registers it, or vice versa. The policy itself lives at the `corpus_kind`
 conditions in `lib/implementations.ts`, so the check keeps the published sentence from outliving
 the code — re-enabling yuku's N-API row after an upstream fix fails the run until the disclosure is
@@ -1243,7 +1357,7 @@ gates over every file.**
   public benchmark page's "What's measured" prose — keep them in sync.**
 
   **Every in-scope tool must process every file**, because it's code that ships: after the perf
-  pre-flight, `bench.ts` HARD-FAILS on any per-file failure not excused by `lib/perf_omit.ts`
+  pre-flight, `bench_preflight.ts` HARD-FAILS on any per-file failure not excused by `lib/perf_omit.ts`
   (`PERF_OMITS` — kept minimal, each entry typed by why the tool fails: a rival's own limit on
   declaration-file syntax (acorn-typescript has no `.d.ts` mode), syntax it does not implement
   (biome's experimental HTML path on real Svelte), the bench's synthetic `file.ts` name, a harvest
@@ -1423,7 +1537,12 @@ benches/js/
 ├── harvest_test262.ts     # `bench:harvest:test262`: graded positives → .cache (Deno-only)
 ├── harvest_ts_repo.ts     # `bench:harvest:ts-repo`: the tsc corpus's valid + rejects lists →
 │                          # .cache (Deno-only; tsc itself is the validity oracle)
-├── bench.ts               # Benchmark entry point (runtime-neutral)
+├── bench.ts               # Benchmark entry point (runtime-neutral): the ORCHESTRATOR — starts the
+│                          # pre-flight process and one process per timed row per pass, pools
+│                          # the timings, writes the report (§Process model)
+├── bench_preflight.ts     # The run's pre-flight process: corpus + every impl, per-file accept
+│                          # sets, the run's standing grades, the timed file sets + snapshot
+├── bench_row.ts           # One pass of one timed row, in a process holding that row's engine alone
 ├── conformance.ts         # Single-process pre-release aggregate driver: every leg, one
 │                          # module cache
 ├── smoke.ts               # Smoke test for formatters and parsers (runtime-neutral)
@@ -1472,6 +1591,17 @@ benches/js/
     ├── gate_counts.ts     # Pinned gate counts — see ../../docs/gate_counts.md
     ├── harvest_stamp.ts   # Harvest freshness stamps (checkout ids + pins + view entry lists) + the HARVEST_STAMPS table
     ├── implementations.ts # Implementation registry (branches native FFI vs N-API by runtime)
+    ├── bench_child.ts     # The orchestrator's spawn: one child at a time, blocking, its outcome
+    │                      # classified; the ONE home of the bench's Deno child permissions
+    ├── bench_config.ts    # The run's environment-derived configuration (`BENCH_*`), shared by
+    │                      # the orchestrator and the pre-flight process
+    ├── bench_plan.ts      # The pass arithmetic: the order each pass takes a group's rows in, and
+    │                      # pooling a row's passes (spread, within-pass drift, process noise) —
+    │                      # node-modules-free, unit-tested by bench_plan_test.ts
+    ├── bench_protocol.ts  # What the run's processes hand each other: the specs, the pre-flight
+    │                      # snapshot, a row's result
+    ├── bench_sweep.ts     # Shared by the two processes that RUN impls: the stderr noise filter
+    │                      # and the empty-output verdict
     ├── loc_cross_grade.ts # The `loc` cross-grade: tsv's loc wire vs the shipped `locations.js`
     │                      # reconstruction of its span-only wire (node-modules-free; shared by
     │                      # `scripts/check_loc.ts` and corpus_compare_parse's definition check)
@@ -1561,10 +1691,10 @@ benches/js/
 ## Error Tracking
 
 Benchmark failures are recorded during the up-front pre-flight pass (each task runs
-once per file untimed). The timed loop then iterates the pre-filtered intersection
+once per file untimed). A timed row's process then sweeps the pre-filtered intersection
 (or per-impl success set under `BENCH_MODE=union`), so throws during measurement
-would be real bugs — they're allowed to propagate rather than being silently
-catalogued.
+would be real bugs — they fail that process, and with it the run, rather than being
+silently catalogued.
 
 Two surfaces summarize what was skipped: the **effective corpus report** (per-benchmark
 coverage rate, e.g. `⚠ biome 500/660 files (76%)`) and the **skipped files report**
@@ -1605,9 +1735,9 @@ state) shows in the coverage report and skip counts without `--verbose`.
      `corpus_compare_format.ts` errors on semantically-empty prettier output for non-empty
      source; the prettier cache neither stores nor returns semantically-empty entries; the Rust
      sidecar's `run_prettier` returns a hard `DenoError::EmptyOutput` instead of `Ok("")`; and
-     the bench itself (`bench.ts` `empty_output_error` / `assert_output_present`, every format
-     row) records an empty output for a non-empty input as a skip in pre-flight and throws in
-     the timed loop — otherwise an empty return during a timed sweep would silently drop that
+     the bench itself (`lib/bench_sweep.ts` `empty_output_error` / `assert_output_present`, every
+     format row) records an empty output for a non-empty input as a skip in pre-flight and throws
+     in a timed sweep — otherwise an empty return during a timed sweep would silently drop that
      file's cost from prettier's sweep, the denominator of every published `Nx`. Deliberately
      **no retry** anywhere: a flaky oracle must stay loud.
 
@@ -1668,7 +1798,7 @@ state) shows in the coverage report and skip counts without `--verbose`.
   native oxc-parser correctly rejects.
   Rule: read getter-backed napi-WASI result fields **once into a local**
   (`lib/oxc_wasm.ts` does; `lib/oxc.ts` mirrors the form defensively). Two guards
-  exist: the single-read pattern at the wrappers, and `bench.ts`'s
+  exist: the single-read pattern at the wrappers, and `bench_preflight.ts`'s
   `check_variant_parity` — after pre-flight, same-engine pairs
   (tsv↔tsv-wasm variants, oxc-parser↔oxc-parser-wasm, yuku-parser↔yuku-parser-wasm,
   rsvelte-parse↔rsvelte-parse-skip-expr-loc) are compared file-for-file and
@@ -1719,19 +1849,15 @@ state) shows in the coverage report and skip counts without `--verbose`.
   0.57.0 on Deno 2.8.3), so the regression is on the Deno / napi-rs side; re-test the
   repro before ever removing the workaround. ⚠ It does NOT reproduce on Deno 2.9.7 —
   every timer in the repro fires, at the oxfmt pin on either side of a bump — so the
-  runtime no longer forces the workaround; bringing a cooldown back is now a
-  methodology choice (it would have to be uniform across the three runtimes, below),
-  not a bug dodge. In `bench.ts` oxfmt is invoked
-  per-iteration during the `format/*` loops; the leak shows up at the next inter-task
-  `await wait(cooldown_ms)`, which never fires. Workaround: `cooldown_ms: 0` in
-  `run_benchmark_group`'s `Benchmark` config. Async measurement loops (`prettier`,
+  runtime no longer forces the workaround. The hazard is to any timer awaited AFTER an
+  oxfmt call in the same process, and the timed phase no longer has one to hit: a row is
+  timed in a process of its own (`bench_row.ts`), one task, so the timing library's
+  inter-task cooldown never runs — the process still sets `cooldown_ms: 0`, and writes
+  its result and exits without awaiting a timer. Async measurement loops (`prettier`,
   `oxfmt` itself) are unaffected because their per-iteration awaits resolve via
-  microtasks, not timers. The inter-task SETTLE the cooldown would supply is not
-  lost with it: each task's untimed `setup` forces a major GC (`settle_heap`), which
-  is timer-free and uniform across the three runtimes — a runtime-conditional
-  cooldown would put a settle under Node/Bun and none under Deno, biasing the very
-  cross-runtime ratios this design exists to read (../../docs/benchmarks.md
-  §Fairness caveats).
+  microtasks, not timers. The pre-flight process calls oxfmt among every other impl, and
+  awaits no timer after it either. Keep it that way: a `setTimeout`-based wait added to
+  either process would hang under an affected Deno.
 - **wasm-opt** runs with explicit feature flags in `crates/tsv_wasm/Cargo.toml` —
   Rust 2024's bulk-memory and nontrapping-float-to-int ops, plus the simd128 and
   multivalue features the `.cargo/config.toml` rustflags enable, are passed by name
@@ -1779,4 +1905,4 @@ Documented above, though they live here: the parse-conformance gates
 | `wasm_format_probe.ts` | WASM **format** wall-time A/B at single-digit-% resolution (paired discipline: interleaved pairs, in-run A/A noise floor, byte-identity gate) | — |
 | `wasm_memory_probe.ts` | WASM **linear-memory high-water** for `format()` — the axis the wall-time probe can't see, and the gate for doc-IR memory work. `--cold` (per-file cold-start peak) or default steady-state | — |
 | `facade_probe.ts` | what the packages' facade costs per call over the flat exports beneath it, per binding × operation × language, and what separates a `tsv-wasm` row from the staged `@fuzdev/tsv-wasm` entry (which needs `deno task build:npm:all`). Same paired discipline (rotated interleaved arms, in-run A/A floor, byte-identity gate) over three sets — the perf corpus, its smallest tenth, one minimal source — plus the facade's one O(source) step (`isWellFormed`) priced alone. Runs under **all three runtimes** (its own load path, not `init_implementations`) | — |
-| `biome_heap_probe.ts` | does biome's sweep time move with its leaked wasm linear memory, per runtime? N consecutive full sweeps of one format row under a reset regime (`never` / `every` / the production rule), wall beside heap size, grow count and JSC's own heap stats per sweep; `--prelude prettier,oxfmt,…` first runs the group's earlier tasks in the same process, which is the state that decides the answer on bun. Runs under **node and bun** (not `deno task`: `node --expose-gc --disable-warning=ExperimentalWarning …` / `bun --expose-gc …`); what sized `RESET_GROWTH_BYTES` | — |
+| `biome_heap_probe.ts` | does biome's sweep time move with its leaked wasm linear memory, per runtime? N consecutive full sweeps of one format row under a reset regime (`never` / `every` / the production rule), wall beside heap size, grow count and JSC's own heap stats per sweep; `--prelude prettier,oxfmt,…` first runs the group's earlier rows in the same process — a SHARED process, which the bench no longer is (§Process model), and the state that decided the answer on bun. Runs under **node and bun** (not `deno task`: `node --expose-gc --disable-warning=ExperimentalWarning …` / `bun --expose-gc …`); what sized `RESET_GROWTH_BYTES` | — |

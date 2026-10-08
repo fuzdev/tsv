@@ -54,6 +54,11 @@ node_modules
 !/benches/js/results/report.tsc-conformance.json
 !/benches/js/results/report.tsc-conformance.md
 
+# A bench run's scratch directory — what its processes hand each other (specs,
+# results, the timed file sets). A clean run removes its own; one whose child failed
+# keeps it to reproduce from, as does one killed outright — `deno task bench:clean`.
+/benches/js/results/.run-*/
+
 # Env
 .env*
 !.env.example

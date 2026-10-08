@@ -140,10 +140,44 @@ export interface SourceFile {
 	goal_fallback?: boolean;
 }
 
+/**
+ * The one row a process is about to time, handed to `init` so an impl that fronts
+ * several engines loads only the one that row runs.
+ *
+ * A timed row is measured in a process of its own (`bench_row.ts`) so that no other
+ * engine's code, type feedback or allocation shares its heap — and an impl whose
+ * `init` loads or probes more than its row needs would put the confound straight
+ * back. `canonical` (prettier, svelte/compiler and acorn) and `oxc` (oxc-parser and
+ * oxfmt) load only what the row calls; tsv's three bindings (`TsvBinding.probe`) load
+ * one engine but probe only the row's own call (`call`) on its language, and biome
+ * only its language, since every other export they probe goes through the same call
+ * sites first. The rest
+ * ignore it — one call per engine, except rsvelte-parse, which probes both of its
+ * option rows over the one native `parse`. Without a scope `init` loads and probes
+ * everything, which is what pre-flight and every gate want.
+ */
+export interface InitScope {
+	operation: 'parse' | 'format';
+	language: Language;
+	/**
+	 * For a tsv row, the one binding call it times (`BenchmarkTask.binding_call`):
+	 * the default parse and `{locations: true}` share the facade's `parse_<lang>`, so
+	 * the operation alone would still probe the row's call site with the other's
+	 * options first. Absent for every other row.
+	 */
+	call?: BindingCall;
+}
+
+/** One of a tsv binding's published calls — the one a tsv row times (`InitScope.call`). */
+export type BindingCall = 'parse' | 'parse_with_locations' | 'parse_internal' | 'format';
+
 /** Common interface for parser/formatter implementations */
 export interface TsvImplementation {
-	/** Initialize the implementation (load WASM, open FFI library, etc.) */
-	init(): Promise<void>;
+	/**
+	 * Initialize the implementation (load WASM, open FFI library, etc.). `scope`
+	 * narrows a multi-engine impl to the one row about to be timed — see `InitScope`.
+	 */
+	init(scope?: InitScope): Promise<void>;
 
 	/** Check if parsing is supported for this language */
 	supports_parse_language(language: Language): boolean;
@@ -166,9 +200,10 @@ export interface TsvImplementation {
 
 	/**
 	 * Return the engine to a clean heap without a new process — for an impl whose
-	 * heap a GC cannot settle. The bench calls it in the UNTIMED slots: before a
-	 * task's warmup beside the major GC every task gets (`settle_heap`), after
-	 * every warmup sweep, and between every two timed sweeps — so a row measures
+	 * heap a GC cannot settle. A row's process (`bench_row.ts`) calls it in the
+	 * UNTIMED slots: before the warmup beside the major GC every row gets
+	 * (`settle_heap`), after every warmup sweep, and between every two timed sweeps
+	 * — so a row measures
 	 * the engine's work rather than what its previous sweeps left behind. The impl
 	 * owns the budget: it is called between EVERY two sweeps, so it must be a cheap
 	 * no-op while the retained state is small and act only once that state could
@@ -222,7 +257,7 @@ export abstract class BaseImplementation implements TsvImplementation {
 		return this.format_languages.includes(language);
 	}
 
-	abstract init(): Promise<void>;
+	abstract init(scope?: InitScope): Promise<void>;
 
 	abstract parse(source: string, language: Language, goal?: ParseGoal): unknown;
 

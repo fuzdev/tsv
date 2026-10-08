@@ -10,9 +10,39 @@
  * - WASM: tsv compiled to WASM (portable, near-native)
  * - Alternatives: oxc-parser, oxfmt, biome-wasm, dprint-wasm, yuku-parser (for comparison)
  *
- * Run with: deno task bench:deno:run (Deno) or deno task bench:node:run (Node).
- * The same body runs under both — it detects the runtime and writes a
- * runtime-labeled report (report.deno.* / report.node.*). See benches/js/CLAUDE.md.
+ * Run with: deno task bench:deno:run (Deno), deno task bench:node:run (Node) or
+ * deno task bench:bun:run (Bun). The same scripts run under all three — each detects
+ * the runtime and the run writes a runtime-labeled report (report.deno.* /
+ * report.node.* / report.bun.*). See benches/js/CLAUDE.md.
+ *
+ * ## Process model
+ *
+ * A run is several processes of one runtime, and this script is the one that holds
+ * none of what is measured:
+ *
+ * 1. **This process — the orchestrator.** It loads no engine and no corpus. It
+ *    starts the others one at a time and awaits each, then pools what
+ *    they measured and writes the report.
+ * 2. **One pre-flight process** (`bench_preflight.ts`). It loads the corpus and
+ *    every implementation, runs every row once over every file to learn what each
+ *    accepts, grades the run's standing claims, writes each group's timed file set
+ *    and a snapshot of what it learned — and exits, taking the corpus and every
+ *    loaded engine with it.
+ * 3. **One process per timed row per pass** (`bench_row.ts`). Each loads the one
+ *    engine its row runs and that row's file set, warms, times, reports and exits.
+ *    A row is timed in `BENCH_PASSES` such processes; each pass takes a group's rows
+ *    in a different order (`lib/bench_plan.ts` `pass_order`), and a row's published
+ *    statistics pool the timings of all its passes.
+ *
+ * Why: timed back to back in one process, the rows moved each other's numbers.
+ * Engines that share code shape each other's type feedback; the collector sizes its
+ * young generation from whatever has been allocating; a wasm heap one row grew
+ * stays grown for the next. A forced collection between rows resets where a row
+ * starts, not the regime it runs in, and a fixed order turns all of it into a
+ * per-position bias. A process per row removes the shared state rather than
+ * bounding it; several passes in different orders balance what the machine itself
+ * still carries from one row to the next, and their spread is published
+ * (`pass_spread` per row, `process_noise` for the run).
  *
  * CLI options:
  *   --json              Output results as JSON
@@ -27,14 +57,16 @@
  * to git). Conformance runs (BENCH_CORPUS=conformance) tag both filenames with `conformance.`
  * before the runtime (report.conformance.<runtime>.{json,md}).
  *
- * Environment variables:
+ * Environment variables (read in lib/bench_config.ts; every process of the run
+ * inherits them):
  *   BENCH_LIMIT         Limit files per language (default: all)
  *   BENCH_FILTER        Filter files by path pattern (default: none)
- *   BENCH_DURATION      Duration per benchmark in ms (default: 5000; 15000 in
+ *   BENCH_PASSES        Fresh processes each row is timed in (default: 3)
+ *   BENCH_DURATION      Duration of ONE PASS of a row in ms (default: 5000; 15000 in
  *                       conformance mode — full-corpus sweeps per iteration)
- *   BENCH_WARMUP        Warmup iteration FLOOR per row (default: 3); every row also
+ *   BENCH_WARMUP        Warmup iteration FLOOR per pass (default: 3); every pass also
  *                       warms for at least BENCH_WARMUP_MS, whichever is more
- *   BENCH_WARMUP_MS     Warmup duration floor per row in ms (default: 5000) — a
+ *   BENCH_WARMUP_MS     Warmup duration floor per pass in ms (default: 5000) — a
  *                       fast row's three sweeps were ~50 ms of warmup, and the
  *                       JIT was still tiering through the measured window; JSC
  *                       keeps tiering for seconds of wall time, so 1 s was not enough
@@ -68,7 +100,12 @@ declare global {
 
 import { z } from 'zod';
 import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.ts';
-import { Benchmark } from '@fuzdev/fuz_util/benchmark.ts';
+import { BenchmarkStats } from '@fuzdev/fuz_util/benchmark_stats.ts';
+import {
+	stats_confidence_interval_from_summary,
+	stats_min_max,
+	stats_outliers_mad
+} from '@fuzdev/fuz_util/stats.ts';
 import type { BenchmarkResult } from '@fuzdev/fuz_util/benchmark_types.ts';
 import {
 	benchmark_baseline_compare,
@@ -76,41 +113,76 @@ import {
 	benchmark_baseline_save
 } from '@fuzdev/fuz_util/benchmark_baseline.ts';
 import { spawn_out } from '@fuzdev/fuz_util/process.ts';
-import { createHash } from 'node:crypto';
+import { mkdirSync, rmSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { argv, env, exit, memoryUsage } from 'node:process';
+import process, { argv, exit, pid } from 'node:process';
 import { fileURLToPath } from 'node:url';
 import {
-	corpus_missing_entries,
-	type CorpusRepoRef,
-	type CorpusSource,
-	CorpusLoader,
-	type ExclusionCacheState,
-	format_mb,
-	group_by_language
-} from './lib/corpus.ts';
-import { detect_corpus_snapshot, enrich_source_repos } from './lib/corpus_repos.ts';
+	BenchChildError,
+	type ChildScript,
+	kill_running_child,
+	PREFLIGHT_DEADLINE_MS,
+	run_bench_child
+} from './lib/bench_child.ts';
 import {
-	generate_group_omissions_markdown,
-	type GroupOmissions,
-	PERF_OMITS,
-	type PerfOmit,
-	perf_omit_matches,
-	stale_perf_omits,
-	summarize_group_omissions
-} from './lib/perf_omit.ts';
+	BASELINE_DIR,
+	BENCH_DURATION,
+	BENCH_GC,
+	BENCH_PASSES,
+	BENCH_WARMUP,
+	BENCH_WARMUP_MS,
+	CORPUS_MODE,
+	type CorpusKind,
+	COVERAGE_ONLY,
+	IS_CONFORMANCE,
+	IS_LIMITED,
+	MAX_ERROR_MESSAGE_LENGTH,
+	OPERATIONS,
+	PASS_MIN_ITERATIONS,
+	REPORT_TAG,
+	RESULTS_DIR,
+	RUNTIME,
+	TASK_OPTIONS
+} from './lib/bench_config.ts';
 import {
-	get_alternative_versions,
-	get_benchmark_tasks,
-	get_defined_cells,
-	get_defined_rows,
-	init_implementations,
-	type UnavailableImpl,
-	unavailable_with_rows
-} from './lib/implementations.ts';
+	median_of,
+	pass_order,
+	type PassSummary,
+	type PassTimings,
+	type ProcessNoise,
+	summarize_passes,
+	summarize_process_noise,
+	RAW_CV_SAMPLE_CEILING,
+	row_deadline_ms,
+	sample_sd,
+	t_critical_95,
+	UNSTABLE_CV_THRESHOLD,
+	UNSTABLE_DRIFT_THRESHOLD,
+	UNSTABLE_PASS_SPREAD_THRESHOLD,
+	unstable_readings
+} from './lib/bench_plan.ts';
+import type {
+	ChildSpec,
+	PreflightGroup,
+	PreflightRow,
+	PreflightSnapshot,
+	PreflightSpec,
+	RowResult,
+	RowSpec,
+	VariantParityFinding
+} from './lib/bench_protocol.ts';
 import {
+	type BinarySize,
+	type CollectedBinarySizes,
+	generate_binary_size_markdown,
+	generate_binary_size_report
+} from './lib/binary_sizes.ts';
+import { type CorpusRepoRef, type CorpusSource, format_mb } from './lib/corpus.ts';
+import type { UnavailableImpl } from './lib/implementations.ts';
+import { generate_group_omissions_markdown, type GroupOmissions } from './lib/perf_omit.ts';
+import {
+	alternative_version_parts,
 	type CoverageBySource,
-	type EffectiveCorpusEntry,
 	generate_comparison_markdown,
 	generate_comparison_summary,
 	generate_coverage_by_source_markdown,
@@ -130,41 +202,16 @@ import {
 	type GroupResults,
 	parse_payload_tier,
 	type PayloadTier,
-	rows_missing_from_comparisons,
-	rows_missing_from_display_order,
-	rows_missing_from_payload_tiers,
-	type SourceCoverageCell,
-	alternative_version_parts,
-	type ReportVersions
+	type ReportVersions,
+	type SourceCoverageCell
 } from './lib/report.ts';
-import {
-	type BinarySize,
-	type CollectedBinarySizes,
-	collect_binary_sizes,
-	generate_binary_size_markdown,
-	generate_binary_size_report
-} from './lib/binary_sizes.ts';
+import { current_machine, type Machine, type Runtime } from './lib/runtime.ts';
 import {
 	CANONICAL_FORMATTER_ROW,
 	CANONICAL_PARSER_ROWS,
 	type Language,
-	LANGUAGES,
-	type SourceFile,
-	type TsvImplementation
+	LANGUAGES
 } from './lib/types.ts';
-import {
-	check_executed_artifacts,
-	warn_stale_reported_artifacts
-} from './lib/check_artifact_freshness.ts';
-import { CSS_REJECTS_PIN } from './lib/gate_counts.ts';
-import { check_node_modules } from './lib/check_node_modules.ts';
-import { current_machine, current_runtime, type Machine, type Runtime } from './lib/runtime.ts';
-
-/** The JS runtime executing this bench — labels the report siblings
- * (`report.deno.*` / `report.node.*`) and every row's `runtime` field, and
- * selects the runtime-specific native (FFI vs N-API) + WASM (deno vs nodejs
- * target) artifacts below. The same bench body runs under both. */
-const RUNTIME = current_runtime();
 
 //
 // CLI Arguments
@@ -213,9 +260,8 @@ const args = {
 	verbose: parsed.data.verbose
 };
 
-// Baseline statistics requested — raises the sample floors in the timed suite
-// (see `min_iterations` in `run_benchmark_group`) so the Welch comparisons run
-// on usable sample sizes. Costs wall clock only on baseline runs.
+// Baseline statistics requested — raises a one-pass run's sweep floor (see
+// `pass_min_iterations`), the one run whose Welch comparisons read sweeps.
 const baselining = args.save_baseline || args.compare_baseline;
 
 // In JSON/markdown mode, progress goes to stderr so stdout is clean structured output
@@ -229,180 +275,6 @@ function log(...messages: unknown[]): void {
 	}
 }
 
-//
-// stderr noise suppression
-//
-// Several third-party impls write to stderr directly during failure paths,
-// bypassing our per-file try/catch:
-//
-// - `prettier-plugin-svelte`/`prettier-plugin-oxfmt` log via `console.error`
-//   inside their babel-parser-fallback chain before re-throwing. The
-//   exception is caught and recorded as a skip; the console.error has
-//   already flushed.
-// - `biome` (WASM) uses `console_error_panic_hook` to write Rust panic
-//   text to stderr when an internal AST cast fails. Same shape: panic
-//   surfaces through wasm-bindgen as a thrown JS error we catch, but
-//   the panic hook has already written.
-//
-// Skips are already disclosed in the Skipped Files report. The console
-// output is pure noise. Filter by substring match against the wrapped
-// `console.error`. Patterns are intentionally narrow so unrelated
-// errors still surface.
-const NOISE_PATTERNS = [
-	// oxfmt 0.50 wraps the call site in backticks (`oxfmt::textToDoc()`),
-	// so match the unwrapped function name to survive minor wording shifts.
-	'oxfmt::textToDoc',
-	'panicked at crates/biome_rowan'
-];
-const original_console_error = console.error.bind(console);
-const suppressed_noise = new Map<string, number>();
-console.error = (...args: unknown[]): void => {
-	const probe = args
-		.map((a) => (a instanceof Error ? a.message : typeof a === 'string' ? a : ''))
-		.join(' ');
-	for (const pattern of NOISE_PATTERNS) {
-		if (probe.includes(pattern)) {
-			suppressed_noise.set(pattern, (suppressed_noise.get(pattern) ?? 0) + 1);
-			return;
-		}
-	}
-	original_console_error(...args);
-};
-
-//
-// Configuration
-//
-
-/** Parse optional non-negative integer from env var; malformed values fall back to undefined. */
-const env_int = (name: string): number | undefined => {
-	const val = env[name];
-	if (!val) return undefined;
-	const n = parseInt(val, 10);
-	return Number.isFinite(n) && n >= 0 ? n : undefined;
-};
-
-/** Limit files per language (default: all) */
-const MAX_FILES_PER_LANGUAGE = env_int('BENCH_LIMIT');
-
-/** Filter files by path pattern (default: none) */
-const FILE_FILTER = env.BENCH_FILTER;
-
-/** Warmup iteration floor (default: 3, every row — see `warmup_iterations_for`) */
-const BENCH_WARMUP = env_int('BENCH_WARMUP') ?? 3;
-
-/**
- * Warmup DURATION floor per row in ms (default: 5000). Warmup is an iteration
- * count in the timing library, so a fixed count warms a 25 ms row for 75 ms and a
- * 13 s row for 39 s: the fast rows entered their measured window with the JIT
- * still tiering, read as a negative `drift` on every runtime — median −1.9% on
- * rows under 50 ms — and a mean biased slow by about half of it, on exactly the
- * rows the ratios favor. Sizing warmup by TIME from the row's own pre-flight sweep
- * evens that out. The floor is 5 s, not 1 s, because tier-up is a wall-time
- * process and JSC's takes seconds: at a 1 s floor V8's rows settled (deno / node
- * fast-row drift −1.9% → −0.7…−1.0%) while bun's json and yuku rows still read
- * −6…−9% — a synthetic JSON.parse loop shows none of it, so it is the per-file
- * JS paths tiering, not the heap — and at 5 s the same rows read −0.2…+0.7%
- * (a CSS parse row: −9.0% → −0.2%). One floor on every runtime, since a
- * per-runtime warmup would be a second protocol on the rows this bench compares
- * across runtimes; the price is ~2.5 min of wall per runtime on the rows whose
- * three sweeps fall short of it, and the multi-second rows are unchanged.
- */
-const BENCH_WARMUP_MS = env_int('BENCH_WARMUP_MS') ?? 5000;
-
-/**
- * Enable the per-iteration forced-GC hook (default: off — measures realistic
- * throughput where GC happens opportunistically, matching real-world usage).
- * Set `BENCH_GC=1` to force a major GC between every iteration; useful for
- * stabilizing high-allocation workloads at the cost of penalizing efficient
- * low-allocation paths. See `docs/benchmarks.md` §Fairness caveats for the trade-off.
- */
-const BENCH_GC = env.BENCH_GC === '1';
-
-/**
- * Force a major GC — outside every timing loop — or no-op when the runtime wasn't
- * started with `--expose-gc`.
- *
- * The INTER-TASK settle, and it is a fairness control rather than a tuning knob.
- * Tasks run back-to-back in registration order with `cooldown_ms: 0` (the
- * oxfmt × Deno timer workaround — benches/js/CLAUDE.md §Known Issues), so without
- * it the garbage one task leaves behind is collected on the NEXT task's clock, and
- * a fixed task order turns that carryover into a systematic per-position bias:
- * `prettier` leads every format group and the alternatives always trail it.
- *
- * Run from each task's `setup` (which the timing library excludes from its
- * measurements), so every task — the first one after pre-flight included — starts
- * its warmup from a comparable heap. That is a different question from `BENCH_GC`,
- * which forces a collection between every ITERATION and so reshapes the measured
- * workload's own GC profile; this one only normalizes where each task begins, and
- * is therefore always on.
- *
- * "Comparable" is what the collection aims at, not what it guarantees, so the heap it
- * leaves is RECORDED per row (`settled_heap_bytes`). Under JSC the next collection is
- * scheduled in proportion to the live heap, so an allocation-heavy pure-JS row
- * (prettier, postcss) runs measurably faster from a larger settled heap, while V8's
- * young generation does not care. The reading is a CONTROL: it reproduces to the MB
- * across full bun runs, which is what rules the heap out when one of those rows reads
- * at a different level in two runs (they sit at two levels ~10–14% apart, each with a
- * quiet `cv`) — and what would name it if a harness change ever made the heap move.
- */
-const settle_heap = (tracking_key: string): void => {
-	globalThis.gc?.();
-	settled_heap_bytes.set(tracking_key, memoryUsage().heapUsed);
-};
-
-/**
- * Include the `tsv-forced-async` control row (default off). Same native engine
- * as `tsv`, routed through the awaited async path, to re-confirm that the
- * per-file await tax the async-only impls (`prettier`, `oxfmt`) pay is below the
- * noise floor. Kept opt-in so the noise-level row stays out of the published
- * report and the regression baseline; set `BENCH_FORCED_ASYNC=1` to enable.
- * See `BenchmarkTaskOptions.forced_async`.
- */
-const BENCH_FORCED_ASYNC = env.BENCH_FORCED_ASYNC === '1';
-
-/**
- * Iteration corpus mode. Default `intersection`: within each group, every
- * task is timed on the same all-N intersection (files every impl in the
- * group successfully processed in pre-flight). Comparisons across impls are
- * then apples-to-apples; one noisy impl shrinks the corpus for the whole
- * group, but the coverage report still discloses per-impl skip rates.
- *
- * Set `BENCH_MODE=union` to restore the per-impl iteration model (each task
- * runs its own preflight success set, ratios reflect different file sets) —
- * useful for reproducing pre-intersection numbers or auditing what the
- * intersection mode hides.
- */
-const BENCH_MODE = env.BENCH_MODE;
-if (BENCH_MODE !== undefined && BENCH_MODE !== 'intersection' && BENCH_MODE !== 'union') {
-	console.error(`Invalid BENCH_MODE: ${BENCH_MODE}. Expected 'intersection' or 'union'.`);
-	exit(1);
-}
-const USE_INTERSECTION = BENCH_MODE !== 'union';
-
-/** Which corpus/surface a report was produced from — see `BENCH_CORPUS`. */
-type CorpusKind = 'perf' | 'conformance';
-
-/**
- * Corpus + surface selector. Default `perf`: the real-world corpus view, parse
- * + format groups, writing `report.<runtime>.*` — the throughput headline.
- * `BENCH_CORPUS=conformance`: the fixtures-only corpus view (prettier suites +
- * the parse-conformance suites, disjoint from the perf/real corpus; a suite with
- * a validity oracle or harness is filtered to what it calls valid — see
- * `lib/corpus.ts` `EXCLUSION_CACHES` and `lib/prettier_fixtures.ts`),
- * parse groups ONLY, writing `report.conformance.<runtime>.*` — the per-tool
- * parse coverage/throughput surface. Format impls are deliberately excluded there:
- * grading formatter behavior on the fixture suites is the correctness gates'
- * job (`corpus:compare:format`), and timing it would put prettier/oxfmt/biome
- * through tens of thousands of fixture files for numbers nothing consumes.
- */
-const BENCH_CORPUS = env.BENCH_CORPUS;
-if (BENCH_CORPUS !== undefined && BENCH_CORPUS !== 'perf' && BENCH_CORPUS !== 'conformance') {
-	console.error(`Invalid BENCH_CORPUS: ${BENCH_CORPUS}. Expected 'perf' or 'conformance'.`);
-	exit(1);
-}
-const CORPUS_MODE: CorpusKind = BENCH_CORPUS === 'conformance' ? 'conformance' : 'perf';
-const IS_CONFORMANCE = CORPUS_MODE === 'conformance';
-
 // Baselines are a perf-surface tool (Welch-t regression detection on
 // throughput, one corpus-blind baseline.json). Conformance-mode changes are
 // coverage moves, reviewed via the committed report diff — sharing the
@@ -415,131 +287,196 @@ if (IS_CONFORMANCE && (args.save_baseline || args.compare_baseline)) {
 	exit(1);
 }
 
-/** Operations measured this run — conformance is a parse-only surface. */
-const OPERATIONS: ('parse' | 'format')[] = IS_CONFORMANCE ? ['parse'] : ['parse', 'format'];
+//
+// Run
+//
 
 /**
- * Report filename tag: `report.<tag>.{json,md}` and
- * `<timestamp>_<commit>.<tag>.{json,md}`. The conformance surface writes
- * sibling files rather than clobbering the perf reports (and stays invisible
- * to `compose_reports.ts`, which globs the exact perf filenames).
+ * The run's scratch directory: what its processes hand each other (a child's spec and
+ * result, the file sets the timed rows read). Inside `RESULTS_DIR` because that is the
+ * one place the Deno tasks may write. Named for the report AND this process, so no two
+ * runs share one — a perf and a conformance run of one runtime, or two of the same,
+ * would otherwise delete each other's directory at startup. The orchestrator's alone:
+ * a child is handed it (`PreflightSpec.run_dir`) rather than deriving it, since a
+ * child's own pid would name a different one.
  */
-const REPORT_TAG = IS_CONFORMANCE ? `conformance.${RUNTIME}` : RUNTIME;
+const RUN_DIR = `${RESULTS_DIR}/.run-${REPORT_TAG}-${pid}`;
 
 /**
- * Duration per benchmark in ms. The default is surface-dependent: 5000 for
- * perf, 15000 in conformance mode — there each iteration is a full sweep of
- * the much larger conformance corpus, so the slow rows need the longer
- * window for a usable sample count. `BENCH_DURATION` overrides either.
+ * Set when a child fails: the run's directory is then KEPT on exit, since the failed
+ * child's spec — and the file set a row's spec names — is what reproduces it.
  */
-const BENCH_DURATION = env_int('BENCH_DURATION') ?? (IS_CONFORMANCE ? 15_000 : 5000);
-/**
- * The sweep floor for the CANONICAL rows (`CANONICAL_FORMATTER_ROW`,
- * `CANONICAL_PARSER_ROWS`) — double the suite floor, because they are the
- * denominator of every published ratio and all of them are multi-second sweeps
- * that stop at the floor rather than the duration budget. See the task loop in
- * `run_benchmark_group`.
- */
-const CANONICAL_MIN_ITERATIONS = 16;
+let keep_run_dir = false;
 
 /**
- * Coverage-only mode (`BENCH_COVERAGE_ONLY=1`): run pre-flight — which fully
- * determines per-tool parse coverage — and emit the report straight from it,
- * SKIPPING the timed benchmark phase entirely. That phase costs a fixed floor
- * of full-corpus sweeps per row (the warmup floor plus the measured floor — the
- * canonical rows' is `CANONICAL_MIN_ITERATIONS`) no matter how low
- * `BENCH_DURATION` goes, yet the conformance surface's coverage consumers (the
- * site's per-engine table, `derive_conformance_groups`) read only the
- * pre-flight counts — so on a coverage refresh the whole timing cost is wasted.
- * Entries are emitted with null timing stats; the output stays the same
- * `report.<tag>.{json,md}` files (coverage is what a conformance report is
- * for). Orthogonal to `BENCH_CORPUS`, but only meaningful with `conformance` —
- * in perf mode the timing IS the headline.
+ * Start one child of the run and return what it reported, or end the run. A child
+ * that fails has already said why on this terminal, so the orchestrator adds the
+ * lines naming which child it was and how to re-run it alone, and exits non-zero —
+ * nothing is written, since a report missing a row (or its pre-flight) would not be
+ * the report of this run.
+ *
+ * A child that wrote its result and then hung in its own teardown is the exception
+ * (`lib/bench_child.ts` `EXIT_GRACE_MS`): it is killed, its result stands, and the
+ * hang is named here and recorded in the report (`exit_hangs`).
  */
-const COVERAGE_ONLY = env.BENCH_COVERAGE_ONLY === '1';
-if (COVERAGE_ONLY && !IS_CONFORMANCE) {
-	// Coverage-only is a conformance-surface mode. In perf mode it would skip the
-	// timed phase and then overwrite the perf report (`report.<runtime>.json`) with
-	// null-timing entries — corrupting the throughput headline. Reject the combo.
-	console.error(
-		'BENCH_COVERAGE_ONLY=1 requires BENCH_CORPUS=conformance (it is a conformance-only mode; ' +
-			'running it in perf mode would overwrite the perf report with null-timing entries).'
-	);
-	exit(1);
+async function run_child<TResult>(
+	script: ChildScript,
+	spec: ChildSpec,
+	spec_path: string,
+	label: string,
+	deadline_ms: number
+): Promise<TResult> {
+	try {
+		const { result, exit_hung } = await run_bench_child<TResult>(
+			script,
+			spec,
+			spec_path,
+			RUN_DIR,
+			label,
+			deadline_ms
+		);
+		if (exit_hung) {
+			exit_hangs.push(label);
+			log(`  ⚠ ${label} reported, then hung on exit and was killed — its result stands`);
+		}
+		return result;
+	} catch (e) {
+		console.error(`\n✗ ${e instanceof Error ? e.message : String(e)}`);
+		if (e instanceof BenchChildError) {
+			keep_run_dir = true;
+			console.error(
+				`  re-run it alone (from the repo root, with this run's BENCH_* environment):\n` +
+					`    ${e.command}\n` +
+					`  ${RUN_DIR} is kept for that; \`deno task bench:clean\` removes it`
+			);
+		}
+		return exit(1);
+	}
 }
 
-/** Maximum length of error message to display (longer messages are truncated) */
-const MAX_ERROR_MESSAGE_LENGTH = 200;
+/** Children that wrote their result and then hung on exit — see `run_child`. */
+const exit_hangs: string[] = [];
 
-/**
- * Baseline storage directory. Passed to `benchmark_baseline_save` /
- * `_compare`; the library calls `mkdir(path, { recursive: true })` and
- * writes `baseline.json` inside, so the file lands at
- * `./benches/js/results/baseline.json`. Moved into `results/` (from its
- * pre-0.60 location at `./benches/js/baseline.json`) so the library's
- * mkdir is covered by the existing `--allow-write=benches/js/results`
- * permission without widening write scope to the whole benches tree.
- */
-const BASELINE_DIR = './benches/js/results';
-
-/** Results directory for comparison JSON files */
-const RESULTS_DIR = './benches/js/results';
-
-//
-// Setup
-//
-
-log('Loading corpus...\n');
-const corpus_loader = new CorpusLoader(CORPUS_MODE, {
-	// The bench loads EVERY language, so it has no `{ complete_for }` posture to
-	// take here — `enforce_css_reject_pin` asks the per-language completeness
-	// question separately, and degrades that one pin to "not graded" rather than
-	// aborting a whole run over a corpus the other groups are fine with.
-	missing: env.BENCH_ALLOW_MISSING === '1' ? 'tolerate' : 'fail'
+// The run's scratch directory: created empty (a recycled pid could find one a failed
+// run kept), and removed when this process exits — unless a child failed
+// (`keep_run_dir`). The signal handlers exist so that an interrupt reaches the
+// `exit` listener, which also takes down the child in flight: children are spawned
+// asynchronously, so one would otherwise outlive an orchestrator stopped on its own.
+// An interrupt stops the run at once, whether it reaches the whole foreground group
+// (Ctrl-C) or this process alone.
+rmSync(RUN_DIR, { recursive: true, force: true });
+mkdirSync(RUN_DIR, { recursive: true });
+process.on('exit', () => {
+	kill_running_child();
+	if (!keep_run_dir) rmSync(RUN_DIR, { recursive: true, force: true });
 });
-// Drain `stream()` directly instead of `load()` so we skip the loader's
-// own corpus summary — bench.ts prints its own tighter one below that
-// includes byte counts and (when applicable) limit annotations.
-const files: SourceFile[] = [];
-for await (const file of corpus_loader.stream(log)) {
-	files.push(file);
-}
-// Reify each loaded source's GitHub origin (URL + commit + subpath) so the
-// report links straight to the measured code — a few cheap `git` calls.
-await enrich_source_repos(corpus_loader.sources);
-enforce_exclusion_caches(corpus_loader.exclusion_caches);
-const by_language = group_by_language(files);
+process.on('SIGINT', () => exit(130));
+process.on('SIGTERM', () => exit(143));
 
-// Preserve total counts before limiting
-const total_file_counts = {
-	svelte: by_language.svelte.length,
-	typescript: by_language.typescript.length,
-	css: by_language.css.length
+// What labels the report — when the run started, and the commit and tsv version it
+// measures — read now, before anything is built into a measurement: a run is hours
+// long, and a checkout or commit during it would otherwise label the report with
+// the tree as it stood at the end.
+const run_started = new Date().toISOString();
+const run_commit = await get_git_commit();
+const tsv_version = await get_tsv_version();
+
+//
+// Pre-flight
+//
+
+const preflight_spec: PreflightSpec = {
+	result_path: `${RUN_DIR}/preflight.result.json`,
+	log_to_stderr: structured_output,
+	run_dir: RUN_DIR
 };
+const snapshot = await run_child<PreflightSnapshot>(
+	'bench_preflight.ts',
+	preflight_spec,
+	`${RUN_DIR}/preflight.spec.json`,
+	'pre-flight',
+	PREFLIGHT_DEADLINE_MS
+);
 
-// Apply file filter and limit (`!== undefined` so an explicit BENCH_LIMIT=0
-// limits to zero files instead of silently meaning "no limit" — matching
-// `is_limited` below, which already treats 0 as a limited run)
-function limit_files(files: SourceFile[]): SourceFile[] {
-	const filtered = FILE_FILTER ? files.filter((f) => f.path.includes(FILE_FILTER)) : files;
-	return MAX_FILES_PER_LANGUAGE !== undefined
-		? filtered.slice(0, MAX_FILES_PER_LANGUAGE)
-		: filtered;
+//
+// Per-row pre-flight state (keyed by tracking_key, e.g. `parse/svelte/native`),
+// rebuilt from the snapshot in the shapes the report reads.
+//
+// `effective_corpus_size` and `skipped_files` always reflect pre-flight results,
+// independent of the iteration mode — they are the source of truth for coverage
+// disclosure. `effective_corpus_bytes` and `iterated_file_count` reflect what was
+// actually timed (intersection or per-impl).
+//
+
+/** Map row name → tracking_key per group, so the report can look a row up by display name. */
+const task_tracking_by_group: Map<string, Map<string, string>> = new Map();
+/** Effective corpus size per row (processed / total files). */
+const effective_corpus_size: Map<string, { processed: number; total: number }> = new Map();
+/** Effective corpus bytes per row — used for honest throughput math. */
+const effective_corpus_bytes: Map<string, number> = new Map();
+/**
+ * Files a timed row sweeps. Distinct from `effective_corpus_size` (which records
+ * pre-flight success — disclosure-only coverage info): in `intersection` mode this
+ * is the per-group all-N intersection (uniform across the rows of a group); in
+ * `union` mode it's the row's own pre-flight success set. Used by the bench-table
+ * `Nx (Mf)` annotation and the Comparisons table's pairwise file counts. A row
+ * that is not timed has NO entry, so its `files_iterated` reads `null`.
+ */
+const iterated_file_count: Map<string, number> = new Map();
+/**
+ * Per-row digest of the SORTED timed path set (see `BaselineEntry.files_iterated_digest`),
+ * recorded beside `iterated_file_count` for the same rows.
+ */
+const iterated_files_digest: Map<string, string> = new Map();
+/**
+ * Tracking keys of coverage-only rows — measured in pre-flight, never timed. See
+ * `BenchmarkTask.coverage_only`.
+ */
+const coverage_only_keys: Set<string> = new Set();
+
+for (const group of snapshot.groups) {
+	const task_tracking = new Map<string, string>();
+	for (const row of group.rows) {
+		task_tracking.set(row.name, row.tracking_key);
+		if (row.coverage_only) coverage_only_keys.add(row.tracking_key);
+		effective_corpus_size.set(row.tracking_key, { processed: row.processed, total: row.total });
+		effective_corpus_bytes.set(row.tracking_key, row.effective_bytes);
+		if (row.timed) {
+			iterated_file_count.set(row.tracking_key, row.timed.files);
+			iterated_files_digest.set(row.tracking_key, row.timed.digest);
+		}
+	}
+	task_tracking_by_group.set(group.name, task_tracking);
 }
 
-const svelte_files = limit_files(by_language.svelte);
-const ts_files = limit_files(by_language.typescript);
-const css_files = limit_files(by_language.css);
+/** Files a row failed on during pre-flight, with the error message. */
+const skipped_files: Map<string, Map<string, string>> = new Map(
+	Object.entries(snapshot.skipped_files).map(([tracking_key, by_path]) => [
+		tracking_key,
+		new Map(Object.entries(by_path))
+	])
+);
 
-// Track if corpus is limited
-const is_limited = MAX_FILES_PER_LANGUAGE !== undefined || FILE_FILTER !== undefined;
+/** The per-source coverage tables' data, back in the shape `lib/report.ts` renders. */
+const coverage_by_source: CoverageBySource = new Map(
+	Object.entries(snapshot.coverage_by_source ?? {}).map(([group, by_source]) => [
+		group,
+		new Map(
+			Object.entries(by_source).map(([source, cells]) => [source, new Map(Object.entries(cells))])
+		)
+	])
+);
 
-// Calculate total bytes per language for throughput metrics
-const bytes_by_language: Record<Language, number> = {
-	svelte: svelte_files.reduce((sum, f) => sum + f.bytes, 0),
-	typescript: ts_files.reduce((sum, f) => sum + f.bytes, 0),
-	css: css_files.reduce((sum, f) => sum + f.bytes, 0)
-};
+/**
+ * Third-party stderr noise the run's processes silenced, by pattern — pre-flight's
+ * counts, plus each timed row's as it reports (`lib/bench_sweep.ts`
+ * `suppress_stderr_noise`).
+ */
+const suppressed_noise: Map<string, number> = new Map(Object.entries(snapshot.suppressed_noise));
+
+//
+// Timed phase
+//
 
 /**
  * Format bytes/sec as MB/s. Always MB/s, even for sub-1-MB values
@@ -552,1720 +489,220 @@ function format_throughput(bytes_per_sec: number): string {
 	return `${(bytes_per_sec / 1_000_000).toFixed(1)} MB/s`;
 }
 
-// Compact corpus summary: file counts + MB per language + total. When
-// limited, each line reads `N of M files` so the subset is obvious.
-const total_files = svelte_files.length + ts_files.length + css_files.length;
-const total_bytes = bytes_by_language.svelte + bytes_by_language.typescript + bytes_by_language.css;
-const fmt_count = (n: number, total: number) =>
-	is_limited && n !== total ? `${n} of ${total}` : `${n}`;
-log(`Corpus (${CORPUS_MODE} view):`);
-log(
-	`  Svelte:      ${fmt_count(svelte_files.length, total_file_counts.svelte).padEnd(11)} files (${format_mb(
-		bytes_by_language.svelte
-	)})`
+/**
+ * `<sweeps/sec> (<MB/s>)` for a mean sweep time. Throughput uses the row's effective
+ * bytes (what it was timed on), and prints `—` rather than a misleading `0.0 MB/s`
+ * when the timed set is empty while sweeps/sec is real.
+ */
+function format_rate(tracking_key: string, mean_ns: number): string {
+	const sweeps_per_second = 1e9 / mean_ns;
+	const effective_bytes = effective_corpus_bytes.get(tracking_key) ?? 0;
+	const throughput =
+		effective_bytes === 0 ? '—' : format_throughput(sweeps_per_second * effective_bytes);
+	return `${sweeps_per_second.toFixed(1)} sweeps/sec (${throughput})`;
+}
+
+/**
+ * The sweep count a ONE-PASS baseline comparison wants under every row: there the
+ * Welch test reads sweeps (`baseline_results`), and its p-values sit in an
+ * unstable-DOF regime at n≈4-7 (the timing library's own n=30 floor exists to avoid
+ * it). With several passes it reads pass means instead, and no sweep floor adds one.
+ */
+const BASELINE_MIN_SAMPLES = 10;
+
+/**
+ * The sweep floor of one pass of every row — ONE protocol per row on every runtime,
+ * with no tier keyed on a row's own timing: a row straddling a timing threshold
+ * takes one tier under one runtime and the other under the next, which is two
+ * protocols published as one runtime ratio. `PASS_MIN_ITERATIONS`, raised to
+ * `BASELINE_MIN_SAMPLES` only for a one-pass run that saves or compares a baseline.
+ */
+const pass_min_iterations = Math.max(
+	PASS_MIN_ITERATIONS,
+	baselining && BENCH_PASSES === 1 ? BASELINE_MIN_SAMPLES : 0
 );
-log(
-	`  TypeScript:  ${fmt_count(ts_files.length, total_file_counts.typescript).padEnd(11)} files (${format_mb(
-		bytes_by_language.typescript
-	)})`
-);
-log(
-	`  CSS:         ${fmt_count(css_files.length, total_file_counts.css).padEnd(11)} files (${format_mb(
-		bytes_by_language.css
-	)})`
-);
-log(`  Total:       ${String(total_files).padEnd(11)} files (${format_mb(total_bytes)})`);
-log();
 
-// A run that measures NOTHING must not look like a run that measured everything.
-// Without this, a mistyped `BENCH_FILTER` (the values are path substrings, so a
-// typo matches nothing) loads every impl, "benchmarks" an empty corpus, writes a
-// report with no entries and exits 0 — the same vacuity the byte check and the
-// config probes each guard against, reached at the top level. Worse on the
-// unfiltered path: `is_limited` is false there, so an empty corpus (every entry
-// missing under BENCH_ALLOW_MISSING=1) would OVERWRITE the canonical report with an
-// empty one. Refuse before init, and name whichever knob emptied it, since the
-// corpus block above prints `0 of 773` without saying why.
-if (total_files === 0) {
-	const cause: string[] = [];
-	if (FILE_FILTER !== undefined) cause.push(`BENCH_FILTER=${FILE_FILTER} matched no path`);
-	if (MAX_FILES_PER_LANGUAGE !== undefined) cause.push(`BENCH_LIMIT=${MAX_FILES_PER_LANGUAGE}`);
-	console.error(
-		`Empty corpus — nothing to measure${cause.length > 0 ? `: ${cause.join(', ')}` : ''}.` +
-			(cause.length > 0
-				? '\n  The corpus loaded fine (see the counts above); the filter/limit removed every file.'
-				: '\n  Every corpus entry loaded zero files — check the paths above and `deno task doctor`.')
-	);
-	exit(1);
+/** What the timed phase learned about a row beyond its pooled `BenchmarkResult`. */
+interface TimedRow {
+	/** The row's passes, pooled — `lib/bench_plan.ts` `summarize_passes`. */
+	summary: PassSummary;
+	/** The fewest warmup sweeps any pass ran. */
+	warmup_iterations: number;
+	/** The median, over the passes, of the heap each pass's warmup began from. */
+	settled_heap_bytes: number;
 }
 
-// Refuse to measure stale binaries (the `:run` tasks skip the rebuild). Which
-// artifacts this runtime executes — FFI or N-API, plus that runtime's WASM target
-// — is `check_executed_artifacts`'s subject; override with BENCH_STALE_OK=1.
-await check_executed_artifacts();
-await warn_stale_reported_artifacts();
-
-// Friendly preflight: the canonical impls (prettier + svelte/compiler) resolve
-// from the harness `node_modules`; without it, init fails with an opaque
-// module-resolution error. Missing is fatal with the installer hint; stale (an
-// exactly-pinned dep whose installed version isn't the pinned one) is fatal too,
-// with BENCH_STALE_OK=1 as the escape — see lib/check_node_modules.ts.
-await check_node_modules();
-
-// Initialize implementations
-const impls = await init_implementations({ logger: log });
-
-/**
- * One row-composition claim about this surface, discriminated by which way it
- * points. `row` is the name `get_benchmark_tasks` registers, in both arms — that is
- * what makes the claim checkable rather than merely authored.
- */
-type SurfaceDisclosure =
-	/** Must NOT be registered on this surface. */
-	| { row: string; direction: 'excluded'; prose: string }
-	/**
-	 * Must BE registered here — carrying `initialized`, which answers whether the
-	 * impl behind the row came up on this machine. A row absent because its package
-	 * didn't load is a machine shortfall (already recorded in `unavailable`), not a
-	 * policy change, and this predicate is what draws that line. Only the `added`
-	 * direction has that question to ask: an `excluded` row is absent by policy
-	 * whether or not its impl loaded, so the shape doesn't carry a predicate nothing
-	 * would read.
-	 */
-	| { row: string; direction: 'added'; initialized: () => boolean; prose: string };
-
-/**
- * The conformance surface's row-composition disclosures: a row this surface drops,
- * or carries alone, with the reasoning a reader needs.
- *
- * The PROSE is authored (a rationale is not derivable), but the CLAIM is not: each
- * entry names the row it is about, and `surface_disclosure_lines` checks that claim
- * against the rows this surface's task REGISTRY produces before printing it. The
- * policy itself lives at the registration sites in `lib/implementations.ts`
- * (conditions on `corpus_kind`), so without that check this table is a second,
- * unlinked source of truth — and the one that gets stale, since re-enabling a row is
- * a change made there while a published report goes on claiming the row was
- * excluded. That is not hypothetical for the entry below: `benches/js/CLAUDE.md`
- * §Known Issues says to revisit yuku's exclusion on an upstream bump.
- *
- * The claim is checked against the REGISTRY rather than against the rows a run
- * measured, because those answer different questions: a corpus filter (`BENCH_LIMIT`
- * / `BENCH_FILTER`) can empty a whole group, and reading that as "the policy
- * changed" failed a partial run at report time — after its work, with nothing
- * written. A filter can only remove rows, never add one, so the registry is the
- * filter-proof form of the same question, and it can be asked before the run
- * measures anything.
- *
- * Mirrors the presence-gated fairness notes in `lib/report.ts`
- * (`comparison_notes`), which derive the same way — from what the run actually
- * produced rather than from a second hand-kept list.
- */
-const SURFACE_DISCLOSURES: ReadonlyArray<SurfaceDisclosure> = [
-	{
-		row: 'yuku-parser',
-		direction: 'excluded',
-		prose:
-			'**Excluded here:** yuku-parser (N-API) — its native binding faults the host process on ' +
-			'this corpus (test262 escaped-identifier fixtures), so it cannot be measured against it. ' +
-			'The WASM binding runs the same engine and carries the row; both are measured on the perf ' +
-			'corpus.\n'
-	},
-	// The two `+locations` rows, one entry each because the claim is checked per row:
-	// consumer-cost rows whose parse IS the default row's, so on a coverage surface
-	// they would add nothing but a duplicate of that row's coverage.
-	{
-		row: 'tsv+locations',
-		direction: 'excluded',
-		prose:
-			'**Excluded here:** tsv+locations — the default span-only parse plus `loc` ' +
-			'reconstructed in JS (`{locations: true}`), a consumer-cost row measured on the perf ' +
-			'corpus. The parse it runs is tsv’s, so its coverage is that row’s.\n'
-	},
-	{
-		row: 'tsv-wasm+locations',
-		direction: 'excluded',
-		prose:
-			'**Excluded here:** tsv-wasm+locations — the same consumer-cost row over the WASM ' +
-			'binding; its coverage is tsv-wasm’s.\n'
-	},
-	{
-		// The mirror-image disclosure: a row present ONLY here needs saying as much
-		// as one absent, and `tsc`'s reading changes by corpus source — it is the
-		// oracle on the corpus it filtered, an independent parser everywhere else.
-		row: 'tsc',
-		direction: 'added',
-		initialized: () => impls.tsc !== undefined,
-		prose:
-			'**Added here:** tsc — the TypeScript compiler’s own parser, a verdict rather than a ' +
-			'speed, so it carries no row on the throughput surface. Its parser is error-recovering ' +
-			'(`createSourceFile` never throws), so an accept means zero `parseDiagnostics`. On the ' +
-			'tsc corpus it is the ORACLE that selected those files — 100% by construction, like ' +
-			'svelte/compiler on the Svelte set — and an independent parser on every other source, ' +
-			'which is what the per-source tables below are for. Coverage counts accepts and so ' +
-			'cannot show over-acceptance; that axis is `deno task ts-repo:over-acceptance`.\n'
-	}
-];
-
-/**
- * This run's task-registry options, in one place: the row-composition guards below
- * and the timed pass must ask the registry the SAME question, and two spellings of
- * `{forced_async, corpus_kind}` were free to drift into asking different ones.
- */
-const TASK_OPTIONS = { forced_async: BENCH_FORCED_ASYNC, corpus_kind: CORPUS_MODE } as const;
-
-/**
- * Render `SURFACE_DISCLOSURES`, THROWING if a claim disagrees with this surface's
- * registry. A wrong disclosure is worse than none: it is a published sentence
- * asserting a policy the code no longer implements, and nothing else in the report
- * contradicts it (an absent row leaves no trace, which is the whole reason the
- * disclosure exists).
- *
- * An `added` row asks TWO questions, of two different sources, because `registered`
- * is availability-independent and so can only answer the first: does this surface
- * DEFINE the row (policy — a `no` is drift, and throws), and did its impl come up
- * on this MACHINE (a `no` is a shortfall, already in `unavailable` — the run warns
- * and drops the prose rather than explaining a row the report doesn't carry).
- * Collapsing them into one `!present` test loses whichever question the registry
- * isn't answering: against the live set a stale claim can never throw on a machine
- * missing the impl, and against the defined set the shortfall goes unnoticed.
- */
-function surface_disclosure_lines(registered: Set<string>): {
-	lines: string[];
-	warnings: string[];
-} {
-	const lines: string[] = [];
-	const warnings: string[] = [];
-	for (const d of SURFACE_DISCLOSURES) {
-		const present = registered.has(d.row);
-		if (d.direction === 'excluded' && present) {
-			throw new Error(
-				`report disclosure is stale: it says '${d.row}' is excluded from the conformance ` +
-					`surface, but this surface registers it. Update SURFACE_DISCLOSURES in bench.ts to ` +
-					`match the registration in lib/implementations.ts.`
-			);
-		}
-		if (d.direction === 'added') {
-			// Two independent questions, each asked of the source that can answer it.
-			// POLICY: does this surface define the row at all? `registered` is the
-			// availability-independent set, so a `false` here is a decision in
-			// `lib/implementations.ts` and nothing else — the stale-claim case.
-			if (!present) {
-				throw new Error(
-					`report disclosure is stale: it says '${d.row}' is added on the conformance surface, ` +
-						`but this surface does not register it. Update SURFACE_DISCLOSURES in bench.ts to ` +
-						`match the registration in lib/implementations.ts.`
-				);
-			}
-			// MACHINE: the surface defines the row, but did the impl behind it come
-			// up here? If not, the prose would explain a row this report doesn't
-			// carry. Asked separately because `registered` deliberately cannot see it.
-			if (!d.initialized()) {
-				warnings.push(
-					`⚠ '${d.row}' did not initialize, so its "Added here" disclosure is omitted from ` +
-						`this report (see \`unavailable\`).`
-				);
-				continue;
-			}
-		}
-		lines.push(d.prose);
-	}
-	return { lines, warnings };
-}
-
-// Resolve the conformance report's row-composition disclosures HERE — before the
-// pre-flight and timed phases — so a stale claim fails immediately, rather than at
-// report time after a full run whose output the throw would then discard.
-// The first two checks below ask the same registry, so it is built ONCE — two calls
-// would invite them to answer from different sets after a future edit. (The payload-tier
-// check further down asks a PARSE-scoped one of its own: a `DefinedRow` carries no
-// operation to filter this one by.)
-//
-// The rows this surface DEFINES, not the rows this machine can run: both questions
-// below are about policy, and answering them from the live set makes an `excluded`
-// claim pass vacuously whenever the impl merely failed to load (see
-// `get_defined_rows`). It is also why the answer is stable across machines — a row
-// missing here is a decision, never a shortfall.
-//
-// The report's `unavailable` joins against this same list (`unavailable_with_rows`,
-// at save time), so it is computed once here for all three readers.
-const DEFINED_ROWS = get_defined_rows(impls, OPERATIONS, TASK_OPTIONS);
-const REGISTERED_ROWS = new Set(DEFINED_ROWS.map((r) => r.name));
-const { lines: SURFACE_DISCLOSURE_PROSE, warnings: surface_disclosure_warnings } = IS_CONFORMANCE
-	? surface_disclosure_lines(REGISTERED_ROWS)
-	: { lines: [], warnings: [] };
-for (const warning of surface_disclosure_warnings) log(warning);
-
-// The report's row order is hand-maintained and UNCHECKED in the other direction:
-// an unlisted name doesn't fail, it sorts silently to the end (`report.ts`
-// `rows_missing_from_display_order`). Same drift shape as a stale disclosure, one
-// severity down — a misordered table misleads nobody the way a false sentence does
-// — so this warns where the disclosure check throws. Runs on both surfaces, since
-// each registers rows the other doesn't.
-const unordered_rows = rows_missing_from_display_order(REGISTERED_ROWS);
-if (unordered_rows.length > 0) {
-	log(
-		`⚠ ${unordered_rows.join(', ')} — not in report.ts DISPLAY_ORDER, so ${
-			unordered_rows.length === 1 ? 'it sorts' : 'they sort'
-		} last in every table`
-	);
-}
-
-// The Comparisons tables' opponent list, asked the same way and at the same
-// severity. Its drift is quieter than DISPLAY_ORDER's — an unlisted row doesn't
-// sort oddly, it simply has no cell — and that is how `swc`, `postcss`,
-// `rsvelte-parse` and `malva-wasm` each came to be registered, preflighted and
-// timed at full coverage while appearing in no comparison at all. A row that
-// genuinely belongs in none is listed in `COMPARISON_EXCLUSIONS` with its reason,
-// so this can reach zero rather than being a warning nobody can clear.
-const uncompared_rows = rows_missing_from_comparisons(REGISTERED_ROWS);
-if (uncompared_rows.length > 0) {
-	log(
-		`⚠ ${uncompared_rows.join(', ')} — neither an opponent in report.ts ` +
-			`COMPARISON_SECTIONS nor excused in COMPARISON_EXCLUSIONS, so ${
-				uncompared_rows.length === 1 ? 'it appears' : 'they appear'
-			} in no Comparisons table`
-	);
-}
-
-// The parse rows' payload tiers (`report.ts` `PARSE_PAYLOAD_TIERS`), asked the same
-// way: an unlisted parse row publishes `payload: null`, which a consumer can read
-// only as "unknown" — and an `Nx` it renders from that row then carries no word on
-// whether the two products match.
-const untiered_rows = rows_missing_from_payload_tiers(
-	get_defined_cells(impls, 'parse', TASK_OPTIONS)
-);
-if (untiered_rows.length > 0) {
-	log(
-		`⚠ ${untiered_rows.join(', ')} — no entry in report.ts PARSE_PAYLOAD_TIERS, so ${
-			untiered_rows.length === 1 ? 'it publishes' : 'they publish'
-		} \`payload: null\``
-	);
-}
-
-//
-// Benchmark Helpers
-//
-
-//
-// Per-impl tracking maps (keyed by tracking_key, e.g. `parse/svelte/native`).
-//
-// Populated by the **untimed pre-flight pass** before each group's timed
-// bench run. The pre-flight records each impl's success/skip set; the timed
-// loop then iterates either the per-group all-N intersection (default) or
-// each impl's preflight success set (`BENCH_MODE=union`).
-//
-// `successful_files` and `skipped_files` always reflect preflight results,
-// independent of the iteration mode — they are the source of truth for
-// coverage disclosure. `effective_corpus_bytes` and `iterated_file_count` are
-// updated to reflect what was actually timed (intersection or per-impl).
-//
-
-/** Files an impl successfully processed during pre-flight, keyed by tracking_key. */
-const successful_files: Map<string, Set<string>> = new Map();
-/** Files an impl failed on during pre-flight, with the error message. */
-const skipped_files: Map<string, Map<string, string>> = new Map();
-/**
- * Of `successful_files`, the ones accepted only on the Script-goal retry a
- * `goal_fallback` file allows (`SourceFile.goal_fallback`), keyed by tracking_key —
- * surfaced per source as `SourceCoverageCell.script_only`.
- */
-const script_only_files: Map<string, Set<string>> = new Map();
-
-/**
- * `files` with each goal the timed sweep must replay: `script` for a file only the
- * `goal_fallback` retry accepted, the file's own goal otherwise. Replayed at its
- * own (module) goal, a script-only file throws inside the timed loop, where a throw
- * is a harness failure rather than a skip. Rewritten once, ahead of the sweep, so
- * the timed loop pays no per-file lookup.
- */
-function with_accepted_goals(tracking_key: string, files: SourceFile[]): SourceFile[] {
-	const script_only = script_only_files.get(tracking_key);
-	if (!script_only) return files;
-	return files.map((f): SourceFile => (script_only.has(f.path) ? { ...f, goal: 'script' } : f));
-}
-/** Effective corpus size per benchmark (processed / total files). */
-const effective_corpus_size: Map<string, { processed: number; total: number }> = new Map();
-/** Effective corpus bytes per benchmark — used for honest throughput math. */
-const effective_corpus_bytes: Map<string, number> = new Map();
-/**
- * Files actually iterated by the timed loop per task. Distinct from
- * `effective_corpus_size` (which records preflight success — disclosure-only
- * coverage info): in `intersection` mode this is the per-group all-N
- * intersection (uniform across tasks in a group); in `union` mode it's the
- * task's preflight success set. Used by the bench-table `Nx (Mf)` annotation
- * and the Comparisons table's pairwise file counts.
- */
-const iterated_file_count: Map<string, number> = new Map();
-/**
- * Per-task digest of the SORTED timed path set (see `BaselineEntry.files_iterated_digest`),
- * recorded beside `iterated_file_count` for the same tasks.
- */
-const iterated_files_digest: Map<string, string> = new Map();
-/**
- * Wall-clock ms for one preflight pass per task (iterating every file once).
- * Sizes each task's warmup by time (`warmup_iterations_for`).
- */
-const preflight_elapsed_ms: Map<string, number> = new Map();
-
-/**
- * Warmup sweeps the HARNESS ran in a task's `setup`, by tracking_key — the rows whose
- * impl declares `reset_heap`, which warm outside the library's loop (task loop in
- * `run_benchmark_group`). Read back when the row is serialized, since the library
- * reports 0 for them. Keyed by tracking_key, not display name: one impl's rows share
- * a name across groups, and a name-keyed map published the LAST group's count on
- * every one of them (biome's css warmup, ~45, on its svelte and typescript rows).
- */
-const harness_warmups: Map<string, number> = new Map();
-/**
- * The JS heap (`heapUsed`) each row's `settle_heap` left behind, read straight after
- * the collection — the heap the row's warmup began from. Keyed by tracking_key for
- * the reason `harness_warmups` is.
- */
-const settled_heap_bytes: Map<string, number> = new Map();
-/**
- * Map result.name → tracking_key per group, so the markdown report can look up
- * coverage/throughput by display name (the bench library doesn't surface tracking_key).
- */
-const task_tracking_by_group: Map<string, Map<string, string>> = new Map();
-
-function record_skip(bench_name: string, file_path: string, error: unknown): void {
-	if (!skipped_files.has(bench_name)) {
-		skipped_files.set(bench_name, new Map());
-	}
-	const bench_map = skipped_files.get(bench_name)!;
-	if (bench_map.has(file_path)) return;
-	const error_msg = error instanceof Error ? error.message : String(error);
-	bench_map.set(file_path, error_msg);
-}
-
-/**
- * Tracking keys of coverage-only tasks — measured in pre-flight, never timed.
- * Populated per group by `run_preflight_group`, and read wherever a task's
- * participation would otherwise be assumed: the intersection, the perf
- * hard-fail, and the timed loop. See `BenchmarkTask.coverage_only`.
- */
-const coverage_only_keys: Set<string> = new Set();
-
-/**
- * Fail the run if the perf pre-flight skipped any file for an in-scope task that
- * `PERF_OMITS` doesn't excuse. `skipped_files` is keyed by tracking_key and only
- * ever holds in-scope failures (a task exists only for the languages its impl
- * declares), so every unlisted entry is a real regression. Sorted, one line per
- * violation, so a reviewer can transcribe a genuine tolerance straight into
- * `PERF_OMITS`.
- *
- * Coverage-only tasks are exempt: the invariant says every tool whose THROUGHPUT
- * we publish must process every real-world file, and a coverage-only row
- * publishes no throughput — sub-100% there is the measurement, not an erosion of
- * one.
- *
- * The list is graded in BOTH directions, which is what makes it a ratchet rather
- * than an accumulator: an unlisted failure fails (above), and — on a full run — an
- * entry that excused nothing fails too (`stale_perf_omits`). One direction alone
- * lets a tolerance outlive the failure it was written for. Same posture as
- * `lib/fixtures_gate.ts`'s sanction / known-gap freshness check. (Neither
- * direction catches an entry written too BROADLY — that stays the author's job;
- * see `stale_perf_omits`.)
- *
- * Between the two sits the DISJOINTNESS check, which needs no full run: a failure
- * that more than one entry claims fails here, whatever the corpus scope, because
- * the overlap was observed rather than inferred. It is what makes the staleness
- * direction trustworthy — under a first-match reading an overlapping pair credits
- * only the earlier entry, and the shadowed one then reports as stale while the
- * failure it describes is live. Every match is credited (`perf_omit_matches`), so
- * that misreport is unreachable even if this check is somehow bypassed.
- *
- * Staleness is asked only of entries this run could have exercised, along two
- * independent axes, because "matched nothing" otherwise indicts the ledger for
- * something else's absence:
- *
- * - the TASK, passed down as the graded tracking keys. Every alternative impl is
- *   optional, and one that fails to load registers no task, so its entries can
- *   never fire — on that machine they are unasked, not stale. Coverage-only keys
- *   drop out for the mirror reason: they're exempt from the violation pass above,
- *   so nothing there can ever mark an entry used.
- * - the FILES, which is `full_corpus`: a filter or a partial checkout withholds
- *   the very files an entry is about, and reading that as staleness would fail
- *   every `BENCH_LIMIT` run.
- */
-function enforce_perf_coverage(full_corpus: boolean): void {
-	const violations: string[] = [];
-	const used = new Set<PerfOmit>();
-	/**
-	 * Distinct overlapping CLAIM SETS, keyed by the entries that make them up — a
-	 * broad entry reaching a narrow one's file can shadow it across dozens of
-	 * files, and that is one ledger defect to fix, not dozens to read.
-	 */
-	const overlaps = new Map<string, { entries: PerfOmit[]; count: number; example: string }>();
-	for (const [tracking_key, files] of skipped_files) {
-		if (coverage_only_keys.has(tracking_key)) continue;
-		for (const [path, error] of files) {
-			const matches = perf_omit_matches(PERF_OMITS, tracking_key, path);
-			if (matches.length === 0) {
-				violations.push(`  ${tracking_key}  ${path}: ${error}`);
-				continue;
-			}
-			for (const match of matches) used.add(match);
-			if (matches.length === 1) continue;
-			const key = matches.map((o) => `${o.task ?? '<any>'} @ ${o.path}`).join(' || ');
-			const seen = overlaps.get(key);
-			if (seen) seen.count += 1;
-			else overlaps.set(key, { entries: matches, count: 1, example: `${tracking_key}  ${path}` });
-		}
-	}
-	// Both are ledger failures and both are worth seeing in one pass: an unlisted
-	// failure is a tool regression, an overlap is the list itself being ambiguous,
-	// and fixing either in ignorance of the other invites a second round trip.
-	let failed = false;
-	if (violations.length > 0) {
-		violations.sort();
-		console.error(
-			`Perf corpus: ${violations.length} unlisted pre-flight failure(s). Every in-scope tool must ` +
-				`process every real-world file — fix the tool, or add a reviewed entry (with a reason) to ` +
-				`PERF_OMITS in lib/perf_omit.ts:\n${violations.join('\n')}`
-		);
-		failed = true;
-	}
-	if (overlaps.size > 0) {
-		console.error(
-			`Perf corpus: ${overlaps.size} pre-flight failure shape(s) claimed by more than one ` +
-				`PERF_OMITS entry. Entries must be DISJOINT — while two both match, neither is the entry ` +
-				`that describes the failure, and one of them is redundant or reaches past what it was ` +
-				`written for. Narrow or merge them in lib/perf_omit.ts:\n` +
-				[...overlaps.values()]
-					.map(
-						(o) =>
-							`  ${o.example}${o.count === 1 ? '' : ` (and ${o.count - 1} more file(s))`}\n` +
-							o.entries
-								.map((e) => `      claimed by  ${e.task ?? '<any task>'}  ${e.path}`)
-								.join('\n')
-					)
-					.join('\n')
-		);
-		failed = true;
-	}
-	if (failed) exit(1);
-
-	if (!full_corpus) return;
-	// The tasks this run actually graded — every task that reached pre-flight,
-	// minus the coverage-only ones the violation pass skips. An entry naming
-	// anything else was never asked (see `stale_perf_omits`).
-	const graded_keys = [...successful_files.keys()].filter((key) => !coverage_only_keys.has(key));
-	const stale = stale_perf_omits(PERF_OMITS, used, graded_keys);
-	if (stale.length === 0) return;
-	console.error(
-		`Perf corpus: ${stale.length} stale PERF_OMITS entr${stale.length === 1 ? 'y' : 'ies'} — ` +
-			`excused no pre-flight failure in this full-corpus run, though the task each names ran:\n` +
-			stale.map((o) => `  ${o.task ?? '<any task>'}  ${o.path}: ${o.reason}`).join('\n') +
-			`\n  Delete the entry if the tool was fixed; update it if the corpus path was renamed.`
-	);
-	exit(1);
-}
-
-/**
- * The conformance run's exclusion caches, held to what the published coverage
- * presumes — refused before any impl loads, so a bad state costs seconds. The
- * loader applies them fail-open (most of its graders are untouched by them), but
- * the numbers this run writes are the committed report, and a cache that is absent
- * or predates its pin changes the Svelte or TypeScript denominator for every row.
- * The normal flow cannot reach either state — `bench:conformance` chains the
- * harvests first — so each means something broke:
- *
- * - absent: refused, naming the harvest, unless `BENCH_ALLOW_MISSING=1` — the same
- *   opt-in that tolerates a missing corpus entry and already marks the run as not
- *   comparable. The report records the absence either way (`exclusion_caches`);
- * - present at a size other than its exact pin: refused with no override. The
- *   harvest writes a cache only once its pin holds, so this is a cache from before
- *   a re-pin, and the fix is to re-harvest, never to tolerate it.
- *
- * Graded whatever `BENCH_FILTER` / `BENCH_LIMIT` say: the loader applies each cache
- * whole, so its size is a fact about the cache, not about the files this run kept.
- */
-function enforce_exclusion_caches(caches: ExclusionCacheState[]): void {
-	const refusals: string[] = [];
-	for (const { label, task, pin, size } of caches) {
-		if (size === null) {
-			if (env.BENCH_ALLOW_MISSING === '1') {
-				log(`  ⚠ ${label} cache absent — tolerated (BENCH_ALLOW_MISSING=1); not comparable`);
-			} else {
-				refusals.push(`the ${label} cache is absent — run \`deno task ${task}\``);
-			}
-		} else if (size !== pin) {
-			refusals.push(
-				`the ${label} cache holds ${size} paths ≠ its pin ${pin} — it predates a re-pin; ` +
-					`re-run \`deno task ${task} --force\``
-			);
-		}
-	}
-	if (refusals.length === 0) return;
-	console.error(
-		`Conformance corpus: ${refusals.join('; ')}. The coverage this run publishes presumes ` +
-			'every exclusion cache at its pin' +
-			(env.BENCH_ALLOW_MISSING === '1' ? '.' : ' (BENCH_ALLOW_MISSING=1 tolerates an ABSENT one).')
-	);
-	exit(1);
-}
-
-/**
- * Conformance mode's one exact pin. The files `svelte/compiler`'s `parseCss`
- * rejects are exactly the oracle row's pre-flight skips on `parse/css`, and their
- * count is `CSS_REJECTS_PIN` — the number `diagnostics/css_over_acceptance.ts`
- * grades (and stamps) from the same corpus. Graded here as well because this run
- * already holds it: the published `parse/css` reference row is built from these
- * skips, so a `parseCss` that changed what it accepts, or a corpus input that moved,
- * would otherwise reshape that row with nothing in this surface to catch it.
- *
- * Only a FULL CSS corpus can be graded: a filter, a limit, or a tolerated missing
- * entry withholds files, and a smaller reject set is then not a move. The loader
- * tolerates an absent OPTIONAL entry (the wpt-css cache) without
- * `BENCH_ALLOW_MISSING`, so that absence is asked separately — per language, since
- * an absent test262 cache withholds no CSS.
- */
-async function enforce_css_reject_pin(full_corpus: boolean): Promise<void> {
-	// Every not-graded path says so, this one included: a silent return reads
-	// exactly like a pass, and a `BENCH_LIMIT` / `BENCH_FILTER` /
-	// `BENCH_ALLOW_MISSING` run is the case where a reader is most likely to
-	// assume the pin still held.
-	if (!full_corpus) {
-		log('\nCSS_REJECTS_PIN not graded — this run does not hold the full corpus.');
-		return;
-	}
-	const tracking = task_tracking_by_group.get('parse/css');
-	if (tracking === undefined) {
-		log('\nCSS_REJECTS_PIN not graded — the parse/css group did not run.');
-		return;
-	}
-	const { missing, optional_missing } = await corpus_missing_entries(CORPUS_MODE, 'css');
-	const absent = [...missing, ...optional_missing];
-	if (absent.length > 0) {
-		log(`\nCSS_REJECTS_PIN not graded — the CSS corpus is partial: ${absent.join(', ')}`);
-		return;
-	}
-	const oracle_key = tracking.get(CANONICAL_PARSER_ROWS.css);
-	if (oracle_key === undefined) {
-		// A `0` fallback here would report "rejects 0 ≠ 240" and read as a grammar
-		// move — diagnosing a missing oracle ROW as a corpus change. It is neither:
-		// the row that built the reject set is the measurement, so its absence fails
-		// on its own terms.
-		console.error(
-			`Conformance corpus: the parse/css group ran without its oracle row ` +
-				`(${CANONICAL_PARSER_ROWS.css}), so CSS_REJECTS_PIN has nothing to grade — the reject ` +
-				`set IS that row's pre-flight skips. Check the impl registry and the row's name.`
-		);
-		exit(1);
-	}
-	const rejects = skipped_files.get(oracle_key)?.size ?? 0;
-	if (rejects === CSS_REJECTS_PIN) {
-		// Said aloud: a silent pass reads the same as a gate that never ran.
-		log(
-			`\nCSS_REJECTS_PIN: parseCss rejects ${rejects} of ${files_by_language.css.length} — matches.`
-		);
-		return;
-	}
-	console.error(
-		`Conformance corpus: parseCss rejects ${rejects} of ${files_by_language.css.length} CSS files ` +
-			`≠ pinned CSS_REJECTS_PIN ${CSS_REJECTS_PIN}. Either a pinned input moved (../prettier's, ` +
-			`../svelte's or ../wpt's checkout) or svelte's parseCss changed what it accepts — ` +
-			`re-pin in lib/gate_counts.ts deliberately, after checking which (\`deno task ` +
-			`css:over-acceptance:pin\` grades the same count and stamps it).`
-	);
-	exit(1);
-}
-
-/**
- * A NATIVE tsv row — `tsv` and its variants, `tsv-<variant>` or `tsv+<option>` — as
- * opposed to the `tsv-wasm` family, which shares the `tsv-` prefix since the WASM
- * package took its kebab-case name. The wasm rows are the SIBLINGS these predicates
- * derive, never a base: the prefix test alone would pair `tsv-wasm-internal` with a
- * `tsv-wasm-wasm-internal` that no row defines.
- */
-const is_native_tsv_row = (name: string): boolean =>
-	name === 'tsv' ||
-	name.startsWith('tsv+') ||
-	(name.startsWith('tsv-') && !name.startsWith('tsv-wasm'));
-
-/**
- * The task name that runs the SAME ENGINE as `name`, or `null` when it has no
- * such sibling. Two shapes qualify, and the invariant is identical for both: one
- * engine behind two BINDINGS (native/wasm), and one binding driven with two
- * OPTIONS (rsvelte's default wire vs its `skipExpressionLoc` one). Neither can
- * change which files parse, so a divergence is a broken binding or an option
- * that does more than it claims.
- */
-const same_engine_sibling_name = (name: string): string | null => {
-	if (name === 'oxc-parser') return 'oxc-parser-wasm';
-	if (name === 'yuku-parser') return 'yuku-parser-wasm';
-	if (name === 'rsvelte-parse') return 'rsvelte-parse-skip-expr-loc';
-	if (is_native_tsv_row(name)) return name.replace(/^tsv/, 'tsv-wasm');
-	return null;
-};
-
-/**
- * The engine versions behind a native↔wasm pair, as the report labels them —
- * `[base, sibling]` — or `null` for a pair that has no second version to differ
- * (rsvelte's option pair, tsv's own rows: one package each).
- *
- * Read by the accept-set warning alone: its "same engine" claim holds only while
- * the two sides are installed at ONE version, and oxc's pair is pinned apart on
- * purpose (`package.json` `//oxc-wasi`), so the warning has to say which case it is
- * in rather than assert a binding bug over what may be an engine change.
- */
-const same_engine_pair_versions = (
-	name: string
-): [string | undefined, string | undefined] | null => {
-	const alt = get_alternative_versions(impls, TASK_OPTIONS);
-	if (name === 'oxc-parser') return [alt.oxc_parser, alt.oxc_parser_wasm];
-	if (name === 'yuku-parser') return [alt.yuku_parser, alt.yuku_parser_wasm];
-	return null;
-};
-
-/**
- * Whether `name`'s same-engine sibling must produce byte-identical OUTPUT, not
- * merely accept the same files — the stronger half of the pair invariant, and the
- * only half graded FATALLY (`check_variant_parity`).
- *
- * True for tsv's own rows alone, and each exclusion is an argument rather than an
- * omission:
- *
- * - **tsv native↔wasm** is one Rust engine behind two bindings, so a byte
- *   difference is a marshalling or profile bug in tsv, with no reading under which
- *   it is tolerable — and under Node/Bun the native row IS the N-API addon, which
- *   makes this the cheapest standing correctness signal the shipped native path has.
- * - **rsvelte's option pair** is excluded on the strongest possible ground: its
- *   `skipExpressionLoc` variant removes payload BY DESIGN, so byte equality there
- *   would be the bug.
- * - **oxc's and yuku's native↔wasm pairs** should agree, but a divergence is a
- *   third-party binding's defect rather than something tsv's bench should hard-fail
- *   on — and oxc's WASI binding has a known one (lib/oxc_wasm.ts). They keep the
- *   accept-set warning, which is what surfaced that bug in the first place. oxc's
- *   pair is also pinned APART (the WASI binding is held back — `package.json`
- *   `//oxc-wasi`), so while the two pins differ a warning there can be an
- *   engine-version difference rather than a binding one.
- *
- * The `-internal` rows are excluded because they parse without serializing and
- * return nothing — there is no output to grade, and pretending otherwise would put
- * a pair in the graded set that can never carry digests, which is exactly the shape
- * the vacuity guard in `check_variant_parity` exists to catch. `tsv-forced-async` is
- * excluded for the neighbouring reason: it has no `tsv-wasm-forced-async` sibling to be
- * graded against (it is `tsv`'s own call behind an await, and `tsv` is graded), so
- * digesting it is work nothing compares.
- *
- * ⚠️ This names the BASE row of a pair. The pre-flight must digest BOTH sides, so it
- * derives its row set from this plus `same_engine_sibling_name` rather than from a
- * second hand-written predicate — see `run_preflight`.
- */
-const sibling_outputs_must_match = (name: string): boolean =>
-	is_native_tsv_row(name) && !name.endsWith('-internal') && name !== 'tsv-forced-async';
-
-/**
- * Digest one pre-flight result for byte-parity comparison, or `null` when the
- * task produces nothing to compare.
- *
- * A format row returns its output string; a parse row returns the materialized
- * AST, whose serialization is stable to compare because both sides of a graded
- * pair emit it from the same Rust writer (the object is `JSON.parse`d from that
- * writer's bytes on the native side and materialized from the same bytes on the
- * wasm side, so key order is the writer's either way). The `-internal` rows parse
- * without serializing and return `undefined` — nothing to grade, hence `null`
- * rather than a digest of `"undefined"`, which would grade two blanks as equal
- * and read as coverage.
- *
- * TOTAL by construction, and that is load-bearing rather than defensive: V8's
- * `JSON.stringify` recurses once per AST level, so a pathologically deep tree
- * overflows the stack — tsc's `binderBinaryExpressionStress.ts` is 40 KB of nested
- * binary expressions and does exactly that. Only the WRITER recurses: the same
- * tree's `JSON.parse` is fine (V8's parser is iterative), which is why the row
- * PARSED that file and its output is fine — there is simply no digest for it.
- *
- * A throw escaping here would be caught by the pre-flight's skip handler and
- * recorded as the TOOL failing on a file it actually handled; and because the
- * success set is added to BEFORE this point, the file would count as processed AND
- * skipped at once — a phantom skip on all four byte-graded rows, and in the perf
- * corpus a `enforce_perf_coverage` hard-fail on a file nothing failed. No committed
- * report carries one, and the committed conformance report is the positive evidence
- * rather than the absence of a run: it was regenerated with the digest already
- * outside the try, so the four files that would have been phantom skips are recorded
- * as `output_digest_ungraded` — the disclosure — instead.
- */
-function output_digest(result: unknown): string | null {
-	if (result === undefined || result === null) return null;
-	try {
-		const text = typeof result === 'string' ? result : JSON.stringify(result);
-		if (text === undefined) return null;
-		return createHash('sha1').update(text).digest('hex');
-	} catch {
-		return null;
-	}
-}
-
-/** One same-engine pair that disagreed — on its accept set, its output, or both. */
-interface VariantParityFinding {
-	group: string;
-	/** The base row of the pair (the native binding, or the default-option wire). */
-	impl: string;
-	/** Its same-engine sibling (the wasm binding, or the reduced-option wire). */
-	sibling: string;
-	/** Files only `impl` accepted. */
-	impl_only: number;
-	/** Files only `sibling` accepted. */
-	sibling_only: number;
-	/**
-	 * Files BOTH accepted whose outputs differ byte-for-byte. Always `0` for a pair
-	 * `sibling_outputs_must_match` doesn't grade — those carry no digests, and a
-	 * zero there means "not measured", not "agreed". Non-zero is fatal.
-	 */
-	output_mismatch: number;
-	/** Up to three `output_mismatch` paths, so the failure names files, not just a count. */
-	output_mismatch_examples: string[];
-}
-
-/** Populated by `check_variant_parity()` after pre-flight; lands in the report as `variant_parity`. */
-const variant_parity_findings: VariantParityFinding[] = [];
-
-/**
- * Per-file output digests, keyed by tracking_key then path. Populated during
- * pre-flight for the rows `sibling_outputs_must_match` grades and no others.
- */
-const output_digests: Map<string, Map<string, string>> = new Map();
-
-/**
- * Files a byte-graded row ACCEPTED but whose output `output_digest` could not
- * digest, keyed by tracking_key — the byte check's own blind spot, counted rather
- * than assumed away.
- *
- * Not a failure of anything: the row parsed the file and its output is fine, so it
- * belongs in neither `skipped_files` (it isn't a skip) nor the digest map (there is
- * nothing to compare against). But an ungraded file IS a hole in the standing
- * correctness check on the shipped native artifact, and a hole nothing records is a
- * hole nobody finds — so it is reported both ways: a ⚠ at the pair, and
- * `output_digest_ungraded` in the committed JSON.
- */
-const ungraded_digests: Map<string, { count: number; example: string }> = new Map();
-
-/**
- * Grade every same-engine pair on the two things one engine behind two front-ends
- * owes: the same ACCEPT SET, and — where `sibling_outputs_must_match` says so —
- * the same OUTPUT BYTES.
- *
- * **Accept set, warning only.** Both rows run the identical engine (see
- * `same_engine_sibling_name`), so their accept sets should agree file-for-file; a
- * divergence means one binding's error surface is broken, or an option changed
- * more than it claims — the concrete case being the oxc WASI binding's
- * consume-once `errors` getter, which silently accepted every file and fabricated
- * a 100% coverage row while native oxc-parser correctly rejected 245 (see
- * lib/oxc_wasm.ts + CLAUDE.md §Known Issues). Never fatal: the coverage numbers
- * themselves are the product in conformance mode, and perf mode has its own
- * hard-fail.
- *
- * **Output bytes, FATAL.** An accept set can only see whether a file threw, so it
- * is blind to the failure that actually matters for a shipped binding — the same
- * engine returning *different content* through two front-ends. Under Node and Bun
- * the native row is the N-API addon built with the `napi` profile, so this pass is
- * the standing correctness check on the artifact the native npm packages ship,
- * over the whole bench corpus. There is no reading under which tsv's two bindings
- * may disagree byte-for-byte, so a mismatch exits non-zero rather than printing a
- * warning into a report nobody re-reads.
- *
- * ⚠️ The two halves are counted over different populations and must not be folded:
- * `impl_only`/`sibling_only` are files exactly one row accepted, `output_mismatch`
- * is files BOTH accepted. A file in the first population has no second output to
- * compare, so it can never appear in the second.
- *
- * Findings also land in the report JSON (`variant_parity`), so a surviving
- * accept-set divergence shows up in the committed diff at review time, not just
- * the terminal scroll.
- */
-function check_variant_parity(): void {
-	let fatal = false;
-	for (const [group_name, task_tracking] of task_tracking_by_group) {
-		for (const [name, tracking_key] of task_tracking) {
-			const sibling_name = same_engine_sibling_name(name);
-			if (sibling_name === null) continue;
-			const sibling_key = task_tracking.get(sibling_name);
-			if (sibling_key === undefined) continue;
-			const impl_set = successful_files.get(tracking_key) ?? new Set<string>();
-			const sibling_set = successful_files.get(sibling_key) ?? new Set<string>();
-			let impl_only = 0;
-			let shared = 0;
-			for (const path of impl_set) {
-				if (sibling_set.has(path)) shared++;
-				else impl_only++;
-			}
-			let sibling_only = 0;
-			for (const path of sibling_set) if (!impl_set.has(path)) sibling_only++;
-
-			// Byte parity over the files both accepted. Absent digests mean this pair
-			// isn't byte-graded (the `null` in pre-flight), not that it agreed.
-			const impl_digests = output_digests.get(tracking_key);
-			const sibling_digests = output_digests.get(sibling_key);
-			let output_mismatch = 0;
-			const output_mismatch_examples: string[] = [];
-			let output_compared = 0;
-			if (impl_digests && sibling_digests) {
-				for (const [path, digest] of impl_digests) {
-					const sibling_digest = sibling_digests.get(path);
-					if (sibling_digest === undefined) continue;
-					output_compared++;
-					if (sibling_digest === digest) continue;
-					output_mismatch++;
-					if (output_mismatch_examples.length < 3) output_mismatch_examples.push(path);
-				}
-			}
-
-			// ⚠️ Vacuity guard, and it is not decoration: a byte check that grades
-			// NOTHING passes every run, so the failure mode of this pass is silence,
-			// not a wrong answer. A pair the predicate declares byte-graded, with files
-			// both rows accepted, must have digests on both sides — anything else means
-			// the pre-flight's row set and the grading predicate have come apart, which
-			// is precisely the bug the first cut of this shipped with. It exits on the
-			// spot rather than joining `fatal` below: a mismatch is a finding worth
-			// listing every pair of, but a harness that grades nothing makes every
-			// other line of this pass meaningless, so there is nothing to collect.
-			if (sibling_outputs_must_match(name) && shared > 0 && !(impl_digests && sibling_digests)) {
-				console.error(
-					`✗ variant parity (${group_name}): ${name}/${sibling_name} is byte-graded and shares ` +
-						`${shared} accepted file(s), but ` +
-						`${impl_digests ? sibling_name : name} carries no digests — the pre-flight row set ` +
-						`and the grading predicate have drifted, so the byte check is a NO-OP. Fix the ` +
-						`harness; a green run here proves nothing.`
-				);
-				exit(1);
-			}
-
-			// The byte check's blind spot, named where it applies. Not fatal — the row
-			// accepted the file and its output is fine — but a pair that grades fewer
-			// files than it accepted should say so rather than read as full coverage.
-			//
-			// BOTH sides, because `same_engine_sibling_name` names one direction only:
-			// keying this on `tracking_key` alone warned about the base row and left the
-			// sibling's hole to the JSON, so stderr and `output_digest_ungraded` reported
-			// different totals for the same run (2 vs 4 on the conformance surface).
-			//
-			// The count is reported against what the pair actually COMPARED, not against
-			// the hole alone: `output_digest` is total by construction, so "graded
-			// nothing" is now reachable with both digest maps present — a state the
-			// vacuity arm above cannot see, since it tests that the maps EXIST. Saying
-			// `graded N of M` is what keeps `output_mismatch: 0` from quietly widening
-			// from "agreed" to "never asked".
-			for (const [row_name, key] of [
-				[name, tracking_key],
-				[sibling_name, sibling_key]
-			] as const) {
-				const ungraded = ungraded_digests.get(key);
-				if (ungraded === undefined) continue;
-				console.error(
-					`⚠ variant parity (${group_name}): ${row_name} accepted ${ungraded.count} file(s) whose ` +
-						`output could not be digested, so the byte check graded ${output_compared} of the ` +
-						`${shared} file(s) the pair shares (first ungraded: ${ungraded.example}). Not a tool ` +
-						`failure — see \`output_digest\`.`
-				);
-			}
-
-			// …and when it graded NOTHING at all, that is the vacuity arm's own question
-			// reached by the other road, so it takes the same posture minus the exit: a
-			// pair whose every shared file went ungraded proves nothing, but the cause is
-			// a runtime limit rather than harness drift (a lowered V8 stack would do it),
-			// and hard-failing the run on it would accuse tsv of a defect it doesn't have.
-			if (sibling_outputs_must_match(name) && shared > 0 && output_compared === 0) {
-				console.error(
-					`⚠ variant parity (${group_name}): ${name}/${sibling_name} is byte-graded and shares ` +
-						`${shared} accepted file(s), but graded NONE of them — every output was ungraded, ` +
-						`so this pair's byte check is a no-op this run. See \`output_digest\`.`
-				);
-			}
-
-			if (impl_only === 0 && sibling_only === 0 && output_mismatch === 0) continue;
-			variant_parity_findings.push({
-				group: group_name,
-				impl: name,
-				sibling: sibling_name,
-				impl_only,
-				sibling_only,
-				output_mismatch,
-				output_mismatch_examples
-			});
-			if (impl_only > 0 || sibling_only > 0) {
-				// The diagnosis depends on whether the pair really is ONE engine version.
-				const pair = same_engine_pair_versions(name);
-				const split =
-					pair !== null && pair[0] !== undefined && pair[1] !== undefined && pair[0] !== pair[1];
-				console.error(
-					`⚠ variant parity (${group_name}): ${name} and ${sibling_name} accept different files ` +
-						`(${impl_only} ${name}-only, ${sibling_only} ${sibling_name}-only). ` +
-						(split
-							? `The two sides are installed at DIFFERENT engine versions (${pair[0]} vs ` +
-								`${pair[1]}), so this may be an engine change rather than a binding bug — ` +
-								`re-read once the pins rejoin.`
-							: `Same engine — a divergence means a broken binding or an option doing more ` +
-								`than it claims, not an engine difference.`)
-				);
-			}
-			if (output_mismatch > 0) {
-				fatal = true;
-				console.error(
-					`✗ variant parity (${group_name}): ${name} and ${sibling_name} produced DIFFERENT ` +
-						`OUTPUT on ${output_mismatch} file(s) both accepted. One engine, two bindings — this ` +
-						`is a marshalling or build-profile bug, not an engine difference. First:\n` +
-						output_mismatch_examples.map((path) => `    ${path}`).join('\n') +
-						// Every other failure in this harness names the next action; this is the
-						// most serious one, and the outputs themselves are gone by now (the check
-						// keeps digests, not bytes), so the remedy is how to get them BACK.
-						`\n  Isolate: BENCH_FILTER=${output_mismatch_examples[0]} deno task bench:${RUNTIME}:run` +
-						`\n  Both sides are reachable per file from ${
-							RUNTIME === 'deno' ? 'lib/ffi.ts' : 'lib/napi.ts'
-						} and lib/wasm.ts; \`deno task smoke\` exercises the same two bindings.`
-				);
-			}
-		}
-	}
-	if (fatal) exit(1);
-}
-
-/**
- * Split each group's pre-flight coverage by CORPUS SOURCE — the conformance
- * report's breakdown table.
- *
- * Pure post-processing over state pre-flight already produced (`successful_files`
- * + each file's `source` tag), so it adds no parse work. Only the conformance
- * surface renders it: the perf corpus is 100% by construction, where a per-source
- * split would be a table of `100%`.
- *
- * A file with no `source` (a `DirectoryLoader` run) is skipped rather than bucketed
- * under a placeholder — an unattributed row would read as a corpus entry that
- * doesn't exist.
- *
- * Computed ONCE (`coverage_by_source`, below) and shared by the JSON and markdown
- * halves of the report: two passes over the same live mutable state could report
- * two different numbers for one published figure.
- */
-function compute_coverage_by_source(): CoverageBySource {
-	const by_group: CoverageBySource = new Map();
-	for (const [group_name, task_tracking] of task_tracking_by_group) {
-		const [, language] = group_name.split('/') as ['parse' | 'format', Language];
-		const files = files_by_language[language];
-		const by_source = new Map<string, Map<string, SourceCoverageCell>>();
-		for (const [name, tracking_key] of task_tracking) {
-			const success = successful_files.get(tracking_key);
-			if (!success) continue;
-			const script_only = script_only_files.get(tracking_key);
-			for (const file of files) {
-				if (file.source === undefined) continue;
-				let cells = by_source.get(file.source);
-				if (!cells) {
-					cells = new Map();
-					by_source.set(file.source, cells);
-				}
-				let cell = cells.get(name);
-				if (!cell) {
-					cell = { processed: 0, total: 0 };
-					cells.set(name, cell);
-				}
-				cell.total++;
-				if (success.has(file.path)) cell.processed++;
-				if (script_only?.has(file.path)) cell.script_only = (cell.script_only ?? 0) + 1;
-			}
-		}
-		if (by_source.size > 0) by_group.set(group_name, by_source);
-	}
-	return by_group;
-}
-
-/**
- * The per-source coverage both report halves render, computed once after pre-flight
- * and memoized — see `compute_coverage_by_source`.
- */
-let coverage_by_source: CoverageBySource | null = null;
-function get_coverage_by_source(): CoverageBySource {
-	return (coverage_by_source ??= compute_coverage_by_source());
-}
-
-/**
- * The coefficient-of-variation above which a timed row's number is disclosed as
- * UNSTABLE rather than published bare.
- *
- * Every other shortfall this report can carry says so — `unavailable`,
- * `binary_sizes_absent`, `suppressed_noise`, `output_digest_ungraded`, the `⚠ files`
- * per-group note. How stable the timing itself was is the one property that never
- * did, and it is the property every published `Nx` rests on.
- *
- * 10% is ~3× the measured p90. Across the three committed perf reports (128 timed
- * rows) cv runs median 1.0%, p90 3.1% — so ordinary variation is nowhere near this,
- * and a row that trips it is doing something other than varying (the live rows are the
- * per-runtime reports' §Unstable Rows; a restated value here would only go stale — the
- * calibration figures are `entries[].cv` in the committed reports). Deliberately tighter
- * than `benchmark_baseline_compare`'s 30% noise gate, which answers a different
- * question (is a REGRESSION real) on a run this one never makes: that path needs
- * `--compare-baseline`, so a plain `deno task bench` reaches no stability check at all.
- */
-const UNSTABLE_CV_THRESHOLD = 0.1;
-
-/**
- * The `|drift|` past which a row is unstable regardless of its cv (see
- * `BaselineEntry.drift`). 5% is well outside stationary variation (a stationary
- * row's two half-medians agree to well under 1% at any sample count the bench
- * reaches) and well inside the regime this exists for: the case that motivated it
- * stepped +25–45% mid-row and, at most sample counts, published a cleaned cv under 6%.
- */
-const UNSTABLE_DRIFT_THRESHOLD = 0.05;
-
-/**
- * Below this many raw timings the RAW cv also trips a row. With few samples one
- * deviant sweep is a real share of the measurement — and is exactly what the MAD
- * cleaner's keep-closest fallback blends into the mean — so a raw cv past the
- * threshold there is the disclosure the cleaned cv withheld. With hundreds of
- * samples the raw cv is dominated by isolated pauses (one 80 ms GC among 600 × 8 ms
- * sweeps reads 35%) that the cleaner rightly removes and the upper percentiles
- * already report; there the drift statistic, not the raw cv, is the drift detector.
- */
-const RAW_CV_SAMPLE_CEILING = 30;
-
-/**
- * Timed rows whose measurement was too noisy to read at face value, worst first.
- *
- * Ratios are the report's product and each one divides two of these means, so an
- * unstable row silently widens every comparison it appears in — including the
- * cross-runtime table, whose whole subject is small per-runtime deltas.
- */
-function unstable_rows(data: Baseline): Array<{
-	label: string;
-	cv: number;
-	cv_raw: number | null;
-	drift: number | null;
-	samples: number | null;
-	raw_samples: number | null;
-}> {
-	// Three readings, any one of which trips the row: the cleaned cv (ordinary noise),
-	// the RAW cv (a second mode the cleaner deleted) and the drift (a cost that moved
-	// while the row was measured). The cleaned cv alone was blind to the last two —
-	// a bimodal row can clean to a quiet cv over a mean that is neither mode.
-	return data.entries
-		.filter(
-			(e) =>
-				e.cv !== null &&
-				(e.cv >= UNSTABLE_CV_THRESHOLD ||
-					(e.cv_raw !== null &&
-						e.cv_raw >= UNSTABLE_CV_THRESHOLD &&
-						e.raw_sample_size !== null &&
-						e.raw_sample_size < RAW_CV_SAMPLE_CEILING) ||
-					(e.drift !== null && Math.abs(e.drift) >= UNSTABLE_DRIFT_THRESHOLD))
-		)
-		.map((e) => ({
-			label: `${e.group}/${e.name}`,
-			cv: e.cv as number,
-			cv_raw: e.cv_raw,
-			drift: e.drift,
-			samples: e.sample_size ?? null,
-			raw_samples: e.raw_sample_size ?? null
-		}))
-		.sort(
-			(a, b) =>
-				Math.max(b.cv, b.cv_raw ?? 0, Math.abs(b.drift ?? 0)) -
-				Math.max(a.cv, a.cv_raw ?? 0, Math.abs(a.drift ?? 0))
-		);
-}
-
-/**
- * The raw sample count below which `drift` is `null` — the suite's iteration floor.
- * The statistic is one half's median against the other's, and below four a side a
- * single deviant sweep IS the median: at n=5 one slow first sweep read as a −6%
- * drift on rows whose cleaned cv was under 2%. The floor guarantees every full-run
- * row clears it, so a `null` here means a limited run.
- */
-const DRIFT_MIN_SAMPLES = 8;
-
-/**
- * Stability statistics over a row's RAW timings, in iteration order — what the
- * MAD-cleaned `cv` cannot see (`BaselineEntry.cv_raw` / `.drift`). Both `null` below
- * the sample count that makes them meaningful (2 for `cv_raw`, `DRIFT_MIN_SAMPLES`
- * for `drift`).
- */
-function raw_timing_stats(timings: readonly number[]): {
-	cv_raw: number | null;
-	drift: number | null;
-} {
-	const n = timings.length;
-	const mean_of = (xs: readonly number[]): number => xs.reduce((a, b) => a + b, 0) / xs.length;
-	if (n < 2) return { cv_raw: null, drift: null };
-	const mean = mean_of(timings);
-	const variance = timings.reduce((a, t) => a + (t - mean) ** 2, 0) / (n - 1);
-	const cv_raw = mean > 0 ? Math.sqrt(variance) / mean : null;
-	if (n < DRIFT_MIN_SAMPLES) return { cv_raw, drift: null };
-	const half = Math.floor(n / 2);
-	const median_of = (xs: readonly number[]): number => {
-		const sorted = [...xs].sort((a, b) => a - b);
-		const mid = Math.floor(sorted.length / 2);
-		return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
-	};
-	const first = median_of(timings.slice(0, half));
-	const second = median_of(timings.slice(n - half));
-	return { cv_raw, drift: first > 0 ? second / first - 1 : null };
-}
-
-/**
- * Warmup sweeps for a row: the iteration floor, or as many sweeps as it takes to
- * warm for `BENCH_WARMUP_MS`, whichever is more — sized from the row's cold
- * pre-flight sweep, which over-estimates a warm sweep and so under-counts a little
- * (fine: the floor is a floor). A row with no pre-flight time gets the iteration floor.
- */
-function warmup_iterations_for(preflight_ms: number): number {
-	if (preflight_ms <= 0) return BENCH_WARMUP;
-	return Math.max(BENCH_WARMUP, Math.ceil(BENCH_WARMUP_MS / preflight_ms));
-}
-
-/**
- * The verdict an impl gives by returning NOTHING: a whitespace-only result for an input
- * that is not is a declined file, not a formatted one, and a timed sweep that accepted it would drop
- * that file's whole cost from the row — on the canonical row, from the denominator of
- * every published `Nx`. The in-process prettier is documented to do exactly this
- * intermittently under load (`CLAUDE.md` §Known Issues), and every other consumer of
- * it guards for it, on the same SEMANTICALLY-empty test as here (`lib/prettier_cache.ts`,
- * `corpus_compare_format.ts`) — a byte-zero test alone misses a tool declining with a bare
- * newline. A `null` return is the `-internal` shape and
- * is not graded. Returns the error to record (pre-flight records it as a skip against
- * the tool) or `null` when the output is present.
- */
-function empty_output_error(task_name: string, file: SourceFile, result: unknown): Error | null {
-	// `/\S/.test` rather than `trim()`: this also runs per file inside the timed loop, and
-	// the test stops at the first character of any real output without allocating.
-	// It is also the timed loop's only read of a string result, and reading a character is
-	// what makes the engine flatten a rope: a formatter that builds its output by
-	// concatenation pays that copy inside the clock, as its consumers do. A `.length`
-	// check would not, so don't weaken this to one.
-	if (typeof result === 'string' && !/\S/.test(result) && /\S/.test(file.content)) {
-		return new Error(
-			`${task_name} returned empty output for a ${file.bytes}-byte input (${file.path}) — a ` +
-				`silently declined file, which would read as zero cost in a timed sweep`
-		);
-	}
-	return null;
-}
-
-/** The timed-loop form of `empty_output_error`: throws, so the row errors rather than fake-wins. */
-function assert_output_present(task_name: string, file: SourceFile, result: unknown): void {
-	const error = empty_output_error(task_name, file, result);
-	if (error !== null) throw error;
-}
-
-/**
- * `ungraded_digests` as plain JSON, keyed `"<group>/<row>"` — the two identities a
- * report consumer already holds (`entries[].group` + `entries[].name`), rather than
- * the internal tracking key, which appears nowhere else in the emitted shape.
- */
-function serialize_ungraded_digests(): Record<string, number> {
-	const out: Record<string, number> = {};
-	for (const [group_name, task_tracking] of task_tracking_by_group) {
-		for (const [name, tracking_key] of task_tracking) {
-			const entry = ungraded_digests.get(tracking_key);
-			if (entry) out[`${group_name}/${name}`] = entry.count;
-		}
-	}
-	return out;
-}
-
-/**
- * `compute_coverage_by_source` as plain JSON — `group → source → impl →
- * SourceCoverageCell` (`{processed, total}`, plus `script_only` where a goal
- * fallback added files) — for the committed report. Maps don't survive `JSON.stringify`, and the
- * markdown tables alone would leave a consumer (tsv.fuz.dev, a diff at review time)
- * reading percentages out of prose.
- */
-function serialize_coverage_by_source(): Record<
-	string,
-	Record<string, Record<string, SourceCoverageCell>>
-> {
-	const out: Record<string, Record<string, Record<string, SourceCoverageCell>>> = {};
-	for (const [group, by_source] of get_coverage_by_source()) {
-		const sources: Record<string, Record<string, SourceCoverageCell>> = {};
-		for (const [source, cells] of by_source) {
-			sources[source] = Object.fromEntries(cells);
-		}
-		out[group] = sources;
-	}
-	return out;
-}
-
-/**
- * Iterate files and run `process_fn` for each. The iteration list is
- * pre-filtered to files this task succeeded on during pre-flight (or the
- * group's all-N intersection in `intersection` mode), so throws are real
- * bugs — let them propagate to surface as benchmark errors rather than
- * silently catalog.
- */
-function process_corpus(files: SourceFile[], process_fn: (file: SourceFile) => void): void {
-	for (const file of files) {
-		process_fn(file);
-	}
-}
-
-/** Async variant of `process_corpus`. */
-async function process_corpus_async(
-	files: SourceFile[],
-	process_fn: (file: SourceFile) => Promise<void>
-): Promise<void> {
-	for (const file of files) {
-		await process_fn(file);
-	}
-}
-
-/** Files by language lookup */
-const files_by_language: Record<Language, SourceFile[]> = {
-	svelte: svelte_files,
-	typescript: ts_files,
-	css: css_files
-};
-
-/**
- * Run every task once per file untimed to discover each impl's effective
- * corpus. Populates `successful_files`, `skipped_files`, and
- * `effective_corpus_size` so the caller can compute the per-group iteration
- * set (intersection or per-impl) and the report can disclose coverage.
- *
- * Cost: O(impls × files), each call is one parse/format. Small relative
- * to the timed loop (which iterates the same files for 5s+ per task).
- */
-async function run_preflight(
-	tasks: ReturnType<typeof get_benchmark_tasks>,
-	files: SourceFile[],
-	language: Language
-): Promise<void> {
-	// Rows on EITHER side of a byte-graded pair — the digest set for this group.
-	// Derived from the pairing rather than spelled a second time, because the two
-	// sides cannot be allowed to drift: digesting only the base row leaves the
-	// sibling with no digests, and the byte comparison then silently comes up empty
-	// and grades nothing. (That is not hypothetical — it is what the first cut of
-	// this did, and it passed a clean run while checking nothing. The paired guard
-	// is `check_variant_parity`'s vacuity arm.)
-	const byte_graded_names = new Set<string>();
-	for (const task of tasks) {
-		if (!sibling_outputs_must_match(task.name)) continue;
-		byte_graded_names.add(task.name);
-		const sibling = same_engine_sibling_name(task.name);
-		if (sibling !== null) byte_graded_names.add(sibling);
-	}
-
-	for (let i = 0; i < tasks.length; i++) {
-		const task = tasks[i];
-		const success = new Set<string>();
-		const script_only = new Set<string>();
-		// Digests are the byte half of `check_variant_parity`, and cost nothing on a
-		// row it doesn't grade: `null` here means no hashing happens at all.
-		const digests = byte_graded_names.has(task.name) ? new Map<string, string>() : null;
-		let bytes = 0;
-		let digest_ms = 0;
-		const start_ms = performance.now();
-		for (const file of files) {
-			// ONLY the impl call belongs inside the skip-recording try. Anything else
-			// in it — the digest below was — turns a HARNESS-side failure on a file the
-			// tool handled into a recorded skip against the tool. See `output_digest`.
-			let result: unknown;
-			let at_script = false;
-			try {
-				// `file.goal` is set only on the conformance surface — test262's declared
-				// goal, or a Prettier fixture's extension goal (`.mjs`, `.cts`, …); every
-				// other file leaves it undefined → the default module parse.
-				result = task.is_async
-					? await task.run_async!(file.content, language, file.goal)
-					: task.run(file.content, language, file.goal);
-			} catch (e) {
-				// A `goal_fallback` file (a TypeScript file with no goal of its own) is
-				// retried at script (`SourceFile.goal_fallback`). The retry's own failure is
-				// not the verdict — the module error is recorded, the primary reading — and
-				// a tool the goal does not reach simply rejects twice.
-				if (!file.goal_fallback) {
-					record_skip(task.tracking_key, file.path, e);
-					continue;
-				}
-				try {
-					result = task.is_async
-						? await task.run_async!(file.content, language, 'script')
-						: task.run(file.content, language, 'script');
-				} catch {
-					record_skip(task.tracking_key, file.path, e);
-					continue;
-				}
-				at_script = true;
-			}
-			// A tool-side verdict, not a harness failure: an empty output on a non-empty
-			// input is the impl declining the file without saying so, recorded as a
-			// skip against it — see `assert_output_present`.
-			const empty = empty_output_error(task.name, file, result);
-			if (empty !== null) {
-				record_skip(task.tracking_key, file.path, empty);
-				continue;
-			}
-			success.add(file.path);
-			if (at_script) script_only.add(file.path);
-			bytes += file.bytes;
-			if (digests !== null) {
-				// Digesting is HARNESS work — JSON.stringify + sha1 over the wire, ~+50% of
-				// a parse sweep on the TS corpus — so it is timed out of the pass that the
-				// slow-task tier reads (`preflight_elapsed_ms`); charged in, it moved only
-				// tsv's four byte-graded rows toward the tier threshold.
-				const digest_start_ms = performance.now();
-				const digest = output_digest(result);
-				digest_ms += performance.now() - digest_start_ms;
-				if (digest !== null) {
-					digests.set(file.path, digest);
-				} else if (result !== undefined && result !== null) {
-					// An accepted output that produced no digest — see `ungraded_digests`.
-					// A nullish result is the `-internal` shape, which has nothing to
-					// grade by design and so is not a hole.
-					const seen = ungraded_digests.get(task.tracking_key);
-					if (seen) seen.count += 1;
-					else ungraded_digests.set(task.tracking_key, { count: 1, example: file.path });
-				}
-			}
-		}
-		const elapsed_ms = performance.now() - start_ms - digest_ms;
-		successful_files.set(task.tracking_key, success);
-		if (script_only.size > 0) script_only_files.set(task.tracking_key, script_only);
-		if (digests !== null) output_digests.set(task.tracking_key, digests);
-		effective_corpus_size.set(task.tracking_key, { processed: success.size, total: files.length });
-		effective_corpus_bytes.set(task.tracking_key, bytes);
-		preflight_elapsed_ms.set(task.tracking_key, elapsed_ms);
-		log(`  [${i + 1}/${tasks.length}] ${task.name}: ${success.size}/${files.length} files`);
-	}
-}
-
-//
-// Run Benchmarks
-//
+/** Every timed row's `TimedRow`, by tracking_key. */
+const timed_rows: Map<string, TimedRow> = new Map();
 
 const all_group_results: GroupResults[] = [];
 
-/**
- * Per-group setup captured during the up-front pre-flight pass. Reused by
- * `run_benchmark_group` so the timed loop is purely measurement.
- */
-interface GroupSetup {
-	tasks: ReturnType<typeof get_benchmark_tasks>;
-	filtered_files_by_task: Map<string, SourceFile[]>;
+/** How many row processes the run has started — names each one's spec and result. */
+let row_processes = 0;
+
+/** Time one pass of one row in a process of its own. */
+function time_row_pass(group: PreflightGroup, row: PreflightRow, pass: number): Promise<RowResult> {
+	const timed = row.timed!;
+	const id = row_processes++;
+	const spec: RowSpec = {
+		result_path: `${RUN_DIR}/row_${id}.result.json`,
+		row: {
+			operation: group.operation,
+			language: group.language,
+			name: row.name,
+			impl: row.impl
+		},
+		task_options: TASK_OPTIONS,
+		file_set: timed.file_set,
+		files_digest: timed.digest,
+		script_only: timed.script_only,
+		duration_ms: BENCH_DURATION,
+		// One rule for every pass of every row on every runtime — a sweep floor and a
+		// wall-time floor, whichever ends later (`bench_row.ts` `warm_up`) — keyed on
+		// nothing a row measured, in this process or another.
+		warmup_iterations: BENCH_WARMUP,
+		warmup_ms: BENCH_WARMUP_MS,
+		min_iterations: pass_min_iterations,
+		gc_each_iteration: BENCH_GC,
+		artifacts: snapshot.artifacts
+	};
+	return run_child<RowResult>(
+		'bench_row.ts',
+		spec,
+		`${RUN_DIR}/row_${id}.spec.json`,
+		`${group.name}/${row.name} (pass ${pass + 1}/${BENCH_PASSES})`,
+		row_deadline_ms({
+			sweep_ms: timed.preflight_ms,
+			warmup_ms: spec.warmup_ms,
+			warmup_iterations: spec.warmup_iterations,
+			duration_ms: spec.duration_ms,
+			min_iterations: spec.min_iterations
+		})
+	);
 }
-const group_setups: Map<string, GroupSetup> = new Map();
 
 /**
- * Run pre-flight + iteration-set computation for one group. Populates
- * `successful_files`, `skipped_files`, `effective_corpus_size`,
- * `effective_corpus_bytes`, `iterated_file_count`, and `task_tracking_by_group`,
- * and stashes the per-group setup in `group_setups` for the timed pass.
- *
- * Doing this for every group up front (before any timed run) means the
- * coverage picture lands in the terminal/report before any 5s+ timed
- * benchmark starts — easier to spot a broken impl early.
+ * One pass's sweeps with the outlier cleaner run over that pass alone — the
+ * library's own cleaner (`BenchmarkStats` runs the same one over the same valid
+ * timings), so a pass is cleaned exactly as a one-process row always was. Why per
+ * pass: `lib/bench_plan.ts` `summarize_passes`.
  */
-async function run_preflight_group(
-	operation: 'parse' | 'format',
-	language: Language
-): Promise<void> {
-	const files = files_by_language[language];
-	if (files.length === 0) return;
+function clean_pass(timings_ns: number[]): PassTimings & { outliers_ns: number[] } {
+	const { cleaned, outliers } = stats_outliers_mad(timings_ns.filter((t) => isFinite(t) && t > 0));
+	return { timings_ns, cleaned_ns: cleaned, outliers_ns: outliers };
+}
 
-	const group_name = `${operation}/${language}`;
-	log(`\n· ${group_name}`);
+/**
+ * A row's published statistics, from its passes (`summarize_passes`): the library's
+ * statistic families, each over the set it means across processes.
+ *
+ * - the MEAN is the passes' cleaned means weighted equally, and `ops_per_second` its
+ *   inverse;
+ * - the dispersion (`std_dev_ns`, `cv`) and `min_ns` are over every pass's cleaned
+ *   sweeps, around that mean — so a level shift between passes is IN the cv rather
+ *   than trimmed out of it;
+ * - the upper tail (`p50`–`p99`, `max_ns`) is over every raw sweep, as the library
+ *   takes it for one process;
+ * - the confidence interval is the PASS-level one (`pass_mean_sd_ns` over the pass
+ *   count, Student's t at that count's few degrees of freedom): the variation between
+ *   processes is what the mean's error is made of, and sweeps inside one process are
+ *   not independent draws of it. Within-pass for a one-pass run, which has nothing
+ *   else.
+ *
+ * Built on the library's own `BenchmarkStats` over the raw sweeps, with the fields
+ * that differ across processes replaced, so every consumer reads the type it expects.
+ */
+function pooled_stats(summary: PassSummary, outliers_ns: number[]): BenchmarkStats {
+	const stats = new BenchmarkStats(summary.timings_ns);
+	if (summary.pass_mean_ns.length === 1) return stats;
+	const { mean_ns, cleaned_ns } = summary;
+	const n = cleaned_ns.length;
+	const std_dev_ns = sample_sd(cleaned_ns, mean_ns);
+	return Object.assign(stats, {
+		mean_ns,
+		ops_per_second: 1e9 / mean_ns,
+		std_dev_ns,
+		cv: std_dev_ns / mean_ns,
+		// not `Math.min(...)`: a pooled sample of fast sweeps passes the engines' argument limits
+		min_ns: stats_min_max(cleaned_ns).min,
+		confidence_interval_ns: stats_confidence_interval_from_summary(
+			mean_ns,
+			summary.pass_mean_sd_ns!,
+			summary.pass_mean_ns.length,
+			{ z_score: t_critical_95(summary.pass_mean_ns.length - 1) }
+		),
+		sample_size: n,
+		outliers_ns,
+		outlier_ratio: outliers_ns.length / (n + outliers_ns.length)
+	});
+}
 
-	const tasks = get_benchmark_tasks(impls, operation, language, TASK_OPTIONS);
-	await run_preflight(tasks, files, language);
+/**
+ * Time one group: `BENCH_PASSES` passes over its timed rows, each row of each pass
+ * in a fresh process, then pool every row's passes into one `BenchmarkResult`.
+ *
+ * The passes of a group run back to back, so whatever the machine does over the
+ * length of a run (a governor, a neighbour, the weather) falls on the rows a ratio
+ * compares rather than between them.
+ */
+async function time_group(group: PreflightGroup): Promise<void> {
+	const rows = group.rows.filter((row) => row.timed !== null);
+	log(`\n▶ ${group.name}`);
 
-	const task_tracking = new Map<string, string>();
-	for (const task of tasks) {
-		task_tracking.set(task.name, task.tracking_key);
-		if (task.coverage_only) coverage_only_keys.add(task.tracking_key);
-	}
-	task_tracking_by_group.set(group_name, task_tracking);
-
-	// Build each task's iteration file list. In `intersection` mode (default)
-	// every task in the group iterates the same all-N intersection, making
-	// timing ratios within the group apples-to-apples. In `union` mode each
-	// task iterates its own preflight success set — ratios then reflect
-	// different file sets per impl, useful for auditing what intersection
-	// mode hides.
-	// A coverage-only task is never timed, so it must not narrow the intersection
-	// either — otherwise a file it alone rejects would silently drop out of the
-	// set every REAL row is measured on, letting a non-participant move the
-	// published numbers.
-	const timed_tasks = tasks.filter((task) => !task.coverage_only);
-
-	const filtered_files_by_task = new Map<string, SourceFile[]>();
-	if (USE_INTERSECTION) {
-		// Seeded EMPTY rather than null-until-first-task, so the no-timed-tasks case
-		// (a group of nothing but coverage-only rows) falls out as the empty
-		// intersection it is, without the membership test below having to re-answer
-		// "was there a first task?" once per file.
-		let intersection = new Set<string>();
-		let seeded = false;
-		for (const task of timed_tasks) {
-			const success_set = successful_files.get(task.tracking_key) ?? new Set<string>();
-			if (!seeded) {
-				intersection = new Set(success_set);
-				seeded = true;
-			} else {
-				for (const path of intersection) {
-					if (!success_set.has(path)) intersection.delete(path);
-				}
+	const passes = new Map<string, RowResult[]>(rows.map((row) => [row.tracking_key, []]));
+	for (let pass = 0; pass < BENCH_PASSES; pass++) {
+		if (rows.length > 0) log(`  pass ${pass + 1}/${BENCH_PASSES}`);
+		const order = pass_order(rows, pass, BENCH_PASSES);
+		for (let i = 0; i < order.length; i++) {
+			const row = order[i];
+			const result = await time_row_pass(group, row, pass);
+			passes.get(row.tracking_key)!.push(result);
+			for (const [pattern, count] of Object.entries(result.suppressed_noise)) {
+				suppressed_noise.set(pattern, (suppressed_noise.get(pattern) ?? 0) + count);
 			}
+			// the pass's own cleaned mean — the estimator the pooled line below uses
+			const { mean_ns } = new BenchmarkStats(result.timings_ns);
+			log(`    [${i + 1}/${order.length}] ${row.name}: ${format_rate(row.tracking_key, mean_ns)}`);
 		}
-		const intersection_list = files.filter((f) => intersection.has(f.path));
-		for (const task of timed_tasks) {
-			filtered_files_by_task.set(task.tracking_key, intersection_list);
-		}
-		log(`  Intersection: ${intersection_list.length}/${files.length} files`);
-	} else {
-		for (const task of timed_tasks) {
-			const success_set = successful_files.get(task.tracking_key) ?? new Set<string>();
-			filtered_files_by_task.set(
-				task.tracking_key,
-				files.filter((f) => success_set.has(f.path))
+	}
+
+	// Pooled, in registration order — the order every table and the baseline read.
+	const results: BenchmarkResult[] = rows.map((row) => {
+		const row_passes = passes.get(row.tracking_key)!;
+		const cleaned = row_passes.map((p) => clean_pass(p.timings_ns));
+		const summary = summarize_passes(cleaned);
+		timed_rows.set(row.tracking_key, {
+			summary,
+			// the fewest any pass ran — each warms to the same count and wall-time floor,
+			// so the passes differ only where the floor needed more sweeps
+			warmup_iterations: Math.min(...row_passes.map((p) => p.warmup_iterations)),
+			settled_heap_bytes: median_of(row_passes.map((p) => p.settled_heap_bytes))
+		});
+		return {
+			name: row.name,
+			stats: pooled_stats(
+				summary,
+				cleaned.flatMap((p) => p.outliers_ns)
+			),
+			iterations: summary.timings_ns.length,
+			total_time_ms: row_passes.reduce((sum, p) => sum + p.total_time_ms, 0),
+			timings_ns: summary.timings_ns,
+			// the per-pass protocol, identical across the row's passes
+			budget: row_passes[0].budget
+		};
+	});
+	if (BENCH_PASSES > 1 && results.length > 0) {
+		log(`  pooled`);
+		for (const result of results) {
+			const tracking_key = task_tracking_by_group.get(group.name)!.get(result.name)!;
+			const { pass_spread } = timed_rows.get(tracking_key)!.summary;
+			log(
+				`    ${result.name}: ${format_rate(tracking_key, result.stats.mean_ns)} · ` +
+					`pass spread ${(pass_spread * 100).toFixed(1)}%`
 			);
 		}
 	}
-
-	// Overwrite preflight-derived byte counts with iteration byte counts so
-	// throughput math (`ops_per_sec × effective_corpus_bytes`) reflects what was
-	// actually measured. Also record per-task iteration size for the
-	// `Nx (Mf)` annotation in the bench-table `vs baseline` column.
-	//
-	// Coverage-only tasks are skipped, deliberately leaving them with NO
-	// `iterated_file_count` entry: they were timed on nothing, so their
-	// `files_iterated` must read `null` rather than borrow the intersection's
-	// count and imply a measurement that never happened. Their
-	// `effective_corpus_bytes` likewise keeps the pre-flight value, which is the
-	// only bytes figure that means anything for them.
-	//
-	// A coverage-only RUN times nothing either, so it records no iterated count for
-	// any task: its every row must read `files_iterated: null` on the same terms.
-	for (const task of timed_tasks) {
-		const task_files = filtered_files_by_task.get(task.tracking_key)!;
-		effective_corpus_bytes.set(
-			task.tracking_key,
-			task_files.reduce((sum, f) => sum + f.bytes, 0)
-		);
-		if (COVERAGE_ONLY) continue;
-		iterated_file_count.set(task.tracking_key, task_files.length);
-		iterated_files_digest.set(
-			task.tracking_key,
-			createHash('sha1')
-				.update(
-					task_files
-						.map((f) => f.path)
-						.sort()
-						.join('\n')
-				)
-				.digest('hex')
-				.slice(0, 12)
-		);
-	}
-
-	group_setups.set(group_name, { tasks: timed_tasks, filtered_files_by_task });
-}
-
-/** Run the timed measurement loop for one group using its stashed pre-flight setup. */
-async function run_benchmark_group(
-	operation: 'parse' | 'format',
-	language: Language
-): Promise<void> {
-	const group_name = `${operation}/${language}`;
-	const setup = group_setups.get(group_name);
-	if (!setup) return;
-	const { tasks, filtered_files_by_task } = setup;
-	const task_tracking = task_tracking_by_group.get(group_name) ?? new Map<string, string>();
-
-	log(`\n▶ ${group_name}`);
-
-	// Task name → the impl's `reset_heap`, for the tasks whose impl declares one.
-	// Keyed by name because the library's `on_iteration` hands back the task name.
-	const reset_heap_by_task = new Map<string, () => void>();
-	for (const task of tasks) {
-		const impl: TsvImplementation | undefined = impls[task.impl];
-		const reset_heap = impl?.reset_heap;
-		if (reset_heap) reset_heap_by_task.set(task.name, () => reset_heap.call(impl));
-	}
-
-	const bench = new Benchmark({
-		duration_ms: BENCH_DURATION,
-		warmup_iterations: BENCH_WARMUP,
-		// Suite floor, ONE value for every row but the canonical ones (there is no
-		// per-task tier keyed on timing — see the task loop; the canonical rows get a
-		// higher floor keyed on their NAME, `CANONICAL_MIN_ITERATIONS`). Fast rows are
-		// duration-bound (they hit BENCH_DURATION long before any floor); the floor
-		// exists for the multi-second rows, where the
-		// 5 s budget alone would leave a handful of sweeps. Eight, because that is
-		// what the RAW-timing stability readings need (`DRIFT_MIN_SAMPLES`): with
-		// four a side no single deviant sweep can be a half's median — and the
-		// multi-second rows are exactly the ones a leak or a heap tipping over
-		// degrades, so nulling the reading there would blind the detector where it
-		// matters most. Costs ~2.5 min of wall per runtime, all of it on rows slower
-		// than 625 ms a sweep. When a baseline is being saved or compared the floor
-		// rises to 10: the Welch p-values feeding regression verdicts need the
-		// samples (n≈4-7 sits in the unstable-DOF regime the timing library's own
-		// n=30 floor exists to avoid).
-		min_iterations: baselining ? 10 : 8,
-		// oxfmt's async napi binding leaks state into Deno's timer wheel:
-		// after the first oxfmt.format call, exactly one further setTimeout
-		// fires and then all subsequent timers stall forever. The default
-		// 100ms inter-task cooldown is the only timer-dependent await in
-		// the loop, so dropping it sidesteps the hang.
-		// See benches/js/CLAUDE.md → Known Issues.
-		// An inter-task SETTLE is still provided without it:
-		// each task's `setup` forces a major GC (`settle_heap`), which is both
-		// timer-free and uniform across the three runtimes — a runtime-conditional
-		// cooldown would put a settle under Node/Bun and none under Deno, biasing
-		// the very cross-runtime ratios this bench exists to read.
-		cooldown_ms: 0,
-		// Runs between one sweep's end timer and the next's start timer — outside
-		// every timing, inside the duration budget, never during warmup. Two things
-		// live here: the opt-in forced GC, and the per-sweep heap reset for an impl
-		// whose heap a GC cannot settle (`TsvImplementation.reset_heap`).
-		on_iteration:
-			BENCH_GC || reset_heap_by_task.size > 0
-				? (name: string) => {
-						if (BENCH_GC) globalThis.gc?.();
-						reset_heap_by_task.get(name)?.();
-					}
-				: undefined,
-		on_task_complete: (result: BenchmarkResult, index: number, total: number) => {
-			const ops_per_sec = result.stats.ops_per_second.toFixed(1);
-			// Throughput uses effective bytes (this impl's success set) so
-			// the displayed MB/s is what this impl actually achieved, not
-			// what it would have done on the full corpus.
-			const tracking_key = task_tracking.get(result.name);
-			const effective_bytes = tracking_key ? (effective_corpus_bytes.get(tracking_key) ?? 0) : 0;
-			// Mirror the report-path guard (`generate_group_throughput_markdown`):
-			// with an empty intersection the MB/s figure is a misleading `0.0 MB/s`
-			// while ops/sec is real, so print `—` instead of a fake throughput.
-			const throughput =
-				effective_bytes === 0
-					? '—'
-					: format_throughput(result.stats.ops_per_second * effective_bytes);
-			log(`  [${index + 1}/${total}] ${result.name}: ${ops_per_sec} sweeps/sec (${throughput})`);
-		}
-	});
-
-	// The canonical rows are the denominator of every published ratio, and every
-	// one of them is a multi-second sweep that stops AT the floor (prettier on
-	// TypeScript runs ~15 s a sweep, so 8 sweeps is ~2 min and the duration budget
-	// never enters into it — raising BENCH_DURATION would change nothing). Eight
-	// samples under every denominator is thin: the drift detector proves least at
-	// the floor, and these are the rows a leak or a heap tipping over degrades. So
-	// the canonical rows alone get double the floor, keyed on the row NAME — which,
-	// unlike the timing-keyed tier removed below, is the same on every runtime, so
-	// each row still runs one protocol everywhere. Costs ~3.3 min of wall per
-	// runtime, nearly all of it prettier's TypeScript row. The resolved value rides
-	// the row into the report (`min_iterations`) so the two floors are legible.
-	const canonical_rows = new Set([
-		CANONICAL_FORMATTER_ROW,
-		...Object.values(CANONICAL_PARSER_ROWS)
-	]);
-	const canonical_min_iterations = Math.max(CANONICAL_MIN_ITERATIONS, baselining ? 10 : 8);
-
-	for (const task of tasks) {
-		const task_files = with_accepted_goals(
-			task.tracking_key,
-			filtered_files_by_task.get(task.tracking_key)!
-		);
-		// ONE protocol per row on every runtime: the suite floor (8; 10 when
-		// baselining; 16 on the canonical rows), the duration budget, and a warmup
-		// sized by TIME from the row's own pre-flight sweep. There used to be a slow-task tier here (a cold
-		// pre-flight pass over 5 s raised the floor 5 → 7, and once dropped warmup
-		// 3 → 1) — but the tier was decided by ONE cold pass against a 5 s edge, and
-		// a row straddling it (biome's TS sweep, ~4.5–5.0 s) took the tier on one
-		// runtime and not another: two protocols on one row, published as a runtime
-		// ratio. A runtime-stable key does not exist in-process (each runtime knows
-		// only its own sweep time), so the tier is gone: its two extra samples on a
-		// 5–15 s row served percentiles no consumer reads (the baseline mode, whose
-		// Welch statistics do need samples, keeps its own higher floor). Both
-		// resolved values ride each row (`warmup_iterations`, `min_iterations`) so
-		// a protocol difference would be legible in the report.
-		const preflight_ms = preflight_elapsed_ms.get(task.tracking_key) ?? 0;
-		const warmup_iterations = warmup_iterations_for(preflight_ms);
-		const min_iterations = canonical_rows.has(task.name) ? canonical_min_iterations : undefined;
-		const reset_heap = reset_heap_by_task.get(task.name);
-		const sweep: () => void | Promise<void> = task.is_async
-			? async () => {
-					await process_corpus_async(task_files, async (f) => {
-						assert_output_present(task.name, f, await task.run_async!(f.content, language, f.goal));
-					});
-				}
-			: () => {
-					process_corpus(task_files, (f) =>
-						assert_output_present(task.name, f, task.run(f.content, language, f.goal))
-					);
-				};
-		// Untimed (the library excludes `setup`), so every task's warmup and
-		// measurement start from a comparable heap — see `settle_heap`. An impl that
-		// declares `reset_heap` is offered one there too, and for it the WARMUP moves
-		// in here as well: the library's warmup loop has no between-sweeps hook, so
-		// the warmup sweeps would pile their leak onto the first timed sweep with no
-		// reset offered in between. Warming in `setup`, with `reset_heap` after every
-		// sweep, gives the first timed sweep the same footing every later one gets
-		// from `on_iteration` (the impl decides whether a reset is due — see
-		// `TsvImplementation.reset_heap`). The library then warms 0 times;
-		// `harness_warmups` carries the count actually run into the row.
-		if (reset_heap) {
-			harness_warmups.set(task.tracking_key, warmup_iterations);
-			bench.add({
-				name: task.name,
-				warmup_iterations: 0,
-				min_iterations,
-				setup: async () => {
-					settle_heap(task.tracking_key);
-					reset_heap();
-					for (let i = 0; i < warmup_iterations; i++) {
-						await sweep();
-						reset_heap();
-					}
-				},
-				fn: sweep,
-				async: task.is_async
-			});
-		} else {
-			bench.add({
-				name: task.name,
-				warmup_iterations,
-				min_iterations,
-				setup: () => settle_heap(task.tracking_key),
-				fn: sweep,
-				async: task.is_async
-			});
-		}
-	}
-
-	const results = await bench.run();
-	all_group_results.push({ name: group_name, results });
-}
-
-// Two-phase run: pre-flight every group up front (so the coverage picture
-// lands before any 5s+ timed run starts), then time every group.
-log('Pre-flight (discover coverage + exclude failing files before timing):');
-for (const lang of LANGUAGES) {
-	for (const operation of OPERATIONS) {
-		await run_preflight_group(operation, lang);
-	}
-}
-
-// Same-engine native/wasm variant pairs should accept identical file sets AND —
-// for tsv's own pair — produce identical bytes. A divergence is a binding-boundary
-// bug masquerading as coverage; the byte half is fatal (see the fn doc).
-check_variant_parity();
-
-// Perf corpus is real-world code every in-scope tool must fully process, so a
-// per-file pre-flight failure that isn't an explicitly-reviewed `PERF_OMITS`
-// entry is a hard error — not the silent skip that would quietly erode coverage.
-// Conformance mode measures coverage (sub-100% is the metric), so this hard error is
-// perf-only — but the other branch is not empty: conformance's own exact pin
-// (`enforce_css_reject_pin`) is graded there, at the same point and for the same
-// reason. Both run before the timed phase, so a regression fails in seconds and
-// nothing is written.
-//
-// The staleness half of the same grade is asked only of a run that could actually
-// reach every omitted file: a corpus filter, or a missing repo tolerated by
-// BENCH_ALLOW_MISSING, withholds them, and "matched nothing" would then mean
-// "wasn't there". The other absence — an optional impl that didn't load, so its
-// task never ran — is handled inside, against the graded tracking keys (see
-// `stale_perf_omits`).
-if (CORPUS_MODE === 'perf') {
-	enforce_perf_coverage(!is_limited && env.BENCH_ALLOW_MISSING !== '1');
-} else {
-	await enforce_css_reject_pin(!is_limited && env.BENCH_ALLOW_MISSING !== '1');
+	all_group_results.push({ name: group.name, results });
 }
 
 if (COVERAGE_ONLY) {
@@ -2273,26 +710,89 @@ if (COVERAGE_ONLY) {
 		'\nCoverage-only mode: skipping the timed benchmark phase (coverage is a pre-flight product).'
 	);
 } else {
-	// Both the inter-task settle and the opt-in per-iteration hook go through
+	// Both the pre-warmup settle and the opt-in per-iteration hook go through
 	// `globalThis.gc`, which exists only when the runtime was started with
-	// `--expose-gc` (every timed `bench:*:run` task passes it). A silent no-op would
-	// remove the ordering control while the numbers still looked publishable, so say
-	// so — here rather than at startup, since the coverage-only run has no timed
-	// phase to bias and its task passes no such flag.
+	// `--expose-gc` (every timed `bench:*:run` task passes it, and a row's process is
+	// started with this one's flags). A silent no-op would remove a control while the
+	// numbers still looked publishable, so say so — here rather than at startup, since
+	// the coverage-only run has no timed phase to bias and its task passes no such flag.
 	if (typeof globalThis.gc !== 'function') {
 		log(
-			'⚠ globalThis.gc is unavailable (no --expose-gc): tasks run without the inter-task heap ' +
-				'settle, so task order can bias the results' +
+			'⚠ globalThis.gc is unavailable (no --expose-gc): rows warm up from an unsettled heap' +
 				(BENCH_GC ? ', and BENCH_GC=1 is inert' : '')
 		);
 	}
 
-	log('\nRunning benchmarks:');
-	for (const lang of LANGUAGES) {
-		for (const operation of OPERATIONS) {
-			await run_benchmark_group(operation, lang);
-		}
-	}
+	log(
+		`\nRunning benchmarks (${BENCH_PASSES} pass${BENCH_PASSES === 1 ? '' : 'es'}, ` +
+			`every row of every pass in a fresh process):`
+	);
+	for (const group of snapshot.groups) await time_group(group);
+}
+
+/**
+ * The run's between-process noise (`lib/bench_plan.ts` `summarize_process_noise`):
+ * how far two fresh processes of the same row sat apart, over every timed row.
+ * `null` when nothing was timed or the run made a single pass.
+ */
+const process_noise: ProcessNoise | null = summarize_process_noise(
+	[...timed_rows.values()].map((row) => row.summary.pass_mean_ns)
+);
+if (process_noise !== null) {
+	const pct = (v: number): string => `${(v * 100).toFixed(1)}%`;
+	log(
+		`\nProcess noise (two fresh processes of one row, ${process_noise.pairs} pairs): ` +
+			`median ${pct(process_noise.median)}, p95 ${pct(process_noise.p95)}, max ${pct(process_noise.max)}`
+	);
+}
+
+/**
+ * Timed rows whose measurement was too noisy to read at face value, worst first —
+ * by `lib/bench_plan.ts` `unstable_readings`, the one definition this report and the
+ * combined one (`compose_reports.ts`) share.
+ *
+ * Every other shortfall this report can carry says so — `unavailable`,
+ * `binary_sizes_absent`, `suppressed_noise`, `output_digest_ungraded`, the `⚠ files`
+ * per-group note. How stable the timing itself was is the property every published
+ * `Nx` rests on, and each ratio divides two of these means, so an unstable row
+ * silently widens every comparison it appears in — including the cross-runtime
+ * table, whose whole subject is small per-runtime deltas.
+ */
+function unstable_rows(data: Baseline): Array<{
+	label: string;
+	cv: number;
+	cv_raw: number | null;
+	drift: number | null;
+	pass_spread: number | null;
+	samples: number | null;
+	raw_samples: number | null;
+}> {
+	return data.entries
+		.flatMap((e) => {
+			// a coverage-only row was timed on nothing, so it has no stability to read
+			if (e.cv === null) return [];
+			const tripped = unstable_readings({
+				cv: e.cv,
+				cv_raw: e.cv_raw,
+				drift: e.drift,
+				pass_spread: e.pass_spread,
+				raw_samples_per_pass:
+					e.raw_sample_size === null ? null : e.raw_sample_size / (e.passes ?? 1)
+			});
+			if (tripped.length === 0) return [];
+			const row = {
+				label: `${e.group}/${e.name}`,
+				cv: e.cv,
+				cv_raw: e.cv_raw,
+				drift: e.drift,
+				pass_spread: e.pass_spread,
+				samples: e.sample_size ?? null,
+				raw_samples: e.raw_sample_size ?? null
+			};
+			return [{ row, worst: Math.max(...tripped) }];
+		})
+		.sort((a, b) => b.worst - a.worst)
+		.map(({ row }) => row);
 }
 
 //
@@ -2302,9 +802,12 @@ if (COVERAGE_ONLY) {
 interface BaselineEntry {
 	name: string;
 	group: string;
-	// Timing stats — `null` in a coverage-only run (`BENCH_COVERAGE_ONLY=1`),
-	// which skips the timed phase and emits coverage from pre-flight alone. A
-	// timed run always fills them.
+	// Timing stats, over the row's passes (every pass a fresh process — `passes`
+	// below): `mean_ns` and `ops_per_second` the passes' cleaned means weighted
+	// equally, the dispersion and `min_ns` over every pass's cleaned sweeps, the
+	// percentiles and `max_ns` over every raw sweep (`pooled_stats`). `null` in a
+	// coverage-only run (`BENCH_COVERAGE_ONLY=1`), which skips the timed phase and
+	// emits coverage from pre-flight alone. A timed run always fills them.
 	mean_ns: number | null;
 	p50_ns: number | null;
 	p75_ns: number | null;
@@ -2319,38 +822,66 @@ interface BaselineEntry {
 	sample_size: number | null;
 	/**
 	 * Stability read from the RAW timings, which the cleaned `cv` above cannot see:
-	 * `cv_raw` is std_dev / mean over every timing before outlier removal, and `drift`
-	 * is median(second half) / median(first half) − 1 in iteration order — medians, so
-	 * an isolated pause among hundreds of samples does not read as drift, while a
-	 * level shift (four fast sweeps then three slow) still does. A row whose cost
-	 * changes WHILE it is measured — a wasm heap that leaks per sweep and tips the
+	 * `cv_raw` is std_dev / mean over every pooled timing before outlier removal, and
+	 * `drift` is median(second half) / median(first half) − 1 in iteration order —
+	 * medians, so an isolated pause among hundreds of samples does not read as drift,
+	 * while a level shift (four fast sweeps then three slow) still does. A row whose
+	 * cost changes WHILE it is measured — a wasm heap that leaks per sweep and tips the
 	 * engine into a slower regime mid-row — reads as drift here while its cleaned `cv`
 	 * can read as quiet: the MAD cleaner deletes or blends a second mode rather than
 	 * reporting it, so the cleaned mean is then neither mode and `cv` says nothing.
-	 * `raw_sample_size` is the timing count before cleaning (`sample_size` is after);
-	 * `outlier_ratio` is the share the cleaner removed. `null` on a coverage-only row.
+	 *
+	 * `drift` is taken WITHIN each pass — it is only meaningful over one process's
+	 * timings — and the row publishes the pass furthest from zero, signed. A level
+	 * shift BETWEEN two passes is not drift and is not counted here: that is
+	 * `pass_spread`.
+	 *
+	 * `raw_sample_size` is the pooled timing count before cleaning (`sample_size` is
+	 * after); `outlier_ratio` is the share the cleaner removed. `null` on a
+	 * coverage-only row.
 	 */
 	cv_raw: number | null;
 	drift: number | null;
 	raw_sample_size: number | null;
 	outlier_ratio: number | null;
 	/**
-	 * The protocol this row actually ran under — the warmup and iteration floor the
-	 * slow-task tier resolved for it — so two runtimes that tiered one row differently
-	 * are legible as two protocols rather than as one ratio. `null` on a coverage-only
-	 * row.
+	 * The protocol ONE PASS of this row ran under — its warmup sweeps and its sweep
+	 * floor — so two runtimes that ran one row differently would be legible as two
+	 * protocols rather than as one ratio. Per pass: a floor-bound row's
+	 * `raw_sample_size` is `min_iterations × passes`. `warmup_iterations` is the fewest
+	 * warmup sweeps any pass ran: each pass warms for a count AND a wall-time floor
+	 * (`BENCH_WARMUP_MS`), so a fast row's count is what the floor took, and it can
+	 * differ a little between passes. `null` on a coverage-only row.
 	 */
 	warmup_iterations: number | null;
 	min_iterations: number | null;
 	/**
+	 * How many fresh processes the row was timed in (`BENCH_PASSES`), each pass's
+	 * mean sweep time (over its own cleaned sweeps) in pass order — the figures
+	 * `mean_ns` is the mean of — and how far apart they sat: the largest over the
+	 * smallest, minus one (`lib/bench_plan.ts` `summarize_passes`).
+	 *
+	 * `pass_spread` is the reading no single process can make. Each pass is one draw
+	 * of the row in a process that holds nothing else, so the spread is what another
+	 * draw could have published — and a row whose passes disagree by more than its
+	 * `cv` within any one of them has a level that depends on the process, which a
+	 * single-process `cv` reports as quiet. `0` for a one-pass run. `null` on a
+	 * coverage-only row.
+	 *
+	 * Since `version` 21.
+	 */
+	passes: number | null;
+	pass_mean_ns: number[] | null;
+	pass_spread: number | null;
+	/**
 	 * The JS heap (`heapUsed`, bytes) the row's warmup began from, read straight after
-	 * the inter-task collection — see `settle_heap`. A diagnostic, not a measurement:
-	 * under JSC a pure-JS row's level depends on it, so it is what to compare first when
-	 * one bun row reads differently across two runs — equal here means the heap is not
-	 * why. Comparable across RUNS of one
-	 * runtime, never across runtimes: JSC's figure counts the memory its heap answers
-	 * for (wasm linear memories, buffers), V8's does not, so the same harness reads
-	 * ~1–1.5 GB under bun and ~140 MB under node/deno. `null` on a coverage-only row.
+	 * a full collection in the row's own process — its engine and its file set, nothing
+	 * else — and the median over the row's passes. A diagnostic, not a measurement:
+	 * under JSC a pure-JS row's level depends on the heap it starts from, so it is what
+	 * to compare first when one bun row reads differently across two runs — equal here
+	 * means the heap is not why. Comparable across RUNS of one runtime, never across
+	 * runtimes: JSC's figure counts the memory its heap answers for (wasm linear
+	 * memories, buffers), V8's does not. `null` on a coverage-only row.
 	 */
 	settled_heap_bytes: number | null;
 	/**
@@ -2478,8 +1009,26 @@ interface BaselineVersions extends ReportVersions {
  * `tsv-wasm` (the format rows' names, in the parse groups) and `{locations: true}`
  * is `tsv+locations` / `tsv-wasm+locations`, so a row name identifies a row only
  * together with its group.
+ *
+ * 21: every timed row is measured in fresh PROCESSES, several passes of them, and
+ * its statistics pool the passes (`bench.ts` §Process model). Per row: `passes`,
+ * `pass_mean_ns` and `pass_spread` (how far the row's passes sat apart). Top level:
+ * `process_noise` (the same reading over the whole run) and `exit_hangs` (children
+ * killed after reporting, whose results stand). Existing per-row fields
+ * change MEANING, not name: `mean_ns` / `ops_per_second` are the passes' cleaned
+ * means weighted equally, each pass cleaned of outliers on its own; `cv` and
+ * `std_dev_ns` are over every pass's cleaned sweeps around that mean, so they include
+ * the variation between processes; `min_iterations` and `warmup_iterations` are per
+ * pass, so a floor-bound row's `raw_sample_size` is `min_iterations × passes` where
+ * it was `min_iterations`; `warmup_iterations` is the fewest any pass ran, since a
+ * pass now warms for a wall-time floor (`BENCH_WARMUP_MS`) as well as a count, in a
+ * process that starts cold; `drift` is the within-pass drift furthest from zero
+ * (a shift between passes is `pass_spread`'s); `timestamp` is when the run started,
+ * as the commit is read; and `settled_heap_bytes` is the heap
+ * of the row's own process, the median over its passes. The canonical rows no longer
+ * carry a higher sweep floor than the rest — every row's floor is the same per pass.
  */
-const REPORT_SCHEMA_VERSION = 20;
+const REPORT_SCHEMA_VERSION = 21;
 
 interface Baseline {
 	/** See `REPORT_SCHEMA_VERSION`. */
@@ -2497,7 +1046,9 @@ interface Baseline {
 	 * Since `version` 6.
 	 */
 	corpus_kind: CorpusKind;
+	/** When the run STARTED (from `version` 21; its end before), beside the commit it measured. */
 	timestamp: string;
+	/** HEAD when the run started — the commit its artifacts were built from. */
 	git_commit: string | null;
 	/**
 	 * The machine that produced this report — CPU model, OS/arch, and the
@@ -2627,6 +1178,31 @@ interface Baseline {
 	 * else, and the init label matches none of them. See `UnavailableImpl`.
 	 */
 	unavailable: UnavailableImpl[];
+	/**
+	 * How much two fresh processes of the SAME row disagreed, over every timed row of
+	 * the run — `pairs` (row, pass pair) comparisons, with the `median`, `p95` and
+	 * `max` of the slower pass mean over the faster, minus one
+	 * (`lib/bench_plan.ts` `summarize_process_noise`). A process-level A/A the passes
+	 * give for free, and the bound to read a small ratio against: it describes one
+	 * process against one, and a published row pools all its passes, so a difference
+	 * inside `p95` is not one this run measured.
+	 *
+	 * `null` when nothing was timed (a coverage-only run) or the run made one pass.
+	 *
+	 * Since `version` 21.
+	 */
+	process_noise: ProcessNoise | null;
+	/**
+	 * The children (by label: the pre-flight, or `<group>/<row> (pass i/n)`) that wrote
+	 * their result and then hung in their own teardown, and were killed — their results
+	 * stand, since the result is a child's last act (`lib/bench_child.ts`
+	 * `EXIT_GRACE_MS`). `[]` when every child exited on its own, the healthy state. A
+	 * runtime fault, not a measurement one: recorded so a recurring one is visible
+	 * across reports rather than only in a run's scroll.
+	 *
+	 * Since `version` 21.
+	 */
+	exit_hangs: string[];
 }
 
 /**
@@ -2691,6 +1267,9 @@ const NULL_STATS = {
 	outlier_ratio: null,
 	warmup_iterations: null,
 	min_iterations: null,
+	passes: null,
+	pass_mean_ns: null,
+	pass_spread: null,
 	settled_heap_bytes: null
 } as const;
 
@@ -2701,38 +1280,6 @@ const NULL_STATS = {
 function row_payload(group_name: string, row_name: string): PayloadTier | null {
 	const [operation, language] = group_name.split('/') as [string, Language];
 	return operation === 'parse' ? parse_payload_tier(row_name, language) : null;
-}
-
-/**
- * `Baseline.omissions`: per timed group, the files its intersection left out and
- * the rows that left them (`summarize_group_omissions`). Perf surface, intersection
- * mode, timed run — the only place an omission exists: a coverage run times nothing,
- * and under `BENCH_MODE=union` a file one row fails leaves no other row's set.
- */
-function build_omissions(): GroupOmissions[] | undefined {
-	if (COVERAGE_ONLY || !USE_INTERSECTION || CORPUS_MODE !== 'perf') return undefined;
-	const omissions: GroupOmissions[] = [];
-	for (const language of LANGUAGES) {
-		for (const operation of OPERATIONS) {
-			const group_name = `${operation}/${language}`;
-			const tracking = task_tracking_by_group.get(group_name);
-			if (!tracking) continue;
-			const rows = [...tracking]
-				.filter(([, tracking_key]) => !coverage_only_keys.has(tracking_key))
-				.map(([name, tracking_key]) => ({
-					name,
-					tracking_key,
-					failed: [...(skipped_files.get(tracking_key)?.keys() ?? [])]
-				}));
-			// Nothing timed is "not measured", which the field spells as an absent group —
-			// zeroes would claim an intersection that never existed.
-			if (rows.length === 0) continue;
-			omissions.push(
-				summarize_group_omissions(group_name, files_by_language[language], rows, PERF_OMITS)
-			);
-		}
-	}
-	return omissions;
 }
 
 /**
@@ -2797,6 +1344,9 @@ async function build_results_data(
 				const tracking_key = tracking?.get(result.name);
 				const coverage = tracking_key ? effective_corpus_size.get(tracking_key) : undefined;
 				const iterated = tracking_key ? iterated_file_count.get(tracking_key) : undefined;
+				// Every result here came out of `time_group`, which records its `TimedRow`.
+				const timed = tracking_key ? timed_rows.get(tracking_key) : undefined;
+				if (!timed) throw new Error(`${group.name}/${result.name} has a result but no timed row`);
 				entries.push({
 					name: result.name,
 					group: group.name,
@@ -2812,17 +1362,18 @@ async function build_results_data(
 					cv: result.stats.cv,
 					ops_per_second: result.stats.ops_per_second,
 					sample_size: result.stats.sample_size,
-					...raw_timing_stats(result.timings_ns),
+					cv_raw: timed.summary.cv_raw,
+					drift: timed.summary.drift,
 					raw_sample_size: result.timings_ns.length,
 					outlier_ratio: result.stats.outlier_ratio,
-					// A `reset_heap` row warms in its `setup` (see the task loop), so the
-					// library's count is 0 for it and the harness's is the protocol.
-					warmup_iterations:
-						(tracking_key ? harness_warmups.get(tracking_key) : undefined) ??
-						result.budget.warmup_iterations,
+					// The sweeps the passes actually warmed for (`RowResult.warmup_iterations`):
+					// every row warms outside the timing library's loop, whose own count is 0.
+					warmup_iterations: timed.warmup_iterations,
 					min_iterations: result.budget.min_iterations,
-					settled_heap_bytes:
-						(tracking_key ? settled_heap_bytes.get(tracking_key) : undefined) ?? null,
+					passes: timed.summary.pass_mean_ns.length,
+					pass_mean_ns: timed.summary.pass_mean_ns,
+					pass_spread: timed.summary.pass_spread,
+					settled_heap_bytes: timed.settled_heap_bytes,
 					files_processed: coverage?.processed ?? null,
 					files_total: coverage?.total ?? null,
 					files_iterated: iterated ?? null,
@@ -2844,36 +1395,38 @@ async function build_results_data(
 		version: REPORT_SCHEMA_VERSION,
 		runtime: RUNTIME,
 		corpus_kind: CORPUS_MODE,
-		timestamp: new Date().toISOString(),
-		git_commit: await get_git_commit(),
+		timestamp: run_started,
+		git_commit: run_commit,
 		machine: current_machine(),
 		corpus,
-		corpus_sources: corpus_loader.sources,
+		corpus_sources: snapshot.corpus_sources,
 		exclusion_caches: IS_CONFORMANCE
-			? Object.fromEntries(corpus_loader.exclusion_caches.map((c) => [c.label, c.size]))
+			? Object.fromEntries(snapshot.exclusion_caches.map((c) => [c.label, c.size]))
 			: undefined,
-		corpus_snapshot: (await detect_corpus_snapshot(corpus_loader.sources)) ?? undefined,
+		corpus_snapshot: snapshot.corpus_snapshot ?? undefined,
 		// Per-source coverage, the JSON half of the markdown tables. Coverage-only
 		// runs only: on the perf surface every cell would read 100% by construction
 		// (an unlisted per-file failure hard-fails the run instead).
-		coverage_by_source: COVERAGE_ONLY ? serialize_coverage_by_source() : undefined,
+		coverage_by_source: snapshot.coverage_by_source ?? undefined,
 		versions,
 		binary_sizes: collected_sizes.sizes,
 		binary_sizes_absent: collected_sizes.absent,
-		omissions: build_omissions(),
+		omissions: snapshot.omissions ?? undefined,
 		entries,
 		suppressed_noise: Object.fromEntries(suppressed_noise),
-		output_digest_ungraded: serialize_ungraded_digests(),
-		variant_parity: variant_parity_findings,
-		unavailable: unavailable_with_rows(impls.unavailable, DEFINED_ROWS)
+		output_digest_ungraded: snapshot.output_digest_ungraded,
+		variant_parity: snapshot.variant_parity,
+		unavailable: snapshot.unavailable,
+		process_noise,
+		exit_hangs
 	};
 }
 
 /** Generate a full markdown report from benchmark data */
 function generate_markdown_report(data: Baseline, groups: GroupResults[]): string {
-	// Every figure the report labels comes from ONE `Baseline`, and the live
-	// pre-flight state is read straight from module scope rather than threaded back
-	// into a function that already sits in this module.
+	// Every figure the report labels comes from ONE `Baseline`, and the pre-flight
+	// state is read straight from module scope (where the snapshot was unpacked)
+	// rather than threaded back into a function that already sits in this module.
 	//
 	// This took thirteen positional parameters before, six of them those same
 	// globals passed through and seven of them fields of the `data` the caller
@@ -2881,7 +1434,7 @@ function generate_markdown_report(data: Baseline, groups: GroupResults[]): strin
 	// corpus with another's versions. Same hazard `CollectedBinarySizes` names for
 	// its own two halves, an order of magnitude wider.
 	const { binary_sizes, corpus, versions, timestamp, git_commit, machine } = data;
-	const corpus_bytes = bytes_by_language;
+	const corpus_bytes = snapshot.bytes_by_language;
 	const task_tracking = task_tracking_by_group;
 	const effective_size = effective_corpus_size;
 	const effective_bytes = effective_corpus_bytes;
@@ -2924,14 +1477,14 @@ function generate_markdown_report(data: Baseline, groups: GroupResults[]): strin
 				`the real-code sources are its collections, vendored at this commit\n`
 		);
 	}
-	if (corpus_loader.sources.length > 0) {
+	if (data.corpus_sources.length > 0) {
 		lines.push(
-			`**Sources:** ${corpus_loader.sources.map((s) => `${s.path} (${s.files})`).join(', ')}\n`
+			`**Sources:** ${data.corpus_sources.map((s) => `${s.path} (${s.files})`).join(', ')}\n`
 		);
 	}
-	if (corpus_loader.exclusion_caches.length > 0) {
+	if (snapshot.exclusion_caches.length > 0) {
 		lines.push(
-			`**Excluded by cache:** ${corpus_loader.exclusion_caches
+			`**Excluded by cache:** ${snapshot.exclusion_caches
 				.map((c) => `${c.label} (${c.size ?? 'ABSENT — not comparable'})`)
 				.join(', ')}\n`
 		);
@@ -2949,9 +1502,9 @@ function generate_markdown_report(data: Baseline, groups: GroupResults[]): strin
 	lines.push(`**Versions:** ${version_parts.join(', ')}\n`);
 
 	// A row absent from a coverage report reads as "not measured"; say why. Each
-	// claim was CHECKED against this surface's registry back at init, before the
-	// run's work — see `SURFACE_DISCLOSURES`.
-	lines.push(...SURFACE_DISCLOSURE_PROSE);
+	// claim was CHECKED against this surface's registry by the pre-flight process,
+	// before the run's work — see `SURFACE_DISCLOSURES` in `bench_preflight.ts`.
+	lines.push(...snapshot.surface_disclosure_prose);
 
 	lines.push(
 		'**Methodology:** Single-threaded — every implementation formats/parses one file at a time, ' +
@@ -2961,13 +1514,29 @@ function generate_markdown_report(data: Baseline, groups: GroupResults[]): strin
 			'annotations) for per-file figures; ratios and MB/s are denominated consistently either way. ' +
 			'This is single-core throughput, not the multi-core batch throughput a CLI gets formatting many files at once.\n'
 	);
+	if (!COVERAGE_ONLY) {
+		const noise = data.process_noise;
+		const pct = (v: number): string => `${(v * 100).toFixed(1)}%`;
+		lines.push(
+			`**Isolation:** every row is timed in a process of its own that loads that row’s engine ` +
+				`and nothing else measured, ${BENCH_PASSES} time${BENCH_PASSES === 1 ? '' : 's'} over ` +
+				`(passes), each pass taking a group’s rows in a different order; a row’s statistics pool ` +
+				`its passes.` +
+				(noise === null
+					? ''
+					: ` Two fresh processes of the same row sat ${pct(noise.median)} apart at the median, ` +
+						`${pct(noise.p95)} at the 95th percentile and ${pct(noise.max)} at most ` +
+						`(${noise.pairs} pass pairs) — a ratio inside that is not a difference this run measured.`) +
+				'\n'
+		);
+	}
 
 	// Coverage-only run: no timed groups exist, so render the per-tool coverage
-	// tables straight from pre-flight state (the timed loop below no-ops).
+	// tables straight from pre-flight state (the loop over timed groups below no-ops).
 	if (COVERAGE_ONLY) {
 		lines.push(
 			...generate_coverage_only_markdown(LANGUAGES, OPERATIONS, task_tracking, effective_size),
-			...generate_coverage_by_source_markdown(LANGUAGES, OPERATIONS, get_coverage_by_source())
+			...generate_coverage_by_source_markdown(LANGUAGES, OPERATIONS, coverage_by_source)
 		);
 		lines.push(
 			'**The test262 source is tsv-scope-filtered, and it favors tsv.** The cache the ' +
@@ -3087,10 +1656,14 @@ function generate_markdown_report(data: Baseline, groups: GroupResults[]): strin
 			`${unstable.length} timed row(s) were not stable: a cv past ` +
 				`${(UNSTABLE_CV_THRESHOLD * 100).toFixed(0)}% (std_dev / mean — \`cv\` after outlier ` +
 				`removal; \`cv (raw)\` before it, which counts only under ${RAW_CV_SAMPLE_CEILING} raw ` +
-				`samples, where one deviant sweep is a real share of the row) or a drift past ` +
-				`${(UNSTABLE_DRIFT_THRESHOLD * 100).toFixed(0)}% (the median of the second half of the ` +
-				`timings against the first's — a cost that moved WHILE the row was measured, which the ` +
-				`cleaned cv cannot see: a second mode is deleted or blended, not reported). The drift's sign ` +
+				`samples a pass, where one deviant sweep is a real share of the row), a drift past ` +
+				`${(UNSTABLE_DRIFT_THRESHOLD * 100).toFixed(0)}% (within one pass, the median of the second ` +
+				`half of the timings against the first's — a cost that moved WHILE the row was measured, ` +
+				`which the cleaned cv cannot see: a second mode is deleted or blended, not reported; the ` +
+				`row's worst pass is shown), or a pass spread past ` +
+				`${(UNSTABLE_PASS_SPREAD_THRESHOLD * 100).toFixed(0)}% (the row's slowest pass mean over ` +
+				`its fastest — each pass is a fresh process, so this is a level that depends on the process ` +
+				`the row was drawn in). The drift's sign ` +
 				`names the mechanism: negative means the row got FASTER while measured (still warming up — ` +
 				`under-warmed), positive means it got slower (degrading — a leak, a heap tipping over, ` +
 				`thermal). Every \`Nx\` involving ` +
@@ -3099,13 +1672,13 @@ function generate_markdown_report(data: Baseline, groups: GroupResults[]): strin
 				`row, it moves the answer.`
 		);
 		lines.push('');
-		lines.push('| Row | cv | cv (raw) | drift | samples (cleaned/raw) |');
-		lines.push('| --- | ---: | ---: | ---: | ---: |');
+		lines.push('| Row | cv | cv (raw) | drift | pass spread | samples (cleaned/raw) |');
+		lines.push('| --- | ---: | ---: | ---: | ---: | ---: |');
 		const pct = (v: number | null): string => (v === null ? '—' : `${(v * 100).toFixed(1)}%`);
 		for (const u of unstable) {
 			lines.push(
 				`| ${u.label} | ${pct(u.cv)} | ${pct(u.cv_raw)} | ${u.drift === null ? '—' : `${u.drift >= 0 ? '+' : ''}${(u.drift * 100).toFixed(1)}%`} | ` +
-					`${u.samples ?? '—'}/${u.raw_samples ?? '—'} |`
+					`${pct(u.pass_spread)} | ${u.samples ?? '—'}/${u.raw_samples ?? '—'} |`
 			);
 		}
 		lines.push('');
@@ -3165,17 +1738,51 @@ async function save_results(
 }
 
 /**
- * Flatten `all_group_results` into a single list with namespaced names. The
- * fuz_util baseline module joins by `result.name` and our task names repeat
- * across groups (`tsv` lives in `format/svelte`, `format/typescript`,
- * `format/css`). Without namespacing, the last write wins and three groups
- * collapse into one.
+ * The rows as the baseline module saves and compares them.
+ *
+ * Namespaced: the fuz_util baseline module joins by `result.name` and our row names
+ * repeat across groups (`tsv` lives in `format/svelte`, `format/typescript`,
+ * `format/css`), so without the group the last write wins and three groups collapse
+ * into one.
+ *
+ * And read at the PASS level when the run made several: the comparison is Welch's t
+ * on `(mean_ns, std_dev_ns, sample_size)`, which treats its samples as independent
+ * draws of the row. Sweeps are not — the sweeps of one process share that process's
+ * level, so pooled they hand Welch hundreds of samples whose error is really the
+ * passes', and a level that merely moved between processes reads as a significant
+ * regression. Each pass mean IS one independent draw, so the comparison gets those:
+ * `pass_mean_sd_ns` over the pass count. That asks a larger difference of a few
+ * passes before calling it real, which is the honest answer to how much a few
+ * processes can tell apart. A one-pass run keeps the sweep-level statistics, the only
+ * ones it has (and raises its sweep floor for them — `pass_min_iterations`).
+ *
+ * The within-pass noise this no longer hands the library's `noise_warning` (its cv
+ * gate reads `std_dev_ns / mean_ns`) is reported beside the comparison instead
+ * (`compare_baseline`), from the same §Unstable Rows readings the report publishes.
  */
-function flatten_results_for_baseline(groups: GroupResults[]): BenchmarkResult[] {
+function baseline_results(groups: GroupResults[]): BenchmarkResult[] {
 	const out: BenchmarkResult[] = [];
 	for (const group of groups) {
+		const tracking = task_tracking_by_group.get(group.name);
 		for (const r of group.results) {
-			out.push({ ...r, name: `${group.name}/${r.name}` });
+			const tracking_key = tracking?.get(r.name);
+			const summary = tracking_key ? timed_rows.get(tracking_key)?.summary : undefined;
+			const name = `${group.name}/${r.name}`;
+			if (!summary || summary.pass_mean_sd_ns === null) {
+				out.push({ ...r, name });
+				continue;
+			}
+			const passes = summary.pass_mean_ns.length;
+			const stats: BenchmarkStats = Object.assign(
+				Object.create(BenchmarkStats.prototype),
+				r.stats,
+				{
+					std_dev_ns: summary.pass_mean_sd_ns,
+					cv: summary.pass_mean_sd_ns / r.stats.mean_ns,
+					sample_size: passes
+				}
+			);
+			out.push({ ...r, name, stats });
 		}
 	}
 	return out;
@@ -3190,6 +1797,11 @@ function flatten_results_for_baseline(groups: GroupResults[]): BenchmarkResult[]
  */
 function build_baseline_metadata(data: Baseline): Record<string, unknown> {
 	return {
+		// The sample unit of every comparison against this baseline (`baseline_results`):
+		// a pass count that differs between the two sides compares pass means to sweeps,
+		// or three draws to five — a change the library's budget check cannot see, since
+		// `BENCH_PASSES` is not in a pass's budget.
+		passes: BENCH_PASSES,
 		corpus: data.corpus,
 		versions: data.versions,
 		binary_sizes: data.binary_sizes
@@ -3198,12 +1810,13 @@ function build_baseline_metadata(data: Baseline): Record<string, unknown> {
 
 /** Shape of our metadata in the baseline file (best-effort, validated lazily). */
 interface BaselineMeta {
+	passes?: number;
 	corpus?: { svelte?: number; typescript?: number; css?: number };
 }
 
 /** Save the current run as the regression baseline. */
 async function save_baseline(data: Baseline): Promise<void> {
-	await benchmark_baseline_save(flatten_results_for_baseline(all_group_results), {
+	await benchmark_baseline_save(baseline_results(all_group_results), {
 		path: BASELINE_DIR,
 		metadata: build_baseline_metadata(data)
 	});
@@ -3219,20 +1832,17 @@ async function save_baseline(data: Baseline): Promise<void> {
  * fairness caveats in docs/benchmarks.md.
  */
 async function compare_baseline(current: Baseline): Promise<void> {
-	const comparison = await benchmark_baseline_compare(
-		flatten_results_for_baseline(all_group_results),
-		{
-			path: BASELINE_DIR,
-			// 1.0 means "any statistically significant slowdown counts." Tune
-			// upward (e.g. 1.05) to suppress trivial regressions in CI without
-			// losing the practical-significance gate already inside the Welch
-			// comparison (`min_percent_difference` default 0.10).
-			regression_threshold: 1.0,
-			// Mark the baseline stale after a week so a long-untouched baseline
-			// doesn't quietly mask drift accumulated over months.
-			staleness_warning_days: 7
-		}
-	);
+	const comparison = await benchmark_baseline_compare(baseline_results(all_group_results), {
+		path: BASELINE_DIR,
+		// 1.0 means "any statistically significant slowdown counts." Tune
+		// upward (e.g. 1.05) to suppress trivial regressions in CI without
+		// losing the practical-significance gate already inside the Welch
+		// comparison (`min_percent_difference` default 0.10).
+		regression_threshold: 1.0,
+		// Mark the baseline stale after a week so a long-untouched baseline
+		// doesn't quietly mask drift accumulated over months.
+		staleness_warning_days: 7
+	});
 
 	if (!comparison.baseline_found) {
 		console.error(
@@ -3266,37 +1876,48 @@ async function compare_baseline(current: Baseline): Promise<void> {
 		);
 	}
 
+	// The sample unit — see `baseline_results`. A baseline from before the field was
+	// recorded compared sweeps pooled over one shared process.
+	if (meta?.passes !== BENCH_PASSES) {
+		log(
+			`\n⚠️  Pass count differs from baseline: baseline ${meta?.passes ?? 'unrecorded (pre-process-isolation)'}, ` +
+				`current ${BENCH_PASSES}. The two sides' samples are different units (pass means vs sweeps, ` +
+				`or a different number of draws), so read every verdict below as approximate and re-save.`
+		);
+	}
+
 	log('');
 	log(benchmark_baseline_format(comparison));
+
+	// What the library's cv gate no longer sees once a row is compared on its pass means
+	// (`baseline_results`): noise WITHIN this run's processes. Same readings, same
+	// thresholds as the report's §Unstable Rows.
+	const unstable = unstable_rows(current);
+	if (unstable.length > 0) {
+		log(
+			`\n⚠️  ${unstable.length} row(s) of this run were unstable (§Unstable Rows) — read their verdicts ` +
+				`above as approximate: ${unstable.map((u) => u.label).join(', ')}`
+		);
+	}
 }
 
 //
 // Output
 //
 
-// Collect binary sizes once (used by all output paths). Versions no longer
-// thread through — bindings live in node_modules (flat, no version dir).
-const collected_sizes = await collect_binary_sizes(impls);
+// The size table, collected by the pre-flight process (it gates each third-party
+// row on the impl having loaded, which only that process knows).
+const collected_sizes = snapshot.binary_sizes;
 const binary_sizes = collected_sizes.sizes;
 
 // Build results data (used by all output paths and always saved)
-const corpus = {
-	svelte: svelte_files.length,
-	typescript: ts_files.length,
-	css: css_files.length
-};
-const alt_versions = get_alternative_versions(impls, TASK_OPTIONS);
-const v = impls.versions.canonical;
-const versions: BaselineVersions = {
-	tsv: await get_tsv_version(),
-	svelte: v.svelte,
-	acorn: v.acorn,
-	acorn_ts: v['@sveltejs/acorn-typescript'],
-	prettier: v.prettier,
-	prettier_svelte: v['prettier-plugin-svelte'],
-	...alt_versions
-};
-const results_data = await build_results_data(all_group_results, corpus, versions, collected_sizes);
+const versions: BaselineVersions = { tsv: tsv_version, ...snapshot.versions };
+const results_data = await build_results_data(
+	all_group_results,
+	snapshot.corpus,
+	versions,
+	collected_sizes
+);
 
 if (args.json) {
 	// JSON output (same structure as saved results)
@@ -3364,7 +1985,7 @@ if (suppressed_noise.size > 0) {
 
 // Always save the timestamped pair; only overwrite the canonical
 // `report.<runtime>.{json,md}` on full-corpus runs or when --save-report is set.
-const write_report = args.save_report || !is_limited;
+const write_report = args.save_report || !IS_LIMITED;
 const results_path = await save_results(results_data, all_group_results, write_report);
 log(`\nResults saved to:`);
 log(`  ${results_path}.json`);
@@ -3393,6 +2014,12 @@ if (write_report) {
 				`${cost} (recorded in \`unavailable\`)`
 		);
 	}
+	if (results_data.exit_hangs.length > 0) {
+		log(
+			`  ⚠ ${results_data.exit_hangs.length} child(ren) hung on exit after reporting and were killed: ` +
+				`${results_data.exit_hangs.join(', ')} (results kept; recorded in \`exit_hangs\`)`
+		);
+	}
 	if (results_data.binary_sizes_absent.length > 0) {
 		log(
 			`  ⚠ size table missing ${results_data.binary_sizes_absent.length} artifact(s): ` +
@@ -3406,17 +2033,19 @@ if (write_report) {
 	if (unstable_published.length > 0) {
 		log(
 			`  ⚠ ${unstable_published.length} unstable row(s) (cv ≥ ${(UNSTABLE_CV_THRESHOLD * 100).toFixed(0)}%, ` +
-				`or |drift| ≥ ${(UNSTABLE_DRIFT_THRESHOLD * 100).toFixed(0)}%): ` +
+				`|drift| ≥ ${(UNSTABLE_DRIFT_THRESHOLD * 100).toFixed(0)}%, ` +
+				`or pass spread ≥ ${(UNSTABLE_PASS_SPREAD_THRESHOLD * 100).toFixed(0)}%): ` +
 				`${unstable_published
 					.map(
 						(u) =>
 							`${u.label} cv ${(u.cv * 100).toFixed(1)}%` +
 							(u.drift === null
 								? ''
-								: ` drift ${u.drift >= 0 ? '+' : ''}${(u.drift * 100).toFixed(1)}%`)
+								: ` drift ${u.drift >= 0 ? '+' : ''}${(u.drift * 100).toFixed(1)}%`) +
+							(u.pass_spread === null ? '' : ` spread ${(u.pass_spread * 100).toFixed(1)}%`)
 					)
 					.join(', ')} ` +
-				`(per-entry \`cv\` / \`cv_raw\` / \`drift\`; §Unstable Rows in the md)`
+				`(per-entry \`cv\` / \`cv_raw\` / \`drift\` / \`pass_spread\`; §Unstable Rows in the md)`
 		);
 	}
 } else {

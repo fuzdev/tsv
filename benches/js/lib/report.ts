@@ -145,7 +145,7 @@ const DISPLAY_ORDER = [
  * END, silently — which is exactly how a row joins a surface and sorts last
  * indefinitely, since nothing about the output looks broken. Asking the task
  * REGISTRY this question turns a hand-maintained list into a checked one, the same
- * way `SURFACE_DISCLOSURES` (bench.ts) checks its claims against the registry.
+ * way `SURFACE_DISCLOSURES` (bench_preflight.ts) checks its claims against the registry.
  *
  * One direction only. A LISTED name absent from `names` is NOT drift: each surface
  * registers its own subset (`tsc` rides the conformance surface alone), so the
@@ -1617,7 +1617,7 @@ export type CoverageBySource = Map<string, Map<string, Map<string, SourceCoverag
  * deliberately kept: they read identically only while the *bindings and payloads*
  * agree, which is a claim, not a given — a wire-writer failure would show as
  * the default row trailing `-internal`, and a broken binding error surface as a native/wasm
- * split (the oxc WASI consume-once bug, `bench.ts` `check_variant_parity`). Folding
+ * split (the oxc WASI consume-once bug, `bench_preflight.ts` `check_variant_parity`). Folding
  * the columns per engine would erase exactly that signal, per source, where it is
  * most legible.
  */
@@ -1930,7 +1930,7 @@ export function generate_skipped_files_markdown(
  * Generate effective corpus report showing files actually processed per benchmark.
  *
  * `task_tracking_by_group` is the per-group `display_name → tracking_key` map
- * captured in `bench.ts`. We invert it here to render display names
+ * rebuilt in `bench.ts` from the pre-flight snapshot. We invert it here to render display names
  * (e.g. `svelte/compiler`, `tsv-wasm-internal`) instead of the tracking_key
  * suffix (e.g. `canonical`, `wasm-internal`) so the labels line up with
  * the bench tables.

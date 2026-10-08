@@ -25,7 +25,17 @@
 
 import { create_format_api } from '../../../crates/tsv_wasm/npm/api.js';
 import { create_parse_api } from '../../../crates/tsv_wasm/npm/api_parse.js';
-import { BaseImplementation, goal_for, type Language, LANGUAGES, type ParseGoal } from './types.ts';
+import { assert_binding_emits_span_only, type LocationsProbeArtifact } from './locations_probe.ts';
+import { assert_binding_reports_rejection } from './reject_probe.ts';
+import {
+	BaseImplementation,
+	type BindingCall,
+	goal_for,
+	type InitScope,
+	type Language,
+	LANGUAGES,
+	type ParseGoal
+} from './types.ts';
 
 /**
  * A flat engine export: the source, then the optional source type — a `string` because
@@ -82,6 +92,13 @@ const per_language = <T>(of: (language: Language) => T): Record<Language, T> => 
 });
 
 /**
+ * The call a scoped init probes: the row's own when it names one, else its
+ * operation's default — the default parse, or the format.
+ */
+export const scope_call = (scope: InitScope): BindingCall =>
+	scope.call ?? (scope.operation === 'parse' ? 'parse' : 'format');
+
+/**
  * Shared base of tsv's three binding wrappers: the published calls, once.
  *
  * A wrapper owns how its binding loads and marshals; what its rows call is the same
@@ -110,6 +127,42 @@ export abstract class TsvBinding extends BaseImplementation {
 			parse: per_language((language) => published[`parse_${language}`]),
 			format: per_language((language) => published[`format_${language}`] as Published<string>)
 		};
+	}
+
+	/**
+	 * The wrapper's init self-checks, run once `bind` has published the engine: every
+	 * published call still THROWS on a source tsv rejects (`lib/reject_probe.ts`), and
+	 * the parse wire is the span-only one (`lib/locations_probe.ts`). Through the
+	 * wrapper's own methods, so each probes the call the rows make, facade included.
+	 *
+	 * Unscoped (pre-flight, the gates), the whole call × language matrix. With a
+	 * `scope` — a timed row's own process — only that row's call and language: this
+	 * binding is one slot behind every tsv row, and probing the rest would send the
+	 * other engine functions, or the row's own under another option, through the
+	 * facade's shared call sites ahead of the clock — the cross-row confound the row's
+	 * process exists to remove. So the span-only probe, which asks the default parse,
+	 * runs there only for the default parse's own row; pre-flight has asked it of this
+	 * artifact for every row, and each row's process checks it loads that artifact.
+	 *
+	 * @param binding - the row-facing name, so a throw names which binding failed
+	 * @param artifact - what the binding loaded and how to rebuild it
+	 * @param scope - the timed row the process is for, if any — see `InitScope`
+	 * @throws if a probe fails — tsv's bindings are required, so this stops the run
+	 */
+	protected probe(
+		binding: string,
+		artifact: LocationsProbeArtifact,
+		scope: InitScope | undefined
+	): void {
+		assert_binding_reports_rejection(binding, this, scope);
+		if (scope === undefined || scope_call(scope) === 'parse') {
+			assert_binding_emits_span_only(
+				binding,
+				artifact,
+				this,
+				scope === undefined ? LANGUAGES : [scope.language]
+			);
+		}
 	}
 
 	/** Drop the engine. A wrapper holding more (a library handle) overrides and calls up. */

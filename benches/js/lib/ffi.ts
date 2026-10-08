@@ -11,8 +11,7 @@
 
 import { ffi_library_path } from './tsv_artifacts.ts';
 import { type EngineFn, TsvBinding } from './tsv_api.ts';
-import { assert_binding_reports_rejection } from './reject_probe.ts';
-import { assert_binding_emits_span_only } from './locations_probe.ts';
+import type { InitScope } from './types.ts';
 
 // FFI symbol definitions.
 //
@@ -166,7 +165,7 @@ export class NativeImplementation extends TsvBinding {
 		return this.lib.symbols;
 	}
 
-	async init(): Promise<void> {
+	async init(scope?: InitScope): Promise<void> {
 		const lib_path = get_library_path();
 
 		const profile = Deno.env.get('TSV_FFI_PROFILE') ?? 'release';
@@ -228,14 +227,10 @@ export class NativeImplementation extends TsvBinding {
 		});
 
 		// This binding returns a payload either way, so the `out_status` word is the
-		// only thing that tells a refusal from a formatted file. Prove it still
-		// fires — see `lib/reject_probe.ts`.
-		assert_binding_reports_rejection('tsv (FFI)', this);
-
-		// The parse wire is span-only — prove this artifact emits it, so a stale library
-		// whose parse still emits `loc` can't be timed as the span-only default.
-		// See `lib/locations_probe.ts`.
-		assert_binding_emits_span_only('tsv (FFI)', { path: lib_path, rebuild }, this);
+		// only thing that tells a refusal from a formatted file — the reject probe is
+		// what proves it still fires. And the parse wire is span-only, so a stale
+		// library whose parse still emits `loc` can't be timed as the span-only default.
+		this.probe('tsv (FFI)', { path: lib_path, rebuild }, scope);
 	}
 
 	/**

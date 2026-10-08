@@ -4,7 +4,7 @@
  *
  * The `perf` corpus view (`lib/corpus.ts`) is application, library, and upstream
  * framework source: code that actually ships, so every benchmarked tool is expected
- * to process every file in the languages it declares support for. `bench.ts` enforces
+ * to process every file in the languages it declares support for. `bench_preflight.ts` enforces
  * that — after the perf pre-flight, a per-file failure that isn't listed here is a
  * hard error, not the silent skip that would quietly erode coverage. (Conformance
  * mode measures coverage, so failures are expected there and the guard doesn't run.)

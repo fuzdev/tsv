@@ -23,6 +23,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 
+import { sample_sd, unstable_readings } from './lib/bench_plan.ts';
 import type { Machine, Runtime } from './lib/runtime.ts';
 
 /**
@@ -72,10 +73,10 @@ interface Entry {
 	 * iterations. Optional on the same terms as `cv`.
 	 *
 	 * Read together with it, never separately: a cv is an ESTIMATE, and its own
-	 * error falls off with n. The bench drives sample count from `duration_ms` with
-	 * a floor of 8, so a multi-second row can land at 6–8
-	 * cleaned timings while a microsecond row lands at four figures — a spread of
-	 * two orders of magnitude inside one table.
+	 * error falls off with n. The bench drives sample count from a duration budget
+	 * with a sweep floor per pass, so a multi-second row lands at its floor (a few
+	 * timings from an older single-pass sibling) while a microsecond row lands at
+	 * four figures — a spread of two orders of magnitude inside one table.
 	 */
 	sample_size?: number | null;
 	/**
@@ -86,6 +87,18 @@ interface Entry {
 	cv_raw?: number | null;
 	drift?: number | null;
 	raw_sample_size?: number | null;
+	/**
+	 * How far apart the row's passes sat (report `version` 21+, where each pass is a
+	 * fresh process): the slowest pass mean over the fastest, minus one. Absent on
+	 * an older sibling, which timed every row once in one shared process.
+	 */
+	pass_spread?: number | null;
+	/**
+	 * Each pass's mean sweep time, in pass order (report `version` 21+) — the figures
+	 * the row's `mean_ns` is the mean of, and so the draws its error is made of: what
+	 * `within_noise` reads its noise from where a sibling carries several.
+	 */
+	pass_mean_ns?: number[] | null;
 	/**
 	 * A hash of the sorted timed path set (report `version` 15+), which is what
 	 * "same files on every runtime" actually means; the counts alone never proved it.
@@ -198,6 +211,10 @@ interface Row {
 	cv_raw: Partial<Record<Runtime, number>>;
 	drift: Partial<Record<Runtime, number>>;
 	raw_samples: Partial<Record<Runtime, number>>;
+	/** `Entry.pass_spread` per runtime, where a sibling carries it. */
+	pass_spread: Partial<Record<Runtime, number>>;
+	/** `Entry.pass_mean_ns` per runtime, where a sibling carries it. */
+	pass_means: Partial<Record<Runtime, number[]>>;
 	/** `Entry.files_iterated_digest` per runtime, where a sibling carries it. */
 	digest: Partial<Record<Runtime, string>>;
 }
@@ -226,6 +243,8 @@ for (const r of present) {
 				cv_raw: {},
 				drift: {},
 				raw_samples: {},
+				pass_spread: {},
+				pass_means: {},
 				digest: {}
 			};
 			rows.set(key, row);
@@ -239,6 +258,8 @@ for (const r of present) {
 		if (e.cv_raw != null) row.cv_raw[r] = e.cv_raw;
 		if (e.drift != null) row.drift[r] = e.drift;
 		if (e.raw_sample_size != null) row.raw_samples[r] = e.raw_sample_size;
+		if (e.pass_spread != null) row.pass_spread[r] = e.pass_spread;
+		if (e.pass_mean_ns != null) row.pass_means[r] = e.pass_mean_ns;
 		if (e.files_iterated_digest != null) row.digest[r] = e.files_iterated_digest;
 	}
 }
@@ -512,12 +533,27 @@ const machine = sources.find((s) => s.machine)?.machine ?? null;
  * `tsv-wasm+locations` for `{locations: true}` — so `tsv` and `tsv-wasm` name a row
  * in the parse groups as well as the format ones, and a consumer must key a row on
  * `group` + `name`, never `name` alone.
+ *
+ * 17: `unstable_cells[]` entries gain `pass_spread`, and a spread past 5% trips a
+ * cell by itself. From per-runtime report `version` 21 each row is timed in several
+ * fresh processes and pooled, so a sibling's `cv` and `drift` are no longer readings
+ * of one shared process: `cv` includes the variation between a row's processes, and
+ * `drift` is its worst single pass's. `pass_spread` is `null` for a cell whose
+ * sibling predates it.
+ *
+ * 18: `within_noise[]` entries carry `basis` — per side, `passes` or `sweeps` — and
+ * `samples` counts in that unit. A sibling timed in several passes (report `version`
+ * 21+) is read on its PASS MEANS: the spread between them is the noise, and three are
+ * needed (`MIN_NOISE_PASSES`). Only a sibling with one pass, or from before passes,
+ * is read on its sweep-level `cv` as in 17. A consumer that read 17's `samples` as
+ * cleaned sweeps reads 18's wrongly on every `passes` side.
  */
-const COMBINED_SCHEMA_VERSION = 16;
+const COMBINED_SCHEMA_VERSION = 18;
 
 // JSON: metadata + provenance per source + the comparison rows.
 /**
- * The cleaned-timing count below which a row's cv is not a usable noise estimate.
+ * The cleaned-timing count below which a SWEEP-level cv is not a usable noise
+ * estimate — the gate for a sibling read on its sweeps (`cell_noise`).
  *
  * Ten, not the 30 `benchmark.ts` names as the central-limit floor for its Welch
  * test: this is a reading aid, and 30 would silence it on every row the bench
@@ -525,6 +561,91 @@ const COMBINED_SCHEMA_VERSION = 16;
  * estimate is merely rough and withdraws it where it is arbitrary.
  */
 const MIN_NOISE_SAMPLES = 10;
+
+/**
+ * The pass count below which a row's PASS MEANS are not a usable noise estimate —
+ * the gate for a sibling read on its passes (`cell_noise`). The spread of two is one
+ * degree of freedom: two passes that happen to agree say nothing about a third.
+ */
+const MIN_NOISE_PASSES = 3;
+
+/** What one side of a `within_noise` cell's noise was read from. */
+type NoiseBasis = 'passes' | 'sweeps';
+
+/**
+ * One runtime's noise on one row, as a relative error of its published mean, and
+ * what it was read from — or `null` when that runtime gives no usable estimate.
+ *
+ * A sibling timed in several fresh processes (report `version` 21+) is read on its
+ * PASS MEANS: its published mean is their mean, so the spread between them is the
+ * error it is made of — what one more process of the row could have read. Its pooled
+ * `cv` is not: that is the spread of one SWEEP, including within-process variation the
+ * mean averages away, so it overstates the noise of the mean and would call real
+ * runtime differences "no difference". Its sample count is not either: pooled over
+ * the passes, it clears any sweep gate while the between-process part rests on a few
+ * draws. So the pass means, with their own gate (`MIN_NOISE_PASSES`).
+ *
+ * A sibling with one pass, or from before passes, has only its sweeps: the cleaned
+ * `cv`, behind `MIN_NOISE_SAMPLES` — both one process's readings, the best it has.
+ */
+const cell_noise = (
+	row: Row,
+	r: Runtime
+): { noise: number; samples: number; basis: NoiseBasis } | null => {
+	const means = row.pass_means[r];
+	if (means !== undefined && means.length > 1) {
+		if (means.length < MIN_NOISE_PASSES) return null;
+		const mean = means.reduce((a, m) => a + m, 0) / means.length;
+		return mean > 0
+			? { noise: sample_sd(means, mean) / mean, samples: means.length, basis: 'passes' }
+			: null;
+	}
+	const cv = row.cv[r];
+	const n = row.samples[r];
+	if (cv === undefined || n === undefined || n < MIN_NOISE_SAMPLES) return null;
+	return { noise: cv, samples: n, basis: 'sweeps' };
+};
+
+/**
+ * Per-runtime measurements that were not stable, so every ratio through them is
+ * unreadable — asked BEFORE any sample gate, because this is the direction where a
+ * cv needs no minimum n: a recorded 48% on five timings is not an estimate that
+ * might be wrong, it is five timings that disagree. The gate on `within_noise` is
+ * about an estimate too thin to classify by; it silenced the one cell that had to be
+ * named.
+ *
+ * The rule is the per-runtime bench's own (`lib/bench_plan.ts` `unstable_readings`),
+ * imported rather than restated, so the two reports cannot disagree about a row:
+ * four readings, any one of which trips the cell — each only where the sibling
+ * carries it (the raw two from report 15, the spread from 21).
+ */
+const unstable_cells = order.flatMap((key) => {
+	const row = rows.get(key)!;
+	return present
+		.filter((r) => {
+			const raw = row.raw_samples[r];
+			const tripped = unstable_readings({
+				cv: row.cv[r] ?? null,
+				cv_raw: row.cv_raw[r] ?? null,
+				drift: row.drift[r] ?? null,
+				pass_spread: row.pass_spread[r] ?? null,
+				// one pass before report 21, whose siblings carry no pass means
+				raw_samples_per_pass: raw === undefined ? null : raw / (row.pass_means[r]?.length ?? 1)
+			});
+			return tripped.length > 0;
+		})
+		.map((r) => ({
+			group: row.group,
+			name: row.name,
+			runtime: r,
+			cv: row.cv[r] ?? null,
+			cv_raw: row.cv_raw[r] ?? null,
+			drift: row.drift[r] ?? null,
+			pass_spread: row.pass_spread[r] ?? null,
+			samples: row.samples[r] ?? null
+		}));
+});
+const unstable_keys = new Set(unstable_cells.map((c) => `${c.group}/${c.name}`));
 
 /**
  * Per-runtime deltas that are smaller than the noise of the two measurements they
@@ -536,74 +657,24 @@ const MIN_NOISE_SAMPLES = 10;
  * each wobble 10% is not a runtime difference; a `1.15x` between two 1% rows is.
  * Nothing here could tell them apart.
  *
- * The bar is the quadrature sum of the two rows' cv — the standard combination for
- * independent relative errors, and deliberately a rough one: it is a READING AID,
- * not a significance test (that is `benchmark_baseline_compare`'s Welch job, on a
- * run this composer never sees). Rows missing a cv on either side are skipped
- * rather than assumed quiet — a sibling predating the field would otherwise read as
- * noiseless.
+ * The bar is the quadrature sum of the two sides' noise (`cell_noise`) — the
+ * standard combination for independent relative errors, and deliberately a rough
+ * one: it is a READING AID, not a significance test (that is
+ * `benchmark_baseline_compare`'s Welch job, on a run this composer never sees). A
+ * side with no usable estimate leaves the cell unclassified rather than assumed
+ * quiet — a sibling predating the fields would otherwise read as noiseless.
  *
- * ⚠ A row too thinly sampled to have a trustworthy cv is skipped on the SAME
- * argument (`MIN_NOISE_SAMPLES`), and it is the more reachable half. A cv is an
- * estimate, and this test consumes it in the direction where being wrong is
- * expensive: too SMALL a cv makes a real per-runtime difference read as "no
- * difference", which is the one verdict here a reader cannot check from the table.
- * The bench floors iterations at 8 and drives the rest from
- * `duration_ms`, so a multi-second row lands at a handful of cleaned timings —
- * measured, 17 of 44 rows per runtime sit under ten — while a fast row lands at
- * four figures. Three timings that happen to agree are not evidence of quiet.
+ * ⚠ The estimate is consumed in the direction where an OVERestimate is expensive:
+ * too LARGE a noise makes a real per-runtime difference read as "no difference",
+ * which is the one verdict here a reader cannot check from the table. That is why a
+ * pooled sweep `cv` is not the noise of a pass-pooled mean (it is larger), and why an
+ * estimate too thin to trust — a handful of sweeps, two passes — is not used at all:
+ * a thin estimate errs in both directions, and three timings that happen to disagree
+ * would call a real difference noise.
  *
- * Measured when this was written: across the three committed reports, 6 of 44
- * node/deno deltas land inside their combined cv, all six at ~1.00x — and one of
- * the six rests on 7 timings a side, which is exactly the cell this guard
- * declines to call. So it currently confirms "no difference" rather than
- * overturning anything; it is here for the case it does overturn.
+ * In practice it confirms "no difference" (cells at ~1.00x) rather than overturning
+ * a reading; it is here for the case it does overturn.
  */
-/** The per-runtime bench's own thresholds (`bench.ts` `UNSTABLE_*_THRESHOLD`, `RAW_CV_SAMPLE_CEILING`), restated here. */
-const UNSTABLE_CV_THRESHOLD = 0.1;
-const UNSTABLE_DRIFT_THRESHOLD = 0.05;
-const RAW_CV_SAMPLE_CEILING = 30;
-
-/**
- * Per-runtime measurements that were not stable, so every ratio through them is
- * unreadable — asked BEFORE any sample gate, because this is the direction where a
- * cv needs no minimum n: a recorded 48% on five timings is not an estimate that
- * might be wrong, it is five timings that disagree. The gate on `within_noise` is
- * about a cv that might be too SMALL; it silenced the one cell that had to be named.
- *
- * Three readings, any one of which trips the cell: the cleaned cv, the raw cv (a
- * second mode the cleaner deleted) and the drift (a cost that moved while the row
- * was measured) — the raw two only where the sibling carries them (report 15+).
- */
-const unstable_cells = order.flatMap((key) => {
-	const row = rows.get(key)!;
-	return present
-		.filter((r) => {
-			const cv = row.cv[r];
-			const cv_raw = row.cv_raw[r];
-			const drift = row.drift[r];
-			const raw_n = row.raw_samples[r];
-			return (
-				(cv !== undefined && cv >= UNSTABLE_CV_THRESHOLD) ||
-				(cv_raw !== undefined &&
-					cv_raw >= UNSTABLE_CV_THRESHOLD &&
-					raw_n !== undefined &&
-					raw_n < RAW_CV_SAMPLE_CEILING) ||
-				(drift !== undefined && Math.abs(drift) >= UNSTABLE_DRIFT_THRESHOLD)
-			);
-		})
-		.map((r) => ({
-			group: row.group,
-			name: row.name,
-			runtime: r,
-			cv: row.cv[r] ?? null,
-			cv_raw: row.cv_raw[r] ?? null,
-			drift: row.drift[r] ?? null,
-			samples: row.samples[r] ?? null
-		}));
-});
-const unstable_keys = new Set(unstable_cells.map((c) => `${c.group}/${c.name}`));
-
 const within_noise = order.flatMap((key) => {
 	const row = rows.get(key)!;
 	const cells: Array<{
@@ -613,7 +684,9 @@ const within_noise = order.flatMap((key) => {
 		runtimes: [Runtime, Runtime];
 		delta: number;
 		noise: number;
-		/** Cleaned timing counts, in the same order as `runtimes` — the md's `n=a/b`. */
+		/** What each side's noise was read from, in the same order as `runtimes`. */
+		basis: [NoiseBasis, NoiseBasis];
+		/** Each side's count in its `basis` unit (passes or cleaned sweeps) — the md's `n=a/b`. */
 		samples: [number, number];
 	}> = [];
 	// An unstable row is reported as such; a delta inside a 48% "noise" is not "no
@@ -625,17 +698,12 @@ const within_noise = order.flatMap((key) => {
 			const b = present[j];
 			const a_ops = row.ops[a];
 			const b_ops = row.ops[b];
-			const a_cv = row.cv[a];
-			const b_cv = row.cv[b];
-			const a_n = row.samples[a];
-			const b_n = row.samples[b];
-			if (a_ops === undefined || b_ops === undefined || a_cv === undefined || b_cv === undefined) {
-				continue;
-			}
-			if (a_n === undefined || a_n < MIN_NOISE_SAMPLES) continue;
-			if (b_n === undefined || b_n < MIN_NOISE_SAMPLES) continue;
+			if (a_ops === undefined || b_ops === undefined) continue;
+			const a_noise = cell_noise(row, a);
+			const b_noise = cell_noise(row, b);
+			if (a_noise === null || b_noise === null) continue;
 			const delta = Math.abs(b_ops / a_ops - 1);
-			const noise = Math.sqrt(a_cv ** 2 + b_cv ** 2);
+			const noise = Math.sqrt(a_noise.noise ** 2 + b_noise.noise ** 2);
 			if (delta < noise) {
 				cells.push({
 					group: row.group,
@@ -643,7 +711,8 @@ const within_noise = order.flatMap((key) => {
 					runtimes: [a, b],
 					delta,
 					noise,
-					samples: [a_n, b_n]
+					basis: [a_noise.basis, b_noise.basis],
+					samples: [a_noise.samples, b_noise.samples]
 				});
 			}
 		}
@@ -761,13 +830,15 @@ if (unstable_cells.length > 0) {
 					(c) =>
 						`\`${c.group}/${c.name}\` ${c.runtime} (cv ${pct(c.cv)}, raw ${pct(c.cv_raw)}, drift ` +
 						`${c.drift === null ? '—' : `${c.drift >= 0 ? '+' : ''}${(c.drift * 100).toFixed(1)}%`}, ` +
-						`n=${c.samples ?? '—'})`
+						`pass spread ${pct(c.pass_spread)}, n=${c.samples ?? '—'})`
 				)
 				.join('; ') +
 			'. The cell is marked `⚠` in its table. A drift is a cost that moved WHILE the row was ' +
 			'measured (the median of the second half of its timings against the first’s — negative: it got ' +
 			'faster, still warming up; positive: it got slower, degrading); the cleaned cv cannot see ' +
-			'it, and a longer window moves such a row’s answer rather than converging it. Re-run the ' +
+			'it, and a longer window moves such a row’s answer rather than converging it. A pass spread ' +
+			'is how far apart the row’s passes sat — each a fresh process — so a wide one is a level ' +
+			'that depends on the process the row was drawn in. Re-run the ' +
 			'runtime before reading the row, and read the per-runtime report’s §Unstable Rows for ' +
 			'the row’s own detail.\n'
 	);
@@ -783,12 +854,14 @@ if (within_noise.length > 0) {
 						`${(c.noise * 100).toFixed(1)}% noise, n=${c.samples.join('/')})`
 				)
 				.join('; ') +
-			'. Read those cells as "no difference". The two cv values behind each are ' +
-			"`entries[].cv` in the per-runtime JSON — NOT that report's §Unstable Rows, which lists " +
-			'only rows past its own 10% threshold and so names none of these: a cell lands here ' +
-			'whenever the delta is small relative to the noise, which two perfectly ordinary 3% rows ' +
-			`satisfy. \`n\` is the cleaned timings behind each cv — a row under ${MIN_NOISE_SAMPLES} ` +
-			'a side is left unclassified rather than called quiet on an estimate that thin. Every ' +
+			'. Read those cells as "no difference". The noise behind each side is the spread of ' +
+			"its row's pass means (`entries[].pass_mean_ns` in the per-runtime JSON) where the row " +
+			'was timed in several fresh processes, and its sweep-level `cv` only where it was not — ' +
+			"NOT that report's §Unstable Rows, which lists only rows past its own thresholds and so " +
+			'names none of these: a cell lands here whenever the delta is small relative to the ' +
+			`noise. \`n\` counts what each side was read from — passes, or cleaned sweeps for a ` +
+			`one-pass sibling — and a side under ${MIN_NOISE_PASSES} passes or ${MIN_NOISE_SAMPLES} ` +
+			'sweeps is left unclassified rather than called quiet on an estimate that thin. Every ' +
 			'pair of runtimes is classified, not only each against the ratio base, and a row named ' +
 			'under **Unstable** above is never classified here.\n'
 	);
@@ -919,7 +992,7 @@ if (unstable_cells.length > 0) {
 	console.error(
 		'⚠ compose: UNSTABLE measurements (' +
 			unstable_cells.map((c) => `${c.group}/${c.name}=${c.runtime}`).join(' | ') +
-			') — a cv or drift past the bench’s thresholds; every ratio through them is unreadable. ' +
+			') — a cv, drift or pass spread past the bench’s thresholds; every ratio through them is unreadable. ' +
 			'Re-run those runtimes (`deno task bench:<runtime>:run && deno task bench:compose`) before publishing.'
 	);
 }

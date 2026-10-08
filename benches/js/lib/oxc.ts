@@ -7,6 +7,7 @@
 
 import {
 	BaseImplementation,
+	type InitScope,
 	type Language,
 	LANGUAGE_EXTENSIONS,
 	LANGUAGES,
@@ -179,16 +180,30 @@ export class OxcImplementation extends BaseImplementation {
 		this.versions = versions;
 	}
 
-	async init(): Promise<void> {
+	/**
+	 * Load both tools and prove them — or, with a `scope` (a timed row's own
+	 * process), only the tool that row calls: oxc-parser for a parse row, oxfmt for a
+	 * format row, probed on that row's language alone. Two packages behind one slot,
+	 * and a row's process holds nothing its row does not run (`InitScope`).
+	 */
+	async init(scope?: InitScope): Promise<void> {
 		// oxfmt's svelte path is a bundled prettier-plugin-svelte, with the same
 		// echo-the-block-verbatim fallback — see `lib/reject_probe.ts`. Set here as
 		// well as in `lib/canonical.ts` so this impl does not depend on init order.
 		surface_embedded_format_errors();
 
-		const [parser_mod, formatter_mod] = await Promise.all([import('oxc-parser'), import('oxfmt')]);
+		const parses = scope === undefined || scope.operation === 'parse';
+		const formats = scope === undefined || scope.operation === 'format';
+		const format_languages: ReadonlyArray<Language> =
+			scope === undefined ? this.format_languages : [scope.language];
 
-		this._parser = parser_mod as OxcParserModule;
-		this._formatter = formatter_mod as OxfmtModule;
+		const [parser_mod, formatter_mod] = await Promise.all([
+			parses ? import('oxc-parser') : null,
+			formats ? import('oxfmt') : null
+		]);
+
+		this._parser = parser_mod as OxcParserModule | null;
+		this._formatter = formatter_mod as OxfmtModule | null;
 
 		// Neither half of this impl reports a broken assumption on its own: oxc says
 		// nothing about its diagnostic vocabulary, and oxfmt accepts an unrecognized
@@ -199,20 +214,23 @@ export class OxcImplementation extends BaseImplementation {
 		// is the impl, not the row. Over-broad, and deliberately so — the alternative
 		// is a second registry entry per binding — and disclosed rather than silent:
 		// `unavailable[].rows` names every row the failure removed.
-		assert_oxc_rejects_invalid(this._parser, 'oxc-parser');
-		// That reads the raw module, so it names a moved vocabulary precisely — and proves
-		// nothing about THIS wrapper turning the diagnostics into a throw. Ask the row's
-		// own call too, at every goal it is handed (`lib/reject_probe.ts`).
-		assert_parser_rejects_invalid('oxc-parser', this.parse_languages, (s, l, goal) =>
-			this.parse(s, l, goal)
-		);
+		if (this._parser) {
+			assert_oxc_rejects_invalid(this._parser, 'oxc-parser');
+			// That reads the raw module, so it names a moved vocabulary precisely — and proves
+			// nothing about THIS wrapper turning the diagnostics into a throw. Ask the row's
+			// own call too, at every goal it is handed (`lib/reject_probe.ts`).
+			assert_parser_rejects_invalid('oxc-parser', this.parse_languages, (s, l, goal) =>
+				this.parse(s, l, goal)
+			);
+		}
+		if (!formats) return;
 		// Per LANGUAGE, and through `format_async` rather than the raw module call:
 		// one options bag drives all three here (unlike biome's per-language sections),
 		// so the extra two are corroboration — but they run the exact call the timed
 		// row makes, which grades oxfmt's own diagnostics through `oxc_fatal_errors`,
 		// and the svelte pass is the standing proof that the pins reach oxfmt's
 		// bundled-prettier fallback (docs/benchmarks.md §Fairness caveats asserts it).
-		for (const language of this.format_languages) {
+		for (const language of format_languages) {
 			assert_format_config_landed(
 				'oxfmt',
 				language,

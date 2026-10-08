@@ -21,9 +21,9 @@ import { stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { wasm_target } from './runtime.ts';
 import { wasm_bundle_dir } from './tsv_artifacts.ts';
-import { TsvBinding } from './tsv_api.ts';
-import { assert_binding_reports_rejection } from './reject_probe.ts';
-import { assert_binding_emits_span_only } from './locations_probe.ts';
+import { LOCATIONS_PROBE_SOURCES } from './locations_probe.ts';
+import { scope_call, TsvBinding } from './tsv_api.ts';
+import { type InitScope, LANGUAGES } from './types.ts';
 
 /**
  * WASM module function signatures — the raw wasm-bindgen exports, flat like the two
@@ -50,7 +50,7 @@ interface WasmModule {
 }
 
 export class WasmImplementation extends TsvBinding {
-	async init(): Promise<void> {
+	async init(scope?: InitScope): Promise<void> {
 		// The same directory the freshness guard resolves — both sides go through
 		// `tsv_artifacts.ts`'s `wasm_bundle_dir`, so the bundle guarded is the bundle
 		// loaded (the guard names the `.wasm`, this names the `.js` glue beside it).
@@ -113,30 +113,34 @@ export class WasmImplementation extends TsvBinding {
 		// js_sys-materialized OBJECT (the engine runs the host's JSON.parse from
 		// Rust). If a glue/build regression ever handed back the raw JSON string
 		// instead, the timed `tsv-wasm` parse rows would silently skip
-		// materialization and read artificially fast vs their native sibling. Probe
-		// once here, outside any timed loop — and on the raw export, since the facade
-		// passes through whatever the engine's `parse` returns.
-		const probe = module.parse_typescript('const x = 1;');
-		if (typeof probe !== 'object' || probe === null) {
-			throw new Error(
-				`tsv-wasm parse returned a ${typeof probe} — expected a materialized AST object`
-			);
+		// materialization and read artificially fast vs their native sibling. Probed
+		// here, outside any timed loop, on the raw export (the facade passes through
+		// whatever the engine's `parse` returns) — and, like the probes below, only for
+		// a row that calls it (the default parse and `{locations: true}` both do), on
+		// that row's language, when the process is one row's (`scope`).
+		const call = scope === undefined ? undefined : scope_call(scope);
+		if (call === undefined || call === 'parse' || call === 'parse_with_locations') {
+			for (const language of scope === undefined ? LANGUAGES : [scope.language]) {
+				const probe = this.engine.parse![language](LOCATIONS_PROBE_SOURCES[language]);
+				if (typeof probe !== 'object' || probe === null) {
+					throw new Error(
+						`tsv-wasm parse_${language} returned a ${typeof probe} — expected a materialized AST object`
+					);
+				}
+			}
 		}
 
 		// The bindings throw natively today; probed anyway so the three can't come to
-		// disagree about what surfacing a refusal MEANS — see `lib/reject_probe.ts`.
-		// The guard above asks what a SUCCESS returns; this asks what a REFUSAL does.
-		assert_binding_reports_rejection('tsv (WASM)', this);
-
-		// The parse wire is span-only — prove this bundle emits it, so a stale one whose
-		// `parse_<lang>` still returns the loc-bearing wire can't be timed under the span
-		// rows' label. The
-		// freshness guard refuses such a bundle unless `BENCH_STALE_OK=1`; this is what
-		// still stands then — see `lib/locations_probe.ts`.
-		assert_binding_emits_span_only(
+		// disagree about what surfacing a refusal MEANS. The guard above asks what a
+		// SUCCESS returns; the reject probe asks what a REFUSAL does. And the parse wire
+		// is span-only, so a stale bundle whose `parse_<lang>` still returns the
+		// loc-bearing wire can't be timed under the span rows' label — the freshness
+		// guard refuses such a bundle unless `BENCH_STALE_OK=1`, and this is what still
+		// stands then.
+		this.probe(
 			'tsv (WASM)',
 			{ path: wasm_path, rebuild: `deno task build:wasm:all:${target}` },
-			this
+			scope
 		);
 	}
 }
