@@ -347,12 +347,12 @@ async function* load_file_list(
  * column of sizes scans uniformly without unit-switching mid-table.
  *
  * EVERY printer of a corpus SIZE routes here: this module's loader summary, the
- * terminal corpus block and the markdown report's `**Corpus:**` line in
- * `bench.ts`, and `diagnostics/corpus_stats.ts`'s MB tier. They all describe the
- * same bytes, so a second spelling is a second answer — dividing by 1024² under
- * this same `MB` label makes a LARGER corpus print as fewer MB than a smaller one
- * measured decimally, which is a disagreement no reader can resolve from the
- * output.
+ * bench's terminal corpus block (`bench_preflight.ts`) and its markdown report's
+ * `**Corpus:**` line (`bench.ts`), and `diagnostics/corpus_stats.ts`'s MB tier. They
+ * all describe the same bytes, so a second spelling is a second answer — dividing by
+ * 1024² under this same `MB` label makes a LARGER corpus print as fewer MB than a
+ * smaller one measured decimally, which is a disagreement no reader can resolve from
+ * the output.
  */
 export function format_mb(bytes: number): string {
 	return `${(bytes / 1_000_000).toFixed(1)} MB`;

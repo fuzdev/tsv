@@ -1433,7 +1433,6 @@ async function run_preflight_group(
 				name: task.name,
 				tracking_key: task.tracking_key,
 				impl: task.impl,
-				is_async: task.is_async,
 				coverage_only: task.coverage_only === true,
 				processed: coverage.processed,
 				total: coverage.total,

@@ -82,13 +82,16 @@ export const BENCH_GC = env.BENCH_GC === '1';
  * How many fresh processes each row is timed in (`BENCH_PASSES`, default 3, at
  * least 1). A pass is one process per row, the rows of a group taken in a different
  * order each pass (`lib/bench_plan.ts` `pass_order`), and a row's published figures
- * pool the timings of all its passes.
+ * pool its passes (`summarize_passes`: the mean is the passes' means, weighted
+ * equally).
  *
  * Several, because one process is one draw: a row's level can differ between two
  * fresh processes by more than it varies inside either (JSC's allocation-heavy rows
  * have sat at two levels a tenth apart), and a single pass publishes whichever it
- * drew with a quiet `cv`. Three rather than two so the pooled middle is a pass
- * rather than the gap between two that disagree. The spread across passes is
+ * drew with a quiet `cv`. Three rather than two because two passes that disagree say
+ * only THAT they disagree — a third says whether one of them is the odd one out —
+ * and because a baseline comparison reads pass means (`bench.ts` `baseline_results`),
+ * where two give its t-test a single degree of freedom. The spread across passes is
  * published per row (`pass_spread`), which is what makes the draw visible.
  */
 export const BENCH_PASSES = Math.max(1, env_int('BENCH_PASSES') ?? 3);
@@ -220,15 +223,6 @@ export const BASELINE_DIR = './benches/js/results';
 
 /** Results directory for comparison JSON files */
 export const RESULTS_DIR = './benches/js/results';
-
-/**
- * The run's scratch directory: what its processes hand each other (a child's spec
- * and result, the file sets the timed rows read). Inside `RESULTS_DIR` because that
- * is the one place the Deno tasks may write; per runtime, since the three runtimes'
- * runs are separate invocations; created empty by the orchestrator and removed when
- * it exits.
- */
-export const RUN_DIR = `${RESULTS_DIR}/.run-${RUNTIME}`;
 
 /**
  * This run's task-registry options, in one place: the row-composition guards, the

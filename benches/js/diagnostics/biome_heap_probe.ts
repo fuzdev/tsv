@@ -158,14 +158,14 @@ if (prelude.length === 0) {
 	impl = new BiomeImplementation(versions.biome);
 	await impl.init();
 } else {
-	// The bench's own process state: every impl initialized (their modules, wasm
-	// instances and JIT state all resident), then the named earlier tasks of the
-	// group sweep the corpus ahead of the biome row.
+	// A shared process's state: every impl initialized (their modules, wasm instances
+	// and JIT state all resident), then the named earlier rows of the group sweep the
+	// corpus ahead of the biome row.
 	const impls = await init_implementations({ logger: () => {} });
 	if (!impls.biome) throw new Error('biome failed to initialize');
 	impl = impls.biome;
 	if (typeof globalThis.gc !== 'function') {
-		log('⚠ no gc() — run with --expose-gc so the inter-task settle is the bench’s');
+		log('⚠ no gc() — run with --expose-gc so the prelude rows are settled between');
 	}
 	const sweep_of: Record<PreludeRow, (f: SourceFile) => Promise<unknown> | unknown> = {
 		prettier: (f) => impls.canonical.format_async(f.content, language),

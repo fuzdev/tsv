@@ -16,7 +16,7 @@
  */
 
 import type { BenchmarkBudget } from '@fuzdev/fuz_util/benchmark_types.ts';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { argv } from 'node:process';
 import type { CollectedBinarySizes } from './binary_sizes.ts';
 import type { CorpusRepoRef, CorpusSource, ExclusionCacheState } from './corpus.ts';
@@ -34,12 +34,12 @@ import type { Language } from './types.ts';
 export interface ChildSpec {
 	/** Where the child writes its one JSON result. */
 	result_path: string;
-	/** Whether the child's progress goes to stderr — see `create_logger`. */
-	log_to_stderr: boolean;
 }
 
 /** The pre-flight child's spec. */
 export interface PreflightSpec extends ChildSpec {
+	/** Whether the process's progress goes to stderr — see `create_logger`. */
+	log_to_stderr: boolean;
 	/** The run's scratch directory, where the file sets are written (`PreflightTimedRow.file_set`). */
 	run_dir: string;
 }
@@ -98,7 +98,6 @@ export interface PreflightRow {
 	tracking_key: string;
 	/** The implementation slot behind it. */
 	impl: ImplKey;
-	is_async: boolean;
 	/** Measured for coverage and never timed — `BenchmarkTask.coverage_only`. */
 	coverage_only: boolean;
 	/** Files the row accepted in pre-flight. */
@@ -162,7 +161,6 @@ export interface PreflightSnapshot {
 /** One pass of one timed row: what its process is asked to measure. */
 export interface RowSpec extends ChildSpec {
 	row: RowIdentity;
-	tracking_key: string;
 	/** The run's registry options — the ones pre-flight asked the registry with. */
 	task_options: BenchmarkTaskOptions;
 	/** `PreflightTimedRow.file_set`. */
@@ -212,7 +210,13 @@ export const read_child_spec = <T extends ChildSpec>(): T => {
 	return JSON.parse(readFileSync(spec_path, 'utf8')) as T;
 };
 
-/** Write this process's result where its spec says. */
+/**
+ * Write this process's result where its spec says — whole or not at all: written
+ * beside it and renamed into place, so the file existing means the result is
+ * complete. The orchestrator relies on that (`lib/bench_child.ts` `EXIT_GRACE_MS`).
+ */
 export const write_child_result = (spec: ChildSpec, result: unknown): void => {
-	writeFileSync(spec.result_path, JSON.stringify(result));
+	const partial = `${spec.result_path}.partial`;
+	writeFileSync(partial, JSON.stringify(result));
+	renameSync(partial, spec.result_path);
 };

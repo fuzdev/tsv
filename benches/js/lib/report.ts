@@ -1930,7 +1930,7 @@ export function generate_skipped_files_markdown(
  * Generate effective corpus report showing files actually processed per benchmark.
  *
  * `task_tracking_by_group` is the per-group `display_name → tracking_key` map
- * captured in `bench.ts`. We invert it here to render display names
+ * rebuilt in `bench.ts` from the pre-flight snapshot. We invert it here to render display names
  * (e.g. `svelte/compiler`, `tsv-wasm-internal`) instead of the tracking_key
  * suffix (e.g. `canonical`, `wasm-internal`) so the labels line up with
  * the bench tables.

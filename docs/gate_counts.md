@@ -72,7 +72,7 @@ real move in a number is a deliberate, visible edit.
   reject set. Three more get a weaker cache-staleness check: `TS_REPO_REJECTS_PIN` from
   `ts_repo_over_acceptance.ts`, and `SVELTE_REJECTS_PIN` / `PRETTIER_JSX_PIN` from the
   conformance coverage run, which refuses to publish over an exclusion cache whose size
-  is not its pin (`bench.ts` `enforce_exclusion_caches`). `deno task doctor` reports a
+  is not its pin (`bench_preflight.ts` `enforce_exclusion_caches`). `deno task doctor` reports a
   stamp whose recorded checkout id is behind its checkout.
 - **Rust-side counts are consts** — grep `REGRESSION PIN`. test262 (discovered +
   graded-manifest + the `--gate` positive count, `POSITIVE_PASSED_PIN`), `fixtures_validate`

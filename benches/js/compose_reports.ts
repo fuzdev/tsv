@@ -88,7 +88,7 @@ interface Entry {
 	raw_sample_size?: number | null;
 	/**
 	 * How far apart the row's passes sat (report `version` 21+, where each pass is a
-	 * fresh process): the slowest pass median over the fastest, minus one. Absent on
+	 * fresh process): the slowest pass mean over the fastest, minus one. Absent on
 	 * an older sibling, which timed every row once in one shared process.
 	 */
 	pass_spread?: number | null;

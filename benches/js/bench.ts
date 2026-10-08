@@ -21,7 +21,7 @@
  * none of what is measured:
  *
  * 1. **This process — the orchestrator.** It loads no engine and no corpus. It
- *    starts the others one at a time and blocks while each runs, then pools what
+ *    starts the others one at a time and awaits each, then pools what
  *    they measured and writes the report.
  * 2. **One pre-flight process** (`bench_preflight.ts`). It loads the corpus and
  *    every implementation, runs every row once over every file to learn what each
@@ -101,6 +101,10 @@ declare global {
 import { z } from 'zod';
 import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.ts';
 import { BenchmarkStats } from '@fuzdev/fuz_util/benchmark_stats.ts';
+import {
+	stats_confidence_interval_from_summary,
+	stats_outliers_mad
+} from '@fuzdev/fuz_util/stats.ts';
 import type { BenchmarkResult } from '@fuzdev/fuz_util/benchmark_types.ts';
 import {
 	benchmark_baseline_compare,
@@ -110,9 +114,9 @@ import {
 import { spawn_out } from '@fuzdev/fuz_util/process.ts';
 import { mkdirSync, rmSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import process, { argv, exit } from 'node:process';
+import process, { argv, exit, pid } from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { run_bench_child } from './lib/bench_child.ts';
+import { BenchChildError, kill_running_child, run_bench_child } from './lib/bench_child.ts';
 import {
 	BASELINE_DIR,
 	BENCH_DURATION,
@@ -130,16 +134,17 @@ import {
 	PASS_MIN_ITERATIONS,
 	REPORT_TAG,
 	RESULTS_DIR,
-	RUN_DIR,
 	RUNTIME,
 	TASK_OPTIONS
 } from './lib/bench_config.ts';
 import {
 	pass_order,
 	type PassSummary,
+	type PassTimings,
 	type ProcessNoise,
 	summarize_passes,
 	summarize_process_noise,
+	t_critical_95,
 	warmup_iterations_for
 } from './lib/bench_plan.ts';
 import type {
@@ -241,7 +246,7 @@ const args = {
 };
 
 // Baseline statistics requested — raises a one-pass run's sweep floor (see
-// `pass_min_iterations`) so the Welch comparisons run on usable sample sizes.
+// `pass_min_iterations`), the one run whose Welch comparisons read sweeps.
 const baselining = args.save_baseline || args.compare_baseline;
 
 // In JSON/markdown mode, progress goes to stderr so stdout is clean structured output
@@ -272,46 +277,84 @@ if (IS_CONFORMANCE && (args.save_baseline || args.compare_baseline)) {
 //
 
 /**
- * Start one child of the run and return what it reported, or end the run. A child
- * that fails has already said why on this terminal, so the orchestrator adds one
- * line naming which child it was and exits non-zero — nothing is written, since a
- * report missing a row (or its pre-flight) would not be the report of this run.
+ * The run's scratch directory: what its processes hand each other (a child's spec and
+ * result, the file sets the timed rows read). Inside `RESULTS_DIR` because that is the
+ * one place the Deno tasks may write. Named for the report AND this process, so no two
+ * runs share one — a perf and a conformance run of one runtime, or two of the same,
+ * would otherwise delete each other's directory at startup. The orchestrator's alone:
+ * a child is handed it (`PreflightSpec.run_dir`) rather than deriving it, since a
+ * child's own pid would name a different one.
  */
-function run_child<TResult>(
+const RUN_DIR = `${RESULTS_DIR}/.run-${REPORT_TAG}-${pid}`;
+
+/**
+ * Set when a child fails: the run's directory is then KEPT on exit, since the failed
+ * child's spec — and the file set a row's spec names — is what reproduces it.
+ */
+let keep_run_dir = false;
+
+/**
+ * Start one child of the run and return what it reported, or end the run. A child
+ * that fails has already said why on this terminal, so the orchestrator adds the
+ * lines naming which child it was and how to re-run it alone, and exits non-zero —
+ * nothing is written, since a report missing a row (or its pre-flight) would not be
+ * the report of this run.
+ *
+ * A child that wrote its result and then hung in its own teardown is the exception
+ * (`lib/bench_child.ts` `EXIT_GRACE_MS`): it is killed, its result stands, and the
+ * hang is named here and recorded in the report (`exit_hangs`).
+ */
+async function run_child<TResult>(
 	script: Parameters<typeof run_bench_child>[0],
 	spec: Parameters<typeof run_bench_child>[1],
 	spec_path: string,
 	label: string
-): TResult {
+): Promise<TResult> {
 	try {
-		return run_bench_child<TResult>(script, spec, spec_path, RESULTS_DIR, label);
+		const { result, exit_hung } = await run_bench_child<TResult>(
+			script,
+			spec,
+			spec_path,
+			RUN_DIR,
+			label
+		);
+		if (exit_hung) {
+			exit_hangs.push(label);
+			log(`  ⚠ ${label} reported, then hung on exit and was killed — its result stands`);
+		}
+		return result;
 	} catch (e) {
 		console.error(`\n✗ ${e instanceof Error ? e.message : String(e)}`);
+		if (e instanceof BenchChildError) {
+			keep_run_dir = true;
+			console.error(
+				`  re-run it alone (from the repo root, with this run's BENCH_* environment):\n` +
+					`    ${e.command}\n` +
+					`  ${RUN_DIR} is kept for that; \`deno task bench:clean\` removes it`
+			);
+		}
 		return exit(1);
 	}
 }
 
-// The run's scratch directory (`RUN_DIR`): created empty, so nothing a previous run
-// left can be read as this one's, and removed when this process exits. The signal
-// handlers exist so that an interrupt reaches the `exit` listener.
-//
-// What an interrupt does depends on who it reaches. Ctrl-C in a terminal goes to
-// the whole foreground group: the running child dies of it, `run_child` reports that
-// and exits. A signal sent to THIS process alone is held while it blocks on a child
-// — a blocked process runs no handler — and taken when that child returns
-// (`yield_to_signals`), so the run stops after the row in flight, not mid-row.
+/** Children that wrote their result and then hung on exit — see `run_child`. */
+const exit_hangs: string[] = [];
+
+// The run's scratch directory: created empty (a recycled pid could find one a failed
+// run kept), and removed when this process exits — unless a child failed
+// (`keep_run_dir`). The signal handlers exist so that an interrupt reaches the
+// `exit` listener, which also takes down the child in flight: children are spawned
+// asynchronously, so one would otherwise outlive an orchestrator stopped on its own.
+// An interrupt stops the run at once, whether it reaches the whole foreground group
+// (Ctrl-C) or this process alone.
 rmSync(RUN_DIR, { recursive: true, force: true });
 mkdirSync(RUN_DIR, { recursive: true });
-process.on('exit', () => rmSync(RUN_DIR, { recursive: true, force: true }));
+process.on('exit', () => {
+	kill_running_child();
+	if (!keep_run_dir) rmSync(RUN_DIR, { recursive: true, force: true });
+});
 process.on('SIGINT', () => exit(130));
 process.on('SIGTERM', () => exit(143));
-
-/**
- * Let a pending signal handler run. The timed phase is one blocking spawn after
- * another, and a loop that never returns to the event loop would hold a signal
- * until the whole run finished.
- */
-const yield_to_signals = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
 //
 // Pre-flight
@@ -322,7 +365,7 @@ const preflight_spec: PreflightSpec = {
 	log_to_stderr: structured_output,
 	run_dir: RUN_DIR
 };
-const snapshot = run_child<PreflightSnapshot>(
+const snapshot = await run_child<PreflightSnapshot>(
 	'bench_preflight.ts',
 	preflight_spec,
 	`${RUN_DIR}/preflight.spec.json`,
@@ -434,9 +477,10 @@ function format_rate(tracking_key: string, mean_ns: number): string {
 }
 
 /**
- * The pooled sample count a baseline comparison wants under every row: the Welch
- * p-values feeding regression verdicts sit in an unstable-DOF regime at n≈4-7 (the
- * timing library's own n=30 floor exists to avoid it).
+ * The sweep count a ONE-PASS baseline comparison wants under every row: there the
+ * Welch test reads sweeps (`baseline_results`), and its p-values sit in an
+ * unstable-DOF regime at n≈4-7 (the timing library's own n=30 floor exists to avoid
+ * it). With several passes it reads pass means instead, and no sweep floor adds one.
  */
 const BASELINE_MIN_SAMPLES = 10;
 
@@ -444,13 +488,12 @@ const BASELINE_MIN_SAMPLES = 10;
  * The sweep floor of one pass of every row — ONE protocol per row on every runtime,
  * with no tier keyed on a row's own timing: a row straddling a timing threshold
  * takes one tier under one runtime and the other under the next, which is two
- * protocols published as one runtime ratio. `PASS_MIN_ITERATIONS`, unless a
- * baseline is being saved or compared in a run of so few passes that the pooled
- * count would fall short of `BASELINE_MIN_SAMPLES`.
+ * protocols published as one runtime ratio. `PASS_MIN_ITERATIONS`, raised to
+ * `BASELINE_MIN_SAMPLES` only for a one-pass run that saves or compares a baseline.
  */
 const pass_min_iterations = Math.max(
 	PASS_MIN_ITERATIONS,
-	baselining ? Math.ceil(BASELINE_MIN_SAMPLES / BENCH_PASSES) : 0
+	baselining && BENCH_PASSES === 1 ? BASELINE_MIN_SAMPLES : 0
 );
 
 /** What the timed phase learned about a row beyond its pooled `BenchmarkResult`. */
@@ -472,19 +515,17 @@ const all_group_results: GroupResults[] = [];
 let row_processes = 0;
 
 /** Time one pass of one row in a process of its own. */
-function time_row_pass(group: PreflightGroup, row: PreflightRow, pass: number): RowResult {
+function time_row_pass(group: PreflightGroup, row: PreflightRow, pass: number): Promise<RowResult> {
 	const timed = row.timed!;
 	const id = row_processes++;
 	const spec: RowSpec = {
 		result_path: `${RUN_DIR}/row_${id}.result.json`,
-		log_to_stderr: structured_output,
 		row: {
 			operation: group.operation,
 			language: group.language,
 			name: row.name,
 			impl: row.impl
 		},
-		tracking_key: row.tracking_key,
 		task_options: TASK_OPTIONS,
 		file_set: timed.file_set,
 		files_digest: timed.digest,
@@ -505,6 +546,62 @@ function time_row_pass(group: PreflightGroup, row: PreflightRow, pass: number): 
 }
 
 /**
+ * One pass's sweeps with the outlier cleaner run over that pass alone — the
+ * library's own cleaner (`BenchmarkStats` runs the same one over the same valid
+ * timings), so a pass is cleaned exactly as a one-process row always was. Why per
+ * pass: `lib/bench_plan.ts` `summarize_passes`.
+ */
+function clean_pass(timings_ns: number[]): PassTimings & { outliers_ns: number[] } {
+	const { cleaned, outliers } = stats_outliers_mad(timings_ns.filter((t) => isFinite(t) && t > 0));
+	return { timings_ns, cleaned_ns: cleaned, outliers_ns: outliers };
+}
+
+/**
+ * A row's published statistics, from its passes (`summarize_passes`): the library's
+ * statistic families, each over the set it means across processes.
+ *
+ * - the MEAN is the passes' cleaned means weighted equally, and `ops_per_second` its
+ *   inverse;
+ * - the dispersion (`std_dev_ns`, `cv`) and `min_ns` are over every pass's cleaned
+ *   sweeps, around that mean — so a level shift between passes is IN the cv rather
+ *   than trimmed out of it;
+ * - the upper tail (`p50`–`p99`, `max_ns`) is over every raw sweep, as the library
+ *   takes it for one process;
+ * - the confidence interval is the PASS-level one (`pass_mean_sd_ns` over the pass
+ *   count, Student's t at that count's few degrees of freedom): the variation between
+ *   processes is what the mean's error is made of, and sweeps inside one process are
+ *   not independent draws of it. Within-pass for a one-pass run, which has nothing
+ *   else.
+ *
+ * Built on the library's own `BenchmarkStats` over the raw sweeps, with the fields
+ * that differ across processes replaced, so every consumer reads the type it expects.
+ */
+function pooled_stats(summary: PassSummary, outliers_ns: number[]): BenchmarkStats {
+	const stats = new BenchmarkStats(summary.timings_ns);
+	if (summary.pass_mean_ns.length === 1) return stats;
+	const { mean_ns, cleaned_ns } = summary;
+	const n = cleaned_ns.length;
+	const std_dev_ns =
+		n < 2 ? 0 : Math.sqrt(cleaned_ns.reduce((a, t) => a + (t - mean_ns) ** 2, 0) / (n - 1));
+	return Object.assign(stats, {
+		mean_ns,
+		ops_per_second: 1e9 / mean_ns,
+		std_dev_ns,
+		cv: std_dev_ns / mean_ns,
+		min_ns: Math.min(...cleaned_ns),
+		confidence_interval_ns: stats_confidence_interval_from_summary(
+			mean_ns,
+			summary.pass_mean_sd_ns!,
+			summary.pass_mean_ns.length,
+			{ z_score: t_critical_95(summary.pass_mean_ns.length - 1) }
+		),
+		sample_size: n,
+		outliers_ns,
+		outlier_ratio: outliers_ns.length / (n + outliers_ns.length)
+	});
+}
+
+/**
  * Time one group: `BENCH_PASSES` passes over its timed rows, each row of each pass
  * in a fresh process, then pool every row's passes into one `BenchmarkResult`.
  *
@@ -522,7 +619,7 @@ async function time_group(group: PreflightGroup): Promise<void> {
 		const order = pass_order(rows, pass, BENCH_PASSES);
 		for (let i = 0; i < order.length; i++) {
 			const row = order[i];
-			const result = time_row_pass(group, row, pass);
+			const result = await time_row_pass(group, row, pass);
 			passes.get(row.tracking_key)!.push(result);
 			for (const [pattern, count] of Object.entries(result.suppressed_noise)) {
 				suppressed_noise.set(pattern, (suppressed_noise.get(pattern) ?? 0) + count);
@@ -530,14 +627,14 @@ async function time_group(group: PreflightGroup): Promise<void> {
 			// the pass's own cleaned mean — the estimator the pooled line below uses
 			const { mean_ns } = new BenchmarkStats(result.timings_ns);
 			log(`    [${i + 1}/${order.length}] ${row.name}: ${format_rate(row.tracking_key, mean_ns)}`);
-			await yield_to_signals();
 		}
 	}
 
 	// Pooled, in registration order — the order every table and the baseline read.
 	const results: BenchmarkResult[] = rows.map((row) => {
 		const row_passes = passes.get(row.tracking_key)!;
-		const summary = summarize_passes(row_passes.map((p) => p.timings_ns));
+		const cleaned = row_passes.map((p) => clean_pass(p.timings_ns));
+		const summary = summarize_passes(cleaned);
 		const heaps = row_passes.map((p) => p.settled_heap_bytes).sort((a, b) => a - b);
 		timed_rows.set(row.tracking_key, {
 			summary,
@@ -547,7 +644,10 @@ async function time_group(group: PreflightGroup): Promise<void> {
 		});
 		return {
 			name: row.name,
-			stats: new BenchmarkStats(summary.timings_ns),
+			stats: pooled_stats(
+				summary,
+				cleaned.flatMap((p) => p.outliers_ns)
+			),
 			iterations: summary.timings_ns.length,
 			total_time_ms: row_passes.reduce((sum, p) => sum + p.total_time_ms, 0),
 			timings_ns: summary.timings_ns,
@@ -600,7 +700,7 @@ if (COVERAGE_ONLY) {
  * `null` when nothing was timed or the run made a single pass.
  */
 const process_noise: ProcessNoise | null = summarize_process_noise(
-	[...timed_rows.values()].map((row) => row.summary.pass_p50_ns)
+	[...timed_rows.values()].map((row) => row.summary.pass_mean_ns)
 );
 if (process_noise !== null) {
 	const pct = (v: number): string => `${(v * 100).toFixed(1)}%`;
@@ -719,10 +819,12 @@ function unstable_rows(data: Baseline): Array<{
 interface BaselineEntry {
 	name: string;
 	group: string;
-	// Timing stats, over the POOLED timings of the row's passes (every pass a fresh
-	// process — `passes` below). `null` in a coverage-only run
-	// (`BENCH_COVERAGE_ONLY=1`), which skips the timed phase and emits coverage from
-	// pre-flight alone. A timed run always fills them.
+	// Timing stats, over the row's passes (every pass a fresh process — `passes`
+	// below): `mean_ns` and `ops_per_second` the passes' cleaned means weighted
+	// equally, the dispersion and `min_ns` over every pass's cleaned sweeps, the
+	// percentiles and `max_ns` over every raw sweep (`pooled_stats`). `null` in a
+	// coverage-only run (`BENCH_COVERAGE_ONLY=1`), which skips the timed phase and
+	// emits coverage from pre-flight alone. A timed run always fills them.
 	mean_ns: number | null;
 	p50_ns: number | null;
 	p75_ns: number | null;
@@ -769,8 +871,9 @@ interface BaselineEntry {
 	min_iterations: number | null;
 	/**
 	 * How many fresh processes the row was timed in (`BENCH_PASSES`), each pass's
-	 * median sweep time in pass order, and how far apart those medians sat — the
-	 * largest over the smallest, minus one (`lib/bench_plan.ts` `summarize_passes`).
+	 * mean sweep time (over its own cleaned sweeps) in pass order — the figures
+	 * `mean_ns` is the mean of — and how far apart they sat: the largest over the
+	 * smallest, minus one (`lib/bench_plan.ts` `summarize_passes`).
 	 *
 	 * `pass_spread` is the reading no single process can make. Each pass is one draw
 	 * of the row in a process that holds nothing else, so the spread is what another
@@ -782,7 +885,7 @@ interface BaselineEntry {
 	 * Since `version` 21.
 	 */
 	passes: number | null;
-	pass_p50_ns: number[] | null;
+	pass_mean_ns: number[] | null;
 	pass_spread: number | null;
 	/**
 	 * The JS heap (`heapUsed`, bytes) the row's warmup began from, read straight after
@@ -923,9 +1026,13 @@ interface BaselineVersions extends ReportVersions {
  *
  * 21: every timed row is measured in fresh PROCESSES, several passes of them, and
  * its statistics pool the passes (`bench.ts` §Process model). Per row: `passes`,
- * `pass_p50_ns` and `pass_spread` (how far the row's passes sat apart). Top level:
- * `process_noise` (the same reading over the whole run). Three existing per-row
- * fields change MEANING, not name: `min_iterations` and `warmup_iterations` are per
+ * `pass_mean_ns` and `pass_spread` (how far the row's passes sat apart). Top level:
+ * `process_noise` (the same reading over the whole run) and `exit_hangs` (children
+ * killed after reporting, whose results stand). Existing per-row fields
+ * change MEANING, not name: `mean_ns` / `ops_per_second` are the passes' cleaned
+ * means weighted equally, each pass cleaned of outliers on its own; `cv` and
+ * `std_dev_ns` are over every pass's cleaned sweeps around that mean, so they include
+ * the variation between processes; `min_iterations` and `warmup_iterations` are per
  * pass, so a floor-bound row's `raw_sample_size` is `min_iterations × passes` where
  * it was `min_iterations`; `drift` is the within-pass drift furthest from zero
  * (a shift between passes is `pass_spread`'s); and `settled_heap_bytes` is the heap
@@ -1083,7 +1190,7 @@ interface Baseline {
 	/**
 	 * How much two fresh processes of the SAME row disagreed, over every timed row of
 	 * the run — `pairs` (row, pass pair) comparisons, with the `median`, `p95` and
-	 * `max` of the slower pass median over the faster, minus one
+	 * `max` of the slower pass mean over the faster, minus one
 	 * (`lib/bench_plan.ts` `summarize_process_noise`). A process-level A/A the passes
 	 * give for free, and the bound to read a small ratio against: it describes one
 	 * process against one, and a published row pools all its passes, so a difference
@@ -1094,6 +1201,17 @@ interface Baseline {
 	 * Since `version` 21.
 	 */
 	process_noise: ProcessNoise | null;
+	/**
+	 * The children (by label: the pre-flight, or `<group>/<row> (pass i/n)`) that wrote
+	 * their result and then hung in their own teardown, and were killed — their results
+	 * stand, since the result is a child's last act (`lib/bench_child.ts`
+	 * `EXIT_GRACE_MS`). `[]` when every child exited on its own, the healthy state. A
+	 * runtime fault, not a measurement one: recorded so a recurring one is visible
+	 * across reports rather than only in a run's scroll.
+	 *
+	 * Since `version` 21.
+	 */
+	exit_hangs: string[];
 }
 
 /**
@@ -1159,7 +1277,7 @@ const NULL_STATS = {
 	warmup_iterations: null,
 	min_iterations: null,
 	passes: null,
-	pass_p50_ns: null,
+	pass_mean_ns: null,
 	pass_spread: null,
 	settled_heap_bytes: null
 } as const;
@@ -1262,8 +1380,8 @@ async function build_results_data(
 					// count is 0 for it.
 					warmup_iterations: timed.warmup_iterations,
 					min_iterations: result.budget.min_iterations,
-					passes: timed.summary.pass_p50_ns.length,
-					pass_p50_ns: timed.summary.pass_p50_ns,
+					passes: timed.summary.pass_mean_ns.length,
+					pass_mean_ns: timed.summary.pass_mean_ns,
 					pass_spread: timed.summary.pass_spread,
 					settled_heap_bytes: timed.settled_heap_bytes,
 					files_processed: coverage?.processed ?? null,
@@ -1309,7 +1427,8 @@ async function build_results_data(
 		output_digest_ungraded: snapshot.output_digest_ungraded,
 		variant_parity: snapshot.variant_parity,
 		unavailable: snapshot.unavailable,
-		process_noise
+		process_noise,
+		exit_hangs
 	};
 }
 
@@ -1552,7 +1671,7 @@ function generate_markdown_report(data: Baseline, groups: GroupResults[]): strin
 				`half of the timings against the first's — a cost that moved WHILE the row was measured, ` +
 				`which the cleaned cv cannot see: a second mode is deleted or blended, not reported; the ` +
 				`row's worst pass is shown), or a pass spread past ` +
-				`${(UNSTABLE_PASS_SPREAD_THRESHOLD * 100).toFixed(0)}% (the row's slowest pass median over ` +
+				`${(UNSTABLE_PASS_SPREAD_THRESHOLD * 100).toFixed(0)}% (the row's slowest pass mean over ` +
 				`its fastest — each pass is a fresh process, so this is a level that depends on the process ` +
 				`the row was drawn in). The drift's sign ` +
 				`names the mechanism: negative means the row got FASTER while measured (still warming up — ` +
@@ -1629,17 +1748,51 @@ async function save_results(
 }
 
 /**
- * Flatten `all_group_results` into a single list with namespaced names. The
- * fuz_util baseline module joins by `result.name` and our task names repeat
- * across groups (`tsv` lives in `format/svelte`, `format/typescript`,
- * `format/css`). Without namespacing, the last write wins and three groups
- * collapse into one.
+ * The rows as the baseline module saves and compares them.
+ *
+ * Namespaced: the fuz_util baseline module joins by `result.name` and our row names
+ * repeat across groups (`tsv` lives in `format/svelte`, `format/typescript`,
+ * `format/css`), so without the group the last write wins and three groups collapse
+ * into one.
+ *
+ * And read at the PASS level when the run made several: the comparison is Welch's t
+ * on `(mean_ns, std_dev_ns, sample_size)`, which treats its samples as independent
+ * draws of the row. Sweeps are not — the sweeps of one process share that process's
+ * level, so pooled they hand Welch hundreds of samples whose error is really the
+ * passes', and a level that merely moved between processes reads as a significant
+ * regression. Each pass mean IS one independent draw, so the comparison gets those:
+ * `pass_mean_sd_ns` over the pass count. That asks a larger difference of a few
+ * passes before calling it real, which is the honest answer to how much a few
+ * processes can tell apart. A one-pass run keeps the sweep-level statistics, the only
+ * ones it has (and raises its sweep floor for them — `pass_min_iterations`).
+ *
+ * The within-pass noise this no longer hands the library's `noise_warning` (its cv
+ * gate reads `std_dev_ns / mean_ns`) is reported beside the comparison instead
+ * (`compare_baseline`), from the same §Unstable Rows readings the report publishes.
  */
-function flatten_results_for_baseline(groups: GroupResults[]): BenchmarkResult[] {
+function baseline_results(groups: GroupResults[]): BenchmarkResult[] {
 	const out: BenchmarkResult[] = [];
 	for (const group of groups) {
+		const tracking = task_tracking_by_group.get(group.name);
 		for (const r of group.results) {
-			out.push({ ...r, name: `${group.name}/${r.name}` });
+			const tracking_key = tracking?.get(r.name);
+			const summary = tracking_key ? timed_rows.get(tracking_key)?.summary : undefined;
+			const name = `${group.name}/${r.name}`;
+			if (!summary || summary.pass_mean_sd_ns === null) {
+				out.push({ ...r, name });
+				continue;
+			}
+			const passes = summary.pass_mean_ns.length;
+			const stats: BenchmarkStats = Object.assign(
+				Object.create(BenchmarkStats.prototype),
+				r.stats,
+				{
+					std_dev_ns: summary.pass_mean_sd_ns,
+					cv: summary.pass_mean_sd_ns / r.stats.mean_ns,
+					sample_size: passes
+				}
+			);
+			out.push({ ...r, name, stats });
 		}
 	}
 	return out;
@@ -1654,6 +1807,11 @@ function flatten_results_for_baseline(groups: GroupResults[]): BenchmarkResult[]
  */
 function build_baseline_metadata(data: Baseline): Record<string, unknown> {
 	return {
+		// The sample unit of every comparison against this baseline (`baseline_results`):
+		// a pass count that differs between the two sides compares pass means to sweeps,
+		// or three draws to five — a change the library's budget check cannot see, since
+		// `BENCH_PASSES` is not in a pass's budget.
+		passes: BENCH_PASSES,
 		corpus: data.corpus,
 		versions: data.versions,
 		binary_sizes: data.binary_sizes
@@ -1662,12 +1820,13 @@ function build_baseline_metadata(data: Baseline): Record<string, unknown> {
 
 /** Shape of our metadata in the baseline file (best-effort, validated lazily). */
 interface BaselineMeta {
+	passes?: number;
 	corpus?: { svelte?: number; typescript?: number; css?: number };
 }
 
 /** Save the current run as the regression baseline. */
 async function save_baseline(data: Baseline): Promise<void> {
-	await benchmark_baseline_save(flatten_results_for_baseline(all_group_results), {
+	await benchmark_baseline_save(baseline_results(all_group_results), {
 		path: BASELINE_DIR,
 		metadata: build_baseline_metadata(data)
 	});
@@ -1683,20 +1842,17 @@ async function save_baseline(data: Baseline): Promise<void> {
  * fairness caveats in docs/benchmarks.md.
  */
 async function compare_baseline(current: Baseline): Promise<void> {
-	const comparison = await benchmark_baseline_compare(
-		flatten_results_for_baseline(all_group_results),
-		{
-			path: BASELINE_DIR,
-			// 1.0 means "any statistically significant slowdown counts." Tune
-			// upward (e.g. 1.05) to suppress trivial regressions in CI without
-			// losing the practical-significance gate already inside the Welch
-			// comparison (`min_percent_difference` default 0.10).
-			regression_threshold: 1.0,
-			// Mark the baseline stale after a week so a long-untouched baseline
-			// doesn't quietly mask drift accumulated over months.
-			staleness_warning_days: 7
-		}
-	);
+	const comparison = await benchmark_baseline_compare(baseline_results(all_group_results), {
+		path: BASELINE_DIR,
+		// 1.0 means "any statistically significant slowdown counts." Tune
+		// upward (e.g. 1.05) to suppress trivial regressions in CI without
+		// losing the practical-significance gate already inside the Welch
+		// comparison (`min_percent_difference` default 0.10).
+		regression_threshold: 1.0,
+		// Mark the baseline stale after a week so a long-untouched baseline
+		// doesn't quietly mask drift accumulated over months.
+		staleness_warning_days: 7
+	});
 
 	if (!comparison.baseline_found) {
 		console.error(
@@ -1730,8 +1886,29 @@ async function compare_baseline(current: Baseline): Promise<void> {
 		);
 	}
 
+	// The sample unit — see `baseline_results`. A baseline from before the field was
+	// recorded compared sweeps pooled over one shared process.
+	if (meta?.passes !== BENCH_PASSES) {
+		log(
+			`\n⚠️  Pass count differs from baseline: baseline ${meta?.passes ?? 'unrecorded (pre-process-isolation)'}, ` +
+				`current ${BENCH_PASSES}. The two sides' samples are different units (pass means vs sweeps, ` +
+				`or a different number of draws), so read every verdict below as approximate and re-save.`
+		);
+	}
+
 	log('');
 	log(benchmark_baseline_format(comparison));
+
+	// What the library's cv gate no longer sees once a row is compared on its pass means
+	// (`baseline_results`): noise WITHIN this run's processes. Same readings, same
+	// thresholds as the report's §Unstable Rows.
+	const unstable = unstable_rows(current);
+	if (unstable.length > 0) {
+		log(
+			`\n⚠️  ${unstable.length} row(s) of this run were unstable (§Unstable Rows) — read their verdicts ` +
+				`above as approximate: ${unstable.map((u) => u.label).join(', ')}`
+		);
+	}
 }
 
 //
@@ -1845,6 +2022,12 @@ if (write_report) {
 		log(
 			`  ⚠ published without ${results_data.unavailable.length} impl(s) that failed to load: ` +
 				`${cost} (recorded in \`unavailable\`)`
+		);
+	}
+	if (results_data.exit_hangs.length > 0) {
+		log(
+			`  ⚠ ${results_data.exit_hangs.length} child(ren) hung on exit after reporting and were killed: ` +
+				`${results_data.exit_hangs.join(', ')} (results kept; recorded in \`exit_hangs\`)`
 		);
 	}
 	if (results_data.binary_sizes_absent.length > 0) {

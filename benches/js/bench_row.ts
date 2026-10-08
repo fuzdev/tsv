@@ -38,6 +38,7 @@ declare global {
 }
 
 import { Benchmark } from '@fuzdev/fuz_util/benchmark.ts';
+import { Buffer } from 'node:buffer';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { exit, memoryUsage } from 'node:process';
@@ -74,14 +75,24 @@ if (digest !== spec.files_digest) {
 			`(digest ${digest}, expected ${spec.files_digest})`
 	);
 }
-// A file the row accepted only at the Script goal is replayed there — at its own
-// goal the call throws, and here a throw is a harness failure rather than a skip.
-// Rewritten once, ahead of the sweep, so the timed loop pays no per-file lookup.
+// Each file is rebuilt once, ahead of the sweep, so the timed loop pays nothing per file:
+//
+// - its CONTENT is decoded again from its UTF-8 bytes, so it is held as a file read
+//   holds it — as pre-flight held it, and as a consumer does. One `JSON.parse` over the
+//   whole set is not that under JSC: when any file of the set holds a character past
+//   Latin-1, bun returns EVERY string of the parse in its 16-bit form, ASCII files
+//   included (on the perf TypeScript set, 368 of 1068 strings 8-bit read from disk,
+//   none after the parse), and a row timed on those measured up to ~1.5% slower. V8
+//   keeps the narrow form either way, so without this the cost fell on one runtime's
+//   column alone.
+// - a file the row accepted only at the Script goal is replayed there — at its own
+//   goal the call throws, and here a throw is a harness failure rather than a skip.
 const script_only = new Set(spec.script_only);
-const files: SourceFile[] =
-	script_only.size === 0
-		? loaded
-		: loaded.map((f): SourceFile => (script_only.has(f.path) ? { ...f, goal: 'script' } : f));
+const files: SourceFile[] = loaded.map((f): SourceFile => ({
+	...f,
+	content: Buffer.from(f.content, 'utf8').toString('utf8'),
+	...(script_only.has(f.path) ? { goal: 'script' } : {})
+}));
 
 const { task, impl } = await init_row_task(row, spec.task_options);
 

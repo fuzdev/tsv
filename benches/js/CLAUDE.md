@@ -756,7 +756,7 @@ A timed run is **several processes of one runtime**, started one at a time by `b
 
 | Process | Script | Holds | Does |
 | --- | --- | --- | --- |
-| orchestrator | `bench.ts` | no engine, no corpus | starts the others and blocks on each; pools the timings; writes the report |
+| orchestrator | `bench.ts` | no engine, no corpus | starts the others one at a time and awaits each; pools the timings; writes the report |
 | pre-flight (one) | `bench_preflight.ts` | the corpus + every implementation | runs every row once per file untimed, grades the run's standing claims (perf coverage, the conformance pins, byte parity between tsv's bindings), writes each group's timed file set and a snapshot — then exits |
 | row (one per row per pass) | `bench_row.ts` | ONE engine + that row's file set | warms, times its sweeps, reports, exits |
 
@@ -775,26 +775,39 @@ A timed run is **several processes of one runtime**, started one at a time by `b
   back, each taking its rows in a different order (`lib/bench_plan.ts` `pass_order`: the
   registration order, its reverse, then both started further round the list), so no row keeps one
   neighbour — what a fixed order would still carry between rows is the machine itself (the row
-  after a long sweep starts hotter). A row's statistics pool the timings of all its passes
-  (`summarize_passes`).
-- **What the passes publish.** Per row `pass_spread` — its slowest pass median over its fastest —
+  after a long sweep starts hotter). A row's statistics pool its passes (`summarize_passes`;
+  how, under [Report files](#report-files)).
+- **What the passes publish.** Per row `pass_spread` — its slowest pass mean over its fastest —
   which is the reading no single process can make: a level that depends on the process the row was
   drawn in publishes a quiet `cv` from any one process. For the run, `process_noise` — the same
   comparison over every pass pair of every row, a process-level A/A for free.
 - **How they talk.** A child is started on the path of a JSON spec and writes one JSON result to
   the path the spec names (`lib/bench_protocol.ts`), under the run's scratch directory
-  `results/.run-<runtime>/` (created empty, removed on exit, gitignored). stdin and stdout stay the
-  terminal's. A timed file set is written whole — contents included — by the pre-flight process,
-  so a row sweeps byte-for-byte what pre-flight accepted, a harvested stylesheet that exists in no
-  file on disk included, and loads no corpus machinery to do it.
-- **A failed child ends the run** with nothing written: the child has already said why, and the
-  orchestrator names which child it was.
-- **Interrupting.** Ctrl-C reaches the whole foreground group and stops the run at once. A signal
-  sent to the orchestrator alone is taken when the row in flight returns (it blocks on its child),
-  so the run stops after that row.
+  `results/.run-<report tag>-<pid>/` (one per run, so concurrent runs never share one; created
+  empty, removed on a clean exit, gitignored). stdin and stdout stay the terminal's. A timed file
+  set is written whole — contents included — by the pre-flight process, so a row sweeps
+  byte-for-byte what pre-flight accepted, a harvested stylesheet that exists in no file on disk
+  included, and loads no corpus machinery to do it. The row's process decodes each file's content
+  again from its UTF-8 bytes, so it holds the strings as a file read does: under JSC one
+  `JSON.parse` of a set with any non-Latin-1 file returns every string 16-bit, which timed up to
+  ~1.5% slower on bun alone.
+- **A failed child ends the run** with no report written: the child has already said why, and the
+  orchestrator names which child it was and prints the command that re-runs it alone against its
+  spec. The run's directory is then KEPT (its spec and file set are what that command reads);
+  `deno task bench:clean` removes it.
+- **A child that hangs after reporting** is killed and its result kept. A child's result is its
+  last act, renamed into place whole, so once it exists the measurement is done and only teardown
+  is left — and teardown has deadlocked (once, a Node row: result written, then parked on futexes
+  inside `exit(0)`). The orchestrator awaits each child, looking for its result once a second, and
+  kills one still running `EXIT_GRACE_MS` (30 s) after reporting; the report names it in
+  `exit_hangs`. Any other way a child ends without exit 0 still ends the run.
+- **Interrupting** stops the run at once, whether the signal reaches the whole foreground group
+  (Ctrl-C) or the orchestrator alone, which takes the child in flight down with it.
 - **Deno permissions** live in one place, `lib/bench_child.ts`: the `bench:deno:run` task grants
   the orchestrator only what it does itself (read, write `results/`, run `deno` and `git`), since
-  Deno hands a child none of its parent's permissions.
+  Deno hands a child none of its parent's permissions. A child may write only the run's directory;
+  only pre-flight may spawn (git, gzip, deno, rsvelte-fmt) or reach the network — a timed row's
+  process can do neither, so a row that tried would fail rather than be measured doing it.
 - **Wall time** is several times the one-process run's: every pass of every row pays its own
   start-up, engine load and warmup, and slow rows are floor-bound in each pass. `BENCH_PASSES` is
   the dial; `BENCH_PASSES=1` is a single draw per row with no spread to report.
@@ -986,19 +999,39 @@ beyond timing stats:
   RAW-timing stability readings `cv_raw` / `drift` / `raw_sample_size` / `outlier_ratio` beside the
   cleaned `cv`; the protocol ONE PASS of the row ran under (`warmup_iterations` /
   `min_iterations`); from `version` 18, `settled_heap_bytes`; and, from `version` 21, `passes`,
-  `pass_p50_ns` (each pass's median sweep) and `pass_spread`.
+  `pass_mean_ns` (each pass's mean sweep, over its own cleaned sweeps) and `pass_spread`.
 - top-level, from `version` 21: `process_noise` (`pairs`, `median`, `p95`, `max`) — how far two
   fresh processes of the same row sat apart, over every pass pair of every timed row. `null` on a
   coverage-only run and on a one-pass run.
+- top-level, from `version` 21: `exit_hangs` — the children killed after writing their result
+  because they hung in teardown ([Process model](#process-model)); their results stand. `[]` when
+  healthy.
 
-**Every timing statistic is over the row's POOLED passes** ([Process model](#process-model)):
-`mean_ns`, the percentiles, `cv`, `cv_raw`, `sample_size` and `raw_sample_size` are taken over
-all the timings of all the row's processes, so `cv` and `cv_raw` include the variation BETWEEN
-those processes, and a floor-bound row's `raw_sample_size` is `min_iterations × passes`. Two
-readings are deliberately not pooled: `drift` is taken within each pass and the row carries the
-pass furthest from zero (a level shift between two passes is not a cost that moved while a
-process was measured — that is `pass_spread`'s), and `settled_heap_bytes` is the median over the
-passes.
+**Every timing statistic is over the row's passes** ([Process model](#process-model)), each
+family over the set it means across processes (`bench.ts` `pooled_stats`):
+
+- **The mean** (`mean_ns`, `ops_per_second`) is the passes' own means weighted EQUALLY, each pass
+  cleaned of outliers on its own (`pass_mean_ns`). Per pass, because the cleaner is for transients
+  inside a process: over the pooled series it reads a level shift between two passes as outliers
+  and trims a minority pass in part or whole. Equally, because each pass is one draw of the process
+  the row runs in — weighting by sweep count would make a duration-bound row's mean the harmonic
+  mean of its passes, leaning toward the faster draw.
+- **The dispersion** (`std_dev_ns`, `cv`) and `min_ns` are over every pass's cleaned sweeps around
+  that mean, so `cv` includes the variation BETWEEN processes; `cv_raw`, the percentiles,
+  `max_ns` and `raw_sample_size` are over every raw sweep (a floor-bound row's `raw_sample_size` is
+  `min_iterations × passes`).
+- **Not pooled:** `drift` is taken within each pass and the row carries the pass furthest from zero
+  (a level shift between two passes is not a cost that moved while a process was measured — that
+  is `pass_spread`'s), and `settled_heap_bytes` is the median over the passes.
+
+**`--compare-baseline` reads pass means.** Its Welch test treats its samples as independent draws,
+and the sweeps of one process are not — they share that process's level — so with several passes
+each row is compared on its pass means (n = passes, the sd between them), and a level that only
+moved between processes no longer reads as a significant regression. A few passes then need a
+larger difference to call one real, which is what a few processes can honestly tell apart. The
+within-pass noise the library's cv gate no longer sees is printed beside the comparison from the
+§Unstable Rows readings, and so is a pass count that differs from the baseline's (a one-pass run
+compares sweeps, as before, and raises its sweep floor to ten for them).
 
 **Why the raw readings.** A row whose cost moved WHILE it was measured (biome's wasm heap leak,
 below, once tipped Node into a slower regime mid-row) has its second mode deleted or blended by the
@@ -1124,7 +1157,8 @@ variant listed there usually just means its optional build task wasn't run; a th
 means its package shipped nothing where `binary_sizes.ts` looked; a `js bundle` label means
 `deno bundle` failed or was unreachable (`lib/canonical_bundles.ts`). `report.<runtime>.md`
 renders coverage/iterated as prose; the per-entry numbers, `suppressed_noise`, `variant_parity`,
-`unavailable`, and `binary_sizes_absent` are JSON-only.
+`unavailable`, `binary_sizes_absent` and `exit_hangs` are JSON-only (`process_noise` is the md's
+**Isolation:** line).
 
 The conformance report's **Excluded here:** / **Added here:** disclosures are authored prose whose
 CLAIM is checked: `surface_disclosure_lines` (bench_preflight.ts) throws if the table says a row is excluded

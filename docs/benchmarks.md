@@ -339,13 +339,16 @@ Things the published numbers measure that aren't quite what they look like.
   bounding it.
 
   **Passes.** One process is one draw, so each row is timed in several
-  (`BENCH_PASSES`, default 3) and its statistics pool them. A group's passes run back
+  (`BENCH_PASSES`, default 3) and its statistics pool them: the mean is the passes' own
+  means weighted equally, each pass cleaned of outliers on its own — pooled first, the
+  cleaner reads a level shift between processes as outliers and trims part of a pass
+  (../benches/js/CLAUDE.md §Report files). A group's passes run back
   to back, each in a different order — the registration order, its reverse, then both
   started further round the list — because what a fixed order would still carry from
   one row to the next is the machine itself: the row after a two-minute sweep starts
   on a hotter package than the row after a five-second one. The order is a balance,
   not a randomization, and what is left of the effect is published: each row carries
-  `pass_spread` (its slowest pass median over its fastest), and the report carries
+  `pass_spread` (its slowest pass mean over its fastest), and the report carries
   `process_noise`, the same comparison over every pass pair of every row — a
   process-level A/A, and the bound to read a small ratio against.
 

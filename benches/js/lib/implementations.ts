@@ -2,8 +2,9 @@
  * Benchmark implementation management.
  *
  * Centralizes initialization and access to parser/formatter implementations.
- * This module provides a clean interface for bench.ts to work with implementations
- * without needing to know the details of each one.
+ * This module provides a clean interface for the bench's pre-flight
+ * (`init_implementations`) and its timed rows (`init_row_task`) to work with
+ * implementations without needing to know the details of each one.
  *
  * Future: Could evolve into a registry pattern where implementations self-register,
  * enabling dynamic discovery and plugin-like architecture.
@@ -266,7 +267,7 @@ async function init_required<T extends { init: () => Promise<void> }>(
  * ⚠ line alone lives in the terminal scroll: an impl that stops loading drops its
  * ROW from every table, and a reader diffing the committed report would see the
  * column disappear with nothing saying why. Same disclosure posture as
- * `suppressed_noise` and `variant_parity` in `bench.ts`.
+ * `suppressed_noise` and `variant_parity` in the report.
  *
  * `key` rides along for that record — the failure has to be joinable back to the
  * rows it cost, and the display label can't do it (see `UnavailableImpl`).
