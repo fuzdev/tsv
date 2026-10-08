@@ -26,6 +26,7 @@
  */
 
 import { execFile } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -37,21 +38,37 @@ import {
 	split_collection_path
 } from './corpora.ts';
 import type { CorpusRepoRef, CorpusSource } from './corpus.ts';
+import { HARVEST_STAMPS } from './harvest_stamp.ts';
 
 const exec_file = promisify(execFile);
+
+/** A harvest stamp that records the commit its harvest read, as `source_commit`. */
+interface SourceCommitStamp {
+	path: string;
+	checkouts: { source_commit: string };
+}
 
 /**
  * Sources under `benches/js/.cache` are HARVESTED from an upstream repo, so
  * git-detecting their in-tree path resolves the tsv repo — and the local
  * `../wpt` / `../test262` checkouts are typically personal *forks*, which read
- * oddly on a public page. Link the CANONICAL upstream at its root instead (the
- * harvest is a subset, so a commit-pinned deep link isn't meaningful): a
- * declared URL, no commit.
+ * oddly on a public page. Link the CANONICAL upstream at its root instead, a
+ * declared URL, pinned to the harvested commit only where upstream has it
+ * ({@link harvested_commit}).
  */
-const CACHE_CANONICAL: Record<string, string> = {
-	'benches/js/.cache/wpt_css': 'https://github.com/web-platform-tests/wpt',
-	'benches/js/.cache/test262_files.json': 'https://github.com/tc39/test262',
-	'benches/js/.cache/ts_repo_files.json': 'https://github.com/microsoft/TypeScript'
+const CACHE_CANONICAL: Record<string, { url: string; stamp: SourceCommitStamp }> = {
+	'benches/js/.cache/wpt_css': {
+		url: 'https://github.com/web-platform-tests/wpt',
+		stamp: HARVEST_STAMPS['wpt-css']
+	},
+	'benches/js/.cache/test262_files.json': {
+		url: 'https://github.com/tc39/test262',
+		stamp: HARVEST_STAMPS.test262
+	},
+	'benches/js/.cache/ts_repo_files.json': {
+		url: 'https://github.com/microsoft/TypeScript',
+		stamp: HARVEST_STAMPS.ts_repo
+	}
 };
 
 /**
@@ -125,6 +142,28 @@ async function detect_collection_upstream(source_path: string): Promise<CorpusRe
 	};
 }
 
+/**
+ * The commit a harvested cache was read from — its stamp's `source_commit` — or `''`
+ * when upstream can't be shown to have it: the checkout's `origin` must be the
+ * canonical `url` itself and a remote branch must contain the commit. A fork's
+ * HEAD is typically a fork-only commit (an added `CLAUDE.md`), which would link a
+ * 404 on the canonical repo, so a fork checkout publishes no commit.
+ */
+async function harvested_commit(url: string, stamp: SourceCommitStamp): Promise<string> {
+	let commit: unknown;
+	try {
+		commit = (JSON.parse(await readFile(stamp.path, 'utf8')) as Record<string, unknown>)
+			.source_commit;
+	} catch {
+		return '';
+	}
+	if (typeof commit !== 'string' || !commit) return '';
+	const checkout = resolve(stamp.checkouts.source_commit);
+	const origin = normalize_github_url(await git(checkout, ['remote', 'get-url', 'origin']));
+	if (origin?.toLowerCase() !== url.toLowerCase()) return '';
+	return (await git(checkout, ['branch', '-r', '--contains', commit])) ? commit : '';
+}
+
 /** Git-detect the GitHub ref of the checkout containing `abs` (a directory). */
 async function detect_checkout(abs: string): Promise<CorpusRepoRef | null> {
 	const toplevel = await git(abs, ['rev-parse', '--show-toplevel']);
@@ -140,11 +179,12 @@ async function detect_checkout(abs: string): Promise<CorpusRepoRef | null> {
 
 /** Detect the GitHub ref for one corpus source path (present repos only). */
 async function detect_repo(source_path: string): Promise<CorpusRepoRef | null> {
-	// A harvested cache links to its declared canonical upstream at the root
-	// (no git, no commit) — see `CACHE_CANONICAL`.
+	// A harvested cache links to its declared canonical upstream at the root,
+	// pinned where upstream has the harvested commit — see `CACHE_CANONICAL`.
 	const canonical = CACHE_CANONICAL[source_path];
 	if (canonical) {
-		return { url: canonical, slug: slug_of(canonical), commit: '', subpath: '' };
+		const { url, stamp } = canonical;
+		return { url, slug: slug_of(url), commit: await harvested_commit(url, stamp), subpath: '' };
 	}
 	// Any other derived cache (e.g. `svelte_styles`) is gitignored: git would
 	// resolve the enclosing tsv repo and mint a dead link.
