@@ -159,6 +159,9 @@ tsv's goal is to be an optimal, focused toolchain for TypeScript/JS, CSS, and Sv
   - the AST is span-only by default (`start`/`end` offsets, like acorn's `locations: false`);
     `{locations: true}` adds `loc` — acorn's exactly for TypeScript, and for Svelte
     the true line/column of every node rather than a copy of Svelte's own `loc` quirks
+  - [svelte-tsv](https://github.com/ryanatkn/svelte-tsv) is an experimental fork of Svelte
+    that parses with tsv (by the author of tsv), running Svelte's own compiler and test
+    suite on tsv's ASTs for conformance and benchmarks
 - formatters following Prettier
   - formatting is similar to Prettier and prettier-plugin-svelte for the common case,
     and diverges more often for Svelte than TypeScript;
