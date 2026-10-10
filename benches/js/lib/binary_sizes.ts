@@ -70,6 +70,7 @@ const LABELS = {
 	yuku_parser_napi: 'yuku-parser (napi)',
 	yuku_parser_wasm: 'yuku-parser (wasm)',
 	malva_wasm: 'malva (wasm)',
+	markup_wasm: 'markup_fmt (wasm)',
 	rsvelte_fmt_native: 'rsvelte-fmt (binary)',
 	rsvelte_parse_napi: 'rsvelte compiler (napi)',
 	swc_napi: 'swc (napi)'
@@ -388,6 +389,19 @@ export async function collect_binary_sizes(
 			LABELS.malva_wasm,
 			'wasm',
 			[`${node_modules}/dprint-plugin-malva`],
+			'.wasm'
+		);
+	}
+
+	// markup_fmt — dprint's Svelte (markup) plugin wasm, alone. Its row formats a
+	// component with the dprint and malva plugins beside it (each sized above), so
+	// formatting Svelte this way loads all three; this row is the markup layer.
+	if (impls.markup) {
+		await push_resolved(
+			staged,
+			LABELS.markup_wasm,
+			'wasm',
+			[`${node_modules}/dprint-plugin-markup`],
 			'.wasm'
 		);
 	}

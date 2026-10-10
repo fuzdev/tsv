@@ -1,6 +1,6 @@
 /**
  * The shared "did the pinned layout config actually LAND" probe, run by every
- * formatter wrapper: the prettier baseline, biome, oxfmt, dprint and malva.
+ * formatter wrapper: the prettier baseline, biome, oxfmt, dprint, malva and markup_fmt.
  *
  * Every formatter here is pinned to tsv's layout targets — width 100, tabs, single
  * quotes, no trailing commas — so each row wraps and rewrites the same amount of
@@ -8,8 +8,8 @@
  * docs/benchmarks.md §Fairness caveats). Two of the four timed format opponents
  * have a channel that says so when a key stops being recognized, and two do not:
  * `lib/dprint.ts` and `lib/malva.ts` fail init on a non-empty
- * `getConfigDiagnostics()`, while biome's `applyConfiguration` and oxfmt's
- * per-call options bag each accept an unknown key SILENTLY and fall back to their
+ * `getConfigDiagnostics()` (as does the coverage-only `lib/markup.ts`), while
+ * biome's `applyConfiguration` and oxfmt's per-call options bag each accept an unknown key SILENTLY and fall back to their
  * own defaults — measured: biome drops to width 80 + double quotes + trailing
  * commas, oxfmt to spaces + double quotes + trailing commas. A renamed key there
  * would leave the row wrapping a different amount of code with nothing anywhere in

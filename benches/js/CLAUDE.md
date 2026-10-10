@@ -1103,7 +1103,7 @@ detector, not the raw cv). ⚠ A longer `BENCH_DURATION` is NOT the answer to an
 drifting row's mean keeps moving with n, and at most sample counts the cleaner erases the
 disclosure entirely — re-run the runtime, and read the raw fields.
 
-**Null timing is not exclusive to a coverage-only report:** a coverage-only ROW (`rsvelte-fmt`)
+**Null timing is not exclusive to a coverage-only report:** a coverage-only ROW (`rsvelte-fmt`, `markup-fmt-wasm`)
 carries null stats inside an otherwise fully-timed perf report, identifiable by
 `files_iterated: null` — timed on nothing, rather than on the group's intersection. A consumer
 reading `entries[]` as speeds must skip a row with null `ops_per_second`, not treat it as a zero.
@@ -1209,7 +1209,11 @@ not drift — each surface registers its own subset):
   there (`rows_missing_from_payload_tiers`).
 
 All three WARN rather than throw: an absent row understates a table, where a stale
-`SURFACE_DISCLOSURES` sentence asserts something false.
+`SURFACE_DISCLOSURES` sentence asserts something false. One registry check at the same site
+THROWS: a coverage-only row with no `COVERAGE_ONLY_REASONS` entry
+(`coverage_only_rows_missing_reason`) — the report would otherwise publish an untimed name it
+cannot explain, and failing at pre-flight costs nothing where failing at report time would throw
+away a finished run.
 
 A **fourth** row list in the same module is deliberately unchecked: the curated payload-matched
 lines in `generate_summary_report` (`tsv` vs `oxc-parser`, and the rest). Its
@@ -1587,7 +1591,7 @@ benches/js/
     ├── format_config_probe.ts # Behavioral "did the pinned layout config LAND" check —
     │                      # one probe source + grading arm PER LANGUAGE, shared by prettier
     │                      # (the baseline) and every format impl (biome, oxfmt, dprint,
-    │                      # malva); unit-tested by format_config_probe_test.ts
+    │                      # malva, markup_fmt); unit-tested by format_config_probe_test.ts
     ├── gate_counts.ts     # Pinned gate counts — see ../../docs/gate_counts.md
     ├── harvest_stamp.ts   # Harvest freshness stamps (checkout ids + pins + view entry lists) + the HARVEST_STAMPS table
     ├── implementations.ts # Implementation registry (branches native FFI vs N-API by runtime)
@@ -1616,6 +1620,8 @@ benches/js/
     │                      # a binding still emitting `loc` can't be timed as the span-only
     │                      # default; unit-tested by locations_probe_test.ts
     ├── malva.ts           # malva WASM wrapper (CSS only; dprint's CSS plugin, shared formatter host)
+    ├── markup.ts          # markup_fmt WASM wrapper (Svelte only; dprint's Svelte plugin composed with
+    │                      # the dprint + malva plugins in one host context; COVERAGE-ONLY, never timed)
     ├── napi.ts            # process.dlopen bindings (NapiImplementation — Node/Bun native)
     ├── oxc.ts             # OXC native wrappers (oxc-parser + oxfmt)
     ├── oxc_wasm.ts        # OXC WASM wrapper (oxc-parser via wasm32-wasi; per-runtime entry)

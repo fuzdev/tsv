@@ -84,6 +84,15 @@ export interface MalvaVersions {
 	malva: string;
 }
 
+/**
+ * markup_fmt version (`dprint-plugin-markup`, over the shared `@dprint/formatter`
+ * host, composed with `@dprint/typescript` and malva for the embedded code)
+ */
+export interface MarkupVersions {
+	/** The markup plugin itself — the version worth citing */
+	markup: string;
+}
+
 /** postcss version (the `parse/css` alternative engine) */
 export interface PostcssVersions {
 	postcss: string;
@@ -127,6 +136,7 @@ export interface AllVersions {
 	rsvelte_parse: RsvelteParseVersions;
 	swc: SwcVersions;
 	malva: MalvaVersions;
+	markup: MarkupVersions;
 	postcss: PostcssVersions;
 }
 
@@ -300,6 +310,9 @@ export async function load_all_versions(): Promise<AllVersions> {
 		},
 		malva: {
 			malva: dep_version(deps, 'dprint-plugin-malva')
+		},
+		markup: {
+			markup: dep_version(deps, 'dprint-plugin-markup')
 		},
 		postcss: {
 			postcss: dep_version(deps, 'postcss')

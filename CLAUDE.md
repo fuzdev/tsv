@@ -436,6 +436,7 @@ BENCH_FILTER=zzz BENCH_LIMIT=10 deno task bench:deno:run
 - swc — parse-only TS/JS on both surfaces (its own AST dialect, so oxc-class payload disclosure; `decorators` must be enabled explicitly; goal axis `isModule`)
 - postcss — parse-only CSS (the parser behind prettier's CSS printer; the only kind available, since no Rust CSS parser exposes an AST to JS)
 - rsvelte's Svelte **parser** via its N-API addon — two `parse/svelte` rows: plain (mechanism-matched to tsv's default parse row; payload Svelte's own sparse-`loc` wire) and `skipExpressionLoc` (named for its option, since that reduction is not tsv's); the first third-party engine on that surface
+- markup_fmt (`markup-fmt-wasm`, Svelte only) — dprint's Svelte plugin, composed with the dprint and malva plugins for the embedded script, style and expressions; a **coverage-only** row, since it rejects valid real Svelte and a timed row would remove those files from every row's timed set. See ./docs/benchmarks.md §Coverage-only rows.
 - `rsvelte-fmt` (Svelte only) — a **coverage-only** row (accept rate, no timing: no in-process API, and a per-file subprocess row would rank process spawn, not format work); its end-to-end CLI numbers live in the separate hyperfine comparison on tsv.fuz.dev. See ./docs/benchmarks.md §Coverage-only rows.
 
 Results: `benches/js/results/report.<runtime>.{json,md}` (committed; every row carries a `runtime` field) + the combined `report.{json,md}`. Publish to tsv.fuz.dev: `npm run update-benchmarks` in ../tsv.fuz.dev. See ./benches/js/CLAUDE.md.

@@ -121,6 +121,7 @@ const DISPLAY_ORDER = [
 	'biome-wasm',
 	'dprint-wasm',
 	'malva-wasm',
+	'markup-fmt-wasm',
 	'oxc-parser',
 	'oxc-parser-wasm',
 	'oxfmt',
@@ -647,6 +648,7 @@ export interface AlternativeVersionInfo {
 	biome?: string;
 	dprint?: string;
 	malva?: string;
+	markup?: string;
 	postcss?: string;
 	rsvelte_fmt?: string;
 	rsvelte_parse?: string;
@@ -721,6 +723,7 @@ export function alternative_version_parts(versions: AlternativeVersionInfo): str
 	if (versions.biome) parts.push(`@biomejs/wasm-bundler@${versions.biome}`);
 	if (versions.dprint) parts.push(`@dprint/typescript@${versions.dprint}`);
 	if (versions.malva) parts.push(`dprint-plugin-malva@${versions.malva}`);
+	if (versions.markup) parts.push(`dprint-plugin-markup@${versions.markup}`);
 	if (versions.postcss) parts.push(`postcss@${versions.postcss}`);
 	if (versions.rsvelte_fmt) parts.push(`@rsvelte/fmt@${versions.rsvelte_fmt}`);
 	if (versions.rsvelte_parse) {
@@ -858,7 +861,7 @@ const POSTCSS_NOTE: FairnessNote = {
 		'   to JS, so it is the only peer)'
 	],
 	markdown:
-		'postcss is the JS parser behind prettier’s CSS printer, i.e. behind the `format/css` baseline — a JS-vs-native read like prettier’s own, not a same-tier one; it is the only third-party engine available on `parse/css`, since none of the Rust CSS tools considered exposes a parse call to JS (Lightning CSS hands a tree to a visitor only mid-transform, Biome surfaces no parser, malva is a formatter). Not payload-matched either: it keeps selectors as strings where `parseCss` (and so tsv) parses them into selector nodes — 0.38× tsv’s node count and at most 0.56× tsv’s span-only JSON bytes on the perf corpus, though the `source` positions and `raws` on every node leave it about as many JS objects as `parseCss` builds'
+		'postcss is the JS parser behind prettier’s CSS printer, i.e. behind the `format/css` baseline — a JS-vs-native read like prettier’s own, not a same-tier one; it is the only third-party engine available on `parse/css`, since none of the Rust CSS tools considered exposes a parse call to JS (Lightning CSS hands a tree to a visitor only mid-transform, Biome surfaces no parser, malva is a formatter, swc’s CSS package exposes only minify/transform). Not payload-matched either: it keeps selectors as strings where `parseCss` (and so tsv) parses them into selector nodes — 0.38× tsv’s node count and at most 0.56× tsv’s span-only JSON bytes on the perf corpus, though the `source` positions and `raws` on every node leave it about as many JS objects as `parseCss` builds'
 };
 
 const MALVA_NOTE: FairnessNote = {
@@ -985,6 +988,7 @@ const COMPARISON_EXCLUSIONS: Readonly<Record<string, string>> = {
 	'tsv-internal': "tsv's own parse-only variant; no third-party row is the same tier",
 	'tsv-wasm-internal': "tsv's own parse-only variant; no third-party row is the same tier",
 	'tsv-forced-async': 'opt-in async-tax control (`BENCH_FORCED_ASYNC=1`), deliberately unpublished',
+	'markup-fmt-wasm': 'coverage-only — never timed, so there is no ratio to take',
 	'rsvelte-fmt': 'coverage-only — never timed, so there is no ratio to take',
 	tsc: 'conformance surface only — a verdict row, never timed',
 	'rsvelte-parse-skip-expr-loc':
@@ -1511,15 +1515,46 @@ export function generate_group_coverage_markdown(
 }
 
 /**
+ * Why each coverage-only row (`BenchmarkTask.coverage_only`) is not timed, keyed by
+ * row name — published beside its accept rate, so a reader meeting an untimed name
+ * in a throughput report never has to hunt for why. A coverage-only row missing
+ * here fails the run at pre-flight (`coverage_only_rows_missing_reason`), before
+ * any row is timed, rather than publishing an unexplained name.
+ */
+const COVERAGE_ONLY_REASONS: Readonly<Record<string, string>> = {
+	'rsvelte-fmt':
+		'no in-process API, so a timed row would measure process spawn rather than format work',
+	'markup-fmt-wasm':
+		'it rejects valid Svelte in the real corpus (markup inside a template literal in an ' +
+		'attribute expression, `{…}` inside a quoted `style`), and a file any timed row rejects ' +
+		'leaves every row’s timed set'
+};
+
+/**
+ * The coverage-only rows in `rows` with no `COVERAGE_ONLY_REASONS` entry. Asked at
+ * pre-flight of the rows a surface DEFINES, like the registry checks above, but
+ * FATAL there rather than a warning: the reason is the published line's only
+ * account of why a name has no timing, and finding it missing at report time would
+ * throw away a finished run.
+ */
+export function coverage_only_rows_missing_reason(
+	rows: Iterable<{ name: string; coverage_only: boolean }>
+): string[] {
+	const missing = new Set<string>();
+	for (const { name, coverage_only } of rows) {
+		if (coverage_only && COVERAGE_ONLY_REASONS[name] === undefined) missing.add(name);
+	}
+	return [...missing];
+}
+
+/**
  * Per-group line for the impls that were measured for coverage but never timed
- * (`BenchmarkTask.coverage_only`) — an impl with no in-process API, whose timed
- * row would rank process spawn rather than format work.
+ * (`BenchmarkTask.coverage_only`), each with its reason (`COVERAGE_ONLY_REASONS`).
  *
  * Always emitted when such an impl ran, including at 100%: unlike
  * `generate_group_coverage_markdown` (where a line means "some impl skipped
  * files"), coverage IS the entire measurement here, so suppressing it at 100%
- * would erase the row. Carries its own inline reason so a reader meeting an
- * untimed name in a throughput report never has to hunt for why.
+ * would erase the row.
  */
 export function generate_group_coverage_only_markdown(
 	names: readonly string[],
@@ -1527,22 +1562,25 @@ export function generate_group_coverage_only_markdown(
 	effective_corpus_size: Map<string, EffectiveCorpusEntry>
 ): string | null {
 	if (!tracking || names.length === 0) return null;
-	const rows: { name: string; processed: number; total: number }[] = [];
+	const parts: string[] = [];
 	for (const name of names) {
 		const tracking_key = tracking.get(name);
 		if (!tracking_key) continue;
 		const e = effective_corpus_size.get(tracking_key);
 		if (!e) continue;
-		rows.push({ name, processed: e.processed, total: e.total });
+		const reason = COVERAGE_ONLY_REASONS[name];
+		if (reason === undefined) {
+			// unreachable past pre-flight, which refuses a coverage-only row with no reason
+			throw new Error(
+				`coverage-only row '${name}' has no reason in COVERAGE_ONLY_REASONS (lib/report.ts)`
+			);
+		}
+		parts.push(
+			`${name} ${e.processed}/${e.total} (${coverage_pct(e.processed, e.total)}%) — ${reason}`
+		);
 	}
-	if (rows.length === 0) return null;
-	const parts = rows.map(
-		(e) => `${e.name} ${e.processed}/${e.total} (${coverage_pct(e.processed, e.total)}%)`
-	);
-	return (
-		`**Coverage-only (not timed):** ${parts.join(', ')} — no in-process API, so a timed row ` +
-		`would measure process spawn rather than format work; these are accept rates, not speeds.`
-	);
+	if (parts.length === 0) return null;
+	return `**Coverage-only (not timed):** ${parts.join('; ')}. These are accept rates, not speeds.`;
 }
 
 /**

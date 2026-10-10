@@ -33,6 +33,7 @@ import { YukuImplementation } from './yuku.ts';
 import { BiomeImplementation } from './biome.ts';
 import { DprintImplementation } from './dprint.ts';
 import { MalvaImplementation } from './malva.ts';
+import { MarkupImplementation } from './markup.ts';
 import { PostcssImplementation } from './postcss.ts';
 import { RsvelteImplementation } from './rsvelte.ts';
 import { RsvelteParseImplementation } from './rsvelte_parse.ts';
@@ -126,6 +127,12 @@ export interface ImplementationSet {
 	dprint: DprintImplementation | undefined;
 	/** malva (via WASM; dprint's CSS plugin) - format only; undefined if not available */
 	malva: MalvaImplementation | undefined;
+	/**
+	 * markup_fmt (via WASM; dprint's Svelte plugin, composed with dprint's TS and CSS
+	 * plugins) - format only, Svelte; undefined if not available. Coverage-only: it
+	 * rejects valid real Svelte, so it is never timed (see `get_benchmark_tasks`).
+	 */
+	markup: MarkupImplementation | undefined;
 	/** postcss - parse only, CSS; undefined if not available */
 	postcss: PostcssImplementation | undefined;
 	/**
@@ -195,16 +202,17 @@ export interface InitOptions {
 }
 
 // Deliberately NOT surface-scoped: every impl initializes on every run, including
-// the format-only ones (biome, dprint, malva, rsvelte-fmt) on the parse-only
-// conformance surface, where they back no row. Gating init on `OPERATIONS` is the
-// obvious saving and it isn't worth taking — measured, the four cost ~233 ms total
-// (biome 187, dprint 23, malva 9, rsvelte-fmt 14) against a multi-minute run, and
-// two disclosures read the LIVE set rather than `complete`: `collect_binary_sizes`
-// gates each artifact on `impls.<key>`, so a skipped impl silently drops its row
-// from the published BINARY SIZES table (a catalog of what is on disk, which the
-// surface's operation list has no business thinning), and `get_alternative_versions`
-// feeds the report's `Versions:` line from the same set. The cost of the saving is a
-// thinner published report; the cost of not taking it is a fifth of a second.
+// the format-only ones (biome, dprint, malva, markup_fmt, rsvelte-fmt) on the
+// parse-only conformance surface, where they back no row. Gating init on
+// `OPERATIONS` is the obvious saving and it isn't worth taking — measured, the five
+// cost under 300 ms total (biome 187, markup_fmt ~50, dprint 23, rsvelte-fmt 14,
+// malva 9) against a multi-minute run, and two disclosures read the LIVE set rather
+// than `complete`: `collect_binary_sizes` gates each artifact on `impls.<key>`, so
+// a skipped impl silently drops its row from the published BINARY SIZES table (a
+// catalog of what is on disk, which the surface's operation list has no business
+// thinning), and `get_alternative_versions` feeds the report's `Versions:` line
+// from the same set. The cost of the saving is a
+// thinner published report; the cost of not taking it is under a third of a second.
 
 /**
  * Initialize one REQUIRED implementation, rethrowing when it can't load.
@@ -364,6 +372,7 @@ export async function init_implementations(
 		biome,
 		dprint,
 		malva,
+		markup,
 		rsvelte,
 		rsvelte_parse,
 		swc,
@@ -383,6 +392,12 @@ export async function init_implementations(
 	const biome_impl = await optional(biome, 'biome', 'Biome (WASM)', 'Biome');
 	const dprint_impl = await optional(dprint, 'dprint', 'dprint (WASM)', 'dprint');
 	const malva_impl = await optional(malva, 'malva', 'malva (WASM, CSS)', 'malva');
+	const markup_impl = await optional(
+		markup,
+		'markup',
+		'markup_fmt (WASM, Svelte, coverage-only)',
+		'markup_fmt'
+	);
 	const rsvelte_impl = await optional(
 		rsvelte,
 		'rsvelte',
@@ -428,6 +443,7 @@ export async function init_implementations(
 		biome: biome_impl,
 		dprint: dprint_impl,
 		malva: malva_impl,
+		markup: markup_impl,
 		postcss: postcss_impl,
 		rsvelte: rsvelte_impl,
 		rsvelte_parse: rsvelte_parse_impl,
@@ -462,6 +478,7 @@ function construct_implementations(versions: AllVersions): ConstructedImplementa
 		biome: new BiomeImplementation(versions.biome),
 		dprint: new DprintImplementation(versions.dprint),
 		malva: new MalvaImplementation(versions.malva),
+		markup: new MarkupImplementation(versions.markup),
 		postcss: new PostcssImplementation(versions.postcss),
 		rsvelte: new RsvelteImplementation(versions.rsvelte),
 		// A different package from rsvelte-fmt above — the N-API addon, which unlike
@@ -547,9 +564,13 @@ export interface BenchmarkTask {
 	/** Whether this benchmark runs async */
 	is_async: boolean;
 	/**
-	 * Measure this impl's pre-flight coverage but never TIME it. Set for an impl
-	 * with no in-process API, where a timed row would be dominated by process
-	 * spawn rather than format work (`rsvelte-fmt` — see `lib/rsvelte.ts`).
+	 * Measure this impl's pre-flight coverage but never TIME it. Set where a timed
+	 * row would mislead: an impl with no in-process API, whose timed row would be
+	 * dominated by process spawn rather than format work (`rsvelte-fmt` — see
+	 * `lib/rsvelte.ts`), and an impl that rejects valid real code, whose timed row
+	 * would remove every file it rejects from every row's timed set
+	 * (`markup-fmt-wasm` — see `lib/markup.ts`). Each one's reason is published
+	 * beside its accept rate (`report.ts` `COVERAGE_ONLY_REASONS`).
 	 *
 	 * The bench honors this in four places, and all four are load-bearing: the
 	 * pre-flight (`bench_preflight.ts`) plans no timed row for the task, keeps it
@@ -877,7 +898,8 @@ export function get_benchmark_tasks(
 		// No native peer exists to add here: none of the Rust CSS tools considered
 		// exposes a parse call to JS (lightningcss hands a tree to its `visitor` only
 		// mid-transform, biome's js-api exposes no parse, malva is a formatter, oxc has
-		// no CSS parse binding). See lib/postcss.ts.
+		// no CSS parse binding, `@swc/css` exposes only minify/transform). See
+		// lib/postcss.ts.
 		add(
 			'postcss',
 			impls.postcss?.supports_parse_language(language),
@@ -949,6 +971,24 @@ export function get_benchmark_tasks(
 			impls.malva!.format(source, language)
 		);
 
+		// markup_fmt (Svelte only) — dprint's Svelte plugin, composed with the
+		// dprint and malva plugins for the embedded code (see lib/markup.ts) —
+		// COVERAGE-ONLY. It rejects valid Svelte the real corpus holds (markup inside
+		// a template literal in an attribute expression, `{…}` inside a quoted
+		// `style`), a large share of the perf corpus's Svelte bytes. A timed row would
+		// need a `PERF_OMITS` entry per file, and each would leave EVERY row's timed
+		// set, so adding it would reshape every published Svelte number. Measured for
+		// what it accepts instead; time it once upstream accepts the corpus. See
+		// docs/benchmarks.md §Coverage-only rows.
+		add(
+			'markup',
+			impls.markup?.supports_format_language(language),
+			'markup-fmt-wasm',
+			'markup',
+			(source) => impls.markup!.format(source, language),
+			{ coverage_only: true }
+		);
+
 		// rsvelte-fmt (Svelte only) — COVERAGE-ONLY. It ships no in-process format
 		// API in any package (the sibling N-API addon is the compiler), so this task
 		// spawns a process per file: measured on ~5 KB of Svelte the spawn floor
@@ -1012,6 +1052,8 @@ export function get_defined_rows(
 /** One cell this surface defines: a row in one language. */
 export interface DefinedCell extends DefinedRow {
 	language: Language;
+	/** `BenchmarkTask.coverage_only` — measured for coverage, never timed. */
+	coverage_only: boolean;
 }
 
 /**
@@ -1028,7 +1070,8 @@ export function get_defined_cells(
 		get_benchmark_tasks(impls.complete, operation, language, options).map((task) => ({
 			name: task.name,
 			impl: task.impl,
-			language
+			language,
+			coverage_only: task.coverage_only === true
 		}))
 	);
 }
@@ -1085,6 +1128,8 @@ export function get_alternative_versions(
 		dprint: impls.dprint?.versions.typescript,
 		// Same reasoning as dprint: the CSS plugin, not the shared host.
 		malva: impls.malva?.versions.malva,
+		// The markup plugin; its embedded TS and CSS are the dprint and malva versions above.
+		markup: impls.markup?.versions.markup,
 		postcss: impls.postcss?.versions.postcss,
 		rsvelte_fmt: impls.rsvelte?.versions.fmt,
 		// Two facts, both reported: the addon's own version, and the upstream Svelte

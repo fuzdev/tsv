@@ -15,8 +15,9 @@
  * export is types for the `visitor` callback option, which can hand JS the whole
  * `StyleSheet`, but normalized and only as a side channel of a transform run, not
  * a parse product), biome's `js-api` exposes
- * `formatContent`/`lintContent`/`openProject`, malva is a formatter, and oxc's CSS
- * is `oxc_formatter_css` with no JS parse binding. So `parse/css` having a JS-only
+ * `formatContent`/`lintContent`/`openProject`, malva is a formatter, oxc's CSS
+ * is `oxc_formatter_css` with no JS parse binding, and swc's CSS package
+ * (`@swc/css`) exposes `minify`/`transform` only. So `parse/css` having a JS-only
  * alternative is an availability fact rather than an omission.
  *
  * **Not payload-matched.** postcss's `Root` is a CSSOM-ish tree with `nodes` and

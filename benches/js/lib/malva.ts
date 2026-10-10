@@ -4,8 +4,8 @@
  * `dprint-plugin-malva` is dprint's CSS formatter, loaded in-process as its Wasm
  * plugin through the same `@dprint/formatter` host `lib/dprint.ts` uses — so it
  * costs one more plugin wasm and no new machinery. It is one of two wasm-tier
- * engines on `format/css`, the other being `biome-wasm`. dprint's HTML plugin
- * stays unwired: it does not format Svelte.
+ * engines on `format/css`, the other being `biome-wasm`. It also formats each
+ * embedded `<style>` in the `markup-fmt-wasm` Svelte row (`lib/markup.ts`).
  *
  * **CSS only, and enforced by the plugin itself.** malva matches CSS/SCSS/Less
  * extensions and rejects anything else outright with "unknown file extension"
@@ -20,9 +20,18 @@ import { BaseImplementation, type Language } from './types.ts';
 import { assert_format_config_landed, FORMAT_CONFIG_PROBES } from './format_config_probe.ts';
 import { assert_tool_rejects_invalid } from './reject_probe.ts';
 import type { MalvaVersions } from './versions.ts';
+import { DPRINT_GLOBAL_CONFIG } from './dprint.ts';
 // Type-only, so naming `Formatter` here does not load the plugin at import time;
 // the value imports are deferred to `init()`. Same posture as lib/dprint.ts.
 import type { Formatter } from '@dprint/formatter';
+
+/**
+ * malva's plugin config — shared with `lib/markup.ts`, whose Svelte row formats
+ * each embedded `<style>` through this same plugin. `preferSingle` is the faithful
+ * analogue of prettier's `singleQuote: true` (it still switches quotes to avoid
+ * escaping); the layout keys are dprint GLOBAL config (`DPRINT_GLOBAL_CONFIG`).
+ */
+export const MALVA_CONFIG = { quotes: 'preferSingle' } as const;
 
 /**
  * malva CSS formatter.
@@ -53,15 +62,8 @@ export class MalvaImplementation extends BaseImplementation {
 		const wasm_path = require.resolve('dprint-plugin-malva/plugin.wasm');
 		this._formatter = createFromBuffer(await readFile(wasm_path));
 
-		// Match the prettier/tsv layout targets so every format row does the same
-		// work — see docs/benchmarks.md §Fairness caveats. `lineWidth`/`indentWidth`/
-		// `useTabs` are dprint GLOBAL config; `quotes` is malva's plugin config, and
-		// `preferSingle` is the faithful analogue of prettier's `singleQuote: true`
-		// (it still switches quotes to avoid escaping).
-		this._formatter.setConfig(
-			{ lineWidth: 100, indentWidth: 2, useTabs: true },
-			{ quotes: 'preferSingle' }
-		);
+		// the pinned layout targets — see `DPRINT_GLOBAL_CONFIG` / `MALVA_CONFIG`
+		this._formatter.setConfig(DPRINT_GLOBAL_CONFIG, MALVA_CONFIG);
 
 		// Assert the config LANDED, for the same reason lib/dprint.ts does: dprint
 		// reports an unrecognized key as a diagnostic rather than throwing (verified

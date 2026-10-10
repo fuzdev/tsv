@@ -89,6 +89,7 @@ import {
 } from './lib/perf_omit.ts';
 import {
 	type CoverageBySource,
+	coverage_only_rows_missing_reason,
 	rows_missing_from_comparisons,
 	rows_missing_from_display_order,
 	rows_missing_from_payload_tiers,
@@ -439,6 +440,22 @@ if (untiered_rows.length > 0) {
 		`⚠ ${untiered_rows.join(', ')} — no entry in report.ts PARSE_PAYLOAD_TIERS, so ${
 			untiered_rows.length === 1 ? 'it publishes' : 'they publish'
 		} \`payload: null\``
+	);
+}
+
+// Each coverage-only row's published reason (`report.ts` `COVERAGE_ONLY_REASONS`),
+// asked of every operation's cells. FATAL, unlike the three warnings above: the
+// report refuses an unexplained untimed name, and asking here fails the run before
+// anything is timed instead of after.
+const unexplained_rows = coverage_only_rows_missing_reason(
+	OPERATIONS.flatMap((operation) => get_defined_cells(impls, operation, TASK_OPTIONS))
+);
+if (unexplained_rows.length > 0) {
+	throw new Error(
+		`${unexplained_rows.join(', ')} — coverage-only with no entry in report.ts ` +
+			`COVERAGE_ONLY_REASONS, so the report could not say why ${
+				unexplained_rows.length === 1 ? 'it is' : 'they are'
+			} not timed`
 	);
 }
 

@@ -36,9 +36,11 @@ Things the published numbers measure that aren't quite what they look like.
   `quoteStyle: preferSingle` is the faithful analogue of prettier's
   `singleQuote: true`, which likewise switches quotes to avoid escaping, and
   `trailingCommas: never` fans out to each of dprint's per-construct keys), malva
-  (`malva.ts`), and rsvelte-fmt (`rsvelte.ts`). Unmatched defaults
-  (biome's width is 80; oxfmt and biome default to double quotes) would make rows
-  wrap/rewrite different amounts of code, conflating config with engine speed.
+  (`malva.ts`), markup_fmt (`markup.ts`, whose embedded script and style go
+  through the dprint and malva configs above), and rsvelte-fmt (`rsvelte.ts`).
+  Unmatched defaults (biome's width is 80; oxfmt and biome default to double
+  quotes) would make rows wrap/rewrite different amounts of code, conflating
+  config with engine speed.
 
   **Every formatter whose config can move a ratio proves its pins actually
   LANDED** — the four timed alternatives (oxfmt, biome, dprint, malva) *and*
@@ -47,12 +49,13 @@ Things the published numbers measure that aren't quite what they look like.
   there moves every ratio in the report and manufactures thousands of false
   divergences (verified: renaming prettier's four options drops its output to
   2-space indent, double quotes, width 80, with no throw and no warning through the
-  API). rsvelte-fmt is exempt as the one coverage-only row — its config can't move a
-  ratio. A silently-ignored key produces exactly that conflation with nothing in the
-  report to show it: dprint and malva fail init on a non-empty
-  `getConfigDiagnostics()`, while biome's `applyConfiguration` and oxfmt's per-call
-  options bag accept an unknown key with no throw and no diagnostic (verified —
-  biome then falls back to width 80 + double quotes + trailing commas, oxfmt to
+  API). rsvelte-fmt is exempt as a coverage-only row — its config can't move a
+  ratio; markup_fmt, also coverage-only, runs the probe anyway, since it shares
+  the dprint host's diagnostic channel. A silently-ignored key produces exactly
+  that conflation with nothing in the report to show it: dprint and malva fail
+  init on a non-empty `getConfigDiagnostics()`, while biome's
+  `applyConfiguration` and oxfmt's per-call options bag accept an unknown key
+  with no throw and no diagnostic (verified — biome then falls back to width 80 + double quotes + trailing commas, oxfmt to
   spaces + double quotes + trailing commas), so the check is behavioral, and every formatter
   row runs it (a clean dprint/malva diagnostic list proves a key recognized, not its
   value landed): `init` formats a probe source whose output differs under each pinned option and
@@ -583,10 +586,10 @@ Things the published numbers measure that aren't quite what they look like.
   linear memory) by the time it returns, where `tsv-internal` does no
   serialization at all. Publishing it beside `tsv-internal` would invite exactly
   the tier confusion the `-internal` rows exist to avoid.
-- **One row is measured but not timed.** `rsvelte-fmt` is an accept rate with no
-  timing, excluded from the timed loop, the group intersection, and the perf
-  coverage invariant, so it moves no other number — see [Coverage-only
-  rows](#coverage-only-rows).
+- **Some rows are measured but not timed.** The coverage-only rows
+  (`rsvelte-fmt`, `markup-fmt-wasm`) are accept rates with no timing, excluded
+  from the timed loop, the group intersection, and the perf coverage invariant, so
+  they move no other number — see [Coverage-only rows](#coverage-only-rows).
 
 ## Implementations
 
@@ -687,9 +690,9 @@ prettier. Load-bearing on two axes:
   `@dprint/typescript` matches `ts,tsx,js,jsx,mjs,cjs,mts,cts` and **rejects CSS and
   Svelte outright** (verified), so unlike oxfmt/biome it contributes no css or
   svelte row; dprint's CSS plugin is a separate Wasm plugin with its own row
-  (**malva**, below), and its HTML plugin stays unwired — it does not format
-  Svelte. Config is asserted to LAND: dprint reports an unrecognized key as a
-  diagnostic rather than throwing, so `lib/dprint.ts` fails init if
+  (**malva**, below), and so is its Svelte plugin (**markup_fmt**, below — a
+  coverage-only row). Config is asserted to LAND: dprint reports an unrecognized
+  key as a diagnostic rather than throwing, so `lib/dprint.ts` fails init if
   `getConfigDiagnostics()` is non-empty — else a renamed key would silently leave an
   option at its default and skew the row — and, since a recognized key is not a
   landed value, it also runs the shared behavioral probe.
@@ -769,13 +772,24 @@ prettier. Load-bearing on two axes:
   than the bench's missing path threading.
 - **malva (WASM)** — dprint's CSS formatter, loaded over the same
   `@dprint/formatter` host as `@dprint/typescript`, so it adds a wasm-tier engine
-  to `format/css` for one more plugin wasm and no new machinery. The HTML plugin
-  stays out — it does not format Svelte. **CSS only, enforced by the plugin** — it
-  rejects
-  `.svelte` and `.ts` with "unknown file extension", mirroring
-  `@dprint/typescript`'s rejection of CSS and Svelte, so the language list is not
-  a policy the wrapper could get wrong. It and `biome-wasm` are the group's two
-  wasm-tier engines.
+  to `format/css` for one more plugin wasm and no new machinery. **CSS only,
+  enforced by the plugin** — it rejects `.svelte` and `.ts` with "unknown file
+  extension", mirroring `@dprint/typescript`'s rejection of CSS and Svelte, so
+  the language list is not a policy the wrapper could get wrong. It and
+  `biome-wasm` are the group's two wasm-tier engines.
+- **markup_fmt (WASM)** — dprint's Svelte formatter (`dprint-plugin-markup`, by
+  malva's author), **Svelte only**, and **coverage-only**. The plugin formats the
+  markup and hands every embedded `<script>`, `<style>` and template expression
+  back to the host, so `lib/markup.ts` composes it with `@dprint/typescript` and
+  malva in one `createContext` — how the dprint CLI composes plugins — and the
+  embedded code goes through exactly the `dprint-wasm` and `malva-wasm` rows'
+  configs. Without them the row would leave script, style and expressions as
+  written. A syntax error anywhere, embedded regions included, throws, so an accept
+  is a whole-component format — and init probes each embed hop (script, template
+  expression, style), since a region whose plugin went missing would come back as
+  written rather than throw. Why it is not timed: see [Coverage-only
+  rows](#coverage-only-rows). It also formats HTML, Vue, Astro and template
+  dialects, which tsv does not, so it contributes no other row.
 - **postcss (JS)** — the first third-party engine on `parse/css`, earned on one
   argument: it is the parser behind prettier's CSS printer, i.e. behind the
   `format/css` **baseline**, which the parse surface therefore could not see. Not
@@ -785,8 +799,9 @@ prettier. Load-bearing on two axes:
   `transform`/`bundle` only (its `./ast` export is types for the `visitor` callback,
   which can hand JS the whole `StyleSheet` but only as a side channel of a
   transform run, not a parse product), biome's `js-api` exposes
-  `formatContent`/`lintContent`/`openProject`, malva is a formatter, and oxc's CSS
-  is `oxc_formatter_css` with no JS parse binding. So that surface's missing native
+  `formatContent`/`lintContent`/`openProject`, malva is a formatter, oxc's CSS
+  is `oxc_formatter_css` with no JS parse binding, and swc's CSS package
+  (`@swc/css`) exposes `minify`/`transform` only. So that surface's missing native
   row is an **availability fact, not an omission**. `css-tree` was evaluated for
   this slot and rejected: it parses an unclosed block without error even with
   `onParseError` supplied, so its accept rate would read ~100% vacuously, where
@@ -815,12 +830,20 @@ prettier. Load-bearing on two axes:
 
 A coverage-only row (`BenchmarkTask.coverage_only`) is an impl the pre-flight runs
 over the whole corpus — so its accept rate is measured and published — but that the
-timed loop never touches. `rsvelte-fmt` is the only one.
+timed loop never touches. Each is untimed for its own reason, published beside its
+accept rate (`report.ts` `COVERAGE_ONLY_REASONS`).
+
+#### rsvelte-fmt: no in-process API
 
 **Why it can't be timed.** It ships no in-process format API in any package: the
-npm package is a Node launcher that `spawnSync`s a prebuilt binary, and the sibling
+npm package is a Node launcher that `spawnSync`s a prebuilt binary, the sibling
 `@rsvelte/vite-plugin-svelte-native` N-API addon is the *compiler* (`compile` /
-`parse` / `svelte2tsx`, no format export). Driving it means a process per file.
+`parse` / `svelte2tsx`, no format export), and `@rsvelte/compiler` is a wasm
+compile/lint bundle with no format export either. The one other in-process path is
+`@rsvelte/language-server`, whose native server formats over LSP
+`textDocument/formatting` — a JSON-RPC round trip per file, a config it resolves
+from the project rather than one passed in, and a release line of its own, so not
+the engine the coverage row measures. Driving the CLI means a process per file.
 Measured on a ~5 KB `.svelte` file the binary costs ~2.4 ms of which ~1.3 ms is the
 bare spawn floor (`--version`), against tsv's ~0.09 ms in-process — a timed row
 would rank `fork`/`exec` and report it as an engine gap. Same objection that keeps
@@ -839,8 +862,33 @@ speed numbers live; this row answers only "what does it accept."
 `--no-native-js` / `--no-native-css` escape-hatch docs. A ts or css row would
 re-measure oxfmt's acceptance through a spawn, adding no information.
 
-**What the flag must be honored by** — four places, three in the pre-flight process
-(`bench_preflight.ts`) and one in the report (`bench.ts`), each load-bearing:
+**Setup.** The binary comes from `@rsvelte/fmt`'s platform `optionalDependency` and
+is exec'd directly, not through the published Node launcher (which would add a Node
+cold start measuring npm packaging). `lib/rsvelte.ts` probes `--version` at init, so
+a present-but-unexecutable package fails as a broken setup instead of reading as an
+honest 0%. Under Deno the spawn needs `--allow-run`; every published platform
+path is listed on `bench:deno:run` and `smoke` (see the `//rsvelte-allow-run` note
+in `deno.json`).
+
+#### markup_fmt: rejects real Svelte
+
+**Why it isn't timed.** It has an in-process API and would run in the warm loop like
+every other wasm row — the obstacle is what it accepts. It rejects valid Svelte the
+perf corpus holds, chiefly two shapes: a template literal containing markup inside
+an attribute expression (``content={`<details>…</details>`}``, which every docs
+page showing a code sample has) and `{…}` interpolation inside a quoted `style`
+attribute. On the perf surface every in-scope tool must process every file, and a
+file any timed row rejects leaves every row's timed set, so a timed row would need a
+`PERF_OMITS` entry per rejected file and would remove a large share of the Svelte
+bytes — the biggest docs pages — from every published Svelte number. Measured for
+what it accepts instead (the report's coverage line carries the live rate). Time it
+once upstream accepts the corpus: drop `coverage_only` at its registration in
+`lib/implementations.ts` and its entry in `COVERAGE_ONLY_REASONS`.
+
+#### What the flag must be honored by
+
+Four places, three in the pre-flight process (`bench_preflight.ts`) and one in the
+report (`bench.ts`), each load-bearing:
 
 1. The **timed phase** skips it (pre-flight plans no timed row for it, so no process
    is ever started to time it).
@@ -854,17 +902,10 @@ re-measure oxfmt's acceptance through a spawn, adding no information.
    timing and `files_iterated: null`, since the bench library produced no result for
    it — without that its coverage would vanish for not being a speed.
 
-The markdown renders it as a per-group `**Coverage-only (not timed):**` line
-carrying its reason inline, so an untimed name in a throughput report is never
-unexplained.
-
-**Setup.** The binary comes from `@rsvelte/fmt`'s platform `optionalDependency` and
-is exec'd directly, not through the published Node launcher (which would add a Node
-cold start measuring npm packaging). `lib/rsvelte.ts` probes `--version` at init, so
-a present-but-unexecutable package fails as a broken setup instead of reading as an
-honest 0%. Under Deno the spawn needs `--allow-run`; every published platform
-path is listed on `bench:deno:run` and `smoke` (see the `//rsvelte-allow-run` note
-in `deno.json`).
+The markdown renders them as a per-group `**Coverage-only (not timed):**` line
+carrying each row's reason inline, so an untimed name in a throughput report is
+never unexplained; a coverage-only row with no reason fails the run at pre-flight,
+before anything is timed.
 
 ### OXC package details
 
@@ -975,6 +1016,10 @@ with nothing else wrong.
   `*.wasm`, with no JS entry and so no `getPath()` helper like `@dprint/typescript`
   has). CSS-only scope, and tsv has no CSS-only build, so pair it against
   `tsv-format-wasm` knowing malva formats one language where that build formats three.
+- **markup_fmt**: WASM (`dprint-plugin-markup`'s `plugin.wasm`, which like malva's
+  package ships only the wasm). The row is the markup layer alone: formatting Svelte
+  this way also loads the dprint and malva plugins (each its own row), so the three
+  together are what that tool needs for a Svelte component.
 - **rsvelte-fmt**: the standalone executable from its platform package — the one
   native row not scope-matched to a tsv artifact (it carries a CLI plus the whole
   oxc formatter for JS/TS/CSS beside its Svelte engine, where `tsv (ffi)` is a bare

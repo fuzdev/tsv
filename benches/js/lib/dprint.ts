@@ -22,7 +22,8 @@
  * `ts,tsx,js,jsx,mjs,cjs,mts,cts` and rejects CSS/Svelte outright (verified), so
  * unlike `oxfmt`/`biome` this contributes no css or svelte row. dprint's CSS plugin
  * is a separate Wasm plugin with a row of its own over this same formatter host —
- * see `lib/malva.ts`; its HTML plugin stays unwired, since it does not format Svelte.
+ * see `lib/malva.ts` — and its markup plugin backs the Svelte row, composed with this
+ * plugin and malva — see `lib/markup.ts`.
  */
 
 import { readFile } from 'node:fs/promises';
@@ -34,6 +35,28 @@ import type { DprintVersions } from './versions.ts';
 // the Wasm plugin at this module's import. The value imports are deferred to
 // `init()` (see there) so a load-time crash can't escape the registry's skip.
 import type { Formatter } from '@dprint/formatter';
+
+/**
+ * dprint's GLOBAL config, shared by every dprint-hosted row (`dprint-wasm`,
+ * `malva-wasm`, `markup-fmt-wasm`): the prettier/tsv layout targets — width 100,
+ * tabs — so every format row does the same layout work. At dprint's defaults the
+ * rows would wrap different amounts of code and the ratios would conflate config
+ * with engine speed. See docs/benchmarks.md §Fairness caveats.
+ */
+export const DPRINT_GLOBAL_CONFIG = { lineWidth: 100, indentWidth: 2, useTabs: true } as const;
+
+/**
+ * `@dprint/typescript`'s plugin config — shared with `lib/markup.ts`, whose Svelte
+ * row formats each embedded `<script>` and template expression through this same
+ * plugin. `trailingCommas` fans out to the 12 per-construct keys
+ * (`arguments.trailingCommas`, `arrayExpression.…`, …). `preferSingle` (not
+ * `alwaysSingle`) is the faithful analogue of prettier's `singleQuote: true`,
+ * which still switches quotes to avoid escaping.
+ */
+export const DPRINT_TYPESCRIPT_CONFIG = {
+	quoteStyle: 'preferSingle',
+	trailingCommas: 'never'
+} as const;
 
 /**
  * dprint implementation using the `dprint-plugin-typescript` Wasm plugin.
@@ -65,19 +88,8 @@ export class DprintImplementation extends BaseImplementation {
 		const { createFromBuffer } = await import('@dprint/formatter');
 		this._formatter = createFromBuffer(await readFile(getPath()));
 
-		// Match the prettier/tsv config — tabs, line width 100, single quotes, no
-		// trailing commas — so every format row does the same layout work (at
-		// dprint's defaults the rows wrap different amounts of code and the ratios
-		// conflate config with engine speed). See docs/benchmarks.md §Fairness caveats.
-		// `lineWidth`/`indentWidth`/`useTabs` are dprint GLOBAL config; the quote and
-		// trailing-comma keys are plugin config (`trailingCommas` fans out to the 12
-		// per-construct keys — `arguments.trailingCommas`, `arrayExpression.…`, …).
-		// `preferSingle` (not `alwaysSingle`) is the faithful analogue of prettier's
-		// `singleQuote: true`, which still switches quotes to avoid escaping.
-		this._formatter.setConfig(
-			{ lineWidth: 100, indentWidth: 2, useTabs: true },
-			{ quoteStyle: 'preferSingle', trailingCommas: 'never' }
-		);
+		// the pinned layout targets — see `DPRINT_GLOBAL_CONFIG` / `DPRINT_TYPESCRIPT_CONFIG`
+		this._formatter.setConfig(DPRINT_GLOBAL_CONFIG, DPRINT_TYPESCRIPT_CONFIG);
 
 		// Assert the config actually LANDED. dprint reports an unrecognized key as
 		// a diagnostic rather than throwing (verified: a bogus key yields
