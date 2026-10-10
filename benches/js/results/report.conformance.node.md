@@ -6,7 +6,7 @@
 
 **Corpus kind:** conformance — fixtures-only corpus (disjoint from perf; a suite with a validity oracle or harness filtered to what it calls valid), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)
 
-**Date:** 2026-10-08T15:46:31.802Z — tsv 0.6.0 (b24d1494)
+**Date:** 2026-10-10T19:00:43.347Z — tsv 0.6.0 (c93c1649)
 
 **Corpus:** 4643 Svelte (1.1 MB), 53323 TypeScript (70.8 MB), 22450 CSS (7.7 MB) — 80416 files, 79.5 MB total
 
@@ -14,7 +14,7 @@
 
 **Excluded by cache:** canonical-reject (144), prettier-jsx (39)
 
-**Versions:** svelte@5.57.2, acorn@8.19.0, acorn-typescript@1.0.13, prettier@3.9.9, prettier-plugin-svelte@4.1.1, oxc-parser@0.153.0, @oxc-parser/binding-wasm32-wasi@0.142.0, oxfmt@0.72.0, yuku-parser@0.17.0, @biomejs/wasm-bundler@2.5.15, @dprint/typescript@0.96.1, dprint-plugin-malva@0.16.0, postcss@8.5.29, @rsvelte/fmt@0.7.25, @rsvelte/vite-plugin-svelte-native@0.3.17 (targets svelte@5.57.1), @swc/core@1.16.13, typescript@6.0.3
+**Versions:** svelte@5.57.2, acorn@8.19.0, acorn-typescript@1.0.13, prettier@3.9.9, prettier-plugin-svelte@4.1.1, oxc-parser@0.153.0, @oxc-parser/binding-wasm32-wasi@0.142.0, oxfmt@0.72.0, yuku-parser@0.17.0, @biomejs/wasm-bundler@2.5.15, @dprint/typescript@0.96.1, dprint-plugin-malva@0.16.0, dprint-plugin-markup@0.27.5, postcss@8.5.29, @rsvelte/fmt@0.7.25, @rsvelte/vite-plugin-svelte-native@0.3.17 (targets svelte@5.57.1), @swc/core@1.16.13, typescript@6.0.3
 
 **Excluded here:** yuku-parser (N-API) — its native binding faults the host process on this corpus (test262 escaped-identifier fixtures), so it cannot be measured against it. The WASM binding runs the same engine and carries the row; both are measured on the perf corpus.
 
@@ -78,6 +78,7 @@
 | oxc-parser (wasm) | 1.5 MB | 481.4 KB | 0.6x | 0.5x |
 | yuku-parser (wasm) | 698.9 KB | 202.8 KB | 0.3x | 0.2x |
 | malva (wasm) | 1.5 MB | 414.0 KB | 0.5x | 0.4x |
+| markup_fmt (wasm) | 2.0 MB | 557.3 KB | 0.7x | 0.5x |
 | tsv (ffi) | 3.6 MB | 1.7 MB | 0.9x | 0.9x |
 | tsv format (ffi) | 3.3 MB | 1.5 MB | 0.8x | 0.8x |
 | tsv parse (ffi) | 1.6 MB | 698.7 KB | 0.4x | 0.4x |

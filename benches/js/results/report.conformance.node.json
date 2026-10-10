@@ -2,8 +2,8 @@
 	"version": 21,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-10-08T15:46:31.802Z",
-	"git_commit": "b24d1494",
+	"timestamp": "2026-10-10T19:00:43.347Z",
+	"git_commit": "c93c1649",
 	"machine": {
 		"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 		"os": "linux",
@@ -147,7 +147,7 @@
 			"repo": {
 				"url": "https://github.com/microsoft/TypeScript",
 				"slug": "microsoft/TypeScript",
-				"commit": "",
+				"commit": "637d5746b70257028fb95aad32ddec6b26ab0a14",
 				"subpath": ""
 			}
 		}
@@ -569,6 +569,7 @@
 		"biome": "2.5.15",
 		"dprint": "0.96.1",
 		"malva": "0.16.0",
+		"markup": "0.27.5",
 		"postcss": "8.5.29",
 		"rsvelte_fmt": "0.7.25",
 		"rsvelte_parse": "0.3.17",
@@ -690,6 +691,12 @@
 			"bytes": 1465125,
 			"kind": "wasm",
 			"gzip_bytes": 414019
+		},
+		{
+			"label": "markup_fmt (wasm)",
+			"bytes": 1999061,
+			"kind": "wasm",
+			"gzip_bytes": 557307
 		},
 		{
 			"label": "rsvelte compiler (napi)",
