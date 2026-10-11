@@ -1,20 +1,18 @@
 /**
  * The CHANGELOG.md grammar the release path reads — shared by `publish.ts`
  * (stamps `## Unreleased` into `## <version>`) and `release_notes.ts` (reads the
- * stamped section back as the GitHub Release body) — plus the one reading of
- * the version a release tag names (`version_from_tag`), shared by the release
- * scripts that take a tag (`release_notes.ts`, `release_assets.ts`;
- * `publish_napi.ts` goes the other way, spelling `--expect-tag`'s expected
- * value from the staged version). Pure text helpers, no I/O, so both readers
- * parse one grammar and the section a stamp writes is the section a release
- * reads.
+ * stamped section back as the GitHub Release body). Pure text helpers, no I/O,
+ * so both readers parse one grammar and the section a stamp writes is the
+ * section a release reads.
  * The grammar is LF-only: `publish.ts` writes LF, and a CRLF heading matches
  * nothing (pinned by the tests).
+ *
+ * @module
  */
 
-export const CHANGELOG_PATH = 'CHANGELOG.md';
+import type { BumpLevel } from './version.ts';
 
-export type BumpLevel = 'patch' | 'minor' | 'major';
+export const CHANGELOG_PATH = 'CHANGELOG.md';
 
 /** The `<!-- bump: <level> -->` marker, recognized ONLY on the line directly
  * after the `## Unreleased` heading — the exact position `changelog_stamp`'s
@@ -44,14 +42,6 @@ const UNRELEASED_HEADING_WITH_MARKER =
 
 /** What a fresh cycle starts from: an empty `## Unreleased` reset to `bump: patch`. */
 const FRESH_UNRELEASED = '## Unreleased\n<!-- bump: patch -->\n\n';
-
-/** The version a release tag names: `v0.3.0` → `0.3.0` (a bare `0.3.0` is
- * accepted too, so a caller can pass a tag name as-is). Null when the text is
- * not a `v<major>.<minor>.<patch>`. */
-export const version_from_tag = (tag: string): string | null => {
-	const version = tag.startsWith('v') ? tag.slice(1) : tag;
-	return /^\d+\.\d+\.\d+$/.test(version) ? version : null;
-};
 
 /** Matches the `## <heading>` line (multiline), the heading text taken
  * literally — every regex metacharacter escaped, not just the version's dots. */

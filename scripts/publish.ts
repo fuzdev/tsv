@@ -10,13 +10,14 @@
  * Version source of truth: `Cargo.toml [workspace.package] version` (read
  * directly by wasm-pack). There is no root package.json and no changesets —
  * `--bump` edits Cargo.toml and converts CHANGELOG.md's `## Unreleased`
- * section into the new version's section (the grammar is `scripts/changelog.ts`;
+ * section into the new version's section (the grammar is `scripts/release/changelog.ts`;
  * that stamped section is what the tag's GitHub Release reads back as its body,
- * via `scripts/release_notes.ts` in the release workflow).
+ * via `scripts/release_notes.ts` in the release workflow). What a run releases
+ * — fresh or resumed, and every reason a fresh one cannot — is decided once by
+ * `scripts/release/plan.ts`; the dry run warns on exactly what a wetrun refuses.
  *
  * Usage:
- *   deno task publish                        # dry-run (validate everything)
- *   deno task publish --bump minor           # dry-run, preview the bump
+ *   deno task publish --bump patch           # dry-run (validate everything, preview the bump)
  *   deno task publish --wetrun --bump patch  # bump + check + conformance:all + audit:corpus + build + validate + publish + git
  *   deno task publish --wetrun               # resume a failed wetrun (sentinel retry only)
  *
@@ -35,60 +36,96 @@
  *                    benches/js TypeScript install, which Step 6's declaration check needs
  *   --no-git         skip the git commit + tag + push finalization
  *
- * Retry: a failed wetrun leaves the bump in place plus a sentinel file; re-run
- * `deno task publish --wetrun` and it resumes from the bumped version (skipping
- * the git-clean check and the bump; a passed `--bump` is ignored with a
- * warning). Every mutating step is idempotent — already-published packages are
- * skipped, and the git finalize no-ops on an existing commit/tag — so the
- * sentinel covers the run through Step 8 and is removed only once the push
- * lands.
+ * Preflight (Step 1), before anything is mutated or built: the release-state checks —
+ * the plan's problems, a dirty tree, a branch other than main, a HEAD that is not
+ * exactly origin/main, a `v<version>` tag that already exists locally or on origin,
+ * and a failing `npm whoami` — refuse a wetrun and warn a dry run; a missing tool, a
+ * failed registry lookup, and a fresh release whose version is already on npm refuse
+ * both.
+ *
+ * The checkout is fingerprinted (`git_checkout_fingerprint`: HEAD, status, and the
+ * tracked diff's content) after the bump and again after Step 6: a checkout that moved
+ * while the gates ran refuses the publish, since the packages would describe no commit.
+ *
+ * Retry: a failed wetrun leaves the bump in place plus a sentinel file
+ * (`scripts/release/sentinel.ts`); re-run `deno task publish --wetrun` and it resumes
+ * from the bumped version (skipping the bump; a passed `--bump` is ignored with a
+ * warning). A resume accepts a tree dirty with only the release files, one release
+ * commit ahead of origin/main, and a tag on HEAD. Every mutating step is idempotent —
+ * already-published packages are skipped, and the git finalize no-ops on an existing
+ * commit/tag — so the sentinel covers the run through Step 8 and is removed only once
+ * the push lands. A resume whose packages are all already on npm skips straight to
+ * the git finalize.
  */
 
 import { CORPORA_COLLECTIONS, CORPORA_ROOT } from '../benches/js/lib/corpora.ts';
 import {
+	bump_cargo_version,
+	bump_changelog,
+	bump_lockfile,
+	release_commit_message,
+	RELEASE_PATHS
+} from './release/bump.ts';
+import { CHANGELOG_PATH } from './release/changelog.ts';
+import { command_capture, type CommandOptions, command_stream } from './release/command.ts';
+import {
+	git_checkout_fingerprint,
+	git_commit_paths,
+	git_current_branch,
+	git_fetch_and_compare_origin_main,
+	git_head_subject,
+	git_local_tag_commit,
+	git_push_main_with_tags,
+	git_remote_tag_commit,
+	git_rev,
+	git_status_line_path,
+	git_status_lines,
+	git_tag_annotated
+} from './release/git.ts';
+import { npm_error_is_republish, npm_is_published, npm_whoami } from './release/npm.ts';
+import { release_plan } from './release/plan.ts';
+import { sentinel_read, sentinel_remove, sentinel_write } from './release/sentinel.ts';
+import {
 	type BumpLevel,
-	CHANGELOG_PATH,
-	changelog_declared_bump,
-	changelog_stamp,
-	changelog_unreleased_content
-} from './changelog.ts';
+	CARGO_PATH,
+	cargo_workspace_version,
+	is_bump_level,
+	version_tag
+} from './release/version.ts';
 import { format_size, gzip_size } from './size.ts';
 import { TYPECHECK_INSTALL } from './typecheck_packages.ts';
 
-const KNOWN_FLAGS = new Set(['--wetrun', '--no-check', '--no-git', '--bump']);
+const USAGE =
+	'Usage: deno task publish [--wetrun] [--bump patch|minor|major] [--no-check] [--no-git]';
+
 // A misspelled --wetrun fails safe (dry-run), but a misspelled --no-git or
 // --no-check fails open — reject anything unrecognized.
-const unknown_args = Deno.args.filter((arg, i) =>
-	arg.startsWith('--') ? !KNOWN_FLAGS.has(arg) : Deno.args[i - 1] !== '--bump'
-);
+let wetrun = false;
+let no_check = false;
+let no_git = false;
+let bump: BumpLevel | null = null;
+const unknown_args: Array<string> = [];
+for (let i = 0; i < Deno.args.length; i++) {
+	const arg = Deno.args[i];
+	if (arg === '--wetrun') wetrun = true;
+	else if (arg === '--no-check') no_check = true;
+	else if (arg === '--no-git') no_git = true;
+	else if (arg === '--bump') {
+		const level = Deno.args[++i];
+		if (!is_bump_level(level)) {
+			console.error(
+				`FAIL: --bump must be patch, minor, or major (got ${JSON.stringify(level ?? '')})`
+			);
+			Deno.exit(1);
+		}
+		bump = level;
+	} else unknown_args.push(arg);
+}
 if (unknown_args.length > 0) {
 	console.error(`FAIL: unknown argument(s): ${unknown_args.join(' ')}`);
-	console.error(
-		'Usage: deno task publish [--wetrun] [--bump patch|minor|major] [--no-check] [--no-git]'
-	);
+	console.error(USAGE);
 	Deno.exit(1);
 }
-
-const wetrun = Deno.args.includes('--wetrun');
-const no_check = Deno.args.includes('--no-check');
-const no_git = Deno.args.includes('--no-git');
-const bump_index = Deno.args.indexOf('--bump');
-const bump = bump_index === -1 ? null : Deno.args[bump_index + 1];
-if (bump !== null && bump !== 'patch' && bump !== 'minor' && bump !== 'major') {
-	console.error(`FAIL: --bump must be patch, minor, or major (got ${JSON.stringify(bump)})`);
-	Deno.exit(1);
-}
-
-const SENTINEL_PATH = '.publish-in-progress';
-const CARGO_PATH = 'Cargo.toml';
-// Match version under [workspace.package] to avoid clobbering dependency versions.
-// `[^[]*?` bounds the scan to the section (stops at the next `[` heading), so a
-// missing `version` key can never make the rewrite land on a later section's line;
-// `^version` (multiline) skips a `rust-version = "..."` MSRV pin. Same grammar as
-// bench.ts's and build_napi_packages.ts's read-only forms.
-const workspace_pkg_re = /(\[workspace\.package\][^[]*?^version\s*=\s*)"([^"]*)"/m;
-
-const dec = new TextDecoder();
 
 /** The oldest node Step 6 runs on — the first with native TypeScript type stripping
  * unflagged, which `node --test` needs to execute the `.ts` test files directly. */
@@ -110,129 +147,135 @@ const packages = [
 	}
 ];
 
-/** Only the release files — a stray file generated mid-pipeline must never
- * ride into the release commit. */
-const release_files = [CARGO_PATH, 'Cargo.lock', CHANGELOG_PATH];
-
 console.log(`\n=== tsv publish ${wetrun ? '(wetrun)' : '(dry-run)'} ===\n`);
 
 // Step 1: Preflight checks
 
 console.log('=== Step 1: Preflight checks ===');
 
-const version_before = read_cargo_version();
-if (!version_before) {
+const version_before = cargo_workspace_version(Deno.readTextFileSync(CARGO_PATH));
+if (version_before === null) {
 	console.error('  FAIL: could not find [workspace.package] version in Cargo.toml');
 	Deno.exit(1);
 }
+const plan = release_plan({
+	version: version_before,
+	bump,
+	sentinel: await sentinel_read(),
+	changelog: read_changelog()
+});
+/** The version this run releases; null only when a fresh plan has no target, which a
+ * wetrun refuses. */
+const release_version = plan.kind === 'resume' ? plan.version : plan.target;
+const release_tag = release_version === null ? null : version_tag(release_version);
 
-const initial_sentinel = read_sentinel();
-// Only treat a *matching* sentinel as a retry — stale sentinels (wrong version) get removed below
-const retry_mode = wetrun && initial_sentinel !== null && initial_sentinel === version_before;
-
-// Branch check — publish from main only
-const branch_result = capture('git', ['branch', '--show-current']);
-if (!branch_result.success) {
-	console.error('  FAIL: git branch failed — is this a git repository?');
-	Deno.exit(1);
-}
-const branch = branch_result.stdout;
-if (branch !== 'main') {
-	if (wetrun) {
-		console.error(`  FAIL: on branch "${branch}" — publish from main`);
-		Deno.exit(1);
-	}
-	console.warn(`  WARN: on branch "${branch}" — wetrun requires main`);
+if (plan.kind === 'resume') {
+	console.log(`  Sentinel found at v${plan.version} — resuming that release`);
+	for (const note of plan.notes) console.warn(`  WARN: ${note}`);
 } else {
-	console.log('  Branch: main');
+	console.log(
+		`  Version: ${plan.version} -> ${plan.target ?? '?'}${plan.level ? ` (${plan.level})` : ''}`
+	);
+	if (plan.stale_sentinel !== null) {
+		console.warn(`  WARN: stale sentinel (v${plan.stale_sentinel}) — a fresh wetrun removes it`);
+	}
 }
 
-// Origin sync — the final `git push` runs after npm publish, when a stale
-// main is no longer recoverable by re-running. Catch it up front instead.
-if (branch === 'main') {
-	if (!capture('git', ['fetch', 'origin', 'main']).success) {
-		if (wetrun) {
-			console.error('  FAIL: git fetch origin main failed — cannot verify sync with origin');
-			Deno.exit(1);
-		}
-		console.warn('  WARN: git fetch origin main failed — skipping origin sync check (dry-run)');
-	} else {
-		const behind_result = capture('git', ['rev-list', '--count', 'HEAD..origin/main']);
-		const behind = Number(behind_result.stdout);
-		if (!behind_result.success || Number.isNaN(behind)) {
-			console.error('  FAIL: could not compare HEAD with origin/main');
-			Deno.exit(1);
-		}
-		if (behind > 0) {
-			if (wetrun) {
-				console.error(
-					`  FAIL: main is ${behind} commit(s) behind origin/main — run \`git pull\` first`
-				);
-				Deno.exit(1);
-			}
-			console.warn(`  WARN: main is ${behind} commit(s) behind origin/main — wetrun would fail`);
-		} else {
-			console.log('  Origin: up to date with origin/main');
-		}
+// The release-state checks: a refusal under --wetrun and a warning in a dry run,
+// collected so one run names every reason. A missing tool or a failed registry
+// lookup refuses either way (`failures`).
+const failures: Array<string> = [];
+const refusals: Array<string> = [];
+/** How many refusals this dry run downgraded to warnings, so its last line can say a
+ * wetrun would refuse. */
+let warnings = 0;
+const refuse_or_warn = (message: string): void => {
+	if (wetrun) refusals.push(message);
+	else {
+		warnings++;
+		// the verdict goes on the first line, ahead of any listing the message carries
+		const [first, ...rest] = message.split('\n');
+		console.warn([`  WARN: ${first} — a wetrun would FAIL`, ...rest].join('\n'));
 	}
+};
+
+if (plan.kind === 'fresh') for (const problem of plan.problems) refuse_or_warn(problem);
+
+const branch = await git_current_branch();
+if (branch === null) refuse_or_warn('git branch failed — is this a git repository?');
+else if (branch !== 'main') {
+	refuse_or_warn(`${branch ? `on branch "${branch}"` : 'HEAD is detached'} — publish from main`);
+} else console.log('  Branch: main');
+const head = await git_rev('HEAD');
+if (head === null) refuse_or_warn('git rev-parse HEAD failed');
+
+// Origin sync — the published source must be the public source, and the final `git push`
+// runs after npm publish, when a diverged main is no longer recoverable by re-running.
+// A resume may sit one commit ahead, when that commit is its own release commit and only
+// the push failed.
+const compared = await git_fetch_and_compare_origin_main();
+if (!compared.ok) refuse_or_warn(`${compared.error} — cannot verify sync with origin`);
+else {
+	const { ahead, behind } = compared;
+	const own_release_commit =
+		plan.kind === 'resume' &&
+		behind === 0 &&
+		ahead === 1 &&
+		(await git_head_subject()) === release_commit_message(plan.version);
+	if ((behind > 0 || ahead > 0) && !own_release_commit) {
+		refuse_or_warn(
+			`HEAD is ${ahead} ahead / ${behind} behind origin/main — release from exactly origin/main`
+		);
+	} else console.log('  Origin: in sync with origin/main');
 }
 
 // Git cleanliness. A retry legitimately carries the bump's own edits
-// (`release_files`) but nothing else: a source fix made between attempts would
+// (`RELEASE_PATHS`) but nothing else: a source fix made between attempts would
 // publish without landing in the release commit — and since the pushed tag
 // builds the native set, the wasm and napi artifacts would be built from
 // different source. Commit the fix, then re-run `--wetrun` to resume.
-{
-	const git_status = capture('git', ['status', '--porcelain']);
-	if (!git_status.success) {
-		console.error('  FAIL: git status failed');
-		Deno.exit(1);
-	}
-	const status_lines = git_status.stdout ? git_status.stdout.split('\n') : [];
-	if (retry_mode) {
-		console.log(
-			`  Sentinel detected at v${version_before} — resuming (release-file edits expected)`
-		);
-		const outside_release = status_lines.filter((line) => {
-			const path_part = line.slice(3);
-			return path_part.split(' -> ').some((p) => !release_files.includes(p));
-		});
-		if (outside_release.length > 0) {
-			console.error('  FAIL: uncommitted changes outside the release files on a resume:');
-			for (const line of outside_release) {
-				console.error(`    ${line}`);
-			}
-			console.error('  Commit them first, then re-run --wetrun — a resumed publish must build');
-			console.error('  exactly what the release commit and tag will contain.');
-			Deno.exit(1);
-		}
-	} else if (status_lines.length > 0) {
-		console.warn('  WARN: uncommitted changes in worktree:');
-		for (const line of status_lines) {
-			console.warn(`    ${line}`);
-		}
-		if (wetrun) {
-			console.error('  FAIL: refusing to publish with uncommitted changes');
-			Deno.exit(1);
-		}
-		console.warn('  Continuing dry-run anyway...');
+const status = await git_status_lines();
+if (!status.ok) refuse_or_warn(status.error);
+else {
+	const stray =
+		plan.kind === 'fresh'
+			? status.lines
+			: status.lines.filter((line) => !RELEASE_PATHS.includes(git_status_line_path(line)));
+	if (stray.length > 0) {
+		const scope =
+			plan.kind === 'fresh' ? '' : ` outside the release files (${RELEASE_PATHS.join(', ')})`;
+		refuse_or_warn(`uncommitted changes${scope}:\n    ${stray.join('\n    ')}`);
 	}
 }
 
-// npm auth (only for wetrun — no point failing dry-runs over auth)
-if (wetrun) {
-	const whoami = capture('npm', ['whoami']);
-	if (!whoami.success) {
-		console.error('  FAIL: not logged in to npm (run `npm login` first)');
-		Deno.exit(1);
+// The tag Step 8 pushes triggers release_napi.yml, so it must land on the release commit:
+// a fresh release's tag must not exist yet (a stale local one would be pushed in its
+// place, building the native set from the wrong commit; one on origin would fail the push
+// after npm publish), and a resume's may exist only on HEAD.
+if (release_tag !== null) {
+	const local = await git_local_tag_commit(release_tag);
+	const remote = await git_remote_tag_commit(release_tag);
+	if (!remote.ok) refuse_or_warn(remote.error);
+	for (const [where, commit] of [
+		['locally', local],
+		['on origin', remote.ok ? remote.commit : null]
+	] as const) {
+		if (commit === null) continue;
+		if (plan.kind === 'fresh') refuse_or_warn(`tag ${release_tag} already exists ${where}`);
+		else if (commit !== head) {
+			refuse_or_warn(`tag ${release_tag} exists ${where} on ${commit}, not on HEAD`);
+		}
 	}
-	console.log(`  npm authenticated as: ${whoami.stdout}`);
 }
+
+const who = await npm_whoami();
+if (who.ok) console.log(`  npm authenticated as: ${who.user}`);
+else refuse_or_warn(`not logged in to npm (run \`npm login\` first): ${who.error}`);
 
 // node runs Step 6's artifact tests, which `node --test` executes as .ts by native type
 // stripping — so a node older than that fails there, after the bump, as plainly as a
 // missing one
-const node_version = probe_version('node');
+const node_version = await probe_version('node');
 if (node_version === null) {
 	console.error('  FAIL: node not found — required to test the built packages');
 	Deno.exit(1);
@@ -255,7 +298,7 @@ console.log(`  node: ${node_version}`);
 
 // wasm-pack builds every WASM bundle in Step 4 — asked here so a missing one fails
 // before the bump rather than after it
-const wasm_pack_version = probe_version('wasm-pack');
+const wasm_pack_version = await probe_version('wasm-pack');
 if (wasm_pack_version === null) {
 	console.error(
 		'  FAIL: wasm-pack not found — required to build the packages (`cargo install wasm-pack`)'
@@ -269,7 +312,7 @@ console.log(`  ${wasm_pack_version}`);
 // --wetrun without bun fails before the bump. Waived like Step 3b's oracles: a dry run or
 // --no-check warn-skips, re-warned in the final summary.
 let bun_skip_reason: string | null = null;
-const bun_version = probe_version('bun');
+const bun_version = await probe_version('bun');
 if (bun_version !== null) {
 	console.log(`  bun: ${bun_version}`);
 } else if (wetrun && !no_check) {
@@ -307,108 +350,91 @@ console.log(
 		'before a --wetrun (the wasm packages publish before the tag starts the N-API matrix)'
 );
 
-// Step 2: Resolve version
-
-let version: string;
-
-if (wetrun) {
-	console.log('\n=== Step 2: Resolve version ===');
-	if (retry_mode) {
-		version = version_before;
-		console.log(`  Sentinel found at v${version} — skipping bump (retry)`);
-		if (bump) {
-			console.warn(`  WARN: --bump ${bump} ignored — resuming the in-progress v${version} release`);
-		}
-	} else {
-		if (initial_sentinel !== null) {
-			console.warn(`  WARN: removing stale sentinel (v${initial_sentinel})`);
-			Deno.removeSync(SENTINEL_PATH);
-		}
-		// A release must ship notes — require a non-empty `## Unreleased`
-		// section before mutating anything (the bump level can live there too).
-		const changelog = read_changelog();
-		if (changelog === null) {
-			console.error(`  FAIL: no ${CHANGELOG_PATH} — add release notes before publishing`);
-			Deno.exit(1);
-		}
-		const content = changelog_unreleased_content(changelog);
-		if (content === null) {
-			console.error(
-				`  FAIL: no "## Unreleased" section in ${CHANGELOG_PATH} — add release notes before publishing`
-			);
-			Deno.exit(1);
-		}
-		if (content === '') {
-			console.error(
-				`  FAIL: "## Unreleased" section in ${CHANGELOG_PATH} is empty — add release notes before publishing`
-			);
-			Deno.exit(1);
-		}
-		const level = resolve_bump(bump as BumpLevel | null, changelog_declared_bump(changelog));
-		version = bump_version(version_before, level);
-		const cargo = Deno.readTextFileSync(CARGO_PATH);
-		Deno.writeTextFileSync(CARGO_PATH, cargo.replace(workspace_pkg_re, `$1"${version}"`));
-		console.log(`  Version bumped (${level}): ${version_before} -> ${version}`);
-		// Sentinel immediately after the version write — everything below is
-		// idempotent and re-runs on retry, so any later failure is resumable.
-		Deno.writeTextFileSync(SENTINEL_PATH, version);
-		console.log(`  Sentinel written (${SENTINEL_PATH})`);
-	}
-	// Idempotent bump finalization — re-run on retry too, in case the previous
-	// wetrun died partway through.
-	// Sync Cargo.lock's workspace member versions
-	run('cargo update --workspace', 'cargo', ['update', '--workspace']);
-	stamp_changelog(version);
-} else {
-	console.log('\n=== Step 2: Read version (dry-run) ===');
-	version = version_before;
-	console.log(`  Current version: v${version}`);
-	const would_retry = initial_sentinel === version;
-	const changelog = read_changelog();
-	const declared = changelog === null ? null : changelog_declared_bump(changelog);
-	if (would_retry) {
-		// Mirrors wetrun precedence: retry wins over --bump
-		console.log(`  Sentinel found at v${version} — wetrun would retry from it`);
-		if (bump) {
-			console.warn(`  WARN: --bump ${bump} would be ignored — wetrun would resume v${version}`);
-		}
-	} else {
-		// Mirror the wetrun's requirements without exiting — report what it would do.
-		const content = changelog === null ? null : changelog_unreleased_content(changelog);
-		if (changelog === null) {
-			console.warn(`  WARN: no ${CHANGELOG_PATH} — a fresh wetrun would FAIL`);
-		} else if (content === null) {
-			console.warn(
-				`  WARN: no "## Unreleased" section in ${CHANGELOG_PATH} — a fresh wetrun would FAIL`
-			);
-		} else if (content === '') {
-			console.warn(`  WARN: "## Unreleased" section is empty — a fresh wetrun would FAIL`);
-		}
-		if (!bump) {
-			console.warn(
-				'  WARN: no --bump given — a fresh wetrun would FAIL (required, and must match the CHANGELOG marker)'
-			);
-		}
-		if (!declared) {
-			console.warn(
-				`  WARN: no "<!-- bump: <level> -->" marker in ${CHANGELOG_PATH} — a fresh wetrun would FAIL`
-			);
-		}
-		if (bump && declared && bump !== declared) {
-			console.warn(
-				`  WARN: --bump ${bump} disagrees with CHANGELOG marker <!-- bump: ${declared} --> — a fresh wetrun would FAIL`
-			);
-		}
-		if (bump && declared && bump === declared) {
-			console.log(`  Wetrun would bump (${bump}) to: v${bump_version(version, bump)}`);
+// Registry. A fresh release's version must be unpublished everywhere; a resume skips what
+// is already out, and one whose packages are all out only has git left to finish.
+let published_count = 0;
+if (release_version !== null) {
+	for (const { label } of packages) {
+		const published = await npm_is_published(label, release_version);
+		if (!published.ok) failures.push(published.error);
+		else if (published.published) {
+			if (plan.kind === 'fresh') failures.push(`${label}@${release_version} is already on npm`);
+			else published_count++;
 		}
 	}
 }
+const all_published = published_count === packages.length;
 
-if (!/^\d+\.\d+\.\d+$/.test(version)) {
-	console.error(`  FAIL: version "${version}" does not look like semver`);
+if (failures.length > 0 || refusals.length > 0) {
+	for (const message of [...failures, ...refusals]) console.error(`  FAIL: ${message}`);
+	console.error(
+		`  Refusing to ${wetrun ? 'publish' : 'run'} — nothing was changed, built, or published.`
+	);
 	Deno.exit(1);
 }
+
+// Step 2: Bump
+
+/** The version the build stamps: the bumped one under --wetrun, the checkout's in a dry run. */
+let version: string = version_before;
+/** Set once the bump is written: from then on a failure names the resume. */
+let bumped = false;
+
+if (wetrun) {
+	console.log('\n=== Step 2: Bump ===');
+	if (release_version === null) {
+		console.error('  FAIL: no release version — the plan should have refused');
+		Deno.exit(1);
+	}
+	if (plan.kind === 'fresh') {
+		if (plan.stale_sentinel !== null) {
+			console.warn(`  WARN: removing stale sentinel (v${plan.stale_sentinel})`);
+			await sentinel_remove();
+		}
+		const written = await bump_cargo_version(release_version);
+		if (!written.ok) {
+			console.error(`  FAIL: ${written.error}`);
+			Deno.exit(1);
+		}
+		// the sentinel right after the version write: everything below is idempotent and
+		// re-runs on a resume, so any later failure is resumable
+		await sentinel_write(release_version);
+		console.log(`  Version bumped (${plan.level}): ${plan.version} -> ${release_version}`);
+	} else {
+		console.log(`  Resuming v${release_version} — bump already applied`);
+	}
+	bumped = true;
+	version = release_version;
+	const locked = await bump_lockfile();
+	if (!locked.ok) fail_resumable(locked.error);
+	const stamped = await bump_changelog(release_version);
+	if (stamped === 'no_unreleased') {
+		fail_resumable(`no "## Unreleased" or "## ${release_version}" in ${CHANGELOG_PATH}`);
+	}
+	console.log(
+		stamped === 'already_stamped'
+			? `  ${CHANGELOG_PATH} already stamped with ## ${release_version}`
+			: `  Stamped ${CHANGELOG_PATH}: ## Unreleased -> ## ${release_version}; seeded fresh ## Unreleased (bump: patch)`
+	);
+} else {
+	console.log('\n=== Step 2: Bump (dry-run — nothing written) ===');
+	if (plan.kind === 'resume') console.log(`  A wetrun resumes v${plan.version}`);
+	else if (plan.target !== null) console.log(`  A wetrun bumps to v${plan.target}`);
+}
+
+if (all_published) {
+	console.log(`\n  Every package is already on npm at v${version} — only git remains.`);
+	if (!wetrun) {
+		console.log('  Dry-run complete — `deno task publish --wetrun` finishes the release.\n');
+		Deno.exit(0);
+	}
+	await finalize_git();
+	console.log('');
+	Deno.exit(0);
+}
+
+/** The checkout as the build reads it; Step 6 compares against it before anything publishes. */
+const checkout_before = await git_checkout_fingerprint();
 
 // Step 3: Check
 
@@ -416,7 +442,7 @@ if (no_check) {
 	console.log('\n=== Step 3: Check — SKIPPED (--no-check) ===');
 } else {
 	console.log('\n=== Step 3: Check (deno task check) ===');
-	run('deno task check', 'deno', ['task', 'check']);
+	await run('deno task check', 'deno', ['task', 'check']);
 }
 
 // Step 3b: Conformance gates
@@ -474,17 +500,14 @@ if (no_check) {
 				'A --wetrun would FAIL here; run `deno task conformance:all` on a machine with the oracles.'
 		);
 	} else {
-		run(
-			'deno task conformance:all',
-			'deno',
-			['task', 'conformance:all'],
-			undefined,
-			'  Conformance gate failed. If it was a corpus:compare:format SAFETY hit, re-run\n' +
+		await run('deno task conformance:all', 'deno', ['task', 'conformance:all'], {
+			fail_hint:
+				'  Conformance gate failed. If it was a corpus:compare:format SAFETY hit, re-run\n' +
 				'  `deno task corpus:compare:format ../<that-repo>` on the single repo to rule out\n' +
 				'  the known --all FFI heisenbug (benches/js/CLAUDE.md §Known Issues) before treating\n' +
 				'  it as a real regression. A conformance:test262 GATE FAIL is a real positive-parse\n' +
 				'  regression (or a deliberate test262 pull needing a POSITIVE_PASSED_PIN re-pin).'
-		);
+		});
 	}
 }
 
@@ -521,15 +544,12 @@ if (no_check) {
 				'A --wetrun would FAIL here; run `deno task audit:corpus` on a machine with the corpus.'
 		);
 	} else {
-		run(
-			'deno task audit:corpus',
-			'deno',
-			['task', 'audit:corpus'],
-			undefined,
-			'  Corpus robustness audit found a content-loss / panic / non-idempotency regression over\n' +
+		await run('deno task audit:corpus', 'deno', ['task', 'audit:corpus'], {
+			fail_hint:
+				'  Corpus robustness audit found a content-loss / panic / non-idempotency regression over\n' +
 				'  REAL code (what `deno task check`’s fixture-only gate cannot see). Triage the failing\n' +
 				'  leg by name with the matching `tsv_debug` audit on the single repo it points at.'
-		);
+		});
 	}
 }
 
@@ -545,9 +565,9 @@ console.log('\n=== Step 4: Build WASM bundles (npm + deno) ===');
 // A release build must never freshness-skip: the wasm build tasks ride
 // scripts/run_if_stale.ts, whose mtime check can't see toolchain changes
 // (wasm-pack/wasm-opt/rustc upgrades). Force for the whole build step.
-Deno.env.set('TSV_BUILD_FORCE', '1');
-run('deno task build:packages', 'deno', ['task', 'build:packages']);
-Deno.env.delete('TSV_BUILD_FORCE');
+await run('deno task build:packages', 'deno', ['task', 'build:packages'], {
+	env: { TSV_BUILD_FORCE: '1' }
+});
 
 // Step 5: Verify built packages
 
@@ -555,12 +575,10 @@ console.log('\n=== Step 5: Verify built package name + version ===');
 for (const { label, dir } of packages) {
 	const built_pkg = JSON.parse(Deno.readTextFileSync(`${dir}/package.json`));
 	if (built_pkg.name !== label) {
-		console.error(`  FAIL: ${dir} built as ${built_pkg.name}, expected ${label}`);
-		Deno.exit(1);
+		fail_resumable(`${dir} built as ${built_pkg.name}, expected ${label}`);
 	}
 	if (built_pkg.version !== version) {
-		console.error(`  FAIL: ${label} built at v${built_pkg.version}, expected v${version}`);
-		Deno.exit(1);
+		fail_resumable(`${label} built at v${built_pkg.version}, expected v${version}`);
 	}
 	console.log(`  PASS: ${label} = v${version}`);
 }
@@ -568,28 +586,20 @@ for (const { label, dir } of packages) {
 // Step 6: Test the built artifacts
 
 console.log('\n=== Step 6: Validate built packages (sizes + Deno + Node + Bun + declarations) ===');
-run('deno task validate:artifacts', 'deno', ['task', 'validate:artifacts']);
+await run('deno task validate:artifacts', 'deno', ['task', 'validate:artifacts']);
 // A second spelling of deno.json's `test:npm*:run` tasks (see `//test:npm:run`): a leg added
 // there must be added here too, or a publish silently skips it.
 for (const { label, dir } of packages) {
-	const result = new Deno.Command('node', {
-		args: ['--test', 'scripts/test_npm.ts'],
-		env: { PKG_DIR: dir },
-		stdin: 'inherit',
-		stdout: 'inherit',
-		stderr: 'inherit'
-	}).outputSync();
-	if (!result.success) {
-		console.error(`\n  FAIL: artifact tests for ${label}`);
-		Deno.exit(1);
-	}
+	await run(`artifact tests for ${label}`, 'node', ['--test', 'scripts/test_npm.ts'], {
+		env: { PKG_DIR: dir }
+	});
 }
 // The parse-failure table under Bun, the one runtime that grades the engines' point
 // properties (deno.json `//test:bun`), over the three wasm packages this script publishes —
 // the napi engine under Bun is graded locally by `test:napi:npm`, not here. Bun's presence
 // was settled by the preflight, so the leg requires it.
 if (bun_skip_reason === null) {
-	run('deno task test:bun', 'deno', [
+	await run('deno task test:bun', 'deno', [
 		'task',
 		'test:bun',
 		'--require-bun',
@@ -605,14 +615,14 @@ if (bun_skip_reason === null) {
 // staging is a file copy (no cargo build), so it is staged here at this version and graded
 // beside the three wasm packages — all four named, so each is required. Needs the
 // benches/js install whatever --no-check says: it grades what is about to ship.
-run('stage the @fuzdev/tsv loader', 'deno', [
+await run('stage the @fuzdev/tsv loader', 'deno', [
 	'run',
 	'--allow-read',
 	'--allow-write=crates/tsv_napi/pkg',
 	'scripts/build_napi_packages.ts',
 	'--loader-only'
 ]);
-run('deno task typecheck:packages', 'deno', [
+await run('deno task typecheck:packages', 'deno', [
 	'task',
 	'typecheck:packages',
 	'format',
@@ -621,44 +631,64 @@ run('deno task typecheck:packages', 'deno', [
 	'napi'
 ]);
 
+// The packages hold what the checkout held while Step 4 built them: a checkout that moved
+// since the bump refuses a wetrun rather than publish packages no commit describes.
+const checkout_after = await git_checkout_fingerprint();
+if (
+	!checkout_before.ok ||
+	!checkout_after.ok ||
+	checkout_before.fingerprint !== checkout_after.fingerprint
+) {
+	const moved = 'the checkout changed while the gates ran — the built packages may match no commit';
+	if (wetrun) fail_resumable(`${moved}; refusing to publish`);
+	warnings++;
+	console.warn(`  WARN: ${moved}`);
+}
+
 // Step 7: Publish
 
 console.log('\n=== Step 7: Publish to npm ===');
 
 // Publish loop is idempotent: already-published packages are skipped, so retry after
-// partial publish works automatically. Sentinel is removed after all succeed.
+// partial publish works automatically.
 
 for (let i = 0; i < packages.length; i++) {
 	const { label, dir } = packages[i];
 	if (wetrun) {
-		if (is_published(label, version)) {
+		const published = await npm_is_published(label, version);
+		if (!published.ok) fail_resumable(published.error);
+		if (published.published) {
 			console.log(`  SKIP: ${label}@${version} already published`);
 			continue;
 		}
 		console.log(`  Publishing ${label}...`);
 		const not_published = packages.slice(i);
-		const fail_hint = `  Packages not published — re-run \`deno task publish --wetrun\` to retry, or publish manually:\n${not_published
+		const fail_hint = `  Packages not yet published (a resume retries them, or publish by hand):\n${not_published
 			.map((p) => `    cd ${p.dir} && npm publish --access public`)
 			.join('\n')}`;
-		run(`npm publish ${label}`, 'npm', ['publish', '--access', 'public'], dir, fail_hint);
+		await run(`npm publish ${label}`, 'npm', ['publish', '--access', 'public'], {
+			cwd: dir,
+			fail_hint
+		});
 		console.log(`  Published ${label}@${version}`);
 	} else {
 		console.log(`  [dry-run] ${label}:`);
-		const res = capture('npm', ['publish', '--dry-run', '--access', 'public'], dir);
+		const res = await command_capture('npm', ['publish', '--dry-run', '--access', 'public'], {
+			cwd: dir
+		});
 		// npm prints the tarball notice to stderr — surface it regardless.
-		if (res.stderr) console.log(res.stderr);
+		if (res.err) console.log(res.err);
 		if (res.success) {
 			console.log(`  PASS: ${label} packs cleanly`);
-		} else if (/cannot publish over the previously published versions/i.test(res.stderr)) {
+		} else if (plan.kind === 'fresh' && npm_error_is_republish(res.err)) {
 			// Dry-run never bumps, so it dry-publishes the CURRENT (already-published)
 			// version. The real wetrun bumps first, so this isn't a real failure.
-			const preview = (bump as BumpLevel | null) ?? read_declared_bump();
-			const target = preview ? `v${bump_version(version, preview)}` : 'the bumped version';
+			const target = plan.target === null ? 'the bumped version' : `v${plan.target}`;
 			console.log(
 				`  PASS: ${label} packs cleanly (v${version} already published — a real run publishes ${target})`
 			);
 		} else {
-			if (res.stdout) console.error(res.stdout);
+			if (res.out) console.error(res.out);
 			console.error(`  FAIL: npm publish --dry-run ${label}`);
 			Deno.exit(1);
 		}
@@ -667,60 +697,7 @@ for (let i = 0; i < packages.length; i++) {
 
 // Step 8: Git finalize
 
-/** The by-hand finalize — printed when `--no-git` skips the step, and as the
- * failure hint for every git command below. Past Step 7 the packages are
- * already public, so a failure here is the one place a bare exit code is not
- * enough: it needs the exact recovery. */
-const manual_finalize = [
-	`    git add ${release_files.join(' ')}`,
-	`    git commit -m "publish v${version}"`,
-	`    git tag -m v${version} v${version}`,
-	'    git push --follow-tags origin main'
-].join('\n');
-const git_fail_hint =
-	'  The packages are PUBLISHED — only the release commit + tag + push is missing.\n' +
-	'  The sentinel survives this step, so `deno task publish --wetrun` resumes from here\n' +
-	'  (already-published packages skip; add --no-check to skip re-running the gates over\n' +
-	'  the tree they just passed). Or finalize by hand:\n' +
-	manual_finalize;
-
-if (wetrun && !no_git) {
-	console.log('\n=== Step 8: Git finalize (commit + tag + push) ===');
-	if (capture('git', ['status', '--porcelain', '--', ...release_files]).stdout) {
-		run('git add', 'git', ['add', '--', ...release_files], undefined, git_fail_hint);
-		run('git commit', 'git', ['commit', '-m', `publish v${version}`], undefined, git_fail_hint);
-	} else {
-		console.log('  Nothing to commit (retry after a previous commit)');
-	}
-	const tag = `v${version}`;
-	if (capture('git', ['rev-parse', '-q', '--verify', `refs/tags/${tag}`]).success) {
-		console.log(`  Tag ${tag} already exists`);
-	} else {
-		// Annotated — `git push --follow-tags` ignores lightweight tags
-		run('git tag', 'git', ['tag', '-m', tag, tag], undefined, git_fail_hint);
-	}
-	// This push is what triggers release_napi.yml — until it lands, the wasm
-	// packages are public with no tag, so the N-API set never builds.
-	run('git push', 'git', ['push', '--follow-tags', 'origin', 'main'], undefined, git_fail_hint);
-} else if (wetrun) {
-	console.log('\n=== Step 8: Git finalize — SKIPPED (--no-git) ===');
-	console.log('  Finalize manually (only the release files; annotated tag — --follow-tags');
-	console.log('  ignores lightweight tags):');
-	console.log(manual_finalize);
-}
-
-// Remove the sentinel LAST — the release is complete only once the commit, tag
-// and push have landed (or `--no-git` handed them off). Removing it after Step 7
-// instead made a git-finalize failure UNRESUMABLE: the retry path needs the
-// sentinel, and without it the fresh path refuses on the `## Unreleased` section
-// this very run already stamped.
-if (wetrun) {
-	try {
-		Deno.removeSync(SENTINEL_PATH);
-	} catch (error) {
-		if (!(error instanceof Deno.errors.NotFound)) throw error;
-	}
-}
+if (wetrun) await finalize_git();
 
 // Summary
 
@@ -776,43 +753,96 @@ if (bun_skip_reason !== null) {
 	);
 }
 if (!wetrun) {
-	console.log(`\n  Dry-run complete for v${version} — all checks passed.`);
-	console.log('  Run with --wetrun --bump patch|minor|major to publish.');
+	if (warnings > 0) {
+		console.log(
+			`\n  Dry-run complete for v${version} — a wetrun would FAIL on the warnings above.`
+		);
+	} else if (plan.kind === 'resume') {
+		console.log(`\n  Dry-run complete for v${version} — all checks passed.`);
+		console.log('  Run `deno task publish --wetrun` to resume the release.');
+	} else {
+		console.log(`\n  Dry-run complete for v${version} — all checks passed.`);
+		console.log(`  Run with --wetrun --bump ${plan.level} to publish v${plan.target}.`);
+	}
 }
 console.log('');
 
 // Helpers
 
-/** Run a command silently and return success + trimmed stdout/stderr. */
-function capture(
-	cmd: string,
-	args: string[],
-	cwd?: string
-): { success: boolean; stdout: string; stderr: string } {
-	const result = new Deno.Command(cmd, {
-		args,
-		cwd,
-		stdout: 'piped',
-		stderr: 'piped'
-	}).outputSync();
-	return {
-		success: result.success,
-		stdout: dec.decode(result.stdout).trim(),
-		stderr: dec.decode(result.stderr).trim()
-	};
+/** Step 8: commit exactly the release files, tag the commit, push both, then remove the
+ * sentinel — or, under `--no-git`, print those steps. Past Step 7 the packages are public,
+ * so a failure here is the one place a bare exit code is not enough: it names the exact
+ * recovery. Every step no-ops when already done, so a resume repeats it safely. */
+async function finalize_git(): Promise<void> {
+	// every dry-run path exits before this; it guards a future edit that falls through
+	if (!wetrun) {
+		console.error('  FAIL: a dry run reached the git finalize — refusing to commit, tag, or push');
+		Deno.exit(1);
+	}
+	const tag = version_tag(version);
+	const message = release_commit_message(version);
+	const manual_finalize = [
+		`    git add ${RELEASE_PATHS.join(' ')}`,
+		`    git commit -m "${message}"`,
+		`    git tag -m ${tag} ${tag}`,
+		'    git push --follow-tags origin main'
+	].join('\n');
+	function git_fail(error: string): never {
+		console.error(`\n  FAIL: ${error}`);
+		console.error(
+			'  The packages are PUBLISHED — only the release commit + tag + push is missing.\n' +
+				'  The sentinel survives this step, so `deno task publish --wetrun` resumes from here\n' +
+				'  (it skips straight to this step once every package is on npm). Or finalize by hand:\n' +
+				manual_finalize
+		);
+		Deno.exit(1);
+	}
+
+	if (no_git) {
+		console.log('\n=== Step 8: Git finalize — SKIPPED (--no-git) ===');
+		console.log('  Finalize manually (only the release files; annotated tag — --follow-tags');
+		console.log('  ignores lightweight tags):');
+		console.log(manual_finalize);
+	} else {
+		console.log('\n=== Step 8: Git finalize (commit + tag + push) ===');
+		const committed = await git_commit_paths(RELEASE_PATHS, message);
+		if (!committed.ok) git_fail(committed.error);
+		console.log(committed.committed ? `  Committed "${message}"` : '  Release commit already made');
+		if ((await git_local_tag_commit(tag)) === null) {
+			const tagged = await git_tag_annotated(tag);
+			if (!tagged.ok) git_fail(tagged.error);
+			console.log(`  Tagged ${tag}`);
+		} else console.log(`  Tag ${tag} already exists`);
+		// this push is what triggers release_napi.yml — until it lands, the wasm packages
+		// are public with no tag, so the N-API set never builds
+		if (!(await git_push_main_with_tags())) git_fail('git push --follow-tags origin main failed');
+	}
+
+	// last: the release is complete only once the commit, tag and push have landed (or
+	// --no-git handed them off); removing it earlier would make a finalize failure
+	// unresumable, since the fresh path refuses the `## Unreleased` this run already stamped
+	await sentinel_remove();
 }
 
-/** A tool's `--version` output, or `null` when it is not installed or fails — `Deno.Command`
- * throws `NotFound` for a missing binary rather than failing the run, which would otherwise
- * surface as a raw stack. */
-function probe_version(cmd: string): string | null {
-	try {
-		const result = capture(cmd, ['--version']);
-		return result.success ? result.stdout : null;
-	} catch (error) {
-		if (error instanceof Deno.errors.NotFound) return null;
-		throw error;
+/** Exit on a failure, naming the resume once the bump is in place. */
+function fail_resumable(message: string): never {
+	console.error(`  FAIL: ${message}`);
+	exit_resumable();
+}
+
+function exit_resumable(): never {
+	if (bumped) {
+		console.error(
+			'  The bump is in place — fix the cause and run `deno task publish --wetrun` to resume.'
+		);
 	}
+	Deno.exit(1);
+}
+
+/** A tool's `--version` output, or `null` when it is not installed or fails. */
+async function probe_version(cmd: string): Promise<string | null> {
+	const result = await command_capture(cmd, ['--version']);
+	return result.success ? result.out.trim() : null;
 }
 
 function exists(path: string): boolean {
@@ -825,63 +855,20 @@ function exists(path: string): boolean {
 	}
 }
 
-function run(label: string, cmd: string, args: string[], cwd?: string, fail_hint?: string): void {
-	const result = new Deno.Command(cmd, {
-		args,
-		cwd,
-		stdin: 'inherit',
-		stdout: 'inherit',
-		stderr: 'inherit'
-	}).outputSync();
-	if (!result.success) {
-		console.error(`\n  FAIL: ${label} (exit code ${result.code})`);
-		if (fail_hint) console.error(fail_hint);
-		Deno.exit(1);
-	}
-}
-
-function bump_version(current: string, level: 'patch' | 'minor' | 'major'): string {
-	const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(current);
-	if (!match) {
-		console.error(`  FAIL: cannot bump non-semver version "${current}"`);
-		Deno.exit(1);
-	}
-	const [major, minor, patch] = [Number(match[1]), Number(match[2]), Number(match[3])];
-	if (level === 'major') return `${major + 1}.0.0`;
-	if (level === 'minor') return `${major}.${minor + 1}.0`;
-	return `${major}.${minor}.${patch + 1}`;
-}
-
-/** Stamp CHANGELOG.md's `## Unreleased` section into `## <version>` — the pure
- * rewrite is `changelog_stamp`; this owns the file and the log line. Idempotent:
- * a no-op if `## <version>` is already present (a retry after a failed wetrun,
- * where the seeded fresh `## Unreleased` is expected). */
-function stamp_changelog(new_version: string): void {
-	const changelog = read_changelog();
-	if (changelog === null) {
-		console.warn(`  WARN: no ${CHANGELOG_PATH} — skipping changelog stamp`);
-		return;
-	}
-	const stamp = changelog_stamp(changelog, new_version);
-	switch (stamp.outcome) {
-		case 'already_stamped':
-			console.log(`  ${CHANGELOG_PATH} already stamped with ## ${new_version}`);
-			return;
-		case 'stamped':
-		case 'stamped_without_marker':
-			Deno.writeTextFileSync(CHANGELOG_PATH, stamp.text);
-			console.log(
-				`  Stamped ${CHANGELOG_PATH}: ## Unreleased -> ## ${new_version}; seeded fresh ## Unreleased (bump: patch)`
-			);
-			return;
-		case 'no_unreleased':
-			console.warn(`  WARN: no "## Unreleased" section in ${CHANGELOG_PATH} — nothing to stamp`);
-			return;
-		default: {
-			const unhandled: never = stamp.outcome;
-			throw new Error(`unhandled changelog stamp outcome: ${String(unhandled)}`);
-		}
-	}
+/** Run a long step with the terminal attached; exit on failure, printing `fail_hint` and,
+ * after the bump, the resume under the failure. `env` adds to the inherited environment. */
+async function run(
+	label: string,
+	cmd: string,
+	args: ReadonlyArray<string>,
+	options: CommandOptions & { fail_hint?: string } = {}
+): Promise<void> {
+	const { fail_hint, ...command_options } = options;
+	const result = await command_stream(cmd, args, command_options);
+	if (result.success) return;
+	console.error(`\n  FAIL: ${label} (exit code ${result.code})`);
+	if (fail_hint) console.error(fail_hint);
+	exit_resumable();
 }
 
 /** The changelog text, or null when there is no CHANGELOG.md. Only a missing
@@ -894,63 +881,4 @@ function read_changelog(): string | null {
 		if (error instanceof Deno.errors.NotFound) return null;
 		throw error;
 	}
-}
-
-/** The `<!-- bump: <level> -->` marker declared directly after the `## Unreleased`
- * heading, or null (also when there is no CHANGELOG). */
-function read_declared_bump(): BumpLevel | null {
-	const changelog = read_changelog();
-	return changelog === null ? null : changelog_declared_bump(changelog);
-}
-
-/** The bump level — required on BOTH the --bump flag and the CHANGELOG marker,
- * and they must match. Exits if either is missing or they disagree. */
-function resolve_bump(flag: BumpLevel | null, declared: BumpLevel | null): BumpLevel {
-	if (!flag) {
-		console.error(
-			'  FAIL: --bump patch|minor|major is required (and must match the CHANGELOG marker)'
-		);
-		Deno.exit(1);
-	}
-	if (!declared) {
-		console.error(
-			`  FAIL: no "<!-- bump: <level> -->" marker under ## Unreleased in ${CHANGELOG_PATH} — declare the bump there too`
-		);
-		Deno.exit(1);
-	}
-	if (flag !== declared) {
-		console.error(
-			`  FAIL: --bump ${flag} disagrees with CHANGELOG marker <!-- bump: ${declared} --> (they must match)`
-		);
-		Deno.exit(1);
-	}
-	return flag;
-}
-
-/**
- * Whether `pkg_name@target_version` exists on the registry. Distinguishes
- * "not published" (npm E404) from npm/network failure — the latter aborts,
- * since no publish decision is safe without an answer.
- */
-function is_published(pkg_name: string, target_version: string): boolean {
-	const result = capture('npm', ['view', `${pkg_name}@${target_version}`, 'version']);
-	if (result.success) return result.stdout === target_version;
-	if (result.stderr.includes('E404')) return false;
-	console.error(`  FAIL: npm view ${pkg_name}@${target_version} failed:`);
-	console.error(result.stderr);
-	Deno.exit(1);
-}
-
-function read_sentinel(): string | null {
-	try {
-		return Deno.readTextFileSync(SENTINEL_PATH).trim();
-	} catch (error) {
-		if (!(error instanceof Deno.errors.NotFound)) throw error;
-		return null;
-	}
-}
-
-function read_cargo_version(): string {
-	const match = workspace_pkg_re.exec(Deno.readTextFileSync(CARGO_PATH));
-	return match?.[2] ?? '';
 }

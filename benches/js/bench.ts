@@ -117,6 +117,7 @@ import { mkdirSync, rmSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import process, { argv, exit, pid } from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { cargo_workspace_version } from '../../scripts/release/version.ts';
 import {
 	BenchChildError,
 	type ChildScript,
@@ -1221,17 +1222,14 @@ interface Baseline {
 async function get_tsv_version(): Promise<string> {
 	const cargo_toml_path = fileURLToPath(new URL('../../Cargo.toml', import.meta.url));
 	const content = await readFile(cargo_toml_path, 'utf8');
-	// Match the line-leading `version = "..."` inside the `[workspace.package]` section.
-	// `^version` (multiline) avoids matching a `rust-version = "..."` MSRV pin; `[^[]*?`
-	// bounds the search to the section by stopping at the next `[` heading.
-	const match = content.match(/\[workspace\.package\][^[]*?^version\s*=\s*"([^"]+)"/m);
-	if (!match) {
+	const version = cargo_workspace_version(content);
+	if (version === null) {
 		throw new Error(
 			`Cargo.toml has no [workspace.package] version (${cargo_toml_path}) — the report labels ` +
 				`every number with it, so it cannot be defaulted`
 		);
 	}
-	return match[1];
+	return version;
 }
 
 /** Get current git commit hash */

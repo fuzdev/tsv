@@ -35,6 +35,7 @@ import { parseArgs } from 'node:util';
 import { cli_binary_name, host_triple } from './napi_host.ts';
 import { ALL_FAMILIES, LOCATIONS_EXPORT, facade_files } from './npm_facade.ts';
 import { NPM_SHARED_METADATA } from './npm_metadata.ts';
+import { cargo_workspace_version } from './release/version.ts';
 import { format_size } from './size.ts';
 import { stage_file } from './stage_file.ts';
 
@@ -89,11 +90,8 @@ const cli_artifact =
 	args['cli-artifact'] ?? `target/release/${Deno.build.os === 'windows' ? 'tsv.exe' : 'tsv'}`;
 
 const cargo_toml = Deno.readTextFileSync('Cargo.toml');
-// `^version` (multiline) avoids matching a `rust-version = "..."` MSRV pin — without it,
-// the lazy section scan would stamp the MSRV as the package version across every
-// platform package. `[^[]*?` bounds the search to the section (stops at the next `[`
-// heading). Same grammar as bench.ts's read and publish.ts's `workspace_pkg_re` rewrite.
-const version = /\[workspace\.package\][^[]*?^version\s*=\s*"([^"]+)"/m.exec(cargo_toml)?.[1];
+// the one `[workspace.package]` version reader, shared with publish's bump and the bench report
+const version = cargo_workspace_version(cargo_toml);
 if (!version) throw new Error('workspace version not found in Cargo.toml');
 
 const write_pkg = (dir: string, pkg: Record<string, unknown>): void => {

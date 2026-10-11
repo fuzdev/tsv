@@ -39,8 +39,9 @@
 
 import { parseArgs } from 'node:util';
 
-import { version_from_tag } from './changelog.ts';
 import { cli_binary_name } from './napi_host.ts';
+import { command_capture } from './release/command.ts';
+import { version_from_tag } from './release/version.ts';
 
 const { values: args, positionals } = parseArgs({
 	allowPositionals: true,
@@ -71,34 +72,13 @@ const LOADER = '@fuzdev/tsv';
 const REGISTRY_ATTEMPTS = 30;
 const REGISTRY_RETRY_MS = 20_000;
 
-const dec = new TextDecoder();
-
-interface Captured {
-	success: boolean;
-	stdout: string;
-	stderr: string;
-}
-
-const run_captured = async (cmd: string, cmd_args: Array<string>): Promise<Captured> => {
-	const result = await new Deno.Command(cmd, {
-		args: cmd_args,
-		stdout: 'piped',
-		stderr: 'piped'
-	}).output();
-	return {
-		success: result.success,
-		stdout: dec.decode(result.stdout).trim(),
-		stderr: dec.decode(result.stderr)
-	};
-};
-
 /** Run a command once; its trimmed stdout, or a thrown error naming it. */
 const capture = async (cmd: string, cmd_args: Array<string>): Promise<string> => {
-	const result = await run_captured(cmd, cmd_args);
+	const result = await command_capture(cmd, cmd_args);
 	if (!result.success) {
-		throw new Error(`${cmd} ${cmd_args.join(' ')} failed:\n${result.stderr}`);
+		throw new Error(`${cmd} ${cmd_args.join(' ')} failed:\n${result.err}`);
 	}
-	return result.stdout;
+	return result.out;
 };
 
 /** `capture` for the registry: every failure is retried on the bounded window
@@ -106,12 +86,10 @@ const capture = async (cmd: string, cmd_args: Array<string>): Promise<string> =>
  * transiently behind. */
 const capture_npm = async (npm_args: Array<string>): Promise<string> => {
 	for (let attempt = 1; ; attempt++) {
-		const result = await run_captured('npm', npm_args);
-		if (result.success) return result.stdout;
+		const result = await command_capture('npm', npm_args);
+		if (result.success) return result.out;
 		if (attempt >= REGISTRY_ATTEMPTS) {
-			throw new Error(
-				`npm ${npm_args.join(' ')} failed after ${attempt} attempts:\n${result.stderr}`
-			);
+			throw new Error(`npm ${npm_args.join(' ')} failed after ${attempt} attempts:\n${result.err}`);
 		}
 		console.warn(
 			`  npm ${npm_args.join(' ')} failed (attempt ${attempt}/${REGISTRY_ATTEMPTS}) — retrying in ${REGISTRY_RETRY_MS / 1000}s`

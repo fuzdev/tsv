@@ -19,7 +19,8 @@
 
 import { parseArgs } from 'node:util';
 
-import { CHANGELOG_PATH, changelog_release_notes, version_from_tag } from './changelog.ts';
+import { CHANGELOG_PATH, changelog_release_notes } from './release/changelog.ts';
+import { version_from_tag } from './release/version.ts';
 
 // `parseArgs` with no options: a stray `--flag` is rejected instead of being
 // read as the tag.

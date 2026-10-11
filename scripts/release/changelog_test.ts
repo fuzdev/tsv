@@ -12,8 +12,7 @@ import {
 	changelog_release_notes,
 	changelog_section,
 	changelog_stamp,
-	changelog_unreleased_content,
-	version_from_tag
+	changelog_unreleased_content
 } from './changelog.ts';
 
 const changelog = `# tsv changelog
@@ -81,14 +80,6 @@ Deno.test('changelog_release_notes is the trimmed version section', () => {
 	strictEqual(changelog_release_notes(changelog, '0.1.10'), '- initial');
 	strictEqual(changelog_release_notes(changelog, '0.3.0'), null);
 	strictEqual(changelog_release_notes('## 0.3.0\n\n## 0.2.0\n\n- x\n', '0.3.0'), '');
-});
-
-Deno.test('version_from_tag accepts v-prefixed and bare semver only', () => {
-	strictEqual(version_from_tag('v0.3.0'), '0.3.0');
-	strictEqual(version_from_tag('0.3.0'), '0.3.0');
-	strictEqual(version_from_tag('v0.3'), null);
-	strictEqual(version_from_tag('v0.3.0-rc.1'), null);
-	strictEqual(version_from_tag('main'), null);
 });
 
 Deno.test('changelog_stamp renames Unreleased, drops the marker, seeds a fresh cycle', () => {
