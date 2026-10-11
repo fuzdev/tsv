@@ -704,7 +704,8 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 
 # Experimental Async — parse/format supported
 
-Features requiring `experimental: { async: true }` in svelte.config.js. The flag
+Features requiring Svelte's `experimental: { async: true }` compiler option (in SvelteKit 3,
+`compilerOptions` in the `sveltekit({...})` plugin options in `vite.config.ts`). The flag
 gates Svelte's *compilation*, not tsv's parse/format — tsv handles all of these
 today, each with gating fixtures — and will be removed in Svelte 6 (becomes stable).
 
