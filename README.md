@@ -14,7 +14,8 @@ and a drop-in for [Svelte](https://svelte.dev/)'s parser +
 tsv aims to simplify its covered domains and stay lean, and so it makes opinionated choices.
 The formatter has a single non-configurable style, using Svelte's Prettier config.
 Among other benefits, this means tsv doesn't depend on a JS runtime,
-which it would need in order to resolve configs the way Prettier does.
+which it would need in order to resolve configs the way Prettier does,
+avoiding complexity and performance costs.
 
 Compared to Oxc, Biome, and swc, tsv is a set of focused tools, not an extensible language
 platform, so it targets Web standards + TS + Svelte and there's no support for JSX/SCSS/etc.
