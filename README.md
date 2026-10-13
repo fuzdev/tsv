@@ -55,7 +55,7 @@ Otherwise `unsafe_code = "forbid"`.
 AI disclosure: this codebase is LLM-generated.
 It's a high-effort project that prioritizes quality.
 
-## About
+## Features
 
 > **status**: near production-ready - a long tail of rare bugs remains, and APIs may still change
 
