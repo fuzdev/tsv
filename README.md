@@ -52,7 +52,7 @@ The only first-party `unsafe` is in `tsv_ffi`, where the C boundary requires it;
 `tsv_napi` relaxes the lint only to `deny` so napi-derive's generated code compiles.
 Otherwise `unsafe_code = "forbid"`.
 
-AI disclosure: this codebase is LLM-generated, mostly Claude Code.
+AI disclosure: this codebase is LLM-generated using Claude Code.
 It's a high-effort project that prioritizes quality.
 
 ## Features
