@@ -33,7 +33,7 @@ grades); the reference halves live in `docs/`:
 | Gate | Composition | Corpus / oracle | Cadence |
 | --- | --- | --- | --- |
 | **`deno task check`** | `cargo fmt --check` · `format:audit` · `pins:audit` · `docs:audit` · `typecheck` · `typecheck:features` · `typecheck:scripts` · `typecheck:bench-core` · `conformance:audit` · `conformance:audit:compiler` · `variants:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `roundtrip:audit:prettier` · `discovery:audit` · `canonicalize:audit` · `binding:audit` · `authoring:audit` · `paren:audit` · `razor:audit` · `fuzz:audit` · `test:deno` · `cargo test` (incl. fixtures) · `test:audits` · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `fabrication:audit` · `census:audit` · `width:audit` · `ignore:audit` · `check:ast-types` · `check:loc` · `clippy` | **committed tree only** (`tests/fixtures` + pure-Rust/Deno audits, no external oracle), save the two opportunistic legs: `roundtrip:audit:prettier` (the pinned `../prettier` format suites) and `discovery:audit` (`tsv format --list` over the `../corpora` snapshot vs its committed file list) | every commit; the CI `check` job |
-| **`deno task conformance:all`** | `pins:audit:checkouts` + `bench:pins:suites` + `fixtures:validate` + `compile:fixtures:validate` preflights (then `bench:harvest:svelte-styles`, late, beside the corpus legs that read its cache), then `conformance` (one process, its FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:parse tests/fixtures --fixtures` · `corpus:compare:format --all`, plus `render:audit` as its one subprocess leg) **+** `conformance:test262` (pure Rust) | `../corpora` (the real-code snapshot), `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../prettier-plugin-svelte`, `../test262`; the **`gates`** corpus view | release; `scripts/publish.ts` **Step 3b** |
+| **`deno task conformance:all`** | `pins:audit:checkouts` + `bench:pins:suites` + `fixtures:validate` + `compile:fixtures:validate` preflights (then `bench:harvest:svelte-styles`, late, beside the corpus legs that read its cache, and `strip:corpus:run`, the type strip vs ts-blank-space over the snapshot's TypeScript), then `conformance` (one process, its FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:parse tests/fixtures --fixtures` · `corpus:compare:format --all`, plus `render:audit` as its one subprocess leg) **+** `conformance:test262` (pure Rust) | `../corpora` (the real-code snapshot), `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../prettier-plugin-svelte`, `../test262`; the **`gates`** corpus view | release; `scripts/publish.ts` **Step 3b** |
 | **`deno task bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (100%-coverage invariant) / **`conformance`** view (fixtures filtered to what their own suite calls valid + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
 | **`deno task idempotency:sweep`** | `tsv_debug fuzz --iterations 0` over the corpus dirs — F1 (`format(format(x)) == format(x)`) + no-panic + structural reparse on every file **as authored** | **`robustness`** view (the WHOLE `../corpora` snapshot — every collection it vendors, placed in a tier or not — + the `svelte_styles` cache + the live working trees' DIFF against the snapshot; absent dirs skipped with a warning) | after a printer change; conformance cadence |
 | **`deno task audit:corpus`** | the pure-Rust content-loss / robustness suite over **real code**: `roundtrip_audit --gate` · `comment_audit` · `swallow_audit` · `binding_audit --gate` (real code gating; prettier suites report-only) · `authoring_audit` · `paren_audit` (both real-code-only) · `census_audit` · `fabrication_audit` (both strict-zero off their default corpus) · `fuzz --iterations 0`. `width_audit` is NOT a leg — it has no zero to grade (../../docs/audits.md §The Corpus Bundle) | **`robustness`** view (the whole snapshot + the `svelte_styles` cache + the live diff) + the pinned `../prettier` format suites (absent working trees skipped; floor = the whole `../corpora` snapshot) | release; `scripts/publish.ts` **Step 3c**; conformance cadence |
@@ -572,7 +572,9 @@ oracle modules (prettier, the svelte plugin, svelte/compiler, acorn, acorn-ts) l
 module cache, each leg gets a timing line, and failure semantics match a `&&` chain exactly
 (every leg exits the process on a finding — fail-fast). `render:audit`, the lone non-JS leg, is a
 `cargo` subprocess (hence the task's `--allow-run=cargo`). The driver takes no arguments; the
-per-leg tasks remain the scoped/triage entries.
+per-leg tasks remain the scoped/triage entries. Ahead of the driver, the task chains
+`strip:corpus:run` (the type strip vs ts-blank-space, ../../docs/audits.md §Strip Corpus
+Differential) as its own process: it loads none of the canonical oracles and no FFI.
 
 `deno task conformance:all` runs the pure-Rust **test262 positive gate** FIRST, THEN
 the aggregate — so a positive-parse regression trips the quick gate before the
@@ -1553,6 +1555,8 @@ benches/js/
 ├── strip_fixtures.ts      # `strip:fixtures:oracle` / `:update`: the type-strip fixtures' oracle side — expected
 │                          # outputs from ts-blank-space, cross-checked against Node's module.stripTypeScriptTypes
 │                          # (Node-only; tests/fixtures_strip/README.md)
+├── strip_corpus.ts        # `strip:corpus`: tsv_ts::strip vs ts-blank-space over the snapshot's TypeScript, tsv's
+│                          # side from one `tsv_debug strip --stdin` process (Deno; ../../docs/audits.md)
 ├── compose_reports.ts     # Fold report.{deno,node,bun}.json → combined report.{json,md}
 ├── idempotency_sweep.ts   # F1 sweep over the `robustness` view (drives tsv_debug `fuzz --iterations 0`)
 ├── corpus_audit.ts        # `audit:corpus`: the pure-Rust content-loss / robustness legs over
@@ -1645,6 +1649,9 @@ benches/js/
     │                      # and each directory's `format.test.js` verdicts, the conformance view's
     │                      # filter over the Prettier suites (unit-tested by prettier_fixtures_test.ts)
     ├── prettier_cache.ts  # Content-addressed prettier-output cache for the format comparison
+    ├── strip_oracle.ts    # The type strip's oracle side: ts-blank-space's output and refusals in tsv's terms
+    │                      # (the terminator-fold derivation) + the oxc JS-validity guard — shared by
+    │                      # strip_fixtures.ts and strip_corpus.ts
     ├── span_only.ts       # How the parse comparisons serialize a canonical AST: the BigInt
     │                      # replacer, and the span-only one that strips `loc` / `name_loc`
     │                      # (shared by corpus_compare_parse and fixtures_gate)

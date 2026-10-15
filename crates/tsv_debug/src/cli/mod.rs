@@ -35,10 +35,10 @@ use commands::{
     neutrality_audit::NeutralityAuditCommand, paren_audit::ParenAuditCommand,
     profile::ProfileCommand, razor_audit::RazorAuditCommand, render_audit::RenderAuditCommand,
     render_compare::RenderCompareCommand, roundtrip_audit::RoundtripAuditCommand,
-    scan_audit::ScanAuditCommand, strip_fixtures_validate::StripFixturesValidateCommand,
-    test262::Test262Command, ts_fixture_audit::TsFixtureAuditCommand,
-    tsc_conformance::TscConformanceCommand, type_sizes::TypeSizesCommand,
-    variant_audit::VariantAuditCommand,
+    scan_audit::ScanAuditCommand, strip::StripCommand,
+    strip_fixtures_validate::StripFixturesValidateCommand, test262::Test262Command,
+    ts_fixture_audit::TsFixtureAuditCommand, tsc_conformance::TscConformanceCommand,
+    type_sizes::TypeSizesCommand, variant_audit::VariantAuditCommand,
 };
 
 /// A command failure, carrying the process exit code up to the single exit
@@ -151,6 +151,7 @@ pub enum Subcommand {
     RenderCompare(RenderCompareCommand),
     RoundtripAudit(RoundtripAuditCommand),
     ScanAudit(ScanAuditCommand),
+    Strip(StripCommand),
     StripFixturesValidate(StripFixturesValidateCommand),
     // Requires the `swallow_check` feature so default builds keep the
     // render-time swallow instrumentation compiled out (production-shaped
@@ -226,6 +227,7 @@ impl TopLevel {
             Subcommand::RenderCompare(c) => c.run(),
             Subcommand::RoundtripAudit(c) => c.run(),
             Subcommand::ScanAudit(c) => c.run(),
+            Subcommand::Strip(c) => c.run(),
             Subcommand::StripFixturesValidate(c) => c.run(),
             #[cfg(feature = "swallow_check")]
             Subcommand::SwallowAudit(c) => c.run(),

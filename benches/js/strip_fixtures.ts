@@ -48,7 +48,9 @@
  * fails loudly on it (the parse-diagnostics error) rather than writing a claim.
  *
  * Node is unpinned — `stripTypeScriptTypes` moves with the installed Node — so the run
- * prints the versions it graded.
+ * prints the versions it graded. The derivation, the refusal record and the JS-validity
+ * guard are `lib/strip_oracle.ts`, which the strip corpus differential (`strip_corpus.ts`)
+ * shares.
  *
  * Usage (from the repo root; needs `deno task bench:install` and Node ≥ 22.18):
  *
@@ -66,7 +68,6 @@ import { argv, exit, versions } from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { check_node_modules } from './lib/check_node_modules.ts';
-import { oxc_fatal_errors } from './lib/oxc.ts';
 
 const repo_root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const FIXTURES_DIR = 'tests/fixtures_strip';
@@ -83,17 +84,6 @@ const ORACLES = ['ts-blank-space', 'node'] as const;
 type Oracle = (typeof ORACLES)[number];
 /** The `divergences.txt` line that makes the claim a hand-reviewed one (module docs). */
 const OVERRIDE_LINE = 'override ts-blank-space';
-/** tsv's `UnsupportedKind` variant names: what a `refusal.txt` may name. */
-const UNSUPPORTED_KINDS = [
-	'Enum',
-	'ValueNamespace',
-	'ParameterProperty',
-	'ImportEquals',
-	'ExportEquals',
-	'TypeAssertion',
-	'AssertionGrouping'
-] as const;
-type UnsupportedKind = (typeof UNSUPPORTED_KINDS)[number];
 
 if ('Deno' in globalThis) {
 	// `deno task` can put a `node` shim on PATH that runs this file AS Deno, whose
@@ -108,13 +98,16 @@ if (typeof node_module.stripTypeScriptTypes !== 'function') {
 
 await check_node_modules();
 // Dynamic so a missing node_modules reports through the preflight above.
-const { default: ts } = await import('typescript');
-const { blankSourceFile } = await import('ts-blank-space');
-const { parseSync: oxc_parse } = await import('oxc-parser');
-const require = node_module.createRequire(import.meta.url);
-const ts_blank_space_version = (require('ts-blank-space/package.json') as { version: string })
-	.version;
-const oxc_parser_version = (require('oxc-parser/package.json') as { version: string }).version;
+const {
+	derive,
+	is_terminator,
+	js_parse_failure,
+	ORACLE_VERSIONS,
+	point,
+	run_ts_blank_space,
+	UNSUPPORTED_KINDS
+} = await import('./lib/strip_oracle.ts');
+type Outcome = import('./lib/strip_oracle.ts').Outcome;
 
 const args = argv.slice(2);
 const update = args.includes('--update');
@@ -152,134 +145,6 @@ function walk(dir: string, relative: string, out: Array<Fixture>, errors: Array<
 	for (const name of subdirs.sort()) {
 		walk(join(dir, name), relative ? `${relative}/${name}` : name, out, errors);
 	}
-}
-
-const is_terminator = (c: string): boolean =>
-	c === '\n' || c === '\r' || c === '\u2028' || c === '\u2029';
-
-/** The `line:column` of UTF-16 offset `offset` — tsv's `WirePoint` (CRLF is one terminator). */
-function point(text: string, offset: number): string {
-	let line = 1;
-	let column = 0;
-	for (let i = 0; i < offset; i++) {
-		const c = text[i]!;
-		const breaks =
-			c === '\n' || c === '\u2028' || c === '\u2029' || (c === '\r' && text[i + 1] !== '\n');
-		if (breaks) {
-			line++;
-			column = 0;
-		} else {
-			column++;
-		}
-	}
-	return `${line}:${column}`;
-}
-
-/** What one oracle run produced: JS, or a refusal. */
-type Outcome = { code: string } | { refusal: string };
-
-/** ts-blank-space on `text`, with its `onError` nodes collected into a refusal record. */
-function run_ts_blank_space(text: string, positions_in: string): Outcome {
-	const source_file = ts.createSourceFile(
-		'input.ts',
-		text,
-		{
-			languageVersion: ts.ScriptTarget.ESNext,
-			impliedNodeFormat: ts.ModuleKind.ESNext,
-			jsDocParsingMode: ts.JSDocParsingMode.ParseNone
-		},
-		false,
-		ts.ScriptKind.TS
-	);
-	// `parseDiagnostics` is internal: the only parse verdict a SourceFile carries
-	const diagnostics = (source_file as unknown as { parseDiagnostics: Array<unknown> })
-		.parseDiagnostics;
-	if (diagnostics.length > 0) {
-		throw new Error(`TypeScript reports ${diagnostics.length} parse diagnostic(s)`);
-	}
-	const refused: Array<{ kind: string; start: number; end: number }> = [];
-	const code = blankSourceFile(source_file, (node) => {
-		refused.push({
-			kind: unsupported_kind(node),
-			start: node.getStart(source_file),
-			end: node.end
-		});
-	});
-	if (refused.length === 0) return { code };
-	refused.sort((a, b) => a.start - b.start);
-	const first = refused[0]!;
-	return {
-		refusal: `${first.kind}\t${point(positions_in, first.start)}\t${point(positions_in, first.end)}\n`
-	};
-}
-
-/** tsv's `UnsupportedKind` name for a node ts-blank-space refuses. */
-function unsupported_kind(node: import('typescript').Node): UnsupportedKind {
-	const k = ts.SyntaxKind;
-	switch (node.kind) {
-		case k.EnumDeclaration:
-			return 'Enum';
-		case k.ModuleDeclaration:
-			return 'ValueNamespace';
-		case k.PublicKeyword:
-		case k.PrivateKeyword:
-		case k.ProtectedKeyword:
-		case k.ReadonlyKeyword:
-		case k.OverrideKeyword:
-			return 'ParameterProperty';
-		case k.ImportEqualsDeclaration:
-			return 'ImportEquals';
-		case k.ExportAssignment:
-			return 'ExportEquals';
-		case k.TypeAssertionExpression:
-			return 'TypeAssertion';
-		case k.AsExpression:
-		case k.SatisfiesExpression:
-			return 'AssertionGrouping';
-		default:
-			throw new Error(`ts-blank-space refused an unmapped node: ${ts.SyntaxKind[node.kind]}`);
-	}
-}
-
-/**
- * The derivation: ts-blank-space over the terminator-folded input, terminators restored. With
- * nothing folded its output is returned as is, even one that changed the UTF-16 length: that is
- * a wrong output, which the contract guard refuses to claim and an override stands against.
- */
-function derive(input: string): Outcome {
-	const folded = input.replace(/[\r\u2028\u2029]/g, '\n');
-	const outcome = run_ts_blank_space(folded, input);
-	if ('refusal' in outcome || folded === input) return outcome;
-	const code = outcome.code;
-	if (code.length !== input.length) {
-		throw new Error('ts-blank-space changed the UTF-16 length');
-	}
-	let restored = '';
-	for (let i = 0; i < input.length; i++) {
-		const c = input[i]!;
-		if (c === '\r' || c === '\u2028' || c === '\u2029') {
-			if (code[i] !== '\n') throw new Error(`ts-blank-space moved the terminator at ${i}`);
-			restored += c;
-		} else {
-			restored += code[i];
-		}
-	}
-	return { code: restored };
-}
-
-/**
- * Why `code` is not a JS module, or `null` when it is: oxc-parser in JS mode. The
- * Rust side's parse of the expected output is `tsv_ts::parse`, which accepts TypeScript, so
- * this is the check that the claimed output is JS at all.
- */
-function js_parse_failure(code: string, expected_file: string): string | null {
-	// read `errors` once into a local (lib/oxc.ts: a getter on the WASI binding)
-	const errors = oxc_fatal_errors(
-		oxc_parse(expected_file, code, { lang: 'js', sourceType: 'module', showSemanticErrors: true })
-			.errors
-	);
-	if (errors.length === 0) return null;
-	return errors.map((e) => e.message ?? 'unknown error').join('; ');
 }
 
 /**
@@ -448,9 +313,9 @@ if (selected.length === 0) {
 }
 
 console.log(
-	`strip oracles: ts-blank-space ${ts_blank_space_version} (typescript ${ts.version}), ` +
+	`strip oracles: ts-blank-space ${ORACLE_VERSIONS.ts_blank_space} (typescript ${ORACLE_VERSIONS.typescript}), ` +
 		`Node ${versions.node} module.stripTypeScriptTypes; JS parse guard: oxc-parser ` +
-		oxc_parser_version
+		ORACLE_VERSIONS.oxc_parser
 );
 
 let outputs = 0;

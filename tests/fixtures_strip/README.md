@@ -72,7 +72,8 @@ every declared one must still fire. The accepted ones:
 - **Node writes a statement-final assertion's `;` one column later**, and none when nothing
   follows the statement. The same program; tsv keeps ts-blank-space's bytes.
 - **Node misses the `;` before a computed class member after a blanked `declare` field or a
-  blanked bodiless signature**, emitting a different program.
+  blanked bodiless signature**, emitting a different program, and the `;` before a generic
+  arrow after a blanked bodiless signature, emitting a syntax error.
 - **Node writes a `;` before a blanked overload that nothing before it needs** (after a
   declaration ending in `}`). The same program; tsv keeps ts-blank-space's bytes.
 - **Node refuses an overload signature as the lone body of an `if`**, and a member named `in`
@@ -108,10 +109,11 @@ override. The overrides:
   refuses it too.
 - **ts-blank-space blanks a bodiless signature — an overload, an abstract method, an index
   signature — with no `;` ever**, so an unterminated statement or field before it runs on into a
-  next line that continues it — one opening with `[`, `(`, a template, a binary operator, or a
-  member named `in` / `instanceof` (`a = 1` then `[k] = 2` reads `a = 1[k] = 2`). The `;` goes
-  at the signature, as a blanked `declare` field takes one, and only there. Node agrees on a
-  statement, not in a class body. As the lone body of an `if`, a loop or a label, the signature
+  next line that continues it — one opening with `[`, `(`, a template, a generic arrow (its
+  `<T>` blanks to leave the `(` first), a binary operator, or a member named `in` /
+  `instanceof` (`a = 1` then `[k] = 2` reads `a = 1[k] = 2`). The `;` goes at the signature, as
+  a blanked `declare` field takes one, and only there. Node agrees on a statement, except
+  before a generic arrow, and not in a class body. As the lone body of an `if`, a loop or a label, the signature
   always becomes `;` (blanked plain, `if (a)` takes the next statement as its body), as every
   statement blanked whole there does.
 - **ts-blank-space leaves an optional method's `?` and type parameters in place** and inserts

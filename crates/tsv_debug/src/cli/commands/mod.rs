@@ -52,6 +52,7 @@ pub mod render_audit;
 pub mod render_compare;
 pub mod roundtrip_audit;
 pub mod scan_audit;
+pub mod strip;
 pub mod strip_fixtures_validate;
 #[cfg(feature = "swallow_check")]
 pub mod swallow_audit;

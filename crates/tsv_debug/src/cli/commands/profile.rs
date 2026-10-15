@@ -8,6 +8,7 @@ use tsv_cli::cli::input::ParserType;
 /// Profile parse + format timing on files or directories.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "profile")]
+#[expect(clippy::struct_excessive_bools)] // CLI flags; `run` folds `--bind` / `--strip` into a `Mode`
 pub struct ProfileCommand {
     /// number of iterations (default: 10)
     #[argh(option, default = "10")]
@@ -22,6 +23,12 @@ pub struct ProfileCommand {
     #[argh(switch)]
     bind: bool,
 
+    /// measure parse vs the type strip (`tsv_ts::strip`) instead of parse vs format;
+    /// TypeScript files only. The `format` column is the strip's time less the parse's
+    /// (its walk + blank), so `total` is the whole strip
+    #[argh(switch)]
+    strip: bool,
+
     /// with --bind: print the deterministic flow-construction anchors
     /// (flow-node density = flow nodes / AST nodes, dead-label fraction)
     /// summed over the corpus
@@ -35,10 +42,27 @@ pub struct ProfileCommand {
 
 impl ProfileCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
-        // Bind mode is TypeScript-only (the checker binds no Svelte/CSS): drop the
-        // other languages up front so the "format" column is a bind time.
+        if self.bind && self.strip {
+            eprintln!("Error: --bind and --strip each replace the format column; pass one");
+            return Err(CliError::Failed);
+        }
+        let mode = if self.bind {
+            Mode::Bind
+        } else if self.strip {
+            Mode::Strip
+        } else {
+            Mode::Format
+        };
+        // Bind is TypeScript-only (the checker binds no Svelte/CSS): drop the other
+        // languages up front so the "format" column is a bind time. The strip takes what a
+        // module loader strips: `.ts` / `.mts` / `.cts`, no declaration file.
         let (files, skipped) = resolve_profile_files(&self.paths, |p| {
-            !self.bind || ParserType::from_extension(&p.to_string_lossy()) == ParserType::TypeScript
+            let name = p.to_string_lossy();
+            match mode {
+                Mode::Format => true,
+                Mode::Bind => ParserType::from_extension(&name) == ParserType::TypeScript,
+                Mode::Strip => is_strippable(&name),
+            }
         })?;
 
         let mut results = Vec::new();
@@ -52,7 +76,7 @@ impl ProfileCommand {
         let mut doc_arena = tsv_lang::doc::arena::DocArena::new();
 
         for path in &files {
-            match profile_file(path, self.iterations, self.bind, &mut arena, &mut doc_arena) {
+            match profile_file(path, self.iterations, mode, &mut arena, &mut doc_arena) {
                 Ok(result) => results.push(result),
                 Err(err) => {
                     eprintln!("Error profiling {}: {err}", path.display());
@@ -95,6 +119,12 @@ impl ProfileCommand {
             if self.flow_stats {
                 print_flow_stats(&results);
             }
+        }
+        if self.strip {
+            eprintln!(
+                "(the `format` column is the strip's walk + blank — its time less the parse's; \
+                 `total` is the whole strip)"
+            );
         }
 
         Ok(())
@@ -150,6 +180,17 @@ fn read_vm_hwm_kb() -> Option<u64> {
         }
     }
     None
+}
+
+/// What the second timed column measures.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Mode {
+    /// The shipped format path.
+    Format,
+    /// `tsv_check`'s lower + bind (`--bind`).
+    Bind,
+    /// The type strip less its parse (`--strip`).
+    Strip,
 }
 
 /// Timing results for a single file
@@ -256,7 +297,7 @@ fn files_label(n: usize) -> String {
 fn profile_file(
     path: &Path,
     iterations: usize,
-    bind: bool,
+    mode: Mode,
     arena: &mut bumpalo::Bump,
     doc_arena: &mut tsv_lang::doc::arena::DocArena,
 ) -> Result<FileResult, String> {
@@ -268,12 +309,14 @@ fn profile_file(
     let mut bind_stats = None;
 
     for _ in 0..iterations {
-        let (parse_dur, format_dur) = if bind {
-            let (parse_dur, format_dur, stats) = profile_bind_once(&source, arena)?;
-            bind_stats = Some(stats); // deterministic — any iteration's copy
-            (parse_dur, format_dur)
-        } else {
-            profile_once(&source, parser_type, arena, doc_arena)?
+        let (parse_dur, format_dur) = match mode {
+            Mode::Bind => {
+                let (parse_dur, format_dur, stats) = profile_bind_once(&source, arena)?;
+                bind_stats = Some(stats); // deterministic — any iteration's copy
+                (parse_dur, format_dur)
+            }
+            Mode::Strip => profile_strip_once(&source, arena)?,
+            Mode::Format => profile_once(&source, parser_type, arena, doc_arena)?,
         };
         parse_times.push(parse_dur);
         format_times.push(format_dur);
@@ -325,6 +368,38 @@ fn profile_bind_once(
         dead_labels: u64::from(flow.stats.dead_labels),
     };
     Ok((parse_dur, bind_dur, stats))
+}
+
+/// Whether `--strip` times `path`: TypeScript a module loader strips — `.ts` / `.mts` /
+/// `.cts`, `.svelte.ts` included — and not a declaration file, which has no JS to strip to.
+fn is_strippable(path: &str) -> bool {
+    [".ts", ".mts", ".cts"]
+        .iter()
+        .any(|ext| path.ends_with(ext))
+        && ![".d.ts", ".d.mts", ".d.cts"]
+            .iter()
+            .any(|ext| path.ends_with(ext))
+}
+
+/// Run one parse and one type strip of TypeScript, returning `(parse_duration,
+/// strip_duration - parse_duration)`. `tsv_ts::strip` parses inside, so its walk + blank
+/// is read as the difference; a refusal is timed like an output, since the walk ran.
+fn profile_strip_once(
+    source: &str,
+    arena: &mut bumpalo::Bump,
+) -> Result<(Duration, Duration), String> {
+    let t0 = Instant::now();
+    tsv_ts::parse(source, arena).map_err(|e| format!("parse error: {e}"))?;
+    let parse_dur = t0.elapsed();
+    arena.reset();
+
+    let t1 = Instant::now();
+    let result = tsv_ts::strip(source, arena);
+    let strip_dur = t1.elapsed();
+    if let Err(tsv_ts::StripError::Parse(e)) = result {
+        return Err(format!("parse error: {e}"));
+    }
+    Ok((parse_dur, strip_dur.saturating_sub(parse_dur)))
 }
 
 /// Run one parse + format iteration, return (parse_duration, format_duration).

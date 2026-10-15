@@ -54,6 +54,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Canonicalizer](#canonicalizer-audit-canonicalizeaudit) | `canonicalize:audit` | `canonicalize_js` non-idempotence / corrupt output / comment loss | `deno task check` |
 | [Compile fixtures](#compile-fixture-validation-compilefixturesvalidate) | `compile:fixtures:validate` | a stale compile expectation (oracle freshness) · tsv-vs-expected compile parity · expected-file idempotence | parity legs in `deno task check` (`cargo test`); freshness in `deno task conformance` |
 | [Strip fixtures](#strip-fixture-validation-stripfixturesvalidate) | `strip:fixtures:validate` · `strip:fixtures:oracle` | `tsv_ts::strip` departing from a fixture's output or refusal, moving a character's line or UTF-16 column or a line terminator, or not idempotent (a ratchet over known failures) · a committed expectation the oracles no longer derive, or an undeclared oracle disagreement | parity in `deno task check` (`cargo test --test strip_fixtures_tests`); the oracle check on demand (Node + `bench:install`) |
+| [Strip corpus](#strip-corpus-differential-stripcorpus) | `strip:corpus` | `tsv_ts::strip` on real TypeScript panicking, breaking the position contract or idempotence, emitting no JS module, or departing from ts-blank-space's bytes or refusals outside a reviewed list | `deno task conformance` (release) |
 | [Fixture validation](./fixture_overview.md) | `fixtures:validate` | a fixture claim no longer holding — parser/formatter parity vs the committed files · the ORACLE itself having moved (freshness, sidecar) | parity in `deno task check` (`cargo test --test fixtures_tests`); freshness in `deno task conformance` (with `bench:pins:suites`, its pin-freshness preflight) |
 
 **How a corpus-walking audit walks.** Every one — the injection audits directly, the
@@ -2264,8 +2265,43 @@ a known refusal kind and span) instead of deriving it, and fails the override on
 derivation agrees. The parity half grades a reviewed claim like any other and checks the
 `divergences.txt` syntax.
 
-**Blind spots.** Scope is the curated tree; the corpus-scale differential against both oracles
-is not built yet. The position check allows a space or a `;` / `(` / `)` at any offset, not
+**Blind spots.** Scope is the curated tree; real code is the [strip corpus
+differential](#strip-corpus-differential-stripcorpus)'s, against ts-blank-space alone. The position check allows a space or a `;` / `(` / `)` at any offset, not
 only inside a type-only range or at a hazard site, so deleted JS or a misplaced `;` is
 caught only by the output comparison. Node is unpinned, so a Node upgrade can move the
 oracle half's verdict with no commit here — the run prints the Node version it graded.
+
+## Strip Corpus Differential (`strip:corpus`)
+
+```bash
+deno task strip:corpus                     # builds the corpus tsv_debug; :run skips the build
+target/corpus/tsv_debug strip <file.ts>    # one file's strip, for triage
+```
+
+**What it proves.** Over every `.ts` / `.mts` / `.cts` file (`.svelte.ts` included, declaration
+files not) of the `gates` view's snapshot tiers, `tsv_ts::strip` does not panic or reject the
+parse; its output keeps the position contract, strips to itself borrowed, and parses as a JS
+module under oxc-parser in JS mode with semantic errors; and it equals ts-blank-space's output
+byte for byte (the fixtures' derivation, `benches/js/lib/strip_oracle.ts`), or both refuse with
+the same kind and span. tsv's side is one `tsv_debug strip --stdin` process, which grades the
+contract and idempotence; the oracle side is `benches/js/strip_corpus.ts`.
+
+**Scope.** The snapshot tiers because their counts are pinned and they are programs: the view's
+Prettier suites are formatter fixtures (redeclarations, grammar errors tsc reports from its
+checker), where JS validity and refusal parity say nothing about the strip, and the
+`robustness` view's live trees are unpinned. Declaration files are ambient: there is no JS to
+strip one to.
+
+**Gating.** Exact counts, `STRIP_CORPUS_PINS` (files graded, refusals). A JS-validity, byte or
+refusal disagreement fails unless the script's `ACCEPTED` list names the file and check with the
+reason tsv's answer stands; an entry that no longer fires fails too, as does a panic, a contract
+or idempotence finding, a tsv parse error, a TypeScript parse diagnostic (ts-blank-space then
+grades nothing), and an empty corpus. No argument narrows the run: the corpus strips in
+seconds, so every run is a full one. A `deno task conformance` leg, beside the corpus gates it
+shares `../corpora` and `node_modules` with.
+
+**Blind spots.** One oracle: Node's `module.stripTypeScriptTypes` is unpinned and graded only
+over the fixtures. The fixtures' departures from ts-blank-space (the hazards it misses) do not
+occur in this corpus, so it grades agreement with ts-blank-space, not those fixes. The position
+contract has the fixtures' limit (a blank or a `;` / `(` / `)` is allowed at any offset); the
+byte comparison is what catches a misplaced one.

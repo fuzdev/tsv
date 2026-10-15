@@ -118,7 +118,11 @@ The `--bind` form instead measures parse vs lower+bind timing through the
 `tsv_check` crate (the experimental typechecker, which may never ship — see
 [typechecker.md](typechecker.md); TypeScript files only) and reports peak RSS
 (`VmHWM` from `/proc/self/status`) — the binder's standing perf-anchor form;
-add `--flow-stats` for its deterministic flow-construction counters.
+add `--flow-stats` for its deterministic flow-construction counters. The
+`--strip` form times `tsv_ts::strip` over what a module loader strips (`.ts` /
+`.mts` / `.cts`, no declaration file): the strip parses inside, so its second
+column is the strip's time less the parse's — the walk and the blanking copy —
+and `total` is the whole strip.
 
 ```bash
 # Profile a directory
@@ -853,8 +857,9 @@ getting them wrong.
 
 `tsv_debug` exposes several entry points — `profile` (parse + format),
 `json_profile` (parse + wire-JSON write), `profile --bind` (parse + lower/bind),
-`compile_profile` — and the shipped CLI is a fourth shape. Cross those against
-the corpora (TypeScript, Svelte, CSS) and a board is a **cell**, not a summary.
+`profile --strip` (parse + the type strip), `compile_profile` — and the shipped CLI is
+another shape. Cross those against the corpora (TypeScript, Svelte, CSS) and a board is
+a **cell**, not a summary.
 Two rules follow, and it is easy to spend one while believing you have spent both:
 
 - **Enumerate the entry points.** `profile` never calls `convert_ast_json_bytes`,

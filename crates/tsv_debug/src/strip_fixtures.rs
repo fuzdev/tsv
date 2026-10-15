@@ -336,6 +336,13 @@ fn point_of(source: &str, position: u32) -> (u32, u32) {
     (point.line, point.column)
 }
 
+/// A refusal of `source` as `refusal.txt` spells it — `Kind<TAB>line:column<TAB>line:column`
+/// and a newline — the record the oracle side derives from ts-blank-space too.
+pub fn refusal_line(source: &str, kind: tsv_ts::UnsupportedKind, span: tsv_lang::Span) -> String {
+    let (start, end) = (point_of(source, span.start), point_of(source, span.end));
+    format!("{kind:?}\t{}:{}\t{}:{}\n", start.0, start.1, end.0, end.1)
+}
+
 const fn is_terminator(unit: u16) -> bool {
     matches!(unit, 0x0A | 0x0D | 0x2028 | 0x2029)
 }
@@ -605,7 +612,7 @@ fn divergences_failure(content: &str) -> Option<String> {
 }
 
 /// Why stripping `code` again is not the identity on a borrowed source, if it is not.
-fn idempotence_failure(code: &str) -> Option<String> {
+pub fn idempotence_failure(code: &str) -> Option<String> {
     let arena = bumpalo::Bump::new();
     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| tsv_ts::strip(code, &arena))) {
         Err(_) => Some("stripping the output panicked".to_string()),

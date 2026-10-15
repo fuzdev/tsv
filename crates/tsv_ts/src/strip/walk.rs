@@ -150,8 +150,8 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// Blank a bodiless signature — an overload, an abstract method or accessor, an index
     /// signature. ts-blank-space blanks these with no `;` ever, so an expression left open
     /// before one (`Walk::open`) runs on into a following line that continues it (`(`, `[`,
-    /// a template, a binary operator, a generator's `*`, a member key `in` /
-    /// `instanceof`); the `;` goes in exactly then.
+    /// a template, a generic arrow's `<`, a binary operator, a generator's `*`, a member key
+    /// `in` / `instanceof`); the `;` goes in exactly then.
     fn blank_signature(&mut self, span: Span, position: Position) {
         let hazard = self.open.continued_by(self.src.continuation(span.end));
         self.blank_whole(span, hazard || position == Position::Nested);

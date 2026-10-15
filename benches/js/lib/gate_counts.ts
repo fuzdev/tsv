@@ -97,7 +97,7 @@ export const GATE_CHECKOUT_IDS: Record<
 	[CORPORA_ROOT]: {
 		tree: CORPORA_TREE,
 		hash: '9b64dd2a4',
-		pins: ['CORPUS_FORMAT_*', 'CORPUS_PARSE_*', 'SVELTE_STYLES_BLOCKS_PIN']
+		pins: ['CORPUS_FORMAT_*', 'CORPUS_PARSE_*', 'SVELTE_STYLES_BLOCKS_PIN', 'STRIP_CORPUS_PINS']
 	},
 	// `../svelte` feeds the conformance view alone (its `tests` tree); its
 	// `packages/svelte/src` is the snapshot's `svelte` collection.
@@ -1216,6 +1216,16 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
  * 401 holds over kit's fixture drop: none of its 22 removed pages carries a `<style>`.
  */
 export const SVELTE_STYLES_BLOCKS_PIN = 401;
+
+/**
+ * strip:corpus — exact counts over the strippable TypeScript of the `gates` view's snapshot
+ * tiers (`benches/js/strip_corpus.ts`): `files` graded and `refusals`, the files tsv refuses
+ * as ts-blank-space does. A move in `files` is a snapshot refresh, a collection joining a
+ * tier, or a broken filter; `refusals` moves with the snapshot, or with a verdict change on
+ * both sides at once (a ts-blank-space bump), the one move the per-file agreement cannot
+ * see. Measured over ../corpora `collections/`, ts-blank-space 0.9.0.
+ */
+export const STRIP_CORPUS_PINS = { files: 2769, refusals: 70 };
 
 /**
  * bench:harvest:wpt — exact `<style>` blocks from the default `../wpt/css`. Measured

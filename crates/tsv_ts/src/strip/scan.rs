@@ -49,11 +49,13 @@ impl<'s> Source<'s> {
     /// How the first significant token at or after `from` would continue an expression left
     /// open on an earlier line, among the tokens a statement or a class member can open
     /// with; `None` when it would not (`++` / `--`, before which ASI ends the line, or
-    /// anything else).
+    /// anything else). A statement opening with `<` is a generic arrow (`<T>(x: T) => x`),
+    /// whose type parameters blank to leave its `(` the line's first token, so it continues
+    /// as a call's `(` does.
     pub fn continuation(self, from: u32) -> Option<Continuation> {
         let at = self.next_significant(from) as usize;
         match self.bytes.get(at)? {
-            b'(' | b'[' | b'`' => Some(Continuation::Postfix),
+            b'(' | b'[' | b'`' | b'<' => Some(Continuation::Postfix),
             b'/' | b'*' => Some(Continuation::Operator),
             &sign @ (b'+' | b'-') => {
                 (self.bytes.get(at + 1) != Some(&sign)).then_some(Continuation::Operator)
@@ -166,7 +168,8 @@ impl<'s> Source<'s> {
 /// How a next line's first token continues an expression ([`Source::continuation`]).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(super) enum Continuation {
-    /// A call's `(`, a member access's `[`, a tagged template's `` ` ``.
+    /// A call's `(`, a member access's `[`, a tagged template's `` ` `` — and a generic
+    /// arrow's `<`, whose `(` is what is left once its type parameters blank.
     Postfix,
     /// A binary operator: `+`, `-`, `/`, `*`, `in`, `instanceof`.
     Operator,
@@ -231,6 +234,7 @@ mod tests {
             ("(x)", Some(Postfix)),
             ("[k] = 1", Some(Postfix)),
             ("`t`", Some(Postfix)),
+            ("<T>(x) => x", Some(Postfix)),
             ("/re/", Some(Operator)),
             ("*gen() {}", Some(Operator)),
             ("+x", Some(Operator)),

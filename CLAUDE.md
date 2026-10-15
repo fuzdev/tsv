@@ -172,6 +172,9 @@ deno task strip:fixtures:validate    # tsv_ts::strip vs tests/fixtures_strip (= 
 deno task strip:fixtures:update      # regenerate expected.* / refusal.txt from ts-blank-space, cross-checked against Node's
 #                                      module.stripTypeScriptTypes (`strip:fixtures:oracle` re-checks; an `override ts-blank-space`
 #                                      fixture's hand-reviewed claim is validated, never written). Node + bench:install; NOT in check
+deno task strip:corpus               # tsv_ts::strip vs ts-blank-space over the ../corpora snapshot's TypeScript: no panic, the
+#                                      position contract + idempotence, JS-valid output, byte and refusal agreement outside a
+#                                      reviewed ACCEPTED list, exact STRIP_CORPUS_PINS. A `conformance` leg; ./docs/audits.md
 ```
 
 **Standing audit gates** — full reference ./docs/audits.md (what each proves, blind spots, flags, where it gates; its overview table maps every task). Read the relevant section before running or modifying an audit. RATCHET audits grade against a committed known-bug snapshot (`*_known.txt`); each has an `:update` task that re-pins after a fix and refuses a narrowed run. Everything below gates in `deno task check` unless noted.
@@ -368,7 +371,8 @@ deno task conformance                  # pre-release aggregate, in order:
 #      cadence grades (seconds when nothing moved; each stamped leg warn-skips an absent checkout; benches/js/CLAUDE.md §Harvests)
 #   2. fixtures:validate + compile:fixtures:validate — ORACLE-FRESHNESS: `check` runs only each tree's sidecar-free slice,
 #      which grades tsv against the committed file and can't see the oracle moving; only a prettier re-format can (~17 s)
-#   3. bench:harvest:svelte-styles — re-extracts the CSS the `gates` view grades
+#   3. bench:harvest:svelte-styles — re-extracts the CSS the `gates` view grades; then strip:corpus:run — the type strip
+#      vs ts-blank-space over the snapshot's TypeScript (its own process, seconds)
 #   4. in ONE process (benches/js/conformance.ts; oracles load once, fail-fast, FFI built once): the three gates above +
 #      corpus:compare:parse --all + corpus:compare:parse tests/fixtures --fixtures (each fixture's parse-pinned documents,
 #      grading the `loc` tolerance rows real code rarely reaches) + corpus:compare:format --all
@@ -455,6 +459,7 @@ Results: `benches/js/results/report.<runtime>.{json,md}` (committed; every row c
 cargo run --release -p tsv_debug -- profile ../corpora/collections/zzz/src/lib        # profile a directory
 cargo run --release -p tsv_debug -- profile file.ts --iterations 20  # more iterations; --json for machine-readable
 cargo run --release -p tsv_debug -- json_profile ../corpora/collections/zzz/src/lib   # parse vs wire-JSON write (--locations: the loc emitter)
+cargo run --release -p tsv_debug -- profile --strip ../corpora/collections   # parse vs the type strip's walk + blank (TS only)
 cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile  # Svelte compile vs the format wall
 ```
 
@@ -659,6 +664,10 @@ cargo run -p tsv_debug compile_corpus_compare --ratchet [--update]  # validation
 cargo run --profile corpus -p tsv_debug compile_fuzz      # differential compile fuzzer — ⚠️ RED BY DESIGN, a discovery tool (--seed, --iterations, …)
 cargo run --release -p tsv_debug -- erase_comment_census ../corpora/collections/fuz_ui  # type-eraser comment-refusal LOWER BOUND (pure Rust)
 
+# strip - tsv_ts::strip on one file to stdout (a refusal or parse error to stderr, exit 1); --stdin answers NDJSON
+# requests `{source}` — the tsv side of `deno task strip:corpus` (benches/js/strip_corpus.ts)
+cargo run -p tsv_debug strip file.ts
+
 # format_prettier - format using prettier (line widths by default; --no-line-widths to hide)
 cargo run -p tsv_debug format_prettier file.svelte
 
@@ -734,6 +743,7 @@ deno task conformance:tsc-check:update  # re-pin the run's snapshot counts after
 ```bash
 cargo run -p tsv_debug profile ../corpora/collections/zzz/src/lib                    # parse vs format timing (--iterations, --json, --flow-stats)
 cargo run -p tsv_debug profile --bind ../corpora/collections/zzz/src                 # parse vs lower+bind timing (TS-only) + peak RSS (§1)
+cargo run --release -p tsv_debug -- profile --strip ../corpora/collections           # parse vs the type strip's walk + blank (.ts/.mts/.cts, no .d.ts)
 cargo run --release -p tsv_debug -- json_profile ../corpora/collections/zzz/src/lib  # the bindings' parse path: parse vs span-only wire write (§2)
 cargo run -p tsv_debug buffer_sizes ../corpora/collections/zzz/src ../corpora/collections/gro/src     # printer SmallVec sizing histograms (§8)
 cargo run -p tsv_debug arena_stats ../corpora/collections/zzz/src/lib                # DocArena node-population + memory audit (§7; --reuse, --list-errors)
