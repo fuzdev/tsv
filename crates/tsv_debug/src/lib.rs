@@ -10,5 +10,6 @@ pub mod fixtures;
 pub mod json;
 pub mod render_browser;
 pub mod render_normalize;
+pub mod strip_fixtures;
 pub mod test262;
 pub mod tsc_conformance;

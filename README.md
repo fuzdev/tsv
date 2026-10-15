@@ -72,7 +72,7 @@ tsv features:
 - [x] formatters following Prettier + prettier-plugin-svelte + Svelte's prettier config
       (with intentional divergences and no supported style config)
 - [x] [VS Code formatter extension](https://github.com/fuzdev/vscode-extension-tsv-format) - [`fuzdev.tsv-format`](https://marketplace.visualstudio.com/items?itemName=fuzdev.tsv-format) on the Marketplace and [Open VSX](https://open-vsx.org/extension/fuzdev/tsv-format) (WASM-only, works in desktop VS Code and the browser host)
-- [ ] ts-to-js conversion (types-to-whitespace only)
+- [ ] type stripping: TypeScript to JS by blanking types to whitespace, preserving every position (Rust API first)
 - [ ] module lexer
 
 Future features (unknown order):
@@ -300,6 +300,7 @@ Software:
   in ["A prettier printer"](https://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf)
   by [Philip Wadler](https://homepages.inf.ed.ac.uk/wadler/)
 - [TypeScript](https://typescriptlang.org/)
+- [ts-blank-space](https://github.com/bloomberg/ts-blank-space) - the reference oracle for type stripping
 
 Web Standards:
 
@@ -335,3 +336,7 @@ MIT - https://github.com/sveltejs/svelte/blob/main/LICENSE.md
 Prettier
 Copyright © James Long and contributors
 MIT - https://github.com/prettier/prettier/blob/main/LICENSE
+
+ts-blank-space
+Copyright 2024 Bloomberg Finance L.P.
+Apache-2.0 - https://github.com/bloomberg/ts-blank-space/blob/main/LICENSE

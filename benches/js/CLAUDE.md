@@ -1550,6 +1550,9 @@ benches/js/
 ├── conformance.ts         # Single-process pre-release aggregate driver: every leg, one
 │                          # module cache
 ├── smoke.ts               # Smoke test for formatters and parsers (runtime-neutral)
+├── strip_fixtures.ts      # `strip:fixtures:oracle` / `:update`: the type-strip fixtures' oracle side — expected
+│                          # outputs from ts-blank-space, cross-checked against Node's module.stripTypeScriptTypes
+│                          # (Node-only; tests/fixtures_strip/README.md)
 ├── compose_reports.ts     # Fold report.{deno,node,bun}.json → combined report.{json,md}
 ├── idempotency_sweep.ts   # F1 sweep over the `robustness` view (drives tsv_debug `fuzz --iterations 0`)
 ├── corpus_audit.ts        # `audit:corpus`: the pure-Rust content-loss / robustness legs over

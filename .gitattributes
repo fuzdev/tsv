@@ -14,6 +14,8 @@ input_invalid_raw_cr.svelte -text
 unformatted_cr_reindent.svelte -text
 unformatted_crlf_reindent.svelte -text
 unformatted_ours_before_instance_crlf.svelte -text
+# The strip fixtures pin line terminators byte for byte (CRLF, CR, U+2028, U+2029).
+tests/fixtures_strip/** -text
 
 # Recorded oracle outputs — committed on purpose, but generated:
 # collapse in GitHub diffs and exclude from language stats.

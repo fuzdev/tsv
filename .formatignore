@@ -8,3 +8,4 @@
 # and a file named under it is skipped too — see docs/cli.md §Multi-File Formatting.
 tests/fixtures/
 tests/fixtures_compile/
+tests/fixtures_strip/

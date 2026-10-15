@@ -53,6 +53,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Compiler conformance](#compiler-conformance-audit-conformanceauditcompiler) | `conformance:audit:compiler` | compile-fixture divergence catalog + checklist ↔ `Refusal` drift | `deno task check` |
 | [Canonicalizer](#canonicalizer-audit-canonicalizeaudit) | `canonicalize:audit` | `canonicalize_js` non-idempotence / corrupt output / comment loss | `deno task check` |
 | [Compile fixtures](#compile-fixture-validation-compilefixturesvalidate) | `compile:fixtures:validate` | a stale compile expectation (oracle freshness) · tsv-vs-expected compile parity · expected-file idempotence | parity legs in `deno task check` (`cargo test`); freshness in `deno task conformance` |
+| [Strip fixtures](#strip-fixture-validation-stripfixturesvalidate) | `strip:fixtures:validate` · `strip:fixtures:oracle` | `tsv_ts::strip` departing from a fixture's output or refusal, moving a character's line or UTF-16 column or a line terminator, or not idempotent (a ratchet over known failures) · a committed expectation the oracles no longer derive, or an undeclared oracle disagreement | parity in `deno task check` (`cargo test --test strip_fixtures_tests`); the oracle check on demand (Node + `bench:install`) |
 | [Fixture validation](./fixture_overview.md) | `fixtures:validate` | a fixture claim no longer holding — parser/formatter parity vs the committed files · the ORACLE itself having moved (freshness, sidecar) | parity in `deno task check` (`cargo test --test fixtures_tests`); freshness in `deno task conformance` (with `bench:pins:suites`, its pin-freshness preflight) |
 
 **How a corpus-walking audit walks.** Every one — the injection audits directly, the
@@ -2229,3 +2230,42 @@ lockfile's `esrap` pin closes, after it went live with `deno task check` green (
   `canonicalize_js`, whose bar tolerates a comment-POSITION difference (`compare_canonical`) —
   so a difference the canonicalizer erases is one this cannot see, and the canonicalizer itself
   is guarded separately by [`canonicalize:audit`](#canonicalizer-audit-canonicalizeaudit).
+
+## Strip-Fixture Validation (`strip:fixtures:validate`)
+
+```bash
+deno task strip:fixtures:validate          # also: -v, --update, positional filter patterns
+deno task strip:fixtures:oracle            # the oracle side (Node; needs bench:install)
+```
+
+**What it proves.** Per fixture under `tests/fixtures_strip/`, `tsv_ts::strip` produces the
+committed `expected.*` or the refusal in `refusal.txt`; its output has the input's UTF-16
+length, keeps every line terminator at its UTF-16 offset, and holds at every other offset the
+input's character, a space, or a `;` / `(` / `)` hazard substitution — so every surviving
+character keeps its line and UTF-16 column; and stripping the output returns it borrowed. The
+expected output itself is held to the same contract and must parse under `tsv_ts::parse` at
+module goal — a TypeScript parse, so it shows the output parses, not that it is JS.
+The JS-validity guard is the oracle side's: `strip:fixtures:oracle` (and `:update`) parse
+every claimed output (derived or reviewed) with oxc-parser in JS mode and fail on any error. File conventions and
+the oracle derivation: [tests/fixtures_strip/README.md](../tests/fixtures_strip/README.md).
+
+**Gated as a RATCHET** over `strip_fixtures_known.txt` (keyed `CHECK<TAB>fixture`), born with
+every fixture the strip does not yet satisfy: a new failure fails, a pinned one that stopped
+failing fails, and a broken fixture or a panic is never pinned. A pattern-narrowed run grades
+against the snapshot's lines for the fixtures it reached, and `--update` refuses it.
+
+**Split gating.** The parity half needs no oracle and runs as `tests/strip_fixtures_tests.rs`
+in every `cargo test`. The oracle half — the expected files still derived from ts-blank-space,
+every disagreement with Node's `module.stripTypeScriptTypes` declared in the fixture's
+`divergences.txt` — needs Node and `node_modules`, so it is on demand, like `typecheck:js`.
+Where ts-blank-space is wrong, an `override ts-blank-space` line makes the claim a
+hand-reviewed one: the oracle half validates it (oxc's JS-mode parse, the position contract,
+a known refusal kind and span) instead of deriving it, and fails the override once the
+derivation agrees. The parity half grades a reviewed claim like any other and checks the
+`divergences.txt` syntax.
+
+**Blind spots.** Scope is the curated tree; the corpus-scale differential against both oracles
+is not built yet. The position check allows a space or a `;` / `(` / `)` at any offset, not
+only inside a type-only range or at a hazard site, so deleted JS or a misplaced `;` is
+caught only by the output comparison. Node is unpinned, so a Node upgrade can move the
+oracle half's verdict with no commit here — the run prints the Node version it graded.

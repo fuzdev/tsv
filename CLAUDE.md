@@ -143,9 +143,10 @@ tsv format .             # the repo's own TS/JS — tsv formats itself (`--check
 cargo test --workspace strict_reserved_words_are_binding_names  # one test by name
 cargo test --workspace --test fixtures_tests           # fixture validation tests
 cargo test --workspace --test cli_tests                # CLI integration tests
+cargo test --workspace --test strip_fixtures_tests     # type-strip fixtures (tests/fixtures_strip)
 ```
 
-`cargo fmt` (Rust) and `tsv format` (TS/JS) are the repo's ONLY autoformatters and partition it; markdown and JSON are hand-maintained. **Never run `deno fmt` or `prettier` on the repo** — tsv ships no config for them, so they'd churn every file (the prettier oracles pass options inline). `tsv format` on a directory is safe: the root `.formatignore` prunes tests/fixtures/ and tests/fixtures_compile/ (deliberately not format fixed points), and a file named under them is skipped too.
+`cargo fmt` (Rust) and `tsv format` (TS/JS) are the repo's ONLY autoformatters and partition it; markdown and JSON are hand-maintained. **Never run `deno fmt` or `prettier` on the repo** — tsv ships no config for them, so they'd churn every file (the prettier oracles pass options inline). `tsv format` on a directory is safe: the root `.formatignore` prunes tests/fixtures/, tests/fixtures_compile/ and tests/fixtures_strip/ (deliberately not format fixed points), and a file named under them is skipped too.
 
 ### Fixtures (Rust + Deno-based)
 
@@ -165,6 +166,12 @@ deno task compile:fixtures:validate  # compile fixtures: oracle freshness + expe
 #                                      Preflights `deno task conformance` — the ONLY place oracle freshness is graded (the
 #                                      sidecar-free slice in cargo test compares to the COMMITTED file, so it stays green
 #                                      when tsv and the file drift from the oracle together)
+deno task strip:fixtures:validate    # tsv_ts::strip vs tests/fixtures_strip (= `cargo test --test strip_fixtures_tests`):
+#                                      output, position identity, terminators, idempotence, refusals — known failures pinned
+#                                      in a ratchet (`strip:fixtures:validate:update` re-pins). See tests/fixtures_strip/README.md
+deno task strip:fixtures:update      # regenerate expected.* / refusal.txt from ts-blank-space, cross-checked against Node's
+#                                      module.stripTypeScriptTypes (`strip:fixtures:oracle` re-checks; an `override ts-blank-space`
+#                                      fixture's hand-reviewed claim is validated, never written). Node + bench:install; NOT in check
 ```
 
 **Standing audit gates** — full reference ./docs/audits.md (what each proves, blind spots, flags, where it gates; its overview table maps every task). Read the relevant section before running or modifying an audit. RATCHET audits grade against a committed known-bug snapshot (`*_known.txt`); each has an `:update` task that re-pins after a fix and refuses a narrowed run. Everything below gates in `deno task check` unless noted.
@@ -516,7 +523,8 @@ tsv/
 ├── benches/js/      # Cross-runtime benchmark + conformance harness (Deno/Node/Bun)
 ├── tests/           # Integration tests (parser, formatter, CLI)
 │   ├── fixtures/    # Test fixtures organized by language/feature
-│   └── fixtures_compile/ # Compiler fixtures (input.svelte + canonicalized oracle expected_server.js + expected.css) — separate tree so parser/formatter fixture counts stay unperturbed
+│   ├── fixtures_compile/ # Compiler fixtures (input.svelte + canonicalized oracle expected_server.js + expected.css) — separate tree so parser/formatter fixture counts stay unperturbed
+│   └── fixtures_strip/ # Type-strip fixtures for `tsv_ts::strip` (input.ts + oracle-generated expected.js or refusal.txt) — tests/fixtures_strip/README.md
 └── docs/            # Documentation (fixtures, cli, architecture, etc.)
 ```
 

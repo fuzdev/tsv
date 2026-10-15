@@ -24,6 +24,7 @@ mod goal;
 mod lexer;
 mod parser;
 mod printer;
+mod strip;
 
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::is_format_ignore_directive;
@@ -33,6 +34,7 @@ pub use tsv_lang::{ParseError, Result, WirePoint};
 
 pub use goal::Goal;
 pub use parser::TopLevelAs;
+pub use strip::{StripError, Stripped, UnsupportedKind, strip};
 
 /// The coordinates a TypeScript document's positions are reported in — acorn's: a
 /// leading BOM **counted** (acorn reads U+FEFF as whitespace, so it is one UTF-16 unit at
