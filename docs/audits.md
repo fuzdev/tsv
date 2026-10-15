@@ -2249,8 +2249,8 @@ The JS-validity guard is the oracle side's: `strip:fixtures:oracle` (and `:updat
 every claimed output (derived or reviewed) with oxc-parser in JS mode and fail on any error. File conventions and
 the oracle derivation: [tests/fixtures_strip/README.md](../tests/fixtures_strip/README.md).
 
-**Gated as a RATCHET** over `strip_fixtures_known.txt` (keyed `CHECK<TAB>fixture`), born with
-every fixture the strip does not yet satisfy: a new failure fails, a pinned one that stopped
+**Gated as a RATCHET** over `strip_fixtures_known.txt` (keyed `CHECK<TAB>fixture`), which pins
+every fixture the strip does not satisfy and is currently empty: a new failure fails, a pinned one that stopped
 failing fails, and a broken fixture or a panic is never pinned. A pattern-narrowed run grades
 against the snapshot's lines for the fixtures it reached, and `--update` refuses it.
 

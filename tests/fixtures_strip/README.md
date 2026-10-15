@@ -71,9 +71,15 @@ every declared one must still fire. The accepted ones:
   later line. tsv keeps every line terminator verbatim, as Node does.
 - **Node writes a statement-final assertion's `;` one column later**, and none when nothing
   follows the statement. The same program; tsv keeps ts-blank-space's bytes.
-- **Node misses the `;` before a computed class member after a blanked `declare` field**,
-  emitting a different program.
+- **Node misses the `;` before a computed class member after a blanked `declare` field or a
+  blanked bodiless signature**, emitting a different program.
+- **Node writes a `;` before a blanked overload that nothing before it needs** (after a
+  declaration ending in `}`). The same program; tsv keeps ts-blank-space's bytes.
+- **Node refuses an overload signature as the lone body of an `if`**, and a member named `in`
+  after a bodiless member, which it reads as a variance modifier. tsc accepts both.
 - **Node leaves `async` alone on its line** before a moved type-parameter `(`, a syntax error.
+- **Node blanks type parameters broken across lines in place**, keeping the parameters' `(`
+  where ts-blank-space moves it to the `<`. The same program.
 - **Node blanks an assertion whose erasure regroups the expression** (`b + c as T / d`),
   emitting a different program, where ts-blank-space refuses it.
 - **Node drops a leading BOM.**
@@ -92,12 +98,28 @@ disagree with it (a stale override fails, like a stale divergence) and a departu
 Node must be declared with a plain `node` line. Node never derives a claim, so it takes no
 override. The overrides:
 
-- **ts-blank-space writes no `;` before a generator method** whose blanked modifier follows a
-  field with no `;` (`a = 1` then `*gen() {}` reads as `a = 1 * gen() {}`, a syntax error). The
-  `;` goes at the modifier, ts-blank-space's own placement for a computed key; Node agrees.
+- **ts-blank-space writes no `;` before a generator method or a member named `in` /
+  `instanceof`** whose blanked modifier follows a field with no `;` (`a = 1` then `*gen() {}`
+  reads as `a = 1 * gen() {}`, a syntax error; `a = x` then `in` then `y` reads `a = x in y`,
+  silently a different program). The `;` goes at the modifier, ts-blank-space's own placement
+  for a computed key; Node agrees.
 - **ts-blank-space leaves an `override` parameter property verbatim**, which is no
   JS and drops the assignment. The claim is the `ParameterProperty` refusal; Node
   refuses it too.
+- **ts-blank-space blanks a bodiless signature — an overload, an abstract method, an index
+  signature — with no `;` ever**, so an unterminated statement or field before it runs on into a
+  next line that continues it — one opening with `[`, `(`, a template, a binary operator, or a
+  member named `in` / `instanceof` (`a = 1` then `[k] = 2` reads `a = 1[k] = 2`). The `;` goes
+  at the signature, as a blanked `declare` field takes one, and only there. Node agrees on a
+  statement, not in a class body. As the lone body of an `if`, a loop or a label, the signature
+  always becomes `;` (blanked plain, `if (a)` takes the next statement as its body), as every
+  statement blanked whole there does.
+- **ts-blank-space leaves an optional method's `?` and type parameters in place** and inserts
+  blanks before them (`m?<T>()` to `m?   <T>()`), which is no JS and moves every later column.
+  Node blanks both.
+- **ts-blank-space reads a `>>` after an assertion as a lone `>`** (TypeScript's scanner splits
+  `>>` until asked), so it blanks `b < c as T >> d` to `b < c >> d`, which regroups. The claim is
+  an `AssertionGrouping` refusal; Node blanks it too.
 - **Both oracles blank an assertion over a unary operand of `**`** (`-x as T ** 2` to
   `-x ** 2`, likewise `typeof` and `await`), a syntax error. The claim is an
   `AssertionGrouping` refusal.

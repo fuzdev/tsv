@@ -241,10 +241,15 @@ function unsupported_kind(node: import('typescript').Node): UnsupportedKind {
 	}
 }
 
-/** The derivation: ts-blank-space over the terminator-folded input, terminators restored. */
+/**
+ * The derivation: ts-blank-space over the terminator-folded input, terminators restored. With
+ * nothing folded its output is returned as is, even one that changed the UTF-16 length: that is
+ * a wrong output, which the contract guard refuses to claim and an override stands against.
+ */
 function derive(input: string): Outcome {
-	const outcome = run_ts_blank_space(input.replace(/[\r\u2028\u2029]/g, '\n'), input);
-	if ('refusal' in outcome) return outcome;
+	const folded = input.replace(/[\r\u2028\u2029]/g, '\n');
+	const outcome = run_ts_blank_space(folded, input);
+	if ('refusal' in outcome || folded === input) return outcome;
 	const code = outcome.code;
 	if (code.length !== input.length) {
 		throw new Error('ts-blank-space changed the UTF-16 length');

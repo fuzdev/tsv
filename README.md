@@ -72,7 +72,7 @@ tsv features:
 - [x] formatters following Prettier + prettier-plugin-svelte + Svelte's prettier config
       (with intentional divergences and no supported style config)
 - [x] [VS Code formatter extension](https://github.com/fuzdev/vscode-extension-tsv-format) - [`fuzdev.tsv-format`](https://marketplace.visualstudio.com/items?itemName=fuzdev.tsv-format) on the Marketplace and [Open VSX](https://open-vsx.org/extension/fuzdev/tsv-format) (WASM-only, works in desktop VS Code and the browser host)
-- [ ] type stripping: TypeScript to JS by blanking types to whitespace, preserving every position (Rust API first)
+- [x] type stripping: TypeScript to JS by blanking types to whitespace, preserving every position (Rust API first)
 - [ ] module lexer
 
 Future features (unknown order):
