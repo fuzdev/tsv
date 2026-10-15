@@ -13,7 +13,7 @@
  */
 
 import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.ts';
-import { z } from 'zod';
+import * as s from '@fuzdev/fuz_schema/schema.ts';
 
 import {
 	COMPARE_BASE_ARG_FIELDS,
@@ -51,14 +51,14 @@ import {
 	type SafetyViolation
 } from './lib/divergence/mod.ts';
 
-const CorpusCompareArgs = z.object({
+const CorpusCompareArgs = s.strip_object({
 	...COMPARE_BASE_ARG_FIELDS,
-	'exit-on-first': z.boolean().default(false),
-	'safety-only': z.boolean().default(false),
-	explain: z.boolean().default(false),
-	strict: z.boolean().default(false),
-	'audit-patterns': z.boolean().default(false),
-	summary: z.boolean().default(false)
+	'exit-on-first': s.with_default(s.boolean, false),
+	'safety-only': s.with_default(s.boolean, false),
+	explain: s.with_default(s.boolean, false),
+	strict: s.with_default(s.boolean, false),
+	'audit-patterns': s.with_default(s.boolean, false),
+	summary: s.with_default(s.boolean, false)
 });
 
 interface LanguageStats {
@@ -323,12 +323,12 @@ function build_json_report(
  */
 export async function run_corpus_compare_format(argv: string[] = Deno.args): Promise<void> {
 	const parsed = args_parse(argv_parse(argv), CorpusCompareArgs);
-	if (!parsed.success) {
-		console.error(z.prettifyError(parsed.error));
+	if (!parsed.ok) {
+		console.error(parsed.issues.map(s.format_issue).join('\n'));
 		print_usage();
 		Deno.exit(1);
 	}
-	const args = parsed.data;
+	const args = parsed.value;
 
 	if (args.help) {
 		print_usage();

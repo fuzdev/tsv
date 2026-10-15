@@ -98,7 +98,7 @@ declare global {
 	var gc: (() => void) | undefined;
 }
 
-import { z } from 'zod';
+import * as s from '@fuzdev/fuz_schema/schema.ts';
 import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.ts';
 import { BenchmarkStats } from '@fuzdev/fuz_util/benchmark_stats.ts';
 import {
@@ -218,14 +218,14 @@ import {
 // CLI Arguments
 //
 
-const Args_schema = z.strictObject({
-	_: z.array(z.string()).default([]),
-	json: z.boolean().default(false),
-	markdown: z.boolean().default(false),
-	'save-baseline': z.boolean().default(false),
-	'compare-baseline': z.boolean().default(false),
-	'save-report': z.boolean().default(false),
-	verbose: z.boolean().default(false)
+const Args_schema = s.object({
+	_: s.with_default_fn(s.array(s.string), () => []),
+	json: s.with_default(s.boolean, false),
+	markdown: s.with_default(s.boolean, false),
+	'save-baseline': s.with_default(s.boolean, false),
+	'compare-baseline': s.with_default(s.boolean, false),
+	'save-report': s.with_default(s.boolean, false),
+	verbose: s.with_default(s.boolean, false)
 });
 
 // Strip leading -- from deno task passthrough. `argv.slice(2)` (node:process) is
@@ -235,30 +235,27 @@ const raw_argv = cli_args[0] === '--' ? cli_args.slice(1) : cli_args;
 const parsed_argv = argv_parse(raw_argv);
 const parsed = args_parse(parsed_argv, Args_schema);
 
-if (!parsed.success) {
-	const known = Object.keys(Args_schema.shape)
+if (!parsed.ok) {
+	const known = Object.keys(Args_schema.def)
 		.filter((k) => k !== '_')
 		.map((k) => `--${k}`);
-	console.error(
-		'Invalid arguments:',
-		parsed.error.issues.map((i: { message: string }) => i.message).join(', ')
-	);
+	console.error('Invalid arguments:', parsed.issues.map(s.format_issue).join(', '));
 	console.error(`Known flags: ${known.join(', ')}`);
 	exit(1);
 }
 
-if (parsed.data._.length > 0) {
-	console.error(`Unexpected positional arguments: ${parsed.data._.join(', ')}`);
+if (parsed.value._.length > 0) {
+	console.error(`Unexpected positional arguments: ${parsed.value._.join(', ')}`);
 	exit(1);
 }
 
 const args = {
-	json: parsed.data.json,
-	markdown: parsed.data.markdown,
-	save_baseline: parsed.data['save-baseline'],
-	compare_baseline: parsed.data['compare-baseline'],
-	save_report: parsed.data['save-report'],
-	verbose: parsed.data.verbose
+	json: parsed.value.json,
+	markdown: parsed.value.markdown,
+	save_baseline: parsed.value['save-baseline'],
+	compare_baseline: parsed.value['compare-baseline'],
+	save_report: parsed.value['save-report'],
+	verbose: parsed.value.verbose
 };
 
 // Baseline statistics requested — raises a one-pass run's sweep floor (see
@@ -630,7 +627,7 @@ function pooled_stats(summary: PassSummary, outliers_ns: number[]): BenchmarkSta
 			mean_ns,
 			summary.pass_mean_sd_ns!,
 			summary.pass_mean_ns.length,
-			{ z_score: t_critical_95(summary.pass_mean_ns.length - 1) }
+			{ critical: t_critical_95(summary.pass_mean_ns.length - 1) }
 		),
 		sample_size: n,
 		outliers_ns,

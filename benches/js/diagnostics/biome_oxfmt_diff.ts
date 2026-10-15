@@ -26,7 +26,7 @@
  */
 
 import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.ts';
-import { z } from 'zod';
+import * as s from '@fuzdev/fuz_schema/schema.ts';
 
 import { CanonicalImplementation } from '../lib/canonical.ts';
 import { NativeImplementation } from '../lib/ffi.ts';
@@ -35,25 +35,25 @@ import { OxcImplementation } from '../lib/oxc.ts';
 import { load_all_versions } from '../lib/versions.ts';
 import { type Language, LANGUAGE_EXTENSIONS } from '../lib/types.ts';
 
-const Args = z.object({
-	_: z.array(z.string()).default(() => []),
-	parser: z.enum(['typescript', 'svelte', 'css']).default('typescript'),
-	content: z.string().optional(),
-	file: z.string().optional(),
-	files: z.array(z.string()).optional(),
-	stdin: z.boolean().default(false),
-	quiet: z.boolean().default(false)
+const Args = s.strip_object({
+	_: s.with_default_fn(s.array(s.string), () => []),
+	parser: s.with_default(s.one_of(['typescript', 'svelte', 'css']), 'typescript'),
+	content: s.optional(s.string),
+	file: s.optional(s.string),
+	files: s.optional(s.array(s.string)),
+	stdin: s.with_default(s.boolean, false),
+	quiet: s.with_default(s.boolean, false)
 });
 
 type Out = { text?: string; err?: string };
 
 async function main() {
 	const args = args_parse(argv_parse(Deno.args), Args);
-	if (!args.success) {
-		console.error(z.prettifyError(args.error));
+	if (!args.ok) {
+		console.error(args.issues.map(s.format_issue).join('\n'));
 		Deno.exit(1);
 	}
-	const a = args.data;
+	const a = args.value;
 	const lang = a.parser as Language;
 	const ext = LANGUAGE_EXTENSIONS[lang];
 

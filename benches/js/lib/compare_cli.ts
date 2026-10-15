@@ -15,7 +15,8 @@
 import process from 'node:process';
 
 import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.ts';
-import { z } from 'zod';
+import * as s from '@fuzdev/fuz_schema/schema.ts';
+import { meta } from '@fuzdev/fuz_schema/meta.ts';
 
 import { CorpusLoader, DirectoryLoader } from './corpus.ts';
 import { CanonicalImplementation } from './canonical.ts';
@@ -27,32 +28,17 @@ import { type Language, LANGUAGES } from './types.ts';
 import { load_all_versions } from './versions.ts';
 
 /**
- * Zod fields shared by every corpus_compare_* tool — spread into the tool's
+ * Schema fields shared by every corpus_compare_* tool — spread into the tool's
  * own args schema alongside its tool-specific flags.
  */
 export const COMPARE_BASE_ARG_FIELDS = {
-	_: z.array(z.string()).default(() => []),
-	all: z
-		.boolean()
-		.default(false)
-		.meta({ aliases: ['a'] }),
-	filter: z
-		.string()
-		.optional()
-		.meta({ aliases: ['f'] }),
-	limit: z
-		.number()
-		.optional()
-		.meta({ aliases: ['l'] }),
-	verbose: z
-		.boolean()
-		.default(false)
-		.meta({ aliases: ['v'] }),
-	json: z.boolean().default(false),
-	help: z
-		.boolean()
-		.default(false)
-		.meta({ aliases: ['h'] })
+	_: s.with_default_fn(s.array(s.string), () => []),
+	all: meta(s.with_default(s.boolean, false), { aliases: ['a'] }),
+	filter: meta(s.optional(s.string), { aliases: ['f'] }),
+	limit: meta(s.optional(s.number), { aliases: ['l'] }),
+	verbose: meta(s.with_default(s.boolean, false), { aliases: ['v'] }),
+	json: s.with_default(s.boolean, false),
+	help: meta(s.with_default(s.boolean, false), { aliases: ['h'] })
 } as const;
 
 /** Get relative path from base directory. */
@@ -219,14 +205,14 @@ export function gate_on_panics(
  */
 export function run_compare_main<T extends { json: boolean }>(
 	main: () => Promise<void>,
-	schema: z.ZodType<T>,
+	schema: s.Schema<T, any>,
 	build_error_report: (message: string) => Record<string, unknown>
 ): void {
 	main().catch((e) => {
 		const message = e instanceof Error ? e.message : String(e);
 		console.error(message);
 		const parsed = args_parse(argv_parse(process.argv.slice(2)), schema);
-		if (parsed.success && parsed.data.json) {
+		if (parsed.ok && parsed.value.json) {
 			emit_json_stdout(build_error_report(message));
 		}
 		Deno.exit(1);

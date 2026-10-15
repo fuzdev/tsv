@@ -13,16 +13,14 @@
 import process from 'node:process';
 
 import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.ts';
-import { z } from 'zod';
+import * as s from '@fuzdev/fuz_schema/schema.ts';
+import { meta } from '@fuzdev/fuz_schema/meta.ts';
 
 import { format_audit_report, generate_audit_report } from './lib/divergence/mod.ts';
 
-const AuditArgs = z.object({
-	json: z.boolean().default(false),
-	help: z
-		.boolean()
-		.default(false)
-		.meta({ aliases: ['h'] })
+const AuditArgs = s.strip_object({
+	json: s.with_default(s.boolean, false),
+	help: meta(s.with_default(s.boolean, false), { aliases: ['h'] })
 });
 
 function print_usage(): void {
@@ -41,12 +39,12 @@ Examples:
 
 async function main(): Promise<void> {
 	const parsed = args_parse(argv_parse(process.argv.slice(2)), AuditArgs);
-	if (!parsed.success) {
-		console.error(z.prettifyError(parsed.error));
+	if (!parsed.ok) {
+		console.error(parsed.issues.map(s.format_issue).join('\n'));
 		print_usage();
 		Deno.exit(1);
 	}
-	const args = parsed.data;
+	const args = parsed.value;
 
 	if (args.help) {
 		print_usage();

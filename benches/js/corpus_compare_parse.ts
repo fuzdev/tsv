@@ -46,7 +46,8 @@
  */
 
 import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.ts';
-import { z } from 'zod';
+import * as s from '@fuzdev/fuz_schema/schema.ts';
+import { meta } from '@fuzdev/fuz_schema/meta.ts';
 
 import {
 	COMPARE_BASE_ARG_FIELDS,
@@ -96,16 +97,20 @@ import {
  */
 const DEFAULT_INJECT_LIMIT = 12;
 
-const CorpusCompareParseArgs = z.object({
+const CorpusCompareParseArgs = s.strip_object({
 	...COMPARE_BASE_ARG_FIELDS,
-	'multibyte-only': z
-		.boolean()
-		.default(false)
-		.meta({ aliases: ['m'] }),
-	inject: z.boolean().default(false),
-	'inject-terminators': z.boolean().default(false),
-	'inject-limit': z.coerce.number().int().nonnegative().default(DEFAULT_INJECT_LIMIT),
-	fixtures: z.boolean().default(false)
+	'multibyte-only': meta(s.with_default(s.boolean, false), { aliases: ['m'] }),
+	inject: s.with_default(s.boolean, false),
+	'inject-terminators': s.with_default(s.boolean, false),
+	// coerced with `Number` as given, so a bare `--inject-limit` reads as 1
+	'inject-limit': s.with_default(
+		s.message(
+			s.pipe(s.unknown, s.transform(Number), s.safe_integer, s.min_value(0)),
+			'expected a non-negative integer'
+		),
+		DEFAULT_INJECT_LIMIT
+	),
+	fixtures: s.with_default(s.boolean, false)
 });
 
 /** Max sample entries shown per diff group in the report. */
@@ -703,12 +708,12 @@ function print_span_row(label: string, s: SpanStats): void {
  */
 export async function run_corpus_compare_parse(argv: string[] = Deno.args): Promise<void> {
 	const parsed = args_parse(argv_parse(argv), CorpusCompareParseArgs);
-	if (!parsed.success) {
-		console.error(z.prettifyError(parsed.error));
+	if (!parsed.ok) {
+		console.error(parsed.issues.map(s.format_issue).join('\n'));
 		print_usage();
 		Deno.exit(1);
 	}
-	const args = parsed.data;
+	const args = parsed.value;
 
 	if (args.help) {
 		print_usage();
