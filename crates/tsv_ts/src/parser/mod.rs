@@ -228,7 +228,9 @@ pub(super) struct GroupingParen {
 
 /// The parser state [`Parser::rewind`] restores after one of the grammar's
 /// speculative parses ([`Parser::parse_arrow_or_rewind`],
-/// [`Parser::parse_type_arguments_or_rewind`]): the lexer cursor, the
+/// [`Parser::parse_type_arguments_or_rewind`], [`Parser::type_arguments_follower_settled`]
+/// and the `export default` value's decorator-list read in `parse_export_declaration`):
+/// the lexer cursor, the
 /// one-token window with its decoded values and line-terminator flags, `prev_end`,
 /// a peek's stored lexer error, the comment ledger's length, the grouping depth, the
 /// open `<` regions that are read against it ([`Parser::lt_regions`]) and the error
@@ -270,7 +272,9 @@ pub(super) struct GroupingParen {
 /// type grammar claims no comment. The comparison reading it then may try
 /// (`Parser::type_arguments_follower_settled`) reads that token as an expression, which
 /// can claim one, so that speculation puts back the claims it made on the comments
-/// drained ahead of its checkpoint.
+/// drained ahead of its checkpoint. The `export default` site keeps any claim its
+/// decorator-list read makes across the rewind, and that is safe: the re-read parses the
+/// same decorator list the same way, so every surviving claim is one it makes again.
 #[derive(Clone)]
 pub(super) struct Checkpoint<'arena> {
     lexer: LexerCheckpoint,
@@ -1461,7 +1465,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// it read turns out not to be there: [`Parser::parse_arrow_or_rewind`] at an
     /// arrow head in a conditional's consequent,
     /// [`Parser::parse_type_arguments_or_rewind`] at the `<` of a type-argument list
-    /// the lookahead admitted.
+    /// the lookahead admitted, and again at a whole list whose follower only tsc
+    /// refuses, where [`Parser::type_arguments_follower_settled`] tries the comparison from
+    /// a checkpoint of its own; and the `export default` value at the `@` of a decorated
+    /// class, whose decorator list is read ahead to see whether an `abstract` class
+    /// follows (`parse_export_declaration`).
     #[must_use]
     pub(super) fn checkpoint(&self) -> Checkpoint<'arena> {
         // An expression head is never between the constrained-infer handoff's set

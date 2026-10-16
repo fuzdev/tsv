@@ -871,13 +871,8 @@ angle-bracket assertion's operand, a conditional's alternate, an arrow's express
 `await` argument and the last operand of a right-nested same-operator logical chain (`a ?? (b ??
 f<T>)`, which prints rebalanced as `a ?? b ?? f<T>`) all end on the close, so the pair wraps the
 whole head (`{#each (-f<T>) as { a }}`). Where the head's own `}` or a `,` follows — a full-form
-`{#await}`, a `{#key}`, an `{#each}` with no `as` — the pair strips in both formatters.
-
-**◆design_choice.** A shorthand `{#await … catch}` head keeps its pair too (`{#await (f()<T>)
-catch e}`), but that cell is **not** a prettier bug: `catch` does not continue a comparison for
-acorn-typescript, so prettier's `{#await f()<T> catch e}` is the same tree to Svelte. tsv's own
-parser refuses the bare instantiation there (a tsv over-rejection), and the pair keeps tsv's
-output reparseable by tsv.
+`{#await}`, a `{#key}`, an `{#each}` with no `as` — the pair strips in both formatters, and so it
+does ahead of a shorthand `{#await … catch}` head's `catch`, a word that starts no expression.
 
 - `{#each}` and shorthand `{#await}` heads — [head_instantiation_paren](../tests/fixtures/svelte/blocks/head_instantiation_paren_prettier_divergence/)
 

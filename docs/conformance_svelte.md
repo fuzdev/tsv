@@ -576,6 +576,7 @@ Svelte ❌ / Prettier ✅ / tsv ✅ is the common case below; an entry that depa
 - Import type options — [dynamic_attributes](../tests/fixtures/typescript/modules/imports/dynamic_attributes_svelte_divergence/). The comments in the two gaps those options open — specifier→options and options→`)` — are ordinary and match prettier, but they can only be pinned behind the same rejection, so they ride a second fixture rather than a plain one — [options_comment](../tests/fixtures/typescript/types/import_type_options_comment_svelte_divergence/)
 - An **invalid** v-flag regex (`/[a-z--[aeiou]]/v` — a range is not a `ClassSetOperand`, so V8 throws too): tsv accepts it by deferring the `IsValidRegularExpressionLiteral` early error, since regex bodies are opaque. Svelte is *correct* to reject; this is not a `v`-flag gap — [unicode_sets_advanced](../tests/fixtures/typescript/expressions/literals/regex/unicode_sets_advanced_svelte_divergence/)
 - `export default class implements I {}` (anonymous default class, implements-first heritage) — [export_default_implements](../tests/fixtures/typescript/declarations/class/export_default_implements_svelte_divergence/)
+- `export default @dec abstract class Foo {}` — an `abstract` modifier between the decorators and the `class` of a default-exported value. tsc reads that value as a class declaration, whose modifiers include `abstract`, and prettier prints it in the layout of `export default @dec class` and `export default abstract class` alike; acorn reads the decorated value as a class expression, which takes no modifier, and rejects at `class`. tsv parses it as the class expression it builds for `export default @dec class Foo {}`, with `abstract: true`, and ends the value at the class as tsc's declaration does — no `;`, so `export default @dec abstract class Foo {} + 1;` is the export and then the statement `+1;`, prettier's reading, while the class without `abstract` stays acorn's expression, which the operator continues. The admission belongs to that position alone, gated by `[no LineTerminator here]` as the decorators-first `@dec export default abstract class` is: `x = @dec abstract class {}` (prettier rejects) and `export default @dec abstract⏎class Foo {}` (TS1146) stay rejected — [after_export_default_abstract](../tests/fixtures/typescript/typescript_specific/decorators/after_export_default_abstract_svelte_divergence/)
 - A **reversed** class-member modifier pair, `override abstract` — acorn rejects it outright (`'abstract' modifier must precede 'override' modifier`) and so does tsc (TS1029), while prettier parses it and reorders it to the canonical `abstract override`. tsv accepts and reorders identically, so the canonical spelling round-trips and the reversed one is silently corrected rather than refused. Pinned by the regular fixture [abstract_override](../tests/fixtures/typescript/declarations/class/abstract_override/): the canonical order as `input` (which acorn accepts, so `expected.json` matches), the reversed order as its `unformatted_reversed_modifier_order` variant, since an input tsv rewrites cannot be `input`. Flipping tsv to reject it is a reject-flip whose honest form is a modifier **loop** in `parse_class_member` — the shape tsc and acorn-typescript each use — not a third ordered probe
 - A cast as the left operand of `**` (`x as number ** 2`) — see below; the rejection itself is not pinnable
 - A **non-null assertion in a decorator expression** — `@x!`, `@x.y!`, `@x!.y`. The `!` is not in the TC39 decorator grammar and acorn rejects it, but tsc accepts all three with no diagnostic — TypeScript's grammar admits them — and prettier formats them. It is the one member of the decorator grammar's deliberate exclusion list (binary operators, `[…]`, `?.`, tagged templates, `++`/`--`) that carries no argument of its own: the others stay unconsumed so the construct *after* the decorator can parse — the `*` of `@fn *a() {}` being the motivating case — and nothing valid after a decorator begins with `!`. tsv prints the parenthesized form prettier does, so there is no formatting divergence; the bare and doubly-parenthesized spellings ride as `unformatted_*` variants — [non_null_expression](../tests/fixtures/typescript/typescript_specific/decorators/non_null_expression/)
@@ -926,6 +927,29 @@ tsc-over-acorn strictness, the same reverse direction as the
 reserved-keyword-qualified-head and arrow-as-operand entries. **Upstream
 candidate**: acorn-typescript — `tsParseTypeReference` and `tsParseImportType`
 consume type arguments across a line break (no `hasPrecedingLineBreak` guard).
+
+**A `<<` after a `typeof` query (`a as typeof b << c`, a shift)**: tsc reads a type
+query's arguments with `tryParseTypeArguments`, which takes a lone `<` and never re-scans
+a `<<` — only a type reference's list does (`parseTypeArgumentsOfTypeReference`'s
+`reScanLessThanToken`) — so after a query the `<<` is the shift operator, and
+`a as typeof b << c` (also `satisfies`, `typeof b.c`) is `(a as typeof b) << c`, which
+prettier prints. acorn-typescript splits the token in both positions and rejects the text.
+tsv decides the `<<` where it stands: acorn's list is read only where the tail opens a
+generic function type — the one type that list can open, and a tail whose shift reading puts
+an arrow in an operand position, which no parser accepts — so no text reads both ways, acorn's
+list stands in `typeof f<<T>() => void>` (a text tsc rejects), and every other `<<` after a
+query is tsc's shift
+([shift_left_typeof_query](../tests/fixtures/typescript/expressions/binary/shift_left_typeof_query_prettier_divergence/)).
+The type-reference contrast `a as T << c` stays rejected by all three. Every bare spelling
+prints with the assertion's pair, which acorn accepts, so no fixed point carries the
+divergence — like the `export default abstract⏎class` entry above it is pinned as a
+formatting claim: the bare forms are the
+[shift_after_typeof_query](../tests/fixtures/typescript/expressions/binary/shift_after_typeof_query/)
+fixture's `unformatted_bare_operand` variant (standalone `.ts`, the variant being one
+Svelte's parser rejects), its `input_invalid_*` is the contrast, and
+[typeof_query_shift_follow.rs](../tests/typeof_query_shift_follow.rs) asserts the trees.
+**Upstream candidate**: acorn-typescript — inside a type it reads `<<` as two `<` tokens,
+so `tsParseTypeQuery` opens a list where tsc's `tryParseTypeArguments` does not.
 
 **Line break before a tuple element's `?` (`[T` ⏎ `?]`, rejected)**: the postfix
 optional `?` of a tuple element is a `[no LineTerminator here]` position. tsc runs
@@ -1729,6 +1753,8 @@ All corrections exist because of upstream bugs. If fixed upstream, tsv would rem
 - Arrow return type in a conditional's consequent — `shouldParseArrow`'s return-type `tryParse` keeps `(b): c => d` in `a ? (b) : c => d`, then fails on the missing ternary `:`
 - Class-member `static` line break — `parseClassElement` folds `static` into the `tsParseModifiers` loop, whose uniform `tsTokenCanFollowModifier` → `!hasPrecedingLineBreak()` guard imposes a restriction ecma262's `ClassElement` does not have, so `class C { static⏎c = 3 }` ASI-splits into two members where tsc, prettier and plain acorn all read one static field. The `parseClassElement` it overrides already reads it right
 - `export default abstract` line break — `isAbstractClass`'s `this.lookahead().type === tt._class` omits the line-break test tsc's `nextTokenIsClassKeywordOnSameLine` makes, so `export default abstract⏎class Base {}` welds into one exported abstract class and the line terminator vanishes; its `async` neighbour in the same `parseExportDefaultDeclaration` already honours the restriction
+- Decorated `export default` value with `abstract` — `parseExportDefaultDeclaration` asks `isAbstractClass` only at the value's first token, and a value led by `@` goes to the expression parser, whose decorated class takes no modifier, so `export default @dec abstract class Foo {}` fails where tsc reads a class declaration carrying `abstract`
+- A `<<` after a `typeof` query — inside a type `<<` reads as two `<` tokens, so `tsParseTypeQuery` opens a type-argument list at it and `a as typeof b << c` fails where tsc's `tryParseTypeArguments` (a lone `<` only) leaves the shift
 
 (The `v`-flag regex is not an **acorn core** candidate: acorn supports the `v` flag and its
 set operations, and correctly rejects the one construct

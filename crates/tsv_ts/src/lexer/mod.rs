@@ -18,4 +18,5 @@ pub(crate) use core::{
     unicode_escape_len_at,
 };
 pub use core::{Lexer, LexerCheckpoint};
+pub(crate) use token::keyword_at;
 pub use token::{KeywordKind, Token, TokenKind};

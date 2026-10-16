@@ -1,0 +1,770 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 614,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a superclass instantiation followed by a template is the tagged template's type arguments",
+			"start": 20,
+			"end": 112
+		},
+		{
+			"type": "Line",
+			"value": " past a line break too",
+			"start": 235,
+			"end": 259
+		},
+		{
+			"type": "Line",
+			"value": " a list after the tag is the class's super type arguments",
+			"start": 293,
+			"end": 352
+		},
+		{
+			"type": "Line",
+			"value": " followed by a `[` past a line break, the instantiation is the member's object",
+			"start": 387,
+			"end": 467
+		},
+		{
+			"type": "Line",
+			"value": " the same in a class expression",
+			"start": 533,
+			"end": 566
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 613,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 604,
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 114,
+					"end": 140,
+					"id": {
+						"type": "Identifier",
+						"start": 120,
+						"end": 121,
+						"name": "A"
+					},
+					"superClass": {
+						"type": "TaggedTemplateExpression",
+						"start": 130,
+						"end": 137,
+						"tag": {
+							"type": "Identifier",
+							"start": 130,
+							"end": 131,
+							"name": "f"
+						},
+						"quasi": {
+							"type": "TemplateLiteral",
+							"start": 134,
+							"end": 137,
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 135,
+									"end": 136,
+									"value": {
+										"raw": "t",
+										"cooked": "t"
+									},
+									"tail": true
+								}
+							]
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 131,
+							"end": 134,
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 132,
+									"end": 133,
+									"typeName": {
+										"type": "Identifier",
+										"start": 132,
+										"end": 133,
+										"name": "T"
+									}
+								}
+							]
+						}
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 138,
+						"end": 140,
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a superclass instantiation followed by a template is the tagged template's type arguments",
+							"start": 20,
+							"end": 112
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 142,
+					"end": 170,
+					"id": {
+						"type": "Identifier",
+						"start": 148,
+						"end": 149,
+						"name": "B"
+					},
+					"superClass": {
+						"type": "TaggedTemplateExpression",
+						"start": 158,
+						"end": 167,
+						"tag": {
+							"type": "MemberExpression",
+							"start": 158,
+							"end": 161,
+							"object": {
+								"type": "Identifier",
+								"start": 158,
+								"end": 159,
+								"name": "a"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 160,
+								"end": 161,
+								"name": "b"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"quasi": {
+							"type": "TemplateLiteral",
+							"start": 164,
+							"end": 167,
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 165,
+									"end": 166,
+									"value": {
+										"raw": "t",
+										"cooked": "t"
+									},
+									"tail": true
+								}
+							]
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 161,
+							"end": 164,
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 162,
+									"end": 163,
+									"typeName": {
+										"type": "Identifier",
+										"start": 162,
+										"end": 163,
+										"name": "T"
+									}
+								}
+							]
+						}
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 168,
+						"end": 170,
+						"body": []
+					}
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 172,
+					"end": 200,
+					"id": {
+						"type": "Identifier",
+						"start": 178,
+						"end": 179,
+						"name": "C"
+					},
+					"superClass": {
+						"type": "TaggedTemplateExpression",
+						"start": 188,
+						"end": 197,
+						"tag": {
+							"type": "CallExpression",
+							"start": 188,
+							"end": 191,
+							"callee": {
+								"type": "Identifier",
+								"start": 188,
+								"end": 189,
+								"name": "f"
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"quasi": {
+							"type": "TemplateLiteral",
+							"start": 194,
+							"end": 197,
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 195,
+									"end": 196,
+									"value": {
+										"raw": "t",
+										"cooked": "t"
+									},
+									"tail": true
+								}
+							]
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 191,
+							"end": 194,
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 192,
+									"end": 193,
+									"typeName": {
+										"type": "Identifier",
+										"start": 192,
+										"end": 193,
+										"name": "T"
+									}
+								}
+							]
+						}
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 198,
+						"end": 200,
+						"body": []
+					}
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 202,
+					"end": 233,
+					"id": {
+						"type": "Identifier",
+						"start": 208,
+						"end": 209,
+						"name": "D"
+					},
+					"superClass": {
+						"type": "TaggedTemplateExpression",
+						"start": 218,
+						"end": 230,
+						"tag": {
+							"type": "Identifier",
+							"start": 218,
+							"end": 219,
+							"name": "f"
+						},
+						"quasi": {
+							"type": "TemplateLiteral",
+							"start": 222,
+							"end": 230,
+							"expressions": [
+								{
+									"type": "Identifier",
+									"start": 226,
+									"end": 227,
+									"name": "b"
+								}
+							],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 223,
+									"end": 224,
+									"value": {
+										"raw": "a",
+										"cooked": "a"
+									},
+									"tail": false
+								},
+								{
+									"type": "TemplateElement",
+									"start": 228,
+									"end": 229,
+									"value": {
+										"raw": "c",
+										"cooked": "c"
+									},
+									"tail": true
+								}
+							]
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 219,
+							"end": 222,
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 220,
+									"end": 221,
+									"typeName": {
+										"type": "Identifier",
+										"start": 220,
+										"end": 221,
+										"name": "T"
+									}
+								}
+							]
+						}
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 231,
+						"end": 233,
+						"body": []
+					}
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 261,
+					"end": 290,
+					"id": {
+						"type": "Identifier",
+						"start": 267,
+						"end": 269,
+						"name": "D2"
+					},
+					"superClass": {
+						"type": "TaggedTemplateExpression",
+						"start": 278,
+						"end": 287,
+						"tag": {
+							"type": "Identifier",
+							"start": 278,
+							"end": 279,
+							"name": "f"
+						},
+						"quasi": {
+							"type": "TemplateLiteral",
+							"start": 284,
+							"end": 287,
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 285,
+									"end": 286,
+									"value": {
+										"raw": "t",
+										"cooked": "t"
+									},
+									"tail": true
+								}
+							]
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 279,
+							"end": 282,
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 280,
+									"end": 281,
+									"typeName": {
+										"type": "Identifier",
+										"start": 280,
+										"end": 281,
+										"name": "T"
+									}
+								}
+							]
+						}
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 288,
+						"end": 290,
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " past a line break too",
+							"start": 235,
+							"end": 259
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 354,
+					"end": 384,
+					"id": {
+						"type": "Identifier",
+						"start": 360,
+						"end": 361,
+						"name": "E"
+					},
+					"superClass": {
+						"type": "TaggedTemplateExpression",
+						"start": 370,
+						"end": 378,
+						"tag": {
+							"type": "Identifier",
+							"start": 370,
+							"end": 371,
+							"name": "f"
+						},
+						"quasi": {
+							"type": "TemplateLiteral",
+							"start": 375,
+							"end": 378,
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 376,
+									"end": 377,
+									"value": {
+										"raw": "t",
+										"cooked": "t"
+									},
+									"tail": true
+								}
+							]
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 371,
+							"end": 374,
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 372,
+									"end": 373,
+									"typeName": {
+										"type": "Identifier",
+										"start": 372,
+										"end": 373,
+										"name": "T"
+									}
+								}
+							]
+						}
+					},
+					"superTypeParameters": {
+						"type": "TSTypeParameterInstantiation",
+						"start": 378,
+						"end": 381,
+						"params": [
+							{
+								"type": "TSTypeReference",
+								"start": 379,
+								"end": 380,
+								"typeName": {
+									"type": "Identifier",
+									"start": 379,
+									"end": 380,
+									"name": "U"
+								}
+							}
+						]
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 382,
+						"end": 384,
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a list after the tag is the class's super type arguments",
+							"start": 293,
+							"end": 352
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 469,
+					"end": 497,
+					"id": {
+						"type": "Identifier",
+						"start": 475,
+						"end": 476,
+						"name": "F"
+					},
+					"superClass": {
+						"type": "MemberExpression",
+						"start": 485,
+						"end": 494,
+						"object": {
+							"type": "TSInstantiationExpression",
+							"start": 485,
+							"end": 489,
+							"expression": {
+								"type": "Identifier",
+								"start": 485,
+								"end": 486,
+								"name": "f"
+							},
+							"typeArguments": {
+								"type": "TSTypeParameterInstantiation",
+								"start": 486,
+								"end": 489,
+								"params": [
+									{
+										"type": "TSTypeReference",
+										"start": 487,
+										"end": 488,
+										"typeName": {
+											"type": "Identifier",
+											"start": 487,
+											"end": 488,
+											"name": "T"
+										}
+									}
+								]
+							}
+						},
+						"property": {
+							"type": "Literal",
+							"start": 492,
+							"end": 493,
+							"value": 0,
+							"raw": "0"
+						},
+						"computed": true,
+						"optional": false
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 495,
+						"end": 497,
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " followed by a `[` past a line break, the instantiation is the member's object",
+							"start": 387,
+							"end": 467
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 499,
+					"end": 530,
+					"id": {
+						"type": "Identifier",
+						"start": 505,
+						"end": 506,
+						"name": "G"
+					},
+					"superClass": {
+						"type": "MemberExpression",
+						"start": 515,
+						"end": 524,
+						"object": {
+							"type": "TSInstantiationExpression",
+							"start": 515,
+							"end": 519,
+							"expression": {
+								"type": "Identifier",
+								"start": 515,
+								"end": 516,
+								"name": "f"
+							},
+							"typeArguments": {
+								"type": "TSTypeParameterInstantiation",
+								"start": 516,
+								"end": 519,
+								"params": [
+									{
+										"type": "TSTypeReference",
+										"start": 517,
+										"end": 518,
+										"typeName": {
+											"type": "Identifier",
+											"start": 517,
+											"end": 518,
+											"name": "T"
+										}
+									}
+								]
+							}
+						},
+						"property": {
+							"type": "Literal",
+							"start": 522,
+							"end": 523,
+							"value": 0,
+							"raw": "0"
+						},
+						"computed": true,
+						"optional": false
+					},
+					"superTypeParameters": {
+						"type": "TSTypeParameterInstantiation",
+						"start": 524,
+						"end": 527,
+						"params": [
+							{
+								"type": "TSTypeReference",
+								"start": 525,
+								"end": 526,
+								"typeName": {
+									"type": "Identifier",
+									"start": 525,
+									"end": 526,
+									"name": "U"
+								}
+							}
+						]
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 528,
+						"end": 530,
+						"body": []
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 568,
+					"end": 603,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 574,
+							"end": 602,
+							"id": {
+								"type": "Identifier",
+								"start": 574,
+								"end": 575,
+								"name": "H"
+							},
+							"init": {
+								"type": "ClassExpression",
+								"start": 578,
+								"end": 602,
+								"id": null,
+								"superClass": {
+									"type": "TaggedTemplateExpression",
+									"start": 592,
+									"end": 599,
+									"tag": {
+										"type": "Identifier",
+										"start": 592,
+										"end": 593,
+										"name": "f"
+									},
+									"quasi": {
+										"type": "TemplateLiteral",
+										"start": 596,
+										"end": 599,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 597,
+												"end": 598,
+												"value": {
+													"raw": "t",
+													"cooked": "t"
+												},
+												"tail": true
+											}
+										]
+									},
+									"typeArguments": {
+										"type": "TSTypeParameterInstantiation",
+										"start": 593,
+										"end": 596,
+										"params": [
+											{
+												"type": "TSTypeReference",
+												"start": 594,
+												"end": 595,
+												"typeName": {
+													"type": "Identifier",
+													"start": 594,
+													"end": 595,
+													"name": "T"
+												}
+											}
+										]
+									}
+								},
+								"body": {
+									"type": "ClassBody",
+									"start": 600,
+									"end": 602,
+									"body": []
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same in a class expression",
+							"start": 533,
+							"end": 566
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

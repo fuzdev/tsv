@@ -1,0 +1,343 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 301,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 27,
+				"end": 29,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 29,
+				"end": 138,
+				"data": " `catch` starts no expression, so the type argument list before a shorthand `catch` stays\n\tthe head's "
+			},
+			{
+				"type": "Text",
+				"start": 138,
+				"end": 139,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 139,
+				"end": 179,
+				"expression": {
+					"type": "TSInstantiationExpression",
+					"start": 147,
+					"end": 151,
+					"expression": {
+						"type": "Identifier",
+						"start": 147,
+						"end": 148,
+						"name": "f"
+					},
+					"typeArguments": {
+						"type": "TSTypeParameterInstantiation",
+						"start": 148,
+						"end": 151,
+						"params": [
+							{
+								"type": "TSTypeReference",
+								"start": 149,
+								"end": 150,
+								"typeName": {
+									"type": "Identifier",
+									"start": 149,
+									"end": 150,
+									"name": "T"
+								}
+							}
+						]
+					}
+				},
+				"value": null,
+				"error": {
+					"type": "Identifier",
+					"name": "error",
+					"start": 158,
+					"end": 163
+				},
+				"pending": null,
+				"then": null,
+				"catch": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 164,
+							"end": 171,
+							"expression": {
+								"type": "Identifier",
+								"start": 165,
+								"end": 170,
+								"name": "error"
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 179,
+				"end": 180,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 180,
+				"end": 222,
+				"expression": {
+					"type": "TSInstantiationExpression",
+					"start": 188,
+					"end": 194,
+					"expression": {
+						"type": "CallExpression",
+						"start": 188,
+						"end": 191,
+						"callee": {
+							"type": "Identifier",
+							"start": 188,
+							"end": 189,
+							"name": "f"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"typeArguments": {
+						"type": "TSTypeParameterInstantiation",
+						"start": 191,
+						"end": 194,
+						"params": [
+							{
+								"type": "TSTypeReference",
+								"start": 192,
+								"end": 193,
+								"typeName": {
+									"type": "Identifier",
+									"start": 192,
+									"end": 193,
+									"name": "T"
+								}
+							}
+						]
+					}
+				},
+				"value": null,
+				"error": {
+					"type": "Identifier",
+					"name": "error",
+					"start": 201,
+					"end": 206
+				},
+				"pending": null,
+				"then": null,
+				"catch": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 207,
+							"end": 214,
+							"expression": {
+								"type": "Identifier",
+								"start": 208,
+								"end": 213,
+								"name": "error"
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 222,
+				"end": 223,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 223,
+				"end": 256,
+				"expression": {
+					"type": "TSInstantiationExpression",
+					"start": 231,
+					"end": 237,
+					"expression": {
+						"type": "MemberExpression",
+						"start": 231,
+						"end": 234,
+						"object": {
+							"type": "Identifier",
+							"start": 231,
+							"end": 232,
+							"name": "a"
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 233,
+							"end": 234,
+							"name": "b"
+						},
+						"computed": false,
+						"optional": false
+					},
+					"typeArguments": {
+						"type": "TSTypeParameterInstantiation",
+						"start": 234,
+						"end": 237,
+						"params": [
+							{
+								"type": "TSTypeReference",
+								"start": 235,
+								"end": 236,
+								"typeName": {
+									"type": "Identifier",
+									"start": 235,
+									"end": 236,
+									"name": "T"
+								}
+							}
+						]
+					}
+				},
+				"value": null,
+				"error": null,
+				"pending": null,
+				"then": null,
+				"catch": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 244,
+							"end": 248,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 256,
+				"end": 257,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 257,
+				"end": 300,
+				"expression": {
+					"type": "TSInstantiationExpression",
+					"start": 265,
+					"end": 272,
+					"expression": {
+						"type": "Identifier",
+						"start": 265,
+						"end": 266,
+						"name": "f"
+					},
+					"typeArguments": {
+						"type": "TSTypeParameterInstantiation",
+						"start": 266,
+						"end": 272,
+						"params": [
+							{
+								"type": "TSTypeReference",
+								"start": 267,
+								"end": 268,
+								"typeName": {
+									"type": "Identifier",
+									"start": 267,
+									"end": 268,
+									"name": "T"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 270,
+								"end": 271,
+								"typeName": {
+									"type": "Identifier",
+									"start": 270,
+									"end": 271,
+									"name": "U"
+								}
+							}
+						]
+					}
+				},
+				"value": null,
+				"error": {
+					"type": "Identifier",
+					"name": "error",
+					"start": 279,
+					"end": 284
+				},
+				"pending": null,
+				"then": null,
+				"catch": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 285,
+							"end": 292,
+							"expression": {
+								"type": "Identifier",
+								"start": 286,
+								"end": 291,
+								"name": "error"
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 27,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 18,
+			"body": [],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

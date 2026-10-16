@@ -10,7 +10,7 @@ use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
 
 use super::Parser;
-use super::expression_lookahead::paren_starts_function_type;
+use super::expression_lookahead::{generic_function_type_arrow_end, paren_starts_function_type};
 use super::scan::{
     identifier_starts_at, is_word_at, skip_identifier, skip_whitespace_and_comments,
 };
@@ -705,7 +705,26 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // before `<` ends the query — `typeof a` ⏎ `<T>(): void` in an interface
         // is two members, not an instantiation (see
         // `parse_optional_type_arguments_same_line`).
-        let type_arguments = self.parse_optional_type_arguments_same_line()?;
+        //
+        // tsc reads a query's arguments with `tryParseTypeArguments`, which takes a lone
+        // `<` and never re-scans a `<<` (a type reference's list does), so after a query a
+        // `<<` is the shift operator: `a as typeof b << c` is `(a as typeof b) << c`.
+        // acorn-typescript splits the token and reads a list, which only a generic
+        // function type can open (`typeof f<<T>() => void>`, a text tsc rejects). No text
+        // reads both ways — the shift reading of a `<<T>(…) =>` tail puts an arrow in an
+        // operand position — so the bytes decide: the list is read where the tail opens a
+        // generic function type (`generic_function_type_arrow_end`), and the `<<` is left
+        // to the shift everywhere else.
+        let type_arguments = if self.check(&TokenKind::LeftShift) {
+            let second_lt = self.current.start as usize + 1;
+            if generic_function_type_arrow_end(self.source.as_bytes(), second_lt + 1).is_some() {
+                self.parse_optional_type_arguments_same_line()?
+            } else {
+                None
+            }
+        } else {
+            self.parse_optional_type_arguments_same_line()?
+        };
 
         let end = type_arguments
             .as_ref()

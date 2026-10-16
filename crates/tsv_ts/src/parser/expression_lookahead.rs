@@ -13,7 +13,7 @@ use super::scan::{
     identifier_starts_at, is_word_at, skip_identifier, skip_numeric_literal,
     skip_whitespace_and_comments,
 };
-use crate::lexer::is_es_line_terminator_at;
+use crate::lexer::{KeywordKind, is_es_line_terminator_at, keyword_at};
 use tsv_lang::source_scan::{
     OperandAnchor, PAREN_HOP_NEEDLES, TriviaProfile, is_hop_needle, skip_regex_literal, skip_trivia,
 };
@@ -1040,16 +1040,16 @@ pub(super) fn matching_delimiter_close(bytes: &[u8], open: usize) -> Option<usiz
 /// operator never continues a list the way a binary one does.
 pub(super) fn starts_expression_after_type_args(bytes: &[u8], pos: usize) -> bool {
     if identifier_starts_at(bytes, pos) {
-        // `in` and `instanceof` are binary keyword operators — acorn's `tt._in` /
-        // `tt._instanceof` have `startsExpr = false`, so a would-be `<…>` close
-        // followed by one continues the instantiation (`f<T> in x` is `(f<T>) in x`)
-        // rather than becoming a comparison. Every other identifier/keyword
-        // (`as`/`satisfies` included — acorn lexes those as plain names) starts an
-        // expression and disqualifies the type-argument reading.
-        return !matches!(
-            &bytes[pos..skip_identifier(bytes, pos)],
-            b"in" | b"instanceof"
-        );
+        // A word starts an expression unless it is a keyword that begins none
+        // (`KeywordKind::starts_expression`, the parser's own set): the binary keyword
+        // operators `in` / `instanceof` (`f<T> in x` is `(f<T>) in x`) and the statement and
+        // clause keywords — acorn's keyword tokens without `startsExpr`, where tsc's
+        // `isStartOfExpression` agrees — so a Svelte head's `catch` keeps the list
+        // (`{#await f<T> catch e}`). Every other word (`as` / `satisfies` included — acorn
+        // lexes those as plain names) starts an expression and disqualifies the
+        // type-argument reading.
+        let len = skip_identifier(bytes, pos) - pos;
+        return keyword_at(bytes, pos, len).is_none_or(KeywordKind::starts_expression);
     }
     let b = bytes[pos];
     // `!`, `+` and `-` start an expression only as a prefix operator — negation (`!x`),

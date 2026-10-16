@@ -17,8 +17,8 @@ use tsv_lang::source_scan;
 use tsv_lang::{ParseError, Span, TAB_WIDTH};
 
 use super::expression_lookahead::{
-    ArrowHead, matching_angle_close, type_args_follower_refused_by_tsc_alone,
-    type_args_follower_refuses,
+    ArrowHead, has_line_terminator_between, matching_angle_close,
+    type_args_follower_refused_by_tsc_alone, type_args_follower_refuses,
 };
 use super::expression_type_args::TypeArgScan;
 use super::scan::{
@@ -156,8 +156,9 @@ fn is_bare_assignment_head(expr: &Expression<'_>, start: usize, in_yield: bool) 
 /// How `parse_postfix_expression` should treat the subscript chain.
 ///
 /// `ClassHeritage` is the `extends <expr>` clause — a `LeftHandSideExpression` that
-/// deviates from a normal subscript chain in two ways: a bare `<T>` (type args NOT
-/// followed by a call) stops the chain so the class can split it into
+/// deviates from a normal subscript chain in two ways: a bare `<T>` (type args the
+/// expression does not go on past — `Parser::heritage_type_args_continue_expression`)
+/// stops the chain so the class can split it into
 /// `super_type_parameters`, and a postfix `++`/`--` is left UNCONSUMED (the arm is
 /// `Normal`-only), so `class C extends a++ {}` parses the heritage as `a` and the
 /// stray `++` is rejected. In `Normal` mode a postfix `++`/`--` IS consumed as an
@@ -1611,13 +1612,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // If it parses as type arguments it's instantiation; otherwise
                     // let binary expression handle it as comparison/shift.
                     //
-                    // In ClassHeritage mode a bare `<T>` (type args NOT followed by a
-                    // call) belongs to the class's `super_type_parameters` split, so we
-                    // leave it for the caller; only `Base<T>(...)` is consumed here (the
-                    // `(` arm below flattens the instantiation into a call with type
-                    // arguments). A `<` that isn't type args stops the chain either way.
+                    // In ClassHeritage mode a bare `<T>` belongs to the class's
+                    // `super_type_parameters` split, so we leave it for the caller; only a
+                    // list the expression goes on past is consumed here — a call's
+                    // (`Base<T>(...)`, flattened into the call), a tag's (`` f<T>`t` ``) or
+                    // a member's object past a line break (`f<T>⏎[0]`). A `<` that isn't
+                    // type args stops the chain either way.
                     let consume = self.is_type_arguments_start(TypeArgScan::Parse)
-                        && (mode == SubscriptMode::Normal || self.is_type_args_followed_by_call());
+                        && (mode == SubscriptMode::Normal
+                            || self.heritage_type_args_continue_expression());
                     if !consume {
                         break;
                     }
@@ -1713,15 +1716,24 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    /// Check whether the current `<` (or `<<`) opens type arguments immediately
-    /// followed by a call: `<T>(`. Used by the `ClassHeritage` subscript mode to
-    /// tell a call's type arguments (`getMixin<T>(Base)`, consumed) from a bare
-    /// superclass instantiation (`extends Base<T>`, left for the
-    /// `super_type_parameters` split). `matching_angle_close` handles an `=>`
-    /// arrow's `>` (`getMixin<() => void>(Base)`), comments, and strings; for a
-    /// `<<` token, the second `<` re-raises the depth so the scan finds the
-    /// outer close.
-    fn is_type_args_followed_by_call(&self) -> bool {
+    /// Whether the type-argument list at the current `<` (or `<<`) is the heritage
+    /// EXPRESSION's rather than the class's `super_type_parameters`: the expression goes on
+    /// past its close. Used by the `ClassHeritage` subscript mode to tell
+    /// `extends Base<T>` (the split) from a list the superclass expression owns —
+    ///
+    /// - a call's (`getMixin<T>(Base)`);
+    /// - a tag's (`` extends f<T>`t` ``, on any line, as a template continues a tag on any
+    ///   line), the class's own list then following the template (`` f<T>`t`<U> ``);
+    /// - a computed member's object past a line break (`extends f<T>⏎[0]`). On the list's
+    ///   own line a `[` refuses an instantiation (tsc's `canFollowTypeArgumentsInExpression`,
+    ///   acorn-typescript's `startsExpr` bail), so `f<T>[0]` stays rejected.
+    ///
+    /// tsc reads the clause through `parseExpressionWithTypeArguments`, acorn-typescript
+    /// through its subscript loop; both take every one of these as the expression's.
+    /// `matching_angle_close` handles an `=>` arrow's `>` (`getMixin<() => void>(Base)`),
+    /// comments, and strings; for a `<<` token, the second `<` re-raises the depth so the
+    /// scan finds the outer close.
+    fn heritage_type_args_continue_expression(&self) -> bool {
         let bytes = self.source.as_bytes();
         let start = self.current.start as usize;
 
@@ -1730,12 +1742,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             return false;
         }
 
-        match matching_angle_close(bytes, start + 1, TypeArgScan::Parse) {
-            None => false,
-            Some(close) => {
-                let after = skip_whitespace_and_comments(bytes, close + 1);
-                after < bytes.len() && bytes[after] == b'('
-            }
+        let Some(close) = matching_angle_close(bytes, start + 1, TypeArgScan::Parse) else {
+            return false;
+        };
+        let after = skip_whitespace_and_comments(bytes, close + 1);
+        match bytes.get(after) {
+            Some(b'(' | b'`') => true,
+            Some(b'[') => has_line_terminator_between(bytes, close + 1, after),
+            _ => false,
         }
     }
 
@@ -2827,41 +2841,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             | TokenKind::SlashEquals
             | TokenKind::LessThan
             | TokenKind::Hash => true,
-            // Most keywords can start expressions (as primaries, unary ops, or contextual identifiers).
-            // Exclude only declaration/control-flow/binary-operator keywords that cannot.
-            //
-            // `let` is NOT excluded, unlike `const`/`var`: it is no `ReservedWord`, so
-            // it is an ordinary `IdentifierReference` and a perfectly good
-            // `AssignmentExpression` — which is what `YieldExpression : yield [no LT]
-            // AssignmentExpression` takes, so `function* g() { yield let; }` is `yield
-            // (let)`, as tsc and prettier read it. Only a keyword that can begin no
-            // expression at all belongs below.
-            TokenKind::Keyword(kw) => !matches!(
-                kw,
-                KeywordKind::Const
-                    | KeywordKind::Var
-                    | KeywordKind::If
-                    | KeywordKind::Else
-                    | KeywordKind::For
-                    | KeywordKind::While
-                    | KeywordKind::Do
-                    | KeywordKind::Switch
-                    | KeywordKind::Case
-                    | KeywordKind::Default
-                    | KeywordKind::Break
-                    | KeywordKind::Continue
-                    | KeywordKind::Try
-                    | KeywordKind::Catch
-                    | KeywordKind::Finally
-                    | KeywordKind::Throw
-                    | KeywordKind::Return
-                    | KeywordKind::Export
-                    | KeywordKind::Extends
-                    | KeywordKind::Instanceof
-                    | KeywordKind::In
-                    | KeywordKind::Enum
-                    | KeywordKind::Debugger
-            ),
+            // Most keywords can start expressions (as primaries, unary ops, or contextual
+            // identifiers); the statement, clause and binary-operator keywords cannot. The set
+            // is shared with the type-argument follower lookahead.
+            TokenKind::Keyword(kw) => kw.starts_expression(),
             _ => false,
         }
     }

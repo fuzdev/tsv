@@ -156,6 +156,54 @@ impl KeywordKind {
         )
     }
 
+    /// Whether this keyword can begin an expression — as a primary (`this`, `class`,
+    /// `function`, a literal), a prefix operator (`typeof`, `void`, `delete`, `await`), or a
+    /// contextual word that is an ordinary `IdentifierReference` (`let`, `async`, `of`, the
+    /// type keywords). The words that begin none are the statement and clause keywords and
+    /// the binary keyword operators — acorn's keyword tokens without `startsExpr`, where
+    /// tsc's `isStartOfExpression` agrees — plus `enum`, a `ReservedWord` tsc refuses as an
+    /// expression too.
+    ///
+    /// The one definition two readers share: the parser's token test
+    /// (`Parser::is_expression_start`) and the byte lookahead that decides whether a
+    /// type-argument list's `>` is a comparison (`starts_expression_after_type_args`), so a
+    /// word one of them takes as an operand cannot be one the other reads as a clause.
+    ///
+    /// `let` begins an expression, unlike `const` / `var`: it is no `ReservedWord`, so it is
+    /// an ordinary `IdentifierReference` and a perfectly good `AssignmentExpression` — which is
+    /// what `YieldExpression : yield [no LT] AssignmentExpression` takes, so
+    /// `function* g() { yield let; }` is `yield (let)`, as tsc and prettier read it.
+    #[inline]
+    pub const fn starts_expression(self) -> bool {
+        !matches!(
+            self,
+            KeywordKind::Const
+                | KeywordKind::Var
+                | KeywordKind::If
+                | KeywordKind::Else
+                | KeywordKind::For
+                | KeywordKind::While
+                | KeywordKind::Do
+                | KeywordKind::Switch
+                | KeywordKind::Case
+                | KeywordKind::Default
+                | KeywordKind::Break
+                | KeywordKind::Continue
+                | KeywordKind::Try
+                | KeywordKind::Catch
+                | KeywordKind::Finally
+                | KeywordKind::Throw
+                | KeywordKind::Return
+                | KeywordKind::Export
+                | KeywordKind::Extends
+                | KeywordKind::Instanceof
+                | KeywordKind::In
+                | KeywordKind::Enum
+                | KeywordKind::Debugger
+                | KeywordKind::With
+        )
+    }
+
     /// Returns true if this keyword can be used as an identifier in certain contexts.
     ///
     /// These are "contextual keywords" that only have keyword semantics in specific

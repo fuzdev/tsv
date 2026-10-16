@@ -23,11 +23,6 @@
 {#await a && b && f<T> then v}{v}{/await}
 {#await a || b || f<T> then v}{v}{/await}
 
-<!-- `catch` does not continue a comparison for acorn-typescript, but tsv's own parser refuses a
-	bare `f<T>` ahead of it, so the pair keeps the head readable to tsv. -->
-{#await f()<T> catch e}{e}{/await}
-{#await f<T> catch}a{/await}
-
 <!-- Inside `<pre>` the head prints on one line and takes the same pair. -->
 <pre>{#each f<T> as item}{item}{/each}</pre>
 <pre>{#await f<T> then v}{v}{/await}</pre>

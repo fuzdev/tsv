@@ -3876,13 +3876,25 @@ impl<'a> Printer<'a> {
         let d = self.d();
 
         // With a decorated class expression (`@dec class {}`), span.start points
-        // at the first decorator's `@`, so derive the `class` keyword position
-        // from after the decorators (falls back to span.start when undecorated).
-        let class_keyword_start = self.find_keyword_after_decorators(
+        // at the first decorator's `@`, so derive the first keyword's position
+        // from after the decorators (falls back to span.start when undecorated). An
+        // `abstract` one (`export default @dec abstract class {}`) leads with that
+        // modifier, and the `class` keyword follows it.
+        let first_keyword_start = self.find_keyword_after_decorators(
             class_expr.decorators,
-            "class",
+            if class_expr.r#abstract {
+                "abstract"
+            } else {
+                "class"
+            },
             class_expr_span.start,
         );
+        let abstract_end = class_expr
+            .r#abstract
+            .then(|| first_keyword_start + "abstract".len() as u32);
+        let class_keyword_start = abstract_end
+            .and_then(|end| self.find_keyword_in_range(end, class_expr_span.end, "class"))
+            .unwrap_or(first_keyword_start);
 
         // Compute heritage positions once (shared with the class-declaration printer).
         let positions = self.class_heritage_positions(
@@ -3905,9 +3917,18 @@ impl<'a> Printer<'a> {
         let mut parts = DocBuf::new();
 
         // Leading decorators (`@dec class {}`), each on its own line.
-        if let Some(dec_doc) = self.build_decorators_doc(class_expr.decorators, class_keyword_start)
+        if let Some(dec_doc) = self.build_decorators_doc(class_expr.decorators, first_keyword_start)
         {
             parts.push(dec_doc);
+        }
+
+        // `abstract`, with any comment between it and `class` kept inline
+        if let Some(end) = abstract_end {
+            parts.push(d.text("abstract"));
+            if let Some(c) = self.build_inline_comments_between_doc_opt(end, class_keyword_start) {
+                parts.push(c);
+            }
+            parts.push(d.text(" "));
         }
 
         // 'class' keyword

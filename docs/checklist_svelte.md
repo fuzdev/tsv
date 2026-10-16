@@ -163,7 +163,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Then clause (`{:then value}`)
 - Catch clause (`{:catch error}`)
 - Shorthand then (`{#await promise then value}`)
-- Shorthand catch (`{#await promise catch error}`)
+- Shorthand catch (`{#await promise catch error}`) — `catch` starts no expression, so a head ending on an instantiation keeps its list bare (`{#await f<T> catch error}`; see `blocks/await/catch_shorthand_instantiation`)
 - Destructuring in `then`/`catch` bindings (`{:then {a = 1}}`) — same empty-pattern + default-value divergences as each blocks
 - Typed `then`/`catch` value (`{:then value: number}`, `{:catch error: Error}`, lang="ts") — including a destructured pattern (`{:then { a }: { a: number }}`), whose wire `end` widens past the annotation as a typed each binding's does
 - `then`/`catch` value is a bare pattern — a comment immediately before it, or in either gap around its annotation (between the bare pattern and its `:` — or `}` when untyped — and between the annotation and the `}`), is rejected (matching Svelte's `read_pattern` + `read_type_annotation`, which cross those gaps with `allow_whitespace` alone), never relocated or dropped; a comment *inside* a destructure (`{a /* c */}`) or *inside* the type (`value: /* c */ number`) stays valid. See `blocks/await/{then_shorthand,then,catch_shorthand,catch}/input_invalid_*_comment` and `blocks/await/binding_annotation_comment_prettier_divergence/input_invalid_*`

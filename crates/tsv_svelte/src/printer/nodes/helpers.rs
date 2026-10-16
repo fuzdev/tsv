@@ -18,22 +18,20 @@ use tsv_ts::{Expression, ExpressionKind};
 /// What a block head's own syntax prints right after its expression — the question the
 /// instantiation pair asks of the host ([`Printer::build_expression_doc_for_block`]).
 ///
-/// A WORD there — the `{#each}` block's `as`, a shorthand `{#await}` block's `then` /
-/// `catch` — makes a head that prints ending on an instantiation's closing `>` take a pair
-/// ([`tsv_ts::prints_ending_on_instantiation_close`]): acorn-typescript, the parser Svelte
-/// reads the head with, gives up a type argument list ahead of a same-line word, so a bare
-/// `{#each f<T> as item}` is the comparison `f < T > as` and does not parse. (`catch` does
-/// not continue a comparison for acorn, but tsv's own parser refuses the bare head there,
-/// so the pair keeps tsv's output reparseable.) The constructors are the one statement of
-/// which heads are followed by a word.
-// TODO: the `catch` pair exists only for tsv's own over-rejection of a bare
-// `{#await f<T> catch e}` (Svelte accepts it); once the parser accepts that head,
-// `of_await` can answer `Delimiter` for the `catch` shorthand and the pair goes with it.
+/// A word that can start an expression there — the `{#each}` block's `as`, a shorthand
+/// `{#await}` block's `then` — makes a head that prints ending on an instantiation's closing
+/// `>` take a pair ([`tsv_ts::prints_ending_on_instantiation_close`]): acorn-typescript, the
+/// parser Svelte reads the head with, gives up a type argument list ahead of a same-line
+/// word that starts an expression, so a bare `{#each f<T> as item}` is the comparison
+/// `f < T > as` and does not parse. A shorthand `{#await}` block's `catch` starts none, so it
+/// joins nothing to the close (`{#await f<T> catch e}` keeps its list for every parser).
+/// The constructors are the one statement of which heads are followed by such a word.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum HeadTail {
-    /// The head's own syntax continues with a word.
+    /// The head's own syntax continues with a word that can start an expression.
     Keyword,
-    /// The head's own `}` follows, which joins nothing to the close.
+    /// The head's own `}` follows, or a word that starts no expression (`catch`); either
+    /// joins nothing to the close.
     Delimiter,
     /// A delimiter Svelte reads right behind the value, with no comment allowed in between
     /// — the `}` or `,` of an `{#each}` with no `as` binding (`{#each a /* c */}` does not
@@ -53,12 +51,12 @@ impl HeadTail {
         }
     }
 
-    /// An `{#await}` head is followed by `then` / `catch` exactly in the shorthand forms.
+    /// An `{#await}` head is followed by `then` in the `then` shorthand, by `catch` in the
+    /// `catch` shorthand, and by its own `}` in the full form.
     pub(super) fn of_await(shorthand: AwaitShorthand) -> Self {
-        if shorthand == AwaitShorthand::None {
-            Self::Delimiter
-        } else {
-            Self::Keyword
+        match shorthand {
+            AwaitShorthand::Then => Self::Keyword,
+            AwaitShorthand::Catch | AwaitShorthand::None => Self::Delimiter,
         }
     }
 }

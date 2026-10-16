@@ -437,7 +437,12 @@ ES2015 module syntax with ES2025 additions.
 - Class declaration
 - Class expression
 - `extends` clause — any `LeftHandSideExpression` superclass (`extends Base`,
-  `extends getMixin(B)`, `extends class {}`, `extends (a + b)`, `extends null`)
+  `extends getMixin(B)`, `extends class {}`, `extends (a + b)`, `extends null`). A bare
+  type-argument list is the class's super type arguments (`extends Base<T>`) unless the
+  expression goes on past it — a call (`extends f<T>(b)`), a tag (`` extends f<T>`t` ``, the
+  class's own list after it: `` f<T>`t`<U> ``) or a member past a line break
+  (`extends f<T>⏎[0]`); on the list's own line `[`, `.` and `!` reject, as for tsc and acorn
+  ([heritage/extends_instantiation_follower](../tests/fixtures/typescript/declarations/class/heritage/extends_instantiation_follower/))
 - `constructor` method
 - Instance methods
 - Static methods

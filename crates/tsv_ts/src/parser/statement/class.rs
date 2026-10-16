@@ -319,14 +319,43 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// The expression-position counterpart of `parse_decorated_class` (which
     /// builds a class *declaration*): parse the decorator list, then a class
-    /// expression, attaching the decorators to it. `export`/`abstract` are
-    /// declaration-only, so neither appears here.
+    /// expression, attaching the decorators to it. `export` and `abstract` never appear
+    /// here: the `export default` value, the one position that admits `abstract`
+    /// (`export default @dec abstract class {}`, a value tsc reads as a class declaration,
+    /// so the statement ends at the class), reads the list itself and finishes it through
+    /// [`Parser::finish_decorated_class_expression`].
     pub(in crate::parser) fn parse_decorated_class_expression(
         &mut self,
     ) -> Result<&'arena Expression<'arena>, ParseError> {
         let start = self.current_pos().0;
-
         let decorators = self.parse_decorators(DecoratorListKind::Class)?;
+        self.finish_decorated_class_expression(start, decorators, false)
+    }
+
+    /// Whether the current token is an `abstract` modifier heading a class: `abstract`
+    /// then `class` under the `[no LineTerminator here]` gate `finish_decorated_class`
+    /// applies (`export default @dec abstract⏎class C {}` is TS1146 to tsc).
+    pub(super) fn at_abstract_class_modifier(&mut self) -> bool {
+        matches!(self.current_kind(), TokenKind::Identifier)
+            && self.current_value() == "abstract"
+            && !self.peek_preceded_by_line_terminator()
+            && self.peek_kind() == TokenKind::Keyword(KeywordKind::Class)
+    }
+
+    /// Finish a decorated class expression whose decorator list, begun at `start`, is
+    /// parsed: the `abstract` modifier the caller has already sighted
+    /// ([`Parser::at_abstract_class_modifier`]) when `r#abstract` is set, then the class.
+    /// Nowhere but the `export default` value does a decorated class take a modifier
+    /// (`x = @dec abstract class {}`, which prettier rejects), so only that caller sets it.
+    pub(super) fn finish_decorated_class_expression(
+        &mut self,
+        start: usize,
+        decorators: bumpalo::collections::Vec<'arena, Decorator<'arena>>,
+        r#abstract: bool,
+    ) -> Result<&'arena Expression<'arena>, ParseError> {
+        if r#abstract {
+            self.advance()?; // consume 'abstract'
+        }
 
         if *self.current_kind() != TokenKind::Keyword(KeywordKind::Class) {
             return Err(self.error_expected_after("'class'", "decorator"));
@@ -334,7 +363,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // The run is non-empty — this is only reached at a `@` — so it is always a
         // `Some`. `start` is that first `@`, so the class node's span covers it.
-        self.parse_class_expression_from(start, Some(decorators.into_bump_slice()))
+        self.parse_class_expression_from(start, Some(decorators.into_bump_slice()), r#abstract)
     }
 
     /// Parse a list of decorators: `@dec1 @dec2 ...`
@@ -473,7 +502,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
     ) -> Result<&'arena Expression<'arena>, ParseError> {
         let (start, _) = self.current_pos();
-        self.parse_class_expression_from(start, None)
+        self.parse_class_expression_from(start, None, false)
     }
 
     /// Parse a class expression whose span starts at `start` and which carries
@@ -494,6 +523,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: usize,
         decorators: Option<&'arena [Decorator<'arena>]>,
+        r#abstract: bool,
     ) -> Result<&'arena Expression<'arena>, ParseError> {
         // Consume 'class' keyword
         debug_assert!(matches!(
@@ -525,7 +555,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     super_type_parameters,
                     implements,
                     body,
-                    r#abstract: false,
+                    r#abstract,
                     type_parameters,
                 })),
             },
