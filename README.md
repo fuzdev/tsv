@@ -34,7 +34,7 @@ tsv prioritizes, in order:
 3. binary size and memory usage
 4. extensibility, modularity, reusability
 
-Staying simple is an overarching goal, and is sometimes at odds with flexibility.
+Staying simple is an overarching goal.
 Feedback is welcome to help navigate these tradeoffs.
 
 See the [benchmarks](https://tsv.fuz.dev/docs/benchmarks) for measurements.
