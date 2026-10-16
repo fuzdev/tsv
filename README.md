@@ -38,7 +38,7 @@ Staying simple is an overarching goal.
 Feedback is welcome to help navigate these tradeoffs.
 
 See the [benchmarks](https://tsv.fuz.dev/docs/benchmarks) for measurements.
-Compared to Oxc/Oxfmt and Biome, tsv is generally faster and smaller,
+Compared to Oxc/Oxfmt and Biome, tsv is faster and smaller and uses less memory,
 but lacks their features, extensibility, and broad language support.
 One reason for tsv to exist is to help find the performance left on the table
 in the Web's implementations.
