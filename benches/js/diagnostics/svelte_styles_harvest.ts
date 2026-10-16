@@ -2,7 +2,7 @@
  * Harvest real-authored CSS for the corpus: extract every component-level
  * `<style>` block from the **perf view's** `.svelte` files and concatenate them
  * per source collection into `benches/js/.cache/svelte_styles/<collection>.css`.
- * That directory is a `real`-tier corpus entry, so the harvest ~3×es the
+ * That directory is a `benched` corpus entry, so the harvest ~3×es the
  * standalone-CSS sample (otherwise ~30 tiny files) with content people actually
  * wrote — and because the blocks are concatenated per collection, file sizes are
  * driven by reality (each collection's total embedded CSS), not an arbitrary chunking
@@ -160,7 +160,7 @@ async function main(): Promise<void> {
 			`FAIL: ${blocks} style blocks ≠ pinned ${SVELTE_STYLES_BLOCKS_PIN}; cache not written. ` +
 				`${checkout_label(tree_input)} is at ${short_commit(corpora_tree)}, the pin was measured at ${pinned_at}` +
 				(aligned
-					? ' — same tree, so either the perf view changed (a collection joined a perf tier: re-pin ' +
+					? ' — same tree, so either the perf view changed (a collection joined the bench: re-pin ' +
 						'SVELTE_STYLES_BLOCKS_PIN in lib/gate_counts.ts) or the extraction broke: investigate first.'
 					: ' — a snapshot refresh moves this deliberately (re-pin SVELTE_STYLES_BLOCKS_PIN in ' +
 						'lib/gate_counts.ts beside the new tree id); otherwise check out the pinned snapshot.')

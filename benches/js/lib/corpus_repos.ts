@@ -225,7 +225,7 @@ export async function enrich_source_repos(sources: CorpusSource[]): Promise<void
  * checked-out commit (subpath `''`), git-detected — or `null` when no loaded source
  * is one of its collections (a conformance-only run reads no real code, so the field
  * must not name a snapshot the run never opened) or the checkout is absent. One
- * roll-up commit for every `real` / `framework` source, so a reader can reproduce
+ * roll-up commit for every snapshot source, so a reader can reproduce
  * the corpus with one clone. The commit, deliberately, where the corpus gates pin
  * the checkout's `collections/` tree id (`GATE_CHECKOUT_IDS`): a tree id names
  * the bytes but cannot be cloned, and the commit fixes the tree — so the two agree,

@@ -63,8 +63,8 @@ import type { Language } from './types.ts';
  * engineering exercise. An absent checkout, or one that isn't a git repo, is skipped, so
  * clean machines and CI still pass.
  *
- * `../corpora` is the real-code snapshot (`fuzdev/corpora`): every `real` and
- * `framework` corpus entry reads one of its collections, and one object id pins them
+ * `../corpora` is the real-code snapshot (`fuzdev/corpora`): every `benched` and
+ * `gated` corpus entry reads one of its collections, and one object id pins them
  * all — the author's dev repos included, which as live working trees admit no pin at all
  * (an ordinary edit moves their counts, so a gate over them is a re-pin treadmill). The
  * id is its `collections/` TREE's, not a commit's: the corpus is those bytes, so a tooling
@@ -90,10 +90,9 @@ export const GATE_CHECKOUT_IDS: Record<
 	string,
 	{ hash: string; tree?: string; pins: readonly string[] }
 > = {
-	// The real-code snapshot: every snapshot-tier corpus entry (`real`, `framework`,
-	// `third_party`), so every corpus pin plus the styles harvest measured over the perf
-	// view. Pinned by its `collections/` tree (see above); what each collection vendors is
-	// its manifest.
+	// The real-code snapshot: every snapshot-tier corpus entry (`benched`, `gated`), so
+	// every corpus pin plus the styles harvest measured over the perf view. Pinned by its
+	// `collections/` tree (see above); what each collection vendors is its manifest.
 	[CORPORA_ROOT]: {
 		tree: CORPORA_TREE,
 		hash: 'ba7a9a6c8',
@@ -1154,7 +1153,7 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	// 25 → 26: the author's repos join the pinned corpus; `fuz_ui/src/lib/project_stats_data.ts`
 	// arrives (its explained hunk is `fill_101_boundary`).
 	//
-	// 26 → 27: cosmicplayground joins the `real` tier; `cosmicplayground/src/lib/notes.ts` arrives
+	// 26 → 27: cosmicplayground joins the bench; `cosmicplayground/src/lib/notes.ts` arrives
 	// with 3 of 5 hunks explained (`fill_101_boundary`, `comment_position`) and two from its
 	// `chromas.reduce((result, chroma) => {…}, {} as Record<Chroma, Hue>)` calls that no
 	// detector recognized — a real backlog item, closed at 24 → 23 below.
@@ -1209,13 +1208,13 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
  * view, i.e. the `../corpora` snapshot's `.svelte` files. Pure input material (not a
  * tsv success count), and pinned like the suite harvests: the source is a pinned
  * snapshot, so a move is a snapshot refresh (re-pin with the new `collections/` tree
- * id), a collection joining a perf tier, or a broken extraction, and the harvest fails
+ * id), a collection joining the bench, or a broken extraction, and the harvest fails
  * BEFORE writing so a wrong cache never replaces a good one. Stamped on the snapshot's
  * `collections/` tree id and the perf view's entry list (`lib/harvest_stamp.ts`).
  * Measured 2026-10-16: ../corpora `collections/` at ba7a9a6c8, over the perf view's
  * 929 `.svelte` files.
  *
- * 278 → 401: earbetter and cosmicplayground join the `real` tier, so the perf view gains
+ * 278 → 401: earbetter and cosmicplayground join the bench, so the perf view gains
  * their `.svelte` files (58 + 65 blocks) with the snapshot's tree id unmoved — the
  * view-composition move the stamp's `perf_entries` input exists to notice.
  *

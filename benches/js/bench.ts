@@ -960,7 +960,7 @@ interface BaselineVersions extends ReportVersions {
  * measurement the run could not make, where every other field records one it did.
  *
  * 14: `corpus_snapshot` — the `fuzdev/corpora` checkout (URL + commit) every
- * `real`/`framework` source was read from: one roll-up commit for the whole
+ * snapshot source was read from: one roll-up commit for the whole
  * real-code corpus, so the numbers are reproducible with one clone. Absent on a
  * conformance-only run (no real code) or when the snapshot isn't checked out. A
  * COMMIT, where the gate pin (`GATE_CHECKOUT_IDS['../corpora']`) is that
@@ -1077,7 +1077,7 @@ interface Baseline {
 	 */
 	exclusion_caches?: Record<string, number | null>;
 	/**
-	 * The real-code snapshot the `real`/`framework` sources were read from — the
+	 * The real-code snapshot the snapshot sources were read from — the
 	 * `fuzdev/corpora` checkout at its commit (`subpath` empty). One roll-up commit
 	 * for every real-code source (each source's own `repo` names the upstream that
 	 * commit vendored); the commit, not the `collections/` tree id the corpus gates

@@ -35,9 +35,9 @@ grades); the reference halves live in `docs/`:
 | **`deno task check`** | `cargo fmt --check` · `format:audit` · `pins:audit` · `docs:audit` · `typecheck` · `typecheck:features` · `typecheck:scripts` · `typecheck:bench-core` · `conformance:audit` · `conformance:audit:compiler` · `variants:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `roundtrip:audit:prettier` · `discovery:audit` · `canonicalize:audit` · `binding:audit` · `authoring:audit` · `paren:audit` · `razor:audit` · `fuzz:audit` · `test:deno` · `cargo test` (incl. fixtures) · `test:audits` · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `fabrication:audit` · `census:audit` · `width:audit` · `ignore:audit` · `check:ast-types` · `check:loc` · `clippy` | **committed tree only** (`tests/fixtures` + pure-Rust/Deno audits, no external oracle), save the two opportunistic legs: `roundtrip:audit:prettier` (the pinned `../prettier` format suites) and `discovery:audit` (`tsv format --list` over the `../corpora` snapshot vs its committed file list) | every commit; the CI `check` job |
 | **`deno task conformance:all`** | `pins:audit:checkouts` + `bench:pins:suites` + `fixtures:validate` + `compile:fixtures:validate` preflights (then `bench:harvest:svelte-styles`, late, beside the corpus legs that read its cache, and `strip:corpus:run`, the type strip vs ts-blank-space over the snapshot's TypeScript), then `conformance` (one process, its FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:parse tests/fixtures --fixtures` · `corpus:compare:format --all`, plus `render:audit` as its one subprocess leg) **+** `conformance:test262` (pure Rust) | `../corpora` (the real-code snapshot), `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../prettier-plugin-svelte`, `../test262`; the **`gates`** corpus view | release; `scripts/publish.ts` **Step 3b** |
 | **`deno task bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (100%-coverage invariant) / **`conformance`** view (fixtures filtered to what their own suite calls valid + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
-| **`deno task idempotency:sweep`** | `tsv_debug fuzz --iterations 0` over the corpus dirs — F1 (`format(format(x)) == format(x)`) + no-panic + structural reparse on every file **as authored** | **`robustness`** view (the WHOLE `../corpora` snapshot — every collection it vendors, placed in a tier or not — + the `svelte_styles` cache + the live working trees' DIFF against the snapshot; absent dirs skipped with a warning) | after a printer change; conformance cadence |
+| **`deno task idempotency:sweep`** | `tsv_debug fuzz --iterations 0` over the corpus dirs — F1 (`format(format(x)) == format(x)`) + no-panic + structural reparse on every file **as authored** | **`robustness`** view (the WHOLE `../corpora` snapshot — every collection it vendors, placed or not — + the `svelte_styles` cache + the live working trees' DIFF against the snapshot; absent dirs skipped with a warning) | after a printer change; conformance cadence |
 | **`deno task audit:corpus`** | the pure-Rust content-loss / robustness suite over **real code**: `roundtrip_audit --gate` · `comment_audit` · `swallow_audit` · `binding_audit --gate` (real code gating; prettier suites report-only) · `authoring_audit` · `paren_audit` (both real-code-only) · `census_audit` · `fabrication_audit` (both strict-zero off their default corpus) · `fuzz --iterations 0`. `width_audit` is NOT a leg — it has no zero to grade (../../docs/audits.md §The Corpus Bundle) | **`robustness`** view (the whole snapshot + the `svelte_styles` cache + the live diff) + the pinned `../prettier` format suites (absent working trees skipped; floor = the whole `../corpora` snapshot) | release; `scripts/publish.ts` **Step 3c**; conformance cadence |
-| **`deno task render:audit <paths>`** | `render_audit --gate` — per `.svelte` file, does `tsv format` change what it RENDERS? Compares the browser-visible render key of the source vs of `format(source)`. The corpus-scale arm of the fixture **R** rules. **Needs the Deno sidecar** (`svelte compile`), so it is deliberately not a leg of the pure-Rust `audit:corpus` — it rides `conformance` instead | standalone: any `.svelte` corpus, given explicitly. As a `conformance` leg: the WHOLE `../corpora` snapshot (every collection, placed in a tier or not — this leg pins no count, so it reads the root rather than the tiers' entries) + the `suite` checkout, both version-pinned, so a live working tree can't move a release verdict | release (in `conformance`); standalone after a printer change |
+| **`deno task render:audit <paths>`** | `render_audit --gate` — per `.svelte` file, does `tsv format` change what it RENDERS? Compares the browser-visible render key of the source vs of `format(source)`. The corpus-scale arm of the fixture **R** rules. **Needs the Deno sidecar** (`svelte compile`), so it is deliberately not a leg of the pure-Rust `audit:corpus` — it rides `conformance` instead | standalone: any `.svelte` corpus, given explicitly. As a `conformance` leg: the WHOLE `../corpora` snapshot (every collection, placed or not — this leg pins no count, so it reads the root rather than the placed collections' entries) + the `suite` checkout, both version-pinned, so a live working tree can't move a release verdict | release (in `conformance`); standalone after a printer change |
 | **Package / artifact gates** | `validate:artifacts` (wasm size bounds + Deno smoke) · `test:npm[:parse\|:all]:run` · `test:napi:npm:run` · `test:bun` · `typecheck:packages` (the staged packages' declarations, as a consumer compiles them) · `engines:audit` (wasm vs native byte parity) | the STAGED npm packages (`crates/tsv_wasm/pkg/*/npm`, `crates/tsv_napi/pkg/*`), plus both fixture trees and `../corpora` for `engines:audit` | release: `scripts/publish.ts` **Step 6** (all but `test:napi:npm:run` and `engines:audit`); every commit: CI's `artifacts` job (`validate:artifacts`, the Node package suites, the napi suite, `engines:audit` — not `test:bun` or `typecheck:packages`); `release_napi.yml` per target (the napi suite) — full reference: ../../docs/audits.md |
 
 **JS parser (test262) IS release-gated** — `conformance:test262` (`tsv_debug
@@ -887,7 +887,7 @@ since tsc is its oracle and a bump can move a file between its two lists with th
 unchanged); pass `--force` after changing harvest/grading LOGIC, which the stamp can't see.
 `svelte-styles` is stamped too, on the `../corpora` snapshot's `collections/` tree id (not its
 commit — a tooling commit there moves no corpus byte), its exact block pin
-(`SVELTE_STYLES_BLOCKS_PIN`), and the perf view's entry list (a collection joining a perf tier
+(`SVELTE_STYLES_BLOCKS_PIN`), and the perf view's entry list (a collection joining the bench
 changes what the harvest reads with no checkout moving): an unchanged triple skips the walk, and a
 moved count fails before writing like every other harvest.
 
@@ -899,7 +899,7 @@ rebuilt live) but grades `CSS_REJECTS_PIN` over the same view and stamps the sam
 stand in for `../wpt`'s commit: it is a file COUNT, and an edit to an existing wpt
 test moves the CSS this pin grades without moving it.
 
-`bench:harvest:svelte-styles` produces a `real`-tier entry, so it appears in the PERF and GATES
+`bench:harvest:svelte-styles` produces a `benched` entry, so it appears in the PERF and GATES
 views and never in the conformance one. Each caller therefore takes one group: `bench:perf` chains the styles harvest alone (its own view
 holds it), `bench:conformance` chains the suites alone (its holds those), and `deno
 task conformance` — whose corpus legs read the `gates` view — chains the suites as
@@ -948,7 +948,7 @@ stamps:
   an entry joining or leaving changes what the grade reads while every checkout stays put; a stamp
   keyed on checkouts alone would skip that re-harvest and leave the cache short under a green
   stamp. The list's ORDER is part of the stamp, so `corpus_entries()` keeps it stable — table
-  order, then manifest order — and a tier that lands in no perf view (`third_party`) leaves the
+  order, then manifest order — and a collection placed off the bench (`perf: false`) leaves the
   perf stamp untouched.
 - a fingerprint of the loader's per-file **FILTERS** (`corpus_filter_fingerprint` —
   `lib/prettier_fixtures.ts` + `lib/corpus.ts` by source text), because a filter change moves what
@@ -1320,18 +1320,21 @@ tasks it skips the rebuild and is freshness-guarded (rebuild with `deno task bui
 ## Corpus
 
 One tagged entry list (`lib/corpus.ts` `corpus_entries()`, paths relative to the project root).
-Every entry is `{path|files_from, tier, extensions?, skip?, conformance?, optional?, hint?}` with a tier of `real`,
-`framework`, `third_party`, `live`, `prettier_fixture`, or `suite`, and each consumer selects a
-**view**. The snapshot tiers' entries are DERIVED: `COLLECTION_TIERS` places each `../corpora`
-collection in a tier by name, and its entries are one per `subpath` the snapshot's own
-`manifest.json` names for it — so an upstream's layout is spelled once, in the recipe — and the
-`live` working trees derive the same way. Extensions: `.svelte`, the JS/TS family `tsv format`
+Every entry is `{path|files_from, tier, extensions?, skip?, conformance?, optional?, hint?}` with a tier of `benched`,
+`gated`, `live`, `prettier_fixture`, or `suite`, and each consumer selects a **view**. A tier
+names which views an entry reaches, never who wrote it: authorship is each collection's manifest
+`origin` (`own` | `third_party`). The snapshot's entries are DERIVED: `COLLECTIONS` places each
+`../corpora` collection by name and says only whether the bench measures it (`perf: true` or
+`false` — placed means gated either way; a bench-only slice is narrowed in the snapshot's manifest), and its entries are one per `subpath`
+the snapshot's own `manifest.json` names for it — so an upstream's layout is spelled once, in the
+recipe — each `benched` or `gated` by that placement. The `live` working trees derive the same
+way, from the `own` collections. Extensions: `.svelte`, the JS/TS family `tsv format`
 discovers (`.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cjs`, all parsed as TypeScript), `.css`, `.html`
 (treated as Svelte; only loaded by entries that opt in). The loader's family is `tsv format`'s on
 purpose: a file the product formats is a file the gates grade (the prettier JS/TS suites
 contribute `.mjs`/`.cjs`/`.mts`/`.cts` files that way).
 
-**The real code is a pinned snapshot.** `real` + `framework` + `third_party` read the `../corpora`
+**The real code is a pinned snapshot.** `benched` + `gated` read the `../corpora`
 checkout (`fuzdev/corpora`): one collection per upstream repo — the author's dev repos (zzz,
 fuz\_\*, gro, the personal sites), the framework source (kit, svelte, the svelte.dev subpaths) and
 the third-party Svelte libraries and tools (flowbite-svelte, layerchart, layercake, svelte-ux,
@@ -1345,14 +1348,14 @@ whose churn would make an aggregate pin a re-pin treadmill, survive as the `live
 `robustness` view only and only as a diff against the snapshot (below). **SAFETY (content loss)
 gates over every file.**
 
-- **`perf`** — `real` + `framework`, all real code: application & library source (the fuz.dev
+- **`perf`** — `benched`, all real code: application & library source (the fuz.dev
   repos' `src/` — zzz, the fuz ecosystem, gro, svelte-docinfo, tsv.fuz.dev — plus the author's
   public SvelteKit sites and apps: ryanatkn.com, webdevladder.net, earbetter, cosmicplayground)
   plus upstream framework source (kit, svelte, and the svelte.dev subpaths), all from the
-  snapshot's collections. NOT the `third_party` tier the gates read (two thirds of the snapshot's
-  `.svelte`): the throughput headline is ecosystem + framework code by design — flowbite alone
-  would be over 40% of this view's `.svelte` files — and the every-file invariant below is
-  unmeasured over them. `.d.ts` files are IN scope (the product formats them; declaration-heavy
+  snapshot's collections. NOT the `gated` collections the gates read (the third-party Svelte
+  libraries, two thirds of the snapshot's `.svelte`, and any collection awaiting its bench
+  triage): flowbite alone would be over 40% of this view's `.svelte` files, and the every-file
+  invariant below is unmeasured over them. `.d.ts` files are IN scope (the product formats them; declaration-heavy
   shapes carry real divergence signal), and the curated entries skip the `/build/`+`/dist/`
   build-output pruning (a `build/` segment inside a reviewed `src/` tree is real source, e.g.
   kit's `src/exports/vite/build/`; `DirectoryLoader`'s arbitrary-path scans still prune both). The
@@ -1389,8 +1392,8 @@ gates over every file.**
     is about, so only a full run grades that half) and the TASK (every alternative impl is
     optional, and one that fails to load registers no task at all, so on that machine its entries
     are unasked rather than stale).
-- **`gates`** — `real` + `framework` + `third_party` + `prettier_fixture`: the perf tiers, plus the
-  `third_party` collections (prettier-shaped code whose `known` divergences the ecosystem repos
+- **`gates`** — `benched` + `gated` + `prettier_fixture`: the perf view, plus the `gated`
+  collections (prettier-shaped code whose `known` divergences the ecosystem repos
   never carry — the breadth a correctness gate wants and a throughput headline does not), plus
   Prettier's `tests/format/{typescript,js,css,html}` suites and prettier-plugin-svelte's `test/`
   (`.html` treated as Svelte, files with a companion `options.json` skipped) — deliberately tricky
@@ -1404,7 +1407,7 @@ gates over every file.**
   entries — Svelte's compiler tests (with the gate-aligned skips: `_`-prefixed segments,
   `migrate/`, `output.svelte` snapshots), the wpt-css harvest cache, the test262 graded-positive
   path list (a `files_from` entry), and the **tsc-corpus** valid list (another `files_from`, from
-  `harvest_ts_repo.ts`). Deliberately **excludes the `real` perf tier**, so the conformance
+  `harvest_ts_repo.ts`). Deliberately **excludes every snapshot tier**, so the conformance
   coverage surface and the perf corpus are mutually exclusive: perf is the "every in-scope tool
   must fully process it" corpus, conformance is where sub-100% coverage is the metric. This is what
   `deno task bench:conformance` measures.
@@ -1490,10 +1493,10 @@ gates over every file.**
   real-code robustness sweeps (`audit:corpus`, `idempotency:sweep`). Nothing here is counted or
   pinned.
   - The snapshot is read as one ROOT (`corpus_snapshot_dir`: every collection `../corpora`
-    vendors, placed in a tier or not — a sweep grades an invariant, not a pinned count, so a
+    vendors, placed or not — a sweep grades an invariant, not a pinned count, so a
     collection waiting on its triage is swept before it is placed, and one seed beats one per
-    subpath); the cache is the one `real` entry outside that root.
-  - The live diff is the files of the `real` repos' working trees (`../zzz/src`, …, one tree per
+    subpath); the cache is the one `benched` entry outside that root.
+  - The live diff is the files of the `own` repos' working trees (`../zzz/src`, …, one tree per
     manifest subpath) whose bytes differ from, or are absent in, their collection, minus the
     manifest's `exclude` prefixes and minus what git ignores there (`git ls-files -o -i
     --exclude-standard` per tree: a `*.local.ts` scratch file is absent from a git-object snapshot
@@ -1502,7 +1505,7 @@ gates over every file.**
     file the snapshot already holds byte-for-byte has already been swept, so the tier is a diff
     (measured a day after vendoring: the whole trees were 3,102 files for 22 that differed, 455 of
     the rest fixtures the manifest excludes — an 81% surcharge per leg).
-  - `TIERS_BY_VIEW.robustness` still declares `real` + `framework` + `third_party` + `live`: the
+  - `TIERS_BY_VIEW.robustness` still declares `benched` + `gated` + `live`: the
     tiers contribute only what lies outside the root (the cache) and the diff, and the `live` seat
     is what makes the loader refuse the view whole and `corpus_present_dirs_for_tiers` refuse it as
     directories. Two directory seeds plus the live file list (`corpus_robustness_seeds`) — so the

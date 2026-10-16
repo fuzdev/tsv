@@ -333,7 +333,7 @@ else warn(
 if (exists('../wpt/css')) ok('../wpt/css checkout (sparse)');
 else warn('../wpt/css checkout missing — bench:harvest:wpt unavailable (manual-cadence tool)');
 
-// The real-code corpus snapshot: every `real`/`framework` corpus entry reads one of
+// The real-code corpus snapshot: every `benched`/`gated` corpus entry reads one of
 // its collections, and the corpus count pins were measured at the `collections/` tree
 // id `GATE_CHECKOUT_IDS` records — so a checkout whose collections are at any
 // other id grades a different corpus than the pins describe (a refresh re-pins;
@@ -469,7 +469,7 @@ for (const [name, { path, task, checkouts }] of Object.entries(HARVEST_STAMPS)) 
 
 section('Corpus entries (gates + conformance views)');
 try {
-	const { corpus_missing_entries, corpus_untiered_collections } =
+	const { corpus_missing_entries, corpus_unplaced_collections } =
 		await import('../benches/js/lib/corpus.ts');
 	for (const view of ['gates', 'conformance'] as const) {
 		const { missing, optional_missing, total } = await corpus_missing_entries(view);
@@ -484,19 +484,19 @@ try {
 		for (const o of optional_missing)
 			info(`${view} view: optional entry absent (fail-open, disclosed): ${o}`);
 	}
-	// A collection the snapshot vendors that no tier places is in no bench or gate view
-	// — vendored ahead of its triage, read only by the whole-snapshot sweeps. Listed so
-	// it is a standing question rather than a forgotten one.
-	const untiered = await corpus_untiered_collections();
-	if (untiered.length > 0) {
+	// A collection the snapshot vendors that `COLLECTIONS` does not place is in no bench
+	// or gate view — vendored ahead of its triage, read only by the whole-snapshot sweeps.
+	// Listed so it is a standing question rather than a forgotten one.
+	const unplaced = await corpus_unplaced_collections();
+	if (unplaced.length > 0) {
 		info(
-			`${untiered.length} snapshot collection(s) in no tier (whole-snapshot sweeps only): ` +
-				untiered.join(', ')
+			`${unplaced.length} snapshot collection(s) not placed (whole-snapshot sweeps only): ` +
+				unplaced.join(', ')
 		);
 	}
 } catch (e) {
 	// The entry list is derived from the snapshot's manifest, so this is also where a
-	// checkout whose manifest this reader can't take (or a tier table naming a collection
+	// checkout whose manifest this reader can't take (or a placement table naming a collection
 	// the manifest dropped) surfaces — the message names which; a bare import failure is
 	// usually node_modules missing (deno task bench:install).
 	warn(`cannot load the corpus entry list: ${e instanceof Error ? e.message.split('\n')[0] : e}`);

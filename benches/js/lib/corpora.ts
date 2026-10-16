@@ -1,5 +1,5 @@
 /**
- * The real-code snapshot every `real` / `framework` / `third_party` corpus entry reads:
+ * The real-code snapshot every `benched` / `gated` corpus entry reads:
  * where the `fuzdev/corpora` checkout sits, which tree inside it consumers walk, and
  * the reader for its recipe (`manifest.json`) — the recipe is also where a collection's
  * subpaths are spelled, so the corpus entries are derived from it rather than restated.
@@ -37,7 +37,7 @@ export const CORPORA_COLLECTIONS = `${CORPORA_ROOT}/${CORPORA_TREE}`;
 export const CORPORA_MANIFEST = `${CORPORA_ROOT}/manifest.json`;
 
 /** The manifest format this reader understands; a bump upstream is a change here. */
-export const CORPORA_MANIFEST_VERSION = 1;
+export const CORPORA_MANIFEST_VERSION = 2;
 
 /** Whether a corpus entry path reads a snapshot collection. */
 export function is_collection_path(path: string): boolean {
@@ -77,7 +77,15 @@ export interface CorporaCollection {
 	 * too before it can stand in for the collection (`live_diff_files`).
 	 */
 	exclude: string[];
+	/**
+	 * Who wrote the collection: `own` for the fuz ecosystem's authors, the code tsv is
+	 * developed against, or `third_party`. What the `live` diff selects on.
+	 */
+	origin: CorporaOrigin;
 }
+
+/** A collection's `origin` in the manifest. */
+export type CorporaOrigin = 'own' | 'third_party';
 
 /** The manifest's shape, as far as this reader needs it — raw JSON, checked field by field. */
 interface CorporaManifest {
@@ -99,7 +107,7 @@ export function is_under(path: string, prefix: string): boolean {
  */
 function read_collection(raw: unknown): ({ name: string } & CorporaCollection) | null {
 	if (typeof raw !== 'object' || raw === null) return null;
-	const { name, url, commit, subpaths, exclude } = raw as Record<string, unknown>;
+	const { name, url, commit, subpaths, exclude, origin } = raw as Record<string, unknown>;
 	if (typeof name !== 'string' || typeof url !== 'string' || typeof commit !== 'string') {
 		return null;
 	}
@@ -109,7 +117,8 @@ function read_collection(raw: unknown): ({ name: string } & CorporaCollection) |
 	if (!is_string_list(subpaths) || subpaths.length === 0) return null;
 	const excludes = exclude === undefined ? [] : exclude;
 	if (!is_string_list(excludes)) return null;
-	return { name, url, commit, subpaths, exclude: excludes };
+	if (origin !== 'own' && origin !== 'third_party') return null;
+	return { name, url, commit, subpaths, exclude: excludes, origin };
 }
 
 /**

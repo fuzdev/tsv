@@ -1945,7 +1945,7 @@ report/dump.
 
 ## F1 Idempotency Sweep (`idempotency:sweep`)
 
-The fuzzer's pristine pass, pointed at the `robustness` corpus view (the WHOLE `../corpora` snapshot — every collection it vendors, placed in a corpus tier or not, since the sweep grades an invariant rather than a pinned count — plus the `svelte_styles` harvest cache and the live diff: the files of this machine's working trees of the `real` repos that differ from, or are absent in, the snapshot — `lib/corpus.ts` `corpus_robustness_seeds` / `live_diff_files`) — `format(format(x)) == format(x)` on every real file. NOT in `deno task check`: the corpus is machine-dependent checkouts and the sweep is minutes, not seconds. It is a different risk surface from the fixtures — a formatter can be idempotent on every curated fixture and still reflow a real component on pass 2. Run at conformance cadence, or after any printer change.
+The fuzzer's pristine pass, pointed at the `robustness` corpus view (the WHOLE `../corpora` snapshot — every collection it vendors, placed or not, since the sweep grades an invariant rather than a pinned count — plus the `svelte_styles` harvest cache and the live diff: the files of this machine's working trees of the `own` repos that differ from, or are absent in, the snapshot — `lib/corpus.ts` `corpus_robustness_seeds` / `live_diff_files`) — `format(format(x)) == format(x)` on every real file. NOT in `deno task check`: the corpus is machine-dependent checkouts and the sweep is minutes, not seconds. It is a different risk surface from the fixtures — a formatter can be idempotent on every curated fixture and still reflow a real component on pass 2. Run at conformance cadence, or after any printer change.
 
 ```bash
 deno task idempotency:sweep

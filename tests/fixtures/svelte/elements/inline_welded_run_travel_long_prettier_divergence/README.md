@@ -52,7 +52,7 @@ input (confirmed by `render_compare`).
 ⚠️ A regression that split one of the interior boundaries would be invisible to every
 idempotency-shaped gate: the split form is its own fixed point, so F1, the seeded fuzzer,
 `authoring_audit` and the round-trip all pass through it. Only the render oracle sees it, and
-only on the `real` corpus tier.
+only on the real-code corpus.
 
 ## Reason
 

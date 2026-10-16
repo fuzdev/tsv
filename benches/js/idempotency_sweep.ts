@@ -2,9 +2,9 @@
  * F1 (idempotency) sweep over the **real-code** corpus.
  *
  * Drives every file of the `robustness` view — the WHOLE `../corpora` snapshot (every
- * collection it vendors, placed in a corpus tier or not), the `svelte_styles` cache,
+ * collection it vendors, placed or not), the `svelte_styles` cache,
  * plus the live diff (the files of this machine's
- * working trees of the `real` repos that differ from, or are absent in, the snapshot) —
+ * working trees of the `own` repos that differ from, or are absent in, the snapshot) —
  * through `tsv_debug fuzz --iterations 0`:
  * the fuzzer's
  * pristine pass, which asserts the three invariants on each seed **as authored**,

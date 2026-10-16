@@ -2,22 +2,22 @@
  * Corpus loading for benchmarks and comparison.
  *
  * One tagged entry list (`corpus_entries` — the `../corpora` snapshot's collections,
- * each placed in a tier by `COLLECTION_TIERS` and spelled from the snapshot's own
+ * each placed by `COLLECTIONS` and spelled from the snapshot's own
  * manifest, plus the pinned suite checkouts and the derived caches), four views:
  *
- * - `perf` — real-world code only (app + upstream framework source from the
- *   `../corpora` snapshot, whose manifest already leaves the upstreams' test
- *   fixtures behind; `*.test.ts` stays). The
+ * - `perf` — real-world code only (the `benched` collections of the `../corpora`
+ *   snapshot, whose manifest already leaves the upstreams' test fixtures behind;
+ *   `*.test.ts` stays). The
  *   `deno task bench` corpus, so throughput reflects real code rather than formatter
  *   edge-case suites — and one pinned commit names all of it.
- * - `gates` — every snapshot tier (`perf`'s two plus the `third_party` libraries) +
+ * - `gates` — every placed collection (`perf`'s `benched` plus the `gated` ones) +
  *   the prettier fixture suites. The correctness gates (`corpus:compare:*` `--all`,
  *   `skip_triage`, `wasm_json_probe`) keep this scope — their sanction lists and
  *   coverage were reviewed against it. Every file here comes from a pinned checkout,
  *   so every count pin gates over the whole view.
  * - `conformance` — the hard parse cases only: the prettier fixture suites plus
  *   the parse-conformance suites (Svelte's compiler tests, the wpt-css harvest
- *   cache, test262 graded positives). Deliberately EXCLUDES the `real` perf tier,
+ *   cache, test262 graded positives). Deliberately EXCLUDES every snapshot tier,
  *   so the conformance coverage surface and the perf corpus are mutually exclusive:
  *   `perf` is the "every in-scope tool must fully process it" corpus (the bench's
  *   pre-flight hard-fails an unlisted failure there — see `perf_omit.ts`), `conformance` is
@@ -25,9 +25,9 @@
  *   (`deno task bench:conformance`).
  * - `robustness` — the real-code robustness sweeps' scope (`audit:corpus`,
  *   `idempotency:sweep`): the WHOLE snapshot — every collection `../corpora` vendors,
- *   placed in a tier or not, as one root, since a sweep grades an invariant rather than
+ *   placed or not, as one root, since a sweep grades an invariant rather than
  *   a pinned count — plus the `svelte_styles` harvest cache, PLUS the live DIFF — the
- *   files of the `real` repos' working trees (the `live` tier) whose bytes differ from,
+ *   files of the `own` repos' working trees (the `live` tier) whose bytes differ from,
  *   or are absent in, their collection, minus what the snapshot's manifest excludes and
  *   what git ignores. That is where new syntax shows up before any refresh, at a cost
  *   proportional to the drift. The snapshot root and the cache as directories plus the
@@ -52,6 +52,7 @@ import {
 	CORPORA_MANIFEST,
 	CORPORA_ROOT,
 	type CorporaCollection,
+	type CorporaOrigin,
 	is_under,
 	load_corpora_manifest
 } from './corpora.ts';
@@ -384,24 +385,22 @@ export function group_by_language(files: SourceFile[]): Record<Language, SourceF
 //
 
 /**
- * Which concern an entry serves — the axis the views select on.
+ * Which views an entry reaches — the axis the views select on (`TIERS_BY_VIEW`). A tier
+ * says what an entry is FOR, never who wrote it: a snapshot collection's authorship is
+ * its manifest `origin`, read from `../corpora` (`CorporaCollection.origin`).
  *
- * - `real` — the author's own application/library source (zzz, the fuz ecosystem,
- *   gro, the personal sites), read from the `../corpora` snapshot
- *   (`collections/<name>/<subpath>`, the subpaths from its manifest). Every collection
- *   there is pinned at once by the id of the snapshot's `collections/` tree, recorded in
- *   `GATE_CHECKOUT_IDS['../corpora']` and verified by `deno task pins:audit:checkouts` —
- *   real code the perf numbers reflect, AND a reproducible tier the count pins hold over.
- * - `framework` — upstream framework source (kit, svelte, the svelte.dev subpaths),
- *   from the same snapshot. Real code in the perf view, reproducible in the gate.
- * - `third_party` — third-party Svelte libraries and tooling (flowbite-svelte,
- *   layerchart, layercake, svelte-ux, svelte-maplibre, language-tools), from the same
- *   snapshot: the gates' breadth — most of the snapshot's `.svelte`, and prettier-shaped
- *   code whose divergences the ecosystem repos never carry — and reproducible there. NOT
- *   the perf view: the throughput headline is ecosystem + framework code by design
- *   (flowbite alone would be a large share of its `.svelte`), and the perf invariant
- *   that every in-scope tool fully processes every file is unmeasured over these.
- * - `live` — the `real` repos as WORKING TREES (`../zzz/src`, …): unpinned,
+ * - `benched` — snapshot code the throughput headline measures, read from the
+ *   `../corpora` snapshot (`collections/<name>/<subpath>`, the subpaths from its
+ *   manifest), plus the `svelte_styles` harvest derived from it. In `perf`, `gates` and
+ *   `robustness`. Every collection there is pinned at once by the id of the snapshot's
+ *   `collections/` tree, recorded in `GATE_CHECKOUT_IDS['../corpora']` and verified by
+ *   `deno task pins:audit:checkouts` — real code the perf numbers reflect, AND a
+ *   reproducible tier the count pins hold over.
+ * - `gated` — snapshot code the correctness gates read but the bench does not: the
+ *   gates' breadth, and reproducible there. In `gates` and `robustness`, NOT `perf`,
+ *   because the perf invariant that every in-scope tool fully processes every file is
+ *   unmeasured over these until a collection is triaged onto the bench (`COLLECTIONS`).
+ * - `live` — the `own` collections as WORKING TREES (`../zzz/src`, …): unpinned,
  *   machine-dependent, and in no bench or gate view. Read only by the real-code
  *   robustness sweeps (the `robustness` view), and only as a DIFF against the
  *   snapshot (`live_diff_files`): a working tree is where new syntax shows up before
@@ -418,8 +417,7 @@ export function group_by_language(files: SourceFile[]): Record<Language, SourceF
  * so the count pins gate over whole views and no per-file reproducibility flag is
  * needed; `live` is the one unpinned tier and sits only in `robustness`.
  */
-export type CorpusTier =
-	'real' | 'framework' | 'third_party' | 'live' | 'prettier_fixture' | 'suite';
+export type CorpusTier = 'benched' | 'gated' | 'live' | 'prettier_fixture' | 'suite';
 
 /** A named subset of the corpus entries — see the module doc for what each view is for. */
 export type CorpusView = 'perf' | 'gates' | 'conformance' | 'robustness';
@@ -515,80 +513,94 @@ export async function* stream_entry_candidate(dir: string): AsyncGenerator<Sourc
 	yield* walk_corpus(dir, { prune_build_output: false });
 }
 
-/** The tiers a snapshot collection can land in — the `CorpusTier`s read from `../corpora`. */
-type CollectionTier = Extract<CorpusTier, 'real' | 'framework' | 'third_party'>;
+/** The tiers a snapshot collection's entries land in — the `CorpusTier`s read from `../corpora`. */
+type SnapshotTier = Extract<CorpusTier, 'benched' | 'gated'>;
 
 /**
- * The tier of every snapshot collection a bench or gate view reads, by collection
- * name — the ONE table that places a collection (`TIERS_BY_VIEW` says which views each
- * tier reaches). The entries themselves are DERIVED from the snapshot's manifest
- * (`corpus_entries`): one per `subpath` the manifest names for the collection, so an
- * upstream's layout is spelled once, in the snapshot's own recipe (language-tools alone
- * has six subpaths), and a collection whose layout moves upstream re-spells nothing here.
- *
- * Every collection the manifest vendors is placed here today, but the table need not
- * name them all: a collection vendored ahead of its triage stays out of the views (as
- * earbetter and cosmicplayground once did) and is read only by the consumers that pin
- * no count (`corpus_snapshot_dir`); `corpus_untiered_collections` names such
- * collections for the doctor. The reverse — a name here the manifest no longer vendors —
- * is a refusal, since a view that quietly lost a collection would grade less than its
- * pins claim.
- *
- * - `real` and `framework` land in `perf` too, so an add there moves the throughput
- *   headline and the styles harvest as well as every corpus count pin.
- * - `third_party` lands in the gates only, so an add there re-pins the corpus counts and
- *   nothing else — see `CorpusTier`.
+ * How one placed collection reaches the views: `perf: true` benches it, `false` gates it
+ * without benching it. Whole collections only — a bench-only slice is narrowed in the
+ * snapshot's manifest, not here.
  */
-const COLLECTION_TIERS: Record<string, CollectionTier> = {
+interface CollectionPlacement {
+	perf: boolean;
+}
+
+/**
+ * Every snapshot collection a bench or gate view reads, by collection name — the ONE
+ * table that places a collection, and the only thing it says is whether the bench
+ * measures it: placed means gated (`gates`) and swept (`robustness`), and `perf` opts
+ * the collection onto the bench as well (`TIERS_BY_VIEW`). Who wrote a collection is
+ * not spelled here — the manifest's `origin` says it. The entries themselves are DERIVED
+ * from the snapshot's manifest (`corpus_entries`): one per `subpath` the manifest names
+ * for the collection, so an upstream's layout is spelled once, in the snapshot's own
+ * recipe (language-tools alone has six subpaths), and a collection whose layout moves
+ * upstream re-spells nothing here.
+ *
+ * The table need not name every collection the manifest vendors: one vendored ahead of
+ * its triage stays out of the views and is read only by the consumers that pin no count
+ * (`corpus_snapshot_dir`); `corpus_unplaced_collections` names such collections for the
+ * doctor. The reverse — a name here the manifest no longer vendors — is a refusal,
+ * since a view that quietly lost a collection would grade less than its pins claim.
+ *
+ * Placing a collection re-pins every corpus count pin; benching it also moves the
+ * throughput headline and the styles harvest. Order matters: entries follow this
+ * table, and the perf view's entry list is part of the styles harvest's stamp.
+ */
+const COLLECTIONS: Record<string, CollectionPlacement> = {
 	// Large apps
-	zzz: 'real',
+	zzz: { perf: true },
 	// Fuz ecosystem
-	fuz_app: 'real',
-	fuz_blog: 'real',
-	fuz_code: 'real',
-	fuz_css: 'real',
-	fuz_docs: 'real',
-	fuz_repos: 'real',
-	fuz_mastodon: 'real',
-	fuz_template: 'real',
-	fuz_ui: 'real',
-	fuz_util: 'real',
-	mdz: 'real',
+	fuz_app: { perf: true },
+	fuz_blog: { perf: true },
+	fuz_code: { perf: true },
+	fuz_css: { perf: true },
+	fuz_docs: { perf: true },
+	fuz_repos: { perf: true },
+	fuz_mastodon: { perf: true },
+	fuz_template: { perf: true },
+	fuz_ui: { perf: true },
+	fuz_util: { perf: true },
+	mdz: { perf: true },
 	// Build tooling
-	gro: 'real',
-	'svelte-docinfo': 'real',
-	'tsv.fuz.dev': 'real',
+	gro: { perf: true },
+	'svelte-docinfo': { perf: true },
+	'tsv.fuz.dev': { perf: true },
 	// Personal sites (public repos beyond the fuz ecosystem)
-	'ryanatkn.com': 'real',
-	'webdevladder.net': 'real',
+	'ryanatkn.com': { perf: true },
+	'webdevladder.net': { perf: true },
 	// Personal apps (public, The Unlicense; prettier-shaped, so their divergences carry
 	// third-party-shaped signal the fuz repos cannot)
-	earbetter: 'real',
-	cosmicplayground: 'real',
+	earbetter: { perf: true },
+	cosmicplayground: { perf: true },
 	// Upstream framework source — each subpath a reviewed package `src/` tree, never a
 	// whole monorepo, so build output and scaffolding stay out
-	kit: 'framework',
-	svelte: 'framework',
-	'svelte.dev': 'framework',
-	// Third-party Svelte libraries and tooling — the gates' breadth, not the perf corpus
-	'flowbite-svelte': 'third_party',
-	layerchart: 'third_party',
-	layercake: 'third_party',
-	'svelte-ux': 'third_party',
-	'svelte-maplibre': 'third_party',
-	'language-tools': 'third_party'
+	kit: { perf: true },
+	svelte: { perf: true },
+	'svelte.dev': { perf: true },
+	// Third-party Svelte libraries and tooling — the gates' breadth, not yet on the bench
+	// (flowbite alone would be a large share of its `.svelte`)
+	'flowbite-svelte': { perf: false },
+	layerchart: { perf: false },
+	layercake: { perf: false },
+	'svelte-ux': { perf: false },
+	'svelte-maplibre': { perf: false },
+	'language-tools': { perf: false }
 };
+
+/** The tier a placed collection's entries land in. */
+function snapshot_tier(placement: CollectionPlacement): SnapshotTier {
+	return placement.perf ? 'benched' : 'gated';
+}
 
 /**
  * Which collections' WORKING TREES the `live` tier diffs against the snapshot
- * (`live_diff_files`), by tier: a tier here claims its sibling checkouts (`../<name>`)
- * are edited ahead of the snapshot, which is what makes the diff an early warning. The
- * author's `real` repos are; the `framework` and `third_party` checkouts are pulled,
- * not edited, so a diff over them is empty until an upstream pull — when it is a whole
- * release at once, which `pins:audit:checkouts` already names for `../svelte`. Adding a
- * tier here is the entire change if that trade-off is ever wanted.
+ * (`live_diff_files`), by manifest `origin`: an origin here claims its sibling checkouts
+ * (`../<name>`) are edited ahead of the snapshot, which is what makes the diff an early
+ * warning. The `own` repos are; third-party checkouts are pulled, not edited, so a diff
+ * over them is empty until an upstream pull — when it is a whole release at once, which
+ * `pins:audit:checkouts` already names for `../svelte`.
  */
-const LIVE_DIFF_TIERS: readonly CollectionTier[] = ['real'];
+const LIVE_DIFF_ORIGINS: readonly CorporaOrigin[] = ['own'];
 
 /** A `live` working tree standing in for one collection subpath (`live_diff_files`). */
 interface LiveTree {
@@ -604,20 +616,20 @@ interface LiveTree {
 	path: string;
 }
 
-/** A collection the tier table places, joined with what the manifest says it vendors. */
+/** A collection `COLLECTIONS` places, joined with what the manifest says it vendors. */
 interface PlacedCollection extends CorporaCollection {
 	name: string;
-	tier: CollectionTier;
+	placement: CollectionPlacement;
 }
 
 /** Everything derived from the snapshot's manifest plus the static entries, built once. */
 interface CorpusCatalog {
 	/** The tagged entry list every view selects from. */
 	entries: CorpusEntry[];
-	/** The `live` tier's trees, one per subpath of each `LIVE_DIFF_TIERS` collection. */
+	/** The `live` tier's trees, one per subpath of each `LIVE_DIFF_ORIGINS` collection. */
 	live_trees: LiveTree[];
-	/** Manifest collections `COLLECTION_TIERS` does not place — vendored, in no view. */
-	untiered: string[];
+	/** Manifest collections `COLLECTIONS` does not place — vendored, in no view. */
+	unplaced: string[];
 }
 
 let catalog_promise: Promise<CorpusCatalog> | undefined;
@@ -655,35 +667,37 @@ async function build_catalog(): Promise<CorpusCatalog> {
 			);
 		}
 		// Absent snapshot: one placeholder per placed collection, at its root.
-		const placeholders = (tier: CollectionTier): CorpusEntry[] =>
-			placed_names(tier).map((name) => ({ path: `${CORPORA_COLLECTIONS}/${name}`, tier }));
-		return { entries: assemble_entries(placeholders, []), live_trees: [], untiered: [] };
+		const placeholders = Object.entries(COLLECTIONS).map(([name, placement]): CorpusEntry => ({
+			path: `${CORPORA_COLLECTIONS}/${name}`,
+			tier: snapshot_tier(placement)
+		}));
+		return { entries: assemble_entries(placeholders, []), live_trees: [], unplaced: [] };
 	}
 	const { collections } = read;
 	const placed: PlacedCollection[] = [];
 	const dropped: string[] = [];
-	for (const [name, tier] of Object.entries(COLLECTION_TIERS)) {
+	for (const [name, placement] of Object.entries(COLLECTIONS)) {
 		const collection = collections.get(name);
-		if (collection) placed.push({ name, tier, ...collection });
+		if (collection) placed.push({ name, placement, ...collection });
 		else dropped.push(name);
 	}
 	if (dropped.length > 0) {
 		throw new Error(
-			`COLLECTION_TIERS places collections the snapshot's manifest no longer vendors: ` +
+			`COLLECTIONS places collections the snapshot's manifest no longer vendors: ` +
 				`${dropped.join(', ')} — remove them from the table, or restore them in ${CORPORA_ROOT}`
 		);
 	}
 	// One entry per manifest subpath, in table order then manifest order — the ORDER is
 	// part of the perf view's stamped entry list (`corpus_view_paths`), so it is a
 	// deliberate property of this derivation, not an incidental one.
-	const snapshot_entries = (tier: CollectionTier): CorpusEntry[] =>
-		placed
-			.filter((c) => c.tier === tier)
-			.flatMap((c) =>
-				c.subpaths.map((subpath) => ({ path: `${CORPORA_COLLECTIONS}/${c.name}/${subpath}`, tier }))
-			);
+	const snapshot_entries = placed.flatMap((c) =>
+		c.subpaths.map((subpath): CorpusEntry => ({
+			path: `${CORPORA_COLLECTIONS}/${c.name}/${subpath}`,
+			tier: snapshot_tier(c.placement)
+		}))
+	);
 	const live_trees = placed
-		.filter((c) => LIVE_DIFF_TIERS.includes(c.tier))
+		.filter((c) => LIVE_DIFF_ORIGINS.includes(c.origin))
 		.flatMap(({ name, subpaths, exclude }) =>
 			subpaths.map((subpath): LiveTree => ({
 				name,
@@ -693,29 +707,19 @@ async function build_catalog(): Promise<CorpusCatalog> {
 				path: `../${name}/${subpath}`
 			}))
 		);
-	const untiered = [...collections.keys()].filter((name) => !(name in COLLECTION_TIERS));
-	return { entries: assemble_entries(snapshot_entries, live_trees), live_trees, untiered };
-}
-
-/** The names `COLLECTION_TIERS` places in `tier`, in table order. */
-function placed_names(tier: CollectionTier): string[] {
-	return Object.entries(COLLECTION_TIERS)
-		.filter(([, t]) => t === tier)
-		.map(([name]) => name);
+	const unplaced = [...collections.keys()].filter((name) => !(name in COLLECTIONS));
+	return { entries: assemble_entries(snapshot_entries, live_trees), live_trees, unplaced };
 }
 
 /**
- * The tagged corpus entry list, relative to project root (cwd): the snapshot tiers
- * (derived), the derived caches, the same `real` repos as live working trees, and the
- * pinned suite checkouts. A missing entry fails the load unless marked `optional` — see
- * `CorpusLoader`.
+ * The tagged corpus entry list, relative to project root (cwd): the snapshot's
+ * collections (derived), the caches derived from them, the `own` repos as live working
+ * trees, and the pinned suite checkouts. A missing entry fails the load unless marked
+ * `optional` — see `CorpusLoader`.
  */
-function assemble_entries(
-	snapshot_entries: (tier: CollectionTier) => CorpusEntry[],
-	live_trees: LiveTree[]
-): CorpusEntry[] {
+function assemble_entries(snapshot_entries: CorpusEntry[], live_trees: LiveTree[]): CorpusEntry[] {
 	return [
-		...snapshot_entries('real'),
+		...snapshot_entries,
 		// Real-authored CSS extracted from the perf-view `.svelte` files' <style>
 		// blocks, concatenated per source collection (bench:harvest:svelte-styles).
 		// Derived but real content: more than doubles the otherwise-small standalone-CSS
@@ -725,14 +729,12 @@ function assemble_entries(
 		// The same bytes are also timed in the svelte rows; rows are never summed.
 		{
 			path: 'benches/js/.cache/svelte_styles',
-			tier: 'real',
+			tier: 'benched',
 			extensions: ['css'],
 			optional: true,
 			hint: 'run `deno task bench:harvest:svelte-styles`'
 		},
-		...snapshot_entries('framework'),
-		...snapshot_entries('third_party'),
-		// The `real` repos as live working trees — the `live` tier, `robustness` view only,
+		// The `own` repos as live working trees — the `live` tier, `robustness` view only,
 		// one entry per collection subpath. Optional: whichever of them this machine has cloned.
 		...live_trees.map(({ path }): CorpusEntry => ({
 			path,
@@ -821,22 +823,22 @@ export async function corpus_entries(): Promise<CorpusEntry[]> {
 }
 
 /**
- * Collections the snapshot vendors that `COLLECTION_TIERS` does not place — in no bench
+ * Collections the snapshot vendors that `COLLECTIONS` does not place — in no bench
  * or gate view, read only by the whole-snapshot consumers (`corpus_snapshot_dir`). For
  * `scripts/doctor.ts`, so a collection waiting on its triage is listed rather than
  * forgotten. Empty when the snapshot is absent.
  */
-export async function corpus_untiered_collections(): Promise<string[]> {
-	return (await corpus_catalog()).untiered;
+export async function corpus_unplaced_collections(): Promise<string[]> {
+	return (await corpus_catalog()).unplaced;
 }
 
 const TIERS_BY_VIEW: Record<CorpusView, CorpusTier[]> = {
-	// Both are real code from the pinned snapshot — the throughput headline. NOT
-	// `third_party`: see `CorpusTier`.
-	perf: ['real', 'framework'],
-	// Every snapshot tier plus the prettier suites. Every file in this view comes
+	// The snapshot code the bench measures — the throughput headline. NOT `gated`:
+	// see `CorpusTier`.
+	perf: ['benched'],
+	// Every placed collection plus the prettier suites. Every file in this view comes
 	// from a pinned checkout, so every count pin gates over the whole view.
-	gates: ['real', 'framework', 'third_party', 'prettier_fixture'],
+	gates: ['benched', 'gated', 'prettier_fixture'],
 	// deliberately NO snapshot tier: the conformance coverage surface and the perf corpus
 	// are mutually exclusive sets. perf is the "every in-scope tool must fully
 	// process it" corpus (the bench's pre-flight hard-fails an unlisted failure); conformance is
@@ -844,13 +846,13 @@ const TIERS_BY_VIEW: Record<CorpusView, CorpusTier[]> = {
 	conformance: ['prettier_fixture', 'suite'],
 	// The real-code robustness sweeps: the WHOLE snapshot AND the live working trees'
 	// diff. Not a bench or gate view — nothing here is counted or pinned, so the sweeps
-	// read the snapshot ROOT (every collection, placed in a tier or not) rather than the
+	// read the snapshot ROOT (every collection, placed or not) rather than the
 	// tiers' entries; the tiers listed here declare the view's scope and contribute only
-	// what lies OUTSIDE that root (the `svelte_styles` harvest cache, a `real` entry) and
+	// what lies OUTSIDE that root (the `svelte_styles` harvest cache, a `benched` entry) and
 	// the `live` diff's FILES (`corpus_robustness_seeds`). The `live` seat is also what
 	// refuses loading the view whole (`CorpusLoader.stream`) or walking it as directories
 	// (`corpus_present_dirs_for_tiers`).
-	robustness: ['real', 'framework', 'third_party', 'live']
+	robustness: ['benched', 'gated', 'live']
 };
 
 /**
@@ -1039,7 +1041,7 @@ function entry_holds_language(entry: CorpusEntry, language: Language): boolean {
 
 /**
  * A view's entry paths as declared, present or not — the view's COMPOSITION, for a
- * stamp that must record what a harvest read: a collection joining a perf tier
+ * stamp that must record what a harvest read: a collection joining the bench
  * changes the perf view without moving any checkout, and a stamp keyed on checkouts
  * alone would skip the re-harvest that change requires. The ORDER is part of the
  * stamp, and `corpus_entries` keeps it stable (table order, then manifest order).
@@ -1135,7 +1137,7 @@ export async function corpus_present_dirs_for_tiers(
 
 /**
  * The WHOLE snapshot as one directory seed — every collection `../corpora` vendors,
- * placed in a tier or not (`COLLECTION_TIERS`) — for a Rust-side sweep that grades an
+ * placed or not (`COLLECTIONS`) — for a Rust-side sweep that grades an
  * invariant rather than a pinned count: the count pins are why the bench and gate views
  * read the tiers' entries (every collection there re-pins every corpus count, so a
  * collection waits on its triage before it is placed), and a no-panic / render /
@@ -1196,7 +1198,7 @@ async function git_ignored_files(repo_root: string, subdir: string): Promise<Set
 
 /**
  * The `live` tier as a DIFF against the snapshot: every file of a present working tree
- * (`../<name>/<subpath>`, one tree per subpath of each `LIVE_DIFF_TIERS` collection)
+ * (`../<name>/<subpath>`, one tree per subpath of each `LIVE_DIFF_ORIGINS` collection)
  * whose bytes differ from, or have no counterpart at, `collections/<name>/<same
  * upstream-relative path>` — minus that collection's manifest `exclude` prefixes, so the
  * fixtures the snapshot leaves out stay out here too, and minus what git ignores in the
