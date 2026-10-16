@@ -3,6 +3,8 @@ name = "tsv_css"
 version.workspace = true
 edition.workspace = true
 description = "CSS parsing and formatting library"
+license.workspace = true
+repository.workspace = true
 
 [features]
 default = ["convert"]

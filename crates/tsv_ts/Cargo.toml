@@ -3,6 +3,8 @@ name = "tsv_ts"
 version.workspace = true
 edition.workspace = true
 description = "TypeScript parsing and formatting library"
+license.workspace = true
+repository.workspace = true
 
 [features]
 default = ["convert"]

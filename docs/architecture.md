@@ -220,7 +220,7 @@ This shape gives both:
 - **Convention openness (Rust source level)** — anyone can write a
   `my_org/tsv_html_parse` crate following the same shape, and any
   downstream _Rust_ consumer can `use my_org_tsv_html_parse::parse`
-  without central buy-in. The tsv crates are MIT-licensed and will
+  without central buy-in. The tsv crates are 0BSD-licensed and will
   eventually publish to crates.io, where third-party `tsv_*` crates
   can sit alongside the official ones.
 

@@ -856,7 +856,7 @@ pkg.keywords = [
 	'webassembly'
 ];
 // The registry-identity fields shared with the N-API set (license included —
-// wasm-pack derives the same MIT from Cargo.toml, but the module is the
+// wasm-pack derives the same 0BSD from Cargo.toml, but the module is the
 // authority so every published tsv package presents identically).
 Object.assign(pkg, NPM_SHARED_METADATA);
 // wasm-pack emits `sideEffects: ["./snippets/*"]`, declaring index.js

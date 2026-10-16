@@ -324,7 +324,7 @@ The author learned Rust in 2015 but wrote only simple learning programs and some
 
 ## License
 
-[MIT](LICENSE)
+[0BSD](LICENSE)
 
 The code for the following projects was sometimes read by AI agents while producing tsv,
 so their license information is included for completeness:

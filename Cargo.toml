@@ -21,8 +21,8 @@ members = [
 [workspace.package]
 version = "0.6.0"
 edition = "2024"
-authors = ["tsv contributors"]
-license = "MIT"
+authors = ["fuz.dev"]
+license = "0BSD"
 repository = "https://github.com/fuzdev/tsv"
 
 [workspace.dependencies]
@@ -203,6 +203,8 @@ unwrap_used = "warn"
 name = "tsv"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tsv_lang.workspace = true

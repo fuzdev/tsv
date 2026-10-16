@@ -3,6 +3,8 @@ name = "tsv_check"
 version.workspace = true
 edition.workspace = true
 description = "Experimental TypeScript type-checking for tsv (the tsv_check checker crate)"
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 # Foundation (spans, comments, diagnostics substrate) + the TypeScript parser

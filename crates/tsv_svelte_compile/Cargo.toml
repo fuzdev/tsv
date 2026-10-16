@@ -3,6 +3,8 @@ name = "tsv_svelte_compile"
 version.workspace = true
 edition.workspace = true
 description = "Svelte-to-JS compiler (pinned to Svelte's compile() as oracle) and JS canonicalizer"
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 tsv_lang.workspace = true

@@ -3,6 +3,8 @@ name = "tsv_svelte"
 version.workspace = true
 edition.workspace = true
 description = "Svelte parsing and formatting library"
+license.workspace = true
+repository.workspace = true
 
 [features]
 default = ["convert"]

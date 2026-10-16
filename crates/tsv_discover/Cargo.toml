@@ -3,6 +3,8 @@ name = "tsv_discover"
 version.workspace = true
 edition.workspace = true
 description = "tsv file-discovery policy: build-output heuristic + safety-net pruning over a tsv_ignore matcher"
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 # Only the matcher. Zero external dependencies by design (like tsv_ignore),

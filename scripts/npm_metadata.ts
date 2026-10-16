@@ -16,7 +16,7 @@
  * `sideEffects`) stay in each staging script — they genuinely differ.
  */
 export const NPM_SHARED_METADATA = {
-	license: 'MIT',
+	license: '0BSD',
 	homepage: 'https://github.com/fuzdev/tsv',
 	author: {
 		name: 'Ryan Atkinson',

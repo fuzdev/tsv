@@ -116,4 +116,4 @@ Near production-ready. A long tail of rare bugs remains and APIs may still chang
 
 ## License
 
-[MIT](LICENSE)
+[0BSD](LICENSE)

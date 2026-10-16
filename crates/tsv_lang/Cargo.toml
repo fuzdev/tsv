@@ -3,6 +3,8 @@ name = "tsv_lang"
 version.workspace = true
 edition.workspace = true
 description = "Language-agnostic foundation primitives for tsv"
+license.workspace = true
+repository.workspace = true
 
 [features]
 # Opt-in render-time line-comment swallow check (diagnostic). Off by default so

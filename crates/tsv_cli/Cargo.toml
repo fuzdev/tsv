@@ -3,6 +3,8 @@ name = "tsv_cli"
 version.workspace = true
 edition.workspace = true
 description = "Command-line interface for tsv tools"
+license.workspace = true
+repository.workspace = true
 
 [[bin]]
 name = "tsv"
