@@ -1,0 +1,507 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 414,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A `<` after a would-be type-argument close opens a type assertion, so the `<`…`>` is",
+			"start": 20,
+			"end": 107
+		},
+		{
+			"type": "Line",
+			"value": " a comparison chain on any line, with the assertion as its right operand — after a",
+			"start": 109,
+			"end": 193
+		},
+		{
+			"type": "Line",
+			"value": " name, a member and a `new` callee, and inside an argument list.",
+			"start": 195,
+			"end": 261
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 413,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 404,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 263,
+					"end": 283,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 263,
+						"end": 282,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 263,
+							"end": 265,
+							"name": "a1"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 268,
+							"end": 282,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 269,
+								"end": 274,
+								"left": {
+									"type": "Identifier",
+									"start": 269,
+									"end": 270,
+									"name": "f"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 273,
+									"end": 274,
+									"name": "T"
+								}
+							},
+							"operator": ">",
+							"right": {
+								"type": "TSTypeAssertion",
+								"start": 278,
+								"end": 282,
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 279,
+									"end": 280,
+									"typeName": {
+										"type": "Identifier",
+										"start": 279,
+										"end": 280,
+										"name": "U"
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 281,
+									"end": 282,
+									"name": "z"
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `<` after a would-be type-argument close opens a type assertion, so the `<`…`>` is",
+							"start": 20,
+							"end": 107
+						},
+						{
+							"type": "Line",
+							"value": " a comparison chain on any line, with the assertion as its right operand — after a",
+							"start": 109,
+							"end": 193
+						},
+						{
+							"type": "Line",
+							"value": " name, a member and a `new` callee, and inside an argument list.",
+							"start": 195,
+							"end": 261
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 285,
+					"end": 307,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 285,
+						"end": 306,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 285,
+							"end": 287,
+							"name": "a2"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 290,
+							"end": 306,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 291,
+								"end": 298,
+								"left": {
+									"type": "MemberExpression",
+									"start": 291,
+									"end": 294,
+									"object": {
+										"type": "Identifier",
+										"start": 291,
+										"end": 292,
+										"name": "a"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 293,
+										"end": 294,
+										"name": "b"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 297,
+									"end": 298,
+									"name": "T"
+								}
+							},
+							"operator": ">",
+							"right": {
+								"type": "TSTypeAssertion",
+								"start": 302,
+								"end": 306,
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 303,
+									"end": 304,
+									"typeName": {
+										"type": "Identifier",
+										"start": 303,
+										"end": 304,
+										"name": "U"
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 305,
+									"end": 306,
+									"name": "z"
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 309,
+					"end": 335,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 309,
+						"end": 334,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 309,
+							"end": 311,
+							"name": "a3"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 314,
+							"end": 334,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 315,
+								"end": 326,
+								"left": {
+									"type": "NewExpression",
+									"start": 315,
+									"end": 322,
+									"callee": {
+										"type": "Identifier",
+										"start": 319,
+										"end": 320,
+										"name": "f"
+									},
+									"arguments": []
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 325,
+									"end": 326,
+									"name": "T"
+								}
+							},
+							"operator": ">",
+							"right": {
+								"type": "TSTypeAssertion",
+								"start": 330,
+								"end": 334,
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 331,
+									"end": 332,
+									"typeName": {
+										"type": "Identifier",
+										"start": 331,
+										"end": 332,
+										"name": "U"
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 333,
+									"end": 334,
+									"name": "z"
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 337,
+					"end": 359,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 337,
+						"end": 358,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 337,
+							"end": 339,
+							"name": "a4"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 342,
+							"end": 358,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 343,
+								"end": 348,
+								"left": {
+									"type": "Identifier",
+									"start": 343,
+									"end": 344,
+									"name": "f"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 347,
+									"end": 348,
+									"name": "T"
+								}
+							},
+							"operator": ">",
+							"right": {
+								"type": "TSTypeAssertion",
+								"start": 352,
+								"end": 358,
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 353,
+									"end": 354,
+									"typeName": {
+										"type": "Identifier",
+										"start": 353,
+										"end": 354,
+										"name": "U"
+									}
+								},
+								"expression": {
+									"type": "MemberExpression",
+									"start": 355,
+									"end": 358,
+									"object": {
+										"type": "Identifier",
+										"start": 355,
+										"end": 356,
+										"name": "z"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 357,
+										"end": 358,
+										"name": "y"
+									},
+									"computed": false,
+									"optional": false
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 361,
+					"end": 383,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 361,
+						"end": 382,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 361,
+							"end": 363,
+							"name": "a5"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 366,
+							"end": 382,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 367,
+								"end": 372,
+								"left": {
+									"type": "Identifier",
+									"start": 367,
+									"end": 368,
+									"name": "f"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 371,
+									"end": 372,
+									"name": "T"
+								}
+							},
+							"operator": ">",
+							"right": {
+								"type": "TSTypeAssertion",
+								"start": 376,
+								"end": 382,
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 377,
+									"end": 378,
+									"typeName": {
+										"type": "Identifier",
+										"start": 377,
+										"end": 378,
+										"name": "U"
+									}
+								},
+								"expression": {
+									"type": "TemplateLiteral",
+									"start": 379,
+									"end": 382,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 380,
+											"end": 381,
+											"value": {
+												"raw": "z",
+												"cooked": "z"
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 385,
+					"end": 403,
+					"expression": {
+						"type": "CallExpression",
+						"start": 385,
+						"end": 402,
+						"callee": {
+							"type": "Identifier",
+							"start": 385,
+							"end": 386,
+							"name": "g"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 387,
+								"end": 401,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 388,
+									"end": 393,
+									"left": {
+										"type": "Identifier",
+										"start": 388,
+										"end": 389,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 392,
+										"end": 393,
+										"name": "T"
+									}
+								},
+								"operator": ">",
+								"right": {
+									"type": "TSTypeAssertion",
+									"start": 397,
+									"end": 401,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 398,
+										"end": 399,
+										"typeName": {
+											"type": "Identifier",
+											"start": 398,
+											"end": 399,
+											"name": "U"
+										}
+									},
+									"expression": {
+										"type": "Identifier",
+										"start": 400,
+										"end": 401,
+										"name": "z"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

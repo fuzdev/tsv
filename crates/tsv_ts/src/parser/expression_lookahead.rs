@@ -741,13 +741,48 @@ fn type_args_close_is_joined_or_gt_followed(bytes: &[u8], close_end: usize, afte
 /// (tagged template), and other non-expression tokens (`;`, `,`, `)`, `.`, an operator…)
 /// continue the instantiation — and across a line break an expression-starting token
 /// leaves the `<…>` an instantiation too, whether it then begins a new statement via ASI
-/// (`x<y>⏎c`) or continues as an operand (`x<y>⏎+1`). The whole follower split, tsc's
-/// beside acorn's, is in `docs/conformance_prettier_ts.md` §Relational chain type-argument
-/// parens.
+/// (`x<y>⏎c`) or continues as an operand (`x<y>⏎++c`). This is acorn-typescript's rule; the
+/// followers tsc refuses beyond it — a `<` on any line, a `+` / `-` past a line break — are
+/// asked of the list once it is read ([`type_args_follower_refused_by_tsc_alone`]). The
+/// whole follower split, tsc's beside acorn's, is in `docs/conformance_prettier_ts.md`
+/// §Relational chain type-argument parens.
 fn expression_follows_type_args_close(bytes: &[u8], close_end: usize, after: usize) -> bool {
     after < bytes.len()
         && starts_expression_after_type_args(bytes, after)
         && !has_line_terminator_between(bytes, close_end, after)
+}
+
+/// Whether the token at `after`, the first past a type-argument list whose closing `>`
+/// ends at `close_end`, is one tsc's `canFollowTypeArgumentsInExpression` refuses and
+/// acorn-typescript does not: a lone `<` on any line, or a lone `+` / `-` past a line
+/// terminator.
+///
+/// tsc turns `<`, `>`, `+` and `-` away BEFORE it asks about a line break — a list
+/// followed by `<` never makes sense to it, a `>` would be ambiguous with a re-scanned
+/// `>>`, and in that position `+` and `-` are unary operators. acorn-typescript refuses
+/// the `>`-led run too ([`type_args_close_is_joined_or_gt_followed`]) and, on the list's
+/// own line, the `+` / `-` ([`expression_follows_type_args_close`]); what it keeps is a `<`
+/// on any line and a `+` / `-` past a line break (`f<T><U>(z)` is its call
+/// `(f<T>)<U>(z)`, `f<T>⏎+c` its sum `(f<T>) + c`). Those are what this answers, so the
+/// lookahead keeps acorn's verdict and the parser asks this of a list it has read
+/// (`Parser::parse_type_arguments_or_rewind`), taking tsc's comparison only where it
+/// parses. `<<`, `<=`, `++`, `--`, `+=` and `-=` are other tokens, past which tsc keeps the
+/// list (`f<T>⏎++c` is an instantiation and a new statement, `f<T> <= c` an instantiation
+/// compared).
+pub(super) fn type_args_follower_refused_by_tsc_alone(
+    bytes: &[u8],
+    close_end: usize,
+    after: usize,
+) -> bool {
+    let Some(&token) = bytes.get(after) else {
+        return false;
+    };
+    let lone = !matches!(bytes.get(after + 1), Some(&next) if next == token || next == b'=');
+    lone && match token {
+        b'<' => true,
+        b'+' | b'-' => has_line_terminator_between(bytes, close_end, after),
+        _ => false,
+    }
 }
 
 /// Whether the token at `after` REFUSES the type-argument list that ended at `close_end` —

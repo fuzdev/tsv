@@ -73,7 +73,6 @@ pub(crate) use needs_parens::ends_with_instantiation_close;
 use needs_parens::{
     ParenContext, SecondTypeArgs, clarity_pairs_behind_region_close,
     instantiation_keeps_pair_before_type_args, is_called_function, is_in_binary, needs_parens,
-    prints_as_tsc_comparison,
 };
 use types::unwrap_parenthesized;
 
@@ -621,22 +620,13 @@ pub struct Printer<'a> {
     /// only cause more work, never a dropped comment. Defaults `true` (do the full
     /// classify) so any member print reached without a preceding set is fail-safe.
     pub(crate) chain_has_comments: Cell<bool>,
-    /// Spans of the instantiation expressions an OWNER prints bare — the next type
-    /// argument list along, a call, a `new` or a tag (`new f<T><U><V>(x)`) — so their own
-    /// chain of lists continues into the owner's ([`SecondTypeArgs::Instantiation`]).
-    /// Recorded by [`Self::instantiation_keeps_pair`] and the chain base
-    /// (`ChainNode::Base`'s `continues_instantiation`), read by the instantiation printer.
-    /// Keyed by span and never consumed, like the `*_target` cells above, so a head rebuilt
-    /// across conditional-group variants answers the same way every time; a set rather than
-    /// one cell because a chain nests one owner inside the next.
-    pub(crate) continued_instantiation_targets: SpanMarks,
     /// Spans of the bare negative literals an array type's element run of indexed accesses
     /// leads (`-1[K][]`), which the indexed-access object rule prints with a pair
     /// (`(-1)[K][]`; `array_run_negative_literal`). Recorded by the array
     /// builder ahead of its element, read by the object rule, which cannot see the `[]`
-    /// further out. Keyed by span and never consumed, like
-    /// [`Self::continued_instantiation_targets`]. Sound because a recorded span only ever
-    /// adds a pair: every reader that can run BEFORE the array records it (the `=` hug
+    /// further out. Keyed by span and never consumed, so a node rebuilt across
+    /// conditional-group variants answers the same way every time. Sound because a recorded
+    /// span only ever adds a pair: every reader that can run BEFORE the array records it (the `=` hug
     /// gate, the head-shell and open-pair gates) acts only on a paren SHELL, and the bare
     /// literal a span names has none, so an early reader's unrecorded answer is the answer
     /// it would give anyway.
@@ -649,7 +639,7 @@ pub struct Printer<'a> {
     /// the operand's build, read by [`Self::needs_parens_at_operand_end`], which the
     /// position that prints the node asks and cannot see the `/` further out. Keyed by span
     /// and never consumed,
-    /// like [`Self::continued_instantiation_targets`]. Sound because a recorded span only
+    /// like [`Self::negative_literal_pair_targets`]. Sound because a recorded span only
     /// ever adds a pair, and only the node's own position asks about it — which is built
     /// inside the operand the collector records ahead of.
     pub(crate) dividend_tail_targets: SpanMarks,
@@ -665,17 +655,6 @@ pub struct Printer<'a> {
     /// position asks about it — one built inside the comparison the collector records
     /// ahead of; an operand and the node it leads share a start, never a span.
     pub(crate) withheld_clarity_pair_targets: SpanMarks,
-    /// Set while the FIRST type argument list of an instantiation chain printed bare is
-    /// built (`f<keyof (A)><U>(x)`): tsc reads that list as the right operand of a `<`
-    /// comparison, so every authored paren the decision that the chain prints bare reads
-    /// as making the list an operand is kept there rather than stripped as redundant — the
-    /// decision and the print read one text. Two parens qualify (the `maybe` arms of
-    /// `type_is_never_an_expression` in `needs_parens`): one directly under a type
-    /// operator (`keyof (A)` is a call to tsc), read by the type operator's operand-pair
-    /// rule, and one around a function type (`(() => T)` is a parenthesized arrow), kept by
-    /// the parenthesized-type printer and seen through by [`Self::printed_operand`], so no
-    /// parent adds a second.
-    pub(crate) first_list_keeps_maybe_parens: Cell<bool>,
     /// The comment-free window the last comment search on this printer established
     /// ([`CommentFreeWindow`]: the mechanism, its soundness argument, and the gate's
     /// inline/outlined shape live there).
@@ -753,11 +732,9 @@ impl<'a> Printer<'a> {
             chain_arg_share_active: Cell::new(false),
             arrow_body_inject: Cell::new(None),
             chain_has_comments: Cell::new(true),
-            continued_instantiation_targets: SpanMarks::default(),
             negative_literal_pair_targets: SpanMarks::default(),
             dividend_tail_targets: SpanMarks::default(),
             withheld_clarity_pair_targets: SpanMarks::default(),
-            first_list_keeps_maybe_parens: Cell::new(false),
             comment_free_gap,
         }
     }
@@ -1013,16 +990,11 @@ impl<'a> Printer<'a> {
     /// methods; the free function (which still requires the flag explicitly) is
     /// only for the few free helpers that have no `self`.
     ///
-    /// It also keeps a pair the author wrote around an expression tsc reads as a
-    /// comparison ([`prints_as_tsc_comparison`]) wherever the position would strip it —
-    /// the positions [`ParenContext::binds_tighter_than_a_comparison`] names, where a bare
-    /// comparison reaches out of its own extent — and withholds a clarity pair where it
-    /// would commit a type-argument list ([`Self::clarity_pair_is_withheld`]).
+    /// It also withholds a clarity pair where it would commit a type-argument list
+    /// ([`Self::clarity_pair_is_withheld`]).
     #[inline]
     pub(crate) fn needs_parens(&self, expr: &internal::Expression<'_>, ctx: ParenContext) -> bool {
-        (needs_parens(expr, ctx, self.in_for_init.get())
-            && !self.clarity_pair_is_withheld(expr, ctx))
-            || (ctx.binds_tighter_than_a_comparison() && self.authored_pair_holds_comparison(expr))
+        needs_parens(expr, ctx, self.in_for_init.get()) && !self.clarity_pair_is_withheld(expr, ctx)
     }
 
     /// Whether `expr`, at the position `ctx`, is a node whose clarity pair
@@ -1113,25 +1085,6 @@ impl<'a> Printer<'a> {
         ) && self.dividend_tail_targets.is_marked(expr.span())
     }
 
-    /// Whether the author wrote a pair around `expr` that tsc needs, because it reads
-    /// `expr` as a comparison ([`prints_as_tsc_comparison`]). Asked only at a position
-    /// [`ParenContext::binds_tighter_than_a_comparison`] names: one side of the operand is
-    /// always the parent's own operator or postfix there, so a `(` right before and a `)`
-    /// right after are the operand's own pair. "Right after" is the next TOKEN, a literal
-    /// included: a tag's own template follows the call in `` g(f<T><U>(x)`t`) ``, so the
-    /// `)` past it closes the argument list and is no pair around the tag
-    /// ([`next_significant_byte`]).
-    ///
-    /// A callee reached through a member chain (`(f<T><U>(x))()`, `(f<T><U>(x)).y`) is not
-    /// asked here: the chain linearizer keeps that pair as a base of its own, and the
-    /// callee re-evaluation that follows leaves it alone (`ChainNode::Base`'s
-    /// `comparison_pair`).
-    fn authored_pair_holds_comparison(&self, expr: &internal::Expression<'_>) -> bool {
-        paren_shell_close_after(self.source, expr.span().end).is_some()
-            && prints_as_tsc_comparison(self.source, expr)
-            && self.prev_significant_byte(expr.span().start) == Some(b'(')
-    }
-
     /// The byte before `pos` once whitespace — the lexer's JavaScript class — and comments
     /// are stepped over backwards: the reverse of [`next_significant_byte`], reading the
     /// comment table rather than the bytes to know where a comment began.
@@ -1160,30 +1113,13 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// [`instantiation_keeps_pair_before_type_args`], asked by the owner of a second
-    /// list, recording the head as CONTINUED when the owner prints it bare
-    /// ([`Self::continued_instantiation_targets`]) so the head's own chain of lists reads
-    /// on into the owner's.
+    /// [`instantiation_keeps_pair_before_type_args`] over this printer's source.
     pub(crate) fn instantiation_keeps_pair(
         &self,
         head: &internal::Expression<'_>,
-        follow: SecondTypeArgs<'_>,
+        follow: SecondTypeArgs,
     ) -> bool {
-        let keeps = instantiation_keeps_pair_before_type_args(self.source, head, follow);
-        if !keeps {
-            self.mark_continued_instantiation(head);
-        }
-        keeps
-    }
-
-    /// Record `head`, an instantiation expression its owner prints bare, as continued.
-    pub(crate) fn mark_continued_instantiation(&self, head: &internal::Expression<'_>) {
-        if matches!(
-            head.kind,
-            internal::ExpressionKind::TSInstantiationExpression(_)
-        ) {
-            self.continued_instantiation_targets.mark(head.span());
-        }
+        instantiation_keeps_pair_before_type_args(self.source, head, follow)
     }
 
     /// Get a reference to the doc arena.

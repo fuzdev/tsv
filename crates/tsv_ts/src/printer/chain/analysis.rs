@@ -13,7 +13,7 @@ use crate::printer::calls::is_memberish;
 use crate::printer::comments::{paren_pair_keeps_leading_run, paren_shell_close_after};
 use crate::printer::{
     ParenContext, Printer, SecondTypeArgs, SpanMarks, instantiation_keeps_pair_before_type_args,
-    is_called_function, is_multiline_template_expression, needs_parens, prints_as_tsc_comparison,
+    is_called_function, is_multiline_template_expression, needs_parens,
 };
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::has_newline_before_position;
@@ -276,11 +276,6 @@ fn template_preempts_chain_redirect(call: &internal::CallExpression<'_>, source:
 /// is member-accessed (`(function () {})().p`, `(() => 1)().p`), matching
 /// prettier and the bare-callee path in `call_formatting.rs`.
 ///
-/// A pair the linearizer kept around a comparison read (`ChainNode::Base`'s
-/// `comparison_pair`, `(f<T><U>(x))()`) is not a kind rule and is left as it is:
-/// recomputed from the callee's kind it would strip, and the call after it would join
-/// the comparison's right side in tsc's reading (`f<T><U>(x)()`).
-///
 /// The one `Callee` pair that is not owed is a function expression's, and the printer
 /// withholds it behind a `>` that may close a type-argument region
 /// (`Printer::withhold_clarity_pairs_behind_region_close`) — read here off the same
@@ -291,17 +286,12 @@ fn fix_callee_base_parens(nodes: &mut [ChainNode<'_>], input: LinearizeInput<'_>
         ChainNode::Base {
             expr,
             needs_parens: np,
-            continues_instantiation,
-            comparison_pair,
             ..
         },
         ChainNode::Call { call, .. },
         ..,
     ] = nodes
     {
-        if *comparison_pair {
-            return;
-        }
         // A parenthesized optional-chain callee (`(a?.b)()`, `(a?.())()`) keeps its
         // parens — they terminate the chain so the call isn't absorbed into it.
         // The `Callee` rules don't model that boundary (it depends on the stripped
@@ -314,19 +304,12 @@ fn fix_callee_base_parens(nodes: &mut [ChainNode<'_>], input: LinearizeInput<'_>
         // Callee always parenthesizes a binary operand for precedence, so the
         // for-init `in` rule never changes the verdict here — pass `false`. An
         // instantiation callee ahead of the call's own type arguments keeps the pair the
-        // bare-callee path keeps ([`instantiation_keeps_pair_before_type_args`]) — and one
-        // the call prints bare continues its chain of lists into the call's.
-        let second_list = call.type_arguments.as_ref().map(|list| {
-            instantiation_keeps_pair_before_type_args(
-                source,
-                expr,
-                SecondTypeArgs::Arguments(list, call.arguments),
-            )
-        });
+        // bare-callee path keeps ([`instantiation_keeps_pair_before_type_args`]).
+        let second_list = call.type_arguments.is_some()
+            && instantiation_keeps_pair_before_type_args(source, expr, SecondTypeArgs::Expression);
         let callee_pair = needs_parens(expr, ParenContext::Callee, false)
             && !(is_called_function(expr) && input.withheld_clarity_pairs.is_marked(expr.span()));
-        *np = callee_pair || second_list == Some(true);
-        *continues_instantiation = !*np && second_list == Some(false);
+        *np = callee_pair || second_list;
     }
 }
 
@@ -468,26 +451,6 @@ fn push_sealed_chain_base<'a>(
     nodes.push(ChainNode::sealed_base(child, parent_start));
 }
 
-/// Linearize the left-spine child of a chain node whose span is `parent`: a member's
-/// object, a call's callee, a `!` operand. A child the author parenthesized that tsc reads
-/// as a comparison ([`prints_as_tsc_comparison`], `(f<T><U>(x)).y`, `(f<T><U>(x))()`)
-/// keeps its pair as a base of its own ([`ChainNode::comparison_pair_base`]) — flattened,
-/// the access after it would join the comparison's right side in tsc's reading. Every
-/// other child recurses.
-fn linearize_chain_child<'a>(
-    child: &'a Expression<'_>,
-    parent: Span,
-    input: LinearizeInput<'_>,
-    nodes: &mut ChainNodeVec<'a>,
-    paren_gaps: &mut Vec<ParenGap>,
-) {
-    if parent.start < child.span().start && prints_as_tsc_comparison(input.source, child) {
-        nodes.push(ChainNode::comparison_pair_base(child));
-    } else {
-        linearize_recursive(child, input, nodes, paren_gaps);
-    }
-}
-
 fn linearize_recursive<'a>(
     expr: &'a Expression<'_>,
     input: LinearizeInput<'_>,
@@ -535,7 +498,7 @@ fn linearize_recursive<'a>(
                 ));
                 nodes.push(ChainNode::non_null_after_paren_operand());
             } else {
-                linearize_chain_child(inner, expr.span, input, nodes, paren_gaps);
+                linearize_recursive(inner, input, nodes, paren_gaps);
                 // A comment from the stripped grouping parens (`(x + y /* c */)!.foo`)
                 // lives between the operand and the `!`. When the operand is a
                 // parenthesized base, keep the comment INSIDE the parens, where the
@@ -589,7 +552,7 @@ fn linearize_member_object<'a>(
     if let Some(start) = member_object_paren_leading_start(member, span) {
         push_sealed_chain_base(object, start, nodes);
     } else {
-        linearize_chain_child(object, span, input, nodes, paren_gaps);
+        linearize_recursive(object, input, nodes, paren_gaps);
     }
 }
 
@@ -622,7 +585,7 @@ fn linearize_call_callee<'a>(
         } if call.type_arguments.is_none() => inst.expression,
         callee => callee,
     };
-    linearize_chain_child(callee, span, input, nodes, paren_gaps);
+    linearize_recursive(callee, input, nodes, paren_gaps);
     // An IIFE callee reached through the chain (`( // c⏎() => {})().p`) owns its own
     // leading gap, exactly as the bare-callee path does: the pair is required and
     // prettier keeps the run inside it. A function or arrow is never itself a chain,

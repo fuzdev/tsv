@@ -2009,8 +2009,7 @@ impl<'a> Printer<'a> {
     }
 
     /// The **effective** tuple element — the node left once the element's redundant paren
-    /// shell is stripped ([`Self::unwrap_stripped_parens`], which stops at a shell the first
-    /// list of a chain printed bare keeps), which is the node
+    /// shell is stripped ([`unwrap_parenthesized`]), which is the node
     /// [`Self::build_tuple_type_doc_with_line_comments`] emits.
     ///
     /// Shared by that builder and by [`Self::build_tuple_type_doc`]'s expansion gate so the
@@ -2025,7 +2024,7 @@ impl<'a> Printer<'a> {
     /// TODO: reach those by asking each element printer for the span it will emit from, rather
     /// than peeling only the top shell here.
     fn tuple_elem<'t>(&self, ty: &'t TSType<'t>) -> &'t TSType<'t> {
-        self.unwrap_stripped_parens(ty)
+        unwrap_parenthesized(ty)
     }
 
     /// Build a Doc for a tuple type: `[A, B, C]`

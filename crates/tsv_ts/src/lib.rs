@@ -572,6 +572,12 @@ pub fn convert_ast_json_string(program: &Program<'_>, source: &str) -> String {
 /// the whole document ([`ParseError::with_context`], as `tsv_svelte::parse` does): a
 /// context taken over `source`, a slice, would read that position against the wrong
 /// text. The same holds for every embedded entry point here that takes a `base_offset`.
+///
+/// A text that gave a type-argument list up to tsc's comparison and then failed is read
+/// once more as acorn-typescript reads it (`parser::parse_retrying_acorn_followers`).
+/// Where that re-read fails too, its error is the one reported — Svelte reads every
+/// embedded text with acorn-typescript, so it lands where Svelte's does — never the first
+/// parse's, which stopped where tsc's reading did.
 // The `Parser::parse` method-path form clippy suggests for the bare `parser.parse()`
 // closure fails the higher-ranked lifetime check on `with_embedding_parser`'s `f`
 // bound (the closure lets the compiler infer it), so allow the closure here.
@@ -581,11 +587,25 @@ pub fn parse_embedded<'arena>(
     base_offset: usize,
     arena: &'arena bumpalo::Bump,
 ) -> Result<Program<'arena>> {
-    with_embedding_parser(source, base_offset, arena, |parser| parser.parse())
+    with_embedding_parser(
+        source,
+        base_offset,
+        arena,
+        |parser| parser.parse(),
+        |_| Ok(()),
+    )
 }
 
-/// Build an embedding [`parser::Parser`] at `base_offset`, run `f` over it. What
-/// `f` returns borrows only `arena`.
+/// Build an embedding [`parser::Parser`] at `base_offset`, run `f` over it, then the
+/// host's `host_check` over what `f` returned. What `f` returns borrows only `arena`. It
+/// runs through the driver the standalone parse takes too
+/// (`parser::parse_retrying_acorn_followers`), so a failed parse that gave a
+/// type-argument list up to tsc's comparison is run once more reading acorn-typescript's
+/// lists — which is why `f` is `Fn`. A host refusal fails the parse it judged, so a
+/// head the host refuses under tsc's comparison is re-read the same way; an entry point
+/// whose host refuses nothing passes `|_| Ok(())`. Where both readings fail, the
+/// re-read's error is the one reported: Svelte reads every embedded text as
+/// acorn-typescript does, so that error lands where Svelte's does.
 ///
 /// An error leaves here positioned in the host document and context-free. Its point is
 /// the host's to take: `source` is a slice of that document, so a context taken over it
@@ -595,11 +615,18 @@ fn with_embedding_parser<'arena, T>(
     source: &str,
     base_offset: usize,
     arena: &'arena bumpalo::Bump,
-    f: impl FnOnce(&mut parser::Parser<'_, 'arena>) -> std::result::Result<T, ParseError>,
+    f: impl Fn(&mut parser::Parser<'_, 'arena>) -> std::result::Result<T, ParseError>,
+    host_check: impl Fn(&T) -> std::result::Result<(), ParseError>,
 ) -> Result<T> {
-    let mut parser = parser::Parser::with_base_offset(source, base_offset, arena);
-    parser.prime()?;
-    f(&mut parser).map_err(|error| parser.prefer_abandoned_type_arguments_error(error))
+    parser::parse_retrying_acorn_followers(
+        source,
+        base_offset,
+        Goal::Module,
+        arena,
+        true,
+        f,
+        host_check,
+    )
 }
 
 /// Parse embedded TypeScript with grouping parens preserved.
@@ -629,11 +656,17 @@ pub fn parse_embedded_preserve_parens<'arena>(
     base_offset: usize,
     arena: &'arena bumpalo::Bump,
 ) -> Result<(Program<'arena>, bool)> {
-    with_embedding_parser(source, base_offset, arena, |parser| {
-        parser.preserve_parens = true;
-        let program = parser.parse()?;
-        Ok((program, parser.preserved_a_paren))
-    })
+    with_embedding_parser(
+        source,
+        base_offset,
+        arena,
+        |parser| {
+            parser.preserve_parens = true;
+            let program = parser.parse()?;
+            Ok((program, parser.preserved_a_paren))
+        },
+        |_| Ok(()),
+    )
 }
 
 /// Parse a single TypeScript expression and return it with any comments.
@@ -641,18 +674,33 @@ pub fn parse_embedded_preserve_parens<'arena>(
 /// This is used when parsing expressions in contexts where comments need to be
 /// preserved (e.g., Svelte expression tags `{/* comment */ expr}`).
 ///
+/// `host_check` is the host grammar's refusal of the parsed expression (`{@render}`
+/// takes only a call, `{@const}` no bare second declarator), run as part of the parse so
+/// a refusal of tsc's reading of a type-argument follower re-reads the text as
+/// acorn-typescript does — see `with_embedding_parser`. `|_| Ok(())` refuses nothing.
+///
 /// # Errors
 ///
 /// As [`parse_embedded`]'s: positioned in the host document, with no point until the
-/// host fills its context.
+/// host fills its context. A refusal `host_check` returns fails the parse it judged like
+/// any other error, so it is reported only where no list was given up to tsc's comparison;
+/// otherwise the acorn re-read decides, as at [`parse_embedded`].
+// The method-path form clippy suggests fails the higher-ranked lifetime check on
+// `with_embedding_parser`'s `f` bound — same reason as [`parse_embedded`]'s closure.
+#[expect(clippy::redundant_closure_for_method_calls)]
 pub fn parse_expression_with_comments<'arena>(
     source: &str,
     base_offset: usize,
     arena: &'arena bumpalo::Bump,
+    host_check: impl Fn(&'arena Expression<'arena>) -> Result<()>,
 ) -> Result<(&'arena Expression<'arena>, &'arena [ast::Comment])> {
-    with_embedding_parser(source, base_offset, arena, |parser| {
-        parser.parse_expression_with_comments()
-    })
+    with_embedding_parser(
+        source,
+        base_offset,
+        arena,
+        |parser| parser.parse_expression_with_comments(),
+        |&(expr, _)| host_check(expr),
+    )
 }
 
 /// Parse a binding pattern — an expression converted to a pattern — and return it with
@@ -692,14 +740,20 @@ pub fn parse_pattern_with_comments<'arena>(
     base_offset: usize,
     arena: &'arena bumpalo::Bump,
 ) -> Result<(Expression<'arena>, &'arena [ast::Comment])> {
-    with_embedding_parser(source, base_offset, arena, |parser| {
-        let expr = parser.parse_expression_unbounded()?;
-        let pattern = parser.expression_to_svelte_pattern(expr)?;
-        // The pattern must fill the whole slice the caller bounded. Without this a trailing
-        // token is silently dropped, losing content.
-        parser.expect_end_of_input()?;
-        Ok((pattern, parser.take_comments()))
-    })
+    with_embedding_parser(
+        source,
+        base_offset,
+        arena,
+        |parser| {
+            let expr = parser.parse_expression_unbounded()?;
+            let pattern = parser.expression_to_svelte_pattern(expr)?;
+            // The pattern must fill the whole slice the caller bounded. Without this a trailing
+            // token is silently dropped, losing content.
+            parser.expect_end_of_input()?;
+            Ok((pattern, parser.take_comments()))
+        },
+        |_| Ok(()),
+    )
 }
 
 /// Attach a `: T` annotation to a **Svelte block-position** binding pattern
@@ -837,10 +891,16 @@ pub fn parse_type_annotation_partial<'arena>(
     base_offset: usize,
     arena: &'arena bumpalo::Bump,
 ) -> Result<(TSTypeAnnotation<'arena>, &'arena [ast::Comment])> {
-    with_embedding_parser(source, base_offset, arena, |parser| {
-        let ta = parser.parse_type_annotation()?;
-        Ok((ta, parser.take_comments()))
-    })
+    with_embedding_parser(
+        source,
+        base_offset,
+        arena,
+        |parser| {
+            let ta = parser.parse_type_annotation()?;
+            Ok((ta, parser.take_comments()))
+        },
+        |_| Ok(()),
+    )
 }
 
 /// Parse a partial expression, stopping at top-level commas, and return it
@@ -857,20 +917,33 @@ pub fn parse_type_annotation_partial<'arena>(
 /// assertion run its own reader, and one that passes the wrong policy either swallows its
 /// binding or rejects every assertion in the head. `satisfies` is never in question.
 ///
+/// `host_check` judges the expression and where the parse stopped — whether the head
+/// continues there as its grammar requires (`as`, `then`, `, index`, the tag's end) —
+/// as part of the parse, as [`parse_expression_with_comments`]'s does.
+///
 /// # Errors
 ///
 /// As [`parse_embedded`]'s: positioned in the host document, with no point until the
-/// host fills its context.
+/// host fills its context. A refusal `host_check` returns fails the parse it judged like
+/// any other error, so it is reported only where no list was given up to tsc's comparison;
+/// otherwise the acorn re-read decides, as at [`parse_embedded`].
 pub fn parse_expression_partial_with_comments<'arena>(
     source: &str,
     base_offset: usize,
     arena: &'arena bumpalo::Bump,
     top_level_as: TopLevelAs,
+    host_check: impl Fn(&'arena Expression<'arena>, usize) -> Result<()>,
 ) -> Result<(&'arena Expression<'arena>, usize, &'arena [ast::Comment])> {
-    with_embedding_parser(source, base_offset, arena, |parser| {
-        let (expr, end_pos) = parser.parse_assignment_expression_partial(top_level_as)?;
-        Ok((expr, end_pos, parser.take_comments()))
-    })
+    with_embedding_parser(
+        source,
+        base_offset,
+        arena,
+        |parser| {
+            let (expr, end_pos) = parser.parse_assignment_expression_partial(top_level_as)?;
+            Ok((expr, end_pos, parser.take_comments()))
+        },
+        |&(expr, end_pos, _)| host_check(expr, end_pos),
+    )
 }
 
 /// How far a **bare** type (no leading `:`) reaches from the start of `source`, as an
@@ -894,7 +967,13 @@ pub fn parse_expression_partial_with_comments<'arena>(
 // `with_embedding_parser`'s `f` bound — same reason as [`parse_embedded`]'s closure.
 #[expect(clippy::redundant_closure_for_method_calls)]
 pub fn parse_type_extent(source: &str, base_offset: usize, arena: &bumpalo::Bump) -> Result<usize> {
-    with_embedding_parser(source, base_offset, arena, |parser| parser.type_extent())
+    with_embedding_parser(
+        source,
+        base_offset,
+        arena,
+        |parser| parser.type_extent(),
+        |_| Ok(()),
+    )
 }
 
 /// Parse a single statement and return it with any collected comments.
@@ -903,19 +982,32 @@ pub fn parse_type_extent(source: &str, base_offset: usize, arena: &bumpalo::Bump
 /// `{const …}` / `{let …}` tags, which are a `VariableDeclaration` (no trailing
 /// `;`). The statement's `span().end` is the byte offset just past it.
 ///
+/// `host_check` judges the statement — the declaration tags' "a declaration, every
+/// `const` initialized, nothing after it" — as part of the parse, as
+/// [`parse_expression_with_comments`]'s does.
+///
 /// # Errors
 ///
 /// As [`parse_embedded`]'s: positioned in the host document, with no point until the
-/// host fills its context.
+/// host fills its context. A refusal `host_check` returns fails the parse it judged like
+/// any other error, so it is reported only where no list was given up to tsc's comparison;
+/// otherwise the acorn re-read decides, as at [`parse_embedded`].
 pub fn parse_statement_with_comments<'arena>(
     source: &str,
     base_offset: usize,
     arena: &'arena bumpalo::Bump,
+    host_check: impl Fn(&Statement<'arena>) -> Result<()>,
 ) -> Result<(Statement<'arena>, &'arena [ast::Comment])> {
-    with_embedding_parser(source, base_offset, arena, |parser| {
-        let stmt = parser.parse_statement()?;
-        Ok((stmt, parser.take_comments()))
-    })
+    with_embedding_parser(
+        source,
+        base_offset,
+        arena,
+        |parser| {
+            let stmt = parser.parse_statement()?;
+            Ok((stmt, parser.take_comments()))
+        },
+        |(stmt, _)| host_check(stmt),
+    )
 }
 
 /// A variable declaration's **terminator gap**: from the end of its last declarator to the

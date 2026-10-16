@@ -492,11 +492,8 @@ impl<'a> Printer<'a> {
                     if let Some(sealed) = self.build_sealed_non_null_paren_doc(tagged.tag) {
                         sealed
                     } else if self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag)
-                        || tagged.type_arguments.as_ref().is_some_and(|list| {
-                            self.instantiation_keeps_pair(
-                                tagged.tag,
-                                SecondTypeArgs::Template(list),
-                            )
+                        || tagged.type_arguments.as_ref().is_some_and(|_| {
+                            self.instantiation_keeps_pair(tagged.tag, SecondTypeArgs::Expression)
                         })
                     {
                         d.parens(self.build_expression_doc(tagged.tag))

@@ -593,8 +593,30 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
     ) -> Result<&'arena Expression<'arena>, ParseError> {
+        self.parse_ts_expression_checked(source, base_offset, |_, _| Ok(()))
+    }
+
+    /// [`Self::parse_ts_expression`] for a head whose grammar refuses some expressions
+    /// (`{@render}` takes only a call, `{@const}` no bare second declarator).
+    ///
+    /// ⚠️ **A refusal of the parsed island goes in `host_check`, never after the call.**
+    /// The island's parse reads a type-argument list followed by a token tsc's
+    /// `canFollowTypeArgumentsInExpression` refuses as tsc's comparison, and re-reads the
+    /// text as acorn-typescript does — as Svelte reads it — when that reading fails; a
+    /// host refusal run inside the parse is such a failure, while one run after it leaves
+    /// the comparison standing and rejects a head Svelte compiles
+    /// (`{@render f<T, U><V>(x)}`, which tsc's reading makes a sequence).
+    pub(crate) fn parse_ts_expression_checked(
+        &mut self,
+        source: &str,
+        base_offset: usize,
+        host_check: impl Fn(&Self, &'arena Expression<'arena>) -> Result<(), ParseError>,
+    ) -> Result<&'arena Expression<'arena>, ParseError> {
+        let this = &*self;
         let (expr, comments) =
-            tsv_ts::parse_expression_with_comments(source, base_offset, self.arena)?;
+            tsv_ts::parse_expression_with_comments(source, base_offset, self.arena, |expr| {
+                host_check(this, expr)
+            })?;
         self.expression_comments.extend_from_slice(comments);
         Ok(expr)
     }
@@ -611,17 +633,25 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Comments are collected, and the slice's trailing whitespace is the caller's to keep —
     /// see [`Self::parse_ts_expression`], whose warning holds for every region handed to a
     /// sub-parse, this one and [`Self::parse_ts_pattern`] included.
+    ///
+    /// `host_check` is the head's refusal of where the parse stopped — the `as` / `then` /
+    /// `, index` it must continue with — given the expression and that stop, and it runs
+    /// inside the island's parse for the reason [`Self::parse_ts_expression_checked`]
+    /// states: under tsc's comparison `{#each f<T, U><V>(x) as item}` stops at the `,`.
     pub(crate) fn parse_ts_expression_partial(
         &mut self,
         source: &str,
         base_offset: usize,
         top_level_as: TopLevelAs,
+        host_check: impl Fn(&Self, &'arena Expression<'arena>, usize) -> Result<(), ParseError>,
     ) -> Result<(&'arena Expression<'arena>, usize), ParseError> {
+        let this = &*self;
         let (expr, end_pos, comments) = tsv_ts::parse_expression_partial_with_comments(
             source,
             base_offset,
             self.arena,
             top_level_as,
+            |expr, end_pos| host_check(this, expr, end_pos),
         )?;
         self.expression_comments.extend_from_slice(comments);
         Ok((expr, end_pos))
@@ -698,14 +728,20 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Parse a TypeScript statement (the body of a `{const}`/`{let}` tag is a
-    /// `VariableDeclaration`) and collect any comments.
+    /// `VariableDeclaration`) and collect any comments. `host_check` is the tag's refusal
+    /// of the statement, run inside the island's parse for the reason
+    /// [`Self::parse_ts_expression_checked`] states.
     pub(crate) fn parse_ts_statement(
         &mut self,
         source: &str,
         base_offset: usize,
+        host_check: impl Fn(&Self, &tsv_ts::Statement<'arena>) -> Result<(), ParseError>,
     ) -> Result<tsv_ts::Statement<'arena>, ParseError> {
+        let this = &*self;
         let (stmt, comments) =
-            tsv_ts::parse_statement_with_comments(source, base_offset, self.arena)?;
+            tsv_ts::parse_statement_with_comments(source, base_offset, self.arena, |stmt| {
+                host_check(this, stmt)
+            })?;
         self.expression_comments.extend_from_slice(comments);
         Ok(stmt)
     }

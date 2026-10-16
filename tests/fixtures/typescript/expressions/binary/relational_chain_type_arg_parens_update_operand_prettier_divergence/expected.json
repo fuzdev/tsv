@@ -1,0 +1,473 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 465,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A postfix update ends an `UpdateExpression`, which takes no type argument list, so a",
+			"start": 20,
+			"end": 107
+		},
+		{
+			"type": "Line",
+			"value": " `<`…`>` after one is a comparison chain on any line — under a prefix operator or an",
+			"start": 109,
+			"end": 195
+		},
+		{
+			"type": "Line",
+			"value": " angle-bracket assertion as on its own.",
+			"start": 197,
+			"end": 238
+		},
+		{
+			"type": "Line",
+			"value": " No call continues one either, so a `(` line after one is a new statement.",
+			"start": 360,
+			"end": 436
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 464,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 455,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 240,
+					"end": 260,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 240,
+						"end": 259,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 240,
+							"end": 242,
+							"name": "a1"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 245,
+							"end": 259,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 246,
+								"end": 254,
+								"left": {
+									"type": "UnaryExpression",
+									"start": 246,
+									"end": 250,
+									"operator": "!",
+									"prefix": true,
+									"argument": {
+										"type": "UpdateExpression",
+										"start": 247,
+										"end": 250,
+										"operator": "++",
+										"prefix": false,
+										"argument": {
+											"type": "Identifier",
+											"start": 247,
+											"end": 248,
+											"name": "b"
+										}
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 253,
+									"end": 254,
+									"name": "T"
+								}
+							},
+							"operator": ">",
+							"right": {
+								"type": "Identifier",
+								"start": 258,
+								"end": 259,
+								"name": "z"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A postfix update ends an `UpdateExpression`, which takes no type argument list, so a",
+							"start": 20,
+							"end": 107
+						},
+						{
+							"type": "Line",
+							"value": " `<`…`>` after one is a comparison chain on any line — under a prefix operator or an",
+							"start": 109,
+							"end": 195
+						},
+						{
+							"type": "Line",
+							"value": " angle-bracket assertion as on its own.",
+							"start": 197,
+							"end": 238
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 262,
+					"end": 282,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 262,
+						"end": 281,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 262,
+							"end": 264,
+							"name": "a2"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 267,
+							"end": 281,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 268,
+								"end": 276,
+								"left": {
+									"type": "UnaryExpression",
+									"start": 268,
+									"end": 272,
+									"operator": "-",
+									"prefix": true,
+									"argument": {
+										"type": "UpdateExpression",
+										"start": 269,
+										"end": 272,
+										"operator": "--",
+										"prefix": false,
+										"argument": {
+											"type": "Identifier",
+											"start": 269,
+											"end": 270,
+											"name": "b"
+										}
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 275,
+									"end": 276,
+									"name": "T"
+								}
+							},
+							"operator": ">",
+							"right": {
+								"type": "Identifier",
+								"start": 280,
+								"end": 281,
+								"name": "z"
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 284,
+					"end": 312,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 284,
+						"end": 311,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 284,
+							"end": 286,
+							"name": "a3"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 289,
+							"end": 311,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 290,
+								"end": 304,
+								"left": {
+									"type": "UnaryExpression",
+									"start": 290,
+									"end": 300,
+									"operator": "typeof",
+									"prefix": true,
+									"argument": {
+										"type": "UpdateExpression",
+										"start": 297,
+										"end": 300,
+										"operator": "++",
+										"prefix": false,
+										"argument": {
+											"type": "Identifier",
+											"start": 297,
+											"end": 298,
+											"name": "b"
+										}
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 303,
+									"end": 304,
+									"name": "T"
+								}
+							},
+							"operator": ">",
+							"right": {
+								"type": "TemplateLiteral",
+								"start": 308,
+								"end": 311,
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 309,
+										"end": 310,
+										"value": {
+											"raw": "t",
+											"cooked": "t"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 314,
+					"end": 336,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 314,
+						"end": 335,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 314,
+							"end": 316,
+							"name": "a4"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 319,
+							"end": 335,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 320,
+								"end": 330,
+								"left": {
+									"type": "TSTypeAssertion",
+									"start": 320,
+									"end": 326,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 321,
+										"end": 322,
+										"typeName": {
+											"type": "Identifier",
+											"start": 321,
+											"end": 322,
+											"name": "U"
+										}
+									},
+									"expression": {
+										"type": "UpdateExpression",
+										"start": 323,
+										"end": 326,
+										"operator": "++",
+										"prefix": false,
+										"argument": {
+											"type": "Identifier",
+											"start": 323,
+											"end": 324,
+											"name": "b"
+										}
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 329,
+									"end": 330,
+									"name": "T"
+								}
+							},
+							"operator": ">",
+							"right": {
+								"type": "Identifier",
+								"start": 334,
+								"end": 335,
+								"name": "z"
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 338,
+					"end": 357,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 338,
+						"end": 356,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 338,
+							"end": 340,
+							"name": "a5"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 343,
+							"end": 356,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 344,
+								"end": 351,
+								"left": {
+									"type": "UpdateExpression",
+									"start": 344,
+									"end": 347,
+									"operator": "++",
+									"prefix": false,
+									"argument": {
+										"type": "Identifier",
+										"start": 344,
+										"end": 345,
+										"name": "b"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 350,
+									"end": 351,
+									"name": "T"
+								}
+							},
+							"operator": ">",
+							"right": {
+								"type": "Identifier",
+								"start": 355,
+								"end": 356,
+								"name": "z"
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 438,
+					"end": 450,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 438,
+						"end": 449,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 438,
+							"end": 440,
+							"name": "c1"
+						},
+						"right": {
+							"type": "TSTypeAssertion",
+							"start": 443,
+							"end": 449,
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 444,
+								"end": 445,
+								"typeName": {
+									"type": "Identifier",
+									"start": 444,
+									"end": 445,
+									"name": "T"
+								}
+							},
+							"expression": {
+								"type": "UpdateExpression",
+								"start": 446,
+								"end": 449,
+								"operator": "++",
+								"prefix": false,
+								"argument": {
+									"type": "Identifier",
+									"start": 446,
+									"end": 447,
+									"name": "b"
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " No call continues one either, so a `(` line after one is a new statement.",
+							"start": 360,
+							"end": 436
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 452,
+					"end": 454,
+					"expression": {
+						"type": "Identifier",
+						"start": 452,
+						"end": 453,
+						"name": "z"
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

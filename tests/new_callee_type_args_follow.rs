@@ -12,24 +12,24 @@
 //!   `typescript/expressions/new/callee_type_args_follow` pins the printed form through its
 //!   `unformatted_line_break` variant; a variant's TREE has no pin shape there, so the trees
 //!   are asserted here.
-//! - **a second type argument list** — to acorn-typescript, whose tree Svelte compiles,
-//!   `new f<T><U>(x)` constructs the instantiation `f<T>` with the type arguments `<U>`:
-//!   `new (f<T>)<U>(x)`. tsc takes no list ahead of a `<` and reads the comparison
-//!   `(new f < T) > <U>(x)`. tsv builds acorn's tree (the drop-in wire) and prints the
-//!   spelling as written, so each parser reads the output as it read the input — the fixture
-//!   `new/callee_type_args_second_list_prettier_divergence`, whose trees are asserted here
-//!   (a fixture's `expected.json` holds one input's; these are the spellings around it).
+//! - **a second type argument list** — tsc takes no list ahead of a `<` and reads
+//!   `new f<T><U>(x)` as the comparison `(new f < T) > <U>(x)`, whose right operand is the
+//!   type assertion `<U>(x)`; so does tsv, printing the chain with its `<` operand paired,
+//!   `(new f() < T) > <U>x`. acorn-typescript, whose tree Svelte compiles, constructs the
+//!   instantiation `f<T>` with the type arguments `<U>` instead: `new (f<T>)<U>(x)`. The
+//!   fixture is `new/callee_comparison_over_assertion_prettier_divergence`, whose
+//!   bare spellings' trees are asserted here (a variant carries no tree of its own).
 //!   Where tsc's parser rejects the text outright — the assertion `<U>` left with no operand
 //!   (`new a.b<T><U>()`, `new f<T><U>`, `new f<T><U>(...x)`), or a second list that is no
-//!   single type (`new f<T><U, V>(x)`, `new f<T><U,>(x)`) — acorn still accepts, and tsv keeps acorn's tree and prints the
-//!   REPAIRED spelling every parser reads alike, `new (a.b<T>)<U>()`: the repair
-//!   `docs/conformance_prettier_ts.md` §TypeScript (Instantiation expression parens) states
-//!   for `fn<T> >= 1`. The repair has no fixture: in a `<script>` body prettier's
-//!   TypeScript parse is tsc's and throws on the bare spelling, and in a template prettier
-//!   lands on `new a.b<T>()<U>()`, a call on the constructed object, which no marker
-//!   documents. The call twin `f<T><U>` repairs the same way, to `(f<T>)<U>` (its
-//!   template spelling is a fixture variant, below), while `f<T><U>(x)`, which tsc
-//!   accepts, prints as written. An authored pair, `new (f<T>)<U>(x)`, is kept
+//!   single type (`new f<T><U, V>(x)`, `new f<T><U,>(x)`) — acorn still accepts, and tsv
+//!   keeps acorn's tree and prints the REPAIRED spelling every parser reads alike,
+//!   `new (a.b<T>)<U>()`: the repair `docs/conformance_prettier_ts.md` §TypeScript
+//!   (Instantiation expression parens) states for `fn<T> >= 1`. The repair has no fixture:
+//!   in a `<script>` body prettier's TypeScript parse is tsc's and throws on the bare
+//!   spelling, and in a template prettier lands on `new a.b<T>()<U>()`, a call on the
+//!   constructed object, which no marker documents. The call twin `f<T><U>` repairs the same
+//!   way, to `(f<T>)<U>` (its template spelling is a fixture variant, below). An authored
+//!   pair, `new (f<T>)<U>(x)`, is kept
 //!   (`typescript_specific/generics/instantiation_paren_type_args_follow_prettier_divergence`).
 //!
 //! The line-break and repair readings are asserted through a Svelte template expression too,
@@ -135,6 +135,13 @@ fn shape(node: &Value) -> String {
             }
         }
         "TaggedTemplateExpression" => format!("tag[{}]{}`", child("tag"), type_args(node)),
+        "BinaryExpression" => format!(
+            "({} {} {})",
+            child("left"),
+            node.get("operator").and_then(Value::as_str).unwrap_or("?"),
+            child("right")
+        ),
+        "TSTypeAssertion" => format!("<{}>{}", child("typeAnnotation"), child("expression")),
         other => other.to_owned(),
     }
 }
@@ -230,20 +237,20 @@ fn template_expression_reads_and_prints_the_same() {
         ("{new f<T><U>}", "new[inst(f<T>)]<U>()", "{new (f<T>)<U>()}"),
         (
             "{new f<T><U>`x`}",
-            "new[tag[inst(f<T>)]<U>`]()",
-            "{new f<T><U>`x`}",
+            "((new[f]() < T) > <U>TemplateLiteral)",
+            "{(new f() < T) > <U>`x`}",
         ),
         (
             "{new f<T><U>(x)}",
-            "new[inst(f<T>)]<U>(x)",
-            "{new f<T><U>(x)}",
+            "((new[f]() < T) > <U>x)",
+            "{(new f() < T) > <U>x}",
         ),
     ] {
         let source = component(template);
         assert_eq!(
             template_expression_shape(&source),
             expected_shape,
-            "acorn-typescript's tree: {template:?}"
+            "the tree: {template:?}"
         );
         assert_eq!(
             svelte_format(&source),
@@ -258,28 +265,43 @@ fn template_expression_reads_and_prints_the_same() {
     }
 }
 
-/// A second type argument list after the close belongs to the `new` (or the call, or the
-/// tag), and the first stays on the callee as an instantiation: acorn-typescript's tree, the
-/// one Svelte compiles, whether or not tsc's parser accepts the spelling.
+/// A second type argument list after the close is no list where tsc's comparison parses:
+/// the first list is the `<`…`>` of a comparison whose right operand is the type assertion
+/// the second opens, and an argument-less `new` is that comparison's left operand.
 #[test]
-fn second_type_argument_list_reads_as_acorn_does() {
+fn second_type_argument_list_reads_as_tsc_does() {
     for (source, expected) in [
-        ("new f<T><U>(x);", "new[inst(f<T>)]<U>(x)"),
-        ("new a.b<T><U>(x);", "new[inst(a.b<T>)]<U>(x)"),
-        ("new f<T><U>(x)(y);", "call[new[inst(f<T>)]<U>(x)](y)"),
-        ("new f<T><U>(x, y);", "new[inst(f<T>)]<U>(x,y)"),
-        ("new f<T>\n<U>(x);", "new[inst(f<T>)]<U>(x)"),
-        ("new f<A<B>><U>(x);", "new[inst(f<A<B>>)]<U>(x)"),
-        ("new f<T><U>`x`;", "new[tag[inst(f<T>)]<U>`]()"),
-        // tsc's parser rejects these; acorn-typescript's tree is still the wire
+        ("new f<T><U>(x);", "((new[f]() < T) > <U>x)"),
+        ("new a.b<T><U>(x);", "((new[a.b]() < T) > <U>x)"),
+        ("new f<T><U>(x)(y);", "((new[f]() < T) > <U>call[x](y))"),
+        (
+            "new f<T><U>(x, y);",
+            "((new[f]() < T) > <U>SequenceExpression)",
+        ),
+        ("new f<T>\n<U>(x);", "((new[f]() < T) > <U>x)"),
+        ("new f<A<B>><U>(x);", "((new[f]() < A) < (B >> <U>x))"),
+        ("new f<T><U>`x`;", "((new[f]() < T) > <U>TemplateLiteral)"),
+        // the call twin
+        ("f<T><U>(x);", "((f < T) > <U>x)"),
+    ] {
+        assert_eq!(expression_shape(source), expected, "tsc's tree: {source:?}");
+    }
+}
+
+/// Where tsc's parser rejects the comparison, the second list belongs to the `new` (or the
+/// call, or the tag), and the first stays on the callee as an instantiation:
+/// acorn-typescript's tree, the one Svelte compiles.
+#[test]
+fn tsc_rejected_second_type_argument_list_reads_as_acorn_does() {
+    for (source, expected) in [
         ("new f<T><U>;", "new[inst(f<T>)]<U>()"),
         ("new f<T><U>();", "new[inst(f<T>)]<U>()"),
         ("new a.b<T><U>();", "new[inst(a.b<T>)]<U>()"),
         ("new f<T>\n<U>;", "new[inst(f<T>)]<U>()"),
         ("new f<T><U>(...x);", "new[inst(f<T>)]<U>(SpreadElement)"),
         ("new f<T><U,>(x);", "new[inst(f<T>)]<U>(x)"),
-        // the call twin, already acorn's
-        ("f<T><U>(x);", "call[inst(f<T>)]<U>(x)"),
+        ("new f<T><U, V>(x);", "new[inst(f<T>)]<U,V>(x)"),
+        ("f<T><U>();", "call[inst(f<T>)]<U>()"),
     ] {
         assert_eq!(
             expression_shape(source),
@@ -289,21 +311,25 @@ fn second_type_argument_list_reads_as_acorn_does() {
     }
 }
 
-/// tsc accepts these as comparisons, so they print as written: an argument list appended
-/// to a `new` that tsc reads as the comparison would join the assertion's operand
-/// (`` <U>`x`() ``, `<U>(x)()`) and change tsc's reading, and a pair added inside a longer
-/// chain of lists would move where tsc's comparison ends.
+/// tsc's comparison prints as the chain with its `<` operand paired, every spelling of it a
+/// fixed point that reparses to the same tree: an argument-less `new` prints its empty
+/// list, and a third list is an assertion over an assertion.
 #[test]
-fn comparison_read_spellings_print_as_written() {
-    for source in [
-        "new f<T><U>`x`;\n",
-        "new f<T><U>`x`.y;\n",
-        "new new f<T><U>(x);\n",
-        "new new f<T><U>`x`;\n",
-        "new f<T><U><V>(x);\n",
-        "f<T><U><V>(x);\n",
+fn comparison_read_spellings_print_the_paired_chain() {
+    for (source, printed) in [
+        ("new f<T><U>`x`;", "(new f() < T) > <U>`x`;\n"),
+        ("new f<T><U>`x`.y;", "(new f() < T) > <U>`x`.y;\n"),
+        ("new new f<T><U>(x);", "(new new f()() < T) > <U>x;\n"),
+        ("new new f<T><U>`x`;", "(new new f()() < T) > <U>`x`;\n"),
+        ("new f<T><U><V>(x);", "(new f() < T) > <U>(<V>x);\n"),
+        ("f<T><U><V>(x);", "(f < T) > <U>(<V>x);\n"),
     ] {
-        assert_eq!(format(source), source);
+        assert_prints_fixed(source, printed);
+        assert_eq!(
+            expression_shape(printed),
+            expression_shape(source),
+            "the printed form reparses to the same tree: {source:?}"
+        );
     }
 }
 
@@ -380,80 +406,86 @@ fn second_list_after_an_open_optional_chain_prints_bare() {
     }
 }
 
-/// A pair the author wrote around an expression tsc reads as a comparison survives in
-/// every position that would strip it: bare, an operator ahead of it binds to its first
-/// operand and a postfix after it joins the assertion's operand — and an argument-less
-/// `new` printed without its list would take the postfix as its own.
+/// A pair the author wrote around tsc's comparison survives in every position that would
+/// strip a pair around an operand that binds tighter: bare, an operator ahead of it would
+/// bind to its first operand and a postfix after it would join the assertion's operand.
 #[test]
 fn authored_pair_around_a_comparison_read_survives() {
-    for source in [
-        "(new f<T><U>`x`)(y);\n",
-        "(new f<T><U>`x`).y;\n",
-        "(new f<T><U>`x`)[0];\n",
-        "(new f<T><U>`x`)`y`;\n",
-        "(new f<T><U>`x`)!;\n",
-        "(new f<T><U>`x`)?.(y);\n",
-        "(new new f<T><U>(x))(y);\n",
-        "(f<T><U>(x)) * 2;\n",
-        "a * (f<T><U>(x));\n",
-        "-(f<T><U>(x));\n",
-        "typeof (new f<T><U>(x));\n",
-        "(new f<T><U>(x)).y;\n",
-        "(f<T><U>(x)) as W;\n",
-        "(f<T><U>(x))<V>;\n",
-        "(f<T><U>(x)).y.z();\n",
+    for (source, printed) in [
+        ("(new f<T><U>`x`)(y);", "((new f() < T) > <U>`x`)(y);\n"),
+        ("(new f<T><U>`x`).y;", "((new f() < T) > <U>`x`).y;\n"),
+        ("(new f<T><U>`x`)[0];", "((new f() < T) > <U>`x`)[0];\n"),
+        ("(new f<T><U>`x`)`y`;", "((new f() < T) > <U>`x`)`y`;\n"),
+        ("(new f<T><U>`x`)!;", "((new f() < T) > <U>`x`)!;\n"),
+        ("(new f<T><U>`x`)?.(y);", "((new f() < T) > <U>`x`)?.(y);\n"),
+        (
+            "(new new f<T><U>(x))(y);",
+            "((new new f()() < T) > <U>x)(y);\n",
+        ),
+        ("(f<T><U>(x)) * 2;", "((f < T) > <U>x) * 2;\n"),
+        ("a * (f<T><U>(x));", "a * ((f < T) > <U>x);\n"),
+        ("-(f<T><U>(x));", "-((f < T) > <U>x);\n"),
+        (
+            "typeof (new f<T><U>(x));",
+            "typeof ((new f() < T) > <U>x);\n",
+        ),
+        ("(new f<T><U>(x)).y;", "((new f() < T) > <U>x).y;\n"),
+        ("(f<T><U>(x)) as W;", "((f < T) > <U>x) as W;\n"),
+        ("(f<T><U>(x))<V>;", "((f < T) > <U>x)<V>;\n"),
+        ("(f<T><U>(x)).y.z();", "((f < T) > <U>x).y.z();\n"),
+        // a `new` callee: the pair stays, and the `new` takes its argument list
+        ("new (f<T><U>`x`);", "new ((f < T) > <U>`x`)();\n"),
+        ("new (new f<T><U>(x));", "new ((new f() < T) > <U>x)();\n"),
+        ("new (f<T><U>(x)`t`).y;", "new ((f < T) > <U>x`t`).y();\n"),
     ] {
-        assert_eq!(format(source), source);
+        assert_prints_fixed(source, printed);
         assert_eq!(
             expression_shape(source),
-            expression_shape(&format(source)),
+            expression_shape(printed),
             "the tree survives: {source:?}"
         );
     }
-    // a `new` callee: the pair stays, and the `new` takes its argument list
-    for (source, printed) in [
-        ("new (f<T><U>`x`);", "new (f<T><U>`x`)();\n"),
-        ("new (new f<T><U>(x));", "new (new f<T><U>(x))();\n"),
-        ("new (f<T><U>(x)`t`).y;", "new (f<T><U>(x)`t`).y();\n"),
-    ] {
-        assert_prints_fixed(source, printed);
-    }
 }
 
-/// A first list tsc's comparison MAY read as an operand prints as written, the pair only
-/// where tsc definitely refuses it: a spread is an array-literal element and a
-/// parenthesized arrow is a `<` operand, so neither is a refusal — and the paren around
-/// that arrow, which the type printer would strip anywhere else, is kept there, so the
-/// print is read the way the source was.
+/// A first list whose text an expression spells is tsc's comparison: a spread is an
+/// array-literal element and a parenthesized arrow a `<` operand. Where no expression
+/// spells it (an array type, a named or optional tuple member, `unique symbol`), or the
+/// assertion has no operand, tsc rejects the text and acorn-typescript's two lists take the
+/// repair pair.
 #[test]
-fn first_list_that_may_read_as_an_operand_prints_as_written() {
+fn first_list_that_reads_as_an_operand_is_the_comparison() {
     for (source, printed) in [
-        ("f<[...A]><U>(x);", "f<[...A]><U>(x);\n"),
-        ("f<[A, ...B]><U>(x);", "f<[A, ...B]><U>(x);\n"),
-        ("f<A | (() => T)><U>(x);", "f<A | (() => T)><U>(x);\n"),
-        ("f<(() => T)><U>(x);", "f<(() => T)><U>(x);\n"),
-        ("f<(() => A)><U>`t`;", "f<(() => A)><U>`t`;\n"),
-        ("f<(() => A)><U><V>(x);", "f<(() => A)><U><V>(x);\n"),
-        ("f<(() => A)><U>(x).y;", "f<(() => A)><U>(x).y;\n"),
-        ("new f<(() => A)><U>(x);", "new f<(() => A)><U>(x);\n"),
-        ("f<A<(() => T)>><U>(x);", "f<A<(() => T)>><U>(x);\n"),
-        ("f<[...(() => T)]><U>(x);", "f<[...(() => T)]><U>(x);\n"),
-        // a position that needs a pair around a function type takes the kept one
+        ("f<[...A]><U>(x);", "(f < [...A]) > <U>x;\n"),
+        ("f<[A, ...B]><U>(x);", "(f < [A, ...B]) > <U>x;\n"),
+        ("f<A | (() => T)><U>(x);", "(f < A) | ((() => T) > <U>x);\n"),
+        ("f<(() => T)><U>(x);", "(f < (() => T)) > <U>x;\n"),
+        ("f<(() => A)><U>`t`;", "(f < (() => A)) > <U>`t`;\n"),
+        ("f<(() => A)><U><V>(x);", "(f < (() => A)) > <U>(<V>x);\n"),
+        ("f<(() => A)><U>(x).y;", "(f < (() => A)) > <U>x.y;\n"),
+        ("new f<(() => A)><U>(x);", "(new f() < (() => A)) > <U>x;\n"),
+        // bare over the shift, which acorn-typescript reads as a list: the `<` twin of the
+        // relational-chain pair is unwritten
+        ("f<A<(() => T)>><U>(x);", "f < A < (() => T) >> <U>x;\n"),
+        ("f<[...(() => T)]><U>(x);", "(f < [...() => T]) > <U>x;\n"),
+        ("f<[(() => T)]><U>(x);", "(f < [() => T]) > <U>x;\n"),
+        ("f<((() => T))><U>(x);", "(f < (() => T)) > <U>x;\n"),
+        (
+            "f<keyof (() => T)><U>(x);",
+            "(f < keyof(() => T)) > <U>x;\n",
+        ),
+        // a type literal holding a conditional is no object literal
         (
             "f<{ a: (() => T) extends A ? B : C }><U>(x);",
-            "f<{ a: (() => T) extends A ? B : C }><U>(x);\n",
+            "(f<{ a: (() => T) extends A ? B : C }>)<U>(x);\n",
         ),
         (
             "f<{ a: A extends (() => infer V extends B) ? V : C }><U>(x);",
-            "f<{ a: A extends (() => infer V extends B) ? V : C }><U>(x);\n",
+            "(f<{ a: A extends (() => infer V extends B) ? V : C }>)<U>(x);\n",
         ),
-        ("f<[(() => T)]><U>(x);", "f<[(() => T)]><U>(x);\n"),
-        ("f<((() => T))><U>(x);", "f<(() => T)><U>(x);\n"),
-        ("f<keyof (() => T)><U>(x);", "f<keyof (() => T)><U>(x);\n"),
-        // outside a bare chain's first list the paren is stripped as redundant
+        // a single list prints the redundant paren stripped
         ("f<(() => T)>(x);", "f<() => T>(x);\n"),
+        // a refusal repairs
         ("f<(() => T)><U>();", "(f<() => T>)<U>();\n"),
-        // a definite refusal repairs
         ("f<unique symbol><U>(x);", "(f<unique symbol>)<U>(x);\n"),
         ("f<T[]><U>(x);", "(f<T[]>)<U>(x);\n"),
         ("f<[A?]><U>(x);", "(f<[A?]>)<U>(x);\n"),
@@ -465,144 +497,29 @@ fn first_list_that_may_read_as_an_operand_prints_as_written() {
     // the same in a Svelte template expression
     let template = component("{f<(() => A)><U>(x)}");
     let out = svelte_format(&template);
-    assert_eq!(out, template);
+    assert_eq!(out, component("{(f < (() => A)) > <U>x}"));
     assert_eq!(svelte_format(&out), out);
 }
 
-/// The paren a bare chain's first list keeps around a function type is kept when it holds a
-/// comment too, with the comment inside it where the author wrote it: stripped, the arrow
-/// is no `<` operand, so the next pass would read a refusal and take the pair.
+/// tsc reads `void[]` as the unary `void []`, an operand of its comparison, so a first list
+/// holding it is the comparison.
 #[test]
-fn first_list_commented_function_paren_is_kept() {
+fn first_list_void_array_reads_as_the_comparison() {
     for (source, printed) in [
-        (
-            "f<(/* c */ () => T)><U>(x);",
-            "f<(/* c */ () => T)><U>(x);\n",
-        ),
-        (
-            "f<(() => T /* c */)><U>(x);",
-            "f<(() => T /* c */)><U>(x);\n",
-        ),
-        (
-            "f<(/* a */ () => T /* b */)><U>(x);",
-            "f<(/* a */ () => T /* b */)><U>(x);\n",
-        ),
-        (
-            "f<((/* c */ () => T))><U>(x);",
-            "f<(/* c */ () => T)><U>(x);\n",
-        ),
-        (
-            "f<A<(/* c */ () => T)>><U>(x);",
-            "f<A<(/* c */ () => T)>><U>(x);\n",
-        ),
-        (
-            "f<[(/* c */ () => T)]><U>(x);",
-            "f<[(/* c */ () => T)]><U>(x);\n",
-        ),
-        (
-            "f<[...(/* c */ () => T)]><U>(x);",
-            "f<[...(/* c */ () => T)]><U>(x);\n",
-        ),
-        (
-            "f<A | (/* c */ () => T)><U>(x);",
-            "f<A | (/* c */ () => T)><U>(x);\n",
-        ),
-        (
-            "new f<(/* c */ () => T)><U>(x);",
-            "new f<(/* c */ () => T)><U>(x);\n",
-        ),
-        (
-            "f<(/* c */ () => T)><U>`t`;",
-            "f<(/* c */ () => T)><U>`t`;\n",
-        ),
-        (
-            "f<(/* c */ () => T)><U><V>(x);",
-            "f<(/* c */ () => T)><U><V>(x);\n",
-        ),
-        (
-            "f<(/* c */ () => T)><U>(x).y;",
-            "f<(/* c */ () => T)><U>(x).y;\n",
-        ),
-        (
-            "f<( // c\n() => T)><U>(x);",
-            "f<\n\t( // c\n\t\t() => T\n\t)\n><U>(x);\n",
-        ),
-        (
-            "f<(() => T // c\n)><U>(x);",
-            "f<\n\t(\n\t\t() => T // c\n\t)\n><U>(x);\n",
-        ),
-        (
-            "f<(\n// c\n() => T)><U>(x);",
-            "f<\n\t(\n\t\t// c\n\t\t() => T\n\t)\n><U>(x);\n",
-        ),
-        (
-            "f<A<( // c\n() => T)>><U>(x);",
-            "f<\n\tA<\n\t\t( // c\n\t\t\t() => T\n\t\t)\n\t>\n><U>(x);\n",
-        ),
-        (
-            "f<[(() => T // c\n)]><U>(x);",
-            "f<\n\t[\n\t\t(\n\t\t\t() => T // c\n\t\t)\n\t]\n><U>(x);\n",
-        ),
-        (
-            "f<A | ( // c\n() => T)><U>(x);",
-            "f<\n\t| A\n\t| ( // c\n\t\t\t() => T\n\t  )\n><U>(x);\n",
-        ),
-        (
-            "f<[...( // c\n() => T)]><U>(x);",
-            "f<\n\t[\n\t\t...( // c\n\t\t\t() => T\n\t\t)\n\t]\n><U>(x);\n",
-        ),
-        (
-            "new f<(// c\n() => T)><U>(x);",
-            "new f<\n\t( // c\n\t\t() => T\n\t)\n><U>(x);\n",
-        ),
-        // a comment in a redundant shell around the kept one is the list's to emit
-        (
-            "f<(// c\n(() => T))><U>(x);",
-            "f< // c\n\t(() => T)\n><U>(x);\n",
-        ),
-        // outside a bare chain's first list the commented paren strips as anywhere
-        ("f<(/* c */ () => T)>(x);", "f</* c */ () => T>(x);\n"),
-        ("f<(/* c */ () => T)><U>();", "(f</* c */ () => T>)<U>();\n"),
+        ("f<void[]><U>(x);", "(f < void []) > <U>x;\n"),
+        ("f<A | void[]><U>(x);", "(f < A) | (void [] > <U>x);\n"),
+        ("new f<void[]><U>(x);", "(new f() < void []) > <U>x;\n"),
     ] {
         assert_prints_fixed(source, printed);
     }
-}
-
-/// tsc reads `void[]` as the unary `void []`, an operand of its comparison, so a first list
-/// holding it prints as written.
-#[test]
-fn first_list_void_array_prints_as_written() {
-    for source in [
-        "f<void[]><U>(x);\n",
-        "f<A | void[]><U>(x);\n",
-        "new f<void[]><U>(x);\n",
-    ] {
-        assert_prints_fixed(source, source);
-    }
-    // a `void` with nothing to apply to still refuses
+    // a `void` with nothing to apply to has no comparison, and keeps the lists
     assert_prints_fixed("f<void><U>(x);", "(f<void>)<U>(x);\n");
-}
-
-/// An authored pair is found across every JavaScript whitespace code point, not only the
-/// ASCII ones: a no-break space, a byte-order mark, a line or paragraph separator, an
-/// ideographic space inside the pair is still inside the pair.
-#[test]
-fn authored_pair_is_found_across_unicode_whitespace() {
-    for (source, printed) in [
-        ("(\u{a0}new f<T><U>`x`)(y);", "(new f<T><U>`x`)(y);\n"),
-        ("(\u{a0}f<T><U>(x)) + 1;", "(f<T><U>(x)) + 1;\n"),
-        ("-(\u{feff}f<T><U>(x));", "-(f<T><U>(x));\n"),
-        ("(f<T><U>(x)\u{3000}) * 2;", "(f<T><U>(x)) * 2;\n"),
-        ("(f<T><U>(x)\u{2028}).y;", "(f<T><U>(x)).y;\n"),
-        ("a * (\u{2029}f<T><U>(x));", "a * (f<T><U>(x));\n"),
-    ] {
-        assert_eq!(format(source), printed, "printed from {source:?}");
-    }
 }
 
 /// In a class heritage acorn-typescript ends the superclass before a second list its
 /// follower refuses (`{`), and reads that list as the heritage's own; tsc rejects the
-/// bare spelling, so tsv keeps acorn's tree and prints the pair both read alike.
+/// bare spelling, and a heritage takes no comparison, so tsv keeps acorn's tree and prints
+/// the pair both read alike.
 #[test]
 fn heritage_second_list_reads_as_acorn_does() {
     let source = "class D extends new f<T><() => U> {}";
@@ -622,25 +539,33 @@ fn heritage_second_list_reads_as_acorn_does() {
 
 /// A type operator is an expression to tsc when its operand opens with `[` or `(`
 /// (`keyof [A]` is the element access `keyof[A]`, `keyof (A)` the call `keyof(A)`), so tsc
-/// reads the comparison and the spelling prints as written; only an operand that is
-/// itself no expression (`[A][]`, `(A)[]`) or opens otherwise (`A[]`, `symbol`) refuses.
+/// reads the comparison and so does tsv; an operand that is itself no expression (`[A][]`,
+/// `(A)[]`) or opens otherwise (`A[]`, `symbol`) leaves tsc nothing to read, and the lists
+/// take the repair pair.
 #[test]
-fn type_operator_over_a_bracket_or_paren_prints_as_written() {
-    for source in [
-        "f<readonly [A]><U>(x);\n",
-        "new f<readonly [A]><U>(x);\n",
-        "f<readonly [A, B]><U>(x);\n",
-        "f<keyof [A]><U>(x);\n",
-        "f<keyof [A]><U>`x`;\n",
-        "f<keyof [A][0]><U>(x);\n",
-        "f<keyof (() => T)><U>(x);\n",
-        "f<[keyof [B]]><U>(x);\n",
-        "f<A<keyof [B]>><U>(x);\n",
-        "f<A | keyof [B]><U>(x);\n",
-    ] {
-        assert_prints_fixed(source, source);
-    }
+fn type_operator_over_a_bracket_or_paren_reads_as_the_comparison() {
     for (source, printed) in [
+        ("f<readonly [A]><U>(x);", "(f < readonly[A]) > <U>x;\n"),
+        (
+            "new f<readonly [A]><U>(x);",
+            "(new f() < readonly[A]) > <U>x;\n",
+        ),
+        (
+            "f<readonly [A, B]><U>(x);",
+            "(f < readonly[(A, B)]) > <U>x;\n",
+        ),
+        ("f<keyof [A]><U>(x);", "(f < keyof[A]) > <U>x;\n"),
+        ("f<keyof [A]><U>`x`;", "(f < keyof[A]) > <U>`x`;\n"),
+        ("f<keyof [A][0]><U>(x);", "(f < keyof[A][0]) > <U>x;\n"),
+        ("f<keyof (A)><U>(x);", "(f < keyof(A)) > <U>x;\n"),
+        (
+            "f<keyof (() => T)><U>(x);",
+            "(f < keyof(() => T)) > <U>x;\n",
+        ),
+        ("f<[keyof [B]]><U>(x);", "(f < [keyof[B]]) > <U>x;\n"),
+        // bare over the shift (the `<` twin of the relational-chain pair is unwritten)
+        ("f<A<keyof [B]>><U>(x);", "f < A < keyof[B] >> <U>x;\n"),
+        ("f<A | keyof [B]><U>(x);", "(f < A) | (keyof[B] > <U>x);\n"),
         ("f<keyof A[]><U>(x);", "(f<keyof A[]>)<U>(x);\n"),
         ("f<readonly A[]><U>(x);", "(f<readonly A[]>)<U>(x);\n"),
         (
@@ -653,59 +578,4 @@ fn type_operator_over_a_bracket_or_paren_prints_as_written() {
     ] {
         assert_prints_fixed(source, printed);
     }
-}
-
-/// In the first list of a chain printed bare, a paren the author wrote directly under a
-/// type operator is kept, a comment in it included (`keyof (A)` is a call to tsc and must
-/// stay one), and whether an operand opens with `[` or `(` is read off the operand AS
-/// PRINTED — a pair the type printer adds counts (`readonly (readonly [A])`), one it strips
-/// does not (`keyof (A)[0]` prints `keyof A[0]`, which tsc refuses, so the chain takes the
-/// pair). Every output is a fixed point.
-#[test]
-fn first_list_operator_operand_is_read_as_printed() {
-    for (source, printed) in [
-        ("f<keyof (A)><U>(x);", "f<keyof (A)><U>(x);\n"),
-        (
-            "f<keyof /* c */ (A)><U>(x);",
-            "f<keyof /* c */ (A)><U>(x);\n",
-        ),
-        ("f<keyof\n(A)><U>(x);", "f<keyof (A)><U>(x);\n"),
-        ("f<keyof\u{3000}(A)><U>(x);", "f<keyof (A)><U>(x);\n"),
-        ("new f<keyof (A)><U>(x);", "new f<keyof (A)><U>(x);\n"),
-        ("f<A<keyof (B)>><U>(x);", "f<A<keyof (B)>><U>(x);\n"),
-        // the redundant paren down an indexed access's left spine is stripped, and the
-        // stripped operand opens with `A`, so the chain takes the pair
-        ("f<keyof (A)[0]><U>(x);", "(f<keyof A[0]>)<U>(x);\n"),
-        // a comment in the kept paren stays inside it, and one ahead of it hangs the pair
-        (
-            "f<keyof (// c\nA)><U>(x);",
-            "f<\n\tkeyof ( // c\n\t\tA\n\t)\n><U>(x);\n",
-        ),
-        (
-            "f<keyof (\n// c\nA)><U>(x);",
-            "f<\n\tkeyof (\n\t\t// c\n\t\tA\n\t)\n><U>(x);\n",
-        ),
-        (
-            "f<keyof ((// c\nA))><U>(x);",
-            "f<\n\tkeyof ( // c\n\t\tA\n\t)\n><U>(x);\n",
-        ),
-        (
-            "f<keyof // x\n(A)><U>(x);",
-            "f<\n\tkeyof // x\n\t\t(A)\n><U>(x);\n",
-        ),
-        // a chain that takes the pair strips the redundant paren as anywhere
-        ("f<keyof (A)><U>();", "(f<keyof A>)<U>();\n"),
-    ] {
-        let out = format(source);
-        assert_eq!(out, printed, "printed from {source:?}");
-        assert_eq!(format(&out), out, "a fixed point: {source:?}");
-    }
-    // The pair the prefix-operator rule adds counts: the operand prints opening with `(`,
-    // so the spelling prints as written. (tsv's own expression lookahead refuses a
-    // `readonly (` type argument that tsc and acorn read, so a second pass reads this
-    // output as a comparison — a separate over-rejection, not this rule's.)
-    assert_eq!(
-        format("f<readonly readonly [A]><U>(x);"),
-        "f<readonly (readonly [A])><U>(x);\n"
-    );
 }

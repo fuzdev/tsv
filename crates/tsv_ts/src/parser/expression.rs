@@ -16,12 +16,15 @@ use tsv_lang::printing::visual_width;
 use tsv_lang::source_scan;
 use tsv_lang::{ParseError, Span, TAB_WIDTH};
 
-use super::expression_lookahead::{ArrowHead, matching_angle_close, type_args_follower_refuses};
+use super::expression_lookahead::{
+    ArrowHead, matching_angle_close, type_args_follower_refused_by_tsc_alone,
+    type_args_follower_refuses,
+};
 use super::expression_type_args::TypeArgScan;
 use super::scan::{
     LeadingZeroLiteral, classify_leading_zero, parse_number_literal, skip_whitespace_and_comments,
 };
-use super::{GroupingParen, Parser};
+use super::{Checkpoint, GroupingParen, Parser};
 
 //
 // Binding Power Constants for Pratt Parser
@@ -549,14 +552,36 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         min_bp: u8,
     ) -> Result<&'arena Expression<'arena>, ParseError> {
-        let arena = self.arena;
         // Track the true start position (before any parentheses)
         // This is needed because grouped expressions like (a && b) should have their
         // containing binary expression span include the opening paren
         let expr_start = self.current_pos().0;
 
         // Parse prefix expression (primary or unary)
-        let mut left = self.parse_prefix_expression()?;
+        let left = self.parse_prefix_expression()?;
+        self.parse_expression_operators(min_bp, expr_start, left)
+    }
+
+    /// The operator half of [`Parser::parse_expression_bp`]: everything that extends an
+    /// already-parsed `left` operand whose parse began at `expr_start` — binary operators
+    /// and `as` / `satisfies`, then an assignment, a conditional and a sequence, as
+    /// `min_bp` admits them.
+    ///
+    /// Its own function for the one other caller,
+    /// [`Parser::type_arguments_follower_settled`], which asks whether a `<` the
+    /// subscript loop has just read a type-argument list from reads as the comparison
+    /// operator instead — exactly as this loop would read it from that `left`.
+    /// `inline(always)` keeps [`Parser::parse_expression_bp`], the expression ladder's
+    /// hot path, one frame as it was before the split.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    fn parse_expression_operators(
+        &mut self,
+        min_bp: u8,
+        expr_start: usize,
+        mut left: &'arena Expression<'arena>,
+    ) -> Result<&'arena Expression<'arena>, ParseError> {
+        let arena = self.arena;
 
         // A leading *unparenthesized* arrow function — or a bare `yield` inside a
         // generator — is a complete `AssignmentExpression` (see
@@ -857,6 +882,30 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // only one a leading comment can be glued to. Taken before the match, which
         // produces exactly the node that token begins (postfix subscripts wrap it after).
         let (head_start, _) = self.current_pos();
+        // Whether the head is a prefix operator — a unary operator, a prefix update,
+        // `await`, or an angle-bracket type assertion (a generic arrow, the `<` arm's
+        // other reading, is a bare head that returns below either way). What it builds is
+        // a `UnaryExpression` in ecma262's grammar, never a `LeftHandSideExpression`, and
+        // a call, member access, tagged template or type argument list continues only a
+        // `LeftHandSideExpression`. Its operand has already taken every subscript it can,
+        // so a subscript token still standing behind one is one the operand refused: the
+        // one its postfix `++` / `--` ends on (`!b++` before `(z)`, `[0]`, `` `t` `` or
+        // `.c`), which the operator does not take either.
+        let prefix_operator_head = match self.current_kind() {
+            TokenKind::Minus
+            | TokenKind::Plus
+            | TokenKind::Bang
+            | TokenKind::Tilde
+            | TokenKind::PlusPlus
+            | TokenKind::MinusMinus
+            | TokenKind::LessThan
+            | TokenKind::LeftShift
+            | TokenKind::Keyword(KeywordKind::Typeof | KeywordKind::Void | KeywordKind::Delete) => {
+                true
+            }
+            TokenKind::Keyword(KeywordKind::Await) => self.in_await,
+            _ => false,
+        };
         let parsed = match self.current_kind() {
             TokenKind::Minus | TokenKind::Plus | TokenKind::Bang | TokenKind::Tilde => {
                 self.parse_unary_expression()?
@@ -1040,6 +1089,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // (`yield [x]` is `yield` of an array; `yield (e)` its parenthesized arg),
         // so only the no-argument bare head reaches here.
         if is_bare_assignment_head(parsed, head_start, self.in_yield) {
+            return Ok(parsed);
+        }
+
+        // A prefix operator's expression takes no subscript (see `prefix_operator_head`):
+        // past a line break the statement ends before one (`a = !b++⏎(z) => z` is two
+        // statements), and on the same line, or where no statement can end, the token is
+        // a syntax error (`!b++(z)`, `g(!b++⏎(z))`).
+        if prefix_operator_head {
             return Ok(parsed);
         }
 
@@ -1634,7 +1691,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             return self.parse_async_function_expression(start);
         }
         match self.current_kind() {
-            TokenKind::Keyword(KeywordKind::New) => self.parse_new_expression(),
+            TokenKind::Keyword(KeywordKind::New) => self.parse_new_expression_in(true),
             TokenKind::Keyword(KeywordKind::Class) => self.parse_class_expression(),
             TokenKind::Keyword(KeywordKind::Function) => self.parse_function_expression(),
             TokenKind::Keyword(KeywordKind::Import) => self.parse_import_or_meta_property(),
@@ -2239,7 +2296,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         start: u32,
     ) -> Result<Option<&'arena Expression<'arena>>, ParseError> {
         // Parse type parameter instantiation: <T, U>
-        let Some(type_args) = self.parse_type_arguments_or_rewind()? else {
+        let Some(type_args) = self.parse_type_arguments_or_rewind(Some((left, start)))? else {
             return Ok(None);
         };
         let end = type_args.span.end;
@@ -2296,17 +2353,75 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// the operator reading fails as well
     /// (`Parser::prefer_abandoned_type_arguments_error`).
     ///
+    /// **Where the follower refuses a whole list.** A list read whole is still no list
+    /// where the token after its `>` is one tsc refuses there and acorn-typescript does
+    /// not — a `<`, or a `+` / `-` past a line break
+    /// ([`type_args_follower_refused_by_tsc_alone`]): tsc reads the comparison
+    /// (`f<T><U>(z)` is `(f < T) > <U>(z)`, `f<T>⏎+c` is `(f < T) > +c`), and so does
+    /// this, where that reading parses ([`Parser::type_arguments_follower_settled`]). Where
+    /// it does not (`f<T><U>;`, `f<string[]><U>(x)`), tsc rejects the text, and the list
+    /// acorn-typescript reads is kept. Either way the text is then acorn's to read
+    /// throughout, so the driver reads it again with no list given up
+    /// (`parse_retrying_acorn_followers`): where this parse kept a list and gave another
+    /// up (`f<() => A><U><V>(x)` calls `f<() => A><U>` with `<V>`, never
+    /// `(f<() => A> < U) > <V>(x)`), and where the comparison parsed but its context then
+    /// refused it, failing the parse (`const a = f<T, U><V>(x)`, whose `,` ends the
+    /// declarator).
+    ///
     /// Only the positions with an operator reading come here — the subscript loop and
-    /// the `new` callee. Behind `?.` and in a decorator a `<` is a list or nothing, so
-    /// those read theirs committed.
+    /// the `new` callee, each handing over the operand the `<` follows with where its
+    /// parse began (`operand`), which the comparison reading compares. A class heritage's
+    /// `new` callee hands over none: the heritage is a `LeftHandSideExpression`, which no
+    /// comparison is, so there a follower only tsc refuses leaves the list standing as
+    /// acorn-typescript reads it (`extends new f<T><() => U> {}`, whose second list is the
+    /// heritage's). Behind `?.` and in a decorator a `<` is a list or nothing, so those
+    /// read theirs committed.
     pub(super) fn parse_type_arguments_or_rewind(
         &mut self,
+        operand: Option<(&'arena Expression<'arena>, u32)>,
     ) -> Result<Option<TSTypeParameterInstantiation<'arena>>, ParseError> {
         let lt = self.current.start;
         if self.type_arguments_abandoned_at(lt) {
             return Ok(None);
         }
         let checkpoint = self.checkpoint();
+        let Some(type_arguments) = self.parse_type_arguments_tried(lt, &checkpoint)? else {
+            return Ok(None);
+        };
+        let Some((left, start)) = operand else {
+            return Ok(Some(type_arguments));
+        };
+        if !self.tsc_followers
+            || !type_args_follower_refused_by_tsc_alone(
+                self.source.as_bytes(),
+                self.prev_end,
+                self.current.start as usize,
+            )
+            || self.type_arguments_kept_at(lt)
+        {
+            return Ok(Some(type_arguments));
+        }
+        let close_end = self.prev_end;
+        self.rewind(checkpoint.clone());
+        if self.type_arguments_follower_settled(left, start, close_end) {
+            self.settle_type_arguments_follower(lt, true);
+            self.gave_up_list_to_tsc_follower = true;
+            return Ok(None);
+        }
+        self.settle_type_arguments_follower(lt, false);
+        self.kept_list_past_tsc_follower = true;
+        // read the list again, which the verdict now keeps
+        self.parse_type_arguments_tried(lt, &checkpoint)
+    }
+
+    /// The list half of [`Parser::parse_type_arguments_or_rewind`]: the list at the
+    /// current `<` (the offset `lt`), its tail tried past the first separator and
+    /// rewound to `checkpoint` (taken at the `<`) where it spells none.
+    fn parse_type_arguments_tried(
+        &mut self,
+        lt: u32,
+        checkpoint: &Checkpoint<'arena>,
+    ) -> Result<Option<TSTypeParameterInstantiation<'arena>>, ParseError> {
         let (start, first) = self.parse_type_argument_list_head()?;
         if !self.check(&TokenKind::Comma) {
             // no separator: the lookahead graded everything this list holds
@@ -2320,11 +2435,60 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 Err(error)
             }
             Err(error) => {
-                self.rewind(checkpoint);
+                self.rewind(checkpoint.clone());
                 self.abandon_type_arguments(lt, error);
                 Ok(None)
             }
         }
+    }
+
+    /// Whether the `<` at the current token, behind the operand `left` (whose parse
+    /// began at `start`), reads as tsc's comparison: the operator loop run from `left` as
+    /// [`Parser::parse_expression_operators`] runs it, which must parse and must consume
+    /// the token holding the list's closing `>` (ending at `close_end`) — so the
+    /// comparison has the operand after that `>` too. Speculative: the parser is put
+    /// back at the `<` whatever the answer.
+    ///
+    /// The reading fails where tsc's parser rejects the text and acorn-typescript reads
+    /// a list: the operand after the `>` missing (`f<T><U>;`, `new a.b<T><U>()`,
+    /// `f<T><U>(...x)`), or a list that reads as no expression (`f<string[]><U>(x)`,
+    /// `f<void><U>(x)`, `f<A extends B ? C : D><U>(x)`, where the loop stops short of the
+    /// `>`). It is run at the loosest binding power, so a list holding a `,`
+    /// (`g(f<T, U><V>(x))`) reads as the comparison whose `,` the context then takes —
+    /// tsc's reading. Where the context takes none (`const a = f<T, U><V>(x)`) tsc rejects
+    /// the text, which this cannot see: the parse fails there instead, and the driver reads
+    /// the text again as acorn-typescript does (`parse_retrying_acorn_followers`).
+    ///
+    /// The comparison reads the first argument as an expression, which can claim a block
+    /// comment glued to it ([`Checkpoint`]); a claim on a comment drained ahead of the
+    /// checkpoint survives the rewind, so it is put back here.
+    pub(super) fn type_arguments_follower_settled(
+        &mut self,
+        left: &'arena Expression<'arena>,
+        start: u32,
+        close_end: usize,
+    ) -> bool {
+        let lt_pos = self.current_pos().0;
+        // the comments drained ahead of the checkpoint that a reading may still claim:
+        // the ones at or past the `<`, at the ledger's end
+        let unclaimed = self
+            .comments
+            .iter()
+            .rposition(|comment| (comment.span.start as usize) < lt_pos)
+            .map_or(0, |i| i + 1);
+        let unclaimed: Vec<usize> = (unclaimed..self.comments.len())
+            .filter(|&i| !self.comments[i].owned_by_node)
+            .collect();
+        let checkpoint = self.checkpoint();
+        let reads = self
+            .parse_expression_operators(BP_COMMA, start as usize, left)
+            .is_ok()
+            && self.prev_end >= close_end;
+        self.rewind(checkpoint);
+        for i in unclaimed {
+            self.comments[i].owned_by_node = false;
+        }
+        reads
     }
 
     /// Whether the PRINTED form of a type-argument list's tail could spell the list
@@ -2743,6 +2907,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// The `new` keyword has the same precedence as unary operators.
     /// It takes a callee (identifier or member expression) and optional arguments.
     fn parse_new_expression(&mut self) -> Result<&'arena Expression<'arena>, ParseError> {
+        self.parse_new_expression_in(false)
+    }
+
+    /// [`Parser::parse_new_expression`], told whether the `new` is a class heritage's
+    /// superclass (`heritage`), where its callee's type-argument lists have no comparison
+    /// reading to fall back to ([`Parser::parse_type_arguments_or_rewind`]).
+    fn parse_new_expression_in(
+        &mut self,
+        heritage: bool,
+    ) -> Result<&'arena Expression<'arena>, ParseError> {
         let arena = self.arena;
         let (start, new_end) = self.current_pos();
         self.advance()?; // consume 'new'
@@ -2909,7 +3083,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 {
                     // A tail that is no list leaves the `<` to compare the
                     // argument-less `new` with what follows (`new A < b`).
-                    let Some(ta) = self.parse_type_arguments_or_rewind()? else {
+                    let operand = (!heritage).then_some((callee, callee_start));
+                    let Some(ta) = self.parse_type_arguments_or_rewind(operand)? else {
                         break;
                     };
                     if matches!(
@@ -2919,10 +3094,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         callee = self.attach_new_callee_tag(callee, callee_start, Some(ta))?;
                     } else if self.new_callee_continues_past_type_args() {
                         // The list stays on the callee as an instantiation and the chain
-                        // goes on: a second list (`new f<T><U>(x)` constructs `f<T>` with
-                        // `<U>`) or a member past a line break (`new f<T>⏎[x](y)`
-                        // constructs `f<T>[x]`) — acorn-typescript's tree, and tsc's for
-                        // the member.
+                        // goes on: a second list tsc's comparison could not take
+                        // (`new a.b<T><U>()` constructs `a.b<T>` with `<U>`,
+                        // acorn-typescript's tree) or a member past a line break
+                        // (`new f<T>⏎[x](y)` constructs `f<T>[x]`, tsc's and acorn's).
                         callee = alloc_expr(
                             arena,
                             Expression {
@@ -3000,10 +3175,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// the `new` only when it is the callee's LAST subscript; two followers keep the chain
     /// going:
     ///
-    /// - **a second type argument list** — `new f<T><U>(x)` is `new (f<T>)<U>(x)`, the
-    ///   second list the `new`'s. tsc takes no list ahead of a `<` and reads the text as a
-    ///   comparison instead; the printer keeps both readings apart (it prints the spelling
-    ///   as written where tsc accepts it, and adds the pair where tsc refuses it).
+    /// - **a second type argument list** — `new a.b<T><U>()` is `new (a.b<T>)<U>()`, the
+    ///   second list the `new`'s. It stands only where tsc's comparison does not parse:
+    ///   tsc takes no list ahead of a `<`, and where its comparison parses
+    ///   (`new f<T><U>(x)` is `(new f < T) > <U>(x)`) the first list was abandoned to it
+    ///   already ([`Parser::parse_type_arguments_or_rewind`]). The printer adds the pair
+    ///   both parsers read alike.
     /// - **a `[` past a line break** — `new f<T>⏎[x](y)` constructs the member `f<T>[x]`,
     ///   to tsc as to acorn: the break commits the list, and the member is the callee's.
     ///   On the list's own line the `[` refuses it, which the lookahead that admitted the

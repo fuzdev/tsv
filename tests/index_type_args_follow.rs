@@ -409,21 +409,22 @@ fn expression_index_bodies_stay_comparisons() {
         ),
         ("a < b[A<B><C>] > (c);\n", "(a < b[(A<B>)<C>]) > c;\n"),
         ("a < b[(A<B><C>)] > (c);\n", "(a < b[(A<B>)<C>]) > c;\n"),
-        // and one ahead of a call's arguments or a template is the call no type spells,
-        // which prints as written — in the index itself and as an arrow function's body
+        // and one ahead of a call's arguments or a template is tsc's comparison over a
+        // type assertion, which no type spells — in the index itself and as an arrow
+        // function's body
         (
             "f<A[() => b<C><D>(e)]>(x);\n",
-            "(f < A[() => b<C><D>(e)]) > x;\n",
+            "(f < A[() => (b < C) > <D>e]) > x;\n",
         ),
         (
             "f<A[() => b<C><D>(e)]>`t`;\n",
-            "(f < A[() => b<C><D>(e)]) > `t`;\n",
+            "(f < A[() => (b < C) > <D>e]) > `t`;\n",
         ),
-        ("f<A[b<C><D>(e)]>(x);\n", "(f < A[b<C><D>(e)]) > x;\n"),
-        ("f<A[b<C><D>`t`]>(x);\n", "(f < A[b<C><D>`t`]) > x;\n"),
+        ("f<A[b<C><D>(e)]>(x);\n", "(f < A[(b < C) > <D>e]) > x;\n"),
+        ("f<A[b<C><D>`t`]>(x);\n", "(f < A[(b < C) > <D>`t`]) > x;\n"),
         (
             "f<A[() => b<C><D><E>(e)]>(x);\n",
-            "(f < A[() => b<C><D><E>(e)]) > x;\n",
+            "(f < A[() => (b < C) > <D>(<E>e)]) > x;\n",
         ),
         // so is one no operand follows for tsc's type assertion: the compiler rejects
         // the spelling, and the instantiation is the only reading
@@ -640,22 +641,31 @@ fn printed_chains_survive_a_break_past_the_close() {
 }
 
 /// A second list behind a first whose index holds a function type: tsc reads the bare
-/// spelling as a comparison over an arrow function indexing `A`, acorn-typescript as a
-/// call over an instantiation, and the line prints as written so each reads the output as
-/// it read the input. Where the arrow's body spells nothing an expression does, tsc has no
-/// comparison to read and the chain takes the pair every parser reads alike.
+/// spelling as a comparison over an arrow function indexing `A` (acorn-typescript as a
+/// call over an instantiation), and so does tsv, printing the paired chain. Where the
+/// arrow's body spells nothing an expression does, tsc has no comparison to read and the
+/// chain takes the pair every parser reads alike.
 #[test]
-fn second_list_behind_a_function_type_index_prints_as_written() {
+fn second_list_behind_a_function_type_index_reads_as_tsc_does() {
+    // an arrow function indexes `A` in tsc's comparison, which reads the second list as a
+    // type assertion
     for (source, printed) in [
-        ("f<A[() => B]><D>(x);\n", "f<A[() => B]><D>(x);\n"),
+        ("f<A[() => B]><D>(x);\n", "(f < A[() => B]) > <D>x;\n"),
         (
             "f<A[(a: B) => C] | E><D>(x);\n",
-            "f<A[(a: B) => C] | E><D>(x);\n",
+            "(f < A[(a: B) => C]) | (E > <D>x);\n",
         ),
         (
             "f<A[() => () => B]><D>(x);\n",
-            "f<A[() => () => B]><D>(x);\n",
+            "(f < A[() => () => B]) > <D>x;\n",
         ),
+    ] {
+        assert_prints_fixed(source, printed);
+        assert_ne!(expression_kind(printed), "CallExpression", "{printed:?}");
+    }
+    // where the arrow returns nothing an expression spells, tsc rejects the comparison and
+    // acorn-typescript's two lists stay, the first in the pair both read alike
+    for (source, printed) in [
         ("f<A[() => B[]]><D>(x);\n", "(f<A[() => B[]]>)<D>(x);\n"),
         (
             "f<A[(a) => a is B]><D>(x);\n",
@@ -1196,7 +1206,7 @@ fn expression_index_bodies_print_as_their_chain() {
         ),
         (
             "f<A[() => typeof import('m', { with: { a: 'b' } })<C><D>[K]]>(x);\n",
-            "(f < A[() => ((typeof import('m', { with: { a: 'b' } })<C>) < D) > [K]]) > x;\n",
+            "(f < A[() => (typeof import('m', { with: { a: 'b' } }) < C) > <D>[K]]) > x;\n",
         ),
         // a negative literal's list past a line break, in an index that opens as no type
         (

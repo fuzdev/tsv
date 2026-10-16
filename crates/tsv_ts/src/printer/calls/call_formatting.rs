@@ -133,7 +133,7 @@ fn build_call_head(
         ParenContext::Callee,
         call.type_arguments
             .as_ref()
-            .map(|list| SecondTypeArgs::Arguments(list, call.arguments)),
+            .map(|_| SecondTypeArgs::Expression),
     );
     // The pair's facts and every window that opens past its `)`, off ONE derivation
     // ([`super::CalleeGap`]).

@@ -1,0 +1,426 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 339,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A postfix update ends an `UpdateExpression`, which no call, member or template",
+			"start": 10,
+			"end": 91
+		},
+		{
+			"type": "Line",
+			"value": " continues, so under a prefix operator too a line opening with `(`, `[` or a",
+			"start": 93,
+			"end": 171
+		},
+		{
+			"type": "Line",
+			"value": " template is a new statement.",
+			"start": 173,
+			"end": 204
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 338,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 329,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 206,
+					"end": 215,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 206,
+						"end": 215,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 206,
+							"end": 208,
+							"name": "a1"
+						},
+						"right": {
+							"type": "UnaryExpression",
+							"start": 211,
+							"end": 215,
+							"operator": "!",
+							"prefix": true,
+							"argument": {
+								"type": "UpdateExpression",
+								"start": 212,
+								"end": 215,
+								"operator": "++",
+								"prefix": false,
+								"argument": {
+									"type": "Identifier",
+									"start": 212,
+									"end": 213,
+									"name": "b"
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A postfix update ends an `UpdateExpression`, which no call, member or template",
+							"start": 10,
+							"end": 91
+						},
+						{
+							"type": "Line",
+							"value": " continues, so under a prefix operator too a line opening with `(`, `[` or a",
+							"start": 93,
+							"end": 171
+						},
+						{
+							"type": "Line",
+							"value": " template is a new statement.",
+							"start": 173,
+							"end": 204
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 217,
+					"end": 221,
+					"expression": {
+						"type": "Identifier",
+						"start": 218,
+						"end": 219,
+						"name": "z"
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 223,
+					"end": 232,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 223,
+						"end": 232,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 223,
+							"end": 225,
+							"name": "a2"
+						},
+						"right": {
+							"type": "UnaryExpression",
+							"start": 228,
+							"end": 232,
+							"operator": "-",
+							"prefix": true,
+							"argument": {
+								"type": "UpdateExpression",
+								"start": 229,
+								"end": 232,
+								"operator": "--",
+								"prefix": false,
+								"argument": {
+									"type": "Identifier",
+									"start": 229,
+									"end": 230,
+									"name": "b"
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 234,
+					"end": 238,
+					"expression": {
+						"type": "Identifier",
+						"start": 235,
+						"end": 236,
+						"name": "z"
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 240,
+					"end": 257,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 240,
+						"end": 257,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 240,
+							"end": 242,
+							"name": "a3"
+						},
+						"right": {
+							"type": "UnaryExpression",
+							"start": 245,
+							"end": 257,
+							"operator": "typeof",
+							"prefix": true,
+							"argument": {
+								"type": "UpdateExpression",
+								"start": 252,
+								"end": 257,
+								"operator": "++",
+								"prefix": false,
+								"argument": {
+									"type": "MemberExpression",
+									"start": 252,
+									"end": 255,
+									"object": {
+										"type": "Identifier",
+										"start": 252,
+										"end": 253,
+										"name": "b"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 254,
+										"end": 255,
+										"name": "c"
+									},
+									"computed": false,
+									"optional": false
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 259,
+					"end": 263,
+					"expression": {
+						"type": "Identifier",
+						"start": 260,
+						"end": 261,
+						"name": "z"
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 265,
+					"end": 281,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 265,
+						"end": 281,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 265,
+							"end": 267,
+							"name": "a4"
+						},
+						"right": {
+							"type": "UnaryExpression",
+							"start": 270,
+							"end": 281,
+							"operator": "void",
+							"prefix": true,
+							"argument": {
+								"type": "UpdateExpression",
+								"start": 275,
+								"end": 281,
+								"operator": "--",
+								"prefix": false,
+								"argument": {
+									"type": "MemberExpression",
+									"start": 275,
+									"end": 279,
+									"object": {
+										"type": "Identifier",
+										"start": 275,
+										"end": 276,
+										"name": "b"
+									},
+									"property": {
+										"type": "Literal",
+										"start": 277,
+										"end": 278,
+										"value": 0,
+										"raw": "0"
+									},
+									"computed": true,
+									"optional": false
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 283,
+					"end": 287,
+					"expression": {
+						"type": "ArrayExpression",
+						"start": 283,
+						"end": 286,
+						"elements": [
+							{
+								"type": "Literal",
+								"start": 284,
+								"end": 285,
+								"value": 0,
+								"raw": "0"
+							}
+						]
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 289,
+					"end": 299,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 289,
+						"end": 299,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 289,
+							"end": 291,
+							"name": "a5"
+						},
+						"right": {
+							"type": "UnaryExpression",
+							"start": 294,
+							"end": 299,
+							"operator": "!",
+							"prefix": true,
+							"argument": {
+								"type": "UnaryExpression",
+								"start": 295,
+								"end": 299,
+								"operator": "!",
+								"prefix": true,
+								"argument": {
+									"type": "UpdateExpression",
+									"start": 296,
+									"end": 299,
+									"operator": "++",
+									"prefix": false,
+									"argument": {
+										"type": "Identifier",
+										"start": 296,
+										"end": 297,
+										"name": "b"
+									}
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 301,
+					"end": 305,
+					"expression": {
+						"type": "TemplateLiteral",
+						"start": 301,
+						"end": 304,
+						"expressions": [],
+						"quasis": [
+							{
+								"type": "TemplateElement",
+								"start": 302,
+								"end": 303,
+								"value": {
+									"raw": "t",
+									"cooked": "t"
+								},
+								"tail": true
+							}
+						]
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 307,
+					"end": 317,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 307,
+						"end": 316,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 307,
+							"end": 309,
+							"name": "a6"
+						},
+						"right": {
+							"type": "UnaryExpression",
+							"start": 312,
+							"end": 316,
+							"operator": "!",
+							"prefix": true,
+							"argument": {
+								"type": "UpdateExpression",
+								"start": 313,
+								"end": 316,
+								"operator": "++",
+								"prefix": false,
+								"argument": {
+									"type": "Identifier",
+									"start": 313,
+									"end": 314,
+									"name": "b"
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 319,
+					"end": 328,
+					"expression": {
+						"type": "ArrowFunctionExpression",
+						"start": 319,
+						"end": 327,
+						"id": null,
+						"expression": true,
+						"generator": false,
+						"async": false,
+						"params": [
+							{
+								"type": "Identifier",
+								"start": 320,
+								"end": 321,
+								"name": "z"
+							}
+						],
+						"body": {
+							"type": "Identifier",
+							"start": 326,
+							"end": 327,
+							"name": "z"
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

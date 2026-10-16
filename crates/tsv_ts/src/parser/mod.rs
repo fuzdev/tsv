@@ -252,8 +252,9 @@ pub(super) struct GroupingParen {
 /// also sees wrapped. These are deliberately not carried either, each a fact about the
 /// source that outlives the reading that found it:
 ///
-/// - `abandoned_type_argument_lists` — which `<` open no type-argument list, in which
-///   context. Surviving the rewind is its whole purpose
+/// - `abandoned_type_argument_lists` and `type_argument_lists_kept` — which `<` open no
+///   type-argument list, and which open one whatever follows it, in which context.
+///   Surviving the rewind is their whole purpose
 ///   ([`Parser::abandoned_type_argument_lists`]).
 /// - `await_name_operand` — where a name `await` stood at this goal. It is read once,
 ///   against the position of the error the whole parse ends on, and the tokens an
@@ -264,9 +265,13 @@ pub(super) struct GroupingParen {
 /// A comment's `owned_by_node` is written through the ledger rather than appended to it,
 /// so truncating the ledger does not undo a claim on a comment drained AHEAD of the
 /// checkpoint — one glued to the token the parser had peeked.
-/// [`Parser::parse_type_arguments_or_rewind`] cannot leave such a claim: that token
-/// opens the list's first argument, which is read as a type, and the type grammar
-/// claims no comment.
+/// [`Parser::parse_type_arguments_or_rewind`] cannot leave such a claim from the list it
+/// tries: that token opens the list's first argument, which is read as a type, and the
+/// type grammar claims no comment. The comparison reading it then may try
+/// (`Parser::type_arguments_follower_settled`) reads that token as an expression, which
+/// can claim one, so that speculation puts back the claims it made on the comments
+/// drained ahead of its checkpoint.
+#[derive(Clone)]
 pub(super) struct Checkpoint<'arena> {
     lexer: LexerCheckpoint,
     current: Token,
@@ -463,7 +468,39 @@ pub struct Parser<'a, 'arena> {
     /// context, is re-read as an arrow function's. So the key holds every flag the
     /// expressions in a list inherit ([`Parser::type_arguments_context_key`]), and a
     /// read in another context tries the list again.
+    ///
+    /// A list is abandoned a second way, whole: where the token after its `>` is one
+    /// tsc's `canFollowTypeArgumentsInExpression` refuses and acorn-typescript does not,
+    /// and tsc's comparison reading parses (`Parser::type_arguments_follower_settled`).
+    /// That entry says the same thing — the `<` is the operator in this context — and is
+    /// a fact about the same tokens.
     abandoned_type_argument_lists: BTreeSet<(u32, u8)>,
+    /// The `<` tokens whose type-argument list was read whole, followed by a token only
+    /// tsc refuses, and KEPT because tsc's comparison reading does not parse
+    /// (`Parser::type_arguments_follower_settled`), each with the context it was read in
+    /// — read again at one of them in that context, the list is kept without asking. The
+    /// twin of [`Parser::abandoned_type_argument_lists`]'s whole-list entries, and for the
+    /// same reason: the comparison reading is a parse of everything after the `<`, which
+    /// holds any list nested there, so unremembered each answer would be asked once per
+    /// reading of every list around it.
+    type_argument_lists_kept: BTreeSet<(u32, u8)>,
+    /// Whether a whole type-argument list followed by a token only tsc refuses is put to
+    /// tsc's comparison reading at all (`Parser::parse_type_arguments_or_rewind`). Off only
+    /// in the re-parse [`parse_retrying_acorn_followers`] runs where tsc rejects the text,
+    /// which reads every such list as acorn-typescript does.
+    tsc_followers: bool,
+    /// Whether this parse gave a whole list up to tsc's comparison reading
+    /// ([`Parser::abandoned_type_argument_lists`]'s whole-list entries) — the reading the
+    /// acorn re-parse would undo, so without one there is nothing to re-parse for.
+    gave_up_list_to_tsc_follower: bool,
+    /// Whether this parse KEPT a whole list past a follower only tsc refuses
+    /// ([`Parser::type_argument_lists_kept`]) — tsc's comparison does not parse there, so
+    /// tsc rejects the text, which earns a parse that also gave a list up the acorn
+    /// re-parse even where it succeeded.
+    ///
+    /// Neither flag is rewound: they are facts about the tokens, as the sets are, and one
+    /// set inside an abandoned speculation can only over-report.
+    kept_list_past_tsc_follower: bool,
     /// The error of the abandoned type-argument list that reached furthest into the
     /// source, kept for the case where the operator reading fails too: the parse then
     /// reports whichever error reached further
@@ -573,13 +610,6 @@ pub struct Parser<'a, 'arena> {
 }
 
 impl<'a, 'arena> Parser<'a, 'arena> {
-    /// Create a parser against an explicit goal symbol, not yet [primed](Parser::prime). The
-    /// standalone `parse`/`parse_with_goal` paths use this; embedders go through
-    /// [`Parser::with_base_offset`] (always `Module`).
-    fn new_with_goal(source: &'a str, goal: Goal, arena: &'arena Bump) -> Self {
-        Self::with_base_offset_and_goal(source, 0, goal, arena)
-    }
-
     /// Allocate a single AST node in the arena, returning a shared `&'arena`
     /// reference (replaces `Box::new`). Zero-copy: `Bump::alloc` moves the value
     /// into arena memory; the mut→shared reborrow is implicit.
@@ -640,20 +670,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         })
     }
 
-    /// Create a parser at a base offset (for embedded expressions), not yet
-    /// [primed](Parser::prime).
-    ///
-    /// Used when parsing embedded expressions/scripts in Svelte templates.
-    /// base_offset is added to all span positions to get correct positions in full source.
-    /// Embedded contexts are always modules (Svelte `<script>` is a module), so
-    /// this defaults the goal; the goal-aware [`Parser::new_with_goal`] is the
-    /// only `Script` entry.
-    pub fn with_base_offset(source: &'a str, base_offset: usize, arena: &'arena Bump) -> Self {
-        Self::with_base_offset_and_goal(source, base_offset, Goal::Module, arena)
-    }
-
-    /// [`Parser::with_base_offset`] with an explicit goal symbol — the single
-    /// constructor that actually builds the parser state.
+    /// Create a parser of `source` at `base_offset` against `goal`, not yet
+    /// [primed](Parser::prime) — the one constructor, which every parse reaches through
+    /// [`parse_retrying_acorn_followers`]. `base_offset` is where `source` sits in the
+    /// document it was cut from (a Svelte `<script>` or template expression; `0`
+    /// standalone), added to every span. Embedded parses are always `Goal::Module` (a
+    /// Svelte `<script>` is a module); only the standalone entry points name `Script`.
     ///
     /// Infallible, and the first token is not lexed here: `current` holds an empty `Eof`
     /// placeholder until [`Parser::prime`] replaces it. The split is what lets the state be
@@ -665,15 +687,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// [`Parser::advance`] does.
     ///
     /// `#[inline(never)]`: out of line it is a run of stores through the caller's pointer
-    /// and no frame of its own, where each of the embedded-parse entry points it would inline
-    /// into carries its own copy of those stores.
+    /// and no frame of its own, where each monomorphized copy of the driver it would inline
+    /// into — one per parse entry point, each calling it twice — carries its own copy of
+    /// those stores.
     #[inline(never)]
-    fn with_base_offset_and_goal(
-        source: &'a str,
-        base_offset: usize,
-        goal: Goal,
-        arena: &'arena Bump,
-    ) -> Self {
+    fn new(source: &'a str, base_offset: usize, goal: Goal, arena: &'arena Bump) -> Self {
         Self {
             arena,
             source,
@@ -707,6 +725,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             lt_regions: LtRegions::default(), // No `<` region open
             lt_regions_statement_base: LtRegions::default(), // The top level inherits none
             abandoned_type_argument_lists: BTreeSet::new(), // No list tried yet
+            type_argument_lists_kept: BTreeSet::new(), // Nor kept past a follower
+            tsc_followers: true,             // tsc's reading, until a failure retries
+            gave_up_list_to_tsc_follower: false, // Nothing given up yet
+            kept_list_past_tsc_follower: false, // Nor kept
             abandoned_type_arguments_error: None,
             goal,
             // Module top level is `[+Await]` (`ModuleItem[+Await]`); Script top
@@ -728,8 +750,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Lex the first token into `current`, collecting the comments ahead of it — the step
-    /// every constructor leaves to its caller ([`Parser::with_base_offset_and_goal`] says
-    /// why), owed exactly once before anything reads a token.
+    /// the constructor leaves to its caller ([`Parser::new`] says why), owed exactly once
+    /// before anything reads a token.
     ///
     /// The comment drain records a line terminator it crosses, as it does between two
     /// tokens; ahead of the first token there is no previous token for one to separate
@@ -1543,6 +1565,30 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ]
         .iter()
         .fold(0, |key, &flag| (key << 1) | u8::from(flag))
+    }
+
+    /// Whether the `<` at `lt` is one whose type-argument list was read whole and kept
+    /// past a follower only tsc refuses ([`Parser::type_argument_lists_kept`]).
+    #[inline]
+    pub(super) fn type_arguments_kept_at(&self, lt: u32) -> bool {
+        !self.type_argument_lists_kept.is_empty()
+            && self
+                .type_argument_lists_kept
+                .contains(&(lt, self.type_arguments_context_key()))
+    }
+
+    /// Record the verdict on the type-argument list at `lt` that a follower only tsc
+    /// refuses asked for: abandoned to the comparison reading (`abandoned`), or kept.
+    /// Called after the rewind, as [`Parser::abandon_type_arguments`] is. No error is
+    /// kept for an abandoned list: the list parsed, so the comparison reading that
+    /// replaces it is the one the error will be about.
+    pub(super) fn settle_type_arguments_follower(&mut self, lt: u32, abandoned: bool) {
+        let key = (lt, self.type_arguments_context_key());
+        if abandoned {
+            self.abandoned_type_argument_lists.insert(key);
+        } else {
+            self.type_argument_lists_kept.insert(key);
+        }
     }
 
     /// Record the type-argument list at `lt` as abandoned, with the error it failed
@@ -2983,31 +3029,113 @@ pub fn parse_typescript<'arena>(
     parse_typescript_with_goal(source, Goal::Module, arena)
 }
 
-/// Build a standalone [`Parser`] against `goal`, run `f`. What `f` returns
-/// borrows only `arena`. Error context (`with_context`) is applied by the public
-/// `crate::parse*` wrappers, not here.
-fn parse_with<'arena, T>(
+/// Build a parser of `source` at `base_offset` against `goal`, prime it and run `f` — the
+/// driver every parse entry point runs through, standalone ([`parse_typescript_with_goal`])
+/// and embedded (`crate::with_embedding_parser`, which Svelte's entry points take). What
+/// `f` returns borrows only `arena`. Error context (`with_context`) is applied by the
+/// public `crate::parse*` wrappers, not here.
+///
+/// **The acorn re-parse.** A whole type-argument list followed by a token only tsc refuses
+/// (a `<`, or a `+` / `-` past a line break) is given up to tsc's comparison wherever that
+/// comparison parses as an expression, and kept where it does not
+/// ([`Parser::type_arguments_follower_settled`]). That reading is tsc's only where tsc
+/// accepts the text, and where tsc rejects a text acorn-typescript accepts, tsv keeps
+/// acorn's reading — of the whole text, every list read as acorn reads it. So a parse
+/// that gave a list up is run once more with none given up ([`Parser::tsc_followers`]
+/// off) when tsc rejects the text, which it does in two ways:
+///
+/// - **The parse kept a list too.** tsc's comparison does not parse there, so tsc
+///   rejects the text, and every list given up elsewhere in it is acorn's —
+///   `f<() => A><U><V>(x)` calls `f<() => A><U>` with `<V>`, never
+///   `(f<() => A> < U) > <V>(x)`, and in `f<string[]><U>(g<T><V>(y))` the argument is
+///   acorn's call too. The re-parse's result is taken; should it fail, the first one is.
+/// - **The parse failed.** The speculation cannot see the context around the expression,
+///   which may refuse what it read: in `const a = f<T, U><V>(x)` the comparison's `,`
+///   ends the declarator ahead of a second one that is no binding, and in an arrow body,
+///   a conditional branch or a property value the `,` ends the expression where none may
+///   follow. tsc rejects those texts and acorn parses them. The re-parse's result is
+///   taken if it parses.
+///
+/// A text tsc accepts gives lists up and keeps none, so it never pays for the second
+/// parse, and neither does a failed parse that gave nothing up.
+///
+/// **The host's refusals are part of the parse.** An embedder whose grammar refuses what
+/// the parse returned — a Svelte head whose `as` / `then` boundary is missing, a
+/// `{@const}` init that reads as a second declarator, a `{@render}` that is no call — is
+/// the context around the expression in the same sense, so it hands that refusal in as
+/// `host_check`, which runs on each parse's result; a refusal fails that parse, and the
+/// failed tsc-reading parse is retried like any other. Run after the parse rather than
+/// inside `f`, a refusal never trades places with an abandoned type-argument list's error
+/// (`Parser::prefer_abandoned_type_arguments_error`), which is the parse's own.
+///
+/// **Which error a text both readings fail reports** follows who reads the text.
+/// `embedded` says a host document holds it — a Svelte `<script>` or template island,
+/// every embedding entry point's text. Svelte reads each of those with acorn-typescript,
+/// so the re-parse's error, acorn's reading's, is the one reported, whether a refusal
+/// of the host's or the parse's own failure: it lands where Svelte's does —
+/// `{const a = f<T, U><V>(x) /* c */}` reports the content after the declaration and
+/// `{a ? f<T, U><V>(x) : }` the missing alternate, not tsc's stop at the `,` or the
+/// `<V>`. A standalone text has no host to read it as acorn does, and tsc's reading is the
+/// one it is given, so where each failed inside the parse itself the first parse's error
+/// is reported (`a ? f<T, U><V>(x) : ;` stops at tsc's `,`).
+pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
     source: &str,
+    base_offset: usize,
     goal: Goal,
     arena: &'arena Bump,
-    f: impl FnOnce(&mut Parser<'_, 'arena>) -> Result<T, ParseError>,
+    embedded: bool,
+    f: impl Fn(&mut Parser<'_, 'arena>) -> Result<T, ParseError>,
+    host_check: impl Fn(&T) -> Result<(), ParseError>,
 ) -> Result<T, ParseError> {
-    let mut parser = Parser::new_with_goal(source, goal, arena);
+    // Each failure carries whether the host refused it (`true`) or the parse itself did.
+    let checked = |parsed: T| {
+        host_check(&parsed)
+            .map(|()| parsed)
+            .map_err(|error| (error, true))
+    };
+    let mut parser = Parser::new(source, base_offset, goal, arena);
     parser.prime()?;
-    f(&mut parser).map_err(|error| parser.prefer_abandoned_type_arguments_error(error))
+    let first = f(&mut parser)
+        .map_err(|error| (parser.prefer_abandoned_type_arguments_error(error), false))
+        .and_then(checked);
+    if !parser.gave_up_list_to_tsc_follower
+        || (first.is_ok() && !parser.kept_list_past_tsc_follower)
+    {
+        return first.map_err(|(error, _)| error);
+    }
+    let mut retry = Parser::new(source, base_offset, goal, arena);
+    retry.tsc_followers = false;
+    let second = retry
+        .prime()
+        .and_then(|()| f(&mut retry))
+        .map_err(|error| (error, false))
+        .and_then(checked);
+    match (second, first) {
+        (Ok(parsed), _) | (Err(_), Ok(parsed)) => Ok(parsed),
+        (Err((_, false)), Err((error, false))) if !embedded => Err(error),
+        (Err((error, _)), Err(_)) => Err(error),
+    }
 }
 
 /// [`parse_typescript`] against an explicit goal symbol. `parse_typescript` is
 /// the `Goal::Module` form.
 // `Parser::parse` (clippy's method-path suggestion) fails the higher-ranked
-// lifetime check on `parse_with`'s `f` bound; the closure infers it.
+// lifetime check on `parse_retrying_acorn_followers`'s `f` bound; the closure infers it.
 #[expect(clippy::redundant_closure_for_method_calls)]
 pub fn parse_typescript_with_goal<'arena>(
     source: &str,
     goal: Goal,
     arena: &'arena Bump,
 ) -> Result<Program<'arena>, ParseError> {
-    parse_with(source, goal, arena, |parser| parser.parse())
+    parse_retrying_acorn_followers(
+        source,
+        0,
+        goal,
+        arena,
+        false,
+        |parser| parser.parse(),
+        |_| Ok(()),
+    )
 }
 
 /// [`parse_typescript`] with grouping parens preserved as `ParenthesizedExpression`
@@ -3019,8 +3147,16 @@ pub fn parse_typescript_preserve_parens<'arena>(
     source: &str,
     arena: &'arena Bump,
 ) -> Result<Program<'arena>, ParseError> {
-    parse_with(source, Goal::Module, arena, |parser| {
-        parser.preserve_parens = true;
-        parser.parse()
-    })
+    parse_retrying_acorn_followers(
+        source,
+        0,
+        Goal::Module,
+        arena,
+        false,
+        |parser| {
+            parser.preserve_parens = true;
+            parser.parse()
+        },
+        |_| Ok(()),
+    )
 }

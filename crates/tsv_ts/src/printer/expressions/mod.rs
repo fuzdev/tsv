@@ -38,9 +38,7 @@ use crate::ast::internal::{BinaryExpression, Expression, ExpressionKind, TSType}
 use crate::printer::ShareTag;
 use crate::printer::comments::{AsiOperandShell, CommentFilter, CommentSpacing};
 use crate::printer::ignore::FrozenOperandPair;
-use crate::printer::needs_parens::{
-    holds_first_list_of_chain, instantiation_operand_is_sealed_chain,
-};
+use crate::printer::needs_parens::instantiation_operand_is_sealed_chain;
 use crate::printer::types::TrailingBlock;
 use crate::printer::types::helpers::unwrap_parenthesized;
 use crate::printer::{
@@ -1487,17 +1485,9 @@ impl<'a> Printer<'a> {
         let mut parts: DocBuf = DocBuf::new();
         // The shared operand-shell seam also emits the `^`→expression gap — the
         // authored `(`'s interior, which no other emitter reaches.
-        // An instantiation head keeps the pair a second list asks for. Whether the chain
-        // of lists goes on past this one is this node's own owner's answer: it printed this
-        // node bare ([`Printer::continued_instantiation_targets`]).
-        let continues = self.continued_instantiation_targets.is_marked(span);
-        let second_list_pair = self.instantiation_keeps_pair(
-            inst_expr.expression,
-            SecondTypeArgs::Instantiation {
-                list: &inst_expr.type_arguments,
-                continues,
-            },
-        );
+        // An instantiation head keeps the pair a second list asks for.
+        let second_list_pair =
+            self.instantiation_keeps_pair(inst_expr.expression, SecondTypeArgs::Expression);
         // An optional chain the author sealed keeps its pair
         // ([`instantiation_operand_is_sealed_chain`]): bare, the list and whatever follows
         // it join the chain. The `!` spelling (`(a?.b)!<T>`) is the sealed shell's own
@@ -1527,16 +1517,7 @@ impl<'a> Printer<'a> {
         ) {
             parts.push(doc);
         }
-        // The first list of a chain printed bare: tsc reads it as a comparison operand, so
-        // an authored paren under a type operator in it stays
-        // ([`Printer::first_list_keeps_maybe_parens`]).
-        let first_of_bare_chain =
-            continues && holds_first_list_of_chain(self.source, inst_expr.expression);
-        let saved = self
-            .first_list_keeps_maybe_parens
-            .replace(first_of_bare_chain);
         parts.push(self.build_type_parameter_instantiation_doc(&inst_expr.type_arguments));
-        self.first_list_keeps_maybe_parens.set(saved);
         d.concat(&parts)
     }
 

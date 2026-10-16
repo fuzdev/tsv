@@ -6,10 +6,10 @@
 // - Comment handling between type members
 
 use super::helpers::{
-    TypeParenRule, find_separator_position, innermost_paren_shell,
-    intersection_has_expanding_first_type, intersection_has_huggable_last_type, is_huggable_type,
-    outermost_paren, paren_shell_gaps, type_needs_parens_in_union_or_intersection,
-    union_has_brace_member, union_hug_shape, unwrap_parenthesized,
+    TypeParenRule, find_separator_position, intersection_has_expanding_first_type,
+    intersection_has_huggable_last_type, is_huggable_type, outermost_paren, paren_shell_gaps,
+    type_needs_parens_in_union_or_intersection, union_has_brace_member, union_hug_shape,
+    unwrap_parenthesized,
 };
 use super::{CommentFilter, CommentSpacing, Printer, TrailingBlock};
 use crate::ast::internal::{
@@ -300,10 +300,7 @@ impl MemberPairLayout {
 /// The **redundant** paren shell of a union / intersection member: the pair the comment-free
 /// rule strips (`(b)` → `b`). `None` both for a member whose parens the precedence rule
 /// REQUIRES (`(a | b) | c`, a function / conditional operand) and for a member that carries
-/// no shell at all — and for a shell the first list of a chain printed bare keeps around a
-/// function type ([`Printer::first_list_keeps_function_paren`]) when that kept shell holds a
-/// comment: the pair survives, so its run stays inside it. Redundant layers over a
-/// comment-free kept shell still hoist theirs.
+/// no shell at all.
 ///
 /// The LEADING side's opening, and only that side's. A leading `//` inside a required pair
 /// stays where the author wrote it — the pair OPENS over hardlines to hold it
@@ -315,13 +312,7 @@ fn redundant_member_shell<'t>(
     p: &Printer<'_>,
     t: &'t TSType<'t>,
 ) -> Option<&'t TSParenthesizedType<'t>> {
-    if type_needs_parens_in_union_or_intersection(p, t)
-        || innermost_paren_shell(t).is_some_and(|shell| {
-            p.first_list_keeps_function_paren(shell)
-                && p.paren_inner_comment_flags(shell) != (false, false)
-                && !p.has_comments_to_emit_between(t.span().start, shell.span.start)
-        })
-    {
+    if type_needs_parens_in_union_or_intersection(p, t) {
         return None;
     }
     outermost_paren(t)

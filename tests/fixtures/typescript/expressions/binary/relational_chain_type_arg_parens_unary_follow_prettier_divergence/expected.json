@@ -1,0 +1,621 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 470,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A `+` or `-` after a would-be type-argument close is a unary operator, so the",
+			"start": 20,
+			"end": 100
+		},
+		{
+			"type": "Line",
+			"value": " `<`…`>` is a comparison chain on any line — after a name, a member, a `new`",
+			"start": 102,
+			"end": 180
+		},
+		{
+			"type": "Line",
+			"value": " callee, and inside an argument list.",
+			"start": 182,
+			"end": 221
+		},
+		{
+			"type": "Line",
+			"value": " Every other follower keeps the type arguments past a line break.",
+			"start": 330,
+			"end": 397
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 469,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 460,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 223,
+					"end": 241,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 223,
+						"end": 240,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 223,
+							"end": 225,
+							"name": "a1"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 228,
+							"end": 240,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 229,
+								"end": 234,
+								"left": {
+									"type": "Identifier",
+									"start": 229,
+									"end": 230,
+									"name": "f"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 233,
+									"end": 234,
+									"name": "T"
+								}
+							},
+							"operator": ">",
+							"right": {
+								"type": "UnaryExpression",
+								"start": 238,
+								"end": 240,
+								"operator": "+",
+								"prefix": true,
+								"argument": {
+									"type": "Identifier",
+									"start": 239,
+									"end": 240,
+									"name": "c"
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `+` or `-` after a would-be type-argument close is a unary operator, so the",
+							"start": 20,
+							"end": 100
+						},
+						{
+							"type": "Line",
+							"value": " `<`…`>` is a comparison chain on any line — after a name, a member, a `new`",
+							"start": 102,
+							"end": 180
+						},
+						{
+							"type": "Line",
+							"value": " callee, and inside an argument list.",
+							"start": 182,
+							"end": 221
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 243,
+					"end": 261,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 243,
+						"end": 260,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 243,
+							"end": 245,
+							"name": "a2"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 248,
+							"end": 260,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 249,
+								"end": 254,
+								"left": {
+									"type": "Identifier",
+									"start": 249,
+									"end": 250,
+									"name": "f"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 253,
+									"end": 254,
+									"name": "T"
+								}
+							},
+							"operator": ">",
+							"right": {
+								"type": "UnaryExpression",
+								"start": 258,
+								"end": 260,
+								"operator": "-",
+								"prefix": true,
+								"argument": {
+									"type": "Identifier",
+									"start": 259,
+									"end": 260,
+									"name": "c"
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 263,
+					"end": 283,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 263,
+						"end": 282,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 263,
+							"end": 265,
+							"name": "a3"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 268,
+							"end": 282,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 269,
+								"end": 276,
+								"left": {
+									"type": "MemberExpression",
+									"start": 269,
+									"end": 272,
+									"object": {
+										"type": "Identifier",
+										"start": 269,
+										"end": 270,
+										"name": "a"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 271,
+										"end": 272,
+										"name": "b"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 275,
+									"end": 276,
+									"name": "T"
+								}
+							},
+							"operator": ">",
+							"right": {
+								"type": "UnaryExpression",
+								"start": 280,
+								"end": 282,
+								"operator": "+",
+								"prefix": true,
+								"argument": {
+									"type": "Identifier",
+									"start": 281,
+									"end": 282,
+									"name": "c"
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 285,
+					"end": 309,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 285,
+						"end": 308,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 285,
+							"end": 287,
+							"name": "a4"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 290,
+							"end": 308,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 291,
+								"end": 302,
+								"left": {
+									"type": "NewExpression",
+									"start": 291,
+									"end": 298,
+									"callee": {
+										"type": "Identifier",
+										"start": 295,
+										"end": 296,
+										"name": "f"
+									},
+									"arguments": []
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 301,
+									"end": 302,
+									"name": "T"
+								}
+							},
+							"operator": ">",
+							"right": {
+								"type": "UnaryExpression",
+								"start": 306,
+								"end": 308,
+								"operator": "-",
+								"prefix": true,
+								"argument": {
+									"type": "Identifier",
+									"start": 307,
+									"end": 308,
+									"name": "c"
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 311,
+					"end": 327,
+					"expression": {
+						"type": "CallExpression",
+						"start": 311,
+						"end": 326,
+						"callee": {
+							"type": "Identifier",
+							"start": 311,
+							"end": 312,
+							"name": "g"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 313,
+								"end": 325,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 314,
+									"end": 319,
+									"left": {
+										"type": "Identifier",
+										"start": 314,
+										"end": 315,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 318,
+										"end": 319,
+										"name": "T"
+									}
+								},
+								"operator": ">",
+								"right": {
+									"type": "UnaryExpression",
+									"start": 323,
+									"end": 325,
+									"operator": "+",
+									"prefix": true,
+									"argument": {
+										"type": "Identifier",
+										"start": 324,
+										"end": 325,
+										"name": "c"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 399,
+					"end": 409,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 399,
+						"end": 408,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 399,
+							"end": 401,
+							"name": "b1"
+						},
+						"right": {
+							"type": "TSInstantiationExpression",
+							"start": 404,
+							"end": 408,
+							"expression": {
+								"type": "Identifier",
+								"start": 404,
+								"end": 405,
+								"name": "f"
+							},
+							"typeArguments": {
+								"type": "TSTypeParameterInstantiation",
+								"start": 405,
+								"end": 408,
+								"params": [
+									{
+										"type": "TSTypeReference",
+										"start": 406,
+										"end": 407,
+										"typeName": {
+											"type": "Identifier",
+											"start": 406,
+											"end": 407,
+											"name": "T"
+										}
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Every other follower keeps the type arguments past a line break.",
+							"start": 330,
+							"end": 397
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 411,
+					"end": 413,
+					"expression": {
+						"type": "Identifier",
+						"start": 411,
+						"end": 412,
+						"name": "c"
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 415,
+					"end": 428,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 415,
+						"end": 427,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 415,
+							"end": 417,
+							"name": "b2"
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 420,
+							"end": 427,
+							"callee": {
+								"type": "Identifier",
+								"start": 420,
+								"end": 421,
+								"name": "f"
+							},
+							"arguments": [
+								{
+									"type": "Identifier",
+									"start": 425,
+									"end": 426,
+									"name": "c"
+								}
+							],
+							"typeArguments": {
+								"type": "TSTypeParameterInstantiation",
+								"start": 421,
+								"end": 424,
+								"params": [
+									{
+										"type": "TSTypeReference",
+										"start": 422,
+										"end": 423,
+										"typeName": {
+											"type": "Identifier",
+											"start": 422,
+											"end": 423,
+											"name": "T"
+										}
+									}
+								]
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 430,
+					"end": 443,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 430,
+						"end": 442,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 430,
+							"end": 432,
+							"name": "b3"
+						},
+						"right": {
+							"type": "TaggedTemplateExpression",
+							"start": 435,
+							"end": 442,
+							"tag": {
+								"type": "Identifier",
+								"start": 435,
+								"end": 436,
+								"name": "f"
+							},
+							"quasi": {
+								"type": "TemplateLiteral",
+								"start": 439,
+								"end": 442,
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 440,
+										"end": 441,
+										"value": {
+											"raw": "c",
+											"cooked": "c"
+										},
+										"tail": true
+									}
+								]
+							},
+							"typeArguments": {
+								"type": "TSTypeParameterInstantiation",
+								"start": 436,
+								"end": 439,
+								"params": [
+									{
+										"type": "TSTypeReference",
+										"start": 437,
+										"end": 438,
+										"typeName": {
+											"type": "Identifier",
+											"start": 437,
+											"end": 438,
+											"name": "T"
+										}
+									}
+								]
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 445,
+					"end": 459,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 445,
+						"end": 458,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 445,
+							"end": 447,
+							"name": "b4"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 450,
+							"end": 458,
+							"left": {
+								"type": "TSInstantiationExpression",
+								"start": 450,
+								"end": 454,
+								"expression": {
+									"type": "Identifier",
+									"start": 450,
+									"end": 451,
+									"name": "f"
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 451,
+									"end": 454,
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 452,
+											"end": 453,
+											"typeName": {
+												"type": "Identifier",
+												"start": 452,
+												"end": 453,
+												"name": "T"
+											}
+										}
+									]
+								}
+							},
+							"operator": "*",
+							"right": {
+								"type": "Identifier",
+								"start": 457,
+								"end": 458,
+								"name": "c"
+							}
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

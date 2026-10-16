@@ -246,6 +246,17 @@ fn each_binding_separator(s: &str, s_offset: usize, arena: &Bump) -> EachHeadSpl
     }
 }
 
+/// The clause an `{#await}` head's shorthand fills — `{#await promise then value}` /
+/// `{#await promise catch error}` — and its binding text, read from `after_expr`, the head
+/// past the promise expression; `None` for the block form, whose tag must end there.
+fn await_head_clause(after_expr: &str) -> Option<(AwaitClause, &str)> {
+    if let Some(value_str) = strip_head_keyword_or_final(after_expr, "then") {
+        return Some((AwaitClause::Then, value_str));
+    }
+    strip_head_keyword_or_final(after_expr, "catch")
+        .map(|error_str| (AwaitClause::Catch, error_str))
+}
+
 /// The `function f…` declaration a `{#snippet}` head's wrapper parses to. `None` only for a
 /// wrapper that produced no such statement, which the caller reports as an error.
 fn snippet_signature<'arena>(
@@ -269,6 +280,23 @@ type EachBindingResult<'arena> = (
 
 /// Return type for parse_index_and_key_after_context: (index, key, consumed_end).
 type IndexAndKeyResult<'arena> = (Option<&'arena str>, Option<EachKey<'arena>>, usize);
+
+/// An `{#each}` head's ", index" / "(key)" tail as `SvelteParser::split_index_and_key`
+/// reads it — the key bounded by its parens but not yet parsed.
+struct EachIndexAndKey<'s> {
+    index: Option<&'s str>,
+    key: Option<EachKeyRegion<'s>>,
+    /// Absolute offset just past the last token the tail consumed.
+    consumed_end: usize,
+}
+
+/// A `(key)` region: the key expression's text (leading whitespace trimmed), its absolute
+/// offset, and the span of the parens around it.
+struct EachKeyRegion<'s> {
+    expr_str: &'s str,
+    expr_offset: usize,
+    span: Span,
+}
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Parse a control flow block starting with {#
@@ -437,7 +465,47 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Leading whitespace only, and `expr_offset` is already the first non-whitespace byte:
         // this slice ends at the head's SECOND `as`, so its trailing run may be a line
         // comment's own text (`SvelteParser::parse_ts_expression`).
-        self.parse_ts_expression(iterable.trim_start_matches(is_svelte_ws), expr_offset)
+        let iterable = iterable.trim_start_matches(is_svelte_ws);
+        // The partial parse stopped at no top-level comma, so a bare sequence here is tsc's
+        // comparison reading a list the partial parse read as acorn-typescript's
+        // (`f<T, U><V>(x) as A[]`) — refused inside the parse, so it is re-read the same way.
+        self.parse_ts_expression_checked(iterable, expr_offset, |this, expression| {
+            match super::tag::bare_sequence_comma(expression, iterable) {
+                Some(comma) => Err(this.error_expected_at("'as'", expr_offset + comma)),
+                None => Ok(()),
+            }
+        })
+    }
+
+    /// Whether an `{#each}` head continues as its grammar requires where the iterable's
+    /// partial parse stopped — `parse_each_block`'s host check on that parse
+    /// (`parse_ts_expression_partial`). An `as` there leaves the rest to the binding; with
+    /// none, the remainder from the iterable's end must be the `, index` / `(key)` tail
+    /// and nothing after it, read by the same [`Self::split_index_and_key`] the block
+    /// reads it with. Refused inside the parse, a stop that only tsc's comparison makes
+    /// (`{#each f<T, U><V>(x) as item}`, stopped at the `,`) is re-read as
+    /// acorn-typescript reads the list.
+    ///
+    /// `content` is the head after `each`, running to the tag's `}`, and `content_offset`
+    /// its first byte's offset.
+    fn check_each_head_tail(
+        &self,
+        content: &str,
+        content_offset: usize,
+        expression: &Expression<'arena>,
+        expr_end_pos: usize,
+    ) -> Result<(), ParseError> {
+        if strip_head_keyword(&content[expr_end_pos - content_offset..], "as").is_some() {
+            return Ok(());
+        }
+        // The SEMANTIC end, as the no-binding arm of `parse_each_block` reads it.
+        let semantic_end = expression.span().end as usize;
+        let tail =
+            self.split_index_and_key(&content[semantic_end - content_offset..], semantic_end)?;
+        self.reject_trailing_tag_content(
+            &content[tail.consumed_end - content_offset..],
+            tail.consumed_end,
+        )
     }
 
     /// Parse an each block: {#each expression as context, index (key)}...{:else}...{/each}
@@ -470,8 +538,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let mark_before_expr = self.embedded_parse_mark();
         let expr_str = content.trim_start_matches(is_svelte_ws);
         let expr_offset = content_offset + subslice_offset(content, expr_str);
-        let (expression, expr_end_pos) =
-            self.parse_ts_expression_partial(expr_str, expr_offset, TopLevelAs::HostSeparator)?;
+        let (expression, expr_end_pos) = self.parse_ts_expression_partial(
+            expr_str,
+            expr_offset,
+            TopLevelAs::HostSeparator,
+            |this, expression, end_pos| {
+                this.check_each_head_tail(content, content_offset, expression, end_pos)
+            },
+        )?;
 
         // Opening tag span is from start to content_start (includes the closing })
         let opening_tag_span = Span {
@@ -746,6 +820,31 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         remaining: &str,
         remaining_offset: usize,
     ) -> Result<IndexAndKeyResult<'arena>, ParseError> {
+        let tail = self.split_index_and_key(remaining, remaining_offset)?;
+        let index = tail.index.map(|name| self.alloc_str_in(name));
+        let key = match tail.key {
+            Some(region) => Some(EachKey {
+                expression: self.parse_ts_expression(region.expr_str, region.expr_offset)?,
+                span: region.span,
+            }),
+            None => None,
+        };
+        Ok((index, key, tail.consumed_end))
+    }
+
+    /// Read the ", index" and/or "(key)" tail after an `{#each}` context — or after an
+    /// iterable with no context — down to where it stops, without parsing the key: the
+    /// half of [`Self::parse_index_and_key_after_context`] that needs no `&mut`, so the
+    /// iterable's own parse can ask it as its host check ([`Self::check_each_head_tail`])
+    /// and the two cannot read the tail differently.
+    fn split_index_and_key<'s>(
+        &self,
+        remaining: &'s str,
+        remaining_offset: usize,
+    ) -> Result<EachIndexAndKey<'s>, ParseError>
+    where
+        'a: 's,
+    {
         let trimmed = remaining.trim_start_matches(is_svelte_ws);
         let ws_len = remaining.len() - trimmed.len();
         let offset = remaining_offset + ws_len;
@@ -770,7 +869,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // identifier".
             let idx_offset = offset + 1 + comma_ws;
             if let Some(name) = self.read_identifier(after_comma_trimmed, idx_offset)? {
-                index = Some(self.alloc_str_in(name));
+                index = Some(name);
                 rest = &after_comma_trimmed[name.len()..];
                 rest_offset = idx_offset + name.len();
                 consumed_end = rest_offset;
@@ -793,22 +892,23 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // Leading whitespace only — the trailing run may be a line comment's own text
             // (`SvelteParser::parse_ts_expression`).
             let key_expr_str = key_str.trim_start_matches(is_svelte_ws);
-            let key_expr = self.parse_ts_expression(
-                key_expr_str,
-                key_offset + (key_str.len() - key_expr_str.len()),
-            )?;
             // Span includes the parentheses: from '(' to after ')'.
             let span = Span::new(paren_start as u32, (paren_start + close + 1) as u32);
             consumed_end = span.end as usize;
-            Some(EachKey {
-                expression: key_expr,
+            Some(EachKeyRegion {
+                expr_str: key_expr_str,
+                expr_offset: key_offset + (key_str.len() - key_expr_str.len()),
                 span,
             })
         } else {
             None
         };
 
-        Ok((index, key, consumed_end))
+        Ok(EachIndexAndKey {
+            index,
+            key,
+            consumed_end,
+        })
     }
 
     /// Parse an await block: {#await expression}...{:then value}...{:catch error}...{/await}
@@ -837,11 +937,24 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // assertion canonical accepts (`{#await p as T then v}`) and — since the printer
         // strips the parens the authored form needs — turned `{#await (p as T) then v}`
         // into output tsv itself could not re-read.
+        //
+        // What the head must continue with where the parse stopped — a `then` / `catch`
+        // clause, or the tag's end — is checked inside the parse
+        // (`parse_ts_expression_partial`), so a stop only tsc's comparison makes
+        // (`{#await f<T, U><V>(x) then v}`, stopped at the `,`) is re-read as
+        // acorn-typescript reads the list.
         let expr_str = content.trim_start_matches(is_svelte_ws);
         let (expression, expr_end_pos) = self.parse_ts_expression_partial(
             expr_str,
             content_offset + subslice_offset(content, expr_str),
             TopLevelAs::Assertion,
+            |this, _, end_pos| {
+                let after_expr = &content[end_pos - content_offset..];
+                match await_head_clause(after_expr) {
+                    Some(_) => Ok(()),
+                    None => this.reject_trailing_tag_content(after_expr, end_pos),
+                }
+            },
         )?;
 
         // Opening tag span is from start to content_start (includes the closing })
@@ -854,28 +967,18 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let expr_consumed = expr_end_pos - content_offset;
         let after_expr = &content[expr_consumed..];
 
-        // Check for shorthand: {#await promise then value} / {#await promise catch error}.
-        let shorthand_then = strip_head_keyword_or_final(after_expr, "then");
-        let shorthand_catch = strip_head_keyword_or_final(after_expr, "catch");
-
         // Which clause the HEAD fills, and with what binding text. The block form fills
         // none — its first body is the pending phase — while each shorthand fills its
         // own, which is exactly the state canonical's `next` guards the continuations
         // against. Naming it here is what lets all three forms share one continuation
         // loop below: with a copy per shorthand arm, a duplicate-clause guard added
         // to one copy would silently not apply to the others.
-        let head_clause = match (shorthand_then, shorthand_catch) {
-            (Some(value_str), _) => Some((AwaitClause::Then, value_str)),
-            (_, Some(error_str)) => Some((AwaitClause::Catch, error_str)),
-            (None, None) => {
-                // No `then`/`catch` shorthand matched, so the opening tag must end
-                // right after the promise expression. Reject trailing content like
-                // `{#await p garbage}` or a shorthand jammed against the expression
-                // (`{#await p then(v)}`) — the canonical parser rejects both.
-                self.reject_trailing_tag_content(after_expr, expr_end_pos)?;
-                None
-            }
-        };
+        //
+        // With no `then`/`catch` shorthand the opening tag ends right after the promise
+        // expression — trailing content like `{#await p garbage}` or a shorthand jammed
+        // against the expression (`{#await p then(v)}`) was refused inside the parse, as
+        // the canonical parser refuses both.
+        let head_clause = await_head_clause(after_expr);
 
         // The block form (`{#await x}…{/await}`) always carries a pending Fragment —
         // empty or not — unlike the inline `then`/`catch` shorthand (no pending

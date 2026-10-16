@@ -542,13 +542,13 @@ impl<'a> CalleeParens<'a> {
         printer: &Printer<'_>,
         callee: &'a internal::Expression<'a>,
         context: ParenContext,
-        second_type_args: Option<SecondTypeArgs<'_>>,
+        second_type_args: Option<SecondTypeArgs>,
     ) -> Option<Self> {
         let pair = printer.needs_parens(callee, context)
             || second_type_args
                 .is_some_and(|follow| printer.instantiation_keeps_pair(callee, follow))
             || (matches!(context, ParenContext::NewCallee)
-                && printer.new_callee_holds_bare_call(callee, second_type_args));
+                && printer.new_callee_holds_bare_call(callee));
         if !pair {
             return None;
         }

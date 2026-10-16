@@ -278,9 +278,11 @@ fn a_pair_whose_close_keeps_two_tokens_apart_is_not_withheld() {
     // asserted a fixed point. What must hold is that the pair survived: bare, the first is
     // `await g < T > +1` and the second ends a function body directly ahead of a `/`.
     // The last two are the same pairs one level down: the clarity pair above each is
-    // left in place with it.
+    // left in place with it. The instantiation is authored in a pair of its own, since
+    // no bare spelling holds one ahead of a `+` (`g<T>⏎+ 1` is `g < T > +1` to tsc, and to
+    // tsv).
     for (source, kept) in [
-        ("fn(a < b, c > await g<T>\n+ 1);", "c > (await g<T>) + 1"),
+        ("fn(a < b, c > await (g<T>) + 1);", "c > (await g<T>) + 1"),
         (
             "fn(a < b, c > await function () {} / 2);",
             "c > (await function () {}) / 2",
@@ -289,7 +291,7 @@ fn a_pair_whose_close_keeps_two_tokens_apart_is_not_withheld() {
             "fn(a < b, c > function () {} / 2);",
             "c > (function () {}) / 2",
         ),
-        ("fn(a < b, c > d * g<T>\n+ 1);", "c > (d * g<T>) + 1"),
+        ("fn(a < b, c > d * (g<T>) + 1);", "c > (d * g<T>) + 1"),
         (
             "fn(a < b, c > await function () {} % 2 + f);",
             "c > ((await function () {}) % 2) + f",

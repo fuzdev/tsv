@@ -620,6 +620,162 @@ Deno.test('type_assertion_paren_arrow: a doubled paren after the type parameters
 	strictEqual(assertion('﻿' + svelte, svelte.indexOf('>(') + 1, 'svelte'), true);
 });
 
+Deno.test('type_args_tsc_follower: a second list ahead of a `<`, as acorn reads it', () => {
+	// `a = f<T><U>(z);` as acorn-typescript reads it: a call with a second list
+	const root_for = (source: string) => {
+		const close = source.indexOf('>') + 1;
+		const second = source.indexOf('<', close);
+		return {
+			body: [
+				{
+					type: 'ExpressionStatement',
+					expression: {
+						type: 'AssignmentExpression',
+						operator: '=',
+						right: {
+							type: 'CallExpression',
+							start: 4,
+							callee: {
+								type: 'TSInstantiationExpression',
+								start: 4,
+								end: close,
+								expression: { type: 'Identifier', name: 'f' }
+							},
+							typeArguments: { type: 'TSTypeParameterInstantiation', start: second },
+							arguments: [{ type: 'Identifier', name: 'z' }]
+						}
+					}
+				}
+			]
+		};
+	};
+	const entry = (path: string, ours: unknown, canonical: unknown): Entry => ({
+		kind: 'value_mismatch',
+		path,
+		ours,
+		canonical
+	});
+	const at = (source: string, e: Entry) =>
+		claims('type_args_tsc_follower', e, root_for(source), 'typescript', source);
+	const type = entry('body[0].expression.right.type', 'BinaryExpression', 'CallExpression');
+	const inner = entry('body[0].expression.right.callee.type', 'BinaryExpression', 'X');
+	strictEqual(at('a = f<T><U>(z);', type), true);
+	strictEqual(at('a = f<T><U>(z);', inner), true);
+	// on the next line, behind a comment
+	strictEqual(at('a = f<T>\n<U>(z);', type), true);
+	strictEqual(at('a = f<T> /* c */ <U>(z);', type), true);
+	// tsv's side of the region's root is the comparison, or the difference is a bug
+	strictEqual(
+		at('a = f<T><U>(z);', entry('body[0].expression.right.type', 'Identifier', 'x')),
+		false
+	);
+	// a pair closes the first list: no follower refuses it, and acorn's tree is tsc's
+	strictEqual(at('a = (f<T>)<U>(z);', type), false);
+	// a `<<` is another token, past which tsc keeps the list too
+	strictEqual(at('a = f<T><<U>() => V>(z);', type), false);
+	// outside the region: the assignment and its target are no part of the comparison
+	strictEqual(at('a = f<T><U>(z);', entry('body[0].expression.operator', '+=', '=')), false);
+	// tsv's comparison operand, a subtree acorn's call has no slot for
+	const operand = (left: unknown): Entry => ({
+		kind: 'missing_canonical',
+		path: 'body[0].expression.right.left',
+		ours: {
+			type: 'BinaryExpression',
+			operator: '<',
+			left,
+			right: { type: 'Identifier', name: 'U' }
+		},
+		canonical: undefined
+	});
+	const f = { type: 'Identifier', start: 4, end: 5, name: 'f' };
+	strictEqual(at('a = f<T><U>(z);', operand(f)), true);
+	// near miss: a list kept on acorn's reading and then compared — `(f<() => A> < U) > <V>(z)`,
+	// a tree neither parser builds (tsc rejects the text, acorn reads three lists)
+	const hybrid = 'a = f<() => A><U><V>(z);';
+	const first_close = hybrid.indexOf('><') + 1;
+	const second_close = hybrid.indexOf('><', first_close) + 1;
+	const kept = { type: 'TSInstantiationExpression', start: 4, end: first_close, expression: f };
+	const hybrid_root = {
+		body: [
+			{
+				type: 'ExpressionStatement',
+				expression: {
+					type: 'AssignmentExpression',
+					operator: '=',
+					right: {
+						type: 'CallExpression',
+						start: 4,
+						callee: {
+							type: 'TSInstantiationExpression',
+							start: 4,
+							end: second_close,
+							expression: kept,
+							typeArguments: { type: 'TSTypeParameterInstantiation', start: first_close }
+						},
+						typeArguments: { type: 'TSTypeParameterInstantiation', start: second_close },
+						arguments: [{ type: 'Identifier', name: 'z' }]
+					}
+				}
+			}
+		]
+	};
+	const in_hybrid = (e: Entry) =>
+		claims('type_args_tsc_follower', e, hybrid_root, 'typescript', hybrid);
+	// the region is acorn's, so tsc's comparison over it would be claimed …
+	strictEqual(in_hybrid(type), true);
+	strictEqual(in_hybrid(operand(f)), true);
+	// … but tsv's operand holds the kept list `f<() => A>` ahead of a `<`
+	strictEqual(in_hybrid(operand(kept)), false);
+});
+
+Deno.test('type_args_tsc_follower: a `+` or `-` past a line break, as acorn reads it', () => {
+	// `a = f<T>⏎+c;` as acorn-typescript reads it: the instantiation added to `c`
+	const root_for = (source: string, operator: string) => ({
+		body: [
+			{
+				type: 'ExpressionStatement',
+				expression: {
+					type: 'AssignmentExpression',
+					operator: '=',
+					right: {
+						type: 'BinaryExpression',
+						operator,
+						left: {
+							type: 'TSInstantiationExpression',
+							start: 4,
+							end: source.indexOf('>') + 1,
+							expression: { type: 'Identifier', name: 'f' }
+						},
+						right: { type: 'Identifier', name: 'c' }
+					}
+				}
+			}
+		]
+	});
+	const operator_entry: Entry = {
+		kind: 'value_mismatch',
+		path: 'body[0].expression.right.operator',
+		ours: '>',
+		canonical: '+'
+	};
+	const left_entry: Entry = {
+		kind: 'value_mismatch',
+		path: 'body[0].expression.right.left.type',
+		ours: 'BinaryExpression',
+		canonical: 'TSInstantiationExpression'
+	};
+	const at = (source: string, e: Entry, operator = '+') =>
+		claims('type_args_tsc_follower', e, root_for(source, operator), 'typescript', source);
+	strictEqual(at('a = f<T>\n+c;', operator_entry), true);
+	strictEqual(at('a = f<T>\n+c;', left_entry), true);
+	strictEqual(at('a = f<T>\n-c;', operator_entry, '-'), true);
+	strictEqual(at('a = f<T> // x\n+c;', operator_entry), true);
+	// on the list's own line acorn refuses the list as tsc does: no divergence there
+	strictEqual(at('a = f<T> + c;', operator_entry), false);
+	// the operator the source holds must be the one acorn built
+	strictEqual(at('a = f<T>\n+c;', operator_entry, '-'), false);
+});
+
 Deno.test('static_member_ladder: an ASI-split `static`, from the ladder on', () => {
 	// `class C {⏎static;⏎static⏎static⏎a() {}⏎}` as acorn-typescript reads it
 	const source = 'class C {\n\tstatic;\n\tstatic\n\tstatic\n\ta() {}\n}';

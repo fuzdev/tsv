@@ -13,6 +13,18 @@ Each `## Unreleased` section must be non-empty and carry a
 ## Unreleased
 <!-- bump: patch -->
 
+- fix: a type argument list followed by a `<`, or by a `+` or `-` on the next line, parses as
+  tsc reads it — a comparison, not a list — so `f<T><U>(x)` is `(f < T) > <U>(x)`,
+  `new f<T><U>(x)` is `(new f < T) > <U>(x)`, and `f<T>` with `+c` on the next line is
+  `(f < T) > +c`; format prints them `(f < T) > <U>x` and `(f < T) > +c`. Where tsc rejects
+  the text over such a follower (`new a.b<T><U>()`, `f<T><U>`, `const a = f<T, U><V>(x)`),
+  every list in it reads as acorn-typescript reads it, and `new a.b<T><U>()` prints
+  `new (a.b<T>)<U>()`
+- fix: a call, member access, template or type argument list no longer continues a prefix
+  operator over a postfix update — `a = !b++` followed by `(z) => z` on the next line parses
+  as two statements, and `!b++(z)` is a syntax error instead of a call, also with the `(z)`
+  on the next line where no statement can end (inside `g(…)`)
+
 ## 0.6.0
 
 - **breaking** feat: parsing returns the span-only AST by default — `start`/`end` on every

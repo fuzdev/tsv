@@ -483,6 +483,165 @@ function comment_copied_past_lifted_root(
 	return null;
 }
 
+/** An untyped tree node as the follower matcher reads it. */
+type NodeLike = Record<string, unknown> & { type?: unknown; start?: unknown; end?: unknown };
+
+const as_node = (value: unknown): NodeLike | null =>
+	typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as NodeLike) : null;
+
+/** A run of whitespace and comments from `at`, sticky — the gap a token is read past. */
+const TRIVIA_RUN = /(?:\s|\/\/[^\n\r\u2028\u2029]*|\/\*[\s\S]*?\*\/)*/y;
+
+/** The offset of the first token at or after `at`, past whitespace and comments. */
+function next_token_at(text: string, at: number): number {
+	TRIVIA_RUN.lastIndex = at;
+	return at + TRIVIA_RUN.exec(text)![0].length;
+}
+
+/** Whether the token at `at` is the lone `token` — not doubled, not followed by `=`. */
+function lone_punctuator(text: string, at: number, token: '<' | '+' | '-'): boolean {
+	return text[at] === token && text[at + 1] !== token && text[at + 1] !== '=';
+}
+
+/**
+ * Whether the token after an instantiation that ends at `end` is one tsc refuses after a
+ * type-argument list and acorn-typescript does not: a lone `<` on any line, or a lone
+ * `+` / `-` past a line terminator.
+ */
+function follows_with_tsc_refused_token(text: string, end: number): boolean {
+	const at = next_token_at(text, end);
+	if (lone_punctuator(text, at, '<')) return true;
+	return (
+		(lone_punctuator(text, at, '+') || lone_punctuator(text, at, '-')) &&
+		/[\n\r\u2028\u2029]/.test(text.slice(end, at))
+	);
+}
+
+/**
+ * Whether `value` — a subtree of tsv's side of a diff — holds an instantiation (no paren
+ * closing it) followed by a token tsc refuses after a list: a node tsc never builds, so a
+ * subtree holding one is no tsc reading. tsv reads such a list as acorn-typescript does,
+ * and then reads every list in the text as acorn does, so a region where it differs from
+ * acorn's tree never holds one either.
+ */
+function holds_tsc_refused_instantiation(value: unknown, text: string, depth = 0): boolean {
+	if (depth > 256 || typeof value !== 'object' || value === null) return false;
+	if (Array.isArray(value)) {
+		return value.some((item) => holds_tsc_refused_instantiation(item, text, depth + 1));
+	}
+	const node = value as NodeLike;
+	if (
+		node.type === 'TSInstantiationExpression' &&
+		typeof node.end === 'number' &&
+		follows_with_tsc_refused_token(text, node.end)
+	) {
+		return true;
+	}
+	return Object.entries(node).some(
+		([key, child]) => key !== 'loc' && holds_tsc_refused_instantiation(child, text, depth + 1)
+	);
+}
+
+/**
+ * Whether canonical node `owner` is acorn-typescript's reading of a type-argument list that
+ * tsc refuses by its follower: an instantiation `inst` (a `TSInstantiationExpression` no
+ * paren closes) followed by a lone `<` on any line — which acorn reads as a second list,
+ * `owner` being the call, `new`, tag or instantiation that takes it — or by a lone `+` / `-`
+ * past a line terminator, which acorn reads as the binary operator `owner` is.
+ */
+function owns_tsc_refused_follower(owner: NodeLike, text: string): boolean {
+	if (owner.type === 'BinaryExpression') {
+		const left = as_node(owner.left);
+		const operator = owner.operator;
+		if (left?.type !== 'TSInstantiationExpression' || typeof left.end !== 'number') return false;
+		if (operator !== '+' && operator !== '-') return false;
+		const at = next_token_at(text, left.end);
+		return (
+			lone_punctuator(text, at, operator) && /[\n\r\u2028\u2029]/.test(text.slice(left.end, at))
+		);
+	}
+	const head = as_node(
+		owner.type === 'TaggedTemplateExpression'
+			? owner.tag
+			: owner.type === 'TSInstantiationExpression'
+				? owner.expression
+				: owner.type === 'CallExpression' || owner.type === 'NewExpression'
+					? owner.callee
+					: undefined
+	);
+	const list = as_node(owner.typeArguments);
+	if (head?.type !== 'TSInstantiationExpression' || typeof head.end !== 'number') return false;
+	if (typeof list?.start !== 'number') return false;
+	const at = next_token_at(text, head.end);
+	return at === list.start && lone_punctuator(text, at, '<');
+}
+
+/** The binary operators at relational precedence or tighter, whose operands tsc's comparison regroups. */
+const REGROUPED_OPERATORS = new Set([
+	'<',
+	'>',
+	'<=',
+	'>=',
+	'instanceof',
+	'in',
+	'<<',
+	'>>',
+	'>>>',
+	'+',
+	'-',
+	'*',
+	'/',
+	'%',
+	'**'
+]);
+
+/**
+ * The child edges a tsc comparison over `node` regroups through: an operand of a binary
+ * operator at relational precedence or tighter, an `as` / `satisfies` / angle-bracket
+ * assertion's or a prefix operator's operand, and the left spine of a postfix chain.
+ */
+function regrouped_children(node: NodeLike): unknown[] {
+	switch (node.type) {
+		case 'BinaryExpression':
+			return REGROUPED_OPERATORS.has(node.operator as string) ? [node.left, node.right] : [];
+		case 'TSAsExpression':
+		case 'TSSatisfiesExpression':
+		case 'TSTypeAssertion':
+		case 'TSNonNullExpression':
+		case 'ChainExpression':
+			return [node.expression];
+		case 'UnaryExpression':
+		case 'AwaitExpression':
+			return [node.argument];
+		case 'MemberExpression':
+			return [node.object];
+		case 'CallExpression':
+		case 'NewExpression':
+			return [node.callee];
+		case 'TaggedTemplateExpression':
+			return [node.tag];
+		case 'TSInstantiationExpression':
+			return [node.expression];
+		default:
+			return [];
+	}
+}
+
+/**
+ * Whether `node` — or a node reached from it through the edges tsc's comparison regroups
+ * (`regrouped_children`) — is acorn-typescript's reading of a list tsc refuses by its
+ * follower (`owns_tsc_refused_follower`): the region whose canonical tree is acorn's
+ * list where tsv's is tsc's comparison.
+ */
+function reaches_tsc_refused_follower(node: NodeLike, text: string, depth = 0): boolean {
+	if (depth > 64) return false;
+	if (owns_tsc_refused_follower(node, text)) return true;
+	return regrouped_children(node).some((child) => {
+		const next = as_node(child);
+		return next !== null && reaches_tsc_refused_follower(next, text, depth + 1);
+	});
+}
+
 export interface DocumentedMatcher {
 	name: string;
 	/** docs/conformance_svelte.md section the divergence is cataloged under */
@@ -812,6 +971,42 @@ export const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 			if (entry.kind === 'missing_ours') return field === 'expression' || field === 'typeArguments';
 			const unwrapped = instantiation.expression as Record<string, unknown> | null | undefined;
 			return unwrapped != null && json_equal(entry.ours, unwrapped[field]);
+		}
+	},
+	{
+		// tsc refuses a type argument list in an expression ahead of a `<` on any line and a
+		// lone `+` / `-` past a line terminator (`canFollowTypeArgumentsInExpression`), and
+		// reads the comparison: `f<T><U>(z)` is `(f < T) > <U>(z)`, `f<T>⏎+c` is
+		// `(f < T) > +c`. acorn-typescript keeps the list ahead of both — a call with a second
+		// list, a sum — and tsv follows tsc wherever the comparison parses, so the subtree
+		// differs from the instantiation up through every node the comparison regroups.
+		// Gated on acorn's shape: an instantiation no paren closes, its `>` followed by
+		// exactly that token (a lone `<` the second list opens at; a lone `+` / `-` past a
+		// line break, the binary operator acorn built), and the entry inside the region the
+		// comparison regroups, from its highest such ancestor down. That ancestor is the
+		// comparison on tsv's side, so a `type` there must read `BinaryExpression`, and no
+		// subtree of tsv's side may hold an instantiation tsc refuses by its follower
+		// (`holds_tsc_refused_instantiation`) — a list kept on acorn's reading and compared
+		// after it (`(f<() => A> < U) > <V>(x)`) is neither parser's tree.
+		name: 'type_args_tsc_follower',
+		conformance_section:
+			'TypeScript Corrections — `<`, `+` or `-` after a would-be type-argument close',
+		matches: (entry, _canonical_parent, ctx) => {
+			if (ctx.language === 'css') return false;
+			const text = offset_text(ctx);
+			if (holds_tsc_refused_instantiation(entry.ours, text)) return false;
+			const segments = entry.path.split('.');
+			for (let i = 0; i < segments.length; i++) {
+				const node = as_node(get_at_path(ctx.canonical_root, segments.slice(0, i).join('.')));
+				if (node === null || typeof node.type !== 'string') continue;
+				if (!reaches_tsc_refused_follower(node, text)) continue;
+				// the highest ancestor reaching one: its own `type` is the comparison's
+				if (i === segments.length - 1 && segments[i] === 'type') {
+					return entry.ours === 'BinaryExpression';
+				}
+				return true;
+			}
+			return false;
 		}
 	},
 	{

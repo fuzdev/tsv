@@ -70,17 +70,6 @@ pub(super) fn find_separator_position(
 // Type unwrapping
 //
 
-/// The innermost paren shell of a run of them (`((T))` → the shell around `T`), or `None`
-/// where `ts_type` is no paren shell.
-pub(in crate::printer) fn innermost_paren_shell<'a>(
-    ts_type: &'a TSType<'a>,
-) -> Option<&'a TSParenthesizedType<'a>> {
-    match ts_type {
-        TSType::Parenthesized(p) => innermost_paren_shell(p.type_annotation).or(Some(p)),
-        _ => None,
-    }
-}
-
 /// Recursively unwrap TSParenthesizedType to get the inner type.
 pub fn unwrap_parenthesized<'a>(ts_type: &'a TSType<'a>) -> &'a TSType<'a> {
     match ts_type {
@@ -386,12 +375,6 @@ impl Printer<'_> {
         &self,
         ts_type: &'t TSType<'t>,
     ) -> &'t TSType<'t> {
-        // A paren the first list of a chain printed bare keeps around a function type is
-        // printed by the shell itself ([`Printer::first_list_keeps_maybe_parens`]); the
-        // shell is what the parent sees, so it adds no pair of its own.
-        if self.prints_kept_function_paren(ts_type) {
-            return ts_type;
-        }
         let inner = unwrap_parenthesized(ts_type);
         match self.transparent_sole_member(inner) {
             Some(member) => self.printed_operand(member),
@@ -407,43 +390,6 @@ impl Printer<'_> {
         ts_type: &TSType<'_>,
     ) -> bool {
         self.negative_literal_pair_targets.is_marked(ts_type.span())
-    }
-
-    /// [`unwrap_parenthesized`] short of a shell the first list of a chain printed bare
-    /// keeps ([`Self::first_list_keeps_function_paren`]) — the node a run of paren shells
-    /// prints from, where every other shell strips.
-    pub(in crate::printer) fn unwrap_stripped_parens<'t>(
-        &self,
-        ts_type: &'t TSType<'t>,
-    ) -> &'t TSType<'t> {
-        match ts_type {
-            TSType::Parenthesized(p) if !self.first_list_keeps_function_paren(p) => {
-                self.unwrap_stripped_parens(p.type_annotation)
-            }
-            _ => ts_type,
-        }
-    }
-
-    /// Whether `ts_type`'s run of paren shells ends in one
-    /// [`Self::first_list_keeps_function_paren`] keeps — so the run prints its own pair, and
-    /// a position that would add one around a function type adds none.
-    pub(in crate::printer) fn prints_kept_function_paren(&self, ts_type: &TSType<'_>) -> bool {
-        innermost_paren_shell(ts_type)
-            .is_some_and(|shell| self.first_list_keeps_function_paren(shell))
-    }
-
-    /// Whether the first list of a chain printed bare keeps this paren around a function
-    /// type ([`Printer::first_list_keeps_maybe_parens`]) — the paren the second-list rule
-    /// (`type_is_never_an_expression`) reads as an operand, so the two agree by
-    /// construction. A comment in either gap keeps it too, printed inside the pair where
-    /// the author wrote it ([`Printer::build_kept_function_paren_doc`]): stripped, the
-    /// arrow is no `<` operand, and the next pass would read a refusal.
-    pub(in crate::printer) fn first_list_keeps_function_paren(
-        &self,
-        shell: &TSParenthesizedType<'_>,
-    ) -> bool {
-        self.first_list_keeps_maybe_parens.get()
-            && matches!(shell.type_annotation, TSType::Function(_))
     }
 }
 
@@ -587,12 +533,9 @@ pub(super) fn type_needs_parens_for_optional_element(
 /// without them the `extends`/`?` rebinds. Union/intersection/keyof check types need
 /// none. Matches Prettier's `checkType` rule (`needs-parentheses.js`).
 pub(super) fn type_needs_parens_for_conditional_check(
-    p: &Printer<'_>,
+    _: &Printer<'_>,
     ts_type: &TSType<'_>,
 ) -> bool {
-    if p.prints_kept_function_paren(ts_type) {
-        return false;
-    }
     let inner = unwrap_parenthesized(ts_type);
     matches!(
         inner,
@@ -612,12 +555,9 @@ pub(super) fn type_needs_parens_for_conditional_check(
 ///
 /// Matches Prettier's `extendsType` rule (`needs-parentheses.js`).
 pub(super) fn type_needs_parens_for_conditional_extends(
-    p: &Printer<'_>,
+    _: &Printer<'_>,
     ts_type: &TSType<'_>,
 ) -> bool {
-    if p.prints_kept_function_paren(ts_type) {
-        return false;
-    }
     match unwrap_parenthesized(ts_type) {
         TSType::Conditional(_) => true,
         TSType::Function(f) => return_type_is_constrained_infer(&f.return_type),
