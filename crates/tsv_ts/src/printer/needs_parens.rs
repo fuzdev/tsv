@@ -578,7 +578,7 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         // one bare parsed only because the author parenthesized it (the deferred
         // `AssignmentTargetType` early error — tsc's parser accepts the pair), so the
         // pair is load-bearing and stays, by KIND, under every assignment operator:
-        // - a type assertion (`(x as T) = …`; bare `x as T = 1` is a tsc parse error);
+        // - a type assertion (`(x as T) = …`; bare, `x as T = 1` is a parse error);
         // - an operator expression — unary, update, `await`, binary, logical — whose
         //   bare reprint (`-a = 1`) is a grammar error;
         // - an alternative of `AssignmentExpression` itself — conditional, arrow,

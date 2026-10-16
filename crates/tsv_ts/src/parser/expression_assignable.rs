@@ -388,12 +388,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// early error refuses it, so `(-a) = 1` defers like `foo() = bar` (tsc's parser
     /// accepts it) and the printer keeps the pair (`ParenContext::AssignmentTarget`).
     ///
-    /// A bare type assertion (`a as T = 1`, `<T>a = 1`) is no `LeftHandSideExpression`
-    /// either, and tsc's parser refuses it; tsv follows acorn-typescript, which accepts
-    /// one over a SIMPLE operand (an identifier or a member, through further assertions)
-    /// — the printer repairs it to `(a as T) = 1`, the spelling every parser reads alike.
-    /// Over any other operand (`-a as T = 1`, `fn() as T = 1`, `[a, b] as T = c`) both
-    /// oracles reject, and so does this.
+    /// A bare type assertion (`a as T = 1`, `a satisfies T += 1`, `<T>a = 1`) is no
+    /// `LeftHandSideExpression` either, over any operand: tsc's parser rejects every one
+    /// (TS1005), and so does prettier. acorn-typescript alone accepts one over a simple
+    /// operand (an identifier or a member, through further assertions), but the
+    /// production derives none, and the only reprint every parser reads — the
+    /// parenthesized `(a as T) = 1` — would be a repair into a different, valid program,
+    /// not the input. Parenthesized, the assertion is the deferred class like any other
+    /// operand (`(a as T) = 1`). A destructuring element's own target (`[a as T] = c`)
+    /// and a for-in/of head never reach here; an element default's does
+    /// (`[a as T = 1] = c`), since the element is an assignment before it is a pattern.
     ///
     /// "Unparenthesized" is read off the node's extent against the expression's: a
     /// grouped operand starts after the `(` the parse began at (`expr_start`) and ends
@@ -417,13 +421,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             | ExpressionKind::AwaitExpression(_)
             // a logical expression too: the internal AST folds `&&` / `||` / `??` into
             // `BinaryExpression`
-            | ExpressionKind::BinaryExpression(_) => true,
-            ExpressionKind::TSAsExpression(_)
+            | ExpressionKind::BinaryExpression(_)
+            | ExpressionKind::TSAsExpression(_)
             | ExpressionKind::TSSatisfiesExpression(_)
-            | ExpressionKind::TSTypeAssertion(_) => !matches!(
-                left.skip_type_assertions().kind,
-                ExpressionKind::Identifier(_) | ExpressionKind::MemberExpression(_)
-            ),
+            | ExpressionKind::TSTypeAssertion(_) => true,
             _ => false,
         };
         if refused {

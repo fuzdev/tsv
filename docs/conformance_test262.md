@@ -109,14 +109,18 @@ ECMAScript), so they don't move the counts above, but each is pinned by a fixtur
 - **`export import X = …`** — the export form of an import-equals re-export
   (`export import NS = A.B` / `export import NS = require('m')`), entity-name and
   `require(…)` references alike (`TSImportEqualsDeclaration` with `isExport`).
-- **A type assertion as an assignment target** — `(x as T) = 1`, `(x!) = 1`,
+- **A PARENTHESIZED type assertion as an assignment target** — `(x as T) = 1`,
   `(x satisfies T) = 1`, `(<T>x) = 1`, chained `(x as A as B) = 1`, member inners,
   compound `(x as T) += 1`, and the destructuring-element forms `[x as T] = y` /
-  `({ a: x as T } = y)`. tsv keeps the assertion node so the formatter reproduces
-  prettier (`(x as T) = 1`), while the public AST drops it from a simple `=` left
-  (`left: Identifier`), matching acorn. An assertion wrapping a *pattern*
-  (`([a, b] as T) = c`), or in a for-in/of head or binding position, stays rejected
-  — also matching acorn.
+  `({ a: x as T } = y)`; `x! = 1` needs no pair, a non-null being a member postfix. tsv
+  keeps the assertion node, in the wire (`left: TSAsExpression`, as acorn) and in the
+  formatter (prettier's `(x as T) = 1`). The pair is load-bearing: a BARE assertion
+  target (`x as T = 1`) is no `LeftHandSideExpression`, so no production derives the
+  assignment and tsv rejects it as tsc's parser does ([conformance_svelte.md
+  §TypeScript Corrections](./conformance_svelte.md#typescript-corrections), "A bare type
+  assertion as an assignment target"). An assertion wrapping a *pattern*
+  (`([a, b] as T) = c`) and the no-declaration for-in/of head (`for (a as T of b)`) are
+  the deferred class too, cataloged there; a binding position rejects.
 - **`export as namespace Foo`** — the TypeScript UMD global export declaration
   (`TSNamespaceExportDeclaration`), at the top level and inside `declare module`.
 

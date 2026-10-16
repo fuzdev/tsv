@@ -24,8 +24,10 @@
 //! The fixtures pin the family: `typescript/expressions/assignment/operator_target` (the
 //! bare spellings, as `input_invalid_*` files, beside the valid controls),
 //! `operator_target_paren_svelte_prettier_divergence` and
-//! `assignment_tier_target_paren_svelte_prettier_divergence` (the kept pairs), and
-//! `cast_target`'s `input_invalid_*` files (a bare assertion over a non-simple operand).
+//! `assignment_tier_target_paren_svelte_prettier_divergence` (the kept pairs),
+//! `cast_target`'s `input_invalid_*` files (a bare assertion over a non-simple operand),
+//! and `cast_target_bare_svelte_divergence` (a bare assertion over a simple operand, which
+//! acorn alone accepts).
 //! What stays here is what a fixture cannot hold: every assignment operator over one
 //! operand, the line-break spellings a formatted input never carries, the nested
 //! positions, the `Script`-goal reading of `await`, and the format fallback.
@@ -181,45 +183,115 @@ fn pattern_default_operator_target_rejects() {
     }
 }
 
-/// A bare type assertion is an assignment target only over a SIMPLE operand — acorn's
-/// reading, which tsv follows though tsc's parser refuses the bare assertion outright (the
-/// formatter repairs it to `(a as T) = 1`, a spelling all three parsers read alike). Over
-/// a non-simple operand both oracles reject, and so does tsv; parenthesized, the
-/// assertion is the deferred class again (`([a, b] as T) = c`, pinned in
-/// `tests/nonsimple_assignment_target.rs`).
+/// A bare type assertion is no `LeftHandSideExpression`, so it is no assignment target —
+/// over any operand and under any assignment operator. tsc's parser refuses every one
+/// (TS1005 `';' expected.`: `parseAssignmentExpressionOrHigher` reads an assignment
+/// operator only after a `LeftHandSideExpression`), and so does prettier; acorn alone
+/// accepts one over a simple operand, an over-rejection the fixture
+/// `cast_target_bare_svelte_divergence` grades against Svelte's live parse.
 #[test]
-fn bare_assertion_over_non_simple_operand_rejects() {
+fn bare_assertion_target_rejects_under_every_operator() {
+    for left in [
+        "a as T",
+        "a satisfies T",
+        "<T>a",
+        "a.b as T",
+        "a[0] satisfies T",
+        "<T>a.b",
+        "a as A as B",
+        "<A>(a as B)",
+        "(a) as T",
+        "a! as T",
+        "a!.b as T",
+        "-a as T",
+        "a++ as T",
+        "a + b as T",
+        "(-a) as T",
+        "fn() as T",
+        "[a, b] as T",
+        "-a satisfies T",
+        "<T>-a",
+        "<T>a++",
+        "<T>(-a)",
+        "<T>fn()",
+    ] {
+        for operator in ASSIGNMENT_OPERATORS {
+            let source = format!("{left} {operator} c;");
+            // the target's own error, not a failure somewhere else in the spelling
+            let arena = bumpalo::Bump::new();
+            let error = tsv_ts::parse(&source, &arena)
+                .err()
+                .unwrap_or_else(|| panic!("a bare assertion target rejects: {source:?}"));
+            assert!(
+                error
+                    .to_string()
+                    .contains("Invalid left-hand side in assignment"),
+                "the bare assertion target is the error: {source:?} -> {error}"
+            );
+        }
+    }
+    // nested, where an enclosing assignment or expression holds the bare target
     for source in [
-        "-a as T = 1;",
-        "a++ as T = 1;",
-        "a + b as T = 1;",
-        "(-a) as T = 1;",
-        "fn() as T = 1;",
-        "[a, b] as T = c;",
-        "-a satisfies T = 1;",
-        "<T>-a = 1;",
-        "<T>a++ = 1;",
-        "<T>(-a) = 1;",
-        "<T>fn() = 1;",
+        "r = a as T = c;",
+        "r = <T>a += c;",
+        "f(a as T = c);",
+        "x = { k: a satisfies T ??= c };",
+        "() => a as T = c;",
+        "[a as T = 1] = c;",
+        "({ x: a as T = 1 } = c);",
     ] {
         assert!(
             rejects(source),
-            "a bare assertion over a non-simple operand rejects: {source:?}"
+            "a nested bare assertion target rejects: {source:?}"
         );
     }
-    // The simple-operand spellings keep parsing, repaired to the parenthesized form.
-    for (source, canonical) in [
-        ("a as T = 1;", "(a as T) = 1;\n"),
-        ("a satisfies T = 1;", "(a satisfies T) = 1;\n"),
-        ("<T>a = 1;", "(<T>a) = 1;\n"),
-        ("a.b as T = 1;", "(a.b as T) = 1;\n"),
-        ("(a) as T = 1;", "(a as T) = 1;\n"),
-        ("a as T as U = 1;", "(a as T as U) = 1;\n"),
-        ("a! as T = 1;", "(a! as T) = 1;\n"),
-        ("a as T += 1;", "(a as T) += 1;\n"),
+}
+
+/// Parenthesized, the assertion is a `ParenthesizedExpression` — a `PrimaryExpression` the
+/// production derives — and parses as a target under every operator, printing its pair.
+/// So does an assertion as a destructuring ELEMENT (the element is a pattern position, not
+/// an assignment's left), a non-null target (a member-expression postfix in TypeScript),
+/// and a non-null over a parenthesized assertion; tsc's parser accepts every one.
+#[test]
+fn assertion_target_in_parens_or_a_pattern_parses() {
+    for operator in ASSIGNMENT_OPERATORS {
+        for left in [
+            "(a as T)",
+            "(a satisfies T)",
+            "(<T>a)",
+            "(a.b as T)",
+            "(a as A as B)",
+        ] {
+            let source = format!("{left} {operator} c;");
+            assert_eq!(
+                format(&source),
+                format!("{source}\n"),
+                "keeps its pair: {source:?}"
+            );
+        }
+    }
+    for source in [
+        "[a as T] = c;",
+        "({ x: a as T } = c);",
+        "[(a as T) = 1] = c;",
+        "a! = c;",
+        "a!.b = c;",
+        "(a as T)! = c;",
+        "r = (a as T) = c;",
     ] {
-        assert_eq!(format(source), canonical, "repaired: {source:?}");
-        assert_eq!(format(canonical), canonical, "idempotent: {canonical:?}");
+        assert_eq!(
+            format(source),
+            format!("{source}\n"),
+            "parses and is stable: {source:?}"
+        );
+    }
+    // update operands stay as they were: an assertion is no `UpdateExpression` operand
+    // bare, and is one in parens
+    for source in ["a as T++;", "a as T--;"] {
+        assert!(rejects(source), "rejects: {source:?}");
+    }
+    for source in ["++(a as T);", "(a as T)++;", "++a as T;"] {
+        assert_eq!(format(source), format!("{source}\n"), "parses: {source:?}");
     }
 }
 

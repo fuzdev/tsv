@@ -883,8 +883,11 @@ Early errors that still parse (not yet enforced):
   [script_goal/nonsimple_params_directive](../tests/fixtures/typescript/script_goal/nonsimple_params_directive_svelte_prettier_divergence/)
 - Duplicate parameter names (`function f(a, a) {}`)
 - A non-simple `=` target (`foo() = bar`, `1 >>= 2`, `this = x`, `(a => a) = 1`) — the
-  `AssignmentTargetType` early error of §13.15.1; the target is kept as written (a
-  parenthesized non-`LeftHandSideExpression` reprints bare, so its shell is not preserved).
+  `AssignmentTargetType` early error of §13.15.1; the target is kept as written, its
+  pair included (`(-a) = 1` reprints with the pair). A BARE type assertion (`a as T = 1`,
+  `<T>a += 1`) is a grammar error instead, no production deriving the assignment, as
+  tsc's parser reads it; parenthesized it defers like the rest
+  ([conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md#typescript-corrections)).
   The no-declaration for-in/of head is NOT an assignment context and rejects the same
   targets, and two spellings with no faithful reprint reject in every position: a compound
   operator as a default (`[a += b] = xs` — the pattern node has no slot for the operator)
