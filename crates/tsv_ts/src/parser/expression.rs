@@ -478,6 +478,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// while `a + b as T` stays `(a + b) as T`. Three conditions leave the keyword
     /// unconsumed (each returns `false`) — ASI on a preceding line break, the Svelte
     /// `#each` binding-separator gate, and relational precedence; see the guards.
+    ///
+    /// `inline(always)` because each `inline(always)` copy of
+    /// [`Parser::parse_expression_operators`] holds a call site, and with two the hot one in
+    /// [`Parser::parse_expression_bp`] stops inlining it.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
     fn try_parse_type_assertion(
         &mut self,
         min_bp: u8,

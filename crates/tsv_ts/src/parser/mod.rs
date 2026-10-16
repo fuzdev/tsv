@@ -1954,6 +1954,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Returns `Some(operator)` for: `=`, `+=`, `-=`, `*=`, `/=`, `%=`, `**=`,
     /// `<<=`, `>>=`, `>>>=`, `&=`, `|=`, `^=`, `&&=`, `||=`, `??=`
+    ///
+    /// `inline(always)` because each `inline(always)` copy of
+    /// [`Parser::parse_expression_operators`] holds a call site, and with two the hot one in
+    /// [`Parser::parse_expression_bp`] stops inlining it.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
     pub(super) fn try_assignment_operator(&self) -> Option<AssignmentOperator> {
         match &self.current.kind {
             TokenKind::Equals => Some(AssignmentOperator::Assign),
