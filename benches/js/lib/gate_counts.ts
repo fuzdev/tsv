@@ -96,7 +96,7 @@ export const GATE_CHECKOUT_IDS: Record<
 	// its manifest.
 	[CORPORA_ROOT]: {
 		tree: CORPORA_TREE,
-		hash: '9b64dd2a4',
+		hash: 'ba7a9a6c8',
 		pins: ['CORPUS_FORMAT_*', 'CORPUS_PARSE_*', 'SVELTE_STYLES_BLOCKS_PIN', 'STRIP_CORPUS_PINS']
 	},
 	// `../svelte` feeds the conformance view alone (its `tests` tree); its
@@ -1212,7 +1212,7 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
  * id), a collection joining a perf tier, or a broken extraction, and the harvest fails
  * BEFORE writing so a wrong cache never replaces a good one. Stamped on the snapshot's
  * `collections/` tree id and the perf view's entry list (`lib/harvest_stamp.ts`).
- * Measured 2026-10-02: ../corpora `collections/` at 9b64dd2a4, over the perf view's
+ * Measured 2026-10-16: ../corpora `collections/` at ba7a9a6c8, over the perf view's
  * 929 `.svelte` files.
  *
  * 278 → 401: earbetter and cosmicplayground join the `real` tier, so the perf view gains
