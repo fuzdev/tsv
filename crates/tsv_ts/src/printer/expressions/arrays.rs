@@ -637,6 +637,7 @@ impl<'a> Printer<'a> {
         arr: &internal::ArrayExpression<'_>,
         arr_span: Span,
     ) -> DocId {
+        self.mark_relational_sibling_authored_pairs(arr.elements.iter().copied());
         if arr.elements.is_empty() {
             return self.build_empty_brackets_inline_with_comments_doc(arr_span);
         }
@@ -1295,6 +1296,7 @@ impl<'a> Printer<'a> {
         arr: &internal::ArrayExpression<'_>,
         span: Span,
     ) -> DocId {
+        self.mark_relational_sibling_authored_pairs(arr.elements.iter().copied());
         let d = self.d();
         // A commented array hands off to `build_array_doc` wholesale — the element-doc-only
         // loop below would DROP every structural comment, the empty-`[]` dangling one

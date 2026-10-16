@@ -347,6 +347,14 @@ fn build_import_args_doc(
 
     let open = d.concat(&[head, d.text("(")]);
 
+    // The two arguments are a comma list like a call's, so the list owner's authored-pair
+    // rule reaches them too ([`Printer::mark_relational_sibling_authored_pairs`]): a source
+    // holding a `<` keeps its pair when the options hold a closer. Marked ahead of either
+    // argument's build, as every list owner marks.
+    printer.mark_relational_sibling_authored_pairs(
+        [Some(import_expr.source), import_expr.options].into_iter(),
+    );
+
     // Rule A over the two arguments: `import()`'s source and options are an argument list
     // like any other, so an own-line directive in the head→source gap (which spans the
     // `(`, matching the leading-comment scan above it) or in the source→options gap
@@ -356,12 +364,18 @@ fn build_import_args_doc(
 
     // Parenthesize an `in` argument inside a for-header init (`for (a = import(m,
     // (b in c));…)`); a no-op elsewhere. Dynamic-import args are hand-rolled here
-    // rather than routed through `needs_parens(Argument)`, so apply the rule directly.
+    // rather than routed through `needs_parens(Argument)`, so apply the rule directly —
+    // and the kept comparison pair with it, which that `in` pair already supplies when
+    // both apply. The frozen arm asks `needs_parens(Argument)`, which answers both.
     let raw_source_doc = frozen_source.map_or_else(
         || {
-            printer.wrap_for_init_in(
+            printer.wrap_relational_sibling_pair(
                 import_expr.source,
-                printer.build_expression_doc_claiming_outermost(import_expr.source),
+                printer.for_init_in_needs_parens(import_expr.source),
+                printer.wrap_for_init_in(
+                    import_expr.source,
+                    printer.build_expression_doc_claiming_outermost(import_expr.source),
+                ),
             )
         },
         |frozen| printer.build_frozen_arg_doc(import_expr.source, frozen),

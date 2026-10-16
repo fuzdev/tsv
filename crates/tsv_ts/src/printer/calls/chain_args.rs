@@ -416,6 +416,7 @@ fn build_call_args_doc_for_chain_impl(
     // Only the chain HEAD can be one — a link's callee is a member expression — and with one
     // argument only the single-argument and force-expanded builders ever hold it.
     mark_boolean_coercion_argument(printer, call);
+    printer.mark_relational_sibling_authored_pairs(call.arguments.iter().copied().map(Some));
 
     // Prettier's React-hook deps-array layout — the FIRST thing `printCallArguments` asks,
     // above `anyArgEmptyLine` and every specialized layout, and above the chain's own

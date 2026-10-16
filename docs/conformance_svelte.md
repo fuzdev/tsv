@@ -1555,7 +1555,9 @@ function behind a token the list stopped at first is no part of any of this
 (`x = { p: a < b, q: c => c > (d, e) }` stops at the `:`).
 The refused comparisons need no token changed to be written: the first from its other
 side (`fn(b > a, c => c > (d, e))`), either one hoisted into a variable, or a `function`
-expression in the arrow's place. `a_tail_the_printer_would_complete_stays_rejected` and
+expression in the arrow's place. A pair around the first comparison is another escape
+(`fn((a < b), c => c > (d, e))`): its comma-list owner retains it.
+`a_tail_the_printer_would_complete_stays_rejected` and
 its neighbors in
 [type_arguments_tail_fallback.rs](../tests/type_arguments_tail_fallback.rs) pin both
 sides line by line, with which error is reported where the operator reading fails as

@@ -35,7 +35,9 @@ whether the printer strips the pair at all, so `fn(a < b, c => c + 1 > (d, e))` 
 **Authoring around it.** Nothing between the two tokens has to change: write the first
 comparison from the other side (`fn(b > a, c => c > (d - e) * 2)`), or hoist either
 comparison into a variable (`const lt = a < b; fn(lt, c => c > (d - e) * 2)`). An arrow
-function may also be a `function` expression, which no type spells.
+function may also be a `function` expression, which no type spells. A pair around the
+first comparison (`fn((a < b), c => c > (d - e) * 2)`) is retained by the comma-list
+owner and keeps the two comparisons apart.
 
 `tsv_rejects.txt` pins tsv's own error on the first line, and every line is pinned on its
 own by `a_tail_the_printer_would_complete_stays_rejected` in

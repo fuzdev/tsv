@@ -67,7 +67,8 @@ fn a_region_is_open_behind_a_less_than() {
         "fn(x < q, A > B);",
         "[x < q, A > B];",
         // A grouping paren is the one delimiter the printer may strip, so its `)` closes
-        // nothing: this prints as the comma list above.
+        // nothing in the region verdict. The list owner retains the authored comparison
+        // pair, and the flagged closer keeps the same break.
         "fn((x < q), A > B);",
         // The earliest region outlives a later, deeper one.
         "fn(x < q, g(y < r), A > B);",

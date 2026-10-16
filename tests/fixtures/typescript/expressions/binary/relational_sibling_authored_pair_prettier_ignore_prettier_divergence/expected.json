@@ -1,0 +1,446 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 458,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A frozen paired element prints verbatim, its pair included",
+			"start": 20,
+			"end": 81
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 89,
+			"end": 107
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 154,
+			"end": 172
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 218,
+			"end": 236
+		},
+		{
+			"type": "Line",
+			"value": " The authored pair is also the one a bare `in` under a `for` header needs: printed once",
+			"start": 277,
+			"end": 366
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 382,
+			"end": 400
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 457,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 448,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 83,
+					"end": 137,
+					"expression": {
+						"type": "CallExpression",
+						"start": 83,
+						"end": 136,
+						"callee": {
+							"type": "Identifier",
+							"start": 83,
+							"end": 85,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 111,
+								"end": 118,
+								"left": {
+									"type": "Identifier",
+									"start": 111,
+									"end": 112,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 117,
+									"end": 118,
+									"name": "b"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 89,
+										"end": 107
+									}
+								]
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 123,
+								"end": 133,
+								"left": {
+									"type": "Identifier",
+									"start": 123,
+									"end": 124,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "SequenceExpression",
+									"start": 128,
+									"end": 132,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 128,
+											"end": 129,
+											"name": "d"
+										},
+										{
+											"type": "Identifier",
+											"start": 131,
+											"end": 132,
+											"name": "e"
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A frozen paired element prints verbatim, its pair included",
+							"start": 20,
+							"end": 81
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 139,
+					"end": 202,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 145,
+							"end": 201,
+							"id": {
+								"type": "Identifier",
+								"start": 145,
+								"end": 147,
+								"name": "a1"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 150,
+								"end": 201,
+								"elements": [
+									{
+										"type": "BinaryExpression",
+										"start": 176,
+										"end": 183,
+										"left": {
+											"type": "Identifier",
+											"start": 176,
+											"end": 177,
+											"name": "a"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 182,
+											"end": 183,
+											"name": "b"
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " prettier-ignore",
+												"start": 154,
+												"end": 172
+											}
+										]
+									},
+									{
+										"type": "BinaryExpression",
+										"start": 188,
+										"end": 198,
+										"left": {
+											"type": "Identifier",
+											"start": 188,
+											"end": 189,
+											"name": "c"
+										},
+										"operator": ">",
+										"right": {
+											"type": "SequenceExpression",
+											"start": 193,
+											"end": 197,
+											"expressions": [
+												{
+													"type": "Identifier",
+													"start": 193,
+													"end": 194,
+													"name": "d"
+												},
+												{
+													"type": "Identifier",
+													"start": 196,
+													"end": 197,
+													"name": "e"
+												}
+											]
+										}
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ForStatement",
+					"start": 204,
+					"end": 275,
+					"init": {
+						"type": "SequenceExpression",
+						"start": 212,
+						"end": 264,
+						"expressions": [
+							{
+								"type": "Identifier",
+								"start": 212,
+								"end": 213,
+								"name": "a"
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 241,
+								"end": 248,
+								"left": {
+									"type": "Identifier",
+									"start": 241,
+									"end": 242,
+									"name": "x"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 247,
+									"end": 248,
+									"name": "y"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 218,
+										"end": 236
+									}
+								]
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 254,
+								"end": 264,
+								"left": {
+									"type": "Identifier",
+									"start": 254,
+									"end": 255,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "SequenceExpression",
+									"start": 259,
+									"end": 263,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 259,
+											"end": 260,
+											"name": "d"
+										},
+										{
+											"type": "Identifier",
+											"start": 262,
+											"end": 263,
+											"name": "e"
+										}
+									]
+								}
+							}
+						]
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 273,
+						"end": 275,
+						"body": []
+					}
+				},
+				{
+					"type": "ForStatement",
+					"start": 368,
+					"end": 447,
+					"init": {
+						"type": "SequenceExpression",
+						"start": 376,
+						"end": 436,
+						"expressions": [
+							{
+								"type": "Identifier",
+								"start": 376,
+								"end": 377,
+								"name": "a"
+							},
+							{
+								"type": "LogicalExpression",
+								"start": 405,
+								"end": 420,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 405,
+									"end": 410,
+									"left": {
+										"type": "Identifier",
+										"start": 405,
+										"end": 406,
+										"name": "x"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 409,
+										"end": 410,
+										"name": "y"
+									}
+								},
+								"operator": "||",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 414,
+									"end": 420,
+									"left": {
+										"type": "Identifier",
+										"start": 414,
+										"end": 415,
+										"name": "p"
+									},
+									"operator": "in",
+									"right": {
+										"type": "Identifier",
+										"start": 419,
+										"end": 420,
+										"name": "q"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 382,
+										"end": 400
+									}
+								]
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 426,
+								"end": 436,
+								"left": {
+									"type": "Identifier",
+									"start": 426,
+									"end": 427,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "SequenceExpression",
+									"start": 431,
+									"end": 435,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 431,
+											"end": 432,
+											"name": "d"
+										},
+										{
+											"type": "Identifier",
+											"start": 434,
+											"end": 435,
+											"name": "e"
+										}
+									]
+								}
+							}
+						]
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 445,
+						"end": 447,
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The authored pair is also the one a bare `in` under a `for` header needs: printed once",
+							"start": 277,
+							"end": 366
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

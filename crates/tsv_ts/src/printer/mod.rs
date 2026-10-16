@@ -41,6 +41,7 @@ mod layout;
 mod needs_parens;
 mod pre_body;
 mod program;
+mod relational_sibling_pairs;
 mod statement_tail;
 mod statements;
 mod types;
@@ -655,6 +656,13 @@ pub struct Printer<'a> {
     /// position asks about it — one built inside the comparison the collector records
     /// ahead of; an operand and the node it leads share a start, never a span.
     pub(crate) withheld_clarity_pair_targets: SpanMarks,
+    /// Whole-element authored comparison pairs retained by comma-list owners
+    /// ([`Self::mark_relational_sibling_authored_pairs`]), ahead of their element builds.
+    /// Read only at Argument and sequence-operand positions, keyed by span and never
+    /// consumed so conditional-group candidates share the same answer.
+    pub(crate) relational_sibling_pair_targets: SpanMarks,
+    /// Fast gate for the rare document carrying a retained comma-sibling pair.
+    pub(crate) has_relational_sibling_pairs: Cell<bool>,
     /// The comment-free window the last comment search on this printer established
     /// ([`CommentFreeWindow`]: the mechanism, its soundness argument, and the gate's
     /// inline/outlined shape live there).
@@ -735,6 +743,8 @@ impl<'a> Printer<'a> {
             negative_literal_pair_targets: SpanMarks::default(),
             dividend_tail_targets: SpanMarks::default(),
             withheld_clarity_pair_targets: SpanMarks::default(),
+            relational_sibling_pair_targets: SpanMarks::default(),
+            has_relational_sibling_pairs: Cell::new(false),
             comment_free_gap,
         }
     }
@@ -994,7 +1004,9 @@ impl<'a> Printer<'a> {
     /// ([`Self::clarity_pair_is_withheld`]).
     #[inline]
     pub(crate) fn needs_parens(&self, expr: &internal::Expression<'_>, ctx: ParenContext) -> bool {
-        needs_parens(expr, ctx, self.in_for_init.get()) && !self.clarity_pair_is_withheld(expr, ctx)
+        (needs_parens(expr, ctx, self.in_for_init.get())
+            && !self.clarity_pair_is_withheld(expr, ctx))
+            || (matches!(ctx, ParenContext::Argument) && self.relational_sibling_pair_is_kept(expr))
     }
 
     /// Whether `expr`, at the position `ctx`, is a node whose clarity pair

@@ -1,0 +1,1288 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 878,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A block comment leading the comparison stays inside the pair",
+			"start": 20,
+			"end": 83
+		},
+		{
+			"type": "Block",
+			"value": " k ",
+			"start": 89,
+			"end": 96
+		},
+		{
+			"type": "Block",
+			"value": " k ",
+			"start": 132,
+			"end": 139
+		},
+		{
+			"type": "Block",
+			"value": " k ",
+			"start": 164,
+			"end": 171
+		},
+		{
+			"type": "Line",
+			"value": " A block comment ahead of the pair stays ahead of it",
+			"start": 194,
+			"end": 248
+		},
+		{
+			"type": "Block",
+			"value": " k ",
+			"start": 253,
+			"end": 260
+		},
+		{
+			"type": "Block",
+			"value": " k ",
+			"start": 296,
+			"end": 303
+		},
+		{
+			"type": "Block",
+			"value": " k ",
+			"start": 335,
+			"end": 342
+		},
+		{
+			"type": "Line",
+			"value": " A block comment behind the pair stays ahead of the comma",
+			"start": 366,
+			"end": 425
+		},
+		{
+			"type": "Block",
+			"value": " k ",
+			"start": 438,
+			"end": 445
+		},
+		{
+			"type": "Block",
+			"value": " k ",
+			"start": 481,
+			"end": 488
+		},
+		{
+			"type": "Block",
+			"value": " k ",
+			"start": 513,
+			"end": 520
+		},
+		{
+			"type": "Line",
+			"value": " A line comment behind the pair ends the element's line",
+			"start": 536,
+			"end": 593
+		},
+		{
+			"type": "Line",
+			"value": " k",
+			"start": 610,
+			"end": 614
+		},
+		{
+			"type": "Line",
+			"value": " k",
+			"start": 657,
+			"end": 661
+		},
+		{
+			"type": "Line",
+			"value": " k",
+			"start": 690,
+			"end": 694
+		},
+		{
+			"type": "Line",
+			"value": " A line comment glued to the list's opening delimiter keeps that line",
+			"start": 711,
+			"end": 782
+		},
+		{
+			"type": "Line",
+			"value": " k",
+			"start": 788,
+			"end": 792
+		},
+		{
+			"type": "Line",
+			"value": " k",
+			"start": 835,
+			"end": 839
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 877,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 868,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 85,
+					"end": 117,
+					"expression": {
+						"type": "CallExpression",
+						"start": 85,
+						"end": 116,
+						"callee": {
+							"type": "Identifier",
+							"start": 85,
+							"end": 87,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 97,
+								"end": 102,
+								"left": {
+									"type": "Identifier",
+									"start": 97,
+									"end": 98,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 101,
+									"end": 102,
+									"name": "b"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " k ",
+										"start": 89,
+										"end": 96
+									}
+								]
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 105,
+								"end": 115,
+								"left": {
+									"type": "Identifier",
+									"start": 105,
+									"end": 106,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "SequenceExpression",
+									"start": 110,
+									"end": 114,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 110,
+											"end": 111,
+											"name": "d"
+										},
+										{
+											"type": "Identifier",
+											"start": 113,
+											"end": 114,
+											"name": "e"
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block comment leading the comparison stays inside the pair",
+							"start": 20,
+							"end": 83
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 119,
+					"end": 160,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 125,
+							"end": 159,
+							"id": {
+								"type": "Identifier",
+								"start": 125,
+								"end": 127,
+								"name": "a1"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 130,
+								"end": 159,
+								"elements": [
+									{
+										"type": "BinaryExpression",
+										"start": 140,
+										"end": 145,
+										"left": {
+											"type": "Identifier",
+											"start": 140,
+											"end": 141,
+											"name": "a"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 144,
+											"end": 145,
+											"name": "b"
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " k ",
+												"start": 132,
+												"end": 139
+											}
+										]
+									},
+									{
+										"type": "BinaryExpression",
+										"start": 148,
+										"end": 158,
+										"left": {
+											"type": "Identifier",
+											"start": 148,
+											"end": 149,
+											"name": "c"
+										},
+										"operator": ">",
+										"right": {
+											"type": "SequenceExpression",
+											"start": 153,
+											"end": 157,
+											"expressions": [
+												{
+													"type": "Identifier",
+													"start": 153,
+													"end": 154,
+													"name": "d"
+												},
+												{
+													"type": "Identifier",
+													"start": 156,
+													"end": 157,
+													"name": "e"
+												}
+											]
+										}
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 162,
+					"end": 192,
+					"expression": {
+						"type": "SequenceExpression",
+						"start": 163,
+						"end": 190,
+						"expressions": [
+							{
+								"type": "BinaryExpression",
+								"start": 172,
+								"end": 177,
+								"left": {
+									"type": "Identifier",
+									"start": 172,
+									"end": 173,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 176,
+									"end": 177,
+									"name": "b"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " k ",
+										"start": 164,
+										"end": 171
+									}
+								]
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 180,
+								"end": 190,
+								"left": {
+									"type": "Identifier",
+									"start": 180,
+									"end": 181,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "SequenceExpression",
+									"start": 185,
+									"end": 189,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 185,
+											"end": 186,
+											"name": "d"
+										},
+										{
+											"type": "Identifier",
+											"start": 188,
+											"end": 189,
+											"name": "e"
+										}
+									]
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 250,
+					"end": 282,
+					"expression": {
+						"type": "CallExpression",
+						"start": 250,
+						"end": 281,
+						"callee": {
+							"type": "Identifier",
+							"start": 250,
+							"end": 252,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 262,
+								"end": 267,
+								"left": {
+									"type": "Identifier",
+									"start": 262,
+									"end": 263,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 266,
+									"end": 267,
+									"name": "b"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " k ",
+										"start": 253,
+										"end": 260
+									}
+								]
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 270,
+								"end": 280,
+								"left": {
+									"type": "Identifier",
+									"start": 270,
+									"end": 271,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "SequenceExpression",
+									"start": 275,
+									"end": 279,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 275,
+											"end": 276,
+											"name": "d"
+										},
+										{
+											"type": "Identifier",
+											"start": 278,
+											"end": 279,
+											"name": "e"
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block comment ahead of the pair stays ahead of it",
+							"start": 194,
+							"end": 248
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 284,
+					"end": 325,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 290,
+							"end": 324,
+							"id": {
+								"type": "Identifier",
+								"start": 290,
+								"end": 292,
+								"name": "a2"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 295,
+								"end": 324,
+								"elements": [
+									{
+										"type": "BinaryExpression",
+										"start": 305,
+										"end": 310,
+										"left": {
+											"type": "Identifier",
+											"start": 305,
+											"end": 306,
+											"name": "a"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 309,
+											"end": 310,
+											"name": "b"
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " k ",
+												"start": 296,
+												"end": 303
+											}
+										]
+									},
+									{
+										"type": "BinaryExpression",
+										"start": 313,
+										"end": 323,
+										"left": {
+											"type": "Identifier",
+											"start": 313,
+											"end": 314,
+											"name": "c"
+										},
+										"operator": ">",
+										"right": {
+											"type": "SequenceExpression",
+											"start": 318,
+											"end": 322,
+											"expressions": [
+												{
+													"type": "Identifier",
+													"start": 318,
+													"end": 319,
+													"name": "d"
+												},
+												{
+													"type": "Identifier",
+													"start": 321,
+													"end": 322,
+													"name": "e"
+												}
+											]
+										}
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 327,
+					"end": 364,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 327,
+						"end": 363,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 327,
+							"end": 328,
+							"name": "x"
+						},
+						"right": {
+							"type": "SequenceExpression",
+							"start": 332,
+							"end": 362,
+							"expressions": [
+								{
+									"type": "Identifier",
+									"start": 332,
+									"end": 333,
+									"name": "y",
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " k ",
+											"start": 335,
+											"end": 342
+										}
+									]
+								},
+								{
+									"type": "BinaryExpression",
+									"start": 344,
+									"end": 349,
+									"left": {
+										"type": "Identifier",
+										"start": 344,
+										"end": 345,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 348,
+										"end": 349,
+										"name": "b"
+									}
+								},
+								{
+									"type": "BinaryExpression",
+									"start": 352,
+									"end": 362,
+									"left": {
+										"type": "Identifier",
+										"start": 352,
+										"end": 353,
+										"name": "c"
+									},
+									"operator": ">",
+									"right": {
+										"type": "SequenceExpression",
+										"start": 357,
+										"end": 361,
+										"expressions": [
+											{
+												"type": "Identifier",
+												"start": 357,
+												"end": 358,
+												"name": "d"
+											},
+											{
+												"type": "Identifier",
+												"start": 360,
+												"end": 361,
+												"name": "e"
+											}
+										]
+									}
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 427,
+					"end": 459,
+					"expression": {
+						"type": "CallExpression",
+						"start": 427,
+						"end": 458,
+						"callee": {
+							"type": "Identifier",
+							"start": 427,
+							"end": 429,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 431,
+								"end": 436,
+								"left": {
+									"type": "Identifier",
+									"start": 431,
+									"end": 432,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 435,
+									"end": 436,
+									"name": "b"
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " k ",
+										"start": 438,
+										"end": 445
+									}
+								]
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 447,
+								"end": 457,
+								"left": {
+									"type": "Identifier",
+									"start": 447,
+									"end": 448,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "SequenceExpression",
+									"start": 452,
+									"end": 456,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 452,
+											"end": 453,
+											"name": "d"
+										},
+										{
+											"type": "Identifier",
+											"start": 455,
+											"end": 456,
+											"name": "e"
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block comment behind the pair stays ahead of the comma",
+							"start": 366,
+							"end": 425
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 461,
+					"end": 502,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 467,
+							"end": 501,
+							"id": {
+								"type": "Identifier",
+								"start": 467,
+								"end": 469,
+								"name": "a3"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 472,
+								"end": 501,
+								"elements": [
+									{
+										"type": "BinaryExpression",
+										"start": 474,
+										"end": 479,
+										"left": {
+											"type": "Identifier",
+											"start": 474,
+											"end": 475,
+											"name": "a"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 478,
+											"end": 479,
+											"name": "b"
+										},
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " k ",
+												"start": 481,
+												"end": 488
+											}
+										]
+									},
+									{
+										"type": "BinaryExpression",
+										"start": 490,
+										"end": 500,
+										"left": {
+											"type": "Identifier",
+											"start": 490,
+											"end": 491,
+											"name": "c"
+										},
+										"operator": ">",
+										"right": {
+											"type": "SequenceExpression",
+											"start": 495,
+											"end": 499,
+											"expressions": [
+												{
+													"type": "Identifier",
+													"start": 495,
+													"end": 496,
+													"name": "d"
+												},
+												{
+													"type": "Identifier",
+													"start": 498,
+													"end": 499,
+													"name": "e"
+												}
+											]
+										}
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 504,
+					"end": 534,
+					"expression": {
+						"type": "SequenceExpression",
+						"start": 505,
+						"end": 532,
+						"expressions": [
+							{
+								"type": "BinaryExpression",
+								"start": 506,
+								"end": 511,
+								"left": {
+									"type": "Identifier",
+									"start": 506,
+									"end": 507,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 510,
+									"end": 511,
+									"name": "b"
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " k ",
+										"start": 513,
+										"end": 520
+									}
+								]
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 522,
+								"end": 532,
+								"left": {
+									"type": "Identifier",
+									"start": 522,
+									"end": 523,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "SequenceExpression",
+									"start": 527,
+									"end": 531,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 527,
+											"end": 528,
+											"name": "d"
+										},
+										{
+											"type": "Identifier",
+											"start": 530,
+											"end": 531,
+											"name": "e"
+										}
+									]
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 595,
+					"end": 631,
+					"expression": {
+						"type": "CallExpression",
+						"start": 595,
+						"end": 630,
+						"callee": {
+							"type": "Identifier",
+							"start": 595,
+							"end": 597,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 602,
+								"end": 607,
+								"left": {
+									"type": "Identifier",
+									"start": 602,
+									"end": 603,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 606,
+									"end": 607,
+									"name": "b"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " k",
+										"start": 610,
+										"end": 614
+									}
+								]
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 617,
+								"end": 627,
+								"left": {
+									"type": "Identifier",
+									"start": 617,
+									"end": 618,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "SequenceExpression",
+									"start": 622,
+									"end": 626,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 622,
+											"end": 623,
+											"name": "d"
+										},
+										{
+											"type": "Identifier",
+											"start": 625,
+											"end": 626,
+											"name": "e"
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A line comment behind the pair ends the element's line",
+							"start": 536,
+							"end": 593
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 633,
+					"end": 678,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 639,
+							"end": 677,
+							"id": {
+								"type": "Identifier",
+								"start": 639,
+								"end": 641,
+								"name": "a4"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 644,
+								"end": 677,
+								"elements": [
+									{
+										"type": "BinaryExpression",
+										"start": 649,
+										"end": 654,
+										"left": {
+											"type": "Identifier",
+											"start": 649,
+											"end": 650,
+											"name": "a"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 653,
+											"end": 654,
+											"name": "b"
+										},
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " k",
+												"start": 657,
+												"end": 661
+											}
+										]
+									},
+									{
+										"type": "BinaryExpression",
+										"start": 664,
+										"end": 674,
+										"left": {
+											"type": "Identifier",
+											"start": 664,
+											"end": 665,
+											"name": "c"
+										},
+										"operator": ">",
+										"right": {
+											"type": "SequenceExpression",
+											"start": 669,
+											"end": 673,
+											"expressions": [
+												{
+													"type": "Identifier",
+													"start": 669,
+													"end": 670,
+													"name": "d"
+												},
+												{
+													"type": "Identifier",
+													"start": 672,
+													"end": 673,
+													"name": "e"
+												}
+											]
+										}
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 680,
+					"end": 709,
+					"expression": {
+						"type": "SequenceExpression",
+						"start": 681,
+						"end": 707,
+						"expressions": [
+							{
+								"type": "BinaryExpression",
+								"start": 682,
+								"end": 687,
+								"left": {
+									"type": "Identifier",
+									"start": 682,
+									"end": 683,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 686,
+									"end": 687,
+									"name": "b"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " k",
+										"start": 690,
+										"end": 694
+									}
+								]
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 697,
+								"end": 707,
+								"left": {
+									"type": "Identifier",
+									"start": 697,
+									"end": 698,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "SequenceExpression",
+									"start": 702,
+									"end": 706,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 702,
+											"end": 703,
+											"name": "d"
+										},
+										{
+											"type": "Identifier",
+											"start": 705,
+											"end": 706,
+											"name": "e"
+										}
+									]
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 784,
+					"end": 820,
+					"expression": {
+						"type": "CallExpression",
+						"start": 784,
+						"end": 819,
+						"callee": {
+							"type": "Identifier",
+							"start": 784,
+							"end": 786,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 796,
+								"end": 801,
+								"left": {
+									"type": "Identifier",
+									"start": 796,
+									"end": 797,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 800,
+									"end": 801,
+									"name": "b"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " k",
+										"start": 788,
+										"end": 792
+									}
+								]
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 806,
+								"end": 816,
+								"left": {
+									"type": "Identifier",
+									"start": 806,
+									"end": 807,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "SequenceExpression",
+									"start": 811,
+									"end": 815,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 811,
+											"end": 812,
+											"name": "d"
+										},
+										{
+											"type": "Identifier",
+											"start": 814,
+											"end": 815,
+											"name": "e"
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A line comment glued to the list's opening delimiter keeps that line",
+							"start": 711,
+							"end": 782
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 822,
+					"end": 867,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 828,
+							"end": 866,
+							"id": {
+								"type": "Identifier",
+								"start": 828,
+								"end": 830,
+								"name": "a5"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 833,
+								"end": 866,
+								"elements": [
+									{
+										"type": "BinaryExpression",
+										"start": 843,
+										"end": 848,
+										"left": {
+											"type": "Identifier",
+											"start": 843,
+											"end": 844,
+											"name": "a"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 847,
+											"end": 848,
+											"name": "b"
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " k",
+												"start": 835,
+												"end": 839
+											}
+										]
+									},
+									{
+										"type": "BinaryExpression",
+										"start": 853,
+										"end": 863,
+										"left": {
+											"type": "Identifier",
+											"start": 853,
+											"end": 854,
+											"name": "c"
+										},
+										"operator": ">",
+										"right": {
+											"type": "SequenceExpression",
+											"start": 858,
+											"end": 862,
+											"expressions": [
+												{
+													"type": "Identifier",
+													"start": 858,
+													"end": 859,
+													"name": "d"
+												},
+												{
+													"type": "Identifier",
+													"start": 861,
+													"end": 862,
+													"name": "e"
+												}
+											]
+										}
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -2135,7 +2135,9 @@ impl<'a> Printer<'a> {
             },
             |frozen| self.build_frozen_expression_doc(expr, frozen),
         );
-        if matches!(expr.kind, ExpressionKind::AssignmentExpression(_)) {
+        if matches!(expr.kind, ExpressionKind::AssignmentExpression(_))
+            || self.relational_sibling_pair_is_kept(expr)
+        {
             d.parens(core)
         } else {
             core
@@ -2222,6 +2224,7 @@ impl<'a> Printer<'a> {
         parens: SeqParens,
         layout: SeqLayout,
     ) -> DocId {
+        self.mark_relational_sibling_authored_pairs(seq.expressions.iter().copied().map(Some));
         let keep_trailing_inside = matches!(parens, SeqParens::KeepInside);
         // Where this builder's comment scans open: the FIRST OPERAND, never `seq_span.start`.
         // The leading edge between the two — the grouping `(` the parser stripped from that

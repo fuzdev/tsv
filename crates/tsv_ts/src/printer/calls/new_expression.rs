@@ -231,6 +231,7 @@ impl<'a> Printer<'a> {
         callee_with_types: DocId,
         paren_open: u32,
     ) -> DocId {
+        self.mark_relational_sibling_authored_pairs(new_expr.arguments.iter().copied().map(Some));
         let d = self.d();
 
         // Single template literal argument with embedded newlines on the same line as `(` —

@@ -285,6 +285,7 @@ fn build_call_args_doc(
     // mark — a per-arm spelling left every arm but the default list blind. The member-chain
     // printer marks at the same point of its own entry, so a chain HEAD answers alike.
     mark_boolean_coercion_argument(printer, call);
+    printer.mark_relational_sibling_authored_pairs(call.arguments.iter().copied().map(Some));
 
     // Single template literal argument with embedded newlines on the same line as `(` — hug
     // it. A template on its own line declines and falls through to the layouts below, whose

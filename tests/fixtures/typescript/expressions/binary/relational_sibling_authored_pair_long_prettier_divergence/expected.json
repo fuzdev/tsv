@@ -1,0 +1,291 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 580,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " At 100 columns the authored pair and the list stay on one line",
+			"start": 20,
+			"end": 85
+		},
+		{
+			"type": "Line",
+			"value": " At 101 columns the list breaks, one element a line, and the pair stays",
+			"start": 187,
+			"end": 260
+		},
+		{
+			"type": "Line",
+			"value": " A paired comparison too wide for a line breaks inside its pair",
+			"start": 370,
+			"end": 435
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 579,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 570,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 87,
+					"end": 185,
+					"expression": {
+						"type": "CallExpression",
+						"start": 87,
+						"end": 184,
+						"callee": {
+							"type": "Identifier",
+							"start": 87,
+							"end": 89,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 91,
+								"end": 96,
+								"left": {
+									"type": "Identifier",
+									"start": 91,
+									"end": 92,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 95,
+									"end": 96,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 99,
+								"end": 183,
+								"left": {
+									"type": "Identifier",
+									"start": 99,
+									"end": 100,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "SequenceExpression",
+									"start": 104,
+									"end": 182,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 104,
+											"end": 105,
+											"name": "d"
+										},
+										{
+											"type": "Identifier",
+											"start": 107,
+											"end": 182,
+											"name": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At 100 columns the authored pair and the list stay on one line",
+							"start": 20,
+							"end": 85
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 262,
+					"end": 368,
+					"expression": {
+						"type": "CallExpression",
+						"start": 262,
+						"end": 367,
+						"callee": {
+							"type": "Identifier",
+							"start": 262,
+							"end": 264,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 269,
+								"end": 274,
+								"left": {
+									"type": "Identifier",
+									"start": 269,
+									"end": 270,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 273,
+									"end": 274,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 279,
+								"end": 364,
+								"left": {
+									"type": "Identifier",
+									"start": 279,
+									"end": 280,
+									"name": "c"
+								},
+								"operator": ">",
+								"right": {
+									"type": "SequenceExpression",
+									"start": 284,
+									"end": 363,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 284,
+											"end": 285,
+											"name": "d"
+										},
+										{
+											"type": "Identifier",
+											"start": 287,
+											"end": 363,
+											"name": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At 101 columns the list breaks, one element a line, and the pair stays",
+							"start": 187,
+							"end": 260
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 437,
+					"end": 569,
+					"expression": {
+						"type": "CallExpression",
+						"start": 437,
+						"end": 568,
+						"callee": {
+							"type": "Identifier",
+							"start": 437,
+							"end": 439,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 444,
+								"end": 550,
+								"left": {
+									"type": "Identifier",
+									"start": 444,
+									"end": 494,
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 500,
+									"end": 550,
+									"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 555,
+								"end": 565,
+								"left": {
+									"type": "Identifier",
+									"start": 555,
+									"end": 556,
+									"name": "d"
+								},
+								"operator": ">",
+								"right": {
+									"type": "SequenceExpression",
+									"start": 560,
+									"end": 564,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 560,
+											"end": 561,
+											"name": "e"
+										},
+										{
+											"type": "Identifier",
+											"start": 563,
+											"end": 564,
+											"name": "f"
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A paired comparison too wide for a line breaks inside its pair",
+							"start": 370,
+							"end": 435
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

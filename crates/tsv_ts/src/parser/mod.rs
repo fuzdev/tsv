@@ -121,8 +121,9 @@ fn comment_from_token(
 /// - the closer of the delimiter the `<` was written in ([`Parser::exit_grouping`], read
 ///   against [`LtRegion::floor`] as `no_in_depth` reads its baseline) — call arguments,
 ///   a parameter list, `[…]`, `{…}`, each `${…}` of a template. **A grouping paren is
-///   not one**: the printer may strip it, so `f((x < q), a > b)` prints as one comma
-///   list, and the region re-anchors one level out instead
+///   not one**: the printer may strip it, so the region re-anchors one level out
+///   instead. A comma-list owner may retain an authored comparison pair when a later
+///   sibling holds a flagged closer; retention leaves this region verdict unchanged
 ///   ([`Parser::exit_stripped_grouping`]);
 /// - a statement, module-item or class-member boundary
 ///   ([`Parser::lt_regions_statement_base`]), and the two places a statement's own parts

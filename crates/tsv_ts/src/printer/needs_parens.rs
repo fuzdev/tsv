@@ -1699,7 +1699,8 @@ pub(in crate::printer) fn binary_operand_pair(
 // first two. Each is a pair the printed tokens need as they stand (the dividend rule asks
 // no position, the instantiation's bare spelling is a line break, and the literal's is
 // one the number printer does not emit), so the answer there is a pair on the `<` side,
-// which needs the `<` node to know about a `>` in a later sibling.
+// synthesized where no authored pair is present. A comma-list owner retains an
+// authored whole-element pair, which does not answer this invented-pair gap.
 pub(in crate::printer) fn clarity_pairs_behind_region_close(
     close: &BinaryExpression<'_>,
     in_for_init: bool,

@@ -1039,6 +1039,7 @@ impl<'a> Printer<'a> {
         seq_span: Span,
         build_elem: impl Fn(&Expression<'_>) -> DocId,
     ) -> DocId {
+        self.mark_relational_sibling_authored_pairs(seq.expressions.iter().copied().map(Some));
         // A MULTI-LINE block the FIRST operand OWNS prints ahead of the run, outside the
         // layout's group ([`Printer::build_doc_with_outermost_owned_comment_at`]) — the
         // general sequence printer's rule, at the clause that keeps its own copy of the
@@ -1123,17 +1124,26 @@ impl<'a> Printer<'a> {
                         // rather than wrapped here.
                         self.build_for_clause_operand_doc(e, seq_span.end, frozen)
                     } else {
-                        frozen.map_or_else(
+                        // The authored pair the clause keeps around a comparison
+                        // ([`Printer::mark_relational_sibling_authored_pairs`]) is asked
+                        // FIRST, because it is also a pair the header's `[~In]` rule would
+                        // otherwise add: the frozen arm is told so and adds none, and the
+                        // unfrozen arm's `build_elem` adds its own only around an `in`
+                        // binary, which then supplies the kept pair.
+                        let kept = self.relational_sibling_pair_is_kept(e);
+                        let core = frozen.map_or_else(
                             || build_elem(e),
                             |frozen| {
                                 self.wrap_frozen_for_init_in(
                                     e,
                                     frozen,
-                                    false,
+                                    kept,
                                     self.build_frozen_expression_doc(e, frozen),
                                 )
                             },
-                        )
+                        );
+                        let in_pair_printed = frozen.is_none() && self.for_init_in_needs_parens(e);
+                        self.wrap_relational_sibling_pair(e, in_pair_printed, core)
                     });
                     if i == 0 {
                         first_end = docs.len();
