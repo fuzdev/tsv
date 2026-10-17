@@ -32,8 +32,7 @@ enum ChildSlot {
 impl ChildSlot {
     /// Whether an assignment standing here takes the pair the printer's style puts around
     /// it — every position but `Other` — so that, in a region, the pair follows the source
-    /// ([`Printer::mark_region_source_pairs`]) and is the assignment's own
-    /// ([`supplies_its_own_pair`]).
+    /// ([`Printer::mark_region_source_pairs`]).
     fn assignment_pair_follows_source(self) -> bool {
         !matches!(self, Self::Other)
     }
@@ -227,16 +226,20 @@ fn holds_region_closer(expr: &Expression<'_>) -> bool {
     expression_holds_binary(expr, |binary| binary.may_close_type_arguments)
 }
 
-/// Whether the pair the author wrote around `expr` at `slot` is one the printer decides on
-/// its own terms — a sequence's or a JSDoc cast's, which it always prints, or an
-/// assignment's at a position where the region rules already make that pair follow the
-/// source ([`Printer::mark_region_source_pairs`]) — so keeping it again would wrap twice.
-fn supplies_its_own_pair(expr: &Expression<'_>, slot: ChildSlot) -> bool {
-    match expr.kind {
-        ExpressionKind::SequenceExpression(_) | ExpressionKind::JsdocCast(_) => true,
-        ExpressionKind::AssignmentExpression(_) => slot.assignment_pair_follows_source(),
-        _ => false,
-    }
+/// Whether `expr` prints a pair of its own that the pair found around it would double: a
+/// sequence, whose own pair is the one the walk finds (`fn((a < b, c), d > (e, f))` would
+/// print `((a < b, c))`), and a JSDoc cast, whose own pair holds the comparison, so a
+/// redundant one around the cast is left out as prettier leaves it.
+///
+/// An assignment is not one: its authored pair is kept like any other node's, since a
+/// carrier that prints its operands itself — a `for` header's clause — prints no pair of
+/// the assignment's style, and stripped there `(x = a < b), e > (f, g)` reads as one
+/// generic call.
+fn supplies_its_own_pair(expr: &Expression<'_>) -> bool {
+    matches!(
+        expr.kind,
+        ExpressionKind::SequenceExpression(_) | ExpressionKind::JsdocCast(_)
+    )
 }
 
 impl Printer<'_> {
@@ -419,9 +422,7 @@ impl Printer<'_> {
             holds_opener |= self.mark_region_source_pairs(child, slot);
             false
         });
-        if holds_opener
-            && !supplies_its_own_pair(expr, slot)
-            && self.holds_authored_pair(expr, list_end)
+        if holds_opener && !supplies_its_own_pair(expr) && self.holds_authored_pair(expr, list_end)
         {
             self.mark_relational_sibling_pair(expr.span());
         }
