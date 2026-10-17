@@ -21,7 +21,7 @@
 //! regex containing `\`; and an instrument that shared the product lexer's
 //! extent rules would inherit its bugs):
 //!
-//! - **TS/JS** — `//` + `/* */` (+ the byte-0 `#!` hashbang), with strings,
+//! - **TS/JS** — `//` + `/* */` (+ the leading `#!` hashbang), with strings,
 //!   template literals (interpolation stack included), and regex literals
 //!   opaque. Regex-vs-division uses the classic previous-significant-token
 //!   heuristic; where it misreads, it misreads the input and the output with the
@@ -96,7 +96,7 @@ impl CensusBucket {
 /// one of the two template heads the Svelte scanner counts beside the comments.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum CensusKind {
-    /// `//` (and the byte-0 `#!` hashbang, whose content includes the `#!`).
+    /// `//` (and the leading `#!` hashbang, whose content includes the `#!`).
     Line,
     /// `/* */`
     Block,
@@ -241,15 +241,15 @@ fn line_terminator_offset(s: &str) -> usize {
         .map_or(s.len(), |(i, _)| i)
 }
 
-/// Scan a whole TS/JS file: the byte-0 `#!` hashbang (content includes the `#!`,
-/// mirroring `tsv_lang::Comment`), then ordinary code.
+/// Scan a whole TS/JS file: the `#!` hashbang at the start of the source text (content
+/// includes the `#!`, mirroring `tsv_lang::Comment`), then ordinary code.
 fn scan_ts_file(source: &str, out: &mut CensusMultiset) {
-    let mut start = 0;
-    // A BOM may precede the hashbang check in neither grammar; tsv treats the
-    // hashbang as strictly byte-0, so the census does too.
-    if source.starts_with("#!") {
-        let end = line_terminator_offset(source);
-        record(out, CensusBucket::Ts, CensusKind::Line, &source[..end]);
+    // A leading BOM is the file's encoding mark, not its text: tsv's lexer skips it, so a
+    // hashbang behind it still starts the source text, and the census reads it there too.
+    let mut start = tsv_lang::leading_bom_len(source);
+    if source[start..].starts_with("#!") {
+        let end = start + line_terminator_offset(&source[start..]);
+        record(out, CensusBucket::Ts, CensusKind::Line, &source[start..end]);
         start = end;
     }
     let mut scanner = TsScanner::new(&source[start..], CensusBucket::Ts, out);
@@ -1245,6 +1245,11 @@ mod tests {
                 "#!/usr/bin/env node".into(),
                 1
             )]
+        );
+        // Behind a BOM, which is no text of the file's.
+        assert_eq!(
+            ts("\u{FEFF}#!/usr/bin/env node\nconst a = 1;\n"),
+            ts("#!/usr/bin/env node\nconst a = 1;\n")
         );
     }
 
