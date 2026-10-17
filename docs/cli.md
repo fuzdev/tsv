@@ -45,14 +45,14 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
   fans onto `node:worker_threads`, spawning `cli.js` as its own worker. Its two
   **defaults** are both smaller than the native CLI's:
   - **When to pool at all.** A pool costs tens of milliseconds to bring up here
-    against the native pool's ~50 µs of thread spawn, so with no `--jobs` given
+    against the native pool's near-free thread spawn, so with no `--jobs` given
     the run stays single-threaded until the in-scope file count clears a
-    threshold — measured at ~565 files on the WASM engine and ~394 on N-API,
-    with the shipped constants set above each so a pool is only taken where it
-    clearly pays.
+    threshold — measured per engine (lower on N-API than on WASM), with the
+    shipped constants set above each so a pool is only taken where it clearly
+    pays.
   - **How wide.** Not the native `min(logical, ceil(1.5 × physical))`. That
     rule assumes an idle machine, and on the WASM engine V8's own wasm tier-up
-    is already using roughly a third of one before the first worker exists — so
+    is already using part of one before the first worker exists — so
     the pool peaks at half the physical cores and *regresses* past it. The
     N-API mirror has no compiler thread to compete with and peaks at the
     physical core count.
@@ -81,8 +81,8 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
   repeated SWITCHES stay fine on both (argh counts them).
 
   The bound does a different job here than natively: a JS worker is a whole V8
-  isolate (~13 MB resident on either engine, where the native thread's
-  reservation is lazily committed and costs ~none), so an unbounded width on a
+  isolate (megabytes resident on either engine, where the native thread's
+  reservation is lazily committed and costs almost nothing), so an unbounded width on a
   large tree hits the machine's *memory* — ending in an uncatchable OOM SIGKILL
   — long before the OS refuses a thread, and the file-count clamp bounds nothing
   on exactly the trees large enough to matter. An explicit width remains the

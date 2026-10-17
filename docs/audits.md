@@ -885,11 +885,11 @@ source as TypeScript. It grades the engines alone (the drivers' strip contract i
 CLI binary.
 
 The WASM side runs under **node**, the host `cli.js` ships for, not under Deno's compat
-layer — which is not a detail. The audit's first run failed on a `cli.js` bug that exists
-only on that host: spawning the worker pool pipes the workers' stdio through the parent,
-flipping fd 1 to non-blocking, after which the CLI's synchronous `writeFileSync(1, …)` threw
-`EAGAIN` into a full pipe and killed the run — with files already rewritten and the report of
-what changed lost.
+layer — which is not a detail: some `cli.js` bugs exist only on that host. Spawning the
+worker pool pipes the workers' stdio through the parent and flips fd 1 to non-blocking, so a
+synchronous `writeFileSync(1, …)` can throw `EAGAIN` into a full pipe and kill the run — with
+files already rewritten and the report of what changed lost — which Deno's layer would never
+show.
 
 **Blind spots.** It compares the two CLI **drivers** as well as the two engines, so a
 driver-only difference reads as a failure here (a real finding, just a differently
