@@ -279,9 +279,9 @@ fn is_graded(kind: BlankKind) -> bool {
 ///
 /// This is a deliberate divergence from `fuzz` / `roundtrip_audit`, where non-idempotency is an
 /// absolute (never-pinnable) gate: here it IS pinned. The audit is a **ratchet over a live bug
-/// family** born RED — its baseline is a snapshot of known bugs whose shrinking is the goal, so
-/// day-one findings must be pinnable or the gate would hard-block `deno task check` on landing.
-/// Only a crash stays absolute. (`STRUCTURAL-DIVERGENCE` is the one report-only carve-out, handled a
+/// family** — its baseline is a snapshot of known bugs whose shrinking is the goal, so every
+/// finding but a crash must be pinnable or the gate could not stand in `deno task check`. Only a
+/// crash stays absolute. (`STRUCTURAL-DIVERGENCE` is the one report-only carve-out, handled a
 /// layer up by [`is_graded`] — it never reaches this predicate.)
 fn is_pinnable(kind: BlankKind) -> bool {
     kind != BlankKind::Panic

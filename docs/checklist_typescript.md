@@ -29,7 +29,7 @@ Foundation for all parsing.
 - Whitespace tokens — ECMAScript WhiteSpace (space, tab, VT, FF, NBSP, ZWNBSP/U+FEFF, other Zs)
 - Line terminators (LF, CR, CRLF, LS/U+2028, PS/U+2029)
 - Unicode BOM handling (intentional divergence: tsv strips BOM)
-- Hashbang comments (`#!/usr/bin/env node`, terminated by any line terminator) - ES2023
+- Hashbang comments (`#!/usr/bin/env node`, terminated by any line terminator) - ES2023; read only at the start of a whole file (behind a leading BOM too), never in a Svelte `<script>` or template expression ([conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md#typescript-corrections))
 
 ### Comments
 

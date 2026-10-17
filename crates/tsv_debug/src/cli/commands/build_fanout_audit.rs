@@ -848,7 +848,7 @@ fn print_human(results: &[ConstructResult], failed: usize) {
     println!();
     if failed > 0 {
         println!(
-            "FAIL: {failed}/{} constructs show super-linear doc-node fanout (limit exponent {MAX_EXPONENT:.1}).",
+            "FAIL: {failed}/{} constructs show doc-node fanout past the exponent limit ({MAX_EXPONENT:.1}).",
             results.len()
         );
         println!("Cause: a builder rebuilds a child subtree once per layout candidate (e.g.");

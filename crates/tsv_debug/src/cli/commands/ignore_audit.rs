@@ -258,9 +258,9 @@ impl IgnoreKind {
 
 /// Whether a shape may be **pinned** into the snapshot — everything but a [`IgnoreKind::Panic`].
 ///
-/// The audit is a **ratchet over a live bug family** born RED: the confirmed union gap and its
-/// suspected siblings are day-one findings, so they must be pinnable or the gate would hard-block
-/// `deno task check` on landing. Only a crash stays absolute.
+/// The audit is a **ratchet over a live bug family**: its snapshot pins known bugs whose
+/// shrinking is the goal, so every finding but a crash must be pinnable or the gate could not
+/// stand in `deno task check`. Only a crash stays absolute.
 fn is_pinnable(kind: IgnoreKind) -> bool {
     kind != IgnoreKind::Panic
 }

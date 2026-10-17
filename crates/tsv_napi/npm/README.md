@@ -82,7 +82,7 @@ A set value is exact. With none named and both grammars rejecting the source, th
 
 `strip_typescript(source)` turns TypeScript into JS by blanking every type to whitespace — no transform, no sourcemap: every surviving character keeps its line and UTF-16 column, line terminators are kept verbatim, and a type-free source comes back unchanged. Where blanking alone would let the next line continue the statement, one `;`, `(` or `)` takes a blanked character's place.
 
-It returns a result rather than throwing for what it finds in the source: `{ok: true, code}`, or `{ok: false, error}` with `error.kind` `'parse'` (the `message`, `start` and `loc` a `parse_typescript` of the source would throw at the goal the error belongs to) or `'unsupported'` (TypeScript that type blanking cannot erase — an `enum`, a value `namespace`, a parameter property, `import =`, `export =`, `<T>x`, or an `as` whose removal would regroup its expression — named by `error.construct`, with its span as `start`/`end` and `loc`, and a `message` with the line and a caret).
+It returns a result rather than throwing for what it finds in the source: `{ok: true, code}`, or `{ok: false, error}` with `error.kind` `'parse'` (the `message`, `start` and `loc` a `parse_typescript` of the source would throw at the goal the error belongs to) or `'unsupported'` (TypeScript that type blanking cannot erase — an `enum`, a value `namespace`, a parameter property, `import =`, `export =`, `<T>x`, or an `as` / `satisfies` whose removal would regroup its expression — named by `error.construct`, with its span as `start`/`end` and `loc`, and a `message` with the line and a caret).
 
 ```javascript
 import {strip_typescript} from '@fuzdev/tsv';

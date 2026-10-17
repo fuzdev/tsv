@@ -850,7 +850,8 @@ getting them wrong.
    the full `deno task bench` also runs the node conformance coverage surface — a
    pre-flight parse-coverage pass, no timed phase)
 3. **Record results** — for regression detection, use `deno task bench:deno:run -- --save-baseline` / `-- --compare-baseline` (or the `bench:node:run` / `bench:bun:run` siblings for the other runtimes)
-4. **Check the size axis if the change shrank a hot function** — see
+4. **Gate it against its base** — `deno task perf:ab <base>` ([§Gating a change against a base](#gating-a-change-against-a-base--deno-task-perfab))
+5. **Check the size axis if the change shrank a hot function** — see
    [An instruction A/B is blind to code size](#an-instruction-ab-is-blind-to-code-size); no `check` gate covers it
 
 ### Gating a change against a base — `deno task perf:ab`

@@ -102,12 +102,12 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
   N-API engine with no adapter — its workers, having no compiled module to
   inherit, load that engine themselves, while WASM workers take the main
   thread's module through the package's `./worker` entry and recompile nothing.
-  Behavioral changes to `format`/`parse` in either CLI must be mirrored in the
+  Behavioral changes to `format`/`parse`/`strip` in either CLI must be mirrored in the
   other and in the CLI tests of `scripts/test_npm.ts` (wasm) and
-  `scripts/test_napi_npm.ts` (native).
+  `scripts/test_napi_npm.ts` (native) — `strip`'s rows in `scripts/strip_suite.ts`, which both run.
 - **`tsv_debug` (development)**: Uses embedded Deno sidecar for external tools
   - Reuses `tsv_cli` infrastructure
-  - Commands, by family (the full catalog is the root [CLAUDE.md §Debug Tooling](../CLAUDE.md#debug-tooling) and [audits.md](audits.md), not duplicated here): fixtures (`fixture_init`, `fixtures_validate`, `fixtures_update*`, `fixtures_audit`), oracles (`check`, `compare`, `ast_diff`, `canonical_parse`, `format_prettier`, `test262`, `tsc_conformance` — see [typechecker.md](typechecker.md)), the standing audit family (`comment_audit`, `gap_audit`, `census_audit`, …), the compiler harnesses (`compile_*`, `canonical_compile`, `render_compare`), and profiling/metrics (`profile`, `json_profile`, `arena_stats`, `buffer_sizes`, `metrics`, `line_width`, `lex_diff`)
+  - Commands, by family (the full catalog is the root [CLAUDE.md §Debug Tooling](../CLAUDE.md#debug-tooling) and [audits.md](audits.md), not duplicated here): fixtures (`fixture_init`, `fixtures_validate`, `fixtures_update*`, `fixtures_audit`), oracles (`check`, `compare`, `ast_diff`, `canonical_parse`, `format_prettier`, `test262`, `tsc_conformance` — see [typechecker.md](typechecker.md)), the standing audit family (`comment_audit`, `gap_audit`, `census_audit`, …), the compiler harnesses (`compile_*`, `canonical_compile`, `render_compare`), the type strip (`strip`, its `--stdin` the strip-corpus side), and profiling/metrics (`profile`, `json_profile`, `arena_stats`, `buffer_sizes`, `metrics`, `line_width`, `lex_diff`)
 
 ### External Tools (via Embedded Deno Sidecar)
 

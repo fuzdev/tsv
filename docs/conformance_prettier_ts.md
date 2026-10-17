@@ -505,7 +505,8 @@ parser marked `may_close_type_arguments`. `fn((a < b), c > (d, e))` stays as wri
 stripped, it is the generic call `fn(a<b, c>(d, e))` to every parser. The owner's
 walk reaches every expression child, stopping at function, class and block bodies.
 The closer's follower is not read and no pair is synthesized on a bare element.
-A doubled pair becomes one; an assignment, sequence or JSDoc cast supplies its own.
+A doubled pair becomes one; a sequence or JSDoc cast supplies its own, and an assignment
+keeps the pair the author wrote, a `for` header's clause included.
 The rule's superset keeps the harmless pair in `fn((a < b), c > d)` too, beside
 `fn(a < b, c > d)` — the same soundness warrant as the clarity-pair hold below.
 The same holds at every depth of the region: from the `<` element to the closer's, both
@@ -530,8 +531,9 @@ so the pair strips and the line still reads as written. A kept pair ends the cha
 (`fn(() => ((c): boolean => c < d), e > (f, g))`) prints as an ordinary arrow body, not as a
 curried chain broken open. A comparison inside a bracket of its own
 (`fn(g(h, (c < d)), …)`, `[(c < d)]`) opens no region the later `>` closes, so its pair
-follows the ordinary rules. A sequence and a JSDoc cast supply their own pair, as does an
-assignment at a position whose pair the region already follows from the source. **Known
+follows the ordinary rules. A sequence and a JSDoc cast supply their own pair; an
+assignment's authored pair is kept at every carrier, a `for` header's clause included, where
+stripped (`(x = a < b), e > (f, g)`) the line reads as one generic call. **Known
 gap**: a same-operator logical chain still rebalances through a kept pair
 (`assert(ready && (ok && lo < hi), …)` prints `ready && ok && lo < hi`), and the line reads as
 a generic call. **Known gap**: a blank line the

@@ -844,7 +844,7 @@ input surfaces the dead divergence.
 **When no fixed point carries the divergence.** `input.*` must be a prettier fixed point
 (F3) and the two ASTs must differ on it (S17). A parse divergence reachable only from a
 spelling prettier rewrites — every acorn-rejected form of `a ? (b) : c => d` prints as
-`b ? c : (d) => e`, which acorn accepts — has no `input.*` to live in. Pin it as a
+`a ? b : (c) => d`, which acorn accepts — has no `input.*` to live in. Pin it as a
 **formatting claim** instead: a plain fixture whose `unformatted_<what moved>` variant
 holds the divergent spellings (both formatters must normalize them to the fixed point,
 and the formatted form discriminates the reading), plus a node-type test under

@@ -1134,7 +1134,9 @@ every fixture's `expected.json` and `output_prettier.svelte`. The two pin sets
 parser/formatter that defines fixture correctness. Agreement across all pin sites
 (sidecar `VERSIONS` + its `npm:` imports, `benches/js/package.json`, actor.rs's
 acorn import-map pin, and the sidecar `deno.lock` — which also pins the
-literal-less transitives, `LOCKED_TRANSITIVE`) is enforced by `deno task pins:audit`
+literal-less transitives, `LOCKED_TRANSITIVE`) — and the prettier OPTIONS, which the bench's
+`PRETTIER_OPTIONS` (`benches/js/lib/canonical.ts`) and the sidecar's inline call must spell
+identically — is enforced by `deno task pins:audit`
 (`scripts/check_canonical_pins.ts --pins`, gated in `deno task check`).
 
 **Checkout alignment** is the same script's other mode (`deno task

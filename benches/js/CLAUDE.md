@@ -519,8 +519,8 @@ TS edge-case oracle: the shape real-world code can't reach. Entry:
 Scope: every `input.ts` under the suite root (`*.test.ts` / `utils.ts` harness files
 excluded by basename). `.tsx`/JSX fixtures parse as ordinary `.ts` here — tsv and
 acorn (module mode, no JSX plugin) both reject them, so they land in `parity`.
-Sanctions here are deprecated syntax tsv declines (e.g. import assertions `assert
-{…}`) or input its own grammar rejects (`TS_FIXTURE_SANCTIONS`). Strict about
+Sanctions here are deprecated syntax tsv declines (import assertions `assert
+{…}`, `TS_FIXTURE_SANCTIONS`). Strict about
 setup: a missing checkout (0 scanned) **FAILS** — a run that graded nothing must not
 read as a pass; the tolerance point for machines without it is publish Step 3b's
 preflight. Unlike the Svelte tree's backlog this corpus is near-clean, so its AST-shape half can

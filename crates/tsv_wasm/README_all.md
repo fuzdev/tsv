@@ -146,7 +146,7 @@ To run tsv across threads, compile once and share: the main entry exports `wasm_
 It never throws for what it finds in the source. It returns `{ok: true, code}`, or `{ok: false, error}` where `error.kind` says why:
 
 - `'parse'` — the source does not parse: the `message`, `start` and `loc` a `parse_typescript` of it would throw at the goal the error belongs to;
-- `'unsupported'` — the source holds TypeScript that type blanking cannot erase: `error.construct` names it (`'enum'`, `'value_namespace'`, `'parameter_property'`, `'import_equals'`, `'export_equals'`, `'type_assertion'` for `<T>x`, or `'assertion_grouping'` for an `as` whose removal would regroup its expression), `start`/`end` and `loc` give its span in the AST's coordinates, and `message` says it with the line and a caret.
+- `'unsupported'` — the source holds TypeScript that type blanking cannot erase: `error.construct` names it (`'enum'`, `'value_namespace'`, `'parameter_property'`, `'import_equals'`, `'export_equals'`, `'type_assertion'` for `<T>x`, or `'assertion_grouping'` for an `as` / `satisfies` whose removal would regroup its expression), `start`/`end` and `loc` give its span in the AST's coordinates, and `message` says it with the line and a caret.
 
 ```typescript
 import {strip_typescript} from '@fuzdev/tsv-wasm';
