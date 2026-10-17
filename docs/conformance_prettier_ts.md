@@ -1001,9 +1001,10 @@ parser refuses them because tsc's scanner has no sloppy mode. There is no
   [script_goal/sloppy_legacy_octal_escape](../tests/fixtures/typescript/script_goal/sloppy_legacy_octal_escape_prettier_divergence/).
   A bare `'\0'` is the NUL escape, legal in strict code and no divergence
 
-Every form is disallowed in strict code by **production** (ecma262
-sec-strict-mode-of-ecmascript for the literals, sec-literals-string-literals for the
-escapes), not by an early error, so they are legal exactly where the code is sloppy: a Script
+Strict code makes every form a Syntax Error — a Static Semantics early error,
+*IsStrict(this production)* (ecma262 sec-numeric-literals-early-errors for the literals,
+sec-string-literals-early-errors for the escapes; Annex C restates them as disallowed
+productions) — so they are legal exactly where the code is sloppy: a Script
 whose directive prologue holds no `"use strict"`. tsv's Script goal is spec-conforming, so it
 reads them and prints them verbatim. A Svelte `<script>` is always a module and every `parse`
 entry point defaults to `Goal::Module`, so `parse` reaches these only when asked for the

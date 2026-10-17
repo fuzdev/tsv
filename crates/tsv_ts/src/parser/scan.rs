@@ -429,7 +429,8 @@ pub(super) fn skip_identifier(bytes: &[u8], mut pos: usize) -> usize {
 }
 
 /// The two leading-zero numeric literals the sloppy grammar admits and strict code
-/// disallows by production (ecma262 sec-strict-mode-of-ecmascript).
+/// makes a Syntax Error — one of the strict-mode rules
+/// [`Parser::strict`](super::Parser::strict) gates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LeadingZeroLiteral {
     /// `LegacyOctalIntegerLiteral` — `0` followed by octal digits only (`010`,

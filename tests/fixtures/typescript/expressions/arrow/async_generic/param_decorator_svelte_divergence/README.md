@@ -29,7 +29,9 @@ generic and non-generic forms is an artifact of its arrow lookahead, nor on pret
 which is the formatting reference only. On the generic forms tsc raises TS1206 from its
 checker, which the reject-vs-defer line
 ([conformance_tsc.md](../../../../../../../docs/conformance_tsc.md#the-reject-vs-defer-line))
-normally defers. The three non-fixture rows are the ordinary drop-in rejections pinned by
+normally defers. tsv rejects them anyway: the generic spellings are a **sanctioned
+over-rejection**, so every arrow form draws one line rather than following the
+lookahead's split. The three non-fixture rows are the ordinary drop-in rejections pinned by
 the `input_invalid_*` cases in
 [typescript_specific/decorators/parameter_arrow](../../../../typescript_specific/decorators/parameter_arrow/).
 

@@ -12,8 +12,13 @@ exists so `ObjectLiteral` can cover `ObjectAssignmentPattern` — and the reject
 is layered on top as a Static Semantics early error: *"It is a Syntax Error if any
 source text is matched by this production"*
 ([ecma262 §13.2.5.1](https://tc39.es/ecma262/#sec-object-initializer-static-semantics-early-errors)).
-Per tsv's permissive-parser stance the parser defers it to the diagnostics layer,
-so the formatter keeps formatting everything well-formed.
+That wording is the one the reject-vs-defer line
+([conformance_tsc.md](../../../../../../docs/conformance_tsc.md#the-reject-vs-defer-line))
+otherwise reads as grammar in disguise, which rejects. A **cover** production is the
+stated exception: it is not only an error hook but the parse of a valid pattern until a
+later token proves otherwise (`({ a = 1 } = x)`), so the parse that builds it keeps it.
+tsv's parser defers the error to the diagnostics layer, as tsc's parser does, so the
+formatter keeps formatting everything well-formed.
 
 **Acorn-typescript** (used by Svelte's parser) enforces the early error and rejects:
 
@@ -22,7 +27,8 @@ so the formatter keeps formatting everything well-formed.
 ```
 
 acorn-typescript is tsv's AST-**shape** target but not its correctness oracle; for
-validity the oracle is tsc, which reports its own error here. See
+validity the oracle is tsc, whose parser accepts and whose checker reports TS1312
+(*"Did you mean to use a ':'?"*). See
 [conformance_svelte.md §TypeScript Corrections](../../../../../../docs/conformance_svelte.md#typescript-corrections).
 
 ## Expected behavior

@@ -194,7 +194,7 @@ fn a_module_with_its_error_ahead_of_its_export_reports_its_own_error() {
 /// `await /[/**/]/ / x / 010;` is the tie no gate settles, so the tie-break alone decides
 /// it and the case fails with the tie-break reversed. At `Module` the `/` after `await`
 /// opens a regular expression whose class holds `/**/`, and the octal literal ends a
-/// division chain as an operand the strict disallowance refuses. At `Script` `await` is a
+/// division chain as an operand the strict leading-zero rule refuses. At `Script` `await` is a
 /// name, so that `/` divides, `/**/` lexes as a comment, and the reading lexes a second
 /// regular expression (`/ x /`) that ends just before the literal — a missing `;`. The
 /// two token streams part at the operand and meet again at the literal, and the script

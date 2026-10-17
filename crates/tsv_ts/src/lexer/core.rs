@@ -1031,9 +1031,10 @@ impl<'a> Lexer<'a> {
                     // The two leading-zero forms ECMAScript keeps alive for Script
                     // code: `LegacyOctalIntegerLiteral` (`010`, octal digits only)
                     // and `NonOctalDecimalIntegerLiteral` (`08`/`09`/`089`, an `8`
-                    // or `9` in the run). Both are disallowed in strict code — a
-                    // *production disallowance*, ecma262 sec-strict-mode-of-ecmascript
-                    // — so they are legal only in a sloppy Script. The lexer reads
+                    // or `9` in the run). Both are a Syntax Error in strict code — a
+                    // Static Semantics early error the parser enforces (ecma262
+                    // sec-numeric-literals-early-errors; `Parser::strict` says why it
+                    // rejects) — so they are legal only in a sloppy Script. The lexer reads
                     // both and records nothing: the strictness a leading-zero literal
                     // is graded under is the parser's to know, at the point the token
                     // becomes a node (`parse_number_or_bigint_literal`), which also

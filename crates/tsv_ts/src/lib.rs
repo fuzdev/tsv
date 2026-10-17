@@ -202,7 +202,7 @@ pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Progr
 /// tsc decides module-ness from top-level statements alone. The goal carries no
 /// strictness of its own past `Module`: a script is
 /// sloppy unless its directive prologue holds a `"use strict"`, so the strict-mode
-/// production disallowances parse only under a directive-free `Script`. Which
+/// rules the parser enforces parse only under a directive-free `Script`. Which
 /// constructs those are is enumerated once, on the flag that gates them
 /// (`Parser::strict`).
 pub fn parse_with_goal<'arena>(
@@ -238,7 +238,7 @@ pub fn parse_with_goal<'arena>(
 /// first `with` / legacy literal / `await` name — the very construct the retry exists to
 /// admit, so reporting *that* would point a legacy script's author away from their typo.
 /// prettier reads the same way in practice: its babel parser tolerates the
-/// strict-mode production disallowances at the module goal (`allowedReasonCodes`), so the
+/// strict-mode rules tsv's parser enforces at the module goal (`allowedReasonCodes`), so the
 /// error it shows on such a file is the typo. Pinned by
 /// `tests/format_fallback_error_attribution.rs`.
 ///

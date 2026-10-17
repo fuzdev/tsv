@@ -29,9 +29,10 @@
  * pin that enumerates its backlog states the CURRENT membership rather than a list later
  * entries correct. Re-record a moved checkout's id in `GATE_CHECKOUT_IDS` in the same
  * change — that struct is the single provenance record for what a pin was measured
- * against. Never re-pin to absorb an unexplained move; a failure-bucket-pin trip on a
- * single `--all` run can be the known FFI/sidecar heisenbug (benches/js/CLAUDE.md §Known
- * Issues), so confirm on the single repo before treating it as real.
+ * against. Never re-pin to absorb an unexplained move; a failure-bucket-pin trip on an
+ * `--all` run that also reports per-file `native format nondeterminism` or
+ * empty-prettier-output errors can be the environment rather than the code
+ * (benches/js/CLAUDE.md §Known Issues), so re-run before treating it as real.
  *
  * The Rust-side pins (test262 discovery + graded manifest, `fixtures_validate` fixture
  * count) live as consts in their commands — grep `REGRESSION PIN`. The as-authored
@@ -649,9 +650,9 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  * directions fail: a rise = a new unexplained divergence (fix it, catalog a detector in
  * `lib/divergence/patterns.ts`, or consciously re-pin a legitimately-unsupported new pinned
  * file); a drop = the backlog shrank, re-pin to record the win. The author's own repos are
- * gated here like every other snapshot collection. A single-run trip can be the FFI/sidecar
- * heisenbug — confirm on the single repo first. Same corpus + provenance as
- * `CORPUS_FORMAT_MATCH_MIN`.
+ * gated here like every other snapshot collection. A trip on a run that also reports per-file
+ * `native format nondeterminism` or empty-prettier-output errors can be the environment — re-run
+ * it first. Same corpus + provenance as `CORPUS_FORMAT_MATCH_MIN`.
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// Empty, and the fixture suite is what holds it there: every svelte divergence the gates

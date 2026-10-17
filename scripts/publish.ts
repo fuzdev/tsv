@@ -502,11 +502,12 @@ if (no_check) {
 	} else {
 		await run('deno task conformance:all', 'deno', ['task', 'conformance:all'], {
 			fail_hint:
-				'  Conformance gate failed. If it was a corpus:compare:format SAFETY hit, re-run\n' +
-				'  `deno task corpus:compare:format ../<that-repo>` on the single repo to rule out\n' +
-				'  the known --all FFI heisenbug (benches/js/CLAUDE.md §Known Issues) before treating\n' +
-				'  it as a real regression. A conformance:test262 GATE FAIL is a real positive-parse\n' +
-				'  regression (or a deliberate test262 pull needing a POSITIVE_PASSED_PIN re-pin).'
+				'  Conformance gate failed. A corpus:compare:format SAFETY hit is self-verified in-run\n' +
+				'  (the native format re-runs and must reproduce byte-identically), so treat it as a real\n' +
+				'  regression; FFI corruption surfaces instead as a per-file `native format\n' +
+				'  nondeterminism` error (benches/js/CLAUDE.md §Known Issues). A conformance:test262\n' +
+				'  GATE FAIL is a real positive-parse regression (or a deliberate test262 pull needing a\n' +
+				'  POSITIVE_PASSED_PIN re-pin).'
 		});
 	}
 }

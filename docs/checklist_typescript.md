@@ -843,9 +843,14 @@ list above.
 
 Module code is strict always, so all code in Svelte scripts is (ES modules); Script
 code is strict iff its directive prologue holds a `"use strict"`. tsv parses the
-syntactic grammar; it enforces the strict-mode *production disallowances* but not the
-strict-mode *early errors* — those still parse, with enforcement deferred to a future
-diagnostics layer. See [CLAUDE.md §Strictness](../CLAUDE.md#strictness-module-strict-script-by-directive).
+syntactic grammar. The spec words its strict-mode rules as Static Semantics early
+errors; tsv enforces three of them in the parser — the `with` statement, the leading-zero
+literals and the legacy string escapes, listed below — because tsc reports all three
+wherever it reads the file: its parser rejects the two literal rules (TS1121 / TS1489,
+TS1487 / TS1488), and its binder reports a strict `with` (TS1101) among the grammar errors
+it raises even in an unchecked JavaScript file (acorn rejects all three too; only the
+informative Annex C restates the literal rules as disallowed productions). The other strict-mode
+early errors still parse, with enforcement deferred to a future diagnostics layer. See [CLAUDE.md §Strictness](../CLAUDE.md#strictness-module-strict-script-by-directive).
 
 Strictness and the *goal* (`Module` vs `Script`) are orthogonal, coupled only by
 Module ⟹ strict. tsv defaults to `Module` (Svelte hard-wires it); a `Script` goal is

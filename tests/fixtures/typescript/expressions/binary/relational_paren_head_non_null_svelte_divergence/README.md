@@ -3,7 +3,8 @@
 `!T` and `T!` are tsc's `JSDocNonNullableType`. The compiler's PARSER accepts one
 anywhere a type stands, so `a < (!b) > (t, u)` is a generic call over a parenthesized
 type to tsc — prettier prints it as `a<!b>(t, u)` — and the rejection is its checker's
-(TS8020, `JSDoc types can only be used inside documentation comments`), in every
+(TS17020, `'!' at the start of a type is not valid TypeScript syntax`; TS17019, `… at the
+end of a type …`, for the postfix `T!`), in every
 TypeScript file. acorn-typescript has no such type: its type-argument parse fails, it
 backs off, and it reads the comparison chain `a < !b > (t, u)`.
 

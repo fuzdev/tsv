@@ -41,8 +41,9 @@ would stop parsing.
 
 ## Why tsv Differs
 
-Strict code disallows both forms by **production**, not by early error (ecma262
-sec-strict-mode-of-ecmascript), and sloppy Script code is exactly where the productions live.
+Strict code makes both forms a Syntax Error — a Static Semantics early error, *IsStrict(this
+production)* (ecma262 sec-numeric-literals-early-errors; Annex C restates them as disallowed
+productions) — so they are legal exactly where the code is sloppy.
 tsv's Script goal is spec-conforming, so it parses them and formats them **verbatim** — the
 number printer normalizes nothing here, and prettier's own printer would not either.
 

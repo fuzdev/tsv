@@ -545,9 +545,15 @@ pub struct Parser<'a, 'arena> {
     /// inward, so its scopes save-and-restore rather than replace
     /// ([`Parser::with_strict_scope`]).
     ///
-    /// It gates the three constructs strict code disallows *by production*, and this
-    /// is where that list is kept — every other mention names this field rather than
-    /// re-spelling it:
+    /// It gates the strict-mode rules the parser enforces, and this is where that list
+    /// is kept — every other mention names this field rather than re-spelling it. The
+    /// spec words each as a Static Semantics early error (*IsStrict(this production)*;
+    /// only the informative Annex C restates the two literal rules as disallowed
+    /// productions), which the reject-vs-defer line would defer; they reject because
+    /// tsc reports all of them wherever it reads the file: its parser rejects the two
+    /// literal rules (TS1121 / TS1489, TS1487 / TS1488), and its binder reports a strict
+    /// `with` (TS1101) among the grammar errors it raises even in an unchecked
+    /// JavaScript file (acorn rejects all of them too):
     ///
     /// - the **leading-zero numeric literals** (`010`, `08`), read by
     ///   `parse_number_or_bigint_literal` at the moment the token becomes a node;
@@ -559,9 +565,9 @@ pub struct Parser<'a, 'arena> {
     ///   `with` stays a `ReservedWord` in every mode, so only the statement moves.
     ///
     /// Each is read at consumption, so the lexer stays mode-free and a peeked token is
-    /// never graded under the wrong mode. Strict-mode **early errors** (duplicate
-    /// parameters, reserved words as binding names, an assignment to `eval`) are a
-    /// separate, deferred question: they parse under every mode and belong to the
+    /// never graded under the wrong mode. The other strict-mode **early errors**
+    /// (duplicate parameters, reserved words as binding names, an assignment to `eval`)
+    /// are a separate, deferred question: they parse under every mode and belong to the
     /// diagnostics layer.
     strict: bool,
     /// The `[Yield]` grammar context. `true` (`[+Yield]`) inside a generator

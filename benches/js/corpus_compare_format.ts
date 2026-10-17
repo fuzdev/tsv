@@ -944,8 +944,9 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 	// gate on the aggregate: per-language MINIMUM `match` (a drop = a formatter/oracle
 	// collapse in pinned code) + EXACT `unknown`/`partial` (up = a new unexplained
 	// divergence to fix/catalog; down = backlog shrank, re-pin). SAFETY gates over
-	// EVERY file (see below). A single-run trip can be the FFI/sidecar heisenbug —
-	// confirm on the single repo before treating as real.
+	// EVERY file (see below). A trip on a run that also reports per-file `native format
+	// nondeterminism` or empty-prettier-output errors can be the environment rather than the
+	// code (benches/js/CLAUDE.md §Known Issues) — re-run before treating it as real.
 	if (use_all_repos) {
 		const pin = (lang: Language) => stats.get(lang)!;
 		const pin_failures = [

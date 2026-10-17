@@ -167,7 +167,8 @@ const KNOWN_GAPS: KnownGap[] = [
  *   identifier belongs). No other parser follows; matching it would mean tracking
  *   tsc's recovery strategy rather than its grammar.
  * - `tsc_extension` — syntax tsc parses that is not TypeScript at all: JSDoc type
- *   forms inside a `.ts` file (parsed so TS8020 can be reported), U+0085 as a line
+ *   forms inside a `.ts` file (parsed so the checker can report them — TS17020 /
+ *   TS17019 for a leading / trailing `?` or `!`, TS8020 for the rest), U+0085 as a line
  *   break (ECMAScript's WhiteSpace and LineTerminator productions exclude it).
  * - `declaration_file` — valid ONLY under tsc's filename-keyed `.d.ts` rule; tsv
  *   has no declaration mode (the harvest's `DECLARATIONS` argument).
@@ -353,7 +354,8 @@ const BEYOND_ACORN_SANCTIONS: BeyondAcornSanction[] = [
 	})),
 	// --- tsc_extension ---------------------------------------------------------
 	// JSDoc type syntax inside a `.ts` file — `?T`, `T?`, `!T`, `T!`, `<?>`, `a.<T>`
-	// — which tsc parses so it can report TS8020 from the checker.
+	// — which tsc parses so its checker can report them (TS17020 / TS17019 for a leading /
+	// trailing `?` or `!`, TS8020 for the rest).
 	...[
 		'parseInvalidNonNullableTypes.ts',
 		'parseInvalidNullableTypes.ts',

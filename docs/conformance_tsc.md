@@ -150,7 +150,8 @@ nothing fails the gate, so a fixed gap must leave its ledger the day it is fixed
     property name where an enum member's identifier belongs (`enum E { 1 }`). No other
     parser follows; matching it means tracking tsc's recovery strategy, not its grammar.
   - `tsc_extension` — syntax tsc parses that is not TypeScript at all: JSDoc type
-    forms in a `.ts` file (`?T`, `T!`, `<?>`, parsed so TS8020 can be reported), U+0085
+    forms in a `.ts` file (`?T`, `T!`, `<?>`, parsed so the checker can report them:
+    TS17020 / TS17019 for a leading / trailing `?` or `!`, TS8020 for the rest), U+0085
     as a line break (outside ECMAScript's WhiteSpace and LineTerminator).
   - `declaration_file` — valid only under tsc's filename-keyed `.d.ts` rule.
 - **`BEYOND_ACORN_KNOWN_GAPS`** (in the gate) — acorn rejects too, and tsv is wrong.
@@ -239,7 +240,10 @@ layering, not a tsv-invented label:
   parses it and defers.
 - The early-error phrasing *"It is a Syntax Error if any source text is matched by this
   production"* is grammar in disguise — the production exists only as an error hook, so
-  it rejects.
+  it rejects. A **cover** production is the stated exception: `CoverInitializedName`
+  (`({ a = 1 })`) is the parse of a valid pattern until a later token proves otherwise,
+  so it defers, as tsc's parser does
+  ([conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md#typescript-corrections)).
 - **TypeScript's analog:** what `parser.ts` diagnoses is grammar; what tsc raises from
   the binder or checker, `checkGrammar*` included, is *normally* the diagnostics layer's.
   Normally, not always: where tsc's parser departs from the published grammar — looser
@@ -262,6 +266,17 @@ Some rows still sit on the wrong side of the line — early errors that reject i
 (e.g. `get`/`set constructor`, duplicate `import`-attribute keys) and a production rule
 that still parses (a top-level `return`, excluded by the `[Return]` parameter). They
 are known gaps against the line, not exceptions to it.
+
+The exceptions are stated, each argued where it is cataloged: a cover production
+defers (above); the strict-mode rules — the `with` statement, the leading-zero numeric
+literals, the legacy string escapes — reject, though the spec words each as a Static
+Semantics early error, because tsc reports all of them wherever it reads the file — its
+parser rejects the two literal rules (TS1121 / TS1489, TS1487 / TS1488), and its binder
+reports a strict `with` (TS1101) among the grammar errors it raises even in an unchecked
+JavaScript file; and a decorated arrow parameter rejects in every form, the generic
+spellings tsc's parser accepts included (TS1206 is its checker's) — a sanctioned
+over-rejection
+([conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md#typescript-corrections)).
 
 ## Triage
 

@@ -1763,8 +1763,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// The one gate on the **leading-zero** literals — `LegacyOctalIntegerLiteral`
     /// (`010`) and `NonOctalDecimalIntegerLiteral` (`08`). The lexer reads both under
-    /// every mode; strict code disallows them *by production* (ecma262
-    /// sec-strict-mode-of-ecmascript), so the rejection belongs here, where the token
+    /// every mode; strict code makes them a Syntax Error, a Static Semantics early error
+    /// the parser enforces (ecma262 sec-numeric-literals-early-errors; `Parser::strict`
+    /// says why it rejects), so the rejection belongs here, where the token
     /// becomes a node and the enclosing code's strictness is settled. Every position a
     /// numeric literal can occupy routes through this — an expression, an object or
     /// class key, a literal type, a `TSLiteralType`'s negated operand, and a type

@@ -39,8 +39,8 @@ pub enum Goal {
     /// `ParseScript` — `await` is an ordinary identifier (the top level is
     /// `[~Await]`); `import`/`export` declarations, `import.meta`, and top-level
     /// `await` expressions and `for await` loops are syntax errors. Script code is **sloppy** unless its
-    /// directive prologue holds a `"use strict"`, so the strict-mode production
-    /// disallowances parse where a module rejects them — enumerated once on the flag
+    /// directive prologue holds a `"use strict"`, so the strict-mode rules the parser
+    /// enforces parse where a module rejects them — enumerated once on the flag
     /// that gates them (`Parser::strict`), never re-listed here. The Annex B
     /// web-compatibility grammar is out of scope at both goals.
     Script,
