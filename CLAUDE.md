@@ -138,7 +138,9 @@ deno task test:deno      # deno tests over the node-modules-free bench core (div
 #                          — the changelog grammar publish.ts writes and release_notes.ts reads; `release/version_test.ts` +
 #                          `release/plan_test.ts` — the version grammar and the fresh/resume plan; `npm_api_test.ts` + `npm_api_strip_test.ts` — the
 #                          npm options facade and its strip half over a fake engine; `typecheck_packages_test.ts` — the README fence +
-#                          marker grammar); in `check`
+#                          marker grammar; `perf_ab_test.ts` — perf:ab's `git ls-tree -z` listing over a scratch repo, its
+#                          own `deno test` invocation with `--allow-write --allow-run=git` + `--allow-env` for the three
+#                          `GIT_*` variables it clears); in `check`
 deno task test:audits    # cargo test -p tsv_lang --features audits — the `swallow_check` + `comment_check` seams' own tests; in `check`
 deno task lint           # cargo clippy
 cargo fmt                # Rust

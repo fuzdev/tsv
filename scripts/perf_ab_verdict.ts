@@ -282,13 +282,16 @@ export function file_set_mismatch(a: FileSet, b: FileSet): string | null {
 }
 
 /**
- * Read a tree's recursive build-inputs listing (`git ls-tree -r <tree> -- <inputs>`, lines of
- * `<mode> <type> <oid>\t<path>`): the top-level inputs present, in order; the `required` ones
- * missing; and the key text — the listing without the `overlaid` path, whose content the run
- * replaces before every build (the measuring driver), so neither its presence nor its content
- * in the tree changes the binary. The cache is keyed on the key text's sha256: the blob ids
- * cover exactly the files a build reads, so two trees that differ only outside them — `tests/`,
- * the docs, `scripts/`, the driver — share one snapshot and one built driver.
+ * Read a tree's recursive build-inputs listing (`git ls-tree -r -z <tree> -- <inputs>`: entries
+ * of `<mode> <type> <oid>\t<path>`, each ended by a NUL, the path raw — `-z` turns off the
+ * C-quoting `core.quotePath` applies to a non-ASCII or special byte, which would put a leading
+ * `"` on a top-level name): the top-level inputs present, in order; the `required` ones missing;
+ * and the key text — the listing without the `overlaid` path, whose content the run replaces
+ * before every build (the measuring driver), so neither its presence nor its content in the
+ * tree changes the binary. The cache is keyed on the key text's sha256: the blob ids cover
+ * exactly the files a build reads, so two trees that differ only outside them — `tests/`, the
+ * docs, `scripts/`, the driver — share one snapshot and one built driver. The key text keeps
+ * the NUL separators, since a raw path may hold a newline.
  */
 export function build_inputs_of(
 	ls_tree: string,
@@ -297,19 +300,35 @@ export function build_inputs_of(
 ): { names: Array<string>; missing: Array<string>; key_text: string } {
 	const names: Array<string> = [];
 	const kept: Array<string> = [];
-	for (const line of ls_tree.split('\n')) {
-		const tab = line.indexOf('\t');
+	for (const entry of ls_tree.split('\0')) {
+		const tab = entry.indexOf('\t');
 		if (tab === -1) continue;
-		const path = line.slice(tab + 1);
+		const path = entry.slice(tab + 1);
 		const top = path.split('/', 1)[0]!;
 		if (!names.includes(top)) names.push(top);
-		if (path !== overlaid) kept.push(line);
+		if (path !== overlaid) kept.push(entry);
 	}
 	return {
 		names,
 		missing: required.filter((name) => !names.includes(name)),
-		key_text: kept.join('\n')
+		key_text: kept.join('\0')
 	};
+}
+
+/**
+ * The text a built driver's RECIPE is keyed on: the build's whole command line, the variables it
+ * sets itself (`BUILD_FIXED_ENV`, names and values) and the names of the variables it keeps from
+ * the caller (`BUILD_ENV`). Its hash is part of the binary's name beside the driver's content
+ * hash, so a change to how a driver builds — a cargo flag, the profile, a set or kept variable —
+ * never reuses a binary built the old way, on either side.
+ */
+export function build_recipe_text(
+	command: ReadonlyArray<string>,
+	fixed_env: Readonly<Record<string, string>>,
+	kept_env: ReadonlyArray<string>
+): string {
+	const fixed = Object.entries(fixed_env).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+	return JSON.stringify({ command, fixed_env: fixed, kept_env });
 }
 
 /** A cache directory name: the sha256 of a tree's build-inputs key text (`build_inputs_of`). A

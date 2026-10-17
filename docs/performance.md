@@ -864,10 +864,13 @@ deno task perf:ab <base> <cand>    # two refs; also --rounds N (even, 6), --iter
 One command for the parse/format regression check, per language (TypeScript, Svelte, CSS) ×
 phase. Each side is built `--release` from a frozen `git archive` snapshot of its tree's build
 inputs (the workspace manifests, the toolchain pin, `.cargo/`, `src/`, `crates/` — not `tests/`)
-in `~/.cache/tsv/perf_ab/`, keyed by those inputs (a hash of their `git ls-tree -r` entries, the
-same list the snapshot takes, minus the driver below, which every build overlays). A re-run
-reuses the build, and so does a change confined to `tests/`, the docs or `scripts/`: it builds
-nothing new, and `perf:ab HEAD` on one measures a binary against itself. A run keeps the few most
+in `~/.cache/tsv/perf_ab/`, keyed by those inputs (a hash of their `git ls-tree -r -z` entries,
+the same list the snapshot takes, minus the driver below, which every build overlays). A built
+binary is further keyed by the driver's content and by the build recipe (the build's command line,
+the variables it sets itself and the names of the variables it keeps, hashed), so a change to how the driver builds rebuilds
+both sides instead of measuring an old-recipe binary against a new one. A re-run reuses the
+build, and so does a change confined to `tests/`, the docs or `scripts/`: it builds nothing new,
+and `perf:ab HEAD` on one measures a binary against itself. A run keeps the few most
 recently used snapshots and evicts the rest. The report prints each side's binary sha256, so a
 reading that moved between runs can be told apart from a build that changed. The builds run in a
 cleared environment, so a `RUSTFLAGS` or `CARGO_PROFILE_*` in the caller's shell cannot reach one

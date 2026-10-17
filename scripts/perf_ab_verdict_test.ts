@@ -4,6 +4,7 @@ import {
 	ab_row,
 	type AbRow,
 	build_inputs_of,
+	build_recipe_text,
 	CACHE_DIR_PATTERN,
 	DEFAULT_ROUNDS,
 	file_set_mismatch,
@@ -397,25 +398,59 @@ Deno.test('build_inputs_of reads the inputs, the missing ones and the key text',
 		'100644 blob 6666666666666666666666666666666666666666\tcrates/tsv_ts/Cargo.toml'
 	];
 	const required = ['Cargo.toml', 'crates', 'src'];
-	const read = build_inputs_of(lines.join('\n'), required, driver);
+	const read = build_inputs_of(lines.join('\0'), required, driver);
 	deepStrictEqual(read.names, ['.cargo', 'Cargo.lock', 'Cargo.toml', 'crates']);
 	deepStrictEqual(read.missing, ['src']);
 	// the overlaid driver is left out of the key: a tree without it, or with another copy of
 	// it, keys the same
 	deepStrictEqual(read.key_text.includes(driver), false);
 	const without = lines.filter((line) => !line.endsWith(driver));
-	deepStrictEqual(build_inputs_of(without.join('\n'), required, driver).key_text, read.key_text);
+	deepStrictEqual(build_inputs_of(without.join('\0'), required, driver).key_text, read.key_text);
 	const edited = lines.map((line) =>
 		line.endsWith(driver) ? `100644 blob ${'7'.repeat(40)}\t${driver}` : line
 	);
-	deepStrictEqual(build_inputs_of(edited.join('\n'), required, driver).key_text, read.key_text);
+	deepStrictEqual(build_inputs_of(edited.join('\0'), required, driver).key_text, read.key_text);
 	// any other input moving moves the key
 	const moved = lines.map((line) => line.replace('4444', '4445'));
 	deepStrictEqual(
-		build_inputs_of(moved.join('\n'), required, driver).key_text === read.key_text,
+		build_inputs_of(moved.join('\0'), required, driver).key_text === read.key_text,
 		false
 	);
 	deepStrictEqual(build_inputs_of('', required, driver).missing, required);
+	// `-z` ends every entry with a NUL, the last one included, and leaves a path raw
+	const raw = `100644 blob ${'8'.repeat(40)}\tcrates/\u00e9/a\nb.rs`;
+	const ended = build_inputs_of(`${lines.join('\0')}\0${raw}\0`, required, driver);
+	deepStrictEqual(ended.names, ['.cargo', 'Cargo.lock', 'Cargo.toml', 'crates']);
+	deepStrictEqual(ended.key_text.endsWith(raw), true);
+});
+
+Deno.test('build_recipe_text moves with the command and the set and kept variables', () => {
+	const command = ['cargo', 'build', '--release'];
+	const fixed = { CARGO_TARGET_DIR: '../target' };
+	const env = ['PATH', 'HOME'];
+	const text = build_recipe_text(command, fixed, env);
+	deepStrictEqual(build_recipe_text([...command], { ...fixed }, [...env]), text);
+	deepStrictEqual(build_recipe_text([...command, '--locked'], fixed, env) === text, false);
+	deepStrictEqual(
+		build_recipe_text(['cargo', 'build', '--profile', 'corpus'], fixed, env) === text,
+		false
+	);
+	deepStrictEqual(build_recipe_text(command, fixed, [...env, 'RUSTFLAGS']) === text, false);
+	// a variable the build sets moves it by name and by value; the order it is written in does not
+	deepStrictEqual(
+		build_recipe_text(command, { ...fixed, CARGO_PROFILE_RELEASE_LTO: 'fat' }, env) === text,
+		false
+	);
+	deepStrictEqual(build_recipe_text(command, { CARGO_TARGET_DIR: 'target' }, env) === text, false);
+	deepStrictEqual(
+		build_recipe_text(command, { B: '1', A: '2' }, env),
+		build_recipe_text(command, { A: '2', B: '1' }, env)
+	);
+	// an argument boundary is part of the recipe: `a b` as one argument is not `a`, `b`
+	deepStrictEqual(
+		build_recipe_text(['a b'], fixed, env) === build_recipe_text(['a', 'b'], fixed, env),
+		false
+	);
 });
 
 Deno.test('CACHE_DIR_PATTERN takes a build-inputs key and a legacy tree id, nothing else', () => {

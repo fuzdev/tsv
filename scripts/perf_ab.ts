@@ -15,10 +15,12 @@
  * copy of the index (`git add -A` + `git write-tree` under `GIT_INDEX_FILE`), so neither the
  * real index nor any ref moves (the snapshot's blobs land in the object store as unreachable
  * loose objects, which `git gc` prunes); naming a second ref measures that ref instead. A
- * snapshot is keyed by its BUILD INPUTS — the sha256 of `git ls-tree -r <tree> --
+ * snapshot is keyed by its BUILD INPUTS — the sha256 of `git ls-tree -r -z <tree> --
  * <BUILD_INPUTS>`, the same list the archive takes, minus the overlaid driver — so a change to
  * `tests/`, the docs, `scripts/` or the driver file reuses the built snapshot. A built driver
- * is keyed by the driver's content hash, so a re-run reuses both. A run keeps the
+ * is keyed by the driver's content hash and by its build RECIPE (`BUILD_COMMAND`, the
+ * `BUILD_FIXED_ENV` variables and the `BUILD_ENV` names, hashed), so a re-run reuses both and a recipe change rebuilds both sides
+ * rather than measuring an old-recipe binary against a new one. A run keeps the
  * `KEEP_TREES` most recently used snapshots and evicts the rest. The report prints each side's
  * binary sha256, so two readings of one build can be told apart from two builds.
  *
@@ -80,6 +82,7 @@ import {
 	ab_row,
 	type AbRow,
 	build_inputs_of,
+	build_recipe_text,
 	CACHE_DIR_PATTERN,
 	type CachedTree,
 	DEFAULT_ROUNDS,
@@ -129,6 +132,31 @@ const REQUIRED_BUILD_INPUTS = ['Cargo.toml', 'crates', 'src'];
  * the toolchain needs `PATH`, `HOME` and the rustup / cargo homes; `CARGO_BUILD_JOBS` only
  * schedules the build (release codegen is one unit, so the artifact does not depend on it). */
 const BUILD_ENV = ['PATH', 'HOME', 'CARGO_HOME', 'RUSTUP_HOME', 'CARGO_BUILD_JOBS'];
+
+/** The variables a driver build sets itself, the same for every snapshot. `CARGO_TARGET_DIR` is
+ * relative to the build's working directory (the snapshot's `src/`), so each snapshot builds into
+ * its own `target/` beside it. Part of the build RECIPE (`build_recipe_text`). */
+const BUILD_FIXED_ENV: Readonly<Record<string, string>> = { CARGO_TARGET_DIR: '../target' };
+
+/** The driver build's command line, run in the snapshot at idle priority. With `BUILD_FIXED_ENV`
+ * and `BUILD_ENV` it is the build RECIPE, whose hash names the binary (`build_recipe_text`). */
+const BUILD_COMMAND = [
+	'nice',
+	'-n',
+	'19',
+	'ionice',
+	'-c',
+	'3',
+	'cargo',
+	'build',
+	'--release',
+	'--locked',
+	'-p',
+	'tsv_debug',
+	'--example',
+	'perf_ab',
+	'--message-format=json-render-diagnostics'
+];
 
 /** A 1-minute load average above this before the run warns: something else holds a core. */
 const LOAD_WARN = 1;
@@ -249,10 +277,25 @@ interface Side {
 	inputs: Array<string>;
 }
 
+/** The recursive, NUL-separated `git ls-tree -r -z` listing of `paths` in `tree`, run in `cwd`
+ * (untrimmed: a raw path may end in whitespace). */
+export async function list_tree(
+	tree: string,
+	paths: ReadonlyArray<string>,
+	cwd: string = ROOT
+): Promise<string> {
+	const args = ['ls-tree', '-r', '-z', tree, '--', ...paths];
+	const result = await run('git', args, { cwd });
+	if (!result.success) {
+		throw new HarnessError(`git ${args.join(' ')} failed:\n${result.stderr.trim()}`);
+	}
+	return result.stdout;
+}
+
 /** The cache key and the present build inputs of `tree`, from one recursive `git ls-tree`
  * listing of `BUILD_INPUTS` (the driver left out: the overlay replaces it). */
 async function build_inputs(tree: string): Promise<{ key: string; inputs: Array<string> }> {
-	const listing = await git(['ls-tree', '-r', tree, '--', ...BUILD_INPUTS]);
+	const listing = await list_tree(tree, BUILD_INPUTS);
 	const { names, missing, key_text } = build_inputs_of(listing, REQUIRED_BUILD_INPUTS, DRIVER);
 	if (missing.length > 0) {
 		throw new HarnessError(`tree ${tree} has no ${missing.join(', ')} — not a tsv workspace`);
@@ -352,9 +395,10 @@ async function extract_tree(side: Side, dir: string): Promise<void> {
 	}
 }
 
-/** The caller's values for `BUILD_ENV`, the whole environment of a driver build. */
-function build_env(target_dir: string): Record<string, string> {
-	const env: Record<string, string> = { CARGO_TARGET_DIR: target_dir };
+/** `BUILD_FIXED_ENV` plus the caller's values for `BUILD_ENV`, the whole environment of a driver
+ * build. */
+function build_env(): Record<string, string> {
+	const env: Record<string, string> = { ...BUILD_FIXED_ENV };
 	for (const name of BUILD_ENV) {
 		const value = Deno.env.get(name);
 		if (value !== undefined) env[name] = value;
@@ -367,10 +411,11 @@ async function ensure_driver(
 	side: Side,
 	cache: string,
 	driver_source: Uint8Array,
-	driver_hash: string
+	driver_hash: string,
+	recipe_hash: string
 ): Promise<string> {
 	const base = resolve(cache, side.key);
-	const binary = resolve(base, `perf_ab-${driver_hash.slice(0, 16)}`);
+	const binary = resolve(base, `perf_ab-${driver_hash.slice(0, 16)}-${recipe_hash.slice(0, 16)}`);
 	if (existsSync(binary)) {
 		console.error(`perf:ab: ${side.label}: reusing ${binary}`);
 		return binary;
@@ -387,26 +432,12 @@ async function ensure_driver(
 	await Deno.writeFile(overlay, driver_source);
 
 	console.error(`perf:ab: ${side.label}: building the driver (release, idle priority)`);
-	const child = new Deno.Command('nice', {
-		args: [
-			'-n',
-			'19',
-			'ionice',
-			'-c',
-			'3',
-			'cargo',
-			'build',
-			'--release',
-			'--locked',
-			'-p',
-			'tsv_debug',
-			'--example',
-			'perf_ab',
-			'--message-format=json-render-diagnostics'
-		],
+	const [command, ...args] = BUILD_COMMAND;
+	const child = new Deno.Command(command!, {
+		args,
 		cwd: src,
 		clearEnv: true,
-		env: build_env(resolve(base, 'target')),
+		env: build_env(),
 		stdout: 'piped',
 		stderr: 'inherit'
 	}).spawn();
@@ -658,6 +689,9 @@ async function main(): Promise<number> {
 	if (!existsSync(driver_path)) throw new HarnessError(`driver missing: ${driver_path}`);
 	const driver_source = await Deno.readFile(driver_path);
 	const driver_hash = await sha256_hex(driver_source);
+	const recipe_hash = await sha256_hex(
+		new TextEncoder().encode(build_recipe_text(BUILD_COMMAND, BUILD_FIXED_ENV, BUILD_ENV))
+	);
 
 	const home = Deno.env.get('HOME');
 	if (!home) throw new HarnessError('HOME is not set');
@@ -688,7 +722,7 @@ async function main(): Promise<number> {
 	}
 	const binaries: Array<string> = [];
 	for (const side of sides) {
-		binaries.push(await ensure_driver(side, cache, driver_source, driver_hash));
+		binaries.push(await ensure_driver(side, cache, driver_source, driver_hash, recipe_hash));
 	}
 	const binary_sha256 = await Promise.all(
 		binaries.map(async (binary) => sha256_hex(await Deno.readFile(binary)))
