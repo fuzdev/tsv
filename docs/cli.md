@@ -240,11 +240,12 @@ an argument error naming that list (`tsv_discover::strip_unsupported_extension_e
 a directory. A JavaScript path (`.js` `.mjs` `.cjs`) is refused with a reason of its own
 (`a JavaScript file has no types to strip`) rather than read as TypeScript, where
 `f(a < b, c > (d))` is a generic call whose type arguments the strip would blank and
-JavaScript reads two comparisons. The goal is `format`'s ([strip.md §The parse goal](./strip.md#the-parse-goal)):
-unset, a module retried as a script; `--source-type script|module` names it exactly for
-`--content` / `--stdin` (a value naming neither is a usage error), and beside a path it is
-refused in `format`'s words, since a path's goal is its extension's — a `.mts` a module with
-no retry, a `.ts` / `.cts` the fallback.
+JavaScript reads two comparisons. The goal is `format`'s
+([strip.md §The parse goal](./strip.md#the-parse-goal)): unset, a module retried as a
+script; `--source-type script|module` names it exactly for `--content` / `--stdin` (a value
+naming neither is a usage error), and beside a path it is refused in `format`'s words, since
+a path's goal is its extension's — a `.mts` a module with no retry, a `.ts` / `.cts` the
+fallback.
 `--content` and `--stdin` follow `parse`'s precedence between themselves, but either beside
 a path is refused (`--content/--stdin cannot be combined with a file path`), as `format`
 refuses it. Every argument is graded before anything is read, so a refused `--stdin` never
@@ -256,8 +257,10 @@ Exit codes — the `format` scheme, with "would change" read as "refused":
 - **1** — refused: the source holds TypeScript the strip cannot erase. stderr is
   `Error: cannot strip <the construct>` over the `line:col` header, line and caret of the
   refused span's start, in the same coordinates a parse error prints;
-- **2** — a parse error (`Parse error: …`, the text `tsv parse` prints for the same source), a
-  read error, invalid UTF-8, a source over the size cap, or a usage error.
+- **2** — a parse error (`Parse error: …`, the text `tsv format --content` prints for the same
+  source and goal — with none named, the error of the reading it belongs to, per
+  [§Multi-File Formatting](#multi-file-formatting)), a read error, invalid UTF-8, a source over
+  the size cap, or a usage error.
 
 `--check` prints nothing on stdout and keeps the same codes (a refusal still exits 1 and
 says why on stderr), so CI can ask whether a file strips. argh's own flag-parsing refusals

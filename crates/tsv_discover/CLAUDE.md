@@ -83,9 +83,9 @@ crates (the open-convention stance):
   extensions `tsv strip` takes (the TypeScript extensions alone; a `.svelte.ts` and a `.d.ts`
   are `.ts`) and the argument error for a file named to it outside them (read without regard
   to ASCII case, as `is_formattable` reads one) — a JavaScript file's saying why, since it
-  would otherwise be read as TypeScript, where `a < b > (c)` is a generic call. A file-*argument* check, not discovery (the strip takes
-  one input and walks nothing); `cli.js` restates the text by hand, pinned by the strip CLI
-  rows both bins run.
+  would otherwise be read as TypeScript, where `a < b > (c)` is a generic call. A
+  file-*argument* check, not discovery (the strip takes one input and walks nothing);
+  `cli.js` restates the text by hand, pinned by the strip CLI rows both bins run.
 - `formattable_extension_list(separator)` — the extension set rendered as prose
   (`".ts, .mts, …"`), the one spelling behind every message that lists it (the
   refusal above, the CLI's nothing-in-scope error).

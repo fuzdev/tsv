@@ -37,9 +37,10 @@ source is parsed as a **module, retried as a script** only if that fails — so 
 sloppy script (a `with` statement, a leading-zero literal, `await` as a name) strips, while
 a module-valid source is never reinterpreted. When both attempts fail, the error reported
 is the one `format` reports ([cli.md §Multi-File Formatting](./cli.md#multi-file-formatting)).
-A CLI path whose extension settles the goal — `.mts`, a module by name — takes no retry; `--source-type` beside a path is refused, as on `format`. With no goal named the
-result does not say which grammar read the source, so a loader that runs the output names
-the goal it will evaluate under (`sourceType`) rather than relying on the retry.
+A CLI path whose extension settles the goal — `.mts`, a module by name — takes no retry;
+`--source-type` beside a path is refused, as on `format`. With no goal named the result does
+not say which grammar read the source, so a loader that runs the output names the goal it
+will evaluate under (`sourceType`) rather than relying on the retry.
 
 The output is JS at the goal the source was read at: a sloppy script strips to a sloppy
 script. No verdict depends on the goal, except that a script's `with` body is one more lone
@@ -55,7 +56,8 @@ reports in a stack trace:
   UTF-16 offsets never move and the output is never longer than the input — byte offsets
   shift only after non-ASCII text inside a blanked range;
 - every ECMAScript line terminator inside a blanked range is kept verbatim — LF, CR (so
-  CRLF), U+2028, U+2029 — where both oracles blank U+2028 / U+2029 to a space;
+  CRLF), U+2028, U+2029 — as Node keeps them, where ts-blank-space blanks U+2028 / U+2029
+  to a space;
 - a leading byte-order mark and a hashbang are kept, and a type-free source comes back as
   the same string.
 
@@ -77,15 +79,20 @@ clauses; `as T` / `satisfies T`, non-null and definite-assignment `!`, optional 
 overload signatures, `import type` / `export type`, an inline `type` specifier with its
 comma; `abstract` and `declare` class members and index signatures; the
 `public` / `private` / `protected` / `readonly` / `abstract` / `override` / `declare`
-modifiers on kept members; a leading `this` parameter.
+modifiers on kept members; a leading `this` parameter. A declaration file (`.d.ts`) is no
+special case: its `declare`d and type-only items blank, its value `import`s, `export … from`,
+`export { … }` lists and `export default x` are kept, and `export =` / `import =` refuse — so
+its output is not a module to run (`export as namespace N;` too is kept verbatim, as both
+oracles keep it).
 
 **Kept** (JS, with only the type syntax inside blanked): decorators, `accessor` fields, an
 import whose braces only held `type` specifiers (`import {} from 'x'` still loads `'x'`, as
 `verbatimModuleSyntax` specifies), an unmarked import used only as a type (eliding it would
 need symbol resolution), and every comment outside a blanked range.
 
-**Refused** — TypeScript with runtime semantics, which blanking cannot erase. The strip
-refuses rather than transforms, so the output is always the input with ranges blanked:
+**Refused** — TypeScript that type blanking cannot erase: a construct with runtime semantics,
+or an assertion whose blanking would regroup its expression. The strip refuses rather than
+transforms, so the output is always the input with ranges blanked:
 
 | `construct` | what |
 |---|---|
@@ -106,6 +113,9 @@ refusal's span is the construct's (for a parameter property, its first modifier)
 rejects — a class field `declare x = 1` or `abstract x = 1`, `declare let a = 1`, a bodied
 member of a `declare class`. Each is blanked whole, as ts-blank-space blanks it, so the
 value is silently gone; refusing those is the diagnostics layer's job, not the strip's.
+tsc also accepts a class declaration as the lone body of an `if`, a loop or a script's
+`with` (`if (a) abstract class A {}`), which no JS grammar does; it passes through with only
+`abstract` blanked, as both oracles leave it.
 
 ## Oracles
 

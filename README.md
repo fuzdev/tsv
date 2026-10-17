@@ -100,7 +100,7 @@ Future features (unknown order):
 tsv ships to npm as a native package for Node and Bun, plus three WASM
 packages for browsers, Deno, and platforms without a prebuilt binary:
 
-- [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) - the full tool (formatter + parser) as a prebuilt native N-API addon, shipping tsv's real native CLI binary as the `tsv` command
+- [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) - the full tool (formatter + parser + type stripper) as a prebuilt native N-API addon, shipping tsv's real native CLI binary as the `tsv` command
 - [`@fuzdev/tsv-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-wasm) - the full tool with the same `tsv` CLI, as WASM
 - [`@fuzdev/tsv-format-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-format-wasm) - formatter only (smaller)
 - [`@fuzdev/tsv-parse-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-parse-wasm) - parser + JSON AST only (smallest)
@@ -213,6 +213,7 @@ see [docs/architecture.md](docs/architecture.md).
 - [docs/architecture.md](docs/architecture.md) - the major design decisions
 - [docs/directives.md](docs/directives.md) - `format-ignore` / `prettier-ignore` formatting directives
 - [docs/cli.md](docs/cli.md) - commands and design
+- [docs/strip.md](docs/strip.md) - the type strip: TypeScript to JS by blanking, every position kept
 - [docs/audits.md](docs/audits.md) - the standing audit gates: what each proves, its blind spots, and where it gates
 - [docs/benchmarks.md](docs/benchmarks.md) - benchmark fairness caveats, the implementation catalog, and binary size reporting
 - [docs/conformance_prettier.md](docs/conformance_prettier.md) - where formatting diverges from Prettier (and why); its §Catalogs table indexes the per-language catalogs
