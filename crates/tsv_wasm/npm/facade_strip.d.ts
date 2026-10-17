@@ -68,8 +68,9 @@ export interface StripParseError {
 }
 
 /**
- * TypeScript with runtime semantics, which type blanking cannot erase — the strip refuses
- * it rather than transform it. The first six are what `erasableSyntaxOnly` rejects.
+ * TypeScript that type blanking cannot erase — a construct with runtime semantics, or an
+ * assertion whose blanking would regroup its expression — which the strip refuses rather
+ * than transform. The first six are what `erasableSyntaxOnly` rejects.
  */
 export type StripUnsupportedKind =
 	/** A non-`declare` `enum`, `const enum` included. */

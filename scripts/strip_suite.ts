@@ -579,16 +579,7 @@ export const STRIP_CLI_ROWS: ReadonlyArray<StripCliRow> = [
 		status: 2,
 		stdout: '',
 		stderr:
-			'Error: --source-type applies to --content/--stdin; file paths take the module grammar, retried as a script\n'
-	},
-	{
-		name: 'a .mjs file is a module by name: no script retry',
-		args: ['strip', 'FILE'],
-		file: 'with (o as any) { x; }\n',
-		file_name: 'a.mjs',
-		status: 2,
-		stdout: '',
-		stderr_starts: "Parse error: The 'with' statement is not allowed in strict mode\n"
+			"Error: --source-type applies to --content/--stdin; a file path's goal is its extension's (.mjs/.mts a module, any other JS/TS extension the module grammar retried as a script)\n"
 	},
 	{
 		name: 'a .mts file is a module by name: no script retry',
@@ -600,13 +591,13 @@ export const STRIP_CLI_ROWS: ReadonlyArray<StripCliRow> = [
 		stderr_starts: 'Parse error: '
 	},
 	{
-		name: 'a .cjs file keeps the script retry',
+		name: 'an .MTS file is a module by name too: the extension reads without regard to ASCII case',
 		args: ['strip', 'FILE'],
-		file: 'with (o as any) { x; }\n',
-		file_name: 'a.cjs',
-		status: 0,
-		stdout: 'with (o       ) { x; }\n',
-		stderr: ''
+		file: 'var await: number = 1;\n',
+		file_name: 'A.MTS',
+		status: 2,
+		stdout: '',
+		stderr_starts: 'Parse error: '
 	},
 	{
 		name: 'a .cts file keeps the script retry',
@@ -639,8 +630,47 @@ export const STRIP_CLI_ROWS: ReadonlyArray<StripCliRow> = [
 		file_name: 'a.svelte',
 		status: 2,
 		stdout: '',
+		stderr_includes: 'unsupported file extension (tsv strip handles .ts, .mts, .cts)'
+	},
+	{
+		name: 'a .js file is refused, not read as TypeScript',
+		args: ['strip', 'FILE'],
+		file: 'f(a < b, c > (d));\n',
+		file_name: 'a.js',
+		status: 2,
+		stdout: '',
 		stderr_includes:
-			'unsupported file extension (tsv strip handles .ts, .mts, .cts, .js, .mjs, .cjs)'
+			'a.js: a JavaScript file has no types to strip (tsv strip handles .ts, .mts, .cts)\n'
+	},
+	{
+		name: 'a .mjs file is refused, not read as TypeScript',
+		args: ['strip', 'FILE'],
+		file: 'f(a < b, c > (d));\n',
+		file_name: 'a.mjs',
+		status: 2,
+		stdout: '',
+		stderr_includes:
+			'a.mjs: a JavaScript file has no types to strip (tsv strip handles .ts, .mts, .cts)\n'
+	},
+	{
+		name: 'a .cjs file is refused, not read as TypeScript',
+		args: ['strip', 'FILE'],
+		file: 'f(a < b, c > (d));\n',
+		file_name: 'a.cjs',
+		status: 2,
+		stdout: '',
+		stderr_includes:
+			'a.cjs: a JavaScript file has no types to strip (tsv strip handles .ts, .mts, .cts)\n'
+	},
+	{
+		name: 'a JavaScript extension is read without regard to ASCII case',
+		args: ['strip', 'FILE'],
+		file: 'f(a < b, c > (d));\n',
+		file_name: 'A.MJS',
+		status: 2,
+		stdout: '',
+		stderr_includes:
+			'A.MJS: a JavaScript file has no types to strip (tsv strip handles .ts, .mts, .cts)\n'
 	},
 	{
 		name: 'a .css file is out of scope',

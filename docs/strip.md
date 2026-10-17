@@ -37,8 +37,7 @@ source is parsed as a **module, retried as a script** only if that fails — so 
 sloppy script (a `with` statement, a leading-zero literal, `await` as a name) strips, while
 a module-valid source is never reinterpreted. When both attempts fail, the error reported
 is the one `format` reports ([cli.md §Multi-File Formatting](./cli.md#multi-file-formatting)).
-A CLI path whose extension settles the goal — `.mjs` / `.mts`, modules by name — takes no
-retry; `--source-type` beside a path is refused, as on `format`. With no goal named the
+A CLI path whose extension settles the goal — `.mts`, a module by name — takes no retry; `--source-type` beside a path is refused, as on `format`. With no goal named the
 result does not say which grammar read the source, so a loader that runs the output names
 the goal it will evaluate under (`sourceType`) rather than relying on the retry.
 

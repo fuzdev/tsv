@@ -121,10 +121,10 @@ fn test_format_source_type_rejected_in_path_mode() {
         Some(2),
         "`--source-type` with a path should be a usage error"
     );
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains("--source-type applies to --content/--stdin"),
-        "Should explain the path-mode restriction: {stderr}"
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr),
+        "Error: --source-type applies to --content/--stdin; a file path's goal is its extension's (.mjs/.mts a module, any other JS/TS extension the module grammar retried as a script)\n",
+        "Should explain the path-mode restriction"
     );
 }
 

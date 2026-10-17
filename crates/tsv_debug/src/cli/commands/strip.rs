@@ -1,7 +1,8 @@
 //! `strip` — `tsv_ts::strip` on one file, or on request for the strip corpus differential.
 //!
 //! With a path, prints the stripped JS to stdout; a refusal or a parse error goes to
-//! stderr and exits 1. The triage view of one file the differential flags.
+//! stderr and exits 1. The path's extension settles the goal as `tsv strip` reads it
+//! (`tsv_ts::Goal::from_extension`). The triage view of one file the differential flags.
 //!
 //! ## `--stdin`: the strip differential's tsv side
 //!
@@ -69,7 +70,7 @@ fn strip_file(path: &std::path::Path) -> Result<(), CliError> {
         CliError::Failed
     })?;
     let arena = bumpalo::Bump::new();
-    match tsv_ts::strip(&source, &arena) {
+    match strip_at_path(path, &source, &arena) {
         Ok(stripped) => {
             print!("{}", stripped.code);
             Ok(())
@@ -83,6 +84,17 @@ fn strip_file(path: &std::path::Path) -> Result<(), CliError> {
             Err(CliError::Failed)
         }
     }
+}
+
+/// Strip `source` read from `path`, at the goal the path's extension settles — a `.mts` is
+/// a module by name, as the shipped `tsv strip` reads a path; any other the fallback.
+fn strip_at_path<'s>(
+    path: &std::path::Path,
+    source: &'s str,
+    arena: &bumpalo::Bump,
+) -> Result<tsv_ts::Stripped<'s>, tsv_ts::StripError> {
+    let goal = path.to_str().and_then(tsv_ts::Goal::from_extension);
+    tsv_ts::strip_with_goal(source, goal, arena)
 }
 
 /// One `--stdin` request (module doc).
@@ -160,5 +172,29 @@ fn answer(source: &str, arena: &mut bumpalo::Bump) -> serde_json::Value {
             let message = crate::audit::panic_hook::panic_message(payload.as_ref());
             serde_json::json!({ "panic": message })
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::strip_at_path;
+    use std::path::Path;
+
+    /// `await` as a name parses only at Script: a `.mts` path takes no script retry, while
+    /// a `.ts` path keeps the fallback.
+    #[test]
+    fn a_path_takes_the_goal_its_extension_settles() {
+        let source = "var await: number = 1;\n";
+        let arena = bumpalo::Bump::new();
+        assert!(matches!(
+            strip_at_path(Path::new("w.mts"), source, &arena),
+            Err(tsv_ts::StripError::Parse(_))
+        ));
+        assert!(matches!(
+            strip_at_path(Path::new("W.MTS"), source, &arena),
+            Err(tsv_ts::StripError::Parse(_))
+        ));
+        let stripped = strip_at_path(Path::new("w.ts"), source, &arena).expect("the script retry");
+        assert_eq!(stripped.code, "var await         = 1;\n");
     }
 }

@@ -316,18 +316,17 @@ fn test_strip_source_type_beside_a_path_is_refused() {
     assert_refused(
         &tsv(&["strip", "--source-type", "script", path.to_str().unwrap()]),
         2,
-        "Error: --source-type applies to --content/--stdin; file paths take the module grammar, retried as a script\n",
+        "Error: --source-type applies to --content/--stdin; a file path's goal is its extension's (.mjs/.mts a module, any other JS/TS extension the module grammar retried as a script)\n",
     );
 }
 
-/// A path whose extension settles the goal — `.mjs` / `.mts`, ES modules by name — takes
-/// no script retry, as `format` reads it; `.cjs` / `.cts` / `.js` / `.ts` keep the
-/// fallback.
+/// A path whose extension settles the goal — `.mts`, an ES module by name — takes no
+/// script retry, as `format` reads it; `.cts` / `.ts` keep the fallback.
 #[test]
 fn test_strip_file_extension_settles_the_goal() {
     let dir = temp_dir("strip_extension_goal");
     let source = "with (o as any) { x; }\n";
-    for name in ["a.mjs", "a.mts", "A.MTS"] {
+    for name in ["a.mts", "A.MTS"] {
         let path = dir.join(name);
         fs::write(&path, source).unwrap();
         assert_refused(
@@ -336,7 +335,7 @@ fn test_strip_file_extension_settles_the_goal() {
             "Parse error: The 'with' statement is not allowed in strict mode\n",
         );
     }
-    for name in ["a.cjs", "a.cts", "a.js", "a.ts"] {
+    for name in ["a.cts", "a.ts"] {
         let path = dir.join(name);
         fs::write(&path, source).unwrap();
         assert_stripped(
@@ -408,10 +407,28 @@ fn test_strip_refuses_non_typescript_extensions() {
         assert_eq!(status, 2, "{name}: {stderr}");
         assert_eq!(stdout, "", "{name}");
         assert!(
-            stderr.contains(
-                "unsupported file extension (tsv strip handles .ts, .mts, .cts, .js, .mjs, .cjs)"
-            ),
+            stderr.contains("unsupported file extension (tsv strip handles .ts, .mts, .cts)"),
             "{name}: {stderr}"
+        );
+    }
+}
+
+/// A JavaScript path is refused, not read as TypeScript — where `f(a < b, c > (d))` is a
+/// generic call whose type arguments the strip would blank, JavaScript reads two
+/// comparisons. The message says why.
+#[test]
+fn test_strip_refuses_javascript_extensions() {
+    let dir = temp_dir("strip_javascript_extensions");
+    for name in ["a.js", "a.mjs", "a.cjs", "A.MJS"] {
+        let path = dir.join(name);
+        fs::write(&path, "f(a < b, c > (d));\n").unwrap();
+        let path = path.to_str().unwrap();
+        assert_refused(
+            &tsv(&["strip", path]),
+            2,
+            &format!(
+                "Error: {path}: a JavaScript file has no types to strip (tsv strip handles .ts, .mts, .cts)\n"
+            ),
         );
     }
 }

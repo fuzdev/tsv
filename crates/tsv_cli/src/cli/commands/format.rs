@@ -193,7 +193,7 @@ impl FormatCommand {
         if self.source_type.is_some() {
             exit_with_error(
                 2,
-                "Error: --source-type applies to --content/--stdin; file paths take the module grammar, retried as a script",
+                "Error: --source-type applies to --content/--stdin; a file path's goal is its extension's (.mjs/.mts a module, any other JS/TS extension the module grammar retried as a script)",
             );
         }
         if self.list && self.check {

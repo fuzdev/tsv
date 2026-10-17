@@ -194,7 +194,11 @@ const PARSER_NAMES = new Set(['svelte', 'typescript', 'css']);
 
 /** The extensions `tsv strip` takes — the native `tsv_discover::STRIPPABLE_EXTENSIONS`,
  * restated (pinned by the strip CLI rows both bins run). */
-const STRIPPABLE_EXTENSIONS = ['ts', 'mts', 'cts', 'js', 'mjs', 'cjs'];
+const STRIPPABLE_EXTENSIONS = ['ts', 'mts', 'cts'];
+
+/** The JavaScript extensions, which `tsv strip` refuses with a message of their own rather
+ * than read as TypeScript — restated from `tsv_discover`, as above. */
+const JAVASCRIPT_EXTENSIONS = ['js', 'mjs', 'cjs'];
 
 /** Whether a WASM engine reinstantiation already failed on this thread — one
  * warning per thread, not one per remaining file (each worker is its own module
@@ -316,9 +320,8 @@ Strip the types from TypeScript, keeping every character's line and column.
 
 Prints the JS to stdout byte for byte: every type-only range blanked to
 whitespace, no trailing newline added, line endings kept. One input: a
-.ts/.mts/.cts/.js/.mjs/.cjs file, --content, or --stdin. Read as a module,
-retried as a script if that fails, as format reads it; a .mjs/.mts file is a
-module by name.
+.ts/.mts/.cts file, --content, or --stdin. Read as a module, retried as a script
+if that fails, as format reads it; a .mts file is a module by name.
 
 Options:
   --content <s>     content to strip, printed to stdout
@@ -326,8 +329,8 @@ Options:
   --source-type <t> TypeScript parse goal: script | module (default: module, retried as a script; --content/--stdin only)
   --check           print nothing: exit 1 on a refusal, 2 on a parse error
 
-Exit codes: 0 stripped, 1 refused (TypeScript with runtime semantics, such as an
-enum), 2 a parse error or a usage error.
+Exit codes: 0 stripped, 1 refused (TypeScript that type blanking cannot erase,
+such as an enum), 2 a parse error or a usage error.
 `;
 
 /**
@@ -749,7 +752,7 @@ async function format_paths(values, positionals) {
 	if (values.source_type !== undefined) {
 		exit_with_error(
 			2,
-			'Error: --source-type applies to --content/--stdin; file paths take the module grammar, retried as a script'
+			"Error: --source-type applies to --content/--stdin; a file path's goal is its extension's (.mjs/.mts a module, any other JS/TS extension the module grammar retried as a script)"
 		);
 	}
 	if (values.list && values.check) {
@@ -1581,7 +1584,7 @@ function run_strip({ values, positionals }) {
 		if (values.source_type !== undefined) {
 			exit_with_error(
 				2,
-				'Error: --source-type applies to --content/--stdin; file paths take the module grammar, retried as a script'
+				"Error: --source-type applies to --content/--stdin; a file path's goal is its extension's (.mjs/.mts a module, any other JS/TS extension the module grammar retried as a script)"
 			);
 		}
 		let is_dir = false;
@@ -1596,14 +1599,17 @@ function run_strip({ values, positionals }) {
 		// `tsv_discover::strip_unsupported_extension_error`, restated by hand: the binding
 		// exports no strip policy (the `format` refusal it does export names a different list)
 		if (!STRIPPABLE_EXTENSIONS.some((ext) => has_extension_ignoring_case(path, ext))) {
+			const reason = JAVASCRIPT_EXTENSIONS.some((ext) => has_extension_ignoring_case(path, ext))
+				? 'a JavaScript file has no types to strip'
+				: 'unsupported file extension';
 			exit_with_error(
 				2,
-				`Error: ${quote_path(path)}: unsupported file extension (tsv strip handles ` +
+				`Error: ${quote_path(path)}: ${reason} (tsv strip handles ` +
 					`${STRIPPABLE_EXTENSIONS.map((ext) => `.${ext}`).join(', ')})`
 			);
 		}
 	}
-	// `.mjs` / `.mts` are modules by name and take no retry
+	// a `.mts` is a module by name and takes no retry
 	const source_type =
 		resolve_source_type(values.source_type, 2) ??
 		(path === undefined ? undefined : source_type_from_extension(path));

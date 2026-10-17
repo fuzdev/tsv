@@ -235,13 +235,16 @@ that parse error first, exactly as `parse` does.
 `--content`, or `--stdin` — and prints the JS to stdout byte for byte: no newline appended,
 every line terminator, a leading BOM and a hashbang kept. The file is never written. It
 takes no `--parser` (the strip is TypeScript's), and a file path's extension must be one of
-`.ts` `.mts` `.cts` `.js` `.mjs` `.cjs` (a `.svelte.ts` rune module is `.ts`) — anything else
-is an argument error naming that list (`tsv_discover::strip_unsupported_extension_error`), as
-is a directory. The goal is `format`'s ([strip.md §The parse goal](./strip.md#the-parse-goal)):
+`.ts` `.mts` `.cts` (a `.svelte.ts` rune module and a `.d.ts` are `.ts`) — anything else is
+an argument error naming that list (`tsv_discover::strip_unsupported_extension_error`), as is
+a directory. A JavaScript path (`.js` `.mjs` `.cjs`) is refused with a reason of its own
+(`a JavaScript file has no types to strip`) rather than read as TypeScript, where
+`f(a < b, c > (d))` is a generic call whose type arguments the strip would blank and
+JavaScript reads two comparisons. The goal is `format`'s ([strip.md §The parse goal](./strip.md#the-parse-goal)):
 unset, a module retried as a script; `--source-type script|module` names it exactly for
 `--content` / `--stdin` (a value naming neither is a usage error), and beside a path it is
-refused in `format`'s words, since a path's goal is its extension's — `.mjs` / `.mts`
-modules with no retry, every other extension the fallback.
+refused in `format`'s words, since a path's goal is its extension's — a `.mts` a module with
+no retry, a `.ts` / `.cts` the fallback.
 `--content` and `--stdin` follow `parse`'s precedence between themselves, but either beside
 a path is refused (`--content/--stdin cannot be combined with a file path`), as `format`
 refuses it. Every argument is graded before anything is read, so a refused `--stdin` never

@@ -33,7 +33,9 @@
  * files to spawn twice each, so it is graded in-process instead: one Node child imports
  * the native `@fuzdev/tsv` loader and the wasm package side by side and requires
  * `strip_typescript` to return deep-equal results for every file — the code, or every
- * field of a refusal or a parse error. Absent, the snapshot is a warn-skip there too.
+ * field of a refusal or a parse error. That half also takes the JS family's files, which
+ * the CLI refuses: the API reads any source as TypeScript. Absent, the snapshot is a
+ * warn-skip there too.
  *
  * Blind spots. It compares the two CLI **drivers** as well as the two engines,
  * so a driver-only difference reads as a failure here (that is a real finding,
@@ -308,15 +310,19 @@ async function grade(root: string): Promise<RootReport> {
 }
 
 /** The extensions `tsv strip` takes (`tsv_discover::STRIPPABLE_EXTENSIONS`). */
-const STRIP_EXTENSIONS = ['.ts', '.mts', '.cts', '.js', '.mjs', '.cjs'];
+const STRIP_EXTENSIONS = ['.ts', '.mts', '.cts'];
 
-/** Every file under `dir` the strip takes, as absolute paths. */
-function collect_strippable(dir: string, out: string[] = []): string[] {
+/** The extensions the `strip_typescript` engine half grades: the CLI's, plus the JS family —
+ * the API reads any source as TypeScript, so a JS file is still an input it takes. */
+const STRIP_ENGINE_EXTENSIONS = [...STRIP_EXTENSIONS, '.js', '.mjs', '.cjs'];
+
+/** Every file under `dir` in `extensions`, as absolute paths. */
+function collect_strippable(dir: string, extensions: string[], out: string[] = []): string[] {
 	for (const entry of readdirSync(dir, { withFileTypes: true })) {
 		if (entry.name === '.git' || entry.name === 'node_modules') continue;
 		const full = join(dir, entry.name);
-		if (entry.isDirectory()) collect_strippable(full, out);
-		else if (entry.isFile() && STRIP_EXTENSIONS.includes(extname(entry.name).toLowerCase())) {
+		if (entry.isDirectory()) collect_strippable(full, extensions, out);
+		else if (entry.isFile() && extensions.includes(extname(entry.name).toLowerCase())) {
 			out.push(full);
 		}
 	}
@@ -327,7 +333,7 @@ function collect_strippable(dir: string, out: string[] = []): string[] {
 async function grade_strip_cli(root: string): Promise<RootReport> {
 	const absolute = resolve(ROOT, root);
 	if (!existsSync(absolute)) return { root, files: 0, skipped: 'not present', findings: [] };
-	const files = collect_strippable(absolute).map(repo_rel).sort();
+	const files = collect_strippable(absolute, STRIP_EXTENSIONS).map(repo_rel).sort();
 	if (files.length === 0) {
 		return { root, files: 0, skipped: 'no files in the strip’s extensions', findings: [] };
 	}
@@ -387,7 +393,7 @@ async function grade_strip_engines(root: string): Promise<RootReport> {
 	if (!existsSync(absolute)) {
 		return { root: `${root} (strip_typescript)`, files: 0, skipped: 'not present', findings: [] };
 	}
-	const files = collect_strippable(absolute);
+	const files = collect_strippable(absolute, STRIP_ENGINE_EXTENSIONS);
 	if (files.length === 0) {
 		return {
 			root: `${root} (strip_typescript)`,

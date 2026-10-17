@@ -80,9 +80,10 @@ crates (the open-convention stance):
   renders from `FORMATTABLE_EXTENSIONS`, so a new language flows through; the text
   is produced once here, like `shadow_warning`.
 - `STRIPPABLE_EXTENSIONS` / `strip_unsupported_extension_error(path) -> Option<String>` — the
-  extensions `tsv strip` takes (the JS/TS family alone; a `.svelte.ts` and a `.d.ts` are `.ts`)
-  and the argument error for a file named to it outside them, read without regard to ASCII
-  case as `is_formattable` reads one. A file-*argument* check, not discovery (the strip takes
+  extensions `tsv strip` takes (the TypeScript extensions alone; a `.svelte.ts` and a `.d.ts`
+  are `.ts`) and the argument error for a file named to it outside them (read without regard
+  to ASCII case, as `is_formattable` reads one) — a JavaScript file's saying why, since it
+  would otherwise be read as TypeScript, where `a < b > (c)` is a generic call. A file-*argument* check, not discovery (the strip takes
   one input and walks nothing); `cli.js` restates the text by hand, pinned by the strip CLI
   rows both bins run.
 - `formattable_extension_list(separator)` — the extension set rendered as prose

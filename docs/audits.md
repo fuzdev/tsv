@@ -878,9 +878,11 @@ graded per file: over every input in the strip's extensions under `tests/fixture
 code, stdout and stderr must match. The `../corpora` snapshot is too many files to spawn
 twice each, so there one Node child imports the staged native `@fuzdev/tsv` loader and the
 wasm package side by side and requires `strip_typescript` to return the same result for
-every file — the code, or every field of a refusal or a parse error. That half grades the
-engines alone (the drivers' strip contract is `scripts/test_napi_npm.ts`'s parity rows), and
-needs the native loader staged, not just the CLI binary.
+every file — the code, or every field of a refusal or a parse error. That half takes the JS
+family's files too (`.js`/`.mjs`/`.cjs`, which `tsv strip` refuses), since the API reads any
+source as TypeScript. It grades the engines alone (the drivers' strip contract is
+`scripts/test_napi_npm.ts`'s parity rows), and needs the native loader staged, not just the
+CLI binary.
 
 The WASM side runs under **node**, the host `cli.js` ships for, not under Deno's compat
 layer — which is not a detail. The audit's first run failed on a `cli.js` bug that exists

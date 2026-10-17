@@ -5,11 +5,10 @@ use argh::FromArgs;
 /// Strip the types from TypeScript, keeping every character's line and column.
 ///
 /// Prints the JS to stdout byte for byte: every type-only range blanked to whitespace, no
-/// trailing newline added, line endings kept. One input: a .ts/.mts/.cts/.js/.mjs/.cjs
-/// file, --content, or --stdin. Read as a module, retried as a script if that fails, as
-/// format reads it; a .mjs/.mts file is a module by name. Exit codes: 0 stripped, 1
-/// refused (TypeScript with runtime semantics, such as an enum), 2 a parse error or a
-/// usage error.
+/// trailing newline added, line endings kept. One input: a .ts/.mts/.cts file, --content,
+/// or --stdin. Read as a module, retried as a script if that fails, as format reads it;
+/// a .mts file is a module by name. Exit codes: 0 stripped, 1 refused (TypeScript that
+/// type blanking cannot erase, such as an enum), 2 a parse error or a usage error.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "strip")]
 pub struct StripCommand {
@@ -30,7 +29,7 @@ pub struct StripCommand {
     #[argh(switch)]
     check: bool,
 
-    /// file path (.ts/.mts/.cts/.js/.mjs/.cjs)
+    /// file path (.ts/.mts/.cts)
     #[argh(positional)]
     file: Option<String>,
 }
@@ -53,7 +52,7 @@ impl StripCommand {
             if self.source_type.is_some() {
                 exit_with_error(
                     2,
-                    "Error: --source-type applies to --content/--stdin; file paths take the module grammar, retried as a script",
+                    "Error: --source-type applies to --content/--stdin; a file path's goal is its extension's (.mjs/.mts a module, any other JS/TS extension the module grammar retried as a script)",
                 );
             }
             if let Err(e) = refuse_directory(path) {
@@ -65,7 +64,7 @@ impl StripCommand {
         }
         let goal = parse_source_type_arg(self.source_type.as_deref())
             .unwrap_or_else(|e| exit_with_error(2, format_args!("Error: {e}")));
-        // `.mjs` / `.mts` are modules by name and take no retry (`tsv_ts::Goal::from_extension`)
+        // a `.mts` is a module by name and takes no retry (`tsv_ts::Goal::from_extension`)
         let goal = goal.or_else(|| self.file.as_deref().and_then(tsv_ts::Goal::from_extension));
         let (input, _) = InputArgs {
             content: self.content,
