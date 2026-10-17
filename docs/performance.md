@@ -853,6 +853,97 @@ getting them wrong.
 4. **Check the size axis if the change shrank a hot function** — see
    [An instruction A/B is blind to code size](#an-instruction-ab-is-blind-to-code-size); no `check` gate covers it
 
+### Gating a change against a base — `deno task perf:ab`
+
+```bash
+deno task perf:ab <release-tag>    # the last release vs the working tree (HEAD + uncommitted changes)
+deno task perf:ab HEAD             # a change in progress vs the commit it sits on
+deno task perf:ab <base> <cand>    # two refs; also --rounds N (even, 6), --iterations N (10), --corpus DIR, --json
+```
+
+One command for the parse/format regression check, per language (TypeScript, Svelte, CSS) ×
+phase. Each side is built `--release` from a frozen `git archive` snapshot of its tree's build
+inputs (the workspace manifests, the toolchain pin, `.cargo/`, `src/`, `crates/` — not `tests/`)
+in `~/.cache/tsv/perf_ab/`, keyed by those inputs (a hash of their `git ls-tree -r` entries, the
+same list the snapshot takes, minus the driver below, which every build overlays). A re-run
+reuses the build, and so does a change confined to `tests/`, the docs or `scripts/`: it builds
+nothing new, and `perf:ab HEAD` on one measures a binary against itself. A run keeps the few most
+recently used snapshots and evicts the rest. The report prints each side's binary sha256, so a
+reading that moved between runs can be told apart from a build that changed. The builds run in a
+cleared environment, so a `RUSTFLAGS` or `CARGO_PROFILE_*` in the caller's shell cannot reach one
+side's build and not the other's. Both sides run the **same** measuring driver,
+`crates/tsv_debug/examples/perf_ab.rs`, copied from the current checkout over each snapshot:
+only the measured libraries differ. The driver times exactly what `profile` times (fold + parse,
+then format; per-file medians summed per language) over `../corpora/collections`, and is an
+example rather than a `profile` flag so it compiles against an older tree unchanged.
+
+Rounds interleave the two sides, an even number of them so each side goes first in half. In each,
+every side runs the pipeline, parse alone, and zero iterations under `perf stat -e
+instructions:u`; the zero-iteration run is the process's fixed cost (start-up, the corpus walk,
+the reads), subtracted so a phase's count is its own work — a sliver of the TypeScript parse
+count, but a large share of CSS's, whose small corpus parses in little more than the fixed cost.
+The instruction column also carries the arena resets between iterations, which the wall timers
+leave out as `profile` does: a process-level count cannot exclude them, and timing them would part
+the wall column from `profile`'s.
+
+The wall delta is **paired**: each round's two back-to-back runs give a candidate/base ratio, and
+the row grades the median of those ratios, so drift that moves both runs of a round cancels inside
+it. A row whose delta sits within its own round-to-round spread of the threshold — and whose
+verdict would change across it — extends the run by balanced pairs of rounds up to a cap, so a
+row whose true delta sits near the line is decided by more rounds rather than by one round's
+draw. A row the instruction column already decides (flat, so both sides of the line pass; or over the
+instruction threshold, so both fail) needs no more rounds: the count would not move. Rows
+report each side's median and round spread, and a side whose spread exceeds half the threshold
+warns that the machine was too noisy for the wall column. Every spread is a median absolute
+deviation, not a range: a range widens with the round count on the same machine, so it would
+both trip the noise warning on a quiet run and keep extending the rounds it is meant to settle.
+
+**The rule.** A row whose candidate wall exceeds the base's by more than 1.5% fails — unless
+its `instructions:u` moved by less than 0.5%, when it reads as **LAYOUT** and passes; a row whose
+instructions rose 0.5% or more under a passing wall is a **warning**. The escape exists because a
+build's code placement alone moves wall-clock by about as much as the threshold (§Reading
+`cycles:u` below) while leaving the instruction count where it was, so a wall move at flat
+instructions is not work the change added. It is an escape for flat counts only: fewer
+instructions do not excuse a slower wall.
+
+Instructions also fail a row **on their own**: a rise of more than 1.5% fails whatever the wall
+says, a separate threshold from the wall's though equal to it. Wall-clock is a noisy and
+layout-sensitive reading of the work; the instruction count is deterministic — it repeats from
+run to run where the wall wanders — so a rise that large is added work, and a wall that
+happened to land under its line on this run does not excuse it. A rise from 0.5% to 1.5% under
+a passing wall stays a warning: real, small, and a judgment call rather than a block. Only a
+rise fails; a fall in instructions is never a regression by itself.
+
+**Sitting-sensitive failures.** A row that fails on its wall while its instructions sit inside
+the warning band (0.5% to 1.5%) still fails — exit 1 — but is marked **sitting-sensitive**, with a
+line telling the reader to re-run it in a fresh sitting. The procedure: re-run the same command
+later, on a quiet machine; a pass there clears the failure, a second failure stands. The reason:
+the wall reading drifts between sittings by more than the in-run spread measures — the same two
+binaries (the printed sha256s say so) read differently an hour later — so a small real rise
+that one sitting carries over the line another leaves under it. More rounds within one run
+narrow only the in-run error, and the instruction count, which does not drift, says only that
+the work grew a little. Every other verdict is settled in one sitting: flat instructions pass
+either way, a rise over 1.5% fails either way, and a wall failure at fallen instructions, or
+with none counted, is no small-rise reading to re-test.
+
+CSS rows grade a small absolute amount of work — the CSS corpus is small, and its parse count
+is what remains after the fixed cost — so their percentages, wall and instructions alike, move
+on small absolute changes; read a CSS failure against its absolute numbers as well.
+
+Without `perf` the run says so loudly and grades wall alone — no layout escape, no instruction
+gate — so any row over the wall threshold fails. Exit codes: 0 pass, 1 a row regressed, 2 a harness
+error — a build or driver failure (a formatter panic included), a missing corpus, a language with
+files on one side only, file sets (count, bytes, parse failures) that differ between the sides or
+between runs, formatted output that changes between runs of one binary. A language with no files
+on either side is left out with a note. Both sides must reject the same files: a change that makes
+a corpus file parse, or stop parsing, is a harness error rather than a measurement.
+
+Wall-clock wants a quiet machine: the task prints the 1-minute load average (read before it
+builds) and after the run, and names a running `cargo` / `rustc` / `tsv_debug`; the spread warning
+is the stronger signal, since a disturbance can leave the load average low. Run an A/A
+(`perf:ab HEAD HEAD`, one binary against itself) to see the wall noise the 1.5% sits on that day —
+its instruction column reads flat.
+
 ### A board is one cell of (entry point × corpus)
 
 `tsv_debug` exposes several entry points — `profile` (parse + format),

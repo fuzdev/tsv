@@ -461,6 +461,8 @@ cargo run --release -p tsv_debug -- profile file.ts --iterations 20  # more iter
 cargo run --release -p tsv_debug -- json_profile ../corpora/collections/zzz/src/lib   # parse vs wire-JSON write (--locations: the loc emitter)
 cargo run --release -p tsv_debug -- profile --strip ../corpora/collections   # parse vs the type strip's walk + blank (TS only)
 cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile  # Svelte compile vs the format wall
+deno task perf:ab <base-ref> [<cand-ref>]  # parse/format A/B per language: wall + instructions:u, exit 1 on a regression;
+#                                          cand defaults to the working tree. NOT in check (two release builds; ./docs/performance.md)
 ```
 
 Function-level hotspots: `perf` with the `profiling` cargo profile:
