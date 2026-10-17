@@ -112,7 +112,7 @@ Deeply nested input has a ceiling: the WASM stack is 1 MiB, and the deepest shap
 
 ## Status
 
-Near production-ready. A long tail of rare bugs remains and APIs may still change; reports are appreciated.
+A long tail of rare bugs remains and APIs may still change; reports are appreciated.
 
 ## License
 

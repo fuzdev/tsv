@@ -123,7 +123,7 @@ The class is the WASM binding's own, re-exported as is: unlike the format and pa
 
 ## Status
 
-Near production-ready. A long tail of rare bugs remains and APIs may still change; reports are appreciated.
+The formatters are near production-ready. A long tail of rare bugs remains and APIs may still change; reports are appreciated.
 
 ## License
 

@@ -43,7 +43,7 @@ but lacks their features, extensibility, and broad language support.
 One reason for tsv to exist is to help find the performance left on the table
 in the Web's implementations.
 
-tsv is near production-ready, with a long tail of rare bugs.
+tsv's formatters are near production-ready, with a long tail of rare bugs.
 Reports and opinions are appreciated.
 See the [issues](https://github.com/fuzdev/tsv/issues)
 and [discussions](https://github.com/fuzdev/tsv/discussions).
@@ -57,7 +57,7 @@ It's a high-effort project that prioritizes quality.
 
 ## Features
 
-> **status**: near production-ready - a long tail of rare bugs remains, and APIs may still change
+> **status**: the formatters are near production-ready - a long tail of rare bugs remains, and APIs may still change
 
 tsv implements aspects of:
 

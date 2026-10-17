@@ -133,7 +133,7 @@ A Rust panic — always a tsv bug, please report it — is also thrown rather th
 
 ## Status
 
-Near production-ready. A long tail of rare bugs remains and APIs may still change; reports are appreciated.
+The formatters are near production-ready. A long tail of rare bugs remains and APIs may still change; reports are appreciated.
 
 ## License
 

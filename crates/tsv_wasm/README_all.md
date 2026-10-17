@@ -169,7 +169,7 @@ For tooling that needs tsv's exact file scoping, the package also exports the `I
 
 ## Status
 
-Near production-ready. A long tail of rare bugs remains and APIs may still change; reports are appreciated.
+The formatters are near production-ready. A long tail of rare bugs remains and APIs may still change; reports are appreciated.
 
 ## License
 
