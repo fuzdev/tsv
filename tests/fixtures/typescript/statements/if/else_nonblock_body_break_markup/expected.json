@@ -1,0 +1,256 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 150,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Component",
+				"start": 0,
+				"end": 76,
+				"name": "Button",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 9,
+						"end": 73,
+						"name": "onclick",
+						"value": {
+							"type": "ExpressionTag",
+							"start": 17,
+							"end": 73,
+							"expression": {
+								"type": "ArrowFunctionExpression",
+								"start": 18,
+								"end": 72,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 24,
+									"end": 72,
+									"body": [
+										{
+											"type": "IfStatement",
+											"start": 28,
+											"end": 69,
+											"test": {
+												"type": "Identifier",
+												"start": 32,
+												"end": 33,
+												"name": "a"
+											},
+											"consequent": {
+												"type": "ExpressionStatement",
+												"start": 35,
+												"end": 39,
+												"expression": {
+													"type": "CallExpression",
+													"start": 35,
+													"end": 38,
+													"callee": {
+														"type": "Identifier",
+														"start": 35,
+														"end": 36,
+														"name": "b"
+													},
+													"arguments": [],
+													"optional": false
+												}
+											},
+											"alternate": {
+												"type": "ExpressionStatement",
+												"start": 50,
+												"end": 69,
+												"expression": {
+													"type": "CallExpression",
+													"start": 50,
+													"end": 68,
+													"callee": {
+														"type": "Identifier",
+														"start": 50,
+														"end": 51,
+														"name": "c"
+													},
+													"arguments": [
+														{
+															"type": "ObjectExpression",
+															"start": 52,
+															"end": 67,
+															"properties": [
+																{
+																	"type": "Property",
+																	"start": 58,
+																	"end": 62,
+																	"method": false,
+																	"shorthand": false,
+																	"computed": false,
+																	"key": {
+																		"type": "Identifier",
+																		"start": 58,
+																		"end": 59,
+																		"name": "x"
+																	},
+																	"value": {
+																		"type": "Literal",
+																		"start": 61,
+																		"end": 62,
+																		"value": 1,
+																		"raw": "1"
+																	},
+																	"kind": "init"
+																}
+															]
+														}
+													],
+													"optional": false
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 76,
+				"end": 78,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 78,
+				"end": 149,
+				"name": "pre",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 83,
+							"end": 143,
+							"expression": {
+								"type": "CallExpression",
+								"start": 84,
+								"end": 142,
+								"callee": {
+									"type": "ArrowFunctionExpression",
+									"start": 85,
+									"end": 139,
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 91,
+										"end": 139,
+										"body": [
+											{
+												"type": "IfStatement",
+												"start": 95,
+												"end": 136,
+												"test": {
+													"type": "Identifier",
+													"start": 99,
+													"end": 100,
+													"name": "a"
+												},
+												"consequent": {
+													"type": "ExpressionStatement",
+													"start": 102,
+													"end": 106,
+													"expression": {
+														"type": "CallExpression",
+														"start": 102,
+														"end": 105,
+														"callee": {
+															"type": "Identifier",
+															"start": 102,
+															"end": 103,
+															"name": "b"
+														},
+														"arguments": [],
+														"optional": false
+													}
+												},
+												"alternate": {
+													"type": "ExpressionStatement",
+													"start": 117,
+													"end": 136,
+													"expression": {
+														"type": "CallExpression",
+														"start": 117,
+														"end": 135,
+														"callee": {
+															"type": "Identifier",
+															"start": 117,
+															"end": 118,
+															"name": "c"
+														},
+														"arguments": [
+															{
+																"type": "ObjectExpression",
+																"start": 119,
+																"end": 134,
+																"properties": [
+																	{
+																		"type": "Property",
+																		"start": 125,
+																		"end": 129,
+																		"method": false,
+																		"shorthand": false,
+																		"computed": false,
+																		"key": {
+																			"type": "Identifier",
+																			"start": 125,
+																			"end": 126,
+																			"name": "x"
+																		},
+																		"value": {
+																			"type": "Literal",
+																			"start": 128,
+																			"end": 129,
+																			"value": 1,
+																			"raw": "1"
+																		},
+																		"kind": "init"
+																	}
+																]
+															}
+														],
+														"optional": false
+													}
+												}
+											}
+										]
+									}
+								},
+								"arguments": [],
+								"optional": false
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

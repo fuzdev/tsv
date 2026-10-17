@@ -12,34 +12,21 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::skip_comment;
 
-/// Check if a statement can be printed inline after `if (cond)` without a newline.
-///
-/// Block, expression, break, continue, return, throw, and empty statements stay inline.
-/// Other statements (if, for, while, etc.) go on a new line with indent.
-fn is_inline_consequent(stmt: &Statement<'_>) -> bool {
+/// Whether an alternate prints on the `else`'s own line with no indent wrap: a block (its
+/// `{` opens the body) or an else-if (prettier's `adjustClause` with `forceSpace`). Every
+/// other alternate takes the clause rule the consequent does — on the `else`'s line when it
+/// fits flat, dropped below it and indented when it breaks.
+fn is_else_line_alternate(stmt: &Statement<'_>) -> bool {
     matches!(
         &stmt.kind,
-        StatementKind::BlockStatement(_)
-            | StatementKind::ExpressionStatement(_)
-            | StatementKind::BreakStatement(_)
-            | StatementKind::ContinueStatement(_)
-            | StatementKind::ReturnStatement(_)
-            | StatementKind::ThrowStatement(_)
-            | StatementKind::EmptyStatement(_)
+        StatementKind::BlockStatement(_) | StatementKind::IfStatement(_)
     )
 }
 
-/// Check if a statement can be printed inline after `else` without a newline.
-///
-/// Same as `is_inline_consequent` but also allows IfStatement for else-if chains.
-fn is_inline_alternate(stmt: &Statement<'_>) -> bool {
-    is_inline_consequent(stmt) || matches!(&stmt.kind, StatementKind::IfStatement(_))
-}
-
 impl<'a> Printer<'a> {
-    /// Build a non-block, non-inline else body via Prettier's `adjustClause`
-    /// (`group(indent([line, clause]))`): `else while (x) g();` stays inline when it fits
-    /// and breaks to `else⏎↹while (x) g();` when it doesn't — the same soft-line layout the
+    /// Build a non-block, non-else-if else body via Prettier's `adjustClause`
+    /// (`group(indent([line, clause]))`): `else g();` or `else while (x) g();` stays inline
+    /// when it fits and breaks to `else⏎↹g(…);` when it doesn't — the same soft-line layout the
     /// consequent uses (see `build_adjust_clause_with_comments`), never a bare hardline. The
     /// caller emits the bare `else` (no trailing space); the leading `line` supplies the
     /// separator when flat.
@@ -147,10 +134,10 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Append the `else` keyword and its alternate body, choosing the layout: an inline
-    /// alternate (block / expression / else-if) prints `else <body>`; a non-block, non-inline
-    /// alternate uses `adjustClause` (`else` + [`Self::build_else_adjust_clause`]) so it stays
-    /// inline when it fits and breaks to `else⏎↹clause` otherwise. `leading_space` prefixes
+    /// Append the `else` keyword and its alternate body, choosing the layout: a block or an
+    /// else-if prints `else <body>`; every other alternate uses `adjustClause` (`else` +
+    /// [`Self::build_else_adjust_clause`]) so it stays inline when it fits and breaks to
+    /// `else⏎↹clause` otherwise. `leading_space` prefixes
     /// ` else` — set when `else` abuts a preceding `}` on the same line (`} else …`), cleared
     /// when it starts its own line after a `hardline`. (EmptyStatement and comment-bearing
     /// alternates are handled by the callers, not here.)
@@ -162,8 +149,8 @@ impl<'a> Printer<'a> {
         ctx: StatementContext,
     ) {
         let d = self.d();
-        if is_inline_alternate(alternate) {
-            // Inline alternate: on the `else`'s line with no indent wrap.
+        if is_else_line_alternate(alternate) {
+            // On the `else`'s line with no indent wrap.
             parts.push(d.text(if leading_space { " else " } else { "else " }));
             parts.push(self.build_branch_statement_doc(alternate, ctx.clause_body(false, false)));
         } else {
@@ -251,7 +238,7 @@ impl<'a> Printer<'a> {
     ///
     /// ⚠️ It has drifted twice, and both times the comment-bearing printer was the one
     /// that re-decided: once with a weaker head→body gate that relocated an own-line block
-    /// UP onto the `)` line, once with `is_inline_consequent` + a bare `") "` in place of
+    /// UP onto the `)` line, once with an inline-consequent predicate + a bare `") "` in place of
     /// `adjustClause`'s `indent([line, body])`, which had no way to drop the body at all
     /// and so broke the CONDITION PARENS open on overflow — a form neither prettier nor
     /// the other printer produces. The consequent must not be decided twice; the only real

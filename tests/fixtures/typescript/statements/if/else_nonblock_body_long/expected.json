@@ -1,0 +1,165 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 351,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " 100 chars - the body stays on the else line",
+			"start": 10,
+			"end": 56
+		},
+		{
+			"type": "Line",
+			"value": " 101 chars - the body drops below the else keyword",
+			"start": 172,
+			"end": 224
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 350,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 341,
+			"body": [
+				{
+					"type": "IfStatement",
+					"start": 58,
+					"end": 169,
+					"test": {
+						"type": "Identifier",
+						"start": 62,
+						"end": 63,
+						"name": "x"
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 65,
+						"end": 69,
+						"expression": {
+							"type": "CallExpression",
+							"start": 65,
+							"end": 68,
+							"callee": {
+								"type": "Identifier",
+								"start": 65,
+								"end": 66,
+								"name": "g"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"alternate": {
+						"type": "ExpressionStatement",
+						"start": 76,
+						"end": 169,
+						"expression": {
+							"type": "CallExpression",
+							"start": 76,
+							"end": 168,
+							"callee": {
+								"type": "Identifier",
+								"start": 76,
+								"end": 79,
+								"name": "log"
+							},
+							"arguments": [
+								{
+									"type": "Identifier",
+									"start": 80,
+									"end": 167,
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								}
+							],
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 100 chars - the body stays on the else line",
+							"start": 10,
+							"end": 56
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 226,
+					"end": 340,
+					"test": {
+						"type": "Identifier",
+						"start": 230,
+						"end": 231,
+						"name": "x"
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 233,
+						"end": 237,
+						"expression": {
+							"type": "CallExpression",
+							"start": 233,
+							"end": 236,
+							"callee": {
+								"type": "Identifier",
+								"start": 233,
+								"end": 234,
+								"name": "g"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"alternate": {
+						"type": "ExpressionStatement",
+						"start": 246,
+						"end": 340,
+						"expression": {
+							"type": "CallExpression",
+							"start": 246,
+							"end": 339,
+							"callee": {
+								"type": "Identifier",
+								"start": 246,
+								"end": 249,
+								"name": "log"
+							},
+							"arguments": [
+								{
+									"type": "Identifier",
+									"start": 250,
+									"end": 338,
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								}
+							],
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 chars - the body drops below the else keyword",
+							"start": 172,
+							"end": 224
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

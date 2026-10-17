@@ -185,9 +185,10 @@ if (node_version === null) {
 	const new_enough =
 		m !== null && (Number(m[1]) > 22 || (Number(m[1]) === 22 && Number(m[2]) >= 18));
 	if (new_enough) ok(`node ${node_version} (≥ 22.18)`);
-	else warn(
-		`node ${node_version} — < 22.18 lacks native TS type-stripping; the harness entries fail to parse`
-	);
+	else
+		warn(
+			`node ${node_version} — < 22.18 lacks native TS type-stripping; the harness entries fail to parse`
+		);
 	check_ci_pin('node', node_version.replace(/^v/, ''));
 }
 
@@ -321,14 +322,16 @@ if (exists('../prettier')) {
 				'suites (corpus inputs) come from a different version than the live oracle (informational)'
 		);
 	} else ok(`../prettier checkout (v${v ?? '?'})`);
-} else warn(
-	'../prettier checkout missing — the corpus prettier suites + layout-reference reading need it'
-);
+} else
+	warn(
+		'../prettier checkout missing — the corpus prettier suites + layout-reference reading need it'
+	);
 
 if (exists('../test262/test')) ok('../test262 checkout (conformance:test262 release gate)');
-else warn(
-	'../test262 checkout missing — conformance:test262 (the release gate, publish Step 3b) + bench:harvest:test262 need it'
-);
+else
+	warn(
+		'../test262 checkout missing — conformance:test262 (the release gate, publish Step 3b) + bench:harvest:test262 need it'
+	);
 
 if (exists('../wpt/css')) ok('../wpt/css checkout (sparse)');
 else warn('../wpt/css checkout missing — bench:harvest:wpt unavailable (manual-cadence tool)');
@@ -378,9 +381,8 @@ if (exists('../typescript-go/testdata/baselines/reference/submodule')) {
 	warn(
 		'../typescript-go present but testdata/baselines/reference/submodule missing — conformance:tsc-roundtrip would FAIL (partial checkout)'
 	);
-} else info(
-	'../typescript-go checkout absent — needed only by the on-demand tsc_conformance tasks'
-);
+} else
+	info('../typescript-go checkout absent — needed only by the on-demand tsc_conformance tasks');
 
 // The tsc-check task additionally sweeps the corpus INPUTS + bundled libs (unlike
 // roundtrip, which reads only the committed baselines). The corpus is the
@@ -478,9 +480,8 @@ try {
 				`${view} view: ${missing.length}/${total} entries missing — ` +
 					`corpus:compare/bench on this view fail fast:\n      ${missing.join('\n      ')}`
 			);
-		} else ok(
-			`${view} view: all ${total - optional_missing.length}/${total} required entries present`
-		);
+		} else
+			ok(`${view} view: all ${total - optional_missing.length}/${total} required entries present`);
 		for (const o of optional_missing)
 			info(`${view} view: optional entry absent (fail-open, disclosed): ${o}`);
 	}

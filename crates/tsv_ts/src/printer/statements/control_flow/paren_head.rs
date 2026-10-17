@@ -149,12 +149,16 @@ impl<'a> Printer<'a> {
         let do_end = span.start + "do".len() as u32;
         let body_start = stmt.body.span().start;
         // The body's container facts: the `while` CONTINUES on the tail's flush line,
-        // and only the broken header→body arm below wraps the body in an indent — the
-        // plain `do body` spelling is inline, so its tail dedents zero levels.
+        // and the body is wrapped in an indent by the broken header→body arm and by the
+        // comment-free clause arm (a non-block, non-empty body) below — a block body and
+        // a non-breaking comment gap print `do body` inline, so their tail dedents zero
+        // levels.
         let gap_has_comments = self.has_comments_to_emit_between(do_end, body_start);
         let gap_breaks_body =
             gap_has_comments && self.header_to_body_gap_breaks(do_end, body_start) && !is_block;
-        let body_ctx = ctx.clause_body(true, gap_breaks_body);
+        let is_empty = matches!(&stmt.body.kind, StatementKind::EmptyStatement(_));
+        let is_clause = !gap_has_comments && !is_block && !is_empty;
+        let body_ctx = ctx.clause_body(true, gap_breaks_body || is_clause);
         // A loop body collapses its empty block form (`do {} while (cond)`) — unless an
         // own-line directive in the `do`→body gap freezes it.
         let body_doc = self.build_statement_head_doc(do_end, stmt.body, || {
@@ -185,10 +189,15 @@ impl<'a> Printer<'a> {
                 p.push(body_doc);
             }
             p
-        } else if matches!(&stmt.body.kind, StatementKind::EmptyStatement(_)) {
+        } else if is_empty {
             // Prettier's `adjustClause` returns `";"` directly for an empty body
             // → `do;`, not `do ;`.
             smallvec![d.text("do"), body_doc]
+        } else if is_clause {
+            // A non-block body takes `adjustClause` (`group(indent([line, clause]))`), as
+            // an `if` consequent and an `else` alternate do: on the `do`'s line when it
+            // fits flat, dropped below it and indented when it breaks.
+            smallvec![d.text("do"), d.group(d.indent_line(body_doc))]
         } else {
             smallvec![d.text("do "), body_doc]
         };

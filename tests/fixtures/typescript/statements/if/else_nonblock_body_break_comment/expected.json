@@ -1,0 +1,518 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 442,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A comment before else",
+			"start": 10,
+			"end": 34
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 49,
+			"end": 53
+		},
+		{
+			"type": "Line",
+			"value": " A block comment glued to the body",
+			"start": 110,
+			"end": 146
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 168,
+			"end": 175
+		},
+		{
+			"type": "Line",
+			"value": " A trailing comment after the body",
+			"start": 224,
+			"end": 260
+		},
+		{
+			"type": "Line",
+			"value": " tail",
+			"start": 328,
+			"end": 335
+		},
+		{
+			"type": "Line",
+			"value": " A block comment on a flat body stays on the keyword's line",
+			"start": 338,
+			"end": 399
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 419,
+			"end": 426
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 441,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 432,
+			"body": [
+				{
+					"type": "IfStatement",
+					"start": 36,
+					"end": 107,
+					"test": {
+						"type": "Identifier",
+						"start": 40,
+						"end": 41,
+						"name": "x"
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 43,
+						"end": 47,
+						"expression": {
+							"type": "CallExpression",
+							"start": 43,
+							"end": 46,
+							"callee": {
+								"type": "Identifier",
+								"start": 43,
+								"end": 44,
+								"name": "g"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"alternate": {
+						"type": "ExpressionStatement",
+						"start": 62,
+						"end": 107,
+						"expression": {
+							"type": "CallExpression",
+							"start": 62,
+							"end": 106,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 62,
+								"end": 75,
+								"object": {
+									"type": "Identifier",
+									"start": 62,
+									"end": 67,
+									"name": "items"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 68,
+									"end": 75,
+									"name": "forEach"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 76,
+									"end": 105,
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 77,
+											"end": 81,
+											"name": "item"
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 86,
+										"end": 105,
+										"body": [
+											{
+												"type": "ExpressionStatement",
+												"start": 91,
+												"end": 101,
+												"expression": {
+													"type": "CallExpression",
+													"start": 91,
+													"end": 100,
+													"callee": {
+														"type": "Identifier",
+														"start": 91,
+														"end": 94,
+														"name": "use"
+													},
+													"arguments": [
+														{
+															"type": "Identifier",
+															"start": 95,
+															"end": 99,
+															"name": "item"
+														}
+													],
+													"optional": false
+												}
+											}
+										]
+									}
+								}
+							],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c",
+								"start": 49,
+								"end": 53
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment before else",
+							"start": 10,
+							"end": 34
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 148,
+					"end": 221,
+					"test": {
+						"type": "Identifier",
+						"start": 152,
+						"end": 153,
+						"name": "x"
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 155,
+						"end": 159,
+						"expression": {
+							"type": "CallExpression",
+							"start": 155,
+							"end": 158,
+							"callee": {
+								"type": "Identifier",
+								"start": 155,
+								"end": 156,
+								"name": "g"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"alternate": {
+						"type": "ExpressionStatement",
+						"start": 176,
+						"end": 221,
+						"expression": {
+							"type": "CallExpression",
+							"start": 176,
+							"end": 220,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 176,
+								"end": 189,
+								"object": {
+									"type": "Identifier",
+									"start": 176,
+									"end": 181,
+									"name": "items"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 182,
+									"end": 189,
+									"name": "forEach"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 190,
+									"end": 219,
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 191,
+											"end": 195,
+											"name": "item"
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 200,
+										"end": 219,
+										"body": [
+											{
+												"type": "ExpressionStatement",
+												"start": 205,
+												"end": 215,
+												"expression": {
+													"type": "CallExpression",
+													"start": 205,
+													"end": 214,
+													"callee": {
+														"type": "Identifier",
+														"start": 205,
+														"end": 208,
+														"name": "use"
+													},
+													"arguments": [
+														{
+															"type": "Identifier",
+															"start": 209,
+															"end": 213,
+															"name": "item"
+														}
+													],
+													"optional": false
+												}
+											}
+										]
+									}
+								}
+							],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 168,
+								"end": 175
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block comment glued to the body",
+							"start": 110,
+							"end": 146
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 262,
+					"end": 327,
+					"test": {
+						"type": "Identifier",
+						"start": 266,
+						"end": 267,
+						"name": "x"
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 269,
+						"end": 273,
+						"expression": {
+							"type": "CallExpression",
+							"start": 269,
+							"end": 272,
+							"callee": {
+								"type": "Identifier",
+								"start": 269,
+								"end": 270,
+								"name": "g"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"alternate": {
+						"type": "ExpressionStatement",
+						"start": 282,
+						"end": 327,
+						"expression": {
+							"type": "CallExpression",
+							"start": 282,
+							"end": 326,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 282,
+								"end": 295,
+								"object": {
+									"type": "Identifier",
+									"start": 282,
+									"end": 287,
+									"name": "items"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 288,
+									"end": 295,
+									"name": "forEach"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 296,
+									"end": 325,
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 297,
+											"end": 301,
+											"name": "item"
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 306,
+										"end": 325,
+										"body": [
+											{
+												"type": "ExpressionStatement",
+												"start": 311,
+												"end": 321,
+												"expression": {
+													"type": "CallExpression",
+													"start": 311,
+													"end": 320,
+													"callee": {
+														"type": "Identifier",
+														"start": 311,
+														"end": 314,
+														"name": "use"
+													},
+													"arguments": [
+														{
+															"type": "Identifier",
+															"start": 315,
+															"end": 319,
+															"name": "item"
+														}
+													],
+													"optional": false
+												}
+											}
+										]
+									}
+								}
+							],
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A trailing comment after the body",
+							"start": 224,
+							"end": 260
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " tail",
+							"start": 328,
+							"end": 335
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 401,
+					"end": 431,
+					"test": {
+						"type": "Identifier",
+						"start": 405,
+						"end": 406,
+						"name": "x"
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 408,
+						"end": 412,
+						"expression": {
+							"type": "CallExpression",
+							"start": 408,
+							"end": 411,
+							"callee": {
+								"type": "Identifier",
+								"start": 408,
+								"end": 409,
+								"name": "g"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"alternate": {
+						"type": "ExpressionStatement",
+						"start": 427,
+						"end": 431,
+						"expression": {
+							"type": "CallExpression",
+							"start": 427,
+							"end": 430,
+							"callee": {
+								"type": "Identifier",
+								"start": 427,
+								"end": 428,
+								"name": "g"
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 419,
+								"end": 426
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block comment on a flat body stays on the keyword's line",
+							"start": 338,
+							"end": 399
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

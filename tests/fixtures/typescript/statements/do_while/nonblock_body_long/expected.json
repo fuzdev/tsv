@@ -1,0 +1,143 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 355,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " 100 chars - the body stays on the do line",
+			"start": 10,
+			"end": 54
+		},
+		{
+			"type": "Line",
+			"value": " 101 chars - the body drops below the do keyword",
+			"start": 174,
+			"end": 224
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 354,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 345,
+			"body": [
+				{
+					"type": "DoWhileStatement",
+					"start": 56,
+					"end": 171,
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 59,
+						"end": 154,
+						"expression": {
+							"type": "CallExpression",
+							"start": 59,
+							"end": 153,
+							"callee": {
+								"type": "Identifier",
+								"start": 59,
+								"end": 62,
+								"name": "log"
+							},
+							"arguments": [
+								{
+									"type": "Identifier",
+									"start": 63,
+									"end": 152,
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								}
+							],
+							"optional": false
+						}
+					},
+					"test": {
+						"type": "CallExpression",
+						"start": 163,
+						"end": 169,
+						"callee": {
+							"type": "Identifier",
+							"start": 163,
+							"end": 167,
+							"name": "more"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 100 chars - the body stays on the do line",
+							"start": 10,
+							"end": 54
+						}
+					]
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 226,
+					"end": 344,
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 231,
+						"end": 327,
+						"expression": {
+							"type": "CallExpression",
+							"start": 231,
+							"end": 326,
+							"callee": {
+								"type": "Identifier",
+								"start": 231,
+								"end": 234,
+								"name": "log"
+							},
+							"arguments": [
+								{
+									"type": "Identifier",
+									"start": 235,
+									"end": 325,
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								}
+							],
+							"optional": false
+						}
+					},
+					"test": {
+						"type": "CallExpression",
+						"start": 336,
+						"end": 342,
+						"callee": {
+							"type": "Identifier",
+							"start": 336,
+							"end": 340,
+							"name": "more"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 chars - the body drops below the do keyword",
+							"start": 174,
+							"end": 224
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

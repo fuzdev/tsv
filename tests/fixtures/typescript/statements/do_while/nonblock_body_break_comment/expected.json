@@ -1,0 +1,474 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 453,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A block comment glued to the body",
+			"start": 10,
+			"end": 46
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 53,
+			"end": 60
+		},
+		{
+			"type": "Line",
+			"value": " A trailing comment after the body",
+			"start": 126,
+			"end": 162
+		},
+		{
+			"type": "Line",
+			"value": " tail",
+			"start": 215,
+			"end": 222
+		},
+		{
+			"type": "Line",
+			"value": " A block comment on a flat body stays on the keyword's line",
+			"start": 242,
+			"end": 303
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 308,
+			"end": 315
+		},
+		{
+			"type": "Line",
+			"value": " A line comment after do",
+			"start": 340,
+			"end": 366
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 373,
+			"end": 377
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 452,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 443,
+			"body": [
+				{
+					"type": "DoWhileStatement",
+					"start": 48,
+					"end": 123,
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 61,
+						"end": 106,
+						"expression": {
+							"type": "CallExpression",
+							"start": 61,
+							"end": 105,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 61,
+								"end": 74,
+								"object": {
+									"type": "Identifier",
+									"start": 61,
+									"end": 66,
+									"name": "items"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 67,
+									"end": 74,
+									"name": "forEach"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 75,
+									"end": 104,
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 76,
+											"end": 80,
+											"name": "item"
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 85,
+										"end": 104,
+										"body": [
+											{
+												"type": "ExpressionStatement",
+												"start": 90,
+												"end": 100,
+												"expression": {
+													"type": "CallExpression",
+													"start": 90,
+													"end": 99,
+													"callee": {
+														"type": "Identifier",
+														"start": 90,
+														"end": 93,
+														"name": "use"
+													},
+													"arguments": [
+														{
+															"type": "Identifier",
+															"start": 94,
+															"end": 98,
+															"name": "item"
+														}
+													],
+													"optional": false
+												}
+											}
+										]
+									}
+								}
+							],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 53,
+								"end": 60
+							}
+						]
+					},
+					"test": {
+						"type": "CallExpression",
+						"start": 115,
+						"end": 121,
+						"callee": {
+							"type": "Identifier",
+							"start": 115,
+							"end": 119,
+							"name": "more"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block comment glued to the body",
+							"start": 10,
+							"end": 46
+						}
+					]
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 164,
+					"end": 239,
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 169,
+						"end": 214,
+						"expression": {
+							"type": "CallExpression",
+							"start": 169,
+							"end": 213,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 169,
+								"end": 182,
+								"object": {
+									"type": "Identifier",
+									"start": 169,
+									"end": 174,
+									"name": "items"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 175,
+									"end": 182,
+									"name": "forEach"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 183,
+									"end": 212,
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 184,
+											"end": 188,
+											"name": "item"
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 193,
+										"end": 212,
+										"body": [
+											{
+												"type": "ExpressionStatement",
+												"start": 198,
+												"end": 208,
+												"expression": {
+													"type": "CallExpression",
+													"start": 198,
+													"end": 207,
+													"callee": {
+														"type": "Identifier",
+														"start": 198,
+														"end": 201,
+														"name": "use"
+													},
+													"arguments": [
+														{
+															"type": "Identifier",
+															"start": 202,
+															"end": 206,
+															"name": "item"
+														}
+													],
+													"optional": false
+												}
+											}
+										]
+									}
+								}
+							],
+							"optional": false
+						},
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " tail",
+								"start": 215,
+								"end": 222
+							}
+						]
+					},
+					"test": {
+						"type": "CallExpression",
+						"start": 231,
+						"end": 237,
+						"callee": {
+							"type": "Identifier",
+							"start": 231,
+							"end": 235,
+							"name": "more"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A trailing comment after the body",
+							"start": 126,
+							"end": 162
+						}
+					]
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 305,
+					"end": 337,
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 316,
+						"end": 320,
+						"expression": {
+							"type": "CallExpression",
+							"start": 316,
+							"end": 319,
+							"callee": {
+								"type": "Identifier",
+								"start": 316,
+								"end": 317,
+								"name": "g"
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 308,
+								"end": 315
+							}
+						]
+					},
+					"test": {
+						"type": "CallExpression",
+						"start": 329,
+						"end": 335,
+						"callee": {
+							"type": "Identifier",
+							"start": 329,
+							"end": 333,
+							"name": "more"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block comment on a flat body stays on the keyword's line",
+							"start": 242,
+							"end": 303
+						}
+					]
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 368,
+					"end": 442,
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 380,
+						"end": 425,
+						"expression": {
+							"type": "CallExpression",
+							"start": 380,
+							"end": 424,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 380,
+								"end": 393,
+								"object": {
+									"type": "Identifier",
+									"start": 380,
+									"end": 385,
+									"name": "items"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 386,
+									"end": 393,
+									"name": "forEach"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 394,
+									"end": 423,
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 395,
+											"end": 399,
+											"name": "item"
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 404,
+										"end": 423,
+										"body": [
+											{
+												"type": "ExpressionStatement",
+												"start": 409,
+												"end": 419,
+												"expression": {
+													"type": "CallExpression",
+													"start": 409,
+													"end": 418,
+													"callee": {
+														"type": "Identifier",
+														"start": 409,
+														"end": 412,
+														"name": "use"
+													},
+													"arguments": [
+														{
+															"type": "Identifier",
+															"start": 413,
+															"end": 417,
+															"name": "item"
+														}
+													],
+													"optional": false
+												}
+											}
+										]
+									}
+								}
+							],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c",
+								"start": 373,
+								"end": 377
+							}
+						]
+					},
+					"test": {
+						"type": "CallExpression",
+						"start": 434,
+						"end": 440,
+						"callee": {
+							"type": "Identifier",
+							"start": 434,
+							"end": 438,
+							"name": "more"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A line comment after do",
+							"start": 340,
+							"end": 366
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

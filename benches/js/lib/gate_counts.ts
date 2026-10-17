@@ -600,7 +600,14 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// prettier-baseline commit to its upstream parent, which re-authors four `.d.ts` unions
 	// (`exports/public.d.ts`, `types/{ambient,internal,private}.d.ts`); all four match before
 	// and after.
-	typescript: 5141,
+	//
+	// 5141 → 5142: `prettier/tests/format/js/if/else.js` arrives from `unknown` — a non-block
+	// `else` body whose layout breaks now drops below the keyword, prettier's `adjustClause`
+	// (`else return {…}` → `else⏎\treturn {…}`), as does a non-block `do` body; a block or
+	// `else if` stays on the keyword line. Measured by a HEAD-vs-tip byte A/B over the prettier
+	// TS/JS suites (that file is the one mover) and over every `../corpora/collections` file
+	// (zero movers); the `--all` run confirms `partial` / `safety` and every other bucket unmoved.
+	typescript: 5142,
 	// ⚠️ A short `svelte_styles` cache understates every css count at once and reads exactly
 	// like a regression: the harvest is a CORPUS INPUT, not a measurement of tsv, and a
 	// standalone `corpus:compare:format --all` is the one entry point that does not chain it
@@ -1044,7 +1051,10 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	//
 	// 63 → 59: the four `new`-callee files named on `CORPUS_FORMAT_MATCH_MIN` leave for
 	// `match`. Reasoning and the bucket set-diff there.
-	typescript: 59,
+	//
+	// 59 → 58: `prettier/tests/format/js/if/else.js` leaves for `match` — the non-block `else`
+	// body under `adjustClause`. Reasoning and measurement on `CORPUS_FORMAT_MATCH_MIN`.
+	typescript: 58,
 	// 23 → 18: five files LEAVE for `match` (`match` 133 → 138), all of them one language
 	// question — which reader prettier hands an at-rule prelude to, and what that reader
 	// does with the text inside a feature expression.

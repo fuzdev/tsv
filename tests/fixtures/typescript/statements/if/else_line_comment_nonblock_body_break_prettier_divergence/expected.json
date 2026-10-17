@@ -1,0 +1,312 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 332,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Line comment between else and a breaking non-block body - non-block consequent",
+			"start": 10,
+			"end": 91
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 111,
+			"end": 115
+		},
+		{
+			"type": "Line",
+			"value": " Line comment between else and a breaking non-block body - block consequent",
+			"start": 166,
+			"end": 243
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 269,
+			"end": 273
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 331,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 322,
+			"body": [
+				{
+					"type": "IfStatement",
+					"start": 93,
+					"end": 163,
+					"test": {
+						"type": "Identifier",
+						"start": 97,
+						"end": 98,
+						"name": "x"
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 100,
+						"end": 104,
+						"expression": {
+							"type": "CallExpression",
+							"start": 100,
+							"end": 103,
+							"callee": {
+								"type": "Identifier",
+								"start": 100,
+								"end": 101,
+								"name": "g"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"alternate": {
+						"type": "ExpressionStatement",
+						"start": 118,
+						"end": 163,
+						"expression": {
+							"type": "CallExpression",
+							"start": 118,
+							"end": 162,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 118,
+								"end": 131,
+								"object": {
+									"type": "Identifier",
+									"start": 118,
+									"end": 123,
+									"name": "items"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 124,
+									"end": 131,
+									"name": "forEach"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 132,
+									"end": 161,
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 133,
+											"end": 137,
+											"name": "item"
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 142,
+										"end": 161,
+										"body": [
+											{
+												"type": "ExpressionStatement",
+												"start": 147,
+												"end": 157,
+												"expression": {
+													"type": "CallExpression",
+													"start": 147,
+													"end": 156,
+													"callee": {
+														"type": "Identifier",
+														"start": 147,
+														"end": 150,
+														"name": "use"
+													},
+													"arguments": [
+														{
+															"type": "Identifier",
+															"start": 151,
+															"end": 155,
+															"name": "item"
+														}
+													],
+													"optional": false
+												}
+											}
+										]
+									}
+								}
+							],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c",
+								"start": 111,
+								"end": 115
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment between else and a breaking non-block body - non-block consequent",
+							"start": 10,
+							"end": 91
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 245,
+					"end": 321,
+					"test": {
+						"type": "Identifier",
+						"start": 249,
+						"end": 250,
+						"name": "x"
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 252,
+						"end": 263,
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 256,
+								"end": 260,
+								"expression": {
+									"type": "CallExpression",
+									"start": 256,
+									"end": 259,
+									"callee": {
+										"type": "Identifier",
+										"start": 256,
+										"end": 257,
+										"name": "g"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"alternate": {
+						"type": "ExpressionStatement",
+						"start": 276,
+						"end": 321,
+						"expression": {
+							"type": "CallExpression",
+							"start": 276,
+							"end": 320,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 276,
+								"end": 289,
+								"object": {
+									"type": "Identifier",
+									"start": 276,
+									"end": 281,
+									"name": "items"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 282,
+									"end": 289,
+									"name": "forEach"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 290,
+									"end": 319,
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 291,
+											"end": 295,
+											"name": "item"
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 300,
+										"end": 319,
+										"body": [
+											{
+												"type": "ExpressionStatement",
+												"start": 305,
+												"end": 315,
+												"expression": {
+													"type": "CallExpression",
+													"start": 305,
+													"end": 314,
+													"callee": {
+														"type": "Identifier",
+														"start": 305,
+														"end": 308,
+														"name": "use"
+													},
+													"arguments": [
+														{
+															"type": "Identifier",
+															"start": 309,
+															"end": 313,
+															"name": "item"
+														}
+													],
+													"optional": false
+												}
+											}
+										]
+									}
+								}
+							],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c",
+								"start": 269,
+								"end": 273
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment between else and a breaking non-block body - block consequent",
+							"start": 166,
+							"end": 243
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

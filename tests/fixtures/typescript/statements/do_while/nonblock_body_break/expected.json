@@ -1,0 +1,476 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 644,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A callback body that breaks drops the do body below the keyword",
+			"start": 10,
+			"end": 76
+		},
+		{
+			"type": "Line",
+			"value": " An object argument the printer keeps expanded",
+			"start": 148,
+			"end": 196
+		},
+		{
+			"type": "Line",
+			"value": " A template literal spanning lines",
+			"start": 254,
+			"end": 290
+		},
+		{
+			"type": "Line",
+			"value": " Arguments that break",
+			"start": 337,
+			"end": 360
+		},
+		{
+			"type": "Line",
+			"value": " A body that fits flat stays on the keyword's line",
+			"start": 506,
+			"end": 558
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 643,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 634,
+			"body": [
+				{
+					"type": "DoWhileStatement",
+					"start": 78,
+					"end": 145,
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 83,
+						"end": 128,
+						"expression": {
+							"type": "CallExpression",
+							"start": 83,
+							"end": 127,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 83,
+								"end": 96,
+								"object": {
+									"type": "Identifier",
+									"start": 83,
+									"end": 88,
+									"name": "items"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 89,
+									"end": 96,
+									"name": "forEach"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 97,
+									"end": 126,
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 98,
+											"end": 102,
+											"name": "item"
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 107,
+										"end": 126,
+										"body": [
+											{
+												"type": "ExpressionStatement",
+												"start": 112,
+												"end": 122,
+												"expression": {
+													"type": "CallExpression",
+													"start": 112,
+													"end": 121,
+													"callee": {
+														"type": "Identifier",
+														"start": 112,
+														"end": 115,
+														"name": "use"
+													},
+													"arguments": [
+														{
+															"type": "Identifier",
+															"start": 116,
+															"end": 120,
+															"name": "item"
+														}
+													],
+													"optional": false
+												}
+											}
+										]
+									}
+								}
+							],
+							"optional": false
+						}
+					},
+					"test": {
+						"type": "CallExpression",
+						"start": 137,
+						"end": 143,
+						"callee": {
+							"type": "Identifier",
+							"start": 137,
+							"end": 141,
+							"name": "more"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A callback body that breaks drops the do body below the keyword",
+							"start": 10,
+							"end": 76
+						}
+					]
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 198,
+					"end": 251,
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 203,
+						"end": 234,
+						"expression": {
+							"type": "CallExpression",
+							"start": 203,
+							"end": 233,
+							"callee": {
+								"type": "Identifier",
+								"start": 203,
+								"end": 212,
+								"name": "configure"
+							},
+							"arguments": [
+								{
+									"type": "ObjectExpression",
+									"start": 213,
+									"end": 232,
+									"properties": [
+										{
+											"type": "Property",
+											"start": 218,
+											"end": 228,
+											"method": false,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 218,
+												"end": 225,
+												"name": "retries"
+											},
+											"value": {
+												"type": "Literal",
+												"start": 227,
+												"end": 228,
+												"value": 3,
+												"raw": "3"
+											},
+											"kind": "init"
+										}
+									]
+								}
+							],
+							"optional": false
+						}
+					},
+					"test": {
+						"type": "CallExpression",
+						"start": 243,
+						"end": 249,
+						"callee": {
+							"type": "Identifier",
+							"start": 243,
+							"end": 247,
+							"name": "more"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An object argument the printer keeps expanded",
+							"start": 148,
+							"end": 196
+						}
+					]
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 292,
+					"end": 334,
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 297,
+						"end": 317,
+						"expression": {
+							"type": "CallExpression",
+							"start": 297,
+							"end": 316,
+							"callee": {
+								"type": "Identifier",
+								"start": 297,
+								"end": 300,
+								"name": "log"
+							},
+							"arguments": [
+								{
+									"type": "TemplateLiteral",
+									"start": 301,
+									"end": 315,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 302,
+											"end": 314,
+											"value": {
+												"raw": "first\nsecond",
+												"cooked": "first\nsecond"
+											},
+											"tail": true
+										}
+									]
+								}
+							],
+							"optional": false
+						}
+					},
+					"test": {
+						"type": "CallExpression",
+						"start": 326,
+						"end": 332,
+						"callee": {
+							"type": "Identifier",
+							"start": 326,
+							"end": 330,
+							"name": "more"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A template literal spanning lines",
+							"start": 254,
+							"end": 290
+						}
+					]
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 362,
+					"end": 503,
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 367,
+						"end": 486,
+						"expression": {
+							"type": "CallExpression",
+							"start": 367,
+							"end": 485,
+							"callee": {
+								"type": "Identifier",
+								"start": 367,
+								"end": 371,
+								"name": "send"
+							},
+							"arguments": [
+								{
+									"type": "Identifier",
+									"start": 376,
+									"end": 424,
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								},
+								{
+									"type": "Identifier",
+									"start": 429,
+									"end": 481,
+									"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+								}
+							],
+							"optional": false
+						}
+					},
+					"test": {
+						"type": "CallExpression",
+						"start": 495,
+						"end": 501,
+						"callee": {
+							"type": "Identifier",
+							"start": 495,
+							"end": 499,
+							"name": "more"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Arguments that break",
+							"start": 337,
+							"end": 360
+						}
+					]
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 560,
+					"end": 606,
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 563,
+						"end": 589,
+						"expression": {
+							"type": "CallExpression",
+							"start": 563,
+							"end": 588,
+							"callee": {
+								"type": "Identifier",
+								"start": 563,
+								"end": 572,
+								"name": "configure"
+							},
+							"arguments": [
+								{
+									"type": "ObjectExpression",
+									"start": 573,
+									"end": 587,
+									"properties": [
+										{
+											"type": "Property",
+											"start": 575,
+											"end": 585,
+											"method": false,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 575,
+												"end": 582,
+												"name": "retries"
+											},
+											"value": {
+												"type": "Literal",
+												"start": 584,
+												"end": 585,
+												"value": 3,
+												"raw": "3"
+											},
+											"kind": "init"
+										}
+									]
+								}
+							],
+							"optional": false
+						}
+					},
+					"test": {
+						"type": "CallExpression",
+						"start": 598,
+						"end": 604,
+						"callee": {
+							"type": "Identifier",
+							"start": 598,
+							"end": 602,
+							"name": "more"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A body that fits flat stays on the keyword's line",
+							"start": 506,
+							"end": 558
+						}
+					]
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 609,
+					"end": 633,
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 612,
+						"end": 616,
+						"expression": {
+							"type": "UpdateExpression",
+							"start": 612,
+							"end": 615,
+							"operator": "++",
+							"prefix": false,
+							"argument": {
+								"type": "Identifier",
+								"start": 612,
+								"end": 613,
+								"name": "i"
+							}
+						}
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 625,
+						"end": 631,
+						"left": {
+							"type": "Identifier",
+							"start": 625,
+							"end": 626,
+							"name": "i"
+						},
+						"operator": "<",
+						"right": {
+							"type": "Literal",
+							"start": 629,
+							"end": 631,
+							"value": 10,
+							"raw": "10"
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
