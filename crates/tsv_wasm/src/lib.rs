@@ -1,7 +1,8 @@
 //! WebAssembly bindings for tsv.
 //!
-//! Three builds from two features:
-//! - default (`@fuzdev/tsv-wasm`): everything — `format_*` plus the parse exports.
+//! Three builds from three features:
+//! - default (`@fuzdev/tsv-wasm`): everything — `format_*`, the parse exports, and the
+//!   type strip (`strip_typescript`, the `strip` feature, which no subset build enables).
 //! - `--no-default-features --features format` (`@fuzdev/tsv-format-wasm`):
 //!   `format_*` exports only.
 //! - `--no-default-features --features parse` (`@fuzdev/tsv-parse-wasm`):
@@ -15,7 +16,8 @@
 //! Building the JS object graph node-by-node with `serde_wasm_bindgen` is
 //! measurably slower.
 //!
-//! Every export is flat, `(source, source_type?)`. The published packages wrap them
+//! Every export is flat, `(source, source_type?)` — `strip_typescript(source)` alone takes
+//! no source type, since the strip reads a module. The published packages wrap them
 //! in a hand-written JS facade (`npm/api.js`, shared with the native `@fuzdev/tsv`)
 //! that owns the options bag, its errors, and the `{locations: true}` sugar.
 
@@ -45,7 +47,7 @@ use tsv_arena::{parse_convert, parse_internal};
 // `tsv_lang::ParseError` (and the `WirePoint` its `wire_point` returns), so the shared
 // error helpers below take a Svelte or CSS failure as readily as a TypeScript one. Named
 // through `tsv_ts` only because this crate takes no `tsv_lang` edge of its own.
-#[cfg(any(feature = "parse", feature = "format"))]
+#[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
 use tsv_ts::ParseError;
 
 // WASM global allocator: talc replaces std's default dlmalloc on wasm32. The
@@ -98,11 +100,12 @@ fn err(message: impl ToString) -> JsValue {
     JsError::new(&message.to_string()).into()
 }
 
-// The JS `Error` a parse failure is thrown as, with its point set on it as own properties.
-// Declared by hand rather than taken from `js_sys::Error`: the format-only build carries no
-// `js-sys`, and a constructor, three setters and `Reflect.deleteProperty` are all this
-// needs (the `console_error` binding above is the same trade).
-#[cfg(any(feature = "parse", feature = "format"))]
+// The JS `Error` a parse failure is thrown as, with its point set on it as own properties
+// (and a strip refusal, with its construct and span). Declared by hand rather than taken
+// from `js_sys::Error`: the format-only build carries no `js-sys`, and a constructor, a
+// few setters and `Reflect.deleteProperty` are all this needs (the `console_error`
+// binding above is the same trade).
+#[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_name = Error)]
@@ -120,6 +123,22 @@ extern "C" {
     #[wasm_bindgen(method, setter)]
     fn set_column(this: &PointedError, value: u32);
 
+    #[cfg(feature = "strip")]
+    #[wasm_bindgen(method, setter)]
+    fn set_kind(this: &PointedError, value: &str);
+
+    #[cfg(feature = "strip")]
+    #[wasm_bindgen(method, setter)]
+    fn set_end(this: &PointedError, value: u32);
+
+    #[cfg(feature = "strip")]
+    #[wasm_bindgen(method, setter)]
+    fn set_end_line(this: &PointedError, value: u32);
+
+    #[cfg(feature = "strip")]
+    #[wasm_bindgen(method, setter)]
+    fn set_end_column(this: &PointedError, value: u32);
+
     #[wasm_bindgen(js_namespace = Reflect, js_name = deleteProperty)]
     fn delete_property(target: &PointedError, key: &str) -> bool;
 }
@@ -136,7 +155,7 @@ extern "C" {
 /// non-enumerable `line` and `column` at construction, and a plain set writes through
 /// that property and keeps it non-enumerable; with nothing to delete (Node, Deno, a
 /// browser) the delete is a no-op.
-#[cfg(any(feature = "parse", feature = "format"))]
+#[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
 fn parse_err(e: &ParseError) -> JsValue {
     let message = e.to_string();
     let Some(point) = e.wire_point() else {
@@ -150,6 +169,51 @@ fn parse_err(e: &ParseError) -> JsValue {
     error.set_line(point.line);
     error.set_column(point.column);
     error.into()
+}
+
+/// Strip the types from TypeScript `source` (`tsv_ts::strip`, module goal): the JS, every
+/// type-only range blanked to whitespace so every surviving character keeps its line and
+/// UTF-16 column.
+///
+/// A source that does not parse throws as every parse export does ([`parse_err`]); a
+/// source holding TypeScript the strip refuses throws an `Error` carrying the refusal's
+/// message (`cannot strip <construct>`, then its `line:col` header, line and caret) and
+/// own ENUMERABLE `kind` (the construct's snake_case name), `start`, `line`, `column`,
+/// `end`, `end_line` and `end_column` (the refused span's two points in the wire's
+/// coordinates). The npm facade (`npm/api_strip.js`) reads both shapes into its result
+/// object, so these names are its contract, shared with `tsv_napi`. Each property is
+/// deleted before it is set, for the reason [`parse_err`] gives.
+#[cfg(feature = "strip")]
+#[wasm_bindgen]
+pub fn strip_typescript(source: &str) -> Result<String, JsValue> {
+    tsv_arena::with_ast_arena(|arena| match tsv_ts::strip(source, arena) {
+        Ok(stripped) => Ok(stripped.code.into_owned()),
+        Err(tsv_ts::StripError::Parse(e)) => Err(parse_err(&e)),
+        Err(error @ tsv_ts::StripError::Unsupported { kind, span }) => {
+            let start = tsv_ts::WIRE_COORDINATES.point(source, span.start as usize);
+            let end = tsv_ts::WIRE_COORDINATES.point(source, span.end as usize);
+            let thrown = PointedError::new(&error.message(source));
+            for key in [
+                "kind",
+                "start",
+                "line",
+                "column",
+                "end",
+                "end_line",
+                "end_column",
+            ] {
+                delete_property(&thrown, key);
+            }
+            thrown.set_kind(kind.name());
+            thrown.set_start(start.start);
+            thrown.set_line(start.line);
+            thrown.set_column(start.column);
+            thrown.set_end(end.start);
+            thrown.set_end_line(end.line);
+            thrown.set_end_column(end.column);
+            Err(thrown.into())
+        }
+    })
 }
 
 /// The hierarchical, git-faithful matcher for tsv's discovery ignore files, wrapping

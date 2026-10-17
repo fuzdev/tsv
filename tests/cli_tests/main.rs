@@ -13,6 +13,7 @@
 //!   failures, and the filesystem shapes the walk survives.
 //! - `ignore_files` — ignore-file scoping, precedence, shadowing and the warnings they emit.
 //! - `pipes` — a reader that leaves, drains late, or never blocks (unix only).
+//! - `strip` — `tsv strip`: the type strip on one input, `--check`, its exit codes and refusals.
 
 mod common;
 mod format_paths;
@@ -23,4 +24,5 @@ mod outside_git_tree;
 mod parse;
 #[cfg(unix)]
 mod pipes;
+mod strip;
 mod top_level;

@@ -37,13 +37,17 @@ serde_json.workspace = true
 
 [features]
 # Mirrors tsv_ffi / tsv_wasm: `format` exports the formatters, `parse` exports
-# the parsers plus the wire-JSON convert layer they emit through. The
-# default both-features build is what the Node bench loads.
-default = ["format", "parse"]
+# the parsers plus the wire-JSON convert layer they emit through, `strip` the
+# type strip (as `tsv_wasm`'s does; `tsv_ffi` has no strip). The default
+# build, every shipped feature, is what the Node bench loads and what ships.
+default = ["format", "parse", "strip"]
 # Pulls the reusable doc arena (`tsv_arena::with_doc_arena`, which pulls
 # tsv_lang), plus the `IgnoreStack` discovery matcher and its verdict methods.
 format = ["tsv_arena/format", "dep:tsv_ignore", "dep:tsv_discover"]
 parse = ["tsv_ts/convert", "tsv_css/convert", "tsv_svelte/convert"]
+# The `strip_typescript` export — the type strip, `tsv_ts::strip` (the same export
+# `tsv_wasm`'s `strip` feature adds to `@fuzdev/tsv-wasm`).
+strip = []
 # Test-only: compiles the `__panic_probe` export that `deno task test:napi`
 # drives to prove the panic contract end to end (panic → thrown JS error →
 # addon still usable). Never enabled by a published build; `test_napi.ts` skips

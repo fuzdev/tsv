@@ -1,12 +1,14 @@
 # tsv_wasm
 
-WebAssembly bindings for `tsv`. Three npm packages from one Rust crate via the `format` +
-`parse` cargo features (default = both):
+WebAssembly bindings for `tsv`. Three npm packages from one Rust crate via the `format`,
+`parse` and `strip` cargo features (default = all three):
 
 - `@fuzdev/tsv-format-wasm` — `--no-default-features --features format`, format only
 - `@fuzdev/tsv-parse-wasm` — `--no-default-features --features parse`, parse only (the printers
   drop out at link time; bundles `tsv_ast.d.ts` for typed returns)
-- `@fuzdev/tsv-wasm` — the default build: everything, plus the `tsv` CLI from `npm/cli.js`
+- `@fuzdev/tsv-wasm` — the default build: everything — the type strip (`strip_typescript`,
+  the `strip` feature, which neither subset enables) included — plus the `tsv` CLI from
+  `npm/cli.js`
 
 Package shape, version-of-truth rule, and the `deno task publish` / `build:npm:*` commands:
 [../../CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
@@ -98,11 +100,28 @@ engine), a failure there is rethrown as
 `Error('internal error: AST serialized to invalid JSON', {cause})` — the WASM engine's own text for that case — never as the bare `SyntaxError`
 that would read as a parse failure.
 
+**The strip family** (`npm/api_strip.js` + `npm/facade_strip.d.ts`, in `@fuzdev/tsv-wasm` and the
+native `@fuzdev/tsv` alone — [docs/strip.md](../../docs/strip.md)). `strip_typescript(source,
+options?)` is the one export that RETURNS its failure: `{ok: true, code}` or `{ok: false, error}`,
+`error.kind` `'parse'` (the `message` / `start` / `loc` of the `SyntaxError` a parse of the
+source throws) or `'unsupported'` (`construct`, `message`, `start`, `end`, `loc: {start, end}`), a
+plain object — no stack captured per failure, structured-clone-able across a worker. The
+line it draws: argument misuse is still a `TypeError` (the shared `read_source` /
+`read_options`, whose `'strip'` kind takes `sourceType: 'module'` alone, since the strip reads
+a module), an engine failure with no point still throws as itself, and anything the strip
+concludes about the source is the result. The raw export is `strip_typescript(source)` — no
+source type — returning the code or throwing the parse failure's pointed `Error`, or for a
+refusal an `Error` whose own ENUMERABLE `kind` (the construct's snake_case name), `start`,
+`line`, `column`, `end`, `end_line` and `end_column` carry it (`PointedError`'s strip-gated
+setters; `tsv_napi`'s `Failure::Refusal`), each deleted before it is set for the Bun reason
+above. `api_strip.js` imports nothing but `api.js`'s readers, and the patcher stages it into
+the `all` variant alone.
+
 **Why the reader is JS.** Both package sets need it, and the native one has no WASM to host a
 Rust reader — a Rust reader would need a hand restatement in the napi loader plus a parity test.
 One shared JS reader is strictly less to drift: it is unit-tested over a fake engine by
 `scripts/npm_api_test.ts` (a `deno task test:deno` leg, so it gates in `check` with no package
-built), and exercised through
+built) — its strip half by `scripts/npm_api_strip_test.ts`, the same way — and exercised through
 the real engines by `scripts/test_npm.ts` / `scripts/test_napi_npm.ts`, whose exact-string
 tests pin the texts.
 
@@ -685,6 +704,7 @@ require dual updates.
   - **Shared with native.** Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — one source for both packages (it imports its engine from `./index.js`, so each copy binds to its own package's engine), which the ESM loader bought like `locations.js` below. There it is the *fallback*: the bin is a napi-only dispatcher (`tsv_napi/npm/bin.js`) that execs the platform package's real `tsv_cli` binary, deferring to cli.js only when no binary is reachable — the dispatcher deliberately does NOT live in this shared source, so the wasm copy stays byte-identical and can never resolve a sibling-installed native binary.
   - **Path quoting.** Every path it names itself — the `--list` and changed-path lines, `error:` lines, its traversal and argument errors, `parse`'s read failure — goes through its hand restatement of `tsv_discover::quote_path` (a name holding a control character or a double quote is C-quoted as `git ls-files` prints it; the binding's warnings arrive quoted), pinned beside the native rule by `scripts/test_npm.ts` (see [../../docs/cli.md §Multi-File Formatting](../../docs/cli.md#multi-file-formatting))
 - `npm/api.js` + `npm/facade_format.d.ts`, `npm/api_parse.js` + `npm/facade_parse.d.ts`, `npm/syntax_error.d.ts` (the `TsvSyntaxError` type) — The hand-written facade every package publishes through: the options reader + the format family, and the parse family with the `{locations: true}` sugar (see [The npm Facade](#the-npm-facade-options--typed-returns), which also says why the declarations are named apart from their modules). Staged verbatim by `patch_npm_package.ts` (`api_parse.js` + `facade_parse.d.ts` into the parse-capable packages only, `facade_format.d.ts` into the format-capable ones) and by `scripts/build_napi_packages.ts` into the native `@fuzdev/tsv` — one source for both package sets. `scripts/npm_facade.ts` owns what both staging scripts share: the facade file table (with `locations.*` and `types/tsv_ast.d.ts` in the parse half), the `./locations` exports entry, and the re-exported type names
+- `npm/api_strip.js` + `npm/facade_strip.d.ts` — The facade's strip half (`create_strip_api`, the result object; [The npm Facade](#the-npm-facade-options--typed-returns)), staged into `@fuzdev/tsv-wasm` and the native `@fuzdev/tsv` alone, as `scripts/npm_facade.ts`'s strip family
 - `npm/locations.js` + `npm/locations.d.ts` — Pure-JS line/column reconstruction for the span-only wire; ships in the parse-capable packages, run by `api_parse.js` for `{locations: true}`, re-exported from index.js/browser.js by `patch_npm_package.ts`, and exported alone as the `./locations` subpath. Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — this file is the single source for both, which is what the napi loader being ESM bought (see [Line/Column Reconstruction Helper](#linecolumn-reconstruction-helper-npmlocationsjs))
 - `README_format.md` — Shipped as `README.md` in `@fuzdev/tsv-format-wasm` (copied by `patch_npm_package.ts`)
 - `README_parse.md` — Shipped as `README.md` in `@fuzdev/tsv-parse-wasm` (copied by `patch_npm_package.ts`)
@@ -695,7 +715,7 @@ require dual updates.
 
 Variant-first output dirs (`pkg/<variant>/<target>/`) so builds never clobber
 each other. Subsets build `--no-default-features --features format|parse`;
-the `all` builds use the default features (both).
+the `all` builds use the default features (all three).
 
 | Target | format output dir  | parse output dir  | all output dir  | Command (format / parse / all)                                      |
 | ------ | ------------------ | ----------------- | --------------- | ------------------------------------------------------------------- |

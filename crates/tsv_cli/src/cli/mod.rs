@@ -7,9 +7,9 @@ mod pool;
 pub mod stack;
 
 use argh::FromArgs;
-use commands::{format::FormatCommand, parse::ParseCommand};
+use commands::{format::FormatCommand, parse::ParseCommand, strip::StripCommand};
 
-/// tsv — TypeScript/Svelte/CSS parser & formatter.
+/// tsv — formatter and parser for Svelte, TypeScript, and CSS, and a TypeScript type stripper.
 #[derive(FromArgs, Debug)]
 pub struct TopLevel {
     /// print the tsv version
@@ -42,6 +42,7 @@ pub fn version_line() -> String {
 pub enum Subcommand {
     Parse(ParseCommand),
     Format(FormatCommand),
+    Strip(StripCommand),
 }
 
 impl TopLevel {
@@ -58,6 +59,7 @@ impl TopLevel {
         match self.nested {
             Subcommand::Parse(c) => c.run(),
             Subcommand::Format(c) => c.run(),
+            Subcommand::Strip(c) => c.run(),
         }
     }
 }

@@ -24,7 +24,7 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
 
 - **`tsv` (production)**: Pure Rust, no external tool dependencies
   - Crates: `tsv_cli`
-  - Commands: `parse`, `format` (plus the top-level `--version` switch)
+  - Commands: `parse`, `format`, `strip` (plus the top-level `--version` switch)
 - **`tsv` npm bin, native (`@fuzdev/tsv`)**: the production `tsv` binary
   itself, shipped inside each `@fuzdev/tsv-<triple>` platform package and
   exec'd by the loader's `crates/tsv_napi/npm/bin.js` dispatcher (argv,
@@ -123,7 +123,8 @@ Versions are pinned exactly in `crates/tsv_debug/src/deno/sidecar.ts`, the sourc
 
 ## Input Handling
 
-All content-processing commands support three input methods:
+All content-processing commands support three input methods (`strip`, TypeScript's alone,
+takes them without `--parser` — [§Stripping types](#stripping-types-tsv-strip)):
 
 - **File path**: `command <file>` - parser from the extension, which must be one tsv handles (the dispatch has no unknown arm, so a `.md` would otherwise parse as TypeScript); an unsupported one is an argument error (`format <file>`'s message) unless `--parser` names the grammar. A directory is refused by name ahead of either check (`<dir>: is a directory (one file is expected)`): every command resolving a file this way — `tsv_debug`'s too — reads one file, and the read would otherwise fail under a message calling it one
 - **Content**: `command --content <string> --parser <type>` - Requires explicit `--parser svelte|typescript|css`
@@ -228,6 +229,38 @@ other, and in the packages a plain `Error` with no `start` / `loc` rather than t
 `SyntaxError` (`tsv_svelte::parse_folded`). A document whose own bytes do not parse reports
 that parse error first, exactly as `parse` does.
 
+## Stripping types (`tsv strip`)
+
+`tsv strip` runs the type strip ([strip.md](./strip.md)) on **one** input — a file path,
+`--content`, or `--stdin` — and prints the JS to stdout byte for byte: no newline appended,
+every line terminator, a leading BOM and a hashbang kept. The file is never written. It
+takes no `--parser` (the strip is TypeScript's) and no `--source-type` (it reads a module,
+with no script retry), and a file path's extension must be one of `.ts` `.mts` `.cts` `.js`
+`.mjs` `.cjs` (a `.svelte.ts` rune module is `.ts`) — anything else is an argument error
+naming that list (`tsv_discover::strip_unsupported_extension_error`), as is a directory.
+`--content` and `--stdin` follow `parse`'s precedence between themselves, but either beside
+a path is refused (`--content/--stdin cannot be combined with a file path`), as `format`
+refuses it. Every argument is graded before anything is read, so a refused `--stdin` never
+waits on its writer.
+
+Exit codes — the `format` scheme, with "would change" read as "refused":
+
+- **0** — stripped (printed, or with `--check` nothing printed);
+- **1** — refused: the source holds TypeScript the strip cannot erase. stderr is
+  `Error: cannot strip <the construct>` over the `line:col` header, line and caret of the
+  refused span's start, in the same coordinates a parse error prints;
+- **2** — a parse error (`Parse error: …`, the text `tsv parse` prints for the same source), a
+  read error, invalid UTF-8, a source over the size cap, or a usage error.
+
+`--check` prints nothing on stdout and keeps the same codes (a refusal still exits 1 and
+says why on stderr), so CI can ask whether a file strips. argh's own flag-parsing refusals
+exit 1, as for every command; stderr tells them apart. One input per run: several paths
+are argh's `Unrecognized argument`. The JS mirror (`npm/cli.js`) answers every row alike,
+byte for byte (`scripts/strip_suite.ts`, held to the native binary by
+`scripts/test_napi_npm.ts`).
+
+Implemented in `tsv_cli/src/cli/commands/strip.rs`
+
 ## Recursion Depth
 
 The parser and the printer are recursive descents, so nesting depth costs stack — and a
@@ -263,7 +296,7 @@ host and the platform:
   10,384, and a nested computed subscript (`a[a[…]]`) parses to 40,989 and formats to
   12,135 — the chain printer's own frames set the ceiling at ~⅓ of the parser's. **Svelte
   elements** split too, by less: nested elements parse to 34,270 levels and format to
-  24,849. The wire-JSON writer adds nothing on top of the parser on any shape measured.
+  24,849. The wire-JSON writer adds nothing on top of the parser on any shape measured, and `strip` walks no deeper than its parse.
 
 Measured on `const x = ((((…1…))));`, one nesting level costs ~0.78 KiB of stack in a
 release build (~17 KiB in a debug build, where frames are much larger), so the shipped

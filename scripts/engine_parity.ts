@@ -25,11 +25,21 @@
  * WASM fixed point, which two engines with genuinely different outputs can both
  * satisfy. Comparing the two independent runs is the claim that actually holds.
  *
+ * **The type strip** has a leg of its own, since a strip prints its output rather than
+ * writing it back. Per file, over every input of the strip's extensions in
+ * `tests/fixtures_strip` and `tests/fixtures`, `tsv strip <file>` is run on both bins
+ * (cwd the repo root, so the paths they print agree) and the exit code, stdout and stderr
+ * must match — the CLIs and the engines together. The `../corpora` snapshot is too many
+ * files to spawn twice each, so it is graded in-process instead: one Node child imports
+ * the native `@fuzdev/tsv` loader and the wasm package side by side and requires
+ * `strip_typescript` to return deep-equal results for every file — the code, or every
+ * field of a refusal or a parse error. Absent, the snapshot is a warn-skip there too.
+ *
  * Blind spots. It compares the two CLI **drivers** as well as the two engines,
  * so a driver-only difference reads as a failure here (that is a real finding,
  * just a differently-located one; `scripts/test_napi_npm.ts` is where the
  * driver contract is pinned flag by flag). It sees only inputs the corpus
- * holds, and only the format path — `parse` wire equality is not graded here.
+ * holds, and only the format and strip paths — `parse` wire equality is not graded here.
  * And it cannot see a divergence both engines share with each other but not
  * with prettier, which is the conformance gates' job.
  *
@@ -52,11 +62,15 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:f
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, extname, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { CORE_CRATES, wasm_bundle_dir } from '../benches/js/lib/tsv_artifacts.ts';
 import {
 	assert_staged_fresh,
+	napi_addon_check,
+	napi_loader_checks,
+	napi_staged_triple,
+	stage_napi_consumer,
 	type StagedCheck,
 	wasm_package_checks
 } from './check_staged_freshness.ts';
@@ -170,6 +184,9 @@ const freshness: StagedCheck[] = [
 	// `cli.js` over a stale `.wasm` would otherwise grade as fresh
 	...wasm_package_checks('all')
 ];
+// the strip leg's in-process half imports the staged native loader and its addon
+const napi_triple = napi_staged_triple();
+freshness.push(...napi_loader_checks(), napi_addon_check(napi_triple));
 await assert_staged_fresh(freshness);
 const extensions = await formattable_extensions(native.path);
 
@@ -290,11 +307,137 @@ async function grade(root: string): Promise<RootReport> {
 	}
 }
 
+/** The extensions `tsv strip` takes (`tsv_discover::STRIPPABLE_EXTENSIONS`). */
+const STRIP_EXTENSIONS = ['.ts', '.mts', '.cts', '.js', '.mjs', '.cjs'];
+
+/** Every file under `dir` the strip takes, as absolute paths. */
+function collect_strippable(dir: string, out: string[] = []): string[] {
+	for (const entry of readdirSync(dir, { withFileTypes: true })) {
+		if (entry.name === '.git' || entry.name === 'node_modules') continue;
+		const full = join(dir, entry.name);
+		if (entry.isDirectory()) collect_strippable(full, out);
+		else if (entry.isFile() && STRIP_EXTENSIONS.includes(extname(entry.name).toLowerCase())) {
+			out.push(full);
+		}
+	}
+	return out;
+}
+
+/** The strip leg over the CLIs: `tsv strip <file>` on both bins, per file, a few at a time. */
+async function grade_strip_cli(root: string): Promise<RootReport> {
+	const absolute = resolve(ROOT, root);
+	if (!existsSync(absolute)) return { root, files: 0, skipped: 'not present', findings: [] };
+	const files = collect_strippable(absolute).map(repo_rel).sort();
+	if (files.length === 0) {
+		return { root, files: 0, skipped: 'no files in the strip’s extensions', findings: [] };
+	}
+	const findings: string[] = [];
+	let differing = 0;
+	let next = 0;
+	const worker = async (): Promise<void> => {
+		while (next < files.length) {
+			const file = files[next++]!;
+			const [native_run, wasm_run] = await Promise.all([
+				run([native!.path], ROOT, ['strip', file]),
+				run(['node', wasm_cli], ROOT, ['strip', file])
+			]);
+			if (
+				native_run.status === wasm_run.status &&
+				native_run.stdout === wasm_run.stdout &&
+				native_run.stderr === wasm_run.stderr
+			) {
+				continue;
+			}
+			differing++;
+			if (differing <= 10) {
+				findings.push(
+					`tsv strip ${file}: exit native ${native_run.status} / wasm ${wasm_run.status}` +
+						(native_run.stdout === wasm_run.stdout ? '' : ', stdout differs') +
+						(native_run.stderr === wasm_run.stderr ? '' : ', stderr differs')
+				);
+			}
+		}
+	};
+	await Promise.all(Array.from({ length: 4 }, worker));
+	if (differing > 10) findings.push(`… and ${differing - 10} more file(s) whose strip differs`);
+	return { root: `${root} (tsv strip)`, files: files.length, findings };
+}
+
+/** The in-process half: one Node child holding both engines, `strip_typescript` compared
+ * per file (results as JSON, deep-equal by their serialization — every field is a string,
+ * a number, a boolean or a plain object of them, in one key order on both engines). */
+const STRIP_PARITY_SCRIPT = `
+import { readFileSync } from 'node:fs';
+import * as native from '@fuzdev/tsv';
+const wasm = await import(process.argv[2]);
+const files = JSON.parse(readFileSync(process.argv[3], 'utf8'));
+const differing = [];
+for (const file of files) {
+	const source = readFileSync(file, 'utf8');
+	const a = JSON.stringify(native.strip_typescript(source));
+	const b = JSON.stringify(wasm.strip_typescript(source));
+	if (a !== b) differing.push(file);
+}
+process.stdout.write(JSON.stringify({ files: files.length, differing }));
+`;
+
+/** The strip leg over the engines alone, in process (see the module doc). */
+async function grade_strip_engines(root: string): Promise<RootReport> {
+	const absolute = resolve(ROOT, root);
+	if (!existsSync(absolute)) {
+		return { root: `${root} (strip_typescript)`, files: 0, skipped: 'not present', findings: [] };
+	}
+	const files = collect_strippable(absolute);
+	if (files.length === 0) {
+		return {
+			root: `${root} (strip_typescript)`,
+			files: 0,
+			skipped: 'no files in the strip’s extensions',
+			findings: []
+		};
+	}
+	const consumer = await mkdtemp(join(tmpdir(), 'tsv_engines_strip_'));
+	try {
+		stage_napi_consumer(consumer, napi_triple);
+		const script = join(consumer, 'strip_parity.mjs');
+		const list = join(consumer, 'files.json');
+		Deno.writeTextFileSync(script, STRIP_PARITY_SCRIPT);
+		Deno.writeTextFileSync(list, JSON.stringify(files));
+		const wasm_index = pathToFileURL(join(wasm_bundle_dir('all', 'npm'), 'index.js')).href;
+		const result = await run(['node', script], consumer, [wasm_index, list]);
+		if (result.status !== 0) {
+			return {
+				root: `${root} (strip_typescript)`,
+				files: files.length,
+				findings: [`the comparison child failed (exit ${result.status}): ${result.stderr.trim()}`]
+			};
+		}
+		const { files: compared, differing } = JSON.parse(result.stdout) as {
+			files: number;
+			differing: string[];
+		};
+		const findings = differing.slice(0, 10).map((file) => `strip_typescript differs: ${file}`);
+		if (differing.length > 10) findings.push(`… and ${differing.length - 10} more file(s)`);
+		if (compared !== files.length) {
+			findings.push(`compared ${compared} of ${files.length} files`);
+		}
+		return { root: `${root} (strip_typescript)`, files: files.length, findings };
+	} finally {
+		rmSync(consumer, { recursive: true, force: true });
+	}
+}
+
 const roots = args.length
 	? args
 	: ['tests/fixtures', 'tests/fixtures_compile', '../corpora/collections'];
 const reports: RootReport[] = [];
 for (const root of roots) reports.push(await grade(root));
+// the strip leg: its CLI half over the fixture trees, its engine half over the snapshot
+// (a run naming its own roots grades them through both halves)
+const strip_cli_roots = args.length ? args : ['tests/fixtures_strip', 'tests/fixtures'];
+const strip_engine_roots = args.length ? args : ['../corpora/collections'];
+for (const root of strip_cli_roots) reports.push(await grade_strip_cli(root));
+for (const root of strip_engine_roots) reports.push(await grade_strip_engines(root));
 
 if (json) {
 	console.log(JSON.stringify({ native: native.label, reports }, null, 2));
@@ -307,7 +450,9 @@ if (json) {
 		}
 		if (report.findings.length === 0) {
 			const summary = (report.native?.stderr ?? '').trim().split('\n').at(-1) ?? '';
-			console.log(`  ✓ ${report.root}: ${report.files} files, byte-identical — ${summary}`);
+			console.log(
+				`  ✓ ${report.root}: ${report.files} files, byte-identical${summary ? ` — ${summary}` : ''}`
+			);
 		} else {
 			console.log(`  ✗ ${report.root}: ${report.files} files`);
 			for (const finding of report.findings) console.log(`      ${finding}`);

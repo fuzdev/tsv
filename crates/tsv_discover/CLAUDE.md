@@ -79,6 +79,12 @@ crates (the open-convention stance):
   the same line ("No parser could be inferred"). The message's extension list
   renders from `FORMATTABLE_EXTENSIONS`, so a new language flows through; the text
   is produced once here, like `shadow_warning`.
+- `STRIPPABLE_EXTENSIONS` / `strip_unsupported_extension_error(path) -> Option<String>` — the
+  extensions `tsv strip` takes (the JS/TS family alone; a `.svelte.ts` and a `.d.ts` are `.ts`)
+  and the argument error for a file named to it outside them, read without regard to ASCII
+  case as `is_formattable` reads one. A file-*argument* check, not discovery (the strip takes
+  one input and walks nothing); `cli.js` restates the text by hand, pinned by the strip CLI
+  rows both bins run.
 - `formattable_extension_list(separator)` — the extension set rendered as prose
   (`".ts, .mts, …"`), the one spelling behind every message that lists it (the
   refusal above, the CLI's nothing-in-scope error).

@@ -46,9 +46,10 @@ mod quote;
 mod warnings;
 
 pub use policy::{
-    DirVerdict, FORMATTABLE_EXTENSIONS, HEURISTIC_DIRS, SAFETY_NET_DIRS, classify_dir,
-    formattable_extension_list, is_formattable, is_path_pruned, is_safety_net, path_shadow_warning,
-    should_format_file, unsupported_extension_error,
+    DirVerdict, FORMATTABLE_EXTENSIONS, HEURISTIC_DIRS, SAFETY_NET_DIRS, STRIPPABLE_EXTENSIONS,
+    classify_dir, formattable_extension_list, is_formattable, is_path_pruned, is_safety_net,
+    path_shadow_warning, should_format_file, strip_unsupported_extension_error,
+    unsupported_extension_error,
 };
 pub use quote::{quote_path, quote_path_bytes, quote_path_owned};
 pub use warnings::{

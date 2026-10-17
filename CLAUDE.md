@@ -84,11 +84,13 @@ cargo build --workspace [--release]   # or -p tsv_cli / -p tsv_debug
 
 Binding builds (`build:ffi*`, `build:wasm:*`, `build:napi*`, `build:npm:*`): [JS Bindings](#js-bindings).
 
-### CLI Usage - Parse & Format
+### CLI Usage - Parse, Format & Strip
 
 Parser auto-detected from extension (the JS/TS family → TypeScript, `.svelte`, `.css`); `--content`/`--stdin` require `--parser svelte|typescript|css`. For TypeScript, `--source-type script|module` selects the parse goal (for `format`, `--content`/`--stdin` only; `parse` is module-only by default). A `format` **path** parses as a **module, retried as a script** if that fails — except `.mjs`/`.mts`, modules by name, which take no retry; which error is reported when both fail is stated in [Strictness](#strictness-module-strict-script-by-directive).
 
 `format` writes paths **in place** (only when output differs) and prints changed paths; `--content`/`--stdin` print to stdout. Directories recurse over the JS/TS family (`.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cjs`, all parsed as TypeScript — JSX/TSX out of scope), `.svelte`, and `.css` with gitignore-aware, reproducible discovery; scope rules in [Configuration](#configuration) (full: ./docs/cli.md §Multi-File Formatting). A named file must have a supported extension (else an argument error — for `parse <file>` too, unless `--parser` names the grammar). `--list` prints the in-scope files without formatting (path mode only; an empty scope exits 0). Files format in parallel; `--jobs N` overrides the worker count (both bounded per ./docs/cli.md §Multi-File Formatting). Exit codes: 0 clean, 1 would-change (`--check`, also with `--content`/`--stdin`), 2 errors; missing path args fail upfront, per-file and traversal errors report and continue.
+
+`strip` is the type strip (./docs/strip.md) on ONE TypeScript input — a `.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cjs` path, `--content` or `--stdin`, no `--parser`, module goal only — printed to stdout byte for byte (`--check` prints nothing). Exit codes: 0 stripped, 1 refused (TypeScript with runtime semantics), 2 a parse or usage error (./docs/cli.md §Stripping types).
 
 ```bash
 cargo run -p tsv_cli parse file.ts                                       # compact JSON
@@ -100,6 +102,8 @@ cargo run -p tsv_cli format file.svelte src/lib                          # forma
 cargo run -p tsv_cli format --check src/lib                              # list would-change files, exit 1 (CI)
 cargo run -p tsv_cli format --list src/lib                               # list in-scope files (no formatting)
 cargo run -p tsv_cli format --content '<div>x</div>' --parser svelte     # format string to stdout
+cargo run -p tsv_cli strip file.ts                                       # TypeScript to JS on stdout, positions kept
+cargo run -p tsv_cli strip --check --content 'enum E {}'                 # exit 1 on a refusal, 2 on a parse error
 ```
 
 ### Testing & Code Quality
@@ -132,8 +136,8 @@ deno task test:deno      # deno tests over the node-modules-free bench core (div
 #                          span-only wire probe, gate_counts, perf-omit summary, Prettier-suite filter, loc tolerance
 #                          rows, parse diff engine + divergence matchers, NDJSON reader) + scripts/ (`release/changelog_test.ts`
 #                          — the changelog grammar publish.ts writes and release_notes.ts reads; `release/version_test.ts` +
-#                          `release/plan_test.ts` — the version grammar and the fresh/resume plan; `npm_api_test.ts` — the
-#                          npm options facade over a fake engine; `typecheck_packages_test.ts` — the README fence +
+#                          `release/plan_test.ts` — the version grammar and the fresh/resume plan; `npm_api_test.ts` + `npm_api_strip_test.ts` — the
+#                          npm options facade and its strip half over a fake engine; `typecheck_packages_test.ts` — the README fence +
 #                          marker grammar); in `check`
 deno task test:audits    # cargo test -p tsv_lang --features audits — the `swallow_check` + `comment_check` seams' own tests; in `check`
 deno task lint           # cargo clippy
@@ -244,8 +248,9 @@ deno task razor:audit                # print-width RAZOR SWEEP: pads a text word
 #                                      varying WIDTH, and the only one seeing a mangled form that is its own fixed point
 deno task engines:audit              # ENGINE PARITY: wasm32 (under Node, the host `cli.js` ships for) and native builds must
 #                                      produce the SAME BYTES — exit code, changed paths, diagnostics, every file — over both
-#                                      fixture trees + ../corpora when present. Needs both packages built: NOT in check; gates
-#                                      in CI's `artifacts` job
+#                                      fixture trees + ../corpora when present, plus a strip leg (`tsv strip` per file on both
+#                                      bins; `strip_typescript` on both engines over ../corpora). Needs both packages built: NOT
+#                                      in check; gates in CI's `artifacts` job
 deno task render:audit <paths>       # render-equivalence over REAL Svelte (sidecar; NOT in check; release-gated via `deno task conformance`)
 deno task idempotency:sweep          # F1 sweep over the real-code corpus (minutes; NOT in check; conformance cadence)
 deno task audit:corpus               # the content-loss/robustness bundle over REAL code (publish Step 3c; NOT in check)
@@ -280,7 +285,7 @@ Three binding crates:
 - `tsv_wasm` (wasm-bindgen) — browser, Deno, Node; format / parse / all variants via cargo features
 - `tsv_napi` (napi-rs) — Node.js / Bun native addon (`libtsv_napi.*`, loaded via `process.dlopen`), built with the `napi` profile (`release` + `panic = "unwind"` → `target/napi/`; every export is `catch_unwind`, so a panic throws a JS error instead of aborting the host). Its npm surface (`@fuzdev/tsv`, wasm-API-parity by contract) is in [Publishing](#publishing); tested per OS by `test:napi:npm`; expected to eventually subsume the WASM native path. See ./crates/tsv_napi/CLAUDE.md.
 
-`tsv_wasm` produces three npm packages from one crate via the `format` + `parse` cargo features (default = both): `@fuzdev/tsv-format-wasm`, `@fuzdev/tsv-parse-wasm`, and `@fuzdev/tsv-wasm` (everything + the `tsv` CLI), each with its own output directory.
+`tsv_wasm` produces three npm packages from one crate via the `format` + `parse` + `strip` cargo features (default = all three): `@fuzdev/tsv-format-wasm`, `@fuzdev/tsv-parse-wasm`, and `@fuzdev/tsv-wasm` (everything — the type strip's `strip_typescript` included — + the `tsv` CLI), each with its own output directory. `tsv_napi` carries the same `strip` feature in its default set; `tsv_ffi` has none.
 
 ```bash
 deno task build:ffi                  # C FFI, full → target/release/libtsv_ffi.so
@@ -305,7 +310,7 @@ npm is the package surface (each tag's GitHub Release carries only notes + the n
 
 - `@fuzdev/tsv-format-wasm` — format only (`--no-default-features --features format`)
 - `@fuzdev/tsv-parse-wasm` — parse only; bundles the hand-maintained `tsv_ast.d.ts` (`crates/tsv_wasm/types/`) + the pure-JS line/column helper behind `{locations: true}` (`crates/tsv_wasm/npm/locations.js` + `.d.ts`; also exported alone, engine-free, as the `./locations` subpath)
-- `@fuzdev/tsv-wasm` — both features; bundles the above and ships the `tsv` bin (`crates/tsv_wasm/npm/cli.js` — `format` + `parse` mirroring `tsv_cli`'s flags/exit codes; argv parsed by a zero-dep transcription of argh's grammar). Path mode fans onto `node:worker_threads` (workers get the main thread's compiled module via the `./worker` entry); `--jobs N` keeps the native ceiling, while the default pool is sized **per engine**, below the native CLI's — ./docs/cli.md §Binary Structure
+- `@fuzdev/tsv-wasm` — the default features: both of the above plus `strip` (`strip_typescript`, through the facade's `api_strip.js` + `facade_strip.d.ts` — ./docs/strip.md; neither subset carries it); bundles the above and ships the `tsv` bin (`crates/tsv_wasm/npm/cli.js` — `format` + `parse` + `strip` mirroring `tsv_cli`'s flags/exit codes; argv parsed by a zero-dep transcription of argh's grammar). Path mode fans onto `node:worker_threads` (workers get the main thread's compiled module via the `./worker` entry); `--jobs N` keeps the native ceiling, while the default pool is sized **per engine**, below the native CLI's — ./docs/cli.md §Binary Structure
 
 **Naming.** Every npm name tsv publishes is kebab-case (`@fuzdev/tsv`, `@fuzdev/tsv-wasm`, `@fuzdev/tsv-format-wasm`, `@fuzdev/tsv-parse-wasm`, `@fuzdev/tsv-<triple>`) — one spelling with the `tsv-<triple>` release assets and the `fuzdev.tsv-format` VS Code extension (vsce forbids `_`), and the `-wasm` convention of tsv's Rust-tooling peers; the rule for every `@fuzdev` WASM or native-delivery package (`@fuzdev/blake3-wasm` too). Rust crates (`tsv_wasm`, `tsv_napi`) and the rest of the `@fuzdev` libraries stay snake_case; crate-derived file names inside a package (`tsv_wasm.js`, `tsv_wasm_bg.wasm`, `tsv_napi.node`) are internal and follow the crate.
 
@@ -315,7 +320,7 @@ A types-only `@fuzdev/tsv-ast` package is deferred — `import type` from `@fuzd
 
 Version source of truth: `Cargo.toml` `[workspace.package] version` (read directly by `wasm-pack`). No root package.json, no changesets; all published packages move together.
 
-Package shape: wasm-pack `web` target, then `scripts/patch_npm_package.ts` adds a Node/Bun entry (sync auto-init), a browser entry (guarded `await init()`), `index.d.ts`, conditional `exports`, npm metadata, and the variant README. Every entry publishes through one hand-written facade shared with the native `@fuzdev/tsv` (`crates/tsv_wasm/npm/api.js` + `api_parse.js`: the `(source, options?)` bags, their errors, and `{locations: true}` over the span-only wire — ./crates/tsv_wasm/CLAUDE.md §The npm Facade). The export list is extracted from the generated JS, so new `lang_bindings!` languages flow through automatically.
+Package shape: wasm-pack `web` target, then `scripts/patch_npm_package.ts` adds a Node/Bun entry (sync auto-init), a browser entry (guarded `await init()`), `index.d.ts`, conditional `exports`, npm metadata, and the variant README. Every entry publishes through one hand-written facade shared with the native `@fuzdev/tsv` (`crates/tsv_wasm/npm/api.js` + `api_parse.js` + `api_strip.js`: the `(source, options?)` bags, their errors, `{locations: true}` over the span-only wire, and the strip's result object — ./crates/tsv_wasm/CLAUDE.md §The npm Facade). The export list is extracted from the generated JS, so new `lang_bindings!` languages flow through automatically.
 
 `scripts/publish.ts` orchestrates the release: preflight → bump → check → conformance:all → audit:corpus (Step 3c) → build npm packages + deno bundles → verify → artifact validation (size bounds + Deno smoke + Node tests + `test:bun` over the three wasm packages + `typecheck:packages` over all four npm packages, the napi loader staged) → idempotent npm publish → git commit + tag + push, printing a wasm size summary. It stamps CHANGELOG.md's `## Unreleased` into the released version (which the tag's GitHub Release reads back); that section must be non-empty with a `<!-- bump: <level> -->` marker matching `--bump` (both required; a fresh empty `## Unreleased` is seeded on stamp; shared grammar: `scripts/release/changelog.ts`; agents never edit it — [Releases](#releases)). A failed wetrun resumes at **every** step, git finalize included — the retry sentinel is removed only once the push lands, so re-run `--wetrun` with no `--bump`: nothing publishes twice and the tag finishes. The release logic is a library under `scripts/release/` (version, changelog, plan, bump, git, npm, sentinel; the pure ones unit-tested in `test:deno`): one `release_plan` decides fresh vs resumed and every reason a fresh release cannot proceed, so a dry run warns on exactly what a wetrun refuses. The preflight refuses a `HEAD` that is not exactly `origin/main` (a resume may sit one release commit ahead) and a `v<version>` tag that already exists locally or on origin (a resume's only on `HEAD`), the checkout is fingerprinted after the bump and refused if it moved before Step 7, and a resume whose packages are all on npm skips straight to the git finalize.
 
@@ -890,6 +895,7 @@ The shipped language/foundation crates' external deps (`tsv_cli` adds only `argh
 ### Implementation Guides
 
 - ./docs/cli.md - CLI architecture, command patterns, multi-file formatting rules
+- ./docs/strip.md - the type strip: surfaces, the position invariant, verdicts and refusals, oracles
 - ./docs/audits.md - the standing audit gates: what each proves, blind spots, flags, gating
 - ./docs/benchmarks.md - benchmark fairness caveats, the implementation catalog, binary sizes, the canonical-oracle-pin ritual
 - ./docs/gate_counts.md - the pinned counts every graded gate and harvest enforces

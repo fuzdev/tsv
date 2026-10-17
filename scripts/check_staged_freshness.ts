@@ -225,7 +225,11 @@ export function wasm_package_checks(
 			staged: `${dir}/api.js`,
 			crates: [],
 			files: [
-				...facade_sources({ format: variant !== 'parse', parse: variant !== 'format' }),
+				...facade_sources({
+					format: variant !== 'parse',
+					parse: variant !== 'format',
+					strip: variant === 'all'
+				}),
 				'scripts/npm_facade.ts'
 			],
 			rebuild

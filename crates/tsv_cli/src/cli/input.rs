@@ -217,12 +217,7 @@ impl InputArgs {
             // resolving through here reads one file (`tsv parse`, the `tsv_debug` commands),
             // and the read would report `Is a directory` under a message that calls it
             // one. Neutral wording for that reason; `cli.js` mirrors it word for word
-            if fs::metadata(path).is_ok_and(|metadata| metadata.is_dir()) {
-                return Err(format!(
-                    "{}: is a directory (one file is expected)",
-                    tsv_discover::quote_path(path)
-                ));
-            }
+            refuse_directory(path)?;
             match self.parser {
                 Some(parser_type) => Ok(parser_type),
                 None => match tsv_discover::unsupported_extension_error(path) {
@@ -248,6 +243,20 @@ impl InputArgs {
             Err(NO_INPUT.to_string())
         }
     }
+}
+
+/// Refuse a directory named where one file is expected — by name, ahead of any read,
+/// which would report `Is a directory` under a message that calls it one. Neutral
+/// wording, since every single-file command asks it (`tsv parse`, `tsv strip`, the
+/// `tsv_debug` commands); `cli.js` mirrors it word for word.
+pub fn refuse_directory(path: &str) -> Result<(), String> {
+    if fs::metadata(path).is_ok_and(|metadata| metadata.is_dir()) {
+        return Err(format!(
+            "{}: is a directory (one file is expected)",
+            tsv_discover::quote_path(path)
+        ));
+    }
+    Ok(())
 }
 
 /// Parse the `--source-type` argument into a [`tsv_ts::Goal`]. Absent stays

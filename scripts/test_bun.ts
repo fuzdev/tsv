@@ -7,7 +7,9 @@
  * engine deletes the three properties before it sets them (`parse_err` in
  * `crates/tsv_wasm/src/lib.rs`, `pointed_error` in `crates/tsv_napi/src/lib.rs`). Under
  * Node and Deno that delete is a no-op, and every other package suite runs under Node:
- * this is the one place either engine's delete is graded.
+ * this is the one place either engine's delete is graded. The type strip's API table
+ * (`scripts/strip_suite.ts`) rides along over the two packages that carry the strip, since
+ * its refusal crosses the engine boundary on the same own enumerable properties.
  *
  * Narrow by design. The package suites themselves run under `bun test` nearly whole, but
  * their CLI and resolution rows assert Node's own behavior; this registers the shared
@@ -45,10 +47,14 @@ import {
 	wasm_package_checks,
 	wasm_package_dir
 } from './check_staged_freshness.ts';
+import { register_strip_api_suite } from './strip_suite.ts';
 import { register_syntax_error_suite } from './syntax_error_suite.ts';
 
 const PACKAGES = ['format', 'parse', 'all', 'napi'] as const;
 type Package = (typeof PACKAGES)[number];
+
+/** The packages that carry the type strip: the umbrella and the native loader. */
+const STRIP_PACKAGES: ReadonlySet<Package> = new Set(['all', 'napi']);
 
 /** The launcher flag that turns a missing `bun` from a warn-skip into a failure. */
 const REQUIRE_FLAG = '--require-bun';
@@ -134,7 +140,7 @@ async function register(packages: Array<string>): Promise<void> {
 
 	// every import ahead of the first `describe`: a top-level await after one yields to a
 	// runner that may already be draining what is registered
-	const apis: Array<[string, Record<string, unknown>]> = [];
+	const apis: Array<[string, Record<string, unknown>, Package]> = [];
 	for (const p of named) {
 		let name: string;
 		if (p === 'napi') {
@@ -149,7 +155,12 @@ async function register(packages: Array<string>): Promise<void> {
 		// the bare specifier, resolved from inside the consumer as its own import would be
 		const entry = join(consumer, `${p}.mjs`);
 		writeFileSync(entry, `export * from ${JSON.stringify(name)};\n`);
-		apis.push([name, await import(pathToFileURL(entry).href)]);
+		apis.push([name, await import(pathToFileURL(entry).href), p]);
 	}
-	for (const [name, api] of apis) register_syntax_error_suite(`${name} under Bun`, api);
+	for (const [name, api, p] of apis) {
+		register_syntax_error_suite(`${name} under Bun`, api);
+		// the strip's refusal is read off the engine's own enumerable point properties too,
+		// so Bun's non-enumerable `line` / `column` reach it as they reach a parse failure
+		if (STRIP_PACKAGES.has(p)) register_strip_api_suite(`${name} under Bun`, api);
+	}
 }

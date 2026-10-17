@@ -1,7 +1,7 @@
 /**
  * Hand-written types for `@fuzdev/tsv` — `@fuzdev/tsv-wasm`'s surface (the same
  * facade declarations, re-exported from the staged `facade_format.d.ts` /
- * `facade_parse.d.ts`, and the same `tsv_ast` re-export), so the two packages type-check
+ * `facade_parse.d.ts` / `facade_strip.d.ts`, and the same `tsv_ast` re-export), so the two packages type-check
  * interchangeably except for what a WASM engine needs and this one doesn't: `init()` and
  * `init_sync()` (nothing here needs initializing), `wasm_module` (no compiled module
  * to hand a worker), `reinstantiate()` (no instance to poison), and `IgnoreStack`'s `free()` /
@@ -34,6 +34,16 @@ export type {
 	TypeScriptParseJsonOptions
 } from './facade_parse.js';
 export type { FormatOptions, TypeScriptFormatOptions } from './facade_format.js';
+export type {
+	StripOptions,
+	StripSuccess,
+	StripFailure,
+	StripResult,
+	StripError,
+	StripParseError,
+	StripUnsupportedKind,
+	StripUnsupportedError
+} from './facade_strip.js';
 export type { TsvSyntaxError } from './syntax_error.js';
 export {
 	parse_svelte,
@@ -44,6 +54,7 @@ export {
 	parse_css_json
 } from './facade_parse.js';
 export { format_svelte, format_typescript, format_css } from './facade_format.js';
+export { strip_typescript } from './facade_strip.js';
 
 /**
  * The gitignore-aware matcher stack — the same layering and prune decisions

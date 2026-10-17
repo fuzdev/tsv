@@ -122,6 +122,39 @@ pub fn unsupported_extension_error(path: &str) -> Option<String> {
     })
 }
 
+/// The extensions `tsv strip` takes: the JS/TS family alone, every file the TypeScript
+/// parser reads (a `.svelte.ts` rune module and a `.d.ts` are `.ts` by
+/// `Path::extension`). The strip is TypeScript's, so `.svelte` and `.css` are absent.
+pub const STRIPPABLE_EXTENSIONS: [&str; 6] = ["ts", "mts", "cts", "js", "mjs", "cjs"];
+
+/// The error for a file named to `tsv strip` whose extension is not one of
+/// [`STRIPPABLE_EXTENSIONS`] (read without regard to ASCII case, as [`is_formattable`]
+/// reads one), or `None` when it is. An argument error, as
+/// [`unsupported_extension_error`] is for `format`: without it a `.svelte` file would
+/// reach the TypeScript parser and fail on its markup.
+#[must_use]
+pub fn strip_unsupported_extension_error(path: &str) -> Option<String> {
+    let strippable = Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|ext| {
+            STRIPPABLE_EXTENSIONS
+                .iter()
+                .any(|known| known.eq_ignore_ascii_case(ext))
+        });
+    (!strippable).then(|| {
+        let list = STRIPPABLE_EXTENSIONS
+            .iter()
+            .map(|ext| format!(".{ext}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!(
+            "{}: unsupported file extension (tsv strip handles {list})",
+            quote_path(path)
+        )
+    })
+}
+
 /// [`FORMATTABLE_EXTENSIONS`] rendered as dotted names joined by `separator`
 /// (`".ts, .mts, …"`, `".ts/.mts/…"`).
 ///
@@ -446,6 +479,27 @@ mod tests {
         assert_eq!(
             unsupported_extension_error("data.json").unwrap(),
             "data.json: unsupported file extension (tsv handles .ts, .mts, .cts, .js, .mjs, .cjs, .svelte, .css)"
+        );
+    }
+
+    #[test]
+    fn strip_unsupported_extension_error_takes_the_typescript_family() {
+        for ext in STRIPPABLE_EXTENSIONS {
+            assert!(
+                strip_unsupported_extension_error(&format!("src/file.{ext}")).is_none(),
+                "{ext}"
+            );
+        }
+        for path in ["counter.svelte.ts", "types.d.ts", "LEGACY.MJS"] {
+            assert!(strip_unsupported_extension_error(path).is_none(), "{path}");
+        }
+        for path in ["a.svelte", "a.css", "README.md", "Makefile", ".ts", "a.tsx"] {
+            assert!(strip_unsupported_extension_error(path).is_some(), "{path}");
+        }
+        // pinned verbatim: `cli.js` restates this text by hand
+        assert_eq!(
+            strip_unsupported_extension_error("a.svelte").unwrap(),
+            "a.svelte: unsupported file extension (tsv strip handles .ts, .mts, .cts, .js, .mjs, .cjs)"
         );
     }
 

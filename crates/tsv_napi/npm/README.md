@@ -1,8 +1,8 @@
 # @fuzdev/tsv
 
-> native formatter and parser for Svelte, TypeScript, and CSS (N-API)
+> native formatter and parser for Svelte, TypeScript, and CSS, and a TypeScript type stripper (N-API)
 
-Rust-based formatter + parser as a prebuilt native addon for Node.js and Bun. A near-Prettier formatter that tracks **Prettier** + **prettier-plugin-svelte** closely (documented divergences), and a drop-in replacement for the canonical parsers' JSON AST (acorn + acorn-typescript, Svelte's modern parser, `parseCss`).
+Rust-based formatter + parser + type stripper as a prebuilt native addon for Node.js and Bun. A near-Prettier formatter that tracks **Prettier** + **prettier-plugin-svelte** closely (documented divergences), and a drop-in replacement for the canonical parsers' JSON AST (acorn + acorn-typescript, Svelte's modern parser, `parseCss`).
 
 The API mirrors [`@fuzdev/tsv-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-wasm) export for export — same names, same options, same errors — minus only what a WASM engine needs and this one doesn't (`init`, `init_sync`, `wasm_module`, `reinstantiate`, the `./worker` subpath, and the WASM `IgnoreStack`'s `free()` / `[Symbol.dispose]()`, which a GC-managed native class doesn't need), so the two are drop-in swaps: this package is the fast native path; the WASM one runs everywhere (browsers included) and is the fallback for platforms without a prebuilt binding.
 
@@ -33,6 +33,7 @@ npx @fuzdev/tsv format src        # format .ts/.mts/.cts/.js/.mjs/.cjs/.svelte/.
 npx @fuzdev/tsv format --check .  # CI: exit 1 if anything would change
 npx @fuzdev/tsv format --list .   # list the in-scope files, format nothing
 npx @fuzdev/tsv parse file.svelte # JSON AST to stdout (--pretty to indent)
+npx @fuzdev/tsv strip file.ts     # TypeScript to JS on stdout, every position kept
 ```
 
 Installed (`npm i -D @fuzdev/tsv`), the bin is `tsv` — and here it is the **real native CLI**: the platform package ships tsv's production Rust binary beside the addon, and the bin execs it directly (the esbuild/biome shape), so you get the native CLI's exact contract — multi-file parallelism (`--jobs`), parallel discovery, native error paths. (Both binaries ship because neither can play the other's role: an addon can't be exec'd as a process, and an executable can't be loaded as an in-process module.)
@@ -45,6 +46,8 @@ Directories recurse over the JS/TS family (`.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cj
 - A path you name — file or directory — is bounded by the ignore files alone: one they exclude is skipped (with a warning, unless it is a file your `.formatignore` or `.prettierignore` excludes), while the built-in skips never apply to it; a named file's extension must still be one tsv formats.
 
 `format --list` prints the discovered in-scope files without formatting — a read-only view of what `format` would touch. `--content <source>` / `--stdin` (with `--parser svelte|typescript|css`) format or parse strings to stdout. For TypeScript, `--source-type script|module` (`parse` defaults to `module`; `format` takes an unset flag as *none named* — module, retried as a script, except a `.mjs`/`.mts` path, a module by its own name, which takes no retry — and accepts it on `--content`/`--stdin` only) selects the parse goal — at `script`, `await` is an ordinary identifier, top-level `import`/`export`, `for await` and `import.meta` are errors, and the code is sloppy unless its own `"use strict"` prologue makes it strict (so `with` and legacy octal literals/escapes parse). `parse` emits the span-only wire (no per-node `loc`; Svelte also no `name_loc`); `parse --locations` adds them. Exit codes — `format`: 0 clean, 1 would-change (`--check`), 2 errors; `parse`: 0 ok, 1 error.
+
+`strip` takes one TypeScript input — a `.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cjs` path (a `.svelte.ts` rune module included), `--content`, or `--stdin` — and prints it as JS with every type blanked to whitespace ([Stripping types](#stripping-types)); `--check` prints nothing and only sets the exit code. Exit codes — `strip`: 0 stripped, 1 refused (TypeScript that type blanking cannot erase, such as an `enum`), 2 a parse error or a usage error.
 
 Files format in parallel; `--jobs N` overrides the worker count. (If the platform package's CLI binary is missing or unrunnable, the bin degrades to a JS mirror of the same contract over the addon — which parallelizes too, on worker threads; on a platform with no prebuilt package at all, use [`@fuzdev/tsv-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-wasm) instead.) Both packages claim the `tsv` bin name, so install one or the other in a project.
 
@@ -74,6 +77,24 @@ A set value is exact. With none named and both grammars rejecting the source, th
 `parse_svelte` / `parse_typescript` / `parse_css` return the language's public JSON AST as an object — span-only by default, `start`/`end` offsets on every node and no per-node `loc`; the `parse_*_json` siblings return that wire as a JSON string for consumers that forward it without paying `JSON.parse`. The object parsers take an optional `{locations?, sourceType?}` bag, the `_json` ones `{sourceType?}`, and `sourceType` is TypeScript-only. TypeScript types for the AST are bundled in `tsv_ast.d.ts` and re-exported from the package (`import type {...} from '@fuzdev/tsv'`).
 
 `locations: true` adds `loc` (and Svelte's `name_loc`), computed in JS after the parse by `reconstruct_locations`. It is exported too, with `create_locator(source, {language})` for sparse lookups (`language` required), whose `position_at(offset)` / `loc_of(node)` throw a `RangeError` for an offset or span the source doesn't hold (a `TypeError` for an offset that isn't a number, or a node whose `start`/`end` getter throws); the whole-tree forms (`reconstruct_locations`, the locator's `reconstruct(ast)`) check nothing per node, and take an acyclic tree — the parse's own, or a clone of it. Both are also the `@fuzdev/tsv/locations` entry point, pure JS that loads no native addon.
+
+### Stripping types
+
+`strip_typescript(source)` turns TypeScript into JS by blanking every type to whitespace — no transform, no sourcemap: every surviving character keeps its line and UTF-16 column, line terminators are kept verbatim, and a type-free source comes back unchanged. Where blanking alone would let the next line continue the statement, one `;`, `(` or `)` takes a blanked character's place.
+
+It returns a result rather than throwing for what it finds in the source: `{ok: true, code}`, or `{ok: false, error}` with `error.kind` `'parse'` (the `message`, `start` and `loc` a `parse_typescript` of the source would throw) or `'unsupported'` (TypeScript with runtime semantics — an `enum`, a value `namespace`, a parameter property, `import =`, `export =`, `<T>x`, or an `as` whose removal would regroup its expression — named by `error.construct`, with its span as `start`/`end` and `loc`, and a `message` with the line and a caret).
+
+```javascript
+import {strip_typescript} from '@fuzdev/tsv';
+
+const result = strip_typescript('let id: string = "a";\nenum Color { Red }\n');
+if (!result.ok && result.error.kind === 'unsupported') {
+	result.error.construct; // 'enum'
+	result.error.loc.start; // {line: 2, column: 0}
+}
+```
+
+The source is a module; the one option, `{sourceType: 'module'}`, says so, and any other `sourceType` throws.
 
 ### Options
 

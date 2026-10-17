@@ -42,7 +42,7 @@ use napi::bindgen_prelude::{Either, Undefined};
 // hand-synced copies.
 #[cfg(feature = "format")]
 use tsv_arena::parse_format;
-#[cfg(feature = "panic_probe")]
+#[cfg(any(feature = "panic_probe", feature = "strip"))]
 use tsv_arena::with_ast_arena;
 #[cfg(any(feature = "parse", feature = "format"))]
 use tsv_arena::{Family, goal_allowed};
@@ -53,7 +53,7 @@ use tsv_arena::{parse_convert, parse_internal};
 // `tsv_lang::ParseError` (and the `WirePoint` its `wire_point` returns), so the shared
 // error helpers below take a Svelte or CSS failure as readily as a TypeScript one. Named
 // through `tsv_ts` only because this crate takes no `tsv_lang` edge of its own.
-#[cfg(any(feature = "parse", feature = "format"))]
+#[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
 use tsv_ts::ParseError;
 use tsv_ts::WirePoint;
 
@@ -101,12 +101,21 @@ enum Failure {
     /// A parse failure at a point in the document's wire coordinates
     /// (`ParseError::wire_point`).
     Syntax { message: String, point: WirePoint },
+    /// A strip refusal: TypeScript the strip cannot erase — the construct's wire name
+    /// (`tsv_ts::UnsupportedKind::name`) and the refused span's two points.
+    #[cfg(feature = "strip")]
+    Refusal {
+        message: String,
+        kind: &'static str,
+        start: WirePoint,
+        end: WirePoint,
+    },
 }
 
 impl Failure {
     /// A parse error: located ones carry their point, the positionless ones (a source over
     /// the size cap, a format refusal) are plain.
-    #[cfg(any(feature = "parse", feature = "format"))]
+    #[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
     fn parse(e: &ParseError) -> Self {
         let message = e.to_string();
         match e.wire_point() {
@@ -120,6 +129,8 @@ impl Failure {
     fn message(&self) -> &str {
         match self {
             Failure::Plain(message) | Failure::Syntax { message, .. } => message,
+            #[cfg(feature = "strip")]
+            Failure::Refusal { message, .. } => message,
         }
     }
 
@@ -130,12 +141,24 @@ impl Failure {
     /// napi-rs as a reference (`napi::Error::from(Unknown)`), so the object thrown is this
     /// one ([`engine_error`]). Were building it to fail, the message still throws, without
     /// the point.
+    ///
+    /// A strip refusal adds its construct and span: own enumerable `kind`, and `end`,
+    /// `end_line` and `end_column` beside the point of the span's start
+    /// ([`engine_error`]'s `refusal`), which the facade's `npm/api_strip.js` reads.
     fn into_napi(self, env: Env) -> napi::Error {
-        let (message, point) = match self {
-            Failure::Plain(message) => (message, None),
-            Failure::Syntax { message, point } => (message, Some(point)),
+        let (message, point, refusal) = match self {
+            Failure::Plain(message) => (message, None, None),
+            Failure::Syntax { message, point } => (message, Some(point), None),
+            #[cfg(feature = "strip")]
+            Failure::Refusal {
+                message,
+                kind,
+                start,
+                end,
+            } => (message, Some(start), Some((kind, end))),
         };
-        engine_error(env, &message, point).unwrap_or_else(|_| napi::Error::from_reason(message))
+        engine_error(env, &message, point, refusal)
+            .unwrap_or_else(|_| napi::Error::from_reason(message))
     }
 }
 
@@ -153,9 +176,22 @@ impl Failure {
 /// non-enumerable `line` and `column` at construction, and a plain set writes through
 /// that property and keeps it non-enumerable; with nothing to delete (Node, Deno) the
 /// delete is a no-op.
-fn engine_error(env: Env, message: &str, point: Option<WirePoint>) -> napi::Result<napi::Error> {
+///
+/// A strip refusal (`refusal`: the construct's name and the span's end point) sets `kind`
+/// first, then the start point's three, then `end`, `end_line` and `end_column` — the
+/// order `tsv_wasm`'s `strip_typescript` sets them in, each deleted first the same way.
+fn engine_error(
+    env: Env,
+    message: &str,
+    point: Option<WirePoint>,
+    refusal: Option<(&str, WirePoint)>,
+) -> napi::Result<napi::Error> {
     let mut error = env.create_error(napi::Error::from_reason(message))?;
     error.delete_named_property("code")?;
+    if let Some((kind, _)) = refusal {
+        error.delete_named_property("kind")?;
+        error.set("kind", kind)?;
+    }
     if let Some(WirePoint {
         start,
         line,
@@ -163,6 +199,16 @@ fn engine_error(env: Env, message: &str, point: Option<WirePoint>) -> napi::Resu
     }) = point
     {
         for (name, value) in [("start", start), ("line", line), ("column", column)] {
+            error.delete_named_property(name)?;
+            error.set(name, value)?;
+        }
+    }
+    if let Some((_, end)) = refusal {
+        for (name, value) in [
+            ("end", end.start),
+            ("end_line", end.line),
+            ("end_column", end.column),
+        ] {
             error.delete_named_property(name)?;
             error.set(name, value)?;
         }
@@ -209,6 +255,8 @@ macro_rules! lang_bindings {
     ) => {
         /// The engine halves of this language's exports (see `lang_bindings!`).
         mod $engine {
+            // the halves are each feature-gated; a strip-only build compiles none of them
+            #[cfg(any(feature = "parse", feature = "format"))]
             use super::*;
 
             /// The span-only JSON AST as a string.
@@ -322,6 +370,34 @@ lang_bindings!(
     format_css,
     "format_css"
 );
+
+/// The engine half of `strip_typescript` (see `lang_bindings!` for the split): the JS, or
+/// a parse failure as every parse export reports one, or a refusal with its construct
+/// and span in the wire's coordinates.
+#[cfg(feature = "strip")]
+fn strip_typescript_engine(source: &str) -> Result<String, Failure> {
+    with_ast_arena(|arena| match tsv_ts::strip(source, arena) {
+        Ok(stripped) => Ok(stripped.code.into_owned()),
+        Err(tsv_ts::StripError::Parse(e)) => Err(Failure::parse(&e)),
+        Err(error @ tsv_ts::StripError::Unsupported { kind, span }) => Err(Failure::Refusal {
+            message: error.message(source),
+            kind: kind.name(),
+            start: tsv_ts::WIRE_COORDINATES.point(source, span.start as usize),
+            end: tsv_ts::WIRE_COORDINATES.point(source, span.end as usize),
+        }),
+    })
+}
+
+/// Strip the types from TypeScript `source` (`tsv_ts::strip`, module goal): the JS, every
+/// type-only range blanked to whitespace so every surviving character keeps its line and
+/// UTF-16 column. A parse failure throws as the parse exports' does; a refusal throws an
+/// `Error` carrying its construct and span (`Failure::into_napi`), which the npm facade
+/// (`npm/api_strip.js`) reads into its result object.
+#[cfg(feature = "strip")]
+#[napi(js_name = "strip_typescript", catch_unwind)]
+pub fn strip_typescript(env: Env, source: String) -> napi::Result<String> {
+    strip_typescript_engine(&source).map_err(|f| f.into_napi(env))
+}
 
 //
 // Discovery: the gitignore-aware matcher + its `tsv_discover` verdicts
@@ -905,6 +981,51 @@ mod tests {
             at_default(typescript_engine::format, src).unwrap_err(),
             parse_err
         );
+    }
+
+    // --- the type strip: the code, a parse failure, a refusal with its span ---
+
+    #[test]
+    fn strip_typescript_engine_outcomes() {
+        assert_eq!(
+            strip_typescript_engine("let x: T = 1;\n"),
+            Ok("let x    = 1;\n".to_string())
+        );
+        // a parse failure is the one the parse export reports for the same source
+        let src = "let = ;\n";
+        assert_eq!(
+            strip_typescript_engine(src).unwrap_err(),
+            at_default(typescript_engine::parse_json, src).unwrap_err()
+        );
+        // a refusal carries the construct and both points, in UTF-16 units (the astral
+        // character ahead of the enum is two)
+        let src = "let \u{1D49C}: T = 1;\nenum E {}\n";
+        let Failure::Refusal {
+            message,
+            kind,
+            start,
+            end,
+        } = strip_typescript_engine(src).unwrap_err()
+        else {
+            panic!("expected a refusal");
+        };
+        assert_eq!(kind, "enum");
+        assert_eq!(
+            (start, end),
+            (
+                WirePoint {
+                    start: 15,
+                    line: 2,
+                    column: 0
+                },
+                WirePoint {
+                    start: 24,
+                    line: 2,
+                    column: 9
+                }
+            )
+        );
+        assert_eq!(message, "cannot strip an enum\n2:1 enum E {}\n    ^ here");
     }
 
     // --- the per-thread arenas are reset+reused across calls (warm-path soundness) ---

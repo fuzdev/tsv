@@ -35,8 +35,9 @@
  * `recover_engine_suffix`).
  *
  * Exit codes: `format` — 0 clean, 1 would-change (`--check`), 2 errors;
- * `parse` — 0 ok, 1 error. Flag-parsing errors exit 1 (both commands); `format`'s
- * post-parse usage/validation errors (an invalid `--source-type`, conflicting inputs) exit 2.
+ * `parse` — 0 ok, 1 error; `strip` — 0 stripped, 1 refused, 2 a parse or usage error.
+ * Flag-parsing errors exit 1 (every command); `format`'s and `strip`'s post-parse
+ * usage/validation errors (an invalid `--source-type`, conflicting inputs) exit 2.
  */
 
 import { Buffer } from 'node:buffer';
@@ -191,6 +192,10 @@ const WORKER_STACK_SIZE_MB = 32;
  * `PARSERS` are keyed by the same names). */
 const PARSER_NAMES = new Set(['svelte', 'typescript', 'css']);
 
+/** The extensions `tsv strip` takes — the native `tsv_discover::STRIPPABLE_EXTENSIONS`,
+ * restated (pinned by the strip CLI rows both bins run). */
+const STRIPPABLE_EXTENSIONS = ['ts', 'mts', 'cts', 'js', 'mjs', 'cjs'];
+
 /** Whether a WASM engine reinstantiation already failed on this thread — one
  * warning per thread, not one per remaining file (each worker is its own module
  * instance with its own copy, so a pool of N can warn N times; the recovery
@@ -252,7 +257,7 @@ function free_ignore_stack(stack) {
 
 const HELP = `Usage: tsv <command> [<args>]
 
-formatter and parser for Svelte, TypeScript, and CSS
+formatter and parser for Svelte, TypeScript, and CSS, and a TypeScript type stripper
 
 Options:
   --version         print the tsv version
@@ -260,6 +265,7 @@ Options:
 Commands:
   format            Format source code in place (near-Prettier output)
   parse             Parse source code into AST JSON
+  strip             Strip the types from TypeScript, keeping every character's line and column
   help              Print help for a command
 
 Run \`tsv <command> --help\` for command flags.
@@ -304,6 +310,23 @@ Options:
   --locations       emit per-node loc (line/column) beside the start/end offsets (svelte also name_loc); the default wire is span-only
 `;
 
+const STRIP_HELP = `Usage: tsv strip [<file>] [--content <s> | --stdin] [--check]
+
+Strip the types from TypeScript, keeping every character's line and column.
+
+Prints the JS to stdout byte for byte: every type-only range blanked to
+whitespace, no trailing newline added, line endings kept. One input: a
+.ts/.mts/.cts/.js/.mjs/.cjs file, --content, or --stdin.
+
+Options:
+  --content <s>     content to strip, printed to stdout
+  --stdin           read from stdin, print to stdout
+  --check           print nothing: exit 1 on a refusal, 2 on a parse error
+
+Exit codes: 0 stripped, 1 refused (TypeScript with runtime semantics, such as an
+enum), 2 a parse error or a usage error.
+`;
+
 /**
  * Each command's argh grammar, as `parse_argv` reads it: every flag — a switch, or a
  * value-taking option whose `parse(value)` returns `{value}` or `{error}` — how many
@@ -338,10 +361,20 @@ const PARSE_ARGS = {
 	help: PARSE_HELP
 };
 
+const STRIP_ARGS = {
+	options: {
+		'--content': {},
+		'--stdin': { switch: true },
+		'--check': { switch: true }
+	},
+	positionals: 1,
+	help: STRIP_HELP
+};
+
 const TOP_LEVEL_ARGS = {
 	options: { '--version': { switch: true } },
 	positionals: 0,
-	subcommands: { format: FORMAT_ARGS, parse: PARSE_ARGS },
+	subcommands: { format: FORMAT_ARGS, parse: PARSE_ARGS, strip: STRIP_ARGS },
 	help: HELP
 };
 
@@ -402,12 +435,15 @@ async function main() {
 		case 'parse':
 			run_parse(subcommand);
 			break;
+		case 'strip':
+			run_strip(subcommand);
+			break;
 		default:
 			// no subcommand: argh's required-subcommand refusal, the bytes argh prints for the
 			// native CLI (`main` answers a bare `--version` ahead of it, so the subcommand stays required)
 			exit_with_error(
 				1,
-				'One of the following subcommands must be present:\n    help\n    parse\n    format\n\nRun tsv --help for more information.'
+				'One of the following subcommands must be present:\n    help\n    parse\n    format\n    strip\n\nRun tsv --help for more information.'
 			);
 	}
 }
@@ -1518,6 +1554,70 @@ function run_parse({ values, positionals }) {
 		exit_with_error(1, serialization_failure(error));
 	}
 	print(`${json}\n`);
+}
+
+/**
+ * `tsv strip` — the type strip on one input, mirroring the native `StripCommand`: every
+ * argument graded before anything is read (a path beside `--content` / `--stdin`, a
+ * directory, an extension the strip does not take), then the input by `--content` >
+ * `--stdin` > file precedence, then the facade's `strip_typescript`, whose result
+ * object this turns into the native exit codes and lines — the code to stdout verbatim
+ * (nothing with `--check`), a parse error as `Parse error:` exit 2, a refusal as
+ * `Error: cannot strip …` exit 1. What the facade throws (the size cap, an engine
+ * failure) is `single_input_failure`'s, exit 2. Usage errors exit 2.
+ */
+function run_strip({ values, positionals }) {
+	const path = positionals[0];
+	if (path !== undefined) {
+		if (values.content !== undefined || values.stdin) {
+			exit_with_error(2, 'Error: --content/--stdin cannot be combined with a file path');
+		}
+		let is_dir = false;
+		try {
+			is_dir = statSync(path).isDirectory();
+		} catch {
+			// not there, or unreadable: the read below reports it
+		}
+		if (is_dir) {
+			exit_with_error(2, `Error: ${quote_path(path)}: is a directory (one file is expected)`);
+		}
+		// `tsv_discover::strip_unsupported_extension_error`, restated by hand: the binding
+		// exports no strip policy (the `format` refusal it does export names a different list)
+		if (!STRIPPABLE_EXTENSIONS.some((ext) => has_extension_ignoring_case(path, ext))) {
+			exit_with_error(
+				2,
+				`Error: ${quote_path(path)}: unsupported file extension (tsv strip handles ` +
+					`${STRIPPABLE_EXTENSIONS.map((ext) => `.${ext}`).join(', ')})`
+			);
+		}
+	}
+	let input;
+	if (values.content !== undefined) {
+		input = values.content;
+	} else if (values.stdin) {
+		input = read_stdin(2);
+	} else if (path !== undefined) {
+		try {
+			input = decode_source(readFileSync(path));
+		} catch (error) {
+			exit_with_error(2, `Error: Error reading file ${quote_path(path)}: ${error_message(error)}`);
+		}
+	} else {
+		exit_with_error(2, 'Error: No input provided. Use a file path, --content, or --stdin');
+	}
+	let result;
+	try {
+		result = engine.strip_typescript(input);
+	} catch (error) {
+		exit_with_error(2, single_input_failure(error));
+	}
+	if (result.ok) {
+		if (!values.check) print(result.code);
+	} else if (result.error.kind === 'parse') {
+		exit_with_error(2, `Parse error: ${result.error.message}`);
+	} else {
+		exit_with_error(1, `Error: ${result.error.message}`);
+	}
 }
 
 /**

@@ -74,6 +74,14 @@ import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
 import { register_dts_specifier_test } from './dts_specifiers.ts';
 import { register_facade_surface_suite } from './facade_surface_suite.ts';
 import {
+	register_strip_api_suite,
+	register_strip_cli_suite,
+	STRIP_CLI_ROWS,
+	STRIP_OK_ROWS,
+	STRIP_PARSE_ERROR_ROWS,
+	STRIP_REFUSAL_ROWS
+} from './strip_suite.ts';
+import {
 	LONE_CR_REFUSAL,
 	LONE_CR_TAG_COMMENT,
 	register_syntax_error_suite,
@@ -461,7 +469,7 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 	});
 
 	// export names and the lone-surrogate refusal, shared with the wasm entries' suite
-	register_facade_surface_suite('@fuzdev/tsv loader', api, { facade_exports: 9 });
+	register_facade_surface_suite('@fuzdev/tsv loader', api, { facade_exports: 10 });
 
 	it('the loader ships the shared facade verbatim', () => {
 		for (const { published, source } of facade_files(ALL_FAMILIES)) {
@@ -492,6 +500,10 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		assert.deepEqual(
 			reexported('./facade_parse.js'),
 			facade_type_names('facade_parse.d.ts').sort()
+		);
+		assert.deepEqual(
+			reexported('./facade_strip.js'),
+			facade_type_names('facade_strip.d.ts').sort()
 		);
 		assert.deepEqual(
 			reexported('./syntax_error.js'),
@@ -695,6 +707,34 @@ process.stdout.write(JSON.stringify({
 // container, a Debian box with the `musl` package installed, a runtime whose
 // `process.report` is absent or partial).
 register_syntax_error_suite('@fuzdev/tsv loader', api);
+
+// The type strip's API table (`scripts/strip_suite.ts`), shared with the wasm umbrella's suite.
+register_strip_api_suite('@fuzdev/tsv loader', api);
+
+// Engine parity over the strip table: the native addon and the WASM build of one Rust
+// source must return deep-equal results — the code, and every field of a refusal or a parse
+// error. Skipped, not failed, where the wasm package is absent or stale, as the export-set
+// claim above is.
+describe('strip engine parity: @fuzdev/tsv vs @fuzdev/tsv-wasm', () => {
+	it(
+		'every strip row returns the same result on both engines',
+		{ skip: wasm_parity_skip },
+		async () => {
+			const wasm = await import(pathToFileURL(wasm_package_index).href);
+			for (const { source } of [
+				...STRIP_OK_ROWS,
+				...STRIP_REFUSAL_ROWS,
+				...STRIP_PARSE_ERROR_ROWS
+			]) {
+				assert.deepStrictEqual(
+					api.strip_typescript(source),
+					wasm.strip_typescript(source),
+					JSON.stringify(source)
+				);
+			}
+		}
+	);
+});
 
 describe('libc detection (platform.js)', () => {
 	/** A stub probe bag that records which probes a verdict actually asked. */
@@ -1039,20 +1079,29 @@ describe('cli (bin.js): fallback to the JS mirror without the binary', () => {
 // the matrix in `scripts/test_npm.ts` and `tests/cli_tests/`): each side is
 // handed the bare flag and must not answer with its unknown-flag error. A
 // missing value or missing input is a different error and passes — that is the
-// point, since it means the flag was understood. Scope is the two commands;
+// point, since it means the flag was understood. Scope is the three commands;
 // the top-level `--version` / `--help` have their own tests on both sides.
+
+/** Per command, the fewest flags its help may advertise and one it must: the vacuity
+ * floor `advertised_flags` holds each parse to. */
+const FLAG_FLOORS: Record<string, { min: number; anchor: string }> = {
+	format: { min: 5, anchor: '--parser' },
+	parse: { min: 5, anchor: '--parser' },
+	strip: { min: 3, anchor: '--check' }
+};
 
 /** The `--flag`s a help text advertises. Two vacuity checks come with it: a
  * regex that quietly matched nothing would make every assertion below pass. */
-const advertised_flags = (help: string, source: string): Array<string> => {
+const advertised_flags = (help: string, source: string, command: string): Array<string> => {
 	const options = help.slice(help.indexOf('\nOptions:'));
 	const flags = [...options.matchAll(/^ {2}(--[a-z0-9-]+)/gm)]
 		.map((m) => m[1])
 		// argh generates `--help` for every command; the mirror handles it
 		// without advertising it, so it is the one flag the sets can't share.
 		.filter((flag) => flag !== '--help');
-	assert.ok(flags.length >= 5, `parsed too few flags from ${source}: ${flags}`);
-	assert.ok(flags.includes('--parser'), `parsed no --parser from ${source}: ${flags}`);
+	const { min, anchor } = FLAG_FLOORS[command]!;
+	assert.ok(flags.length >= min, `parsed too few flags from ${source}: ${flags}`);
+	assert.ok(flags.includes(anchor), `parsed no ${anchor} from ${source}: ${flags}`);
 	return flags;
 };
 
@@ -1087,11 +1136,11 @@ describe('parity anchor: the two bins under comparison really are the two bins',
 });
 
 describe('flag parity: the native CLI and cli.js recognize the same flags', () => {
-	for (const command of ['format', 'parse']) {
+	for (const command of ['format', 'parse', 'strip']) {
 		it(`${command}: every flag the native CLI advertises, cli.js recognizes`, () => {
 			const help = run_native(['help', command]);
 			assert.equal(help.status, 0, help.stderr);
-			const flags = advertised_flags(help.stdout, `argh's \`${command}\` help`);
+			const flags = advertised_flags(help.stdout, `argh's \`${command}\` help`, command);
 			for (const flag of flags) {
 				const result = run_mirror([command, flag]);
 				assert.doesNotMatch(
@@ -1105,7 +1154,7 @@ describe('flag parity: the native CLI and cli.js recognize the same flags', () =
 		it(`${command}: every flag cli.js advertises, the native CLI recognizes`, () => {
 			const help = run_mirror(['help', command]);
 			assert.equal(help.status, 0, help.stderr);
-			const flags = advertised_flags(help.stdout, `cli.js's \`${command}\` help`);
+			const flags = advertised_flags(help.stdout, `cli.js's \`${command}\` help`, command);
 			for (const flag of flags) {
 				const result = run_native([command, flag]);
 				assert.doesNotMatch(
@@ -1790,3 +1839,41 @@ describe('cli (bin.js): degraded-binary paths', { skip: !posix }, () => {
 // native CLI's.
 register_discovery_parity_suite('discovery parity (bin.js): the native CLI via the shim', bin_path);
 register_discovery_parity_suite('discovery parity (cli.js): the native IgnoreStack', cli_path);
+
+// `tsv strip` through the bin (the native binary) and through the cli.js mirror over the
+// native engine, each held to the shared rows; then the two held to each other byte for
+// byte, stdout and stderr both — a refusal's and a parse error's text included.
+register_strip_cli_suite('bin.js (the native CLI)', (args, stdin, cwd) =>
+	spawnSync(process.execPath, [bin_path, ...args], { encoding: 'utf-8', input: stdin, cwd })
+);
+register_strip_cli_suite('cli.js (the mirror, native engine)', (args, stdin, cwd) =>
+	run_mirror(args, stdin, cwd)
+);
+
+describe('strip parity: the native CLI and cli.js answer every strip row alike', () => {
+	for (const row of STRIP_CLI_ROWS) {
+		// help is argh's on one side and hand-written on the other; flag parity covers it
+		if (row.args[0] === 'help') continue;
+		it(row.name, () => {
+			const dir = mkdtempSync(join(tmpdir(), 'tsv-strip-parity-'));
+			try {
+				const file_path = join(dir, row.file_name ?? 'a.ts');
+				if (row.file !== undefined) writeFileSync(file_path, row.file);
+				const args = row.args.map((arg) => (arg === 'FILE' ? file_path : arg));
+				const native = run_native(args, row.stdin, dir);
+				const mirror = run_mirror(args, row.stdin, dir);
+				assert.equal(native.status, row.status, `native stderr: ${native.stderr}`);
+				assert.equal(mirror.status, native.status, `cli.js stderr: ${mirror.stderr}`);
+				assert.equal(mirror.stdout, native.stdout);
+				if (row.os_words) {
+					// the shared prefix, up to the OS's own words for the failure
+					assert.ok(row.stderr_starts !== undefined && mirror.stderr.startsWith(row.stderr_starts));
+				} else {
+					assert.equal(mirror.stderr, native.stderr);
+				}
+			} finally {
+				rmSync(dir, { recursive: true, force: true });
+			}
+		});
+	}
+});

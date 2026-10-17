@@ -77,7 +77,7 @@ fn test_no_command() {
     assert!(output.stdout.is_empty());
     assert_eq!(
         String::from_utf8_lossy(&output.stderr),
-        "One of the following subcommands must be present:\n    help\n    parse\n    format\n\nRun tsv --help for more information.\n"
+        "One of the following subcommands must be present:\n    help\n    parse\n    format\n    strip\n\nRun tsv --help for more information.\n"
     );
 }
 

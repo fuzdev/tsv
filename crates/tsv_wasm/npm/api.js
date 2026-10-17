@@ -1,7 +1,7 @@
 /**
  * The options reader and the format API every tsv npm package exports — the shared half
  * of one hand-written facade over whichever engine the package carries; the parse
- * family is `api_parse.js`, which builds on this file.
+ * family is `api_parse.js` and the type strip `api_strip.js`, which build on this file.
  *
  * The engines are flat: the WASM bindings (`@fuzdev/tsv-wasm`, `-parse-wasm`,
  * `-format-wasm`) and the native N-API addon (`@fuzdev/tsv`) each export
@@ -15,7 +15,8 @@
  * decoders), and the facade never lets one reach them.
  *
  * The bag: `parse_<lang>(source, {locations?, sourceType?})`,
- * `parse_<lang>_json(source, {sourceType?})`, `format_<lang>(source, {sourceType?})`.
+ * `parse_<lang>_json(source, {sourceType?})`, `format_<lang>(source, {sourceType?})`, and
+ * `strip_<lang>(source, {sourceType?})` with `'module'` its one settable value.
  * `sourceType` (`'script'` / `'module'`) is TypeScript's alone — Svelte hard-wires
  * `module` and CSS has no goal — so the other languages refuse a set one. Unknown keys
  * error whatever their value (a typo like `{locatons: true}` must not silently hand back
@@ -59,10 +60,12 @@
  */
 
 /**
- * The three export kinds a bag is read for: `parse` (`parse_<lang>`, which takes
- * `locations`), `parse_json` (`parse_<lang>_json`, which refuses it) and `format`.
+ * The export kinds a bag is read for: `parse` (`parse_<lang>`, which takes
+ * `locations`), `parse_json` (`parse_<lang>_json`, which refuses it), `format`, and
+ * `strip` (`strip_<lang>`, whose one goal is the module, so its `sourceType` is
+ * settable to `'module'` alone).
  *
- * @typedef {'parse' | 'parse_json' | 'format'} ExportKind
+ * @typedef {'parse' | 'parse_json' | 'format' | 'strip'} ExportKind
  */
 
 /**
@@ -73,8 +76,9 @@
  * The key set follows from the export: `locations` is a key of a `parse` export alone (a
  * `parse_json` export refuses it with its own explanation — the export returns the wire,
  * which `loc` is not part of — and a `format` export as an unknown key), and `sourceType`
- * is settable for TypeScript alone, the one language with a parse goal. Every error names
- * the export family, `parse` or `format`.
+ * is settable for TypeScript alone, the one language with a parse goal — and on a `strip`
+ * export to `'module'` alone, the one goal the strip reads. Every error names the export
+ * family, `parse`, `format` or `strip`.
  *
  * `undefined` / `null` mean all defaults; a string, a number or an array (which is
  * `typeof 'object'` and has no keys, so it would otherwise read as all defaults) is
@@ -91,7 +95,7 @@
  *   holds a value of the wrong type, or has a getter that throws
  */
 export function read_options(options, kind, language) {
-	const noun = kind === 'format' ? 'format' : 'parse';
+	const noun = kind === 'format' || kind === 'strip' ? kind : 'parse';
 	const takes_locations = kind === 'parse';
 	const takes_source_type = language === 'typescript';
 	const parsed = { locations: false, source_type: undefined };
@@ -121,6 +125,11 @@ export function read_options(options, kind, language) {
 			if (value === undefined) continue;
 			if (!takes_source_type) {
 				throw new TypeError(`${noun} option 'sourceType' is only supported for TypeScript`);
+			}
+			if (kind === 'strip' && value !== 'module') {
+				throw new TypeError(
+					`${noun} option 'sourceType' must be 'module' (got ${describe_value(value)})`
+				);
 			}
 			if (value !== 'script' && value !== 'module') {
 				throw new TypeError(
@@ -201,7 +210,7 @@ const TERMINAL_UNSAFE = /[\u007f-\u009f\u061c\u2028\u2029\u200e\u200f\u202a-\u20
  *
  * @param {object} options - the caller's bag
  * @param {string} name - a key this export takes
- * @param {'parse' | 'format'} noun - the export family, as every error names it
+ * @param {'parse' | 'format' | 'strip'} noun - the export family, as every error names it
  * @returns {unknown}
  * @throws TypeError when the key's getter throws
  */
@@ -226,7 +235,7 @@ function read_option(options, name, noun) {
  * a value and offsets for text the caller never wrote.
  *
  * @param {unknown} source - the caller's source
- * @param {'parse' | 'format'} noun - the export family, as every error names it
+ * @param {'parse' | 'format' | 'strip'} noun - the export family, as every error names it
  * @returns {string} the same `source`
  * @throws TypeError when `source` is not a string, or holds a lone surrogate
  */

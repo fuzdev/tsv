@@ -10,7 +10,8 @@
  *
  * - every exported subpath — the root, `./worker` (wasm), `./locations` (parse-capable) —
  *   through lean consumer modules that call the surface with typed returns, forwarded
- *   option bags, `TsvSyntaxError` and the `IgnoreStack` verdict union, plus
+ *   option bags, `TsvSyntaxError`, the `IgnoreStack` verdict union and the type strip's
+ *   result narrowing (in the two packages that carry it), plus
  *   `// @ts-expect-error` negatives for what must NOT compile (an unused one is itself an
  *   error, so the negatives are pinned too);
  * - every ```ts / ```typescript block of the README the package ships, each as its own
@@ -92,6 +93,8 @@ interface PackageSpec {
 	engine: 'wasm' | 'napi';
 	format: boolean;
 	parse: boolean;
+	/** Whether it carries the type strip — the umbrella and the native loader alone. */
+	strip: boolean;
 	/** The command that restages it. */
 	rebuild: string;
 	/** The freshness checks that date the staging, its README included. */
@@ -117,6 +120,7 @@ const wasm_package = (variant: 'format' | 'parse' | 'all', name: string): Packag
 		engine: 'wasm',
 		format: variant !== 'parse',
 		parse: variant !== 'format',
+		strip: variant === 'all',
 		rebuild,
 		checks: [
 			...wasm_package_checks(variant),
@@ -138,6 +142,7 @@ const PACKAGES: Record<PackageKey, PackageSpec> = {
 		engine: 'napi',
 		format: true,
 		parse: true,
+		strip: true,
 		rebuild: NAPI_REBUILD,
 		checks: [
 			...napi_loader_checks(),
@@ -290,6 +295,62 @@ const same: StyleSheetFile = reconstruct_locations(sheet, 'a {}');
 void [returns, root, wire, css_wire, svelte_wire, position, location, loc_of_returns, again, same];
 `;
 
+/** The type strip, over the package root: the result narrows on `ok`, the error on
+ * `kind`, and the bag takes the module goal alone. */
+const strip_module = (pkg: PackageSpec): string => `
+import {strip_typescript} from '${pkg.name}';
+import type {
+	StripError,
+	StripOptions,
+	StripResult,
+	StripUnsupportedError,
+	StripUnsupportedKind
+} from '${pkg.name}';
+
+${EXACT}
+
+const returns: Exact<ReturnType<typeof strip_typescript>, StripResult> = true;
+const options: StripOptions = {sourceType: 'module'};
+const result = strip_typescript('let x: T = 1;', options);
+// one bag forwarded from a caller holding no source type
+strip_typescript('let x: T = 1;', {sourceType: undefined});
+// @ts-expect-error the strip reads a module, the one goal it takes
+strip_typescript('let x', {sourceType: 'script'});
+// @ts-expect-error an unknown option key
+strip_typescript('let x', {locations: true});
+// @ts-expect-error the code is there only once \`ok\` says so
+void result.code;
+let construct: StripUnsupportedKind | undefined;
+if (result.ok) {
+	const code: string = result.code;
+	void code;
+} else {
+	const error: StripError = result.error;
+	// @ts-expect-error a parse error names no construct: narrow on \`kind\` first
+	void error.construct;
+	if (error.kind === 'unsupported') {
+		const refusal: StripUnsupportedError = error;
+		construct = refusal.construct;
+		const span: [number, number, number] = [refusal.start, refusal.end, refusal.loc.end.column];
+		void span;
+	} else {
+		const point: {line: number; column: number} = error.loc;
+		void [error.start, point];
+	}
+}
+const kinds: Exact<
+	StripUnsupportedKind,
+	| 'enum'
+	| 'value_namespace'
+	| 'parameter_property'
+	| 'import_equals'
+	| 'export_equals'
+	| 'type_assertion'
+	| 'assertion_grouping'
+> = true;
+void [returns, construct, kinds];
+`;
+
 /** `./locations` alone: the helper with no engine, graded without the DOM lib. */
 const locations_module = (pkg: PackageSpec): string => `
 import {create_locator, reconstruct_locations} from '${pkg.name}/locations';
@@ -367,6 +428,15 @@ const absent_module = (pkg: PackageSpec): string => {
 			'// @ts-expect-error the parse-only package ships no format option types',
 			`import type {FormatOptions} from '${pkg.name}';`,
 			'void format_css;'
+		);
+	}
+	if (!pkg.strip) {
+		lines.push(
+			'// @ts-expect-error only the umbrella and the native loader carry the strip',
+			`import {strip_typescript} from '${pkg.name}';`,
+			'// @ts-expect-error nor its types',
+			`import type {StripResult} from '${pkg.name}';`,
+			'void strip_typescript;'
 		);
 	}
 	if (pkg.engine === 'napi') {
@@ -472,6 +542,7 @@ function consumer_files(pkg: PackageSpec, readme: string): Array<ConsumerFile> {
 		add('parse', parse_module(pkg));
 		add('locations', locations_module(pkg), { dom: false });
 	}
+	if (pkg.strip) add('strip', strip_module(pkg));
 	if (pkg.engine === 'wasm') {
 		add('worker', worker_module(pkg));
 		add('entry_node', entry_module(pkg, 'nodenext'), { resolutions: ['nodenext'] });

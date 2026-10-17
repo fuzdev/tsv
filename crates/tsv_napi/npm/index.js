@@ -4,9 +4,9 @@
  * A thin loader over the per-platform prebuilt addons
  * (`@fuzdev/tsv-<triple>`, installed as optionalDependencies — the
  * package manager selects by their `os`/`cpu`/`libc` fields; this file only
- * resolves the matching name). The formatter and parser API is
- * `@fuzdev/tsv-wasm`'s — the same hand-written facade (`api.js` / `api_parse.js`,
- * staged in from the wasm crate), so the same names, `(source, options?)` bags, and
+ * resolves the matching name). The formatter, parser and type-strip API is
+ * `@fuzdev/tsv-wasm`'s — the same hand-written facade (`api.js` / `api_parse.js` /
+ * `api_strip.js`, staged in from the wasm crate), so the same names, `(source, options?)` bags, and
  * error strings — and the two are drop-in swaps: this one is the fast native path,
  * that one the universal fallback (browsers + unsupported platforms). What is
  * absent here is only what a WASM engine needs and this one doesn't: `init()`
@@ -38,9 +38,10 @@
 import { createRequire } from 'node:module';
 
 // The shared facade — staged beside this file by `scripts/build_napi_packages.ts` from
-// `crates/tsv_wasm/npm/`, so these two resolve in the package, not in the source tree.
+// `crates/tsv_wasm/npm/`, so these three resolve in the package, not in the source tree.
 import { create_format_api } from './api.js';
 import { create_parse_api } from './api_parse.js';
+import { create_strip_api } from './api_strip.js';
 import { platform_triple } from './platform.js';
 
 const require = createRequire(import.meta.url);
@@ -81,7 +82,7 @@ try {
 	);
 }
 
-// The published surface: the shared facade (`api.js` + `api_parse.js`, staged from
+// The published surface: the shared facade (`api.js` + `api_parse.js` + `api_strip.js`, staged from
 // `crates/tsv_wasm/npm/` — one options reader, one set of error texts, the
 // `{locations: true}` sugar) over the addon's flat exports. The addon emits the
 // span-only wire as a JSON string; the facade `JSON.parse`s it.
@@ -103,6 +104,9 @@ export const {
 export const { format_svelte, format_typescript, format_css } = create_format_api(
 	from_addon('format_<lang>')
 );
+
+// The type strip: TypeScript's alone, so its one engine function is named directly.
+export const { strip_typescript } = create_strip_api({ typescript: addon.strip_typescript });
 
 // The discovery matcher, re-exported straight off the addon — it takes no
 // options bag, so there is nothing to wrap. Same class name and method surface

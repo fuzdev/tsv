@@ -53,6 +53,7 @@ import { assert_staged_fresh, wasm_package_checks } from './check_staged_freshne
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
 import { register_dts_specifier_test } from './dts_specifiers.ts';
 import { register_facade_surface_suite } from './facade_surface_suite.ts';
+import { register_strip_api_suite, register_strip_cli_suite } from './strip_suite.ts';
 import {
 	LONE_CR_REFUSAL,
 	LONE_CR_TAG_COMMENT,
@@ -170,7 +171,11 @@ describe(`package metadata: ${pkg_dir}`, () => {
 	// and the parse half — `api_parse.js`, the `locations.js` helper it imports, and the AST
 	// types — only where parsing ships.
 	it('every variant ships its part of the facade, verbatim', () => {
-		for (const { published, source } of facade_files({ format: has_format, parse: has_parse })) {
+		for (const { published, source } of facade_files({
+			format: has_format,
+			parse: has_parse,
+			strip: variant === 'all'
+		})) {
 			assert.ok(pkg.files.includes(published), published);
 			assert.equal(
 				readFileSync(new URL(`../${pkg_dir}/${published}`, import.meta.url), 'utf8'),
@@ -196,12 +201,25 @@ describe(`package metadata: ${pkg_dir}`, () => {
 		}
 	});
 
+	it('only the umbrella ships the strip facade', () => {
+		const has_strip_facade = variant === 'all';
+		for (const file of ['api_strip.js', 'facade_strip.d.ts']) {
+			assert.equal(pkg.files.includes(file), has_strip_facade, file);
+		}
+		if (!has_strip_facade) {
+			for (const f of ['index.js', 'browser.js', 'index.d.ts', 'browser.d.ts']) {
+				const text = readFileSync(new URL(`../${pkg_dir}/${f}`, import.meta.url), 'utf8');
+				assert.doesNotMatch(text, /api_strip|facade_strip|strip_typescript/, f);
+			}
+		}
+	});
+
 	// The facade's declarations type the ENTRIES' re-exports, not the `.js` modules they
 	// sit beside, so none may share a basename with one: under a resolver that ignores
 	// `exports` (`node10`), `api.d.ts` beside `api.js` would type a deep import of `api.js`
 	// as the published functions, which it does not export.
 	it('no facade declaration is named for a facade module', () => {
-		for (const file of ['api.d.ts', 'api_parse.d.ts']) {
+		for (const file of ['api.d.ts', 'api_parse.d.ts', 'api_strip.d.ts']) {
 			assert.equal(pkg.files.includes(file), false, file);
 		}
 	});
@@ -536,6 +554,17 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 // the lazy entry runs the same table once initialized (the browser entry's block below).
 register_syntax_error_suite(`index.js: ${pkg_dir}`, node_entry);
 
+// The type strip (`scripts/strip_suite.ts`) is the umbrella's alone: the subset packages
+// build without the `strip` cargo feature, so they neither link the strip nor export it.
+const has_strip = variant === 'all';
+if (has_strip) register_strip_api_suite(`index.js: ${pkg_dir}`, node_entry);
+
+describe(`strip scope: ${pkg_dir}`, () => {
+	it(`strip_typescript is ${has_strip ? 'exported' : 'absent'}`, () => {
+		assert.equal(typeof node_entry.strip_typescript, has_strip ? 'function' : 'undefined');
+	});
+});
+
 // What the facade converts: the raw engine's parse failure carries its point as own,
 // ENUMERABLE integer properties — the shape `api.js` requires of one. Read off the glue
 // module the entry initialized, past the facade.
@@ -845,6 +874,8 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 	// the parse-failure table over the lazy entry, now initialized — the same facade over
 	// the same guarded engine functions, reached through the other entry's wiring
 	register_syntax_error_suite(`browser.js (lazy entry): ${pkg_dir}`, () => browser);
+	if (variant === 'all')
+		register_strip_api_suite(`browser.js (lazy entry): ${pkg_dir}`, () => browser);
 
 	it('format functions work after init', { skip: !has_format }, () => {
 		assert.equal(browser.format_typescript('const   x=1'), 'const x = 1;\n');
@@ -2901,6 +2932,16 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		assert.match(result.stdout, /Usage: tsv format/);
 	});
 });
+
+// `tsv strip` over the shipped cli.js — the `all` variant is the only one shipping it. The
+// native CLI holds the same rows in `tests/cli_tests/strip.rs`, and
+// `scripts/test_napi_npm.ts` holds the two bins to one another.
+if (variant === 'all') {
+	const strip_cli_path = fileURLToPath(new URL(`../${pkg_dir}/cli.js`, import.meta.url));
+	register_strip_cli_suite(`cli.js: ${pkg_dir}`, (args, stdin, cwd) =>
+		spawnSync(process.execPath, [strip_cli_path, ...args], { encoding: 'utf-8', input: stdin, cwd })
+	);
+}
 
 // Discovery parity — the wasm-package consumer of the shared scenario table
 // (see `scripts/discovery_parity_suite.ts`; `scripts/test_napi_npm.ts` runs the

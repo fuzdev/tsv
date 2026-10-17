@@ -52,8 +52,11 @@
  * `scripts/npm_facade.ts`'s, shared with the napi staging. The format-only package loads
  * neither `api_parse.js` nor the helper.
  *
- * The `all` variant additionally ships the CLI: `crates/tsv_wasm/npm/cli.js`
- * is copied into the package root and wired up as the `tsv` bin.
+ * The `all` variant additionally ships the type strip — `strip_typescript`, the raw export
+ * the `strip` cargo feature adds (no subset build enables it), published through the
+ * facade's strip half (`api_strip.js` + `facade_strip.d.ts`) — and the CLI:
+ * `crates/tsv_wasm/npm/cli.js` is copied into the package root and wired up as the `tsv`
+ * bin.
  *
  * Usage:  patch_npm_package.ts <format|parse|all>
  *
@@ -86,6 +89,7 @@ const PKG_NAMES = {
 const pkg_name = PKG_NAMES[variant];
 const has_format_exports = variant !== 'parse';
 const has_parse_exports = variant !== 'format';
+const has_strip_exports = variant === 'all';
 const pkg_root = `crates/tsv_wasm/pkg/${variant}/npm`;
 const main_js = 'tsv_wasm.js';
 const dts_file = 'tsv_wasm.d.ts';
@@ -120,6 +124,9 @@ const api_file = 'api.js';
 const format_dts = 'facade_format.d.ts';
 const api_parse_file = 'api_parse.js';
 const parse_dts = 'facade_parse.d.ts';
+// the strip half, in the `all` variant alone
+const api_strip_file = 'api_strip.js';
+const strip_dts = 'facade_strip.d.ts';
 /** A facade declaration file as an import specifier (`.js`, as `dts_module` explains). */
 const dts_specifier = (file: string): string => file.replace(/\.d\.ts$/, '.js');
 // The pure-JS line/column reconstruction helper (`npm/locations.js` + hand-written
@@ -137,7 +144,7 @@ const locations_reexport = has_parse_exports ? `export * from './locations.js';\
 const generated_js = Deno.readTextFileSync(`${pkg_root}/${main_js}`);
 const fns = [...generated_js.matchAll(/^export function (\w+)/gm)]
 	.map((m) => m[1])
-	.filter((name) => /^(format|parse)_/.test(name) && !name.startsWith('parse_internal_'))
+	.filter((name) => /^(format|parse|strip)_/.test(name) && !name.startsWith('parse_internal_'))
 	.sort();
 
 const expected_formats = ['format_css', 'format_svelte', 'format_typescript'];
@@ -162,6 +169,18 @@ if (has_parse_exports && !has_parse) {
 }
 if (!has_parse_exports && has_parse) {
 	console.error(`FAIL: ${variant} variant contains parse_* exports — stale build dir?`);
+	Deno.exit(1);
+}
+const has_strip = fns.some((name) => name.startsWith('strip_'));
+if (has_strip_exports && !fns.includes('strip_typescript')) {
+	console.error(
+		`FAIL: generated ${main_js} is missing expected export \`strip_typescript\` — was the ` +
+			`default \`strip\` feature dropped?`
+	);
+	Deno.exit(1);
+}
+if (!has_strip_exports && has_strip) {
+	console.error(`FAIL: ${variant} variant contains strip_* exports — stale build dir?`);
 	Deno.exit(1);
 }
 
@@ -460,6 +479,8 @@ for (const language of parse_languages) {
 /** The names the facade publishes per family — the raw names, which it keeps. */
 const format_fns = fns.filter((name) => name.startsWith('format_'));
 const parse_fns = fns.filter((name) => name.startsWith('parse_'));
+const strip_fns = fns.filter((name) => name.startsWith('strip_'));
+const strip_languages = languages_of(/^strip_(\w+)$/);
 
 // The types the variant's facade declares — each family's option bags, and the
 // `TsvSyntaxError` every parse and format export throws — re-exported by NAME, so the
@@ -468,6 +489,7 @@ const parse_fns = fns.filter((name) => name.startsWith('parse_'));
 const api_types = has_format_exports ? facade_type_names(format_dts) : [];
 const error_types = facade_type_names('syntax_error.d.ts');
 const api_parse_types = has_parse_exports ? facade_type_names(parse_dts) : [];
+const api_strip_types = has_strip_exports ? facade_type_names(strip_dts) : [];
 
 // Every function and class the entries' `.d.ts` will re-export must actually be
 // DECLARED where it is re-exported from: the facade's functions in its hand-written
@@ -484,9 +506,11 @@ const api_parse_types = has_parse_exports ? facade_type_names(parse_dts) : [];
 const generated_dts = Deno.readTextFileSync(`${pkg_root}/${dts_file}`);
 const format_dts_source = Deno.readTextFileSync(`${FACADE_SOURCE_DIR}/${format_dts}`);
 const parse_dts_source = Deno.readTextFileSync(`${FACADE_SOURCE_DIR}/${parse_dts}`);
+const strip_dts_source = Deno.readTextFileSync(`${FACADE_SOURCE_DIR}/${strip_dts}`);
 const undeclared = [
 	...format_fns.map((name) => [format_dts, format_dts_source, 'declare function', name] as const),
 	...parse_fns.map((name) => [parse_dts, parse_dts_source, 'declare function', name] as const),
+	...strip_fns.map((name) => [strip_dts, strip_dts_source, 'declare function', name] as const),
 	...classes.map((name) => [dts_file, generated_dts, 'class', name] as const)
 ].filter(([, source, kind, name]) => !new RegExp(`^export ${kind} ${name}\\b`, 'm').test(source));
 if (undeclared.length) {
@@ -494,7 +518,7 @@ if (undeclared.length) {
 		`FAIL: missing declarations — ${undeclared.map(([file, , kind, name]) => `${kind} \`${name}\` in ${file}`).join(', ')}. ` +
 			`index.d.ts re-exports the name${undeclared.length === 1 ? '' : 's'} anyway, which ships ` +
 			`untyped under a consumer's skipLibCheck. Declare facade functions in ` +
-			`${FACADE_SOURCE_DIR}/${format_dts} / ${parse_dts}; a class comes from the generated ${dts_file}.`
+			`${FACADE_SOURCE_DIR}/${format_dts} / ${parse_dts} / ${strip_dts}; a class comes from the generated ${dts_file}.`
 	);
 	Deno.exit(1);
 }
@@ -508,7 +532,8 @@ const engine_table = (languages: Array<string>, raw: (language: string) => strin
 // format functions, though its `api_parse.js` still imports `api.js`'s shared helpers
 const facade_imports =
 	(format_fns.length ? `import { create_format_api } from './${api_file}';\n` : '') +
-	(has_parse_exports ? `import { create_parse_api } from './${api_parse_file}';\n` : '');
+	(has_parse_exports ? `import { create_parse_api } from './${api_parse_file}';\n` : '') +
+	(strip_fns.length ? `import { create_strip_api } from './${api_strip_file}';\n` : '');
 const facade_exports = (wrap: (raw: string) => string): string =>
 	(format_fns.length
 		? `export const { ${format_fns.join(', ')} } = create_format_api({\n` +
@@ -519,6 +544,10 @@ const facade_exports = (wrap: (raw: string) => string): string =>
 		? `export const { ${parse_fns.join(', ')} } = create_parse_api({\n` +
 			`\tparse: ${engine_table(parse_languages, (l) => wrap(`_parse_${l}`))},\n` +
 			`\tparse_json: ${engine_table(parse_languages, (l) => wrap(`_parse_${l}_json`))}\n});\n`
+		: '') +
+	(strip_fns.length
+		? `export const { ${strip_fns.join(', ')} } = create_strip_api(` +
+			`${engine_table(strip_languages, (l) => wrap(`_strip_${l}`))});\n`
 		: '');
 
 // 2. Create index.js — Node.js/Bun entry: auto-init via readFileSync + initSync.
@@ -714,7 +743,7 @@ const named_reexport = (names: Array<string>, from: string, type_only: boolean):
 // under a bundler that is a build error TypeScript said was fine, which is a
 // worse failure than a nullable type. Hence one `.d.ts` per entry, and the
 // per-condition `types` in `exports` that lets each be reached.
-const shared_dts = `${ast_reexport}${locations_reexport}${named_reexport(api_parse_types, dts_specifier(parse_dts), true)}${named_reexport(api_types, dts_specifier(format_dts), true)}${named_reexport(error_types, 'syntax_error.js', true)}${named_reexport(parse_fns, dts_specifier(parse_dts), false)}${named_reexport(format_fns, dts_specifier(format_dts), false)}${
+const shared_dts = `${ast_reexport}${locations_reexport}${named_reexport(api_parse_types, dts_specifier(parse_dts), true)}${named_reexport(api_types, dts_specifier(format_dts), true)}${named_reexport(api_strip_types, dts_specifier(strip_dts), true)}${named_reexport(error_types, 'syntax_error.js', true)}${named_reexport(parse_fns, dts_specifier(parse_dts), false)}${named_reexport(format_fns, dts_specifier(format_dts), false)}${named_reexport(strip_fns, dts_specifier(strip_dts), false)}${
 	classes.length ? `export { ${classes.join(', ')} } from '${dts_module}';\n` : ''
 }${init_doc}
 export declare function init(module_or_path?: {
@@ -772,8 +801,12 @@ console.log(`Copied LICENSE → ${pkg_root}/LICENSE`);
 
 // The facade the entries import — its parse half (with the reconstruction helper
 // index.js/browser.js/index.d.ts re-export, and the AST types) in the parse-capable
-// variants only.
-const families = { format: has_format_exports, parse: has_parse_exports };
+// variants only, and its strip half in the `all` variant alone.
+const families = {
+	format: has_format_exports,
+	parse: has_parse_exports,
+	strip: has_strip_exports
+};
 for (const { published, source } of facade_files(families)) {
 	stage_file(source, `${pkg_root}/${published}`);
 	console.log(`Copied ${source} → ${pkg_root}/${published}`);
@@ -794,7 +827,7 @@ pkg.name = pkg_name;
 pkg.description = {
 	format: 'formatter for Svelte, TypeScript, and CSS',
 	parse: 'parser for Svelte, TypeScript, and CSS',
-	all: 'formatter and parser for Svelte, TypeScript, and CSS'
+	all: 'formatter and parser for Svelte, TypeScript, and CSS, and a TypeScript type stripper'
 }[variant];
 pkg.type = 'module';
 pkg.exports = {
@@ -851,7 +884,7 @@ pkg.keywords = [
 	'css',
 	...(has_format_exports ? ['formatter', 'prettier'] : []),
 	...(has_parse_exports ? ['parser', 'ast', 'acorn'] : []),
-	...(variant === 'all' ? ['cli'] : []),
+	...(variant === 'all' ? ['cli', 'strip'] : []),
 	'wasm',
 	'webassembly'
 ];

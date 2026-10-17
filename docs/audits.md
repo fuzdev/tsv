@@ -30,7 +30,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Raw-find scan](#raw-find-scan-audit-scanaudit) | `scan:audit` | new raw substring scans over source (comment-blind delimiter matching) | `deno task check` |
 | [Self-format](#self-format-audit-formataudit) | `format:audit` | tsv failing to format its OWN TS/JS — a would-change file (non-idempotency) or a parse error (over-rejection) | `deno task check` |
 | [Discovery parity](#corpus-discovery-parity-audit-discoveryaudit) | `discovery:audit` | `tsv format --list` over the `../corpora` snapshot naming a different file set than the snapshot's committed tree holds in tsv's extensions — a discovery prune firing on real code, or an extension drift | `deno task check` (when `../corpora` is present) |
-| [Engine parity](#engine-parity-audit-enginesaudit) | `engines:audit` | the WASM engine and the native engine formatting the same file to DIFFERENT bytes — a wasm32-only divergence every other gate is blind to, since they all grade the native build | CI's `artifacts` job ONLY (needs both packages built; neither `deno task check` nor the publish path compares engines) |
+| [Engine parity](#engine-parity-audit-enginesaudit) | `engines:audit` | the WASM engine and the native engine formatting — or type-stripping — the same file to DIFFERENT bytes — a wasm32-only divergence every other gate is blind to, since they all grade the native build | CI's `artifacts` job ONLY (needs both packages built; neither `deno task check` nor the publish path compares engines) |
 | [Doc link](#doc-link-audit-docsaudit) | `docs:audit` | a doc-comment `[link]` that no longer resolves — a stale doc | `deno task check` |
 | [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts` no longer describing what the wire-JSON writers emit — plus a wire type it never declared at all | `deno task check` |
 | [Package declarations](#package-declaration-check-typecheckpackages) | `typecheck:packages` | a staged package's published `.d.ts` failing a consumer's strict compile — a lib the consumer did not ask for (TS2550), a name star-export ambiguation drops (TS2308), a type a package must not export, a README example that does not compile | `scripts/publish.ts` Step 6 (all four packages); on demand (needs `deno task bench:install`, so NOT in `deno task check`) |
@@ -872,6 +872,16 @@ Two trees rather than one tree twice, deliberately: formatting with native and t
 re-running WASM over the SAME tree would prove only that native's output is a WASM fixed
 point, which two engines with genuinely different outputs can both satisfy.
 
+**The strip leg.** The type strip ([strip.md](./strip.md)) prints rather than writes, so it is
+graded per file: over every input in the strip's extensions under `tests/fixtures_strip` and
+`tests/fixtures`, `tsv strip <file>` runs on both bins (cwd the repo root) and their exit
+code, stdout and stderr must match. The `../corpora` snapshot is too many files to spawn
+twice each, so there one Node child imports the staged native `@fuzdev/tsv` loader and the
+wasm package side by side and requires `strip_typescript` to return the same result for
+every file — the code, or every field of a refusal or a parse error. That half grades the
+engines alone (the drivers' strip contract is `scripts/test_napi_npm.ts`'s parity rows), and
+needs the native loader staged, not just the CLI binary.
+
 The WASM side runs under **node**, the host `cli.js` ships for, not under Deno's compat
 layer — which is not a detail. The audit's first run failed on a `cli.js` bug that exists
 only on that host: spawning the worker pool pipes the workers' stdio through the parent,
@@ -882,8 +892,8 @@ what changed lost.
 **Blind spots.** It compares the two CLI **drivers** as well as the two engines, so a
 driver-only difference reads as a failure here (a real finding, just a differently
 located one — `scripts/test_napi_npm.ts` is where the driver contract is pinned flag by
-flag). It sees only inputs the corpus holds, and only the format path: `parse` wire
-equality is not graded. And a divergence both engines share, from prettier, is the
+flag). It sees only inputs the corpus holds, and only the format and strip paths: `parse`
+wire equality is not graded. And a divergence both engines share, from prettier, is the
 conformance gates' business, not this one.
 
 **Gating.** CI's `artifacts` job, after the N-API steps — the first point at
@@ -893,7 +903,7 @@ which builds no packages — nor on the publish path: `scripts/publish.ts` runs
 `validate:artifacts`, `test:npm`, `test:bun` (the wasm packages under Bun) and
 `typecheck:packages`, which grade each bundle alone, so the one engine-agreement verdict a
 release gets is the CI run on the commit it ships. Locally:
-`deno task build:npm:all && deno task build:napi:packages` first. Both bins are mtime-guarded like every other staged artifact,
+`deno task build:npm:all && deno task build:napi:packages` first. Both bins, the native loader and its addon are mtime-guarded like every other staged artifact,
 so a run against a binary from before a formatter change refuses rather than reporting a stale
 agreement. `../corpora` absent is a warn-skip (CI has no sibling checkouts); every root
 skipping is a failure, since then nothing was compared. ~7 s.

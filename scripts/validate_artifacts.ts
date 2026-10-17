@@ -134,8 +134,9 @@ for (const variant of VARIANTS) {
 }
 await assert_staged_fresh(freshness_checks);
 
-// Center measured 2026-10-04 (deno target; npm == deno, identical `.wasm`):
-// format 2,398,778 B; parse 967,938 B; all 2,661,745 B. Bounds are ±8% of it.
+// Centers (deno target; npm == deno, identical `.wasm`): format 2,398,778 B and parse
+// 967,938 B measured 2026-10-04; all 2,764,517 B measured 2026-10-17, with the type strip
+// (the `strip` feature, which the umbrella alone builds). Bounds are ±8% of each.
 //
 // Recenter (and re-measure the deltas below) whenever a measure has drifted to
 // within a few percent of a band edge through accumulated work — otherwise the
@@ -147,7 +148,7 @@ await assert_staged_fresh(freshness_checks);
 const BOUNDS = {
 	format: { min: 2_206_000, max: 2_591_000 },
 	parse: { min: 890_000, max: 1_046_000 },
-	all: { min: 2_448_000, max: 2_875_000 }
+	all: { min: 2_543_000, max: 2_986_000 }
 };
 
 // all = format + parse. `all − format` is what the parse feature adds (parser
@@ -158,12 +159,13 @@ const BOUNDS = {
 // parse feature alone — the format exports read no options bag — so it counts in
 // `all − format`). A change that lands in code both variants link (a parser cut) moves the
 // bundles and leaves the deltas where they were; a delta that moves with the
-// bundles means a feature boundary shifted, not that code got smaller.
+// bundles means a feature boundary shifted, not that code got smaller. The `strip`
+// feature rides `all` alone, so the type strip counts in both deltas.
 //
-// At the current center: `all − format` 262,967 B; `all − parse` 1,693,807 B.
+// At the current center: `all − format` 300,965 B; `all − parse` 1,745,686 B.
 const DELTAS = {
-	format: { min: 241_000, max: 285_000 }, // all − format
-	parse: { min: 1_558_000, max: 1_830_000 } // all − parse
+	format: { min: 277_000, max: 325_000 }, // all − format
+	parse: { min: 1_606_000, max: 1_885_000 } // all − parse
 };
 
 console.log('=== WASM binary sizes ===');
@@ -232,6 +234,8 @@ interface SmokeTarget {
 	entry: string;
 	has_format: boolean;
 	has_parse: boolean;
+	/** The type strip rides the `all` build alone (the `strip` feature). */
+	has_strip: boolean;
 	/** The published npm package (patched by `patch_npm_package.ts`) vs the raw
 	 * wasm-pack deno bundle. The facade and the pure-JS `locations.js` helper are
 	 * patched into the npm packages only, so they're checked on npm entries alone. */
@@ -245,6 +249,7 @@ const smoke_entries = (variant: WasmVariant): SmokeTarget[] => [
 		entry: `${wasm_bundle_dir(variant, 'npm')}/index.js`,
 		has_format: variant !== 'parse',
 		has_parse: variant !== 'format',
+		has_strip: variant === 'all',
 		is_npm: true
 	},
 	// deno-target bundle (auto-init at import)
@@ -253,6 +258,7 @@ const smoke_entries = (variant: WasmVariant): SmokeTarget[] => [
 		entry: `${wasm_bundle_dir(variant, 'deno')}/tsv_wasm.js`,
 		has_format: variant !== 'parse',
 		has_parse: variant !== 'format',
+		has_strip: variant === 'all',
 		is_npm: false
 	}
 ];
@@ -261,7 +267,7 @@ const smoke_targets: SmokeTarget[] = VARIANTS.flatMap(smoke_entries);
 
 console.log('\n=== Deno runtime smoke ===');
 
-for (const { label, entry, has_format, has_parse, is_npm } of smoke_targets) {
+for (const { label, entry, has_format, has_parse, has_strip, is_npm } of smoke_targets) {
 	const entry_url = pathToFileURL(entry);
 	if (file_size(entry_url) === null) {
 		skip(`${label} — not built`);
@@ -361,6 +367,45 @@ for (const { label, entry, has_format, has_parse, is_npm } of smoke_targets) {
 			'parse_css',
 			() => (mod.parse_css('a { color: red }') as { type: string }).type === 'StyleSheetFile'
 		);
+	}
+	// The type strip, one call per outcome: through the facade's result object on the npm
+	// entry, and as the raw export's string-or-throw on the deno bundle — whose refusal
+	// carries the construct and span as own properties, the facade's contract.
+	if (has_strip && is_npm) {
+		check(label, 'strip_typescript', () => {
+			const strip = mod.strip_typescript as unknown as (source: string) => {
+				ok: boolean;
+				code?: string;
+				error?: { kind: string; construct?: string; start: number; end?: number };
+			};
+			const ok = strip('let x: T = 1;');
+			const parse = strip('let = ;');
+			const refused = strip('x;\nenum E {}');
+			return (
+				ok.ok &&
+				ok.code === 'let x    = 1;' &&
+				!parse.ok &&
+				parse.error?.kind === 'parse' &&
+				!refused.ok &&
+				refused.error?.kind === 'unsupported' &&
+				refused.error.construct === 'enum' &&
+				refused.error.start === 3 &&
+				refused.error.end === 12
+			);
+		});
+	} else if (has_strip) {
+		check(label, 'strip_typescript (raw)', () => {
+			if (mod.strip_typescript('let x: T = 1;') !== 'let x    = 1;') return false;
+			try {
+				mod.strip_typescript('x;\nenum E {}');
+				return false;
+			} catch (error) {
+				const { kind, start, end } = error as Record<string, unknown>;
+				return kind === 'enum' && start === 3 && end === 12;
+			}
+		});
+	} else {
+		check(label, 'strip_* absent (subset build)', () => mod.strip_typescript === undefined);
 	}
 	// The facade and the pure-JS reconstruction helper are patched into the npm
 	// packages only (the raw wasm-pack deno bundle carries neither), so scope this to

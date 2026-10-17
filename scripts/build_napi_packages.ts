@@ -111,7 +111,7 @@ for (const [from, to] of [
 	['crates/tsv_napi/npm/bin.js', 'bin.js'],
 	['crates/tsv_napi/npm/README.md', 'README.md'],
 	// the shared facade every tsv package exports through — one options reader and
-	// one set of error texts with the wasm packages; `index.js` imports both halves
+	// one set of error texts with the wasm packages; `index.js` imports every half
 	...facade_files(ALL_FAMILIES).map(({ source, published }) => [source, published]),
 	// the JS CLI — imports its engine from `./index.js`, so the same source
 	// binds to the native loader here and to the wasm engine in
@@ -125,7 +125,8 @@ for (const [from, to] of [
 write_pkg(loader_dir, {
 	name: '@fuzdev/tsv',
 	version,
-	description: 'native formatter and parser for Svelte, TypeScript, and CSS (N-API)',
+	description:
+		'native formatter and parser for Svelte, TypeScript, and CSS, and a TypeScript type stripper (N-API)',
 	// ESM, matching the wasm packages — one module system across tsv's npm
 	// surface, so shared sources load unchanged in either. The platform `.node`
 	// is still `require`d, via `createRequire` (see npm/index.js).
@@ -161,6 +162,7 @@ write_pkg(loader_dir, {
 		'svelte',
 		'css',
 		'formatter',
+		'strip',
 		'prettier',
 		'parser',
 		'ast',

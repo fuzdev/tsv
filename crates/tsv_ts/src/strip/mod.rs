@@ -134,15 +134,66 @@ pub enum UnsupportedKind {
     AssertionGrouping,
 }
 
+impl UnsupportedKind {
+    /// The construct's wire name — snake_case, the `construct` a JS refusal carries
+    /// (`enum`, `value_namespace`, `parameter_property`, `import_equals`, `export_equals`,
+    /// `type_assertion`, `assertion_grouping`).
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Enum => "enum",
+            Self::ValueNamespace => "value_namespace",
+            Self::ParameterProperty => "parameter_property",
+            Self::ImportEquals => "import_equals",
+            Self::ExportEquals => "export_equals",
+            Self::TypeAssertion => "type_assertion",
+            Self::AssertionGrouping => "assertion_grouping",
+        }
+    }
+
+    /// The construct as a refusal's message names it, after `cannot strip `.
+    #[must_use]
+    pub const fn description(self) -> &'static str {
+        match self {
+            Self::Enum => "an enum",
+            Self::ValueNamespace => "a namespace with a value member",
+            Self::ParameterProperty => "a parameter property",
+            Self::ImportEquals => "an 'import =' declaration",
+            Self::ExportEquals => "an 'export =' assignment",
+            Self::TypeAssertion => "an angle-bracket type assertion",
+            Self::AssertionGrouping => "an assertion whose blanking would regroup its expression",
+        }
+    }
+}
+
+impl StripError {
+    /// The error's message rendered against `source`, the text that was stripped: a parse
+    /// error's own text (what goes wrong, then the `line:column` header, the line and a
+    /// caret), and a refusal as `cannot strip <the construct>` over the same header,
+    /// line and caret at the refused span's start, in [`crate::WIRE_COORDINATES`] — one
+    /// shape for both, so a caller prints either the same way.
+    #[must_use]
+    pub fn message(&self, source: &str) -> String {
+        match self {
+            Self::Parse(error) => error.to_string(),
+            Self::Unsupported { kind, span } => ParseError::refusal(
+                &format!("cannot strip {}", kind.description()),
+                source,
+                span.start as usize,
+                crate::WIRE_COORDINATES,
+            )
+            .to_string(),
+        }
+    }
+}
+
+/// The message without its position (the position is the source's to render:
+/// [`StripError::message`]).
 impl fmt::Display for StripError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Parse(error) => error.fmt(f),
-            Self::Unsupported { kind, span } => write!(
-                f,
-                "TypeScript syntax type blanking cannot erase ({kind:?}) at bytes {}..{}",
-                span.start, span.end
-            ),
+            Self::Unsupported { kind, .. } => write!(f, "cannot strip {}", kind.description()),
         }
     }
 }
@@ -152,6 +203,65 @@ impl std::error::Error for StripError {
         match self {
             Self::Parse(error) => Some(error),
             Self::Unsupported { .. } => None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{StripError, UnsupportedKind, strip};
+
+    fn strip_error(source: &str) -> StripError {
+        let arena = bumpalo::Bump::new();
+        match strip(source, &arena) {
+            Err(error) => error,
+            Ok(stripped) => panic!("expected a strip error, stripped to {:?}", stripped.code),
+        }
+    }
+
+    /// A refusal's message reads like a parse error's: the construct, then the `line:col`
+    /// header of the span's start (1-based column, UTF-16 units), the line, a caret.
+    #[test]
+    fn refusal_message_names_the_construct_at_its_point() {
+        let source = "let \u{1d49c}: T = 1;\nenum E {}\n";
+        let error = strip_error(source);
+        assert!(matches!(
+            error,
+            StripError::Unsupported {
+                kind: UnsupportedKind::Enum,
+                ..
+            }
+        ));
+        assert_eq!(error.to_string(), "cannot strip an enum");
+        assert_eq!(
+            error.message(source),
+            "cannot strip an enum\n2:1 enum E {}\n    ^ here"
+        );
+    }
+
+    #[test]
+    fn parse_error_message_is_the_parse_errors_own() {
+        let source = "let = ;\n";
+        let error = strip_error(source);
+        let StripError::Parse(parse) = &error else {
+            panic!("expected a parse error: {error:?}");
+        };
+        assert_eq!(error.message(source), parse.to_string());
+    }
+
+    #[test]
+    fn every_kind_has_a_snake_case_name() {
+        for (kind, name) in [
+            (UnsupportedKind::Enum, "enum"),
+            (UnsupportedKind::ValueNamespace, "value_namespace"),
+            (UnsupportedKind::ParameterProperty, "parameter_property"),
+            (UnsupportedKind::ImportEquals, "import_equals"),
+            (UnsupportedKind::ExportEquals, "export_equals"),
+            (UnsupportedKind::TypeAssertion, "type_assertion"),
+            (UnsupportedKind::AssertionGrouping, "assertion_grouping"),
+        ] {
+            assert_eq!(kind.name(), name);
+            assert!(!kind.description().is_empty());
         }
     }
 }
