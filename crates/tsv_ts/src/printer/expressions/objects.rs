@@ -1006,8 +1006,10 @@ impl<'a> Printer<'a> {
     ///
     /// Drops quotes from an identifier-valid string-literal key for property
     /// signatures (`'plain': T` → `plain: T`) and method signatures (`'foo'(): void`
-    /// → `foo(): void` — prettier 3.9 unquotes these too). Computed keys are always
-    /// emitted verbatim inside their brackets.
+    /// → `foo(): void`, as prettier does). A method signature keyed by the value `new`
+    /// never reaches here: `Printer::build_method_signature_member_doc` keeps its quotes,
+    /// since a bare `new` there would read as a construct signature. Computed keys are
+    /// always emitted verbatim inside their brackets.
     pub(in crate::printer) fn build_type_member_key_doc(
         &self,
         search_start: u32,

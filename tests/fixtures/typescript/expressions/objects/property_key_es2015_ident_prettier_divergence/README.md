@@ -12,9 +12,12 @@ The bare form (`input`) is dual-stable — both formatters keep it — so the di
 shows only when a quoted source (`prettier_variant_quoted`) is normalized: tsv unquotes
 the key, prettier keeps it quoted (its own fixed point).
 
-The rule is position-scoped and never over-unquotes:
+The rule is position-scoped, and a quote that carries meaning stays:
 
-- Object-literal keys, type-literal members, and interface members unquote.
+- Object-literal keys, type-literal members, and interface members unquote — except a
+  method signature keyed by the value `new` (`'new'(): void`), which keeps its quotes in
+  both formatters, since a bare `new` before `(` or `<` starts a construct signature (see
+  [method_signature_new_key_quoted](../../../types/method_signature_new_key_quoted/)).
 - A class method or `get` / `set` accessor key unquotes the same way (`'𐊧'() {}` →
   `𐊧() {}`). A class **field** key is outside the rule: a quoted field key keeps its quotes
   whatever it spells (see [field_key_quoted](../../../declarations/class/field_key_quoted/)).

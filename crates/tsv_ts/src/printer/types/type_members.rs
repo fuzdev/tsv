@@ -209,8 +209,10 @@ impl<'a> Printer<'a> {
             ),
             _ => {}
         }
-        let (key_doc, key_region_end) =
-            self.build_type_member_key_doc(method.span.start, &method.key, method.computed);
+        let (key_doc, key_region_end) = match method_signature_new_key(method, self.source) {
+            Some(lit) => (self.build_string_literal_doc(lit), lit.span.end),
+            None => self.build_type_member_key_doc(method.span.start, &method.key, method.computed),
+        };
         parts.push(key_doc);
 
         // Find `(` in source (skip comments so a `(` inside one isn't matched).
@@ -700,5 +702,36 @@ impl<'a> Printer<'a> {
         self.split_member_terminator_gap_comments(&mut parts, deferred, gap_start, idx.span.end);
 
         d.concat(&parts)
+    }
+}
+
+/// The string-literal key of a method signature whose value is `new` — a key that keeps its
+/// quotes, since a bare `new` opening a type member before `(` or `<` starts a construct
+/// signature: `'new'(): void` declares a method named `new`, `new(): void` a construct
+/// signature, to tsc and acorn-typescript alike (both decide it at the member's first token).
+///
+/// The rule is stated on the method-signature position whatever the member's `kind` and
+/// `optional` — `'new'?(): void` and `get 'new'(): number` keep their quotes too, though a
+/// bare `new` there is still the same member — because that is prettier's condition (a
+/// `TSMethodSignature` keyed by the value `new` is never unquoted), and one condition matches
+/// its output everywhere. The test is on the decoded value, so every spelling of `new` takes
+/// this path; an escaped one (`'ne\u0077'`) would keep its quotes and escapes either way
+/// (`Printer::string_key_unquotes` refuses it). A property signature, a class or object
+/// method and every other key unquote through `Printer::build_type_member_key_doc` as usual.
+fn method_signature_new_key<'m, 'arena>(
+    method: &'m internal::TSMethodSignature<'arena>,
+    source: &str,
+) -> Option<&'m internal::Literal<'arena>> {
+    if method.computed {
+        return None;
+    }
+    match &method.key.kind {
+        internal::ExpressionKind::Literal(
+            lit @ internal::Literal {
+                value: internal::LiteralValue::String(cooked),
+                ..
+            },
+        ) if cooked.resolve(lit.span, source) == "new" => Some(lit),
+        _ => None,
     }
 }
