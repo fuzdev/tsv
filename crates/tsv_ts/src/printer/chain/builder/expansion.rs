@@ -6,8 +6,9 @@
 // - Complex argument detection
 // - Callback analysis
 
-use crate::ast::internal::{ArrowFunctionBody, ExpressionKind};
+use crate::ast::internal::{ArrowFunctionBody, BlockStatement, ExpressionKind};
 use crate::printer::calls::arg_predicates::is_simple_call_argument;
+use crate::printer::is_effectively_empty_body;
 
 use super::super::printing::{chain_gap_any, node_comment_gap};
 use super::super::types::{ChainGroup, ChainNode};
@@ -230,11 +231,8 @@ pub(super) fn call_callback_status<'a>(
                 has_callback = true;
                 if !will_break {
                     will_break = match &arrow.body {
-                        // Block body breaks if it has statements or contains comments
-                        // (comment-only blocks emit hardlines via comment printing)
                         ArrowFunctionBody::BlockStatement(block) => {
-                            !block.body.is_empty()
-                                || printer.has_newline_between(block.span.start, block.span.end)
+                            block_body_will_break(block, printer)
                         }
                         // Expression body - check if it's multiline
                         ArrowFunctionBody::Expression(expr) => {
@@ -245,11 +243,9 @@ pub(super) fn call_callback_status<'a>(
                 }
             }
             ExpressionKind::FunctionExpression(func) => {
-                // Function expressions break if body has statements or contains comments
                 has_callback = true;
                 if !will_break {
-                    will_break = !func.body.body.is_empty()
-                        || printer.has_newline_between(func.body.span.start, func.body.span.end);
+                    will_break = block_body_will_break(&func.body, printer);
                 }
             }
             _ => {}
@@ -264,6 +260,20 @@ pub(super) fn call_callback_status<'a>(
         has_callback,
         will_break,
     }
+}
+
+/// Whether a callback's block body prints broken: it holds a statement that prints (a
+/// bare `;` prints nothing), or a comment occupies the page inside its braces (a
+/// comment-only block prints on its own lines).
+///
+/// Decides from what prints, never from a source newline or the raw statement list: an
+/// empty body authored `{⏎}` or `{ ; }` prints `{}`, so reading either as broken would
+/// expand the chain on one pass and the reparse of that output would join it on the next.
+/// The comment clause is prettier's `willBreak` over the printed body; the comment's own
+/// hardline would break the chain anyway, but the decision is stated here, not inherited.
+fn block_body_will_break(block: &BlockStatement<'_>, printer: &Printer<'_>) -> bool {
+    !is_effectively_empty_body(block.body)
+        || printer.has_comments_on_page_between(block.span.start, block.span.end)
 }
 
 /// Check if chain ends with member access (not a call)
