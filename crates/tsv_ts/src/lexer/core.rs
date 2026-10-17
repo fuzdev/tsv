@@ -1613,9 +1613,10 @@ impl<'a> Lexer<'a> {
                 self.make_token(TokenKind::At, start)
             }
             b'#' => {
-                // A hashbang at the start of the file: #!/usr/bin/env node
-                // ([`Lexer::hashbang_at`]).
-                if self.hashbang_at(start) && self.byte_ahead(1) == Some(b'!') {
+                // A `#!` may open a hashbang (#!/usr/bin/env node) — decided out of line, in
+                // `next_token_dispatch`: the offset test reads the source's BOM, and asked
+                // here it kept the hot path's callee-saved registers live for every token.
+                if self.byte_ahead(1) == Some(b'!') {
                     return self.next_token_dispatch(bytes, start, b'#', dst);
                 }
                 // # for private identifiers
@@ -1714,10 +1715,17 @@ impl<'a> Lexer<'a> {
             }
             // Template literal starting with backtick
             b'`' => self.read_template_into(start, dst),
-            // Hashbang comment at the start of the file - read until end of line
+            // `#!`: a hashbang comment at the start of the file, read until end of line
+            // ([`Lexer::hashbang_at`]); anywhere else the `#` of a private name.
             b'#' => {
-                debug_assert!(self.hashbang_at(start) && self.byte_ahead(1) == Some(b'!'));
-                self.read_hashbang_into(start, dst)
+                debug_assert!(self.byte_ahead(1) == Some(b'!'));
+                if self.hashbang_at(start) {
+                    self.read_hashbang_into(start, dst)
+                } else {
+                    self.advance_ascii();
+                    *dst = self.make_token(TokenKind::Hash, start);
+                    Ok(())
+                }
             }
             // Non-ASCII lead byte: a Unicode IdentifierStart, otherwise an error.
             // (The front lexes `a-z A-Z _ $`; this decodes the char for the Unicode
