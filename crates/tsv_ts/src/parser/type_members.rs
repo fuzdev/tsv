@@ -98,17 +98,25 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<TSTypeElement<'arena>, ParseError> {
         let start = self.current_pos().0;
 
-        // `readonly` is a modifier only when a property key follows — an identifier,
-        // keyword, string/number literal, or `[` (a computed key or index signature):
-        // the same `LiteralPropertyName`-or-computed test `get`/`set` use
-        // (`peek_is_property_name`), matching tsc's `canFollowModifier`. Otherwise
-        // `readonly` is the member's own name: `readonly: T` / `readonly?: T` (property),
-        // `readonly(): T` / `readonly<T>()` (method) — a following `(`/`<` keeps it a name,
-        // and a following string/number key (`readonly 'a': T`, `readonly 1: T`) is a
-        // modifier, not a parse error.
+        // `readonly` is a modifier only when a property key follows on the same line — an
+        // identifier, keyword, string/number literal, or `[` (a computed key or index
+        // signature): the same `LiteralPropertyName`-or-computed test `get`/`set` use
+        // (`peek_is_property_name`), matching tsc's `nextTokenIsOnSameLineAndCanFollowModifier`.
+        // Otherwise `readonly` is the member's own name: `readonly: T` / `readonly?: T`
+        // (property), `readonly(): T` / `readonly<T>()` (method) — a following `(`/`<` keeps
+        // it a name, and a following string/number key (`readonly 'a': T`, `readonly 1: T`)
+        // is a modifier, not a parse error. Across a line break it is a property of its own
+        // and the next line another member (`readonly⏎x: T` is two members, to tsc and
+        // acorn alike).
+        //
+        // The modifier is carried by whatever member follows: a property or index
+        // signature, and a method signature too, accessors included — tsc's parser takes
+        // `readonly x(): void` and leaves it to the checker (TS1024), so the member keeps
+        // the token rather than losing it.
         let readonly = matches!(self.current_kind(), TokenKind::Identifier)
             && self.current_value() == "readonly"
-            && self.peek_is_property_name();
+            && self.peek_is_property_name()
+            && !self.peek_preceded_by_line_terminator();
         if readonly {
             self.advance().ok(); // consume the `readonly` modifier
         }
@@ -129,8 +137,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         // Check for construct signature: `new (): T` or `new <T>(): T`
-        // But NOT when `new` is used as a property name: `{ new: string }`
-        if self.check(&TokenKind::Keyword(KeywordKind::New)) {
+        // But NOT when `new` is used as a property name: `{ new: string }`, nor behind a
+        // `readonly` modifier — tsc tests for a construct signature at the member's first
+        // token, so `readonly new (): T` is a method named `new`.
+        if !readonly && self.check(&TokenKind::Keyword(KeywordKind::New)) {
             // Peek ahead to distinguish construct signature from property named 'new'
             // Construct signature: new() or new<T>() — skipping comments, so
             // `new /* c */ (): T` stays a construct signature
@@ -269,6 +279,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 key,
                 computed,
                 optional,
+                readonly,
                 kind: accessor_kind.unwrap_or(MethodKind::Method),
                 type_parameters,
                 params,

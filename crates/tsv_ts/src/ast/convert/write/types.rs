@@ -405,13 +405,20 @@ fn write_type_element(w: &mut JsonWriter, elem: &internal::TSTypeElement<'_>, ct
             close_node(w, "TSPropertySignature", p.span, ctx);
         }
         internal::TSTypeElement::MethodSignature(m) => {
-            // Field order: `computed`, `key`, then per kind — a get/set
-            // signature's `kind` is assigned between the two
-            // `parsePropertyName` calls (right after the key); a plain
+            // Field order: `readonly` (only when true), `computed`, `key`, then
+            // per kind — a get/set signature's `kind` is assigned between the
+            // two `parsePropertyName` calls (right after the key); a plain
             // method's `kind` lands on the finished signature (last). Then
             // `optional` (only when true), `typeParameters?`, `parameters`,
             // `typeAnnotation?` (the return type's wire name).
+            //
+            // `readonly` has no acorn counterpart — acorn-typescript rejects the
+            // modifier on a method signature — so it is placed as on
+            // `TSPropertySignature`, and an acorn-valid input's wire never holds it.
             node_header(w, "TSMethodSignature", m.span, ctx);
+            if m.readonly {
+                w.raw(",\"readonly\":true");
+            }
             w.raw(",\"computed\":");
             w.bool(m.computed);
             w.raw(",\"key\":");

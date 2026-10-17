@@ -1571,6 +1571,11 @@ export interface TSMethodSignature {
 	start: number;
 	end: number;
 	loc?: SourceLocation;
+	/**
+	 * A `readonly` modifier, which tsc's parser accepts on a method signature (its checker
+	 * rejects it, TS1024) and acorn-typescript rejects. Omitted from JSON when false.
+	 */
+	readonly?: boolean;
 	computed: boolean;
 	key: Expression;
 	/** Omitted from JSON when false. */

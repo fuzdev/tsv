@@ -1,0 +1,438 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 311,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 310,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 301,
+			"body": [
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 20,
+					"end": 256,
+					"id": {
+						"type": "Identifier",
+						"start": 30,
+						"end": 35,
+						"name": "Store"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 35,
+						"end": 38,
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 36,
+								"end": 37,
+								"name": "T"
+							}
+						]
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 39,
+						"end": 256,
+						"body": [
+							{
+								"type": "TSMethodSignature",
+								"start": 43,
+								"end": 99,
+								"readonly": true,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 52,
+									"end": 61,
+									"name": "subscribe"
+								},
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 62,
+										"end": 85,
+										"name": "run",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 65,
+											"end": 85,
+											"typeAnnotation": {
+												"type": "TSFunctionType",
+												"start": 67,
+												"end": 85,
+												"parameters": [
+													{
+														"type": "Identifier",
+														"start": 68,
+														"end": 76,
+														"name": "value",
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 73,
+															"end": 76,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 75,
+																"end": 76,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 75,
+																	"end": 76,
+																	"name": "T"
+																}
+															}
+														}
+													}
+												],
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 78,
+													"end": 85,
+													"typeAnnotation": {
+														"type": "TSVoidKeyword",
+														"start": 81,
+														"end": 85
+													}
+												}
+											}
+										}
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 86,
+									"end": 98,
+									"typeAnnotation": {
+										"type": "TSFunctionType",
+										"start": 88,
+										"end": 98,
+										"parameters": [],
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 91,
+											"end": 98,
+											"typeAnnotation": {
+												"type": "TSVoidKeyword",
+												"start": 94,
+												"end": 98
+											}
+										}
+									}
+								},
+								"kind": "method"
+							},
+							{
+								"type": "TSMethodSignature",
+								"start": 102,
+								"end": 126,
+								"readonly": true,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 111,
+									"end": 116,
+									"name": "reset"
+								},
+								"optional": true,
+								"parameters": [],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 119,
+									"end": 125,
+									"typeAnnotation": {
+										"type": "TSVoidKeyword",
+										"start": 121,
+										"end": 125
+									}
+								},
+								"kind": "method"
+							},
+							{
+								"type": "TSMethodSignature",
+								"start": 129,
+								"end": 176,
+								"readonly": true,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 138,
+									"end": 141,
+									"name": "map"
+								},
+								"typeParameters": {
+									"type": "TSTypeParameterDeclaration",
+									"start": 141,
+									"end": 144,
+									"params": [
+										{
+											"type": "TSTypeParameter",
+											"start": 142,
+											"end": 143,
+											"name": "U"
+										}
+									]
+								},
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 145,
+										"end": 164,
+										"name": "fn",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 147,
+											"end": 164,
+											"typeAnnotation": {
+												"type": "TSFunctionType",
+												"start": 149,
+												"end": 164,
+												"parameters": [
+													{
+														"type": "Identifier",
+														"start": 150,
+														"end": 158,
+														"name": "value",
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 155,
+															"end": 158,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 157,
+																"end": 158,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 157,
+																	"end": 158,
+																	"name": "T"
+																}
+															}
+														}
+													}
+												],
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 160,
+													"end": 164,
+													"typeAnnotation": {
+														"type": "TSTypeReference",
+														"start": 163,
+														"end": 164,
+														"typeName": {
+															"type": "Identifier",
+															"start": 163,
+															"end": 164,
+															"name": "U"
+														}
+													}
+												}
+											}
+										}
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 165,
+									"end": 175,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 167,
+										"end": 175,
+										"typeName": {
+											"type": "Identifier",
+											"start": 167,
+											"end": 172,
+											"name": "Store"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 172,
+											"end": 175,
+											"params": [
+												{
+													"type": "TSTypeReference",
+													"start": 173,
+													"end": 174,
+													"typeName": {
+														"type": "Identifier",
+														"start": 173,
+														"end": 174,
+														"name": "U"
+													}
+												}
+											]
+										}
+									}
+								},
+								"kind": "method"
+							},
+							{
+								"type": "TSMethodSignature",
+								"start": 179,
+								"end": 221,
+								"readonly": true,
+								"computed": true,
+								"key": {
+									"type": "MemberExpression",
+									"start": 189,
+									"end": 204,
+									"object": {
+										"type": "Identifier",
+										"start": 189,
+										"end": 195,
+										"name": "Symbol"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 196,
+										"end": 204,
+										"name": "iterator"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"parameters": [],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 207,
+									"end": 220,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 209,
+										"end": 220,
+										"typeName": {
+											"type": "Identifier",
+											"start": 209,
+											"end": 217,
+											"name": "Iterator"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 217,
+											"end": 220,
+											"params": [
+												{
+													"type": "TSTypeReference",
+													"start": 218,
+													"end": 219,
+													"typeName": {
+														"type": "Identifier",
+														"start": 218,
+														"end": 219,
+														"name": "T"
+													}
+												}
+											]
+										}
+									}
+								},
+								"kind": "method"
+							},
+							{
+								"type": "TSMethodSignature",
+								"start": 224,
+								"end": 253,
+								"readonly": true,
+								"computed": false,
+								"key": {
+									"type": "Literal",
+									"start": 233,
+									"end": 244,
+									"value": "on-change",
+									"raw": "'on-change'"
+								},
+								"parameters": [],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 246,
+									"end": 252,
+									"typeAnnotation": {
+										"type": "TSVoidKeyword",
+										"start": 248,
+										"end": 252
+									}
+								},
+								"kind": "method"
+							}
+						]
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 259,
+					"end": 300,
+					"id": {
+						"type": "Identifier",
+						"start": 264,
+						"end": 270,
+						"name": "Handle"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 273,
+						"end": 299,
+						"members": [
+							{
+								"type": "TSMethodSignature",
+								"start": 275,
+								"end": 297,
+								"readonly": true,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 284,
+									"end": 289,
+									"name": "close"
+								},
+								"parameters": [],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 291,
+									"end": 297,
+									"typeAnnotation": {
+										"type": "TSVoidKeyword",
+										"start": 293,
+										"end": 297
+									}
+								},
+								"kind": "method"
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

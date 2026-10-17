@@ -171,13 +171,14 @@ impl<'a> Printer<'a> {
         parts.push(type_doc);
     }
 
-    /// Build a `TSMethodSignature` member (`get`/`set`? key `?`? `<T>`?
+    /// Build a `TSMethodSignature` member (`readonly`? `get`/`set`? key `?`? `<T>`?
     /// `(params)` `: Ret`?) **without** the trailing `;` — shared by the
     /// type-literal and interface type-element printers (the interface caller
     /// appends `;`; the type-literal caller leaves the separator to
     /// `build_type_literal_doc`).
     ///
-    /// Comment handling at each gap: accessor keyword→key (`get /* c */ a()`),
+    /// Comment handling at each gap: `readonly`→accessor keyword or key
+    /// (`readonly /* c */ a()`), accessor keyword→key (`get /* c */ a()`),
     /// key→`?` (`a /* c */?`), `?`/key→`<`/`(` (preserved after `?`; prettier
     /// moves it before `?`, or into the parens for a body-less signature — a
     /// line comment forces a hardline). A comment *inside* `<>` is left to the
@@ -190,21 +191,31 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let mut parts = smallvec![];
-        // Print accessor keyword for get/set signatures, preserving comments
-        // between keyword and name.
+        let key_start = method.key.span().start;
+        // The `readonly` modifier, then the accessor keyword for get/set signatures, each
+        // preserving the comments between it and what follows (`readonly /* c */ x()`,
+        // `readonly /* c */ get /* d */ x()`).
+        let mut cursor = method.span.start;
+        if method.readonly {
+            self.push_member_keyword_doc(&mut parts, "readonly ", &mut cursor, key_start);
+            if matches!(method.kind, internal::MethodKind::Method) {
+                let name_bound = self.computed_key_name_bound(cursor, key_start, method.computed);
+                self.push_pre_name_comments_doc(&mut parts, cursor, name_bound);
+            }
+        }
         match method.kind {
             internal::MethodKind::Get => self.push_accessor_keyword_doc(
                 &mut parts,
                 "get ",
-                method.span.start,
-                method.key.span().start,
+                cursor,
+                key_start,
                 method.computed,
             ),
             internal::MethodKind::Set => self.push_accessor_keyword_doc(
                 &mut parts,
                 "set ",
-                method.span.start,
-                method.key.span().start,
+                cursor,
+                key_start,
                 method.computed,
             ),
             _ => {}

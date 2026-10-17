@@ -1,0 +1,265 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 252,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 251,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 242,
+			"body": [
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 20,
+					"end": 72,
+					"id": {
+						"type": "Identifier",
+						"start": 30,
+						"end": 35,
+						"name": "Flags"
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 36,
+						"end": 72,
+						"body": [
+							{
+								"type": "TSPropertySignature",
+								"start": 40,
+								"end": 49,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 40,
+									"end": 48,
+									"name": "readonly"
+								}
+							},
+							{
+								"type": "TSPropertySignature",
+								"start": 52,
+								"end": 69,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 52,
+									"end": 59,
+									"name": "enabled"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 59,
+									"end": 68,
+									"typeAnnotation": {
+										"type": "TSBooleanKeyword",
+										"start": 61,
+										"end": 68
+									}
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 75,
+					"end": 134,
+					"id": {
+						"type": "Identifier",
+						"start": 85,
+						"end": 91,
+						"name": "Lookup"
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 92,
+						"end": 134,
+						"body": [
+							{
+								"type": "TSPropertySignature",
+								"start": 96,
+								"end": 105,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 96,
+									"end": 104,
+									"name": "readonly"
+								}
+							},
+							{
+								"type": "TSIndexSignature",
+								"start": 108,
+								"end": 131,
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 109,
+										"end": 120,
+										"name": "key",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 112,
+											"end": 120,
+											"typeAnnotation": {
+												"type": "TSStringKeyword",
+												"start": 114,
+												"end": 120
+											}
+										}
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 121,
+									"end": 130,
+									"typeAnnotation": {
+										"type": "TSUnknownKeyword",
+										"start": 123,
+										"end": 130
+									}
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 137,
+					"end": 190,
+					"id": {
+						"type": "Identifier",
+						"start": 147,
+						"end": 154,
+						"name": "Factory"
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 155,
+						"end": 190,
+						"body": [
+							{
+								"type": "TSPropertySignature",
+								"start": 159,
+								"end": 168,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 159,
+									"end": 167,
+									"name": "readonly"
+								}
+							},
+							{
+								"type": "TSConstructSignatureDeclaration",
+								"start": 171,
+								"end": 187,
+								"parameters": [],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 177,
+									"end": 186,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 179,
+										"end": 186,
+										"typeName": {
+											"type": "Identifier",
+											"start": 179,
+											"end": 186,
+											"name": "Factory"
+										}
+									}
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 193,
+					"end": 241,
+					"id": {
+						"type": "Identifier",
+						"start": 198,
+						"end": 204,
+						"name": "Handle"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 207,
+						"end": 240,
+						"members": [
+							{
+								"type": "TSPropertySignature",
+								"start": 211,
+								"end": 220,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 211,
+									"end": 219,
+									"name": "readonly"
+								}
+							},
+							{
+								"type": "TSMethodSignature",
+								"start": 223,
+								"end": 237,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 223,
+									"end": 228,
+									"name": "close"
+								},
+								"parameters": [],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 230,
+									"end": 236,
+									"typeAnnotation": {
+										"type": "TSVoidKeyword",
+										"start": 232,
+										"end": 236
+									}
+								},
+								"kind": "method"
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

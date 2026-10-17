@@ -559,6 +559,9 @@ pub struct TSMethodSignature<'arena> {
     pub key: Expression<'arena>,
     pub computed: bool,
     pub optional: bool,
+    /// A `readonly` modifier (`readonly x(): void`): tsc's parser accepts it on a method
+    /// signature and its checker rejects it (TS1024), so it is kept rather than dropped.
+    pub readonly: bool,
     /// Method kind: method, get, or set (for accessor signatures in type literals)
     pub kind: MethodKind,
     pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
