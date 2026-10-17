@@ -7,17 +7,22 @@
  */
 
 /**
- * Options accepted by `strip_typescript`. The strip reads a module — the one goal it takes —
- * so `sourceType` is settable only to `'module'`, and declared so a forwarded
- * `{sourceType: 'module' | undefined}` bag type-checks.
+ * Options accepted by `strip_typescript`: the parse goal, read as `format_typescript` reads it.
  */
 export interface StripOptions {
 	/**
-	 * The parse goal: `'module'`, the only one the strip takes; `'script'` throws a
-	 * `TypeError`. Omitted, the source is read as a module too.
-	 * @default 'module'
+	 * Parse goal: at `'script'`, `await` is an ordinary identifier, and
+	 * `import`/`export`/`import.meta` and a top-level `for await` are syntax errors. A
+	 * script is also **sloppy** unless its own `"use strict"` directive prologue makes it
+	 * strict, so `with` and the legacy octal literals/escapes parse there; a module is
+	 * always strict. The output is JS at the goal it was read at.
+	 *
+	 * Omitted, the source is read as a **module, retried as a script** if that parse
+	 * fails — so a legacy sloppy script strips without naming a grammar, while anything
+	 * the module grammar accepts is never reinterpreted. A set value is exact: `'module'`
+	 * refuses a script-only source rather than retrying.
 	 */
-	sourceType?: 'module' | undefined;
+	sourceType?: 'script' | 'module' | undefined;
 }
 
 /** A source that stripped: the JS. */
@@ -46,8 +51,11 @@ export type StripResult = StripSuccess | StripFailure;
 export type StripError = StripParseError | StripUnsupportedError;
 
 /**
- * The source does not parse as a TypeScript module: exactly the `message`, `start` and `loc`
- * the `TsvSyntaxError` from `parse_typescript(source)` carries.
+ * The source does not parse: exactly the `message`, `start` and `loc` the `TsvSyntaxError`
+ * from `parse_typescript(source, {sourceType})` carries for the goal the error belongs to —
+ * the named `sourceType`, or with none named the module's, unless the script retry reached
+ * further into the source without stopping at a construct only a module holds (a top-level
+ * `import` / `export`, `import.meta`, a top-level `await`), which makes it the script's.
  */
 export interface StripParseError {
 	kind: 'parse';
@@ -96,7 +104,8 @@ export interface StripUnsupportedError {
  * Strip the types from TypeScript, keeping every surviving character at its line and
  * UTF-16 column.
  * @throws TypeError when `source` is not a well-formed UTF-16 string, `options` is not an
- *   object, or `options` carries an unknown key or a `sourceType` other than `'module'`
+ *   object, or `options` carries an unknown key or a `sourceType` other than `'script'` or
+ *   `'module'`
  * @throws Error when the source exceeds the 4 GiB size cap
  */
 export declare function strip_typescript(source: string, options?: StripOptions): StripResult;

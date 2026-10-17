@@ -130,7 +130,7 @@ takes them without `--parser` — [§Stripping types](#stripping-types-tsv-strip
 - **Content**: `command --content <string> --parser <type>` - Requires explicit `--parser svelte|typescript|css`
 - **Stdin**: `command --stdin --parser <type>` - Requires explicit `--parser svelte|typescript|css`
 
-`parse` and `format` also take `--source-type script|module` — ESTree's own spelling, and
+`parse`, `format` and `strip` also take `--source-type script|module` — ESTree's own spelling, and
 the value the wire's `Program.sourceType` carries — for TypeScript only: naming one for a
 Svelte or CSS input is an error, as on every JS binding, never a silent drop (the C FFI
 alone accepts its module code `0` on every language, the neutral value of a required
@@ -138,11 +138,11 @@ alone accepts its module code `0` on every language, the neutral value of a requ
 carve-out). It selects the parse goal: at `script`, `await` is an ordinary identifier
 and top-level `import`/`export`, `for await` and `import.meta` are errors (a TypeScript
 namespace body keeps its `import`/`export`). Unset, `parse` uses `module`, while
-`format` uses `module` **retried as `script`** if that parse fails (see
-[§Multi-File Formatting](#multi-file-formatting)). For `format` the flag applies to
+`format` and `strip` use `module` **retried as `script`** if that parse fails (see
+[§Multi-File Formatting](#multi-file-formatting)). For `format` and `strip` the flag applies to
 `--content`/`--stdin` only — a path argument with `--source-type` is a usage error
-(exit 2), since path mode resolves the source type per file and Svelte and CSS have
-no goal at all; `parse` honors `--source-type` on file paths too. The goal does not decide strictness:
+(exit 2), since a path's goal is its extension's (and in `format`'s path mode Svelte and
+CSS have no goal at all); `parse` honors `--source-type` on file paths too. The goal does not decide strictness:
 Module code is strict, Script code is strict only once a `"use strict"` directive
 prologue says so (see
 [CLAUDE.md §Strictness](../CLAUDE.md#strictness-module-strict-script-by-directive); the
@@ -234,10 +234,14 @@ that parse error first, exactly as `parse` does.
 `tsv strip` runs the type strip ([strip.md](./strip.md)) on **one** input — a file path,
 `--content`, or `--stdin` — and prints the JS to stdout byte for byte: no newline appended,
 every line terminator, a leading BOM and a hashbang kept. The file is never written. It
-takes no `--parser` (the strip is TypeScript's) and no `--source-type` (it reads a module,
-with no script retry), and a file path's extension must be one of `.ts` `.mts` `.cts` `.js`
-`.mjs` `.cjs` (a `.svelte.ts` rune module is `.ts`) — anything else is an argument error
-naming that list (`tsv_discover::strip_unsupported_extension_error`), as is a directory.
+takes no `--parser` (the strip is TypeScript's), and a file path's extension must be one of
+`.ts` `.mts` `.cts` `.js` `.mjs` `.cjs` (a `.svelte.ts` rune module is `.ts`) — anything else
+is an argument error naming that list (`tsv_discover::strip_unsupported_extension_error`), as
+is a directory. The goal is `format`'s ([strip.md §The parse goal](./strip.md#the-parse-goal)):
+unset, a module retried as a script; `--source-type script|module` names it exactly for
+`--content` / `--stdin` (a value naming neither is a usage error), and beside a path it is
+refused in `format`'s words, since a path's goal is its extension's — `.mjs` / `.mts`
+modules with no retry, every other extension the fallback.
 `--content` and `--stdin` follow `parse`'s precedence between themselves, but either beside
 a path is refused (`--content/--stdin cannot be combined with a file path`), as `format`
 refuses it. Every argument is graded before anything is read, so a refused `--stdin` never
@@ -611,7 +615,7 @@ output and nothing written; on the WASM engine the same input is reported as the
 
   When **both** grammars reject the file, the reported error is the attempt's whose grammar the file was written against, decided in two steps. A script retry that died on a **goal gate** — a top-level `import`/`export`, an `import.meta`, a top-level `for await`, or the operand a module reads after a top-level `await`, the constructs only a module holds — has proved the file a module wherever that construct sits, so the module error is reported: a broken module's script attempt dies there even when its real error comes first (definitions first, `export` at the bottom — position alone would blame the valid `export` line). Otherwise the error that reached **further into the source** is reported, the module's on a tie: a broken *sloppy script*'s module attempt dies early at its first `with`/legacy literal/`await` name — the construct the retry exists to admit — so the script error (the typo) is reported rather than a pointer at a line tsv accepts. prettier's babel parser reaches the same answer by tolerating those strict-mode productions at the module goal (`allowedReasonCodes`). Pinned by `tests/format_fallback_error_attribution.rs`.
 
-  An explicit `--source-type` is **exact** — `--source-type module` refuses a script-only source rather than retrying — which is why it is a usage error in path mode rather than a per-run override. `parse` has no fallback at either surface: its wire's `Program.sourceType` is a claim about which grammar produced the AST, and one settled goal has to produce it. The same rule reaches every format surface that takes no source type from its caller: the JS CLI's path mode, an editor's `format_typescript(source)`, and the `format_*` exports of all three bindings called with no `sourceType`.
+  An explicit `--source-type` is **exact** — `--source-type module` refuses a script-only source rather than retrying — which is why it is a usage error in path mode rather than a per-run override. `parse` has no fallback at either surface: its wire's `Program.sourceType` is a claim about which grammar produced the AST, and one settled goal has to produce it. The same rule reaches every format surface that takes no source type from its caller: the JS CLI's path mode, an editor's `format_typescript(source)`, and the `format_*` exports of all three bindings called with no `sourceType`, and the type strip — `tsv strip` and `strip_typescript` read an unset goal the same way ([strip.md §The parse goal](./strip.md#the-parse-goal)).
 
 - **Two extensions settle the goal themselves, and skip the retry.** `.mjs` and `.mts` are ES modules whatever any config says — Node loads a `.mjs` as ESM unconditionally, and TypeScript maps both to `ModuleKind.ESNext` with the extension overriding `module` — so a path with one of those names is parsed as a **module with no script retry** (`tsv_ts::Goal::from_extension`). The fallback above exists to reach a *legacy sloppy script*, and a file that is a module by its own name cannot be one; without the narrowing, `tsv format a.mjs` would format a `with` statement that no runtime would load. Nothing else settles a goal: `.js`/`.ts` are ambiguous by design, and `.cjs`/`.cts` are the CommonJS half of that same switch — script *code*, but nothing in tsv's output turns on it, so they keep the fallback with the rest. The narrowing can only ever *reject* a file the fallback would have formatted: the retry runs on a module-parse failure alone, so no module-valid source formats differently. Both `tsv` bins apply it — the native CLI per file in `format_file`, and `crates/tsv_wasm/npm/cli.js` from a hand-restated copy (as with `clamp_worker_count`), pinned on both sides. `parse <file>` reads no extension rule: with no flag every file parses as a module already, and an explicit `--source-type script` on a `.mts` is honored as the caller's exact claim rather than refused — the precedence prettier draws too (its `__babelSourceType` option beats `getSourceType(filepath)`), and the one parse takes on every surface, since the wire's `sourceType` is what was asked for.
 

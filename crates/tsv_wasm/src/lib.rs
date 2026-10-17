@@ -16,8 +16,7 @@
 //! Building the JS object graph node-by-node with `serde_wasm_bindgen` is
 //! measurably slower.
 //!
-//! Every export is flat, `(source, source_type?)` — `strip_typescript(source)` alone takes
-//! no source type, since the strip reads a module. The published packages wrap them
+//! Every export is flat, `(source, source_type?)`. The published packages wrap them
 //! in a hand-written JS facade (`npm/api.js`, shared with the native `@fuzdev/tsv`)
 //! that owns the options bag, its errors, and the `{locations: true}` sugar.
 
@@ -36,10 +35,12 @@ use wasm_bindgen::prelude::*;
 // `parse_format!`) come from the same crate, so the three bindings share ONE definition
 // of which languages have a goal and of what each export does, rather than three
 // hand-synced copies.
+#[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
+use tsv_arena::Family;
+#[cfg(any(feature = "parse", feature = "format"))]
+use tsv_arena::goal_allowed;
 #[cfg(feature = "format")]
 use tsv_arena::parse_format;
-#[cfg(any(feature = "parse", feature = "format"))]
-use tsv_arena::{Family, goal_allowed};
 #[cfg(feature = "parse")]
 use tsv_arena::{parse_convert, parse_internal};
 
@@ -171,9 +172,10 @@ fn parse_err(e: &ParseError) -> JsValue {
     error.into()
 }
 
-/// Strip the types from TypeScript `source` (`tsv_ts::strip`, module goal): the JS, every
+/// Strip the types from TypeScript `source` (`tsv_ts::strip_with_goal`): the JS, every
 /// type-only range blanked to whitespace so every surviving character keeps its line and
-/// UTF-16 column.
+/// UTF-16 column. The source type is read as `format_typescript` reads it: omitted, the
+/// module grammar retried as a script; set, exact.
 ///
 /// A source that does not parse throws as every parse export does ([`parse_err`]); a
 /// source holding TypeScript the strip refuses throws an `Error` carrying the refusal's
@@ -185,8 +187,10 @@ fn parse_err(e: &ParseError) -> JsValue {
 /// deleted before it is set, for the reason [`parse_err`] gives.
 #[cfg(feature = "strip")]
 #[wasm_bindgen]
-pub fn strip_typescript(source: &str) -> Result<String, JsValue> {
-    tsv_arena::with_ast_arena(|arena| match tsv_ts::strip(source, arena) {
+pub fn strip_typescript(source: &str, source_type: JsValue) -> Result<String, JsValue> {
+    let goal =
+        wasm_source_type(SourceTypeArg::read(&source_type), true, Family::Strip).map_err(err)?;
+    tsv_arena::with_ast_arena(|arena| match tsv_ts::strip_with_goal(source, goal, arena) {
         Ok(stripped) => Ok(stripped.code.into_owned()),
         Err(tsv_ts::StripError::Parse(e)) => Err(parse_err(&e)),
         Err(error @ tsv_ts::StripError::Unsupported { kind, span }) => {
@@ -457,7 +461,7 @@ impl IgnoreStack {
 /// release glue does not refuse a wrong-typed one: it coerces a number, a boolean or an
 /// object to `""`, which then reads as `invalid sourceType ''` (and an array throws from
 /// inside the glue, `arg.charCodeAt is not a function`). Read here, the type is named.
-#[cfg(any(feature = "parse", feature = "format"))]
+#[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
 #[derive(Debug, PartialEq, Eq)]
 enum SourceTypeArg {
     /// Omitted, `undefined` or `null`.
@@ -468,7 +472,7 @@ enum SourceTypeArg {
     Other(String),
 }
 
-#[cfg(any(feature = "parse", feature = "format"))]
+#[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
 impl SourceTypeArg {
     fn read(value: &JsValue) -> Self {
         if value.is_null_or_undefined() {
@@ -498,10 +502,10 @@ impl SourceTypeArg {
 /// CSS has none), and a value naming neither goal.
 ///
 /// What an unset one means is the caller's: a parse reads it as `Module` (its wire's
-/// `Program.sourceType` is a claim one settled grammar has to produce), a format as
-/// "none named" — the module grammar retried as a script
+/// `Program.sourceType` is a claim one settled grammar has to produce), a format or the
+/// strip as "none named" — the module grammar retried as a script
 /// (`tsv_ts::parse_with_goal_or_fallback`).
-#[cfg(any(feature = "parse", feature = "format"))]
+#[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
 fn wasm_source_type(
     source_type: SourceTypeArg,
     allowed: bool,
@@ -641,7 +645,7 @@ lang_bindings!(
     tsv_css,
 );
 
-#[cfg(all(test, any(feature = "parse", feature = "format")))]
+#[cfg(all(test, any(feature = "parse", feature = "format", feature = "strip")))]
 mod tests {
     use super::{Family, SourceTypeArg, wasm_source_type};
 
@@ -669,6 +673,14 @@ mod tests {
         assert_eq!(
             wasm_source_type(text("module"), true, Family::Format),
             Ok(Some(tsv_ts::Goal::Module))
+        );
+        assert_eq!(
+            wasm_source_type(SourceTypeArg::Unset, true, Family::Strip),
+            Ok(None)
+        );
+        assert_eq!(
+            wasm_source_type(text("script"), true, Family::Strip),
+            Ok(Some(tsv_ts::Goal::Script))
         );
         // a goalless language refuses the axis, `"module"` included
         for (family, noun) in [(Family::Parse, "parse"), (Family::Format, "format")] {

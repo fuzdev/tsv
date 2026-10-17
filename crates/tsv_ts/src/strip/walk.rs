@@ -33,8 +33,8 @@ use super::scan::{Continuation, EXPONENT_PRECEDENCE, Source};
 use super::{StripError, UnsupportedKind};
 
 /// Where a statement stands: an element of a statement list, or the lone body of an `if` /
-/// loop / label, where a statement blanked whole always becomes an empty statement (`;`) so
-/// the statement after it cannot become the body.
+/// loop / label / `with`, where a statement blanked whole always becomes an empty statement
+/// (`;`) so the statement after it cannot become the body.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Position {
     List,

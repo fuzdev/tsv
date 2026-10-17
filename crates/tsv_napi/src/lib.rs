@@ -40,12 +40,14 @@ use napi::bindgen_prelude::{Either, Undefined};
 // `parse_format!`) come from the same crate, so the three bindings share ONE definition
 // of which languages have a goal and of what each export does, rather than three
 // hand-synced copies.
+#[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
+use tsv_arena::Family;
+#[cfg(any(feature = "parse", feature = "format"))]
+use tsv_arena::goal_allowed;
 #[cfg(feature = "format")]
 use tsv_arena::parse_format;
 #[cfg(any(feature = "panic_probe", feature = "strip"))]
 use tsv_arena::with_ast_arena;
-#[cfg(any(feature = "parse", feature = "format"))]
-use tsv_arena::{Family, goal_allowed};
 #[cfg(feature = "parse")]
 use tsv_arena::{parse_convert, parse_internal};
 
@@ -68,10 +70,10 @@ use tsv_ts::WirePoint;
 ///
 /// What an unset one means is the caller's: the parse exports read it as `Module`
 /// (their wire's `Program.sourceType` is a claim one settled grammar has to
-/// produce), the format exports as "none named", which
+/// produce), the format exports and the strip as "none named", which
 /// `tsv_ts::parse_with_goal_or_fallback` answers with the module grammar retried as
 /// a script.
-#[cfg(any(feature = "parse", feature = "format"))]
+#[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
 fn napi_source_type(
     source_type: Option<String>,
     allowed: bool,
@@ -375,8 +377,9 @@ lang_bindings!(
 /// a parse failure as every parse export reports one, or a refusal with its construct
 /// and span in the wire's coordinates.
 #[cfg(feature = "strip")]
-fn strip_typescript_engine(source: &str) -> Result<String, Failure> {
-    with_ast_arena(|arena| match tsv_ts::strip(source, arena) {
+fn strip_typescript_engine(source: &str, source_type: Option<String>) -> Result<String, Failure> {
+    let goal = napi_source_type(source_type, true, Family::Strip)?;
+    with_ast_arena(|arena| match tsv_ts::strip_with_goal(source, goal, arena) {
         Ok(stripped) => Ok(stripped.code.into_owned()),
         Err(tsv_ts::StripError::Parse(e)) => Err(Failure::parse(&e)),
         Err(error @ tsv_ts::StripError::Unsupported { kind, span }) => Err(Failure::Refusal {
@@ -388,15 +391,20 @@ fn strip_typescript_engine(source: &str) -> Result<String, Failure> {
     })
 }
 
-/// Strip the types from TypeScript `source` (`tsv_ts::strip`, module goal): the JS, every
-/// type-only range blanked to whitespace so every surviving character keeps its line and
-/// UTF-16 column. A parse failure throws as the parse exports' does; a refusal throws an
+/// Strip the types from TypeScript `source` (`tsv_ts::strip_with_goal`): the JS, every type-only
+/// range blanked to whitespace so every surviving character keeps its line and UTF-16 column. The
+/// source type is read as `format_typescript` reads it: omitted, the module grammar retried as a
+/// script; set, exact. A parse failure throws as the parse exports' does; a refusal throws an
 /// `Error` carrying its construct and span (`Failure::into_napi`), which the npm facade
 /// (`npm/api_strip.js`) reads into its result object.
 #[cfg(feature = "strip")]
 #[napi(js_name = "strip_typescript", catch_unwind)]
-pub fn strip_typescript(env: Env, source: String) -> napi::Result<String> {
-    strip_typescript_engine(&source).map_err(|f| f.into_napi(env))
+pub fn strip_typescript(
+    env: Env,
+    source: String,
+    source_type: Option<String>,
+) -> napi::Result<String> {
+    strip_typescript_engine(&source, source_type).map_err(|f| f.into_napi(env))
 }
 
 //
@@ -988,13 +996,13 @@ mod tests {
     #[test]
     fn strip_typescript_engine_outcomes() {
         assert_eq!(
-            strip_typescript_engine("let x: T = 1;\n"),
+            strip_typescript_engine("let x: T = 1;\n", None),
             Ok("let x    = 1;\n".to_string())
         );
         // a parse failure is the one the parse export reports for the same source
         let src = "let = ;\n";
         assert_eq!(
-            strip_typescript_engine(src).unwrap_err(),
+            strip_typescript_engine(src, None).unwrap_err(),
             at_default(typescript_engine::parse_json, src).unwrap_err()
         );
         // a refusal carries the construct and both points, in UTF-16 units (the astral
@@ -1005,7 +1013,7 @@ mod tests {
             kind,
             start,
             end,
-        } = strip_typescript_engine(src).unwrap_err()
+        } = strip_typescript_engine(src, None).unwrap_err()
         else {
             panic!("expected a refusal");
         };
@@ -1026,6 +1034,31 @@ mod tests {
             )
         );
         assert_eq!(message, "cannot strip an enum\n2:1 enum E {}\n    ^ here");
+    }
+
+    #[test]
+    fn strip_typescript_engine_reads_the_source_type_as_format_does() {
+        let sloppy = "with (o as any) {}\n";
+        // unset: the module grammar, retried as a script
+        assert_eq!(
+            strip_typescript_engine(sloppy, None),
+            Ok("with (o       ) {}\n".to_string())
+        );
+        assert_eq!(
+            strip_typescript_engine(sloppy, Some("script".into())),
+            Ok("with (o       ) {}\n".to_string())
+        );
+        // a named goal is exact: no retry
+        assert_eq!(
+            strip_typescript_engine(sloppy, Some("module".into())).unwrap_err(),
+            typescript_engine::parse_json(sloppy, Some("module".into())).unwrap_err()
+        );
+        assert_eq!(
+            strip_typescript_engine(sloppy, Some("sloppy".into())),
+            Err(Failure::Plain(
+                "invalid sourceType 'sloppy' (expected 'script' or 'module')".to_string()
+            ))
+        );
     }
 
     // --- the per-thread arenas are reset+reused across calls (warm-path soundness) ---

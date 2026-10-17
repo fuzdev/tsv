@@ -296,7 +296,7 @@ void [returns, root, wire, css_wire, svelte_wire, position, location, loc_of_ret
 `;
 
 /** The type strip, over the package root: the result narrows on `ok`, the error on
- * `kind`, and the bag takes the module goal alone. */
+ * `kind`, and the bag names either goal. */
 const strip_module = (pkg: PackageSpec): string => `
 import {strip_typescript} from '${pkg.name}';
 import type {
@@ -314,8 +314,10 @@ const options: StripOptions = {sourceType: 'module'};
 const result = strip_typescript('let x: T = 1;', options);
 // one bag forwarded from a caller holding no source type
 strip_typescript('let x: T = 1;', {sourceType: undefined});
-// @ts-expect-error the strip reads a module, the one goal it takes
-strip_typescript('let x', {sourceType: 'script'});
+// a named goal is exact; 'script' reads a sloppy script with no module attempt first
+strip_typescript('var await = 1', {sourceType: 'script'});
+// @ts-expect-error a goal is 'script' or 'module'
+strip_typescript('let x', {sourceType: 'sloppy'});
 // @ts-expect-error an unknown option key
 strip_typescript('let x', {locations: true});
 // @ts-expect-error the code is there only once \`ok\` says so

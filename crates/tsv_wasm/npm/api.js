@@ -16,7 +16,7 @@
  *
  * The bag: `parse_<lang>(source, {locations?, sourceType?})`,
  * `parse_<lang>_json(source, {sourceType?})`, `format_<lang>(source, {sourceType?})`, and
- * `strip_<lang>(source, {sourceType?})` with `'module'` its one settable value.
+ * `strip_<lang>(source, {sourceType?})`.
  * `sourceType` (`'script'` / `'module'`) is TypeScript's alone — Svelte hard-wires
  * `module` and CSS has no goal — so the other languages refuse a set one. Unknown keys
  * error whatever their value (a typo like `{locatons: true}` must not silently hand back
@@ -47,9 +47,10 @@
  *
  * An unset source type stays unset all the way to the engine, which answers it per
  * family: a parse reads it as `module` (its wire's `Program.sourceType` is a claim one
- * settled grammar has to produce), a format as none named — the module grammar, retried
- * as a script — so a legacy sloppy script formats through `format_typescript(source)`
- * with no bag at all.
+ * settled grammar has to produce), a format or a strip as none named — the module grammar,
+ * retried as a script — so a legacy sloppy script formats through
+ * `format_typescript(source)`, and strips through `strip_typescript(source)`, with no bag at
+ * all.
  *
  * Why two files: the parse half reconstructs `loc` with `locations.js`, and the
  * format-only package (`@fuzdev/tsv-format-wasm`) ships neither — so this file imports
@@ -62,8 +63,7 @@
 /**
  * The export kinds a bag is read for: `parse` (`parse_<lang>`, which takes
  * `locations`), `parse_json` (`parse_<lang>_json`, which refuses it), `format`, and
- * `strip` (`strip_<lang>`, whose one goal is the module, so its `sourceType` is
- * settable to `'module'` alone).
+ * `strip` (`strip_<lang>`).
  *
  * @typedef {'parse' | 'parse_json' | 'format' | 'strip'} ExportKind
  */
@@ -76,9 +76,8 @@
  * The key set follows from the export: `locations` is a key of a `parse` export alone (a
  * `parse_json` export refuses it with its own explanation — the export returns the wire,
  * which `loc` is not part of — and a `format` export as an unknown key), and `sourceType`
- * is settable for TypeScript alone, the one language with a parse goal — and on a `strip`
- * export to `'module'` alone, the one goal the strip reads. Every error names the export
- * family, `parse`, `format` or `strip`.
+ * is settable for TypeScript alone, the one language with a parse goal. Every error names
+ * the export family, `parse`, `format` or `strip`.
  *
  * `undefined` / `null` mean all defaults; a string, a number or an array (which is
  * `typeof 'object'` and has no keys, so it would otherwise read as all defaults) is
@@ -125,11 +124,6 @@ export function read_options(options, kind, language) {
 			if (value === undefined) continue;
 			if (!takes_source_type) {
 				throw new TypeError(`${noun} option 'sourceType' is only supported for TypeScript`);
-			}
-			if (kind === 'strip' && value !== 'module') {
-				throw new TypeError(
-					`${noun} option 'sourceType' must be 'module' (got ${describe_value(value)})`
-				);
 			}
 			if (value !== 'script' && value !== 'module') {
 				throw new TypeError(

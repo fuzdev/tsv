@@ -47,7 +47,7 @@ Directories recurse over the JS/TS family (`.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cj
 
 `format --list` prints the discovered in-scope files without formatting — a read-only view of what `format` would touch. `--content <source>` / `--stdin` (with `--parser svelte|typescript|css`) format or parse strings to stdout. For TypeScript, `--source-type script|module` (`parse` defaults to `module`; `format` takes an unset flag as *none named* — module, retried as a script, except a `.mjs`/`.mts` path, a module by its own name, which takes no retry — and accepts it on `--content`/`--stdin` only) selects the parse goal — at `script`, `await` is an ordinary identifier, top-level `import`/`export`, `for await` and `import.meta` are errors, and the code is sloppy unless its own `"use strict"` prologue makes it strict (so `with` and legacy octal literals/escapes parse). `parse` emits the span-only wire (no per-node `loc`; Svelte also no `name_loc`); `parse --locations` adds them. Exit codes — `format`: 0 clean, 1 would-change (`--check`), 2 errors; `parse`: 0 ok, 1 error.
 
-`strip` takes one TypeScript input — a `.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cjs` path (a `.svelte.ts` rune module included), `--content`, or `--stdin` — and prints it as JS with every type blanked to whitespace ([Stripping types](#stripping-types)); `--check` prints nothing and only sets the exit code. Exit codes — `strip`: 0 stripped, 1 refused (TypeScript that type blanking cannot erase, such as an `enum`), 2 a parse error or a usage error.
+`strip` takes one TypeScript input — a `.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cjs` path (a `.svelte.ts` rune module included), `--content`, or `--stdin` — and prints it as JS with every type blanked to whitespace ([Stripping types](#stripping-types)); `--check` prints nothing and only sets the exit code. The parse goal is `format`'s: a module, retried as a script if that fails (a `.mjs`/`.mts` path takes no retry), or the one `--source-type script|module` names for `--content`/`--stdin`. Exit codes — `strip`: 0 stripped, 1 refused (TypeScript that type blanking cannot erase, such as an `enum`), 2 a parse error or a usage error.
 
 Files format in parallel; `--jobs N` overrides the worker count. (If the platform package's CLI binary is missing or unrunnable, the bin degrades to a JS mirror of the same contract over the addon — which parallelizes too, on worker threads; on a platform with no prebuilt package at all, use [`@fuzdev/tsv-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-wasm) instead.) Both packages claim the `tsv` bin name, so install one or the other in a project.
 
@@ -82,7 +82,7 @@ A set value is exact. With none named and both grammars rejecting the source, th
 
 `strip_typescript(source)` turns TypeScript into JS by blanking every type to whitespace — no transform, no sourcemap: every surviving character keeps its line and UTF-16 column, line terminators are kept verbatim, and a type-free source comes back unchanged. Where blanking alone would let the next line continue the statement, one `;`, `(` or `)` takes a blanked character's place.
 
-It returns a result rather than throwing for what it finds in the source: `{ok: true, code}`, or `{ok: false, error}` with `error.kind` `'parse'` (the `message`, `start` and `loc` a `parse_typescript` of the source would throw) or `'unsupported'` (TypeScript with runtime semantics — an `enum`, a value `namespace`, a parameter property, `import =`, `export =`, `<T>x`, or an `as` whose removal would regroup its expression — named by `error.construct`, with its span as `start`/`end` and `loc`, and a `message` with the line and a caret).
+It returns a result rather than throwing for what it finds in the source: `{ok: true, code}`, or `{ok: false, error}` with `error.kind` `'parse'` (the `message`, `start` and `loc` a `parse_typescript` of the source would throw at the goal the error belongs to) or `'unsupported'` (TypeScript with runtime semantics — an `enum`, a value `namespace`, a parameter property, `import =`, `export =`, `<T>x`, or an `as` whose removal would regroup its expression — named by `error.construct`, with its span as `start`/`end` and `loc`, and a `message` with the line and a caret).
 
 ```javascript
 import {strip_typescript} from '@fuzdev/tsv';
@@ -94,7 +94,7 @@ if (!result.ok && result.error.kind === 'unsupported') {
 }
 ```
 
-The source is a module; the one option, `{sourceType: 'module'}`, says so, and any other `sourceType` throws.
+The one option is `sourceType`, read as `format_typescript` reads it: omitted, the source is a module retried as a script if that fails, so a legacy sloppy script strips as the sloppy script it is; `'script'` or `'module'` is exact.
 
 ### Options
 

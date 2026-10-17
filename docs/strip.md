@@ -10,7 +10,8 @@ and Node's `module.stripTypeScriptTypes` share. The implementation is `tsv_ts::s
 
 ## Surfaces
 
-- **Rust**: `tsv_ts::strip(source, &arena) -> Result<Stripped, StripError>`. `Stripped.code`
+- **Rust**: `tsv_ts::strip(source, &arena) -> Result<Stripped, StripError>`, the unset goal,
+  and `tsv_ts::strip_with_goal(source, goal: Option<Goal>, &arena)`. `Stripped.code`
   borrows the source when nothing is type-only. `StripError::Parse` carries the
   `ParseError`; `StripError::Unsupported { kind, span }` the refused construct
   (`UnsupportedKind::name` is its snake_case wire name) and its byte span.
@@ -20,14 +21,31 @@ and Node's `module.stripTypeScriptTypes` share. The implementation is `tsv_ts::s
   default set, which the format-only and parse-only wasm packages build without. It
   returns a result instead of throwing for what it finds in the source: `{ok: true, code}`
   or `{ok: false, error}` with `error.kind` `'parse'` (the `message`, `start` and `loc` the
-  `SyntaxError` from `parse_typescript` carries) or `'unsupported'` (`construct`, and the
-  span as `start` / `end` / `loc: {start, end}`). Argument misuse throws a `TypeError`, as on
+  `SyntaxError` from `parse_typescript` carries for the goal the error belongs to) or `'unsupported'` (`construct`, and the
+  span as `start` / `end` / `loc: {start, end}`). The bag takes `sourceType` as a format's
+  does. Argument misuse throws a `TypeError`, as on
   every export ([crates/tsv_wasm/CLAUDE.md §The npm Facade](../crates/tsv_wasm/CLAUDE.md#the-npm-facade-options--typed-returns)).
-- **CLI**: `tsv strip <file> | --content <s> | --stdin [--check]`, in the native binary and
+- **CLI**: `tsv strip <file> | --content <s> | --stdin [--source-type <t>] [--check]`, in the
+  native binary and
   the JS mirror alike ([cli.md §Stripping types](./cli.md#stripping-types-tsv-strip)).
 
-The source is read as a **module** — the one goal; there is no script fallback, and an
-options bag's `sourceType` takes `'module'` alone.
+## The parse goal
+
+The strip reads the goal as `format` does, one rule for the two: a named goal (`sourceType`,
+`--source-type` with `--content` / `--stdin`, `Some(goal)`) is exact, and with none named the
+source is parsed as a **module, retried as a script** only if that fails — so a legacy
+sloppy script (a `with` statement, a leading-zero literal, `await` as a name) strips, while
+a module-valid source is never reinterpreted. When both attempts fail, the error reported
+is the one `format` reports ([cli.md §Multi-File Formatting](./cli.md#multi-file-formatting)).
+A CLI path whose extension settles the goal — `.mjs` / `.mts`, modules by name — takes no
+retry; `--source-type` beside a path is refused, as on `format`. With no goal named the
+result does not say which grammar read the source, so a loader that runs the output names
+the goal it will evaluate under (`sourceType`) rather than relying on the retry.
+
+The output is JS at the goal the source was read at: a sloppy script strips to a sloppy
+script. No verdict depends on the goal, except that a script's `with` body is one more lone
+statement body: a statement blanked whole there becomes `;`, as under an `if`, where
+ts-blank-space blanks an overload plain and hands the next statement to the `with`.
 
 ## The position invariant
 

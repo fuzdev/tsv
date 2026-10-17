@@ -1,4 +1,4 @@
-use crate::cli::input::{InputArgs, ParserType, refuse_directory};
+use crate::cli::input::{InputArgs, ParserType, parse_source_type_arg, refuse_directory};
 use crate::cli::out::{exit_with_error, exit_with_parse_error, write_stdout};
 use argh::FromArgs;
 
@@ -6,8 +6,10 @@ use argh::FromArgs;
 ///
 /// Prints the JS to stdout byte for byte: every type-only range blanked to whitespace, no
 /// trailing newline added, line endings kept. One input: a .ts/.mts/.cts/.js/.mjs/.cjs
-/// file, --content, or --stdin. Exit codes: 0 stripped, 1 refused (TypeScript with
-/// runtime semantics, such as an enum), 2 a parse error or a usage error.
+/// file, --content, or --stdin. Read as a module, retried as a script if that fails, as
+/// format reads it; a .mjs/.mts file is a module by name. Exit codes: 0 stripped, 1
+/// refused (TypeScript with runtime semantics, such as an enum), 2 a parse error or a
+/// usage error.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "strip")]
 pub struct StripCommand {
@@ -18,6 +20,11 @@ pub struct StripCommand {
     /// read from stdin, print to stdout
     #[argh(switch)]
     stdin: bool,
+
+    /// parse goal: script | module. Unset: parsed as a module, retried as a script if that
+    /// fails. --content/--stdin only.
+    #[argh(option)]
+    source_type: Option<String>,
 
     /// print nothing: exit 1 on a refusal, 2 on a parse error
     #[argh(switch)]
@@ -30,14 +37,23 @@ pub struct StripCommand {
 
 impl StripCommand {
     /// Strip one input. Every argument is graded before anything is read, so a refused
-    /// `--stdin` never waits on its writer: a path beside `--content` / `--stdin`, a
-    /// directory, an extension the strip does not take.
+    /// `--stdin` never waits on its writer: a path beside `--content` / `--stdin` or
+    /// `--source-type`, a directory, an extension the strip does not take, a
+    /// `--source-type` naming neither goal.
     pub fn run(self) {
         if let Some(path) = &self.file {
             if self.content.is_some() || self.stdin {
                 exit_with_error(
                     2,
                     "Error: --content/--stdin cannot be combined with a file path",
+                );
+            }
+            // a path's goal is its extension's, as `format` reads it, so a set
+            // `--source-type` beside one is refused in `format`'s words
+            if self.source_type.is_some() {
+                exit_with_error(
+                    2,
+                    "Error: --source-type applies to --content/--stdin; file paths take the module grammar, retried as a script",
                 );
             }
             if let Err(e) = refuse_directory(path) {
@@ -47,6 +63,10 @@ impl StripCommand {
                 exit_with_error(2, format_args!("Error: {e}"));
             }
         }
+        let goal = parse_source_type_arg(self.source_type.as_deref())
+            .unwrap_or_else(|e| exit_with_error(2, format_args!("Error: {e}")));
+        // `.mjs` / `.mts` are modules by name and take no retry (`tsv_ts::Goal::from_extension`)
+        let goal = goal.or_else(|| self.file.as_deref().and_then(tsv_ts::Goal::from_extension));
         let (input, _) = InputArgs {
             content: self.content,
             stdin: self.stdin,
@@ -58,7 +78,7 @@ impl StripCommand {
         let source = input.content();
         let arena =
             bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
-        match tsv_ts::strip(source, &arena) {
+        match tsv_ts::strip_with_goal(source, goal, &arena) {
             Ok(stripped) => {
                 if !self.check {
                     write_stdout(stripped.code.as_bytes());

@@ -310,17 +310,20 @@ Options:
   --locations       emit per-node loc (line/column) beside the start/end offsets (svelte also name_loc); the default wire is span-only
 `;
 
-const STRIP_HELP = `Usage: tsv strip [<file>] [--content <s> | --stdin] [--check]
+const STRIP_HELP = `Usage: tsv strip [<file>] [--content <s> | --stdin] [--source-type <t>] [--check]
 
 Strip the types from TypeScript, keeping every character's line and column.
 
 Prints the JS to stdout byte for byte: every type-only range blanked to
 whitespace, no trailing newline added, line endings kept. One input: a
-.ts/.mts/.cts/.js/.mjs/.cjs file, --content, or --stdin.
+.ts/.mts/.cts/.js/.mjs/.cjs file, --content, or --stdin. Read as a module,
+retried as a script if that fails, as format reads it; a .mjs/.mts file is a
+module by name.
 
 Options:
   --content <s>     content to strip, printed to stdout
   --stdin           read from stdin, print to stdout
+  --source-type <t> TypeScript parse goal: script | module (default: module, retried as a script; --content/--stdin only)
   --check           print nothing: exit 1 on a refusal, 2 on a parse error
 
 Exit codes: 0 stripped, 1 refused (TypeScript with runtime semantics, such as an
@@ -365,6 +368,7 @@ const STRIP_ARGS = {
 	options: {
 		'--content': {},
 		'--stdin': { switch: true },
+		'--source-type': {},
 		'--check': { switch: true }
 	},
 	positionals: 1,
@@ -1558,8 +1562,9 @@ function run_parse({ values, positionals }) {
 
 /**
  * `tsv strip` — the type strip on one input, mirroring the native `StripCommand`: every
- * argument graded before anything is read (a path beside `--content` / `--stdin`, a
- * directory, an extension the strip does not take), then the input by `--content` >
+ * argument graded before anything is read (a path beside `--content` / `--stdin` or
+ * `--source-type`, a directory, an extension the strip does not take, a `--source-type`
+ * naming neither goal), then the input by `--content` >
  * `--stdin` > file precedence, then the facade's `strip_typescript`, whose result
  * object this turns into the native exit codes and lines — the code to stdout verbatim
  * (nothing with `--check`), a parse error as `Parse error:` exit 2, a refusal as
@@ -1571,6 +1576,13 @@ function run_strip({ values, positionals }) {
 	if (path !== undefined) {
 		if (values.content !== undefined || values.stdin) {
 			exit_with_error(2, 'Error: --content/--stdin cannot be combined with a file path');
+		}
+		// a path's goal is its extension's, as `format` reads it: refused in `format`'s words
+		if (values.source_type !== undefined) {
+			exit_with_error(
+				2,
+				'Error: --source-type applies to --content/--stdin; file paths take the module grammar, retried as a script'
+			);
 		}
 		let is_dir = false;
 		try {
@@ -1591,6 +1603,10 @@ function run_strip({ values, positionals }) {
 			);
 		}
 	}
+	// `.mjs` / `.mts` are modules by name and take no retry
+	const source_type =
+		resolve_source_type(values.source_type, 2) ??
+		(path === undefined ? undefined : source_type_from_extension(path));
 	let input;
 	if (values.content !== undefined) {
 		input = values.content;
@@ -1607,7 +1623,7 @@ function run_strip({ values, positionals }) {
 	}
 	let result;
 	try {
-		result = engine.strip_typescript(input);
+		result = engine.strip_typescript(input, { sourceType: source_type });
 	} catch (error) {
 		exit_with_error(2, single_input_failure(error));
 	}

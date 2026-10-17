@@ -79,7 +79,8 @@ import {
 	STRIP_CLI_ROWS,
 	STRIP_OK_ROWS,
 	STRIP_PARSE_ERROR_ROWS,
-	STRIP_REFUSAL_ROWS
+	STRIP_REFUSAL_ROWS,
+	type StripRowOptions
 } from './strip_suite.ts';
 import {
 	LONE_CR_REFUSAL,
@@ -721,16 +722,20 @@ describe('strip engine parity: @fuzdev/tsv vs @fuzdev/tsv-wasm', () => {
 		{ skip: wasm_parity_skip },
 		async () => {
 			const wasm = await import(pathToFileURL(wasm_package_index).href);
-			for (const { source } of [
+			const rows: Array<{ source: string; options?: StripRowOptions }> = [
 				...STRIP_OK_ROWS,
 				...STRIP_REFUSAL_ROWS,
 				...STRIP_PARSE_ERROR_ROWS
-			]) {
-				assert.deepStrictEqual(
-					api.strip_typescript(source),
-					wasm.strip_typescript(source),
-					JSON.stringify(source)
-				);
+			];
+			for (const { source, options } of rows) {
+				// each row at its own goal, and at each named one: the retry, and both exact reads
+				for (const bag of [options, { sourceType: 'module' }, { sourceType: 'script' }]) {
+					assert.deepStrictEqual(
+						api.strip_typescript(source, bag),
+						wasm.strip_typescript(source, bag),
+						`${JSON.stringify(source)} ${JSON.stringify(bag)}`
+					);
+				}
 			}
 		}
 	);

@@ -19,6 +19,11 @@ it, since blanked output is no format fixed point.
   CRLF, CR-only, U+2028/U+2029, a BOM, a hashbang
 - `files/` — the `.mts` and `.svelte.ts` input shapes
 
+Every input is module code: the tree has no goal marker, its JS guard and its validator parse
+a module. What the strip does with a script — read when the source names that goal, or when
+no goal is named and the module parse fails — is pinned by Rust tests instead (the strip
+module's unit tests and `tests/strip_goal.rs`).
+
 ## Files
 
 Every fixture directory holds one input — `input.ts`, `input.mts`, or `input.svelte.ts` —
@@ -113,9 +118,10 @@ override. The overrides:
   `<T>` blanks to leave the `(` first), a binary operator, or a member named `in` /
   `instanceof` (`a = 1` then `[k] = 2` reads `a = 1[k] = 2`). The `;` goes at the signature, as
   a blanked `declare` field takes one, and only there. Node agrees on a statement, except
-  before a generic arrow, and not in a class body. As the lone body of an `if`, a loop or a label, the signature
-  always becomes `;` (blanked plain, `if (a)` takes the next statement as its body), as every
-  statement blanked whole there does.
+  before a generic arrow, and not in a class body. As the lone body of an `if`, a loop, a label or
+  a script's `with`, the signature always becomes `;` (blanked plain, `if (a)` takes the next
+  statement as its body), as every statement blanked whole there does. The `with` case is a
+  script's alone, so the Rust tests pin it rather than a fixture.
 - **ts-blank-space leaves an optional method's `?` and type parameters in place** and inserts
   blanks before them (`m?<T>()` to `m?   <T>()`), which is no JS and moves every later column.
   Node blanks both.

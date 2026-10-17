@@ -1,6 +1,7 @@
 //! `tsv strip`: the type strip on one input — a file path, `--content` or `--stdin` — to
-//! stdout, `--check`, the exit codes (0 stripped, 1 refused, 2 a parse or usage error), and
-//! the argument refusals. The JS mirror (`cli.js`) is held to the same rows by
+//! stdout, `--check`, the parse goal (`--source-type`, else the module grammar retried as a
+//! script), the exit codes (0 stripped, 1 refused, 2 a parse or usage error), and the
+//! argument refusals. The JS mirror (`cli.js`) is held to the same rows by
 //! `scripts/strip_suite.ts`, and to this binary byte for byte by `scripts/test_napi_npm.ts`.
 
 use std::fs;
@@ -218,14 +219,131 @@ fn test_strip_parse_error_exits_2() {
     );
 }
 
-/// The strip parses a module: a script-only construct is a parse error, never retried.
+/// With no `--source-type`, the strip reads the goal as `format` does: a module, retried
+/// as a script only if that fails — so a legacy sloppy script strips.
 #[test]
-fn test_strip_parses_a_module() {
+fn test_strip_retries_a_failed_module_parse_as_a_script() {
+    for (source, code) in [
+        ("with (a) {}\n", "with (a) {}\n"),
+        (
+            "fs.chmodSync(p as string, 0755);\n",
+            "fs.chmodSync(p          , 0755);\n",
+        ),
+        ("var await: number = 1;\n", "var await         = 1;\n"),
+    ] {
+        assert_stripped(&tsv(&["strip", "--content", source]), code);
+    }
+}
+
+/// When both grammars reject the source, the error is the one `format` reports: here the
+/// sloppy script's own typo on line 2, not the `with` the retry admits.
+#[test]
+fn test_strip_failed_retry_reports_the_scripts_typo() {
+    let source = "with (o) {}\nlet = ;\n";
+    let output = tsv(&["strip", "--content", source]);
     assert_refused(
-        &tsv(&["strip", "--content", "with (a) {}\n"]),
+        &output,
         2,
-        "Parse error: ",
+        "Parse error: Expected expression, found ';'\n2:7 let = ;\n",
     );
+    let format = tsv(&["format", "--content", source, "--parser", "ts"]);
+    assert_eq!(
+        output.stderr, format.stderr,
+        "the same error text as `tsv format`"
+    );
+}
+
+/// A named `--source-type` is exact: no retry either way.
+#[test]
+fn test_strip_source_type_is_exact() {
+    assert_stripped(
+        &tsv(&[
+            "strip",
+            "--source-type",
+            "script",
+            "--content",
+            "var await: number = 1;\n",
+        ]),
+        "var await         = 1;\n",
+    );
+    assert_refused(
+        &tsv(&[
+            "strip",
+            "--source-type",
+            "module",
+            "--content",
+            "with (a) {}\n",
+        ]),
+        2,
+        "Parse error: The 'with' statement is not allowed in strict mode\n",
+    );
+    assert_refused(
+        &tsv(&[
+            "strip",
+            "--source-type",
+            "script",
+            "--content",
+            "import type { A } from 'a';\n",
+        ]),
+        2,
+        "Parse error: 'import' is only allowed in a module\n",
+    );
+    assert_stripped(
+        &tsv_stdin(
+            &["strip", "--stdin", "--source-type", "script"],
+            "with (o as any) { x; }\n",
+        ),
+        "with (o       ) { x; }\n",
+    );
+}
+
+#[test]
+fn test_strip_source_type_invalid_value() {
+    assert_refused(
+        &tsv(&["strip", "--source-type", "sloppy", "--content", "let x: T;"]),
+        2,
+        "Error: invalid --source-type 'sloppy' (expected 'script' or 'module')\n",
+    );
+}
+
+/// `--source-type` is for `--content` / `--stdin`, as on `format`: a path takes the goal
+/// its extension settles, or the fallback.
+#[test]
+fn test_strip_source_type_beside_a_path_is_refused() {
+    let dir = temp_dir("strip_source_type_path");
+    let path = dir.join("a.ts");
+    fs::write(&path, "let y: T;\n").unwrap();
+    assert_refused(
+        &tsv(&["strip", "--source-type", "script", path.to_str().unwrap()]),
+        2,
+        "Error: --source-type applies to --content/--stdin; file paths take the module grammar, retried as a script\n",
+    );
+}
+
+/// A path whose extension settles the goal — `.mjs` / `.mts`, ES modules by name — takes
+/// no script retry, as `format` reads it; `.cjs` / `.cts` / `.js` / `.ts` keep the
+/// fallback.
+#[test]
+fn test_strip_file_extension_settles_the_goal() {
+    let dir = temp_dir("strip_extension_goal");
+    let source = "with (o as any) { x; }\n";
+    for name in ["a.mjs", "a.mts", "A.MTS"] {
+        let path = dir.join(name);
+        fs::write(&path, source).unwrap();
+        assert_refused(
+            &tsv(&["strip", path.to_str().unwrap()]),
+            2,
+            "Parse error: The 'with' statement is not allowed in strict mode\n",
+        );
+    }
+    for name in ["a.cjs", "a.cts", "a.js", "a.ts"] {
+        let path = dir.join(name);
+        fs::write(&path, source).unwrap();
+        assert_stripped(
+            &tsv(&["strip", path.to_str().unwrap()]),
+            "with (o       ) { x; }\n",
+        );
+    }
 }
 
 #[test]
@@ -339,6 +457,7 @@ fn test_strip_help() {
     let (status, stdout, _) = outcome(&tsv(&["help", "strip"]));
     assert_eq!(status, 0);
     assert!(stdout.starts_with("Usage: tsv strip"), "{stdout}");
+    assert!(stdout.contains("--source-type"), "{stdout}");
     let (status, top, _) = outcome(&tsv(&["--help"]));
     assert_eq!(status, 0);
     assert!(

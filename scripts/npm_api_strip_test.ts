@@ -3,8 +3,9 @@
  * the result object a strip outcome becomes, the raw engine's error shapes it reads, the
  * options bag, and the argument refusals, word for word.
  *
- * The raw engine contract (both `tsv_wasm` and `tsv_napi`): `strip_typescript(source)`
- * returns the code, or throws an `Error` whose own ENUMERABLE integer properties carry the
+ * The raw engine contract (both `tsv_wasm` and `tsv_napi`): `strip_typescript(source,
+ * source_type?)` — the source type as the bag named it, `undefined` when unset — returns the
+ * code, or throws an `Error` whose own ENUMERABLE integer properties carry the
  * failure — `start`, `line`, `column` for a parse failure (the shape every parse export
  * throws), and those plus a string `kind` (the refused construct) and `end`, `end_line`,
  * `end_column` for a refusal. Anything else an engine throws passes through as itself. A
@@ -40,8 +41,8 @@ Deno.test('strip: the code, as an ok result', () => {
 	const result = api.strip_typescript('let x: T;');
 	deepStrictEqual(result, { ok: true, code: 'let x   ;' });
 	deepStrictEqual(Object.keys(result), ['ok', 'code']);
-	// the engine takes the source alone: the strip has one goal
-	deepStrictEqual(calls, [['let x: T;']]);
+	// the engine takes the source and the source type, unset here
+	deepStrictEqual(calls, [['let x: T;', undefined]]);
 });
 
 Deno.test('strip: a pointed engine error is a parse error result, never a throw', () => {
@@ -155,26 +156,34 @@ Deno.test('strip: anything else an engine throws passes through as the same obje
 	}
 });
 
-Deno.test('strip: the options bag — module only, unknown keys refused', () => {
+Deno.test('strip: the options bag — the source type forwarded, unknown keys refused', () => {
 	const { api, calls } = fake_strip((source) => source);
 	for (const options of [
 		undefined,
 		null,
 		{},
 		{ sourceType: 'module' },
+		{ sourceType: 'script' },
 		{ sourceType: undefined }
 	]) {
 		deepStrictEqual(api.strip_typescript('x', options), { ok: true, code: 'x' });
 	}
-	strictEqual(calls.length, 5);
+	// a named goal reaches the engine as named; an unset one stays unset, never `'module'`
+	deepStrictEqual(
+		calls.map((call) => call[1]),
+		[undefined, undefined, undefined, 'module', 'script', undefined]
+	);
 	const refusals: Array<[unknown, string]> = [
 		['module', 'strip options must be an object'],
 		[['module'], 'strip options must be an object'],
 		[42, 'strip options must be an object'],
 		[{ locations: true }, "unknown strip option 'locations' (expected 'sourceType')"],
 		[{ locatons: undefined }, "unknown strip option 'locatons' (expected 'sourceType')"],
-		[{ sourceType: 'script' }, "strip option 'sourceType' must be 'module' (got 'script')"],
-		[{ sourceType: 1 }, "strip option 'sourceType' must be 'module' (got 1)"]
+		[
+			{ sourceType: 'sloppy' },
+			"strip option 'sourceType' must be 'script' or 'module' (got 'sloppy')"
+		],
+		[{ sourceType: 1 }, "strip option 'sourceType' must be 'script' or 'module' (got 1)"]
 	];
 	for (const [options, message] of refusals) {
 		throws(
@@ -183,7 +192,7 @@ Deno.test('strip: the options bag — module only, unknown keys refused', () => 
 			message
 		);
 	}
-	strictEqual(calls.length, 5, 'a refused bag never reaches the engine');
+	strictEqual(calls.length, 6, 'a refused bag never reaches the engine');
 });
 
 Deno.test('strip: a bad source is a TypeError that never reaches the engine', () => {

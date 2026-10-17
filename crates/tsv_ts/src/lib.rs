@@ -34,7 +34,7 @@ pub use tsv_lang::{ParseError, Result, WirePoint};
 
 pub use goal::Goal;
 pub use parser::TopLevelAs;
-pub use strip::{StripError, Stripped, UnsupportedKind, strip};
+pub use strip::{StripError, Stripped, UnsupportedKind, strip, strip_with_goal};
 
 /// The coordinates a TypeScript document's positions are reported in — acorn's: a
 /// leading BOM **counted** (acorn reads U+FEFF as whitespace, so it is one UTF-16 unit at
@@ -218,9 +218,9 @@ pub fn parse_with_goal<'arena>(
 /// Parse TypeScript against `goal`, or — when the goal is unset — at `Module`
 /// with a `Script` retry.
 ///
-/// The **format** path's parse. `Some(goal)` is exact, the same parse
-/// [`parse_with_goal`] runs. `None` means the caller never named a source type
-/// (`tsv format <path>`, an editor's `format_typescript(source)`), and there the
+/// The **format** path's parse, and the type strip's (`strip_with_goal`). `Some(goal)` is
+/// exact, the same parse [`parse_with_goal`] runs. `None` means the caller never named a
+/// source type (`tsv format <path>`, an editor's `format_typescript(source)`), and there the
 /// module grammar is tried first and the script grammar only if it *fails* — so a
 /// legacy sloppy script (a `with` statement, a leading-zero literal, `await` as a
 /// name) formats from a bare path while a module-valid source is never reinterpreted.
@@ -246,7 +246,8 @@ pub fn parse_with_goal<'arena>(
 /// whose `sourceType` is a claim about which grammar produced it, and a retry would
 /// make that claim depend on the input. Formatting exposes neither the AST nor the
 /// source type, and the printer never reads the goal, so the retry changes no output
-/// for anything the module grammar already accepts. The retry parses into the same
+/// for anything the module grammar already accepts — the strip's reason too: it hands
+/// back JS text, and no verdict of its walk reads the goal. The retry parses into the same
 /// arena with no reset between the two attempts, so a script's arena high-water is the
 /// failed module attempt plus the script parse — an error-path cost only.
 pub fn parse_with_goal_or_fallback<'arena>(

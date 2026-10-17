@@ -6,15 +6,18 @@
  * `strip_<lang>(source, options?)` RETURNS what the strip concludes about the source and
  * never throws for it: `{ok: true, code}` for the JS, or `{ok: false, error}` for a source
  * that does not parse (`error.kind === 'parse'`, the `message` / `start` / `loc` the
- * `SyntaxError` from `parse_<lang>(source)` carries) or one holding TypeScript the strip
+ * `SyntaxError` from `parse_<lang>(source, {sourceType})` carries for the goal the error
+ * belongs to) or one holding TypeScript the strip
  * refuses (`error.kind === 'unsupported'`: the `construct`, its `message`, and its span as
  * `start` / `end` / `loc: {start, end}`). The error is a plain object — no stack captured
  * per failure, and structured-clone-able, so a worker can post it. What still throws is
  * what throws on every other export: an argument refusal (a `TypeError`), and an engine
  * failure with no point (the size cap, a caught panic, a WASM trap, stack exhaustion).
  *
- * The raw engines (`tsv_wasm`, `tsv_napi`) export `strip_typescript(source)` — no source
- * type, since the strip has one goal — returning the code, or throwing an `Error` whose own
+ * The raw engines (`tsv_wasm`, `tsv_napi`) export `strip_typescript(source, source_type?)`,
+ * the flat shape every other export has, with the source type the bag names forwarded as
+ * it is (unset stays `undefined`: the module grammar, retried as a script, as a format reads
+ * it) — returning the code, or throwing an `Error` whose own
  * ENUMERABLE integer properties carry the failure: `start`, `line` and `column` for a parse
  * failure (the shape every parse export throws), and those plus a string `kind` (the
  * refused construct) and `end`, `end_line`, `end_column` for a refusal. Anything else an
@@ -41,11 +44,11 @@ const CONSTRUCTS = new Set([
 ]);
 
 /**
- * Build the strip family over one engine's `strip_<lang>(source)` functions, keyed by
- * language. Each function is defined under a computed key, which names it, as
+ * Build the strip family over one engine's `strip_<lang>(source, source_type?)` functions,
+ * keyed by language. Each function is defined under a computed key, which names it, as
  * `create_format_api`'s are.
  *
- * @param {Record<string, (source: string) => string>} strip
+ * @param {Record<string, (source: string, source_type?: 'script' | 'module') => string>} strip
  * @returns {Record<string, (source: unknown, options?: unknown) => any>} `strip_<lang>`
  */
 export function create_strip_api(strip) {
@@ -55,10 +58,10 @@ export function create_strip_api(strip) {
 		Object.assign(api, {
 			[`strip_${language}`]: (source, options) => {
 				const text = read_source(source, 'strip');
-				read_options(options, 'strip', language);
+				const { source_type } = read_options(options, 'strip', language);
 				let code;
 				try {
-					code = strip_language(text);
+					code = strip_language(text, source_type);
 				} catch (thrown) {
 					const error = to_strip_error(thrown);
 					if (error === undefined) throw thrown;

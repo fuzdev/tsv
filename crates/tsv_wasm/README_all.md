@@ -41,7 +41,7 @@ Directories recurse over the JS/TS family (`.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cj
 
 `format --list` prints the discovered in-scope files without formatting — a read-only view of what `format` would touch. `--content <source>` / `--stdin` (with `--parser svelte|typescript|css`) format or parse strings to stdout. For TypeScript, `--source-type script|module` (`parse` defaults to `module`; `format` takes an unset flag as *none named* — module, retried as a script, except a `.mjs`/`.mts` path, a module by its own name, which takes no retry — and accepts it on `--content`/`--stdin` only) selects the parse goal — at `script`, `await` is an ordinary identifier, `import`/`export`/`import.meta` and a top-level `for await` are errors, and the code is sloppy unless its own `"use strict"` prologue makes it strict (so `with` and legacy octal literals/escapes parse). `parse` emits the span-only wire (no per-node `loc`; Svelte also no `name_loc`); `parse --locations` adds them. Exit codes — `format`: 0 clean, 1 would-change (`--check`), 2 errors; `parse`: 0 ok, 1 error.
 
-`strip` takes one TypeScript input — a `.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cjs` path (a `.svelte.ts` rune module included), `--content`, or `--stdin` — and prints it as JS with every type blanked to whitespace, so every surviving character keeps its line and column ([Stripping types](#stripping-types)). `--check` prints nothing and only sets the exit code, for CI. Exit codes — `strip`: 0 stripped, 1 refused (TypeScript that type blanking cannot erase, such as an `enum`), 2 a parse error or a usage error.
+`strip` takes one TypeScript input — a `.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cjs` path (a `.svelte.ts` rune module included), `--content`, or `--stdin` — and prints it as JS with every type blanked to whitespace, so every surviving character keeps its line and column ([Stripping types](#stripping-types)). `--check` prints nothing and only sets the exit code, for CI. The parse goal is `format`'s: a module, retried as a script if that fails (a `.mjs`/`.mts` path takes no retry), or the one `--source-type script|module` names for `--content`/`--stdin`. Exit codes — `strip`: 0 stripped, 1 refused (TypeScript that type blanking cannot erase, such as an `enum`), 2 a parse error or a usage error.
 
 Large trees format across worker threads — `--jobs N` sets the count, and the default is sized to your machine. Small ones stay on a single thread, where spinning a pool up would cost more than it saves. This CLI runs the WASM build; on Node.js and Bun, [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) ships tsv's real native CLI binary and its `tsv` bin execs it — the faster option there. Both packages claim the `tsv` bin name, so install one or the other in a project.
 
@@ -65,7 +65,7 @@ Three formatters (`format_svelte`, `format_typescript`, `format_css`) take a sou
 
 Every export takes `(source, options?)` with an acorn-style options object.
 
-`{sourceType: 'script' | 'module'}` sets TypeScript's parse goal — at `'script'` the code is sloppy unless its own `"use strict"` prologue makes it strict. `parse_svelte`/`parse_css` and `format_svelte`/`format_css` throw on a set value. An **omitted** `sourceType` is `'module'` to a parser, while a formatter parses as a module and retries as a script only if that fails, so a legacy sloppy script formats with no options; a set value is exact on both. When both grammars reject a format's source, the error is the one that best explains the failure (the rule is in the repo's [docs/cli.md](https://github.com/fuzdev/tsv/blob/main/docs/cli.md#multi-file-formatting)).
+`{sourceType: 'script' | 'module'}` sets TypeScript's parse goal — at `'script'` the code is sloppy unless its own `"use strict"` prologue makes it strict. `parse_svelte`/`parse_css` and `format_svelte`/`format_css` throw on a set value. An **omitted** `sourceType` is `'module'` to a parser, while a formatter or the strip parses as a module and retries as a script only if that fails, so a legacy sloppy script formats and strips with no options; a set value is exact on all three. When both grammars reject a format's or a strip's source, the error is the one that best explains the failure (the rule is in the repo's [docs/cli.md](https://github.com/fuzdev/tsv/blob/main/docs/cli.md#multi-file-formatting)).
 
 The object parsers also take `{locations: true}`, adding per-node `loc` (line/column, as acorn's `locations: true` does) and Svelte's `name_loc`. Every other export throws on a `locations` key, whatever its value, so only a `sourceType`-only bag forwards to any export.
 
@@ -145,7 +145,7 @@ To run tsv across threads, compile once and share: the main entry exports `wasm_
 
 It never throws for what it finds in the source. It returns `{ok: true, code}`, or `{ok: false, error}` where `error.kind` says why:
 
-- `'parse'` — the source does not parse (as a module): the `message`, `start` and `loc` a `parse_typescript` of it would throw;
+- `'parse'` — the source does not parse: the `message`, `start` and `loc` a `parse_typescript` of it would throw at the goal the error belongs to;
 - `'unsupported'` — the source holds TypeScript with runtime semantics, which blanking cannot erase: `error.construct` names it (`'enum'`, `'value_namespace'`, `'parameter_property'`, `'import_equals'`, `'export_equals'`, `'type_assertion'` for `<T>x`, or `'assertion_grouping'` for an `as` whose removal would regroup its expression), `start`/`end` and `loc` give its span in the AST's coordinates, and `message` says it with the line and a caret.
 
 ```typescript
@@ -161,7 +161,7 @@ if (result.ok) {
 }
 ```
 
-The first six refusals are exactly what TypeScript's `erasableSyntaxOnly` rejects, so a codebase that type-checks under it meets only the last, a rare spelling a pair of parentheses keeps (`a + (b as T) / c`). The source is a module; the one option, `{sourceType: 'module'}`, says so, and any other `sourceType` throws. Argument errors are `TypeError`s, as for every export.
+The first six refusals are exactly what TypeScript's `erasableSyntaxOnly` rejects, so a codebase that type-checks under it meets only the last, a rare spelling a pair of parentheses keeps (`a + (b as T) / c`). The one option is `sourceType`, read as `format_typescript` reads it: omitted, the source is a module retried as a script if that fails, so a legacy sloppy script strips as the sloppy script it is; `'script'` or `'module'` is exact. Argument errors are `TypeError`s, as for every export.
 
 ### File scoping (`IgnoreStack`)
 

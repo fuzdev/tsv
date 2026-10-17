@@ -10,9 +10,12 @@
  * - **the API** (`register_strip_api_suite`): `strip_typescript(source, options?)` returns a
  *   result object and never throws for a strip outcome — `{ok: true, code}` for JS, or
  *   `{ok: false, error}` for a source that does not parse (`error.kind === 'parse'`, the
- *   point `parse_typescript` reports for it) or one holding TypeScript that type blanking
- *   cannot erase (`error.kind === 'unsupported'`, the refused construct and its span). Only
- *   argument misuse throws, as a `TypeError` in the facade's own words;
+ *   point `parse_typescript` reports for it at the goal the error is attributed to) or one
+ *   holding TypeScript that type blanking cannot erase (`error.kind === 'unsupported'`, the
+ *   refused construct and its span). The parse goal reads as the format path reads it: a
+ *   named `sourceType` is exact, and with none the source is parsed as a module and retried
+ *   as a script only if that fails. Only argument misuse throws, as a `TypeError` in the
+ *   facade's own words;
  * - **the CLI** (`register_strip_cli_suite`): `tsv strip <file>` / `--content` / `--stdin`
  *   print the stripped code to stdout verbatim, `--check` prints nothing, and the exit code
  *   is 0 stripped, 1 refused, 2 a parse error or a usage error (argh's own flag-parsing
@@ -53,9 +56,15 @@ export const STRIP_CONSTRUCT_DESCRIPTIONS: Readonly<Record<StripConstruct, strin
 	assertion_grouping: 'an assertion whose blanking would regroup its expression'
 };
 
+/** The options bag a row passes, when any: the parse goal, named. */
+export interface StripRowOptions {
+	sourceType: 'script' | 'module';
+}
+
 export interface StripOkRow {
 	name: string;
 	source: string;
+	options?: StripRowOptions;
 	code: string;
 }
 
@@ -71,6 +80,14 @@ export interface StripRefusalRow {
 export interface StripParseErrorRow {
 	name: string;
 	source: string;
+	options?: StripRowOptions;
+	/**
+	 * The goal whose parse error the strip reports, as `parse_typescript(source, {sourceType})`
+	 * reports it (default `'module'`). A named goal is that goal; with none named, the
+	 * module's, unless the script retry reached further without dying on a module-only
+	 * construct.
+	 */
+	reported?: 'script' | 'module';
 }
 
 export const STRIP_OK_ROWS: ReadonlyArray<StripOkRow> = [
@@ -111,7 +128,44 @@ export const STRIP_OK_ROWS: ReadonlyArray<StripOkRow> = [
 		source: '#!/usr/bin/env node\nlet x: T = 1;\n',
 		code: '#!/usr/bin/env node\nlet x    = 1;\n'
 	},
-	{ name: 'type-free input comes back unchanged', source: 'const x = 1;\n', code: 'const x = 1;\n' }
+	{
+		name: 'type-free input comes back unchanged',
+		source: 'const x = 1;\n',
+		code: 'const x = 1;\n'
+	},
+	// the unset goal: a module, retried as a script only if that fails
+	{
+		name: 'a sloppy script with no goal named: a with statement',
+		source: 'with (o as any) { x; }\n',
+		code: 'with (o       ) { x; }\n'
+	},
+	{
+		name: 'a sloppy script with no goal named: a legacy octal literal',
+		source: 'fs.chmodSync(p as string, 0755);\n',
+		code: 'fs.chmodSync(p          , 0755);\n'
+	},
+	{
+		name: 'a sloppy script with no goal named: await as a name',
+		source: 'var await: number = 1;\n',
+		code: 'var await         = 1;\n'
+	},
+	{
+		name: 'a module-valid source is never read as a script: top-level await',
+		source: 'await f() as T;\n',
+		code: 'await f()     ;\n'
+	},
+	{
+		name: "a named 'script' goal",
+		source: 'var await: number = 1;\n',
+		options: { sourceType: 'script' },
+		code: 'var await         = 1;\n'
+	},
+	{
+		name: "a named 'module' goal",
+		source: 'let x: T = 1;\nexport { x };\n',
+		options: { sourceType: 'module' },
+		code: 'let x    = 1;\nexport { x };\n'
+	}
 ];
 
 export const STRIP_REFUSAL_ROWS: ReadonlyArray<StripRefusalRow> = [
@@ -166,8 +220,29 @@ export const STRIP_PARSE_ERROR_ROWS: ReadonlyArray<StripParseErrorRow> = [
 	{ name: 'a missing binding', source: 'let = ;\n' },
 	{ name: 'the end of the source', source: 'function f() {\n' },
 	{ name: 'after CRLF and an astral character', source: "const a = '\u{1d49c}';\r\nconst = ;\r\n" },
-	// the strip parses a module: a script-only source is a parse error, never a retry
-	{ name: 'a with statement', source: 'with (a) {}\n' }
+	// both grammars reject it: the error is the one the format path's fallback reports
+	{
+		name: "a sloppy script's typo, past the with the retry admits",
+		source: 'with (o) {}\nlet = ;\n',
+		reported: 'script'
+	},
+	{
+		name: 'a module whose error sits ahead of its export',
+		source: 'let x: number = 0755;\nexport {};\n',
+		reported: 'module'
+	},
+	{
+		name: "a named 'module' goal takes no retry",
+		source: 'with (a) {}\n',
+		options: { sourceType: 'module' },
+		reported: 'module'
+	},
+	{
+		name: "a named 'script' goal takes no module attempt",
+		source: "import type { A } from 'a';\n",
+		options: { sourceType: 'script' },
+		reported: 'script'
+	}
 ];
 
 /** The thrown value of `f`, failing the test when nothing is thrown. */
@@ -206,13 +281,13 @@ export function register_strip_api_suite(
 
 		for (const row of STRIP_OK_ROWS) {
 			it(`strips: ${row.name}`, () => {
-				const result = get_api().strip_typescript(row.source);
+				const result = get_api().strip_typescript(row.source, row.options);
 				assert.deepStrictEqual(Object.keys(result), ['ok', 'code']);
 				assert.deepStrictEqual(result, { ok: true, code: row.code });
 				// the position invariant, which every row is an instance of
 				assert.equal(result.code.length, row.source.length, 'UTF-16 length is kept');
 				// idempotence: the output strips to itself
-				assert.deepStrictEqual(get_api().strip_typescript(result.code), result);
+				assert.deepStrictEqual(get_api().strip_typescript(result.code, row.options), result);
 			});
 		}
 
@@ -255,12 +330,14 @@ export function register_strip_api_suite(
 		for (const row of STRIP_PARSE_ERROR_ROWS) {
 			it(`reports a parse error: ${row.name}`, () => {
 				const api = get_api();
-				const result = api.strip_typescript(row.source);
+				const result = api.strip_typescript(row.source, row.options);
 				assert.deepStrictEqual(Object.keys(result), ['ok', 'error']);
 				assert.equal(result.ok, false);
 				assert.deepStrictEqual(Object.keys(result.error), ['kind', 'message', 'start', 'loc']);
-				// the same error, at the same point, that parsing the source as a module reports
-				const thrown = thrown_by(() => api.parse_typescript(row.source));
+				// the same error, at the same point, that parsing at the reported goal reports
+				const thrown = thrown_by(() =>
+					api.parse_typescript(row.source, { sourceType: row.reported ?? 'module' })
+				);
 				assert.ok(thrown instanceof SyntaxError, String(thrown));
 				const parsed = thrown as SyntaxError & { start: number; loc: unknown };
 				assert.deepStrictEqual(result.error, {
@@ -274,18 +351,22 @@ export function register_strip_api_suite(
 
 		it('never throws for a strip outcome', () => {
 			const api = get_api();
-			for (const { source } of [...STRIP_REFUSAL_ROWS, ...STRIP_PARSE_ERROR_ROWS]) {
+			for (const { source } of STRIP_REFUSAL_ROWS) {
 				assert.doesNotThrow(() => api.strip_typescript(source), JSON.stringify(source));
+			}
+			for (const { source, options } of STRIP_PARSE_ERROR_ROWS) {
+				assert.doesNotThrow(() => api.strip_typescript(source, options), JSON.stringify(source));
 			}
 		});
 
-		it('takes a module-only options bag', () => {
+		it('takes a sourceType bag', () => {
 			const api = get_api();
 			const ok = { ok: true, code: 'let x   ;' };
 			assert.deepStrictEqual(api.strip_typescript('let x: T;', undefined), ok);
 			assert.deepStrictEqual(api.strip_typescript('let x: T;', null), ok);
 			assert.deepStrictEqual(api.strip_typescript('let x: T;', {}), ok);
 			assert.deepStrictEqual(api.strip_typescript('let x: T;', { sourceType: 'module' }), ok);
+			assert.deepStrictEqual(api.strip_typescript('let x: T;', { sourceType: 'script' }), ok);
 			// the forwarding idiom: a supported key set to `undefined` is its default
 			assert.deepStrictEqual(api.strip_typescript('let x: T;', { sourceType: undefined }), ok);
 		});
@@ -306,8 +387,8 @@ export function register_strip_api_suite(
 					"unknown strip option 'locations' (expected 'sourceType')"
 				],
 				[
-					() => api.strip_typescript('x', { sourceType: 'script' }),
-					"strip option 'sourceType' must be 'module' (got 'script')"
+					() => api.strip_typescript('x', { sourceType: 'sloppy' }),
+					"strip option 'sourceType' must be 'script' or 'module' (got 'sloppy')"
 				]
 			];
 			for (const [call, message] of refusals) {
@@ -449,6 +530,94 @@ export const STRIP_CLI_ROWS: ReadonlyArray<StripCliRow> = [
 		stderr_starts: 'Parse error: '
 	},
 	{
+		name: '--content with no --source-type retries a sloppy script',
+		args: ['strip', '--content', 'fs.chmodSync(p as string, 0755);\n'],
+		status: 0,
+		stdout: 'fs.chmodSync(p          , 0755);\n',
+		stderr: ''
+	},
+	{
+		name: "a failed retry reports the sloppy script's typo",
+		args: ['strip', '--content', 'with (o) {}\nlet = ;\n'],
+		status: 2,
+		stdout: '',
+		stderr_starts: "Parse error: Expected expression, found ';'\n2:7 let = ;\n"
+	},
+	{
+		name: '--source-type script reads await as a name',
+		args: ['strip', '--source-type', 'script', '--content', 'var await: number = 1;\n'],
+		status: 0,
+		stdout: 'var await         = 1;\n',
+		stderr: ''
+	},
+	{
+		name: '--source-type module takes no retry',
+		args: ['strip', '--source-type', 'module', '--content', 'with (a) {}\n'],
+		status: 2,
+		stdout: '',
+		stderr_starts: "Parse error: The 'with' statement is not allowed in strict mode\n"
+	},
+	{
+		name: '--source-type script takes no module attempt',
+		args: ['strip', '--stdin', '--source-type', 'script'],
+		stdin: "import type { A } from 'a';\n",
+		status: 2,
+		stdout: '',
+		stderr_starts: "Parse error: 'import' is only allowed in a module\n"
+	},
+	{
+		name: 'an invalid --source-type is a usage error',
+		args: ['strip', '--source-type', 'sloppy', '--content', 'let x: T;'],
+		status: 2,
+		stdout: '',
+		stderr: "Error: invalid --source-type 'sloppy' (expected 'script' or 'module')\n"
+	},
+	{
+		name: '--source-type beside a file path is refused',
+		args: ['strip', '--source-type', 'script', 'FILE'],
+		file: 'let y: T;\n',
+		status: 2,
+		stdout: '',
+		stderr:
+			'Error: --source-type applies to --content/--stdin; file paths take the module grammar, retried as a script\n'
+	},
+	{
+		name: 'a .mjs file is a module by name: no script retry',
+		args: ['strip', 'FILE'],
+		file: 'with (o as any) { x; }\n',
+		file_name: 'a.mjs',
+		status: 2,
+		stdout: '',
+		stderr_starts: "Parse error: The 'with' statement is not allowed in strict mode\n"
+	},
+	{
+		name: 'a .mts file is a module by name: no script retry',
+		args: ['strip', 'FILE'],
+		file: 'var await: number = 1;\n',
+		file_name: 'a.mts',
+		status: 2,
+		stdout: '',
+		stderr_starts: 'Parse error: '
+	},
+	{
+		name: 'a .cjs file keeps the script retry',
+		args: ['strip', 'FILE'],
+		file: 'with (o as any) { x; }\n',
+		file_name: 'a.cjs',
+		status: 0,
+		stdout: 'with (o       ) { x; }\n',
+		stderr: ''
+	},
+	{
+		name: 'a .cts file keeps the script retry',
+		args: ['strip', 'FILE'],
+		file: 'var await: number = 1;\n',
+		file_name: 'a.cts',
+		status: 0,
+		stdout: 'var await         = 1;\n',
+		stderr: ''
+	},
+	{
 		name: 'no input is a usage error',
 		args: ['strip'],
 		status: 2,
@@ -545,6 +714,7 @@ export function register_strip_cli_suite(label: string, run: CliRunner): void {
 					}
 					if (row.args[0] === 'help') {
 						assert.ok(result.stdout.startsWith('Usage: tsv strip'), result.stdout);
+						assert.ok(result.stdout.includes('--source-type'), result.stdout);
 					}
 					if (row.file !== undefined) {
 						assert.equal(readFileSync(file_path, 'utf8'), row.file, 'strip never writes the file');

@@ -12,6 +12,11 @@
 //! `module.stripTypeScriptTypes` share. They are not the Svelte compiler's: that product
 //! erases a tree, follows Svelte's own oracle, and shares no code with this one.
 //!
+//! The parse goal is the format path's (`strip_with_goal`): a named goal is exact, and an
+//! unset one reads the source as a module, retried as a script only if that fails. No
+//! verdict below depends on the goal; a script's `with` body is one more lone statement
+//! body.
+//!
 //! Two passes after the parse: one walk over the AST (`walk`) collects the type-only ranges,
 //! the hazard substitutions and the refusals, locating the bytes the AST holds no position
 //! for (a modifier keyword, a `?` / `!` mark, a paren the parser stripped) with
@@ -22,10 +27,10 @@
 //!
 //! - a `;` starting a statement or class member blanked whole after JS that does not end in
 //!   `;` (`let x = y⏎type T = 1⏎(z)`), in ts-blank-space's cases, plus one: a statement
-//!   blanked whole as the lone body of an `if` / loop / label always becomes `;`, so the
-//!   output stays JS and the statement after it cannot become the body (`if (a) g()`). The
-//!   one such body tsc's grammar allows, as the body of an `if` or a loop, is an overload
-//!   signature, which ts-blank-space blanks plain;
+//!   blanked whole as the lone body of an `if` / loop / label / `with` always becomes `;`,
+//!   so the output stays JS and the statement after it cannot become the body
+//!   (`if (a) g()`). The one such body tsc's grammar allows, as the body of an `if`, a loop
+//!   or a `with`, is an overload signature, which ts-blank-space blanks plain;
 //! - a `;` starting a bodiless signature (an overload, an abstract method, an index
 //!   signature) after an expression left open — a statement or field initializer with no
 //!   `;` — where the line after it would continue that expression: it opens with `(`, `[`,
@@ -60,8 +65,27 @@ use std::fmt;
 
 use tsv_lang::{ParseError, Span};
 
-/// Strip the types from TypeScript `source` (module goal), keeping every surviving
+/// Strip the types from TypeScript `source`, keeping every surviving character at its line
+/// and UTF-16 column.
+///
+/// The goal is unset: [`strip_with_goal`] with `None`, which parses the source as a module
+/// and retries it as a script only if that fails, as the format path reads it.
+///
+/// # Errors
+///
+/// As [`strip_with_goal`].
+pub fn strip<'s>(source: &'s str, arena: &bumpalo::Bump) -> Result<Stripped<'s>, StripError> {
+    strip_with_goal(source, None, arena)
+}
+
+/// Strip the types from TypeScript `source` parsed against `goal`, keeping every surviving
 /// character at its line and UTF-16 column.
+///
+/// The parse is [`crate::parse_with_goal_or_fallback`]'s: `Some(goal)` is exact, and `None`
+/// parses at `Module`, retried at `Script` only if that fails, so a legacy sloppy script
+/// strips while a module-valid source is never reinterpreted. When both attempts fail, the
+/// error reported is the one that function picks. The output is JS at the goal the source
+/// was read at; nothing the walk decides depends on the goal.
 ///
 /// The caller owns `arena`, as with [`crate::parse`]: a loader keeps one per worker and
 /// resets it between modules.
@@ -70,8 +94,13 @@ use tsv_lang::{ParseError, Span};
 ///
 /// [`StripError::Parse`] when `source` does not parse; [`StripError::Unsupported`] when it
 /// holds TypeScript syntax that type blanking cannot erase.
-pub fn strip<'s>(source: &'s str, arena: &bumpalo::Bump) -> Result<Stripped<'s>, StripError> {
-    let program = crate::parse(source, arena).map_err(StripError::Parse)?;
+pub fn strip_with_goal<'s>(
+    source: &'s str,
+    goal: Option<crate::Goal>,
+    arena: &bumpalo::Bump,
+) -> Result<Stripped<'s>, StripError> {
+    let program =
+        crate::parse_with_goal_or_fallback(source, goal, arena).map_err(StripError::Parse)?;
     let mut walk = walk::Walk::new(source, arena);
     walk.program(&program);
     let mut edits = walk.finish()?;
@@ -247,6 +276,105 @@ mod tests {
             panic!("expected a parse error: {error:?}");
         };
         assert_eq!(error.message(source), parse.to_string());
+    }
+
+    fn stripped(source: &str) -> String {
+        let arena = bumpalo::Bump::new();
+        match strip(source, &arena) {
+            Ok(stripped) => stripped.code.into_owned(),
+            Err(error) => panic!("expected {source:?} to strip: {}", error.message(source)),
+        }
+    }
+
+    /// The rendered parse error the strip reports for `source`, and the one the parse at
+    /// `goal` reports, which it must be.
+    fn parse_errors(source: &str, goal: crate::Goal) -> (String, String) {
+        let StripError::Parse(stripped) = strip_error(source) else {
+            panic!("expected a parse error for {source:?}");
+        };
+        let arena = bumpalo::Bump::new();
+        let Err(parsed) = crate::parse_with_goal(source, goal, &arena) else {
+            panic!("expected {source:?} to fail at {goal:?}");
+        };
+        (stripped.to_string(), parsed.to_string())
+    }
+
+    /// With no goal named, a source the module grammar rejects is retried as a script, as
+    /// the format path's parse retries it: a legacy sloppy script strips. Each expected
+    /// output is ts-blank-space's, byte for byte.
+    #[test]
+    fn an_unset_goal_retries_a_failed_module_parse_as_a_script() {
+        for (source, code) in [
+            (
+                "fs.chmodSync(p as string, 0755);\n",
+                "fs.chmodSync(p          , 0755);\n",
+            ),
+            ("with (o as any) { x; }\n", "with (o       ) { x; }\n"),
+            ("var await: number = 1;\n", "var await         = 1;\n"),
+            ("let n = 08 as number;\n", "let n = 08          ;\n"),
+            (
+                "module.exports = function (mode: number = 0644) { return mode; };\n",
+                "module.exports = function (mode         = 0644) { return mode; };\n",
+            ),
+            // the script's own hazard sites take the same `;` the module's do
+            (
+                "var await: any;\nawait\ntype T = 1\n(z)\n",
+                "var await     ;\nawait\n;         \n(z)\n",
+            ),
+        ] {
+            assert_eq!(stripped(source), code, "{source:?}");
+        }
+    }
+
+    /// A `with` body is a lone statement body like an `if`'s: a statement blanked whole
+    /// there becomes `;`, so the statement after it cannot become the body. ts-blank-space
+    /// blanks the overload plain, which hands `f()` to the `with`.
+    #[test]
+    fn a_with_body_blanked_whole_becomes_an_empty_statement() {
+        assert_eq!(
+            stripped("with (o) type T = 1;\nf();\n"),
+            "with (o) ;          \nf();\n"
+        );
+        assert_eq!(
+            stripped("with (o) function f(): void;\nf();\n"),
+            "with (o) ;                  \nf();\n"
+        );
+    }
+
+    /// When both grammars reject the source, the error is the one the format path's
+    /// fallback reports: the script attempt's when it reached further without dying on a
+    /// module-only construct — a broken sloppy script's own typo, not the `with` the retry
+    /// admits — and otherwise the module attempt's.
+    #[test]
+    fn a_failed_retry_reports_the_attempt_the_source_was_written_for() {
+        let (stripped, script) = parse_errors("with (o) {}\nlet = ;\n", crate::Goal::Script);
+        assert_eq!(stripped, script, "the sloppy script's typo");
+        // a goal gate proves a module: its error is the file's own, though it sits first
+        let (stripped, module) =
+            parse_errors("let x: number = 0755;\nexport {};\n", crate::Goal::Module);
+        assert_eq!(stripped, module, "the module's legacy octal");
+        let (stripped, module) = parse_errors(
+            "import type { A } from 'a';\nlet x: A = 0755;\n",
+            crate::Goal::Module,
+        );
+        assert_eq!(stripped, module, "a type-only import is a goal gate too");
+        // a script with a `"use strict"` prologue is strict at either goal: a tie, the module's
+        let (stripped, module) = parse_errors(
+            "\"use strict\"; let x: number = 010;\n",
+            crate::Goal::Module,
+        );
+        assert_eq!(stripped, module, "a strict script");
+    }
+
+    /// Control: the retry runs on a module-parse failure alone, so a module-valid source
+    /// strips as the module it is — a top-level `await` stays an expression.
+    #[test]
+    fn a_module_valid_source_is_never_read_as_a_script() {
+        assert_eq!(stripped("await f() as T;\n"), "await f()     ;\n");
+        assert_eq!(
+            stripped("let x: number = 1;\nexport { x };\n"),
+            "let x         = 1;\nexport { x };\n"
+        );
     }
 
     #[test]

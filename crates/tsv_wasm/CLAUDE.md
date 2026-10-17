@@ -37,7 +37,7 @@ Every export takes `(source, options?)` with an acorn-style bag:
 - **`sourceType`** (`'script'` / `'module'`) is TypeScript-only — Svelte hard-wires `Module`,
   CSS has no goal — so the other languages reject a set value. Unset, it means `'module'`
   **for a parse** (the wire's `Program.sourceType` is a claim one settled grammar has to
-  produce); the format exports read the same absence differently — see
+  produce); the format exports and the strip read the same absence differently — see
   [Format Options](#format-options).
 - **Unknown keys always error**, whatever their value: a typo like `{locatons: true}` — or
   `{locatons: undefined}` — silently succeeding would hand back the default to a caller who
@@ -104,13 +104,13 @@ that would read as a parse failure.
 native `@fuzdev/tsv` alone — [docs/strip.md](../../docs/strip.md)). `strip_typescript(source,
 options?)` is the one export that RETURNS its failure: `{ok: true, code}` or `{ok: false, error}`,
 `error.kind` `'parse'` (the `message` / `start` / `loc` of the `SyntaxError` a parse of the
-source throws) or `'unsupported'` (`construct`, `message`, `start`, `end`, `loc: {start, end}`), a
+source throws at the goal the error belongs to) or `'unsupported'` (`construct`, `message`, `start`, `end`, `loc: {start, end}`), a
 plain object — no stack captured per failure, structured-clone-able across a worker. The
 line it draws: argument misuse is still a `TypeError` (the shared `read_source` /
-`read_options`, whose `'strip'` kind takes `sourceType: 'module'` alone, since the strip reads
-a module), an engine failure with no point still throws as itself, and anything the strip
-concludes about the source is the result. The raw export is `strip_typescript(source)` — no
-source type — returning the code or throwing the parse failure's pointed `Error`, or for a
+`read_options`, whose `'strip'` kind takes `sourceType` as a format's does), an engine failure with no point still throws as itself, and anything the strip
+concludes about the source is the result. The raw export is `strip_typescript(source, source_type?)` — the
+flat shape, its unset source type read as a format reads one (`tsv_arena::Family::Strip`) —
+returning the code or throwing the parse failure's pointed `Error`, or for a
 refusal an `Error` whose own ENUMERABLE `kind` (the construct's snake_case name), `start`,
 `line`, `column`, `end`, `end_line` and `end_column` carry it (`PointedError`'s strip-gated
 setters; `tsv_napi`'s `Failure::Refusal`), each deleted before it is set for the Bun reason
@@ -265,7 +265,8 @@ That is what lets `format_typescript(source)` with no bag
 script (`with`, a leading-zero literal or escape, `await` as a name). A **set** value
 is exact, so `{sourceType: 'module'}` refuses one; nothing the module grammar
 accepts is ever reinterpreted, and the printer reads no goal, so no output moves. The
-parse exports unwrap the same unset value to `Module` (see
+strip reads an unset value the same way (`tsv_ts::strip_with_goal`, whose walk reads no goal
+either). The parse exports unwrap the same unset value to `Module` (see
 [../../docs/cli.md §Multi-File Formatting](../../docs/cli.md#multi-file-formatting)).
 
 **`locations` is rejected here, not accepted-and-inert.** It asks for `loc` on a parse tree,
