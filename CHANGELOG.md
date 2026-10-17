@@ -13,6 +13,21 @@ Each `## Unreleased` section must be non-empty and carry a
 ## Unreleased
 <!-- bump: patch -->
 
+- feat: type stripping — `strip_typescript(source, options?)` in `@fuzdev/tsv-wasm` and
+  `@fuzdev/tsv`, and `tsv strip` in both CLIs, turn TypeScript into JS by blanking every type
+  to whitespace, so every line and column stays where it was. TypeScript that blanking cannot
+  erase (`enum`, a value `namespace`, parameter properties, `import =`, `export =`, `<T>x` —
+  what `erasableSyntaxOnly` rejects — and an `as` / `satisfies` whose blanking would regroup
+  its expression) is refused rather than transformed; the result is an object,
+  `{ok: true, code}` or `{ok: false, error}`, never a throw. Like `format`, an unnamed goal
+  reads a module first and retries as a script, and a `.mts` path is always a module;
+  `tsv strip` takes `.ts`/`.mts`/`.cts` paths (exit 0 stripped, 1 refused, 2 an error). The
+  format-only and parse-only packages do not carry it. See `docs/strip.md`
+- feat: a `TSMethodSignature` carries `readonly: true` when written (tsc's parser accepts it;
+  acorn-typescript rejects it)
+- **breaking** fix: code that parsed at 0.6.0 and now rejects, as tsc or Svelte does — a bare
+  type assertion as an assignment target (`a as T = 1`, `<T>a += 1`; parenthesized it still
+  parses), and a hashbang at the start of a Svelte `<script>` or template expression
 - fix: a type argument list followed by a `<`, or by a `+` or `-` on the next line, parses as
   tsc reads it — a comparison, not a list — so `f<T><U>(x)` is `(f < T) > <U>(x)`,
   `new f<T><U>(x)` is `(new f < T) > <U>(x)`, and `f<T>` with `+c` on the next line is
