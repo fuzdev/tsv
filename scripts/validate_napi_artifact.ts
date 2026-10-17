@@ -43,22 +43,22 @@ const { values: args } = parseArgs({
  * the size variable it might have looked like; the size variable is the TARGET
  * (win32/darwin-arm64 sit ~10% under the linux rows, darwin-x64 ~4%). */
 const BOUNDS: Record<string, [number, number]> = {
-	'linux-x64-gnu': [3_458_000, 4_060_000], // 3,758,816
-	'linux-arm64-gnu': [3_202_000, 3_760_000], // 3,480,696
-	'linux-x64-musl': [3_460_000, 4_063_000], // 3,761,776
-	'darwin-arm64': [3_061_000, 3_595_000], // 3,327,968
-	'darwin-x64': [3_336_000, 3_917_000], // 3,626,360
-	'win32-x64': [3_437_000, 4_035_000] // 3,736,064
+	'linux-x64-gnu': [3_730_000, 4_380_000], // 4,055,224
+	'linux-arm64-gnu': [3_443_000, 4_043_000], // 3,742,880
+	'linux-x64-musl': [3_735_000, 4_386_000], // 4,060,784
+	'darwin-arm64': [3_305_000, 3_881_000], // 3,593,376
+	'darwin-x64': [3_453_000, 4_055_000], // 3,753,896
+	'win32-x64': [3_716_000, 4_363_000] // 4,039,680
 };
 
 /** [min, max] bytes per triple for the native `tsv` CLI binary (`release`
  * profile: abort + LTO). Same anchoring discipline as `BOUNDS`, same runs. */
 const CLI_BOUNDS: Record<string, [number, number]> = {
-	'linux-x64-gnu': [3_359_000, 3_944_000], // 3,651,832
-	'linux-arm64-gnu': [3_082_000, 3_619_000], // 3,350,072
-	'linux-x64-musl': [3_362_000, 3_947_000], // 3,654,360
-	'darwin-arm64': [2_819_000, 3_311_000], // 3,065,088
-	'darwin-x64': [3_145_000, 3_693_000], // 3,418,904
+	'linux-x64-gnu': [3_609_000, 4_238_000], // 3,923,256
+	'linux-arm64-gnu': [3_323_000, 3_902_000], // 3,612,816
+	'linux-x64-musl': [3_610_000, 4_239_000], // 3,924,680
+	'darwin-arm64': [3_003_000, 3_526_000], // 3,264,528
+	'darwin-x64': [3_285_000, 3_857_000], // 3,571,048
 	'win32-x64': [2_990_000, 3_511_000] // 3,250,688
 };
 
@@ -79,12 +79,15 @@ if (!triple) {
 
 const cli_binary = cli_binary_name(triple!);
 
-const validate = (filename: string, bounds: [number, number] | undefined): void => {
+/** Check one artifact against its band, logging the size either way; returns false on a
+ * failure so both artifacts report before the exit (a failed addon must not hide the CLI's
+ * size, which the next re-anchor needs). */
+const validate = (filename: string, bounds: [number, number] | undefined): boolean => {
 	if (!bounds) {
 		console.error(
 			`FAIL: no ${filename} size bounds for triple '${triple}' — add a band in scripts/validate_napi_artifact.ts, ±8% around a matrix-built artifact (a wide placeholder until the first run prints one)`
 		);
-		Deno.exit(1);
+		return false;
 	}
 	const path = `${pkg_root}/${triple}/${filename}`;
 	let size: number;
@@ -92,7 +95,7 @@ const validate = (filename: string, bounds: [number, number] | undefined): void 
 		size = Deno.statSync(path).size;
 	} catch {
 		console.error(`FAIL: ${path} not staged — run 'deno task build:napi:packages' first`);
-		Deno.exit(1);
+		return false;
 	}
 	const [min, max] = bounds;
 	if (size < min || size > max) {
@@ -100,12 +103,14 @@ const validate = (filename: string, bounds: [number, number] | undefined): void 
 			`FAIL: ${triple} ${filename} is ${size} bytes (${format_size(size)}) — outside [${min}, ${max}]. ` +
 				`A deliberate size change must move the bound in scripts/validate_napi_artifact.ts.`
 		);
-		Deno.exit(1);
+		return false;
 	}
 	console.log(
 		`OK: ${triple} ${filename} ${size} bytes (${format_size(size)}) within [${min}, ${max}]`
 	);
+	return true;
 };
 
-validate('tsv_napi.node', BOUNDS[triple!]);
-validate(cli_binary, CLI_BOUNDS[triple!]);
+const addon_ok = validate('tsv_napi.node', BOUNDS[triple!]);
+const cli_ok = validate(cli_binary, CLI_BOUNDS[triple!]);
+if (!addon_ok || !cli_ok) Deno.exit(1);
