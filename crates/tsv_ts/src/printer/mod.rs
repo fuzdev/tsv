@@ -656,13 +656,34 @@ pub struct Printer<'a> {
     /// position asks about it — one built inside the comparison the collector records
     /// ahead of; an operand and the node it leads share a start, never a span.
     pub(crate) withheld_clarity_pair_targets: SpanMarks,
-    /// Whole-element authored comparison pairs retained by comma-list owners
-    /// ([`Self::mark_relational_sibling_authored_pairs`]), ahead of their element builds.
-    /// Read only at Argument and sequence-operand positions, keyed by span and never
-    /// consumed so conditional-group candidates share the same answer.
+    /// Authored pairs around a node holding a `<` / `<<` inside a comma-list region
+    /// ([`Self::mark_region_source_pairs`]), marked ahead of the element builds and read
+    /// wherever the printer decides that node's pair: [`Self::needs_parens`] at every
+    /// position, a conditional's test and branches, an assignment's value, and the
+    /// carriers that print their elements themselves. Keyed by span and never consumed so
+    /// conditional-group candidates share the same answer.
     pub(crate) relational_sibling_pair_targets: SpanMarks,
     /// Fast gate for the rare document carrying a retained comma-sibling pair.
     pub(crate) has_relational_sibling_pairs: Cell<bool>,
+    /// Spans whose style pair a comma-list region leaves out because the author wrote none
+    /// ([`Self::mark_region_source_pairs`]): an assignment at a style position, an arrow
+    /// function's conditional body, and an arrow function whose lone parameter is bare.
+    /// Each reader asks about its own kind of node, so the kinds share one set. Keyed by
+    /// span and never consumed, like [`Self::relational_sibling_pair_targets`].
+    pub(crate) region_bare_targets: SpanMarks,
+    /// Spans that keep the pair the author wrote directly behind a `typeof` or a unary `-`
+    /// or around an assignment's target inside a comma-list region
+    /// ([`Self::mark_region_source_pairs`]), read by the unary printer, by
+    /// [`Self::needs_parens`] at an assignment target, a callee, a tag and a non-null
+    /// operand and, for the head of a longer operand, by the chain linearizer.
+    pub(crate) region_kept_shell_targets: SpanMarks,
+    /// Fast gate for the rare document carrying either region mark set.
+    pub(crate) has_region_source_marks: Cell<bool>,
+    /// List elements a region walk ([`Self::mark_region_source_pairs`]) has already
+    /// covered, subtree and all. Every mark the walk sets is a fact about the node alone,
+    /// so a nested list's owner, or the same owner re-entered by another layout
+    /// candidate, skips an element already walked instead of walking its subtree again.
+    pub(crate) region_walked_elements: SpanMarks,
     /// The comment-free window the last comment search on this printer established
     /// ([`CommentFreeWindow`]: the mechanism, its soundness argument, and the gate's
     /// inline/outlined shape live there).
@@ -745,6 +766,10 @@ impl<'a> Printer<'a> {
             withheld_clarity_pair_targets: SpanMarks::default(),
             relational_sibling_pair_targets: SpanMarks::default(),
             has_relational_sibling_pairs: Cell::new(false),
+            region_bare_targets: SpanMarks::default(),
+            region_kept_shell_targets: SpanMarks::default(),
+            has_region_source_marks: Cell::new(false),
+            region_walked_elements: SpanMarks::default(),
             comment_free_gap,
         }
     }
@@ -1001,12 +1026,61 @@ impl<'a> Printer<'a> {
     /// only for the few free helpers that have no `self`.
     ///
     /// It also withholds a clarity pair where it would commit a type-argument list
-    /// ([`Self::clarity_pair_is_withheld`]).
+    /// ([`Self::clarity_pair_is_withheld`]), and the assignment pair a comma-list region
+    /// leaves out where the author wrote none ([`Self::region_withholds_assignment_pair`]),
+    /// and prints the pairs such a region keeps where the author wrote them
+    /// ([`Self::region_keeps_authored_pair`]).
     #[inline]
     pub(crate) fn needs_parens(&self, expr: &internal::Expression<'_>, ctx: ParenContext) -> bool {
         (needs_parens(expr, ctx, self.in_for_init.get())
-            && !self.clarity_pair_is_withheld(expr, ctx))
-            || (matches!(ctx, ParenContext::Argument) && self.relational_sibling_pair_is_kept(expr))
+            && !self.clarity_pair_is_withheld(expr, ctx)
+            && !self.region_withholds_assignment_pair(expr, ctx))
+            || ((self.has_relational_sibling_pairs.get() || self.has_region_source_marks.get())
+                && self.region_keeps_authored_pair(expr, ctx))
+    }
+
+    /// The pairs a comma-list region keeps where the author wrote them, asked only in a
+    /// document that marked one: an authored pair around a node holding a comparison, at
+    /// every position ([`Self::relational_sibling_pair_is_kept`]), and the shell around an
+    /// assignment target or the head a `typeof` / unary `-` operand opens on
+    /// ([`Self::region_keeps_shell`]).
+    #[cold]
+    #[inline(never)]
+    fn region_keeps_authored_pair(
+        &self,
+        expr: &internal::Expression<'_>,
+        ctx: ParenContext,
+    ) -> bool {
+        self.relational_sibling_pair_is_kept(expr)
+            || (matches!(
+                ctx,
+                ParenContext::AssignmentTarget { .. }
+                    | ParenContext::Callee
+                    | ParenContext::TaggedTemplateTag
+                    | ParenContext::NonNull
+            ) && self.region_keeps_shell(expr))
+    }
+
+    /// Whether `expr` is an assignment at one of the positions whose pair is the printer's
+    /// style — an argument or array element, a property value, a template substitution, an
+    /// arrow body — that a comma-list region prints bare ([`Self::region_withholds_pair`]).
+    /// The sequence operand, which prints its pair itself, asks the region directly.
+    #[inline]
+    fn region_withholds_assignment_pair(
+        &self,
+        expr: &internal::Expression<'_>,
+        ctx: ParenContext,
+    ) -> bool {
+        self.has_region_source_marks.get()
+            && matches!(
+                ctx,
+                ParenContext::Argument
+                    | ParenContext::ObjectPropertyValue
+                    | ParenContext::TemplateLiteralExpression
+                    | ParenContext::ArrowBody
+            )
+            && matches!(expr.kind, internal::ExpressionKind::AssignmentExpression(_))
+            && self.region_withholds_pair(expr)
     }
 
     /// Whether `expr`, at the position `ctx`, is a node whose clarity pair
@@ -1780,6 +1854,10 @@ impl<'a> Printer<'a> {
             source: self.source,
             comments: self.comments,
             withheld_clarity_pairs: &self.withheld_clarity_pair_targets,
+            region_kept_shells: self
+                .has_region_source_marks
+                .get()
+                .then_some(&self.region_kept_shell_targets),
         }
     }
 

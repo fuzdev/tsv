@@ -1,0 +1,1899 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1541,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 97,
+				"end": 99,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 99,
+				"end": 254,
+				"data": " A getter holding a `<` and a setter holding a `>` that may close the region: the setter's lone parameter written without a pair prints without one "
+			},
+			{
+				"type": "Text",
+				"start": 254,
+				"end": 255,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 255,
+				"end": 325,
+				"name": "input",
+				"attributes": [
+					{
+						"start": 262,
+						"end": 322,
+						"type": "BindDirective",
+						"name": "value",
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 274,
+							"end": 321,
+							"expressions": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 274,
+									"end": 287,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BinaryExpression",
+										"start": 280,
+										"end": 287,
+										"left": {
+											"type": "Identifier",
+											"start": 280,
+											"end": 282,
+											"name": "lo"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 285,
+											"end": 287,
+											"name": "hi"
+										}
+									}
+								},
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 289,
+									"end": 321,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 289,
+											"end": 290,
+											"name": "v"
+										}
+									],
+									"body": {
+										"type": "LogicalExpression",
+										"start": 294,
+										"end": 321,
+										"left": {
+											"type": "BinaryExpression",
+											"start": 294,
+											"end": 311,
+											"left": {
+												"type": "Identifier",
+												"start": 294,
+												"end": 295,
+												"name": "v"
+											},
+											"operator": ">",
+											"right": {
+												"type": "BinaryExpression",
+												"start": 298,
+												"end": 311,
+												"left": {
+													"type": "BinaryExpression",
+													"start": 299,
+													"end": 306,
+													"left": {
+														"type": "Identifier",
+														"start": 299,
+														"end": 301,
+														"name": "lo"
+													},
+													"operator": "+",
+													"right": {
+														"type": "Identifier",
+														"start": 304,
+														"end": 306,
+														"name": "hi"
+													}
+												},
+												"operator": "/",
+												"right": {
+													"type": "Literal",
+													"start": 310,
+													"end": 311,
+													"value": 2,
+													"raw": "2"
+												}
+											}
+										},
+										"operator": "&&",
+										"right": {
+											"type": "CallExpression",
+											"start": 315,
+											"end": 321,
+											"callee": {
+												"type": "Identifier",
+												"start": 315,
+												"end": 318,
+												"name": "set"
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 319,
+													"end": 320,
+													"name": "v"
+												}
+											],
+											"optional": false
+										}
+									}
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 325,
+				"end": 326,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 326,
+				"end": 468,
+				"name": "input",
+				"attributes": [
+					{
+						"start": 334,
+						"end": 465,
+						"type": "BindDirective",
+						"name": "value",
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 349,
+							"end": 462,
+							"expressions": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 349,
+									"end": 388,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BinaryExpression",
+										"start": 355,
+										"end": 388,
+										"left": {
+											"type": "Identifier",
+											"start": 355,
+											"end": 370,
+											"name": "lowerBoundValue"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 373,
+											"end": 388,
+											"name": "upperBoundValue"
+										}
+									}
+								},
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 392,
+									"end": 462,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 392,
+											"end": 397,
+											"name": "value"
+										}
+									],
+									"body": {
+										"type": "LogicalExpression",
+										"start": 401,
+										"end": 462,
+										"left": {
+											"type": "BinaryExpression",
+											"start": 401,
+											"end": 448,
+											"left": {
+												"type": "Identifier",
+												"start": 401,
+												"end": 406,
+												"name": "value"
+											},
+											"operator": ">",
+											"right": {
+												"type": "BinaryExpression",
+												"start": 409,
+												"end": 448,
+												"left": {
+													"type": "BinaryExpression",
+													"start": 410,
+													"end": 443,
+													"left": {
+														"type": "Identifier",
+														"start": 410,
+														"end": 425,
+														"name": "lowerBoundValue"
+													},
+													"operator": "+",
+													"right": {
+														"type": "Identifier",
+														"start": 428,
+														"end": 443,
+														"name": "upperBoundValue"
+													}
+												},
+												"operator": "/",
+												"right": {
+													"type": "Literal",
+													"start": 447,
+													"end": 448,
+													"value": 2,
+													"raw": "2"
+												}
+											}
+										},
+										"operator": "&&",
+										"right": {
+											"type": "CallExpression",
+											"start": 452,
+											"end": 462,
+											"callee": {
+												"type": "Identifier",
+												"start": 452,
+												"end": 455,
+												"name": "set"
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 456,
+													"end": 461,
+													"name": "value"
+												}
+											],
+											"optional": false
+										}
+									}
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 468,
+				"end": 470,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 470,
+				"end": 548,
+				"data": " The pair the author wrote behind `typeof` or a sign prints as written "
+			},
+			{
+				"type": "Text",
+				"start": 548,
+				"end": 549,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 549,
+				"end": 611,
+				"name": "input",
+				"attributes": [
+					{
+						"start": 556,
+						"end": 608,
+						"type": "BindDirective",
+						"name": "value",
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 568,
+							"end": 607,
+							"expressions": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 568,
+									"end": 579,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BinaryExpression",
+										"start": 574,
+										"end": 579,
+										"left": {
+											"type": "Identifier",
+											"start": 574,
+											"end": 575,
+											"name": "a"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 578,
+											"end": 579,
+											"name": "b"
+										}
+									}
+								},
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 581,
+									"end": 607,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 582,
+											"end": 583,
+											"name": "v"
+										}
+									],
+									"body": {
+										"type": "BinaryExpression",
+										"start": 588,
+										"end": 607,
+										"left": {
+											"type": "UnaryExpression",
+											"start": 588,
+											"end": 598,
+											"operator": "typeof",
+											"prefix": true,
+											"argument": {
+												"type": "Identifier",
+												"start": 596,
+												"end": 597,
+												"name": "v"
+											}
+										},
+										"operator": ">",
+										"right": {
+											"type": "SequenceExpression",
+											"start": 602,
+											"end": 606,
+											"expressions": [
+												{
+													"type": "Identifier",
+													"start": 602,
+													"end": 603,
+													"name": "a"
+												},
+												{
+													"type": "Identifier",
+													"start": 605,
+													"end": 606,
+													"name": "b"
+												}
+											]
+										}
+									}
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 611,
+				"end": 612,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 612,
+				"end": 668,
+				"name": "input",
+				"attributes": [
+					{
+						"start": 619,
+						"end": 665,
+						"type": "BindDirective",
+						"name": "value",
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 631,
+							"end": 664,
+							"expressions": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 631,
+									"end": 642,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BinaryExpression",
+										"start": 637,
+										"end": 642,
+										"left": {
+											"type": "Identifier",
+											"start": 637,
+											"end": 638,
+											"name": "a"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 641,
+											"end": 642,
+											"name": "b"
+										}
+									}
+								},
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 644,
+									"end": 664,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 645,
+											"end": 646,
+											"name": "v"
+										}
+									],
+									"body": {
+										"type": "BinaryExpression",
+										"start": 651,
+										"end": 664,
+										"left": {
+											"type": "UnaryExpression",
+											"start": 651,
+											"end": 655,
+											"operator": "-",
+											"prefix": true,
+											"argument": {
+												"type": "Literal",
+												"start": 653,
+												"end": 654,
+												"value": 1,
+												"raw": "1"
+											}
+										},
+										"operator": ">",
+										"right": {
+											"type": "SequenceExpression",
+											"start": 659,
+											"end": 663,
+											"expressions": [
+												{
+													"type": "Identifier",
+													"start": 659,
+													"end": 660,
+													"name": "a"
+												},
+												{
+													"type": "Identifier",
+													"start": 662,
+													"end": 663,
+													"name": "b"
+												}
+											]
+										}
+									}
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 668,
+				"end": 670,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 670,
+				"end": 706,
+				"data": " A comment beside the setter "
+			},
+			{
+				"type": "Text",
+				"start": 706,
+				"end": 707,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 707,
+				"end": 766,
+				"name": "input",
+				"attributes": [
+					{
+						"start": 714,
+						"end": 763,
+						"type": "BindDirective",
+						"name": "value",
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 726,
+							"end": 762,
+							"expressions": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 726,
+									"end": 737,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BinaryExpression",
+										"start": 732,
+										"end": 737,
+										"left": {
+											"type": "Identifier",
+											"start": 732,
+											"end": 733,
+											"name": "a"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 736,
+											"end": 737,
+											"name": "b"
+										}
+									},
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " k ",
+											"start": 739,
+											"end": 746
+										}
+									]
+								},
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 747,
+									"end": 762,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 747,
+											"end": 748,
+											"name": "v"
+										}
+									],
+									"body": {
+										"type": "BinaryExpression",
+										"start": 752,
+										"end": 762,
+										"left": {
+											"type": "Identifier",
+											"start": 752,
+											"end": 753,
+											"name": "v"
+										},
+										"operator": ">",
+										"right": {
+											"type": "SequenceExpression",
+											"start": 757,
+											"end": 761,
+											"expressions": [
+												{
+													"type": "Identifier",
+													"start": 757,
+													"end": 758,
+													"name": "a"
+												},
+												{
+													"type": "Identifier",
+													"start": 760,
+													"end": 761,
+													"name": "b"
+												}
+											]
+										}
+									}
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 766,
+				"end": 767,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 767,
+				"end": 831,
+				"name": "input",
+				"attributes": [
+					{
+						"start": 775,
+						"end": 828,
+						"type": "BindDirective",
+						"name": "value",
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 790,
+							"end": 825,
+							"expressions": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 790,
+									"end": 801,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BinaryExpression",
+										"start": 796,
+										"end": 801,
+										"left": {
+											"type": "Identifier",
+											"start": 796,
+											"end": 797,
+											"name": "a"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 800,
+											"end": 801,
+											"name": "b"
+										}
+									},
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " k",
+											"start": 803,
+											"end": 807
+										}
+									]
+								},
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 810,
+									"end": 825,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 810,
+											"end": 811,
+											"name": "v"
+										}
+									],
+									"body": {
+										"type": "BinaryExpression",
+										"start": 815,
+										"end": 825,
+										"left": {
+											"type": "Identifier",
+											"start": 815,
+											"end": 816,
+											"name": "v"
+										},
+										"operator": ">",
+										"right": {
+											"type": "SequenceExpression",
+											"start": 820,
+											"end": 824,
+											"expressions": [
+												{
+													"type": "Identifier",
+													"start": 820,
+													"end": 821,
+													"name": "a"
+												},
+												{
+													"type": "Identifier",
+													"start": 823,
+													"end": 824,
+													"name": "b"
+												}
+											]
+										}
+									}
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 831,
+				"end": 833,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 833,
+				"end": 972,
+				"data": " An operand's own pair around a comparison prints as written: the getter's around a value, and around an arrow that guards its body "
+			},
+			{
+				"type": "Text",
+				"start": 972,
+				"end": 973,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 973,
+				"end": 1015,
+				"name": "input",
+				"attributes": [
+					{
+						"start": 980,
+						"end": 1012,
+						"type": "BindDirective",
+						"name": "value",
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 992,
+							"end": 1011,
+							"expressions": [
+								{
+									"type": "BinaryExpression",
+									"start": 993,
+									"end": 998,
+									"left": {
+										"type": "Identifier",
+										"start": 993,
+										"end": 994,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 997,
+										"end": 998,
+										"name": "b"
+									}
+								},
+								{
+									"type": "BinaryExpression",
+									"start": 1001,
+									"end": 1011,
+									"left": {
+										"type": "Identifier",
+										"start": 1001,
+										"end": 1002,
+										"name": "c"
+									},
+									"operator": ">",
+									"right": {
+										"type": "SequenceExpression",
+										"start": 1006,
+										"end": 1010,
+										"expressions": [
+											{
+												"type": "Identifier",
+												"start": 1006,
+												"end": 1007,
+												"name": "d"
+											},
+											{
+												"type": "Identifier",
+												"start": 1009,
+												"end": 1010,
+												"name": "e"
+											}
+										]
+									}
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1015,
+				"end": 1016,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1016,
+				"end": 1090,
+				"name": "input",
+				"attributes": [
+					{
+						"start": 1023,
+						"end": 1087,
+						"type": "BindDirective",
+						"name": "value",
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 1035,
+							"end": 1086,
+							"expressions": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 1036,
+									"end": 1049,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BinaryExpression",
+										"start": 1042,
+										"end": 1049,
+										"left": {
+											"type": "Identifier",
+											"start": 1042,
+											"end": 1044,
+											"name": "lo"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 1047,
+											"end": 1049,
+											"name": "hi"
+										}
+									}
+								},
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 1052,
+									"end": 1086,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 1053,
+											"end": 1054,
+											"name": "v"
+										}
+									],
+									"body": {
+										"type": "LogicalExpression",
+										"start": 1059,
+										"end": 1086,
+										"left": {
+											"type": "BinaryExpression",
+											"start": 1059,
+											"end": 1076,
+											"left": {
+												"type": "Identifier",
+												"start": 1059,
+												"end": 1060,
+												"name": "v"
+											},
+											"operator": ">",
+											"right": {
+												"type": "BinaryExpression",
+												"start": 1063,
+												"end": 1076,
+												"left": {
+													"type": "BinaryExpression",
+													"start": 1064,
+													"end": 1071,
+													"left": {
+														"type": "Identifier",
+														"start": 1064,
+														"end": 1066,
+														"name": "lo"
+													},
+													"operator": "+",
+													"right": {
+														"type": "Identifier",
+														"start": 1069,
+														"end": 1071,
+														"name": "hi"
+													}
+												},
+												"operator": "/",
+												"right": {
+													"type": "Literal",
+													"start": 1075,
+													"end": 1076,
+													"value": 2,
+													"raw": "2"
+												}
+											}
+										},
+										"operator": "&&",
+										"right": {
+											"type": "CallExpression",
+											"start": 1080,
+											"end": 1086,
+											"callee": {
+												"type": "Identifier",
+												"start": 1080,
+												"end": 1083,
+												"name": "set"
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 1084,
+													"end": 1085,
+													"name": "v"
+												}
+											],
+											"optional": false
+										}
+									}
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1090,
+				"end": 1091,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1091,
+				"end": 1141,
+				"name": "input",
+				"attributes": [
+					{
+						"start": 1098,
+						"end": 1138,
+						"type": "BindDirective",
+						"name": "value",
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 1118,
+							"end": 1137,
+							"expressions": [
+								{
+									"type": "BinaryExpression",
+									"start": 1119,
+									"end": 1124,
+									"left": {
+										"type": "Identifier",
+										"start": 1119,
+										"end": 1120,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 1123,
+										"end": 1124,
+										"name": "b"
+									}
+								},
+								{
+									"type": "BinaryExpression",
+									"start": 1127,
+									"end": 1137,
+									"left": {
+										"type": "Identifier",
+										"start": 1127,
+										"end": 1128,
+										"name": "c"
+									},
+									"operator": ">",
+									"right": {
+										"type": "SequenceExpression",
+										"start": 1132,
+										"end": 1136,
+										"expressions": [
+											{
+												"type": "Identifier",
+												"start": 1132,
+												"end": 1133,
+												"name": "d"
+											},
+											{
+												"type": "Identifier",
+												"start": 1135,
+												"end": 1136,
+												"name": "e"
+											}
+										]
+									}
+								}
+							],
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " k ",
+									"start": 1110,
+									"end": 1117
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1141,
+				"end": 1142,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1142,
+				"end": 1215,
+				"name": "input",
+				"attributes": [
+					{
+						"start": 1150,
+						"end": 1212,
+						"type": "BindDirective",
+						"name": "value",
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 1165,
+							"end": 1209,
+							"expressions": [
+								{
+									"type": "BinaryExpression",
+									"start": 1166,
+									"end": 1171,
+									"left": {
+										"type": "Identifier",
+										"start": 1166,
+										"end": 1167,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 1170,
+										"end": 1171,
+										"name": "b"
+									}
+								},
+								{
+									"type": "BinaryExpression",
+									"start": 1197,
+									"end": 1209,
+									"left": {
+										"type": "Identifier",
+										"start": 1197,
+										"end": 1198,
+										"name": "c"
+									},
+									"operator": ">",
+									"right": {
+										"type": "SequenceExpression",
+										"start": 1204,
+										"end": 1208,
+										"expressions": [
+											{
+												"type": "Identifier",
+												"start": 1204,
+												"end": 1205,
+												"name": "d"
+											},
+											{
+												"type": "Identifier",
+												"start": 1207,
+												"end": 1208,
+												"name": "e"
+											}
+										]
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 1176,
+											"end": 1194
+										}
+									]
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1215,
+				"end": 1216,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1216,
+				"end": 1271,
+				"name": "input",
+				"attributes": [
+					{
+						"start": 1224,
+						"end": 1268,
+						"type": "BindDirective",
+						"name": "value",
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 1239,
+							"end": 1265,
+							"expressions": [
+								{
+									"type": "BinaryExpression",
+									"start": 1240,
+									"end": 1245,
+									"left": {
+										"type": "Identifier",
+										"start": 1240,
+										"end": 1241,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 1244,
+										"end": 1245,
+										"name": "b"
+									},
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " k",
+											"start": 1248,
+											"end": 1252
+										}
+									]
+								},
+								{
+									"type": "BinaryExpression",
+									"start": 1255,
+									"end": 1265,
+									"left": {
+										"type": "Identifier",
+										"start": 1255,
+										"end": 1256,
+										"name": "c"
+									},
+									"operator": ">",
+									"right": {
+										"type": "SequenceExpression",
+										"start": 1260,
+										"end": 1264,
+										"expressions": [
+											{
+												"type": "Identifier",
+												"start": 1260,
+												"end": 1261,
+												"name": "d"
+											},
+											{
+												"type": "Identifier",
+												"start": 1263,
+												"end": 1264,
+												"name": "e"
+											}
+										]
+									}
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1271,
+				"end": 1273,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1273,
+				"end": 1346,
+				"data": " The pair stays where no operand opens a region or none closes it "
+			},
+			{
+				"type": "Text",
+				"start": 1346,
+				"end": 1347,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1347,
+				"end": 1414,
+				"name": "input",
+				"attributes": [
+					{
+						"start": 1354,
+						"end": 1411,
+						"type": "BindDirective",
+						"name": "value",
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 1366,
+							"end": 1410,
+							"expressions": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 1366,
+									"end": 1374,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "Identifier",
+										"start": 1372,
+										"end": 1374,
+										"name": "lo"
+									}
+								},
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 1376,
+									"end": 1410,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 1377,
+											"end": 1378,
+											"name": "v"
+										}
+									],
+									"body": {
+										"type": "LogicalExpression",
+										"start": 1383,
+										"end": 1410,
+										"left": {
+											"type": "BinaryExpression",
+											"start": 1383,
+											"end": 1400,
+											"left": {
+												"type": "Identifier",
+												"start": 1383,
+												"end": 1384,
+												"name": "v"
+											},
+											"operator": ">",
+											"right": {
+												"type": "BinaryExpression",
+												"start": 1387,
+												"end": 1400,
+												"left": {
+													"type": "BinaryExpression",
+													"start": 1388,
+													"end": 1395,
+													"left": {
+														"type": "Identifier",
+														"start": 1388,
+														"end": 1390,
+														"name": "lo"
+													},
+													"operator": "+",
+													"right": {
+														"type": "Identifier",
+														"start": 1393,
+														"end": 1395,
+														"name": "hi"
+													}
+												},
+												"operator": "/",
+												"right": {
+													"type": "Literal",
+													"start": 1399,
+													"end": 1400,
+													"value": 2,
+													"raw": "2"
+												}
+											}
+										},
+										"operator": "&&",
+										"right": {
+											"type": "CallExpression",
+											"start": 1404,
+											"end": 1410,
+											"callee": {
+												"type": "Identifier",
+												"start": 1404,
+												"end": 1407,
+												"name": "set"
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 1408,
+													"end": 1409,
+													"name": "v"
+												}
+											],
+											"optional": false
+										}
+									}
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1414,
+				"end": 1415,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1415,
+				"end": 1466,
+				"name": "input",
+				"attributes": [
+					{
+						"start": 1422,
+						"end": 1463,
+						"type": "BindDirective",
+						"name": "value",
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 1434,
+							"end": 1462,
+							"expressions": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 1434,
+									"end": 1447,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BinaryExpression",
+										"start": 1440,
+										"end": 1447,
+										"left": {
+											"type": "Identifier",
+											"start": 1440,
+											"end": 1442,
+											"name": "lo"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 1445,
+											"end": 1447,
+											"name": "hi"
+										}
+									}
+								},
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 1449,
+									"end": 1462,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 1450,
+											"end": 1451,
+											"name": "v"
+										}
+									],
+									"body": {
+										"type": "CallExpression",
+										"start": 1456,
+										"end": 1462,
+										"callee": {
+											"type": "Identifier",
+											"start": 1456,
+											"end": 1459,
+											"name": "set"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 1460,
+												"end": 1461,
+												"name": "v"
+											}
+										],
+										"optional": false
+									}
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1466,
+				"end": 1467,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1467,
+				"end": 1540,
+				"name": "input",
+				"attributes": [
+					{
+						"start": 1474,
+						"end": 1537,
+						"type": "BindDirective",
+						"name": "value",
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 1486,
+							"end": 1536,
+							"expressions": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 1486,
+									"end": 1500,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BinaryExpression",
+										"start": 1492,
+										"end": 1500,
+										"left": {
+											"type": "Identifier",
+											"start": 1492,
+											"end": 1494,
+											"name": "lo"
+										},
+										"operator": "<=",
+										"right": {
+											"type": "Identifier",
+											"start": 1498,
+											"end": 1500,
+											"name": "hi"
+										}
+									}
+								},
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 1502,
+									"end": 1536,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 1503,
+											"end": 1504,
+											"name": "v"
+										}
+									],
+									"body": {
+										"type": "LogicalExpression",
+										"start": 1509,
+										"end": 1536,
+										"left": {
+											"type": "BinaryExpression",
+											"start": 1509,
+											"end": 1526,
+											"left": {
+												"type": "Identifier",
+												"start": 1509,
+												"end": 1510,
+												"name": "v"
+											},
+											"operator": ">",
+											"right": {
+												"type": "BinaryExpression",
+												"start": 1513,
+												"end": 1526,
+												"left": {
+													"type": "BinaryExpression",
+													"start": 1514,
+													"end": 1521,
+													"left": {
+														"type": "Identifier",
+														"start": 1514,
+														"end": 1516,
+														"name": "lo"
+													},
+													"operator": "+",
+													"right": {
+														"type": "Identifier",
+														"start": 1519,
+														"end": 1521,
+														"name": "hi"
+													}
+												},
+												"operator": "/",
+												"right": {
+													"type": "Literal",
+													"start": 1525,
+													"end": 1526,
+													"value": 2,
+													"raw": "2"
+												}
+											}
+										},
+										"operator": "&&",
+										"right": {
+											"type": "CallExpression",
+											"start": 1530,
+											"end": 1536,
+											"callee": {
+												"type": "Identifier",
+												"start": 1530,
+												"end": 1533,
+												"name": "set"
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 1534,
+													"end": 1535,
+													"name": "v"
+												}
+											],
+											"optional": false
+										}
+									}
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " k ",
+			"start": 739,
+			"end": 746
+		},
+		{
+			"type": "Line",
+			"value": " k",
+			"start": 803,
+			"end": 807
+		},
+		{
+			"type": "Block",
+			"value": " k ",
+			"start": 1110,
+			"end": 1117
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 1176,
+			"end": 1194
+		},
+		{
+			"type": "Line",
+			"value": " k",
+			"start": 1248,
+			"end": 1252
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 97,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 88,
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 20,
+					"end": 59,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 24,
+							"end": 30,
+							"id": {
+								"type": "Identifier",
+								"start": 24,
+								"end": 26,
+								"name": "lo"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 29,
+								"end": 30,
+								"value": 0,
+								"raw": "0"
+							}
+						},
+						{
+							"type": "VariableDeclarator",
+							"start": 34,
+							"end": 40,
+							"id": {
+								"type": "Identifier",
+								"start": 34,
+								"end": 36,
+								"name": "hi"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 39,
+								"end": 40,
+								"value": 1,
+								"raw": "1"
+							}
+						},
+						{
+							"type": "VariableDeclarator",
+							"start": 44,
+							"end": 49,
+							"id": {
+								"type": "Identifier",
+								"start": 44,
+								"end": 45,
+								"name": "a"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 48,
+								"end": 49,
+								"value": 0,
+								"raw": "0"
+							}
+						},
+						{
+							"type": "VariableDeclarator",
+							"start": 53,
+							"end": 58,
+							"id": {
+								"type": "Identifier",
+								"start": 53,
+								"end": 54,
+								"name": "b"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 57,
+								"end": 58,
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "let"
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 61,
+					"end": 87,
+					"id": {
+						"type": "Identifier",
+						"start": 70,
+						"end": 73,
+						"name": "set"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 74,
+							"end": 83,
+							"name": "v",
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 75,
+								"end": 83,
+								"typeAnnotation": {
+									"type": "TSNumberKeyword",
+									"start": 77,
+									"end": 83
+								}
+							}
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 85,
+						"end": 87,
+						"body": []
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

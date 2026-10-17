@@ -1012,7 +1012,14 @@ fn build_ternary_arrow_hug_states(
 
     // A forced break collapses the ladder to its break state alone — asked here of the BODY,
     // where the member-chain spelling asks it of the whole arrow.
-    build_ternary_arrow_hug_ladder(d, ArgOpener::Callee(callee), sig_doc, body_doc, body_doc)
+    build_ternary_arrow_hug_ladder(
+        d,
+        ArgOpener::Callee(callee),
+        sig_doc,
+        body_doc,
+        body_doc,
+        printer.arrow_body_takes_ternary_pair(body_expr),
+    )
 }
 
 /// Build the argument-list doc when the arguments carry comments (leading,

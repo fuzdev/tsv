@@ -476,6 +476,7 @@ impl<'a> Printer<'a> {
                                 sig_doc,
                                 body_doc,
                                 body_doc,
+                                self.arrow_body_takes_ternary_pair(body_expr),
                             );
                         }
 

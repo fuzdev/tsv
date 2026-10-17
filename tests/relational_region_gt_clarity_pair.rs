@@ -348,10 +348,11 @@ fn a_shift_closes_as_many_regions_as_it_has_angle_brackets() {
             "fn(g(a < b) < c, d >> await e);",
             "fn(g(a < b) < c, d >> (await e));",
         ),
-        // A grouping paren the printer strips closes nothing.
+        // A grouping paren closes nothing: the author's pair stays, and the shift still
+        // closes both regions.
         (
             "fn((a < b) < c, d >> await e);",
-            "fn(a < b < c, d >> await e);",
+            "fn((a < b) < c, d >> await e);",
         ),
         // The root operand's own clarity pair under a shift is one of them.
         (

@@ -12,7 +12,7 @@ governs every entry here live in [conformance_prettier.md](./conformance_prettie
 - Return type generic union — ◆print_width — [return_type_generic_union_long](../tests/fixtures/typescript/declarations/function/return_type_generic_union_long_prettier_divergence/)
 - Module path calls — ◆print_width — [path_calls_long](../tests/fixtures/typescript/modules/imports/path_calls_long_prettier_divergence/)
 - Instantiation expression parens — ◆prettier_bug — [instantiation_parens](../tests/fixtures/typescript/typescript_specific/assertions/instantiation_parens_prettier_divergence/), [export_default_instantiation](../tests/fixtures/typescript/modules/exports/default_wrappable_leftmost_operators/instantiation_prettier_divergence/), [instantiation_paren_follow](../tests/fixtures/typescript/typescript_specific/generics/instantiation_paren_follow_prettier_divergence/), [instantiation_paren_type_args_follow](../tests/fixtures/typescript/typescript_specific/generics/instantiation_paren_type_args_follow_prettier_divergence/), [instantiation_target_paren](../tests/fixtures/typescript/expressions/assignment/instantiation_target_paren_svelte_prettier_divergence/), [call_callee_instantiation_parens](../tests/fixtures/typescript/expressions/new/call_callee_instantiation_parens_prettier_divergence/), [instantiation_sealed_chain](../tests/fixtures/typescript/typescript_specific/generics/instantiation_sealed_chain_prettier_divergence/), [instantiation_paren_assertion_follow](../tests/fixtures/typescript/typescript_specific/generics/instantiation_paren_assertion_follow_prettier_divergence/)
-- Relational chain type-argument parens — ◆prettier_bug — [relational_chain_type_arg_parens](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_prettier_divergence/), [relational_chain_type_arg_parens_object_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_object_long_prettier_divergence/), [relational_chain_type_arg_parens_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_long_prettier_divergence/), [relational_chain_type_arg_parens_close_follow](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_close_follow_prettier_divergence/), [relational_chain_type_arg_parens_kept_shell](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_kept_shell_prettier_divergence/), [relational_chain_type_arg_parens_kept_shell_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_kept_shell_long_prettier_divergence/), [relational_chain_type_arg_parens_index_body](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_index_body_prettier_divergence/), [relational_paren_head_value_body_pair](../tests/fixtures/typescript/expressions/binary/relational_paren_head_value_body_pair_prettier_divergence/), [relational_region_inner_gt_break_long](../tests/fixtures/typescript/expressions/binary/relational_region_inner_gt_break_long_prettier_divergence/), [relational_chain_type_arg_parens_regex_follow](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_regex_follow_prettier_divergence/), [relational_chain_type_arg_parens_unary_follow](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_unary_follow_prettier_divergence/), [relational_chain_type_arg_parens_assertion_follow](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_assertion_follow_prettier_divergence/), [callee_comparison_over_assertion](../tests/fixtures/typescript/expressions/new/callee_comparison_over_assertion_prettier_divergence/), [less_than_index_comparison_over_assertion](../tests/fixtures/typescript/syntax/disambiguation/less_than_index_comparison_over_assertion_prettier_divergence/), [relational_chain_type_arg_parens_update_operand](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_update_operand_prettier_divergence/), [relational_region_inner_gt_clarity_pair](../tests/fixtures/typescript/expressions/binary/relational_region_inner_gt_clarity_pair_prettier_divergence/), [relational_region_inner_gt_clarity_pair_long](../tests/fixtures/typescript/expressions/binary/relational_region_inner_gt_clarity_pair_long_prettier_divergence/), [relational_region_inner_gt_clarity_pair_recovered_list](../tests/fixtures/typescript/expressions/binary/relational_region_inner_gt_clarity_pair_recovered_list_prettier_divergence/), [relational_sibling_authored_pair](../tests/fixtures/typescript/expressions/binary/relational_sibling_authored_pair_prettier_divergence/), [relational_sibling_authored_pair_regex_follow](../tests/fixtures/typescript/expressions/binary/relational_sibling_authored_pair_regex_follow_prettier_divergence/), [relational_sibling_authored_pair_long](../tests/fixtures/typescript/expressions/binary/relational_sibling_authored_pair_long_prettier_divergence/), [relational_sibling_authored_pair_shift](../tests/fixtures/typescript/expressions/binary/relational_sibling_authored_pair_shift_prettier_divergence/), [relational_sibling_authored_pair_comment](../tests/fixtures/typescript/expressions/binary/relational_sibling_authored_pair_comment_prettier_divergence/), [relational_sibling_authored_pair_prettier_ignore](../tests/fixtures/typescript/expressions/binary/relational_sibling_authored_pair_prettier_ignore_prettier_divergence/)
+- Relational chain type-argument parens — ◆prettier_bug — [relational_chain_type_arg_parens](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_prettier_divergence/), [relational_chain_type_arg_parens_object_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_object_long_prettier_divergence/), [relational_chain_type_arg_parens_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_long_prettier_divergence/), [relational_chain_type_arg_parens_close_follow](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_close_follow_prettier_divergence/), [relational_chain_type_arg_parens_kept_shell](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_kept_shell_prettier_divergence/), [relational_chain_type_arg_parens_kept_shell_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_kept_shell_long_prettier_divergence/), [relational_chain_type_arg_parens_index_body](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_index_body_prettier_divergence/), [relational_paren_head_value_body_pair](../tests/fixtures/typescript/expressions/binary/relational_paren_head_value_body_pair_prettier_divergence/), [relational_region_inner_gt_break_long](../tests/fixtures/typescript/expressions/binary/relational_region_inner_gt_break_long_prettier_divergence/), [relational_chain_type_arg_parens_regex_follow](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_regex_follow_prettier_divergence/), [relational_chain_type_arg_parens_unary_follow](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_unary_follow_prettier_divergence/), [relational_chain_type_arg_parens_assertion_follow](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_assertion_follow_prettier_divergence/), [callee_comparison_over_assertion](../tests/fixtures/typescript/expressions/new/callee_comparison_over_assertion_prettier_divergence/), [less_than_index_comparison_over_assertion](../tests/fixtures/typescript/syntax/disambiguation/less_than_index_comparison_over_assertion_prettier_divergence/), [relational_chain_type_arg_parens_update_operand](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_update_operand_prettier_divergence/), [relational_region_inner_gt_clarity_pair](../tests/fixtures/typescript/expressions/binary/relational_region_inner_gt_clarity_pair_prettier_divergence/), [relational_region_inner_gt_clarity_pair_long](../tests/fixtures/typescript/expressions/binary/relational_region_inner_gt_clarity_pair_long_prettier_divergence/), [relational_region_inner_gt_clarity_pair_recovered_list](../tests/fixtures/typescript/expressions/binary/relational_region_inner_gt_clarity_pair_recovered_list_prettier_divergence/), [relational_sibling_authored_pair](../tests/fixtures/typescript/expressions/binary/relational_sibling_authored_pair_prettier_divergence/), [relational_sibling_authored_pair_regex_follow](../tests/fixtures/typescript/expressions/binary/relational_sibling_authored_pair_regex_follow_prettier_divergence/), [relational_sibling_authored_pair_long](../tests/fixtures/typescript/expressions/binary/relational_sibling_authored_pair_long_prettier_divergence/), [relational_sibling_authored_pair_shift](../tests/fixtures/typescript/expressions/binary/relational_sibling_authored_pair_shift_prettier_divergence/), [relational_sibling_authored_pair_comment](../tests/fixtures/typescript/expressions/binary/relational_sibling_authored_pair_comment_prettier_divergence/), [relational_sibling_authored_pair_prettier_ignore](../tests/fixtures/typescript/expressions/binary/relational_sibling_authored_pair_prettier_ignore_prettier_divergence/), [relational_sibling_authored_pair_nested](../tests/fixtures/typescript/expressions/binary/relational_sibling_authored_pair_nested_prettier_divergence/), [relational_region_prefix_shell](../tests/fixtures/typescript/expressions/binary/relational_region_prefix_shell_prettier_divergence/), [relational_region_prefix_shell_regex_follow](../tests/fixtures/typescript/expressions/binary/relational_region_prefix_shell_regex_follow_prettier_divergence/), [relational_region_prefix_shell_long](../tests/fixtures/typescript/expressions/binary/relational_region_prefix_shell_long_prettier_divergence/), [relational_region_style_pair](../tests/fixtures/typescript/expressions/binary/relational_region_style_pair_prettier_divergence/), [relational_region_style_pair_long](../tests/fixtures/typescript/expressions/binary/relational_region_style_pair_long_prettier_divergence/), [relational_region_arrow_param_pair](../tests/fixtures/typescript/expressions/binary/relational_region_arrow_param_pair_prettier_divergence/), [function_relational_region](../tests/fixtures/svelte/directives/bind/function_relational_region_prettier_divergence/)
 - Non-null parenthesized base — ◆design_choice — [non_null_paren_base_long](../tests/fixtures/typescript/expressions/member/non_null_paren_base_long_prettier_divergence/)
 - Parenthesized binary member base — ◆design_choice ◆print_width — [paren_binary_base_long](../tests/fixtures/typescript/expressions/member/paren_binary_base_long_prettier_divergence/)
 - Constrained infer extends-operand parens — ◆prettier_bug — [constrained_extends_parens](../tests/fixtures/typescript/types/infer/constrained_extends_parens_prettier_divergence/)
@@ -508,9 +508,33 @@ The closer's follower is not read and no pair is synthesized on a bare element.
 A doubled pair becomes one; an assignment, sequence or JSDoc cast supplies its own.
 The rule's superset keeps the harmless pair in `fn((a < b), c > d)` too, beside
 `fn(a < b, c > d)` — the same soundness warrant as the clarity-pair hold below.
-**Known gaps**: only a pair around the WHOLE element is read, so a pair one level in —
-around an operand that ends the element (`assert(ready && (lo < hi), max > (hi - lo) * step)`)
-— still strips, and the line prints as a generic call on the next pass; and a blank line the
+The same holds at every depth of the region: from the `<` element to the closer's, both
+included, a pair the author wrote around any node holding a `<` / `<<` prints as written,
+wherever the printer would otherwise decide it. Where the comparison is the last thing the
+element prints — an arrow's expression body
+(`xs.filter((x) => (x < max), (y) => y > (lo + hi) / 2)`), a conditional's alternate, a
+binary's right operand (`assert(ready && (lo < hi), max > (hi - lo) * step)`), an
+assignment's value, a `yield` operand — its right operand would run on to the element's
+comma, and the stripped line is the same generic call. As a comparison's or shift's LEFT
+operand (`check(ok = (1 << bits) < limit, value >> (bits - 8))`), tsc's type grammar reads a
+nested list or closes a `>>` as two `>`s, and the stripped line is one tsc rejects. Elsewhere
+(`(c < d) ? e : f`, `(c < d) || e`) the stripped line still reads as the two comparisons; the
+pair stays because the author wrote it. An arrow that is another arrow's body keeps its pair
+as well (`fn(() => (c => c < d), e > (f, g))`), where the curried chain would print it bare and
+the line read as the generic call. Around a curried chain, or around its next head, an
+authored pair stays whatever the head holds (`useMemo(lo < hi, () => (v => v > (lo + hi) /
+2))`): printed bare, a head's `=>` follows another inside the region, a line tsv's own parse
+can refuse (`useMemo(lo < hi, () => v => v > (lo + hi) / 2)` does). A plain call whose sole
+argument is the chain (`g((c => d => e))`) is the exception: its own bracket bounds the chain,
+so the pair strips and the line still reads as written. A kept pair ends the chain, so a typed or generic head inside it
+(`fn(() => ((c): boolean => c < d), e > (f, g))`) prints as an ordinary arrow body, not as a
+curried chain broken open. A comparison inside a bracket of its own
+(`fn(g(h, (c < d)), …)`, `[(c < d)]`) opens no region the later `>` closes, so its pair
+follows the ordinary rules. A sequence and a JSDoc cast supply their own pair, as does an
+assignment at a position whose pair the region already follows from the source. **Known
+gap**: a same-operator logical chain still rebalances through a kept pair
+(`assert(ready && (ok && lo < hi), …)` prints `ready && ok && lo < hi`), and the line reads as
+a generic call. **Known gap**: a blank line the
 author left inside a kept pair (`fn((a < b⏎⏎), c > (d, e))`) is not a fixed point — the first
 pass opens the list with the blank between the elements and the second collapses it, as it
 does for an assignment's pair (`fn((a = b⏎⏎), c)`). Both passes keep the two comparisons.
@@ -521,9 +545,75 @@ Pinned by
 the comment placements in
 [relational_sibling_authored_pair_comment](../tests/fixtures/typescript/expressions/binary/relational_sibling_authored_pair_comment_prettier_divergence/),
 the frozen elements in
-[relational_sibling_authored_pair_prettier_ignore](../tests/fixtures/typescript/expressions/binary/relational_sibling_authored_pair_prettier_ignore_prettier_divergence/)
+[relational_sibling_authored_pair_prettier_ignore](../tests/fixtures/typescript/expressions/binary/relational_sibling_authored_pair_prettier_ignore_prettier_divergence/),
+the pairs inside an element in
+[relational_sibling_authored_pair_nested](../tests/fixtures/typescript/expressions/binary/relational_sibling_authored_pair_nested_prettier_divergence/)
 and the 100/101 boundary in
 [relational_sibling_authored_pair_long](../tests/fixtures/typescript/expressions/binary/relational_sibling_authored_pair_long_prettier_divergence/).
+
+**An authored pair behind `typeof` or a sign.** From that `<` element to the later
+element's flagged `>`, both included, a pair the author wrote directly behind `typeof` or a
+unary `-` stays (`fn(a < b, typeof (c) > (d, e))`, `fn(a < -(1), d > (e, f))`,
+`typeof (c)[d]`, `typeof (c.d).e`, `typeof (c)()`, `typeof (c)!`).
+`typeof c` is a type query and `-1` a negative literal type, so with the pair gone the two
+tokens bound a type-argument list and the `(` behind the `>` commits it: the output is
+`fn(a<b, typeof c>(d, e))` to tsc, to acorn-typescript and to tsv's own parse, one argument
+where there were two, and prettier's own second pass writes it out (behind a regex, the list
+has no follower it can take, and the stripped line does not parse at all). `typeof (` is no
+type, so the kept pair ends the list where the author's did. The rule reads the source only
+for whether the pair was written; the region is the parser's flag, as for every rule of the
+family, and the follower is not read, so it keeps pairs that were harmless too
+(`fn(a < b, typeof (c) > d)`, `fn(a < b + 1, typeof (c) > (d, e))`) — a superset with one
+fixed point per authoring. Where a later token already ends the type, both spellings are
+fixed points (`typeof (c) === 's'` beside `typeof c === 's'`, `-(c)` beside `-c`;
+[conformance_prettier.md §The dual-stable remainder, enumerated](./conformance_prettier.md#the-dual-stable-remainder-enumerated)).
+Outside a region, behind `void`, `~` and unary `+`, whose operand reads as no type, and behind
+`!`, which tsc's parser reads as a type prefix with or without the pair, the shell strips as
+everywhere else. **Known gap**: a shell inside
+an authored sequence pair in the region still strips (`fn(a < b, (y, (c)) > (d, e))` prints
+`(y, c) > (d, e)`, whose `(y,` tsc's recovery reads as a function type's parameters) — output
+tsc rejects, read as the input by acorn-typescript and tsv. Pinned by
+[relational_region_prefix_shell](../tests/fixtures/typescript/expressions/binary/relational_region_prefix_shell_prettier_divergence/),
+the regex follower in
+[relational_region_prefix_shell_regex_follow](../tests/fixtures/typescript/expressions/binary/relational_region_prefix_shell_regex_follow_prettier_divergence/)
+and the 100/101 boundary in
+[relational_region_prefix_shell_long](../tests/fixtures/typescript/expressions/binary/relational_region_prefix_shell_long_prettier_divergence/).
+
+**No pair of the printer's own between the two.** In the same span tsv prints none of the
+three pairs its style otherwise adds unless the author wrote it: around an arrow function's conditional body
+(`fn(a < b, (c) => c ? d : e, f > (g, h))`), around an assignment at an argument, element,
+sequence-operand, property-value, template or arrow-body position
+(`fn(a < b, c = d, e > (f, g))`, `[c = d]`, `` `${c = d}` ``), and around an arrow function's
+lone parameter written bare (`check(lo < hi, [x => x > (lo + hi) / 2])`). Each pair opens on
+text tsc's recovering type-argument parse completes — `(c ? d : e)` as a function type's
+parameter list (`c?`, then `d: e`), `(c = d)` as a parameter with an initializer, `(x) => x` as
+a function type in a tuple or a type literal — so prettier's output is a generic call missing
+its tokens to tsc, which rejects it (`',' expected`, `'=>' expected`), while acorn-typescript
+and tsv read the comparisons: prettier throws on its own output. The bare spellings are the
+same program — an arrow's concise body and a list element are each a whole
+`AssignmentExpression` — and every parser reads them as written. Each pair follows the source:
+one the author wrote stays (`(c) => (c ? d : e)` or `(c = d)` written in the region — an
+authoring tsc rejects as written — prints as written), and a pair around a parameter is what
+keeps a list element's arrow (`fn(a < b, (c) => c ? d : e, f > (g, h))`) a line tsv's own parse
+reads as comparisons. An assignment target's own shell stays with it (`(c) = d`): stripped, a
+bare target would stand where the author's `(` did, which inside an authored sequence pair
+(`(y, c = d)`) tsc's recovery reads as a function type's parameters. Pairs
+the tree needs stay (`(c = d) + 1`, `() => ({})`, a sequence's own pair), and the follower is
+not read: the rule keys on the parser's flag, a superset that also leaves out pairs tsc's
+recovery would not have claimed (`(c) => c ? 1 : 2`, `c += d`, a bare-name follower) — one
+fixed point. **Known gap**: a number's member access still prints in a pair
+(`fn(a < b, 5..toFixed() > (c, d))` prints `(5).toFixed()`), a shell ahead of a `.` that tsv's
+own parse then rejects on a second pass. Pinned by
+[relational_region_style_pair](../tests/fixtures/typescript/expressions/binary/relational_region_style_pair_prettier_divergence/),
+the 100/101 boundary in
+[relational_region_style_pair_long](../tests/fixtures/typescript/expressions/binary/relational_region_style_pair_long_prettier_divergence/)
+the parameter in
+[relational_region_arrow_param_pair](../tests/fixtures/typescript/expressions/binary/relational_region_arrow_param_pair_prettier_divergence/),
+and a Svelte function binding (`bind:value={() => lo < hi, v => v > (lo + hi) / 2 && set(v)}`),
+whose host prints the two operands bare as the list they are, in
+[function_relational_region](../tests/fixtures/svelte/directives/bind/function_relational_region_prettier_divergence/) — there prettier's
+pair turns the binding into one generic call, a value Svelte's compiler rejects as no
+`{get, set}` pair.
 
 **Whether a `(` of the printer's own follows.** A `(` past the `>` commits on any line, and
 printed from a bare authoring that `(` is the formatter's doing. `fn(a < b, c > await d)` is two

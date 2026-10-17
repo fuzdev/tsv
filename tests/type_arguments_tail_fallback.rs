@@ -182,7 +182,7 @@ fn a_tail_that_is_no_list_reads_as_two_comparisons() {
         ("fn(a < b, -c > (d, e));", "fn(a < b, -c > (d, e));"),
         ("fn(a < b, c in d > (e, f));", "fn(a < b, c in d > (e, f));"),
         ("fn(a < b, c && d > (e, f));", "fn(a < b, c && d > (e, f));"),
-        ("fn(a < b, c = d > (e, f));", "fn(a < b, (c = d > (e, f)));"),
+        ("fn(a < b, c = d > (e, f));", "fn(a < b, c = d > (e, f));"),
         ("fn(a < b, c + d > `t`);", "fn(a < b, c + d > `t`);"),
         (
             "x = [a < b, c * d > (e, f)];",
@@ -229,11 +229,11 @@ fn a_tail_that_is_no_list_reads_as_two_comparisons() {
         ),
         (
             "fn(a < b, c + d > (e, f), g => g > (h, i));",
-            "fn(a < b, c + d > (e, f), (g) => g > (h, i));",
+            "fn(a < b, c + d > (e, f), g => g > (h, i));",
         ),
         (
             "fn(a < b, async c => c > (d, e));",
-            "fn(a < b, async (c) => c > (d, e));",
+            "fn(a < b, async c => c > (d, e));",
         ),
         // A paren pair ahead of a token no type continues with: one the printer keeps,
         // and a shell it strips, where the name left bare takes that token no better
@@ -331,18 +331,11 @@ fn a_failure_in_the_first_argument_stays_the_lists_own() {
 #[test]
 fn a_tail_the_printer_would_complete_stays_rejected() {
     for source in [
-        // The list stopped at a `=>`: the bare parameter prints in a paren pair, a
-        // function type's.
-        "fn(a < b, c => c > (d - e) * 2);",
-        "fn(a < b, c => d, e > (f, g));",
-        "fn(a < b, [c => d], e > (f, g));",
-        "fn(a < b, { m: c => d }, e > (f, g));",
-        "fn(a < b, (c => d), e > (f, g));",
-        "fn(a < b, c => d => d > (e, f));",
-        "fn(a < b, c /* k */ => c > (d, e));",
-        "x = [a < b, c => c > (d, e)];",
-        // (wider than the hazard: no pair makes `c + 1` a function type's return)
-        "fn(a < b, c => c + 1 > (d, e));",
+        // The list stopped at a `=>` past another: the earlier one a function type's and
+        // the braces a type literal, inside a block body the printer pairs as its style
+        // decides.
+        "fn(a < b, () => { x: y => y }, f > (g, h));",
+        "fn(a < b, () => { return (c) => c ? d : e }, f > (g, h));",
         // The list stopped at a `.` or a `<` right behind a `)`: the shell is stripped,
         // and the name it leaves takes the member or the list behind it.
         "fn(a < b, (c).d > (e, f));",
@@ -361,14 +354,70 @@ fn a_tail_the_printer_would_complete_stays_rejected() {
     }
     // The fixture's first line, with the message its `tsv_rejects.txt` pins.
     assert_eq!(
-        error("fn(a < b, c => c > (d - e) * 2);"),
-        ("Expected '>', found ''=>''".to_owned(), "1:13".to_owned())
+        error("fn(a < b, (c).d > (e, f));"),
+        ("Expected '>', found ''.''".to_owned(), "1:14".to_owned())
     );
 }
 
 #[test]
+fn a_bare_arrow_parameter_is_kept_not_refused() {
+    // The list stops at the `=>`, and the comparisons parse: the comma-list owner keeps an
+    // arrow function's lone parameter bare between the two comparisons
+    // (`tests/relational_region_pairs.rs`), so no `(c) => c` function type is printed, and
+    // the line is its own fixed point.
+    for (source, printed) in [
+        (
+            "fn(a < b, c => c > (d - e) * 2);",
+            "fn(a < b, c => c > (d - e) * 2);",
+        ),
+        (
+            "fn(a < b, c => d, e > (f, g));",
+            "fn(a < b, c => d, e > (f, g));",
+        ),
+        (
+            "fn(a < b, [c => d], e > (f, g));",
+            "fn(a < b, [c => d], e > (f, g));",
+        ),
+        (
+            "fn(a < b, { m: c => d }, e > (f, g));",
+            "fn(a < b, { m: c => d }, e > (f, g));",
+        ),
+        (
+            "fn(a < b, (c => d), e > (f, g));",
+            "fn(a < b, c => d, e > (f, g));",
+        ),
+        (
+            "fn(a < b, c => d => d > (e, f));",
+            "fn(a < b, c => d => d > (e, f));",
+        ),
+        (
+            "fn(a < b, c /* k */ => c > (d, e));",
+            "fn(a < b, c /* k */ => c > (d, e));",
+        ),
+        (
+            "x = [a < b, c => c > (d, e)];",
+            "x = [a < b, c => c > (d, e)];",
+        ),
+        (
+            "fn(a < b, c => c + 1 > (d, e));",
+            "fn(a < b, c => c + 1 > (d, e));",
+        ),
+        (
+            "fn(a < b, x => c < d as T, e > (f, g));",
+            "fn(a < b, x => (c < d) as T, e > (f, g));",
+        ),
+        (
+            "xs.filter(x => x < max, y => y > (lo + hi) / 2);",
+            "xs.filter(\n\tx => x < max,\n\ty => y > (lo + hi) / 2\n);",
+        ),
+    ] {
+        assert_two_comparisons(source, printed);
+    }
+}
+
+#[test]
 fn the_same_comparisons_parse_once_no_list_can_be_read() {
-    // The authoring the refused spellings can take: the first comparison written from
+    // Spellings from which no list can be read at all: the first comparison written from
     // the other side, either one hoisted, or a `function` in the arrow's place.
     for (source, printed) in [
         (
@@ -394,57 +443,36 @@ fn the_same_comparisons_parse_once_no_list_can_be_read() {
 }
 
 #[test]
-fn a_shell_behind_a_prefix_operator_is_not_refused() {
-    // The known gap of the refusal: the list stops AT the shell's `(` here, which reads
-    // as a call's from where the parser stands. The comparisons parse, the shell is
-    // stripped, and the output is a generic call to every parser — so neither line is a
-    // fixed point. Refusing them is the fix this pins the absence of.
-    for (source, printed, reread) in [
-        (
-            "fn(a < b, typeof (c) > (d, e));",
-            "fn(a < b, typeof c > (d, e));\n",
-            "fn(a<b, typeof c>(d, e));\n",
-        ),
-        (
-            "fn(a < b, -(1) > (d, e));",
-            "fn(a < b, -1 > (d, e));\n",
-            "fn(a<b, -1>(d, e));\n",
-        ),
+fn a_shell_behind_a_prefix_operator_is_kept_not_refused() {
+    // The list stops AT the shell's `(` here, which reads as a call's from where the parser
+    // stands, so the comparisons parse. Stripped, `typeof c` and `-1` would be types and the
+    // output a generic call to every parser; the printer keeps the author's pair instead
+    // (`tests/relational_region_pairs.rs`), and the line is its own fixed point.
+    for source in [
+        "fn(a < b, typeof (c) > (d, e));",
+        "fn(a < b, -(1) > (d, e));",
     ] {
-        let output = tsv_ts::format_str(source).expect("the case parses");
-        assert_eq!(output, printed, "printed from {source:?}");
-        assert_eq!(
-            tsv_ts::format_str(&output).expect("the output reparses"),
-            reread,
-            "the second pass of {source:?}"
-        );
+        assert_two_comparisons(source, source);
     }
 }
 
 #[test]
 fn a_pair_the_printer_adds_is_not_read_by_the_refusal() {
-    // The refusal reads the source's tokens; these pairs are the printer's own.
+    // The refusal reads the source's tokens; this pair is the printer's own.
     //
     // A number's member access prints in a pair, which is then a shell ahead of a `.`:
     // the comparisons parse, and their output is rejected on a second pass.
     let output = tsv_ts::format_str("fn(a < b, 5..toFixed() > (c, d));").expect("the case parses");
     assert_eq!(output, "fn(a < b, (5).toFixed() > (c, d));\n");
     assert!(rejects(&output), "{output:?}");
-    // An assignment and an arrow function's conditional body print in a pair too. Both
-    // lines stay two comparisons to this parser and to acorn-typescript, and fixed
-    // points; the compiler's recovering list parse claims the printed pair and rejects
-    // the line.
-    for (source, printed) in [
-        (
-            "fn(a < b, c = d, e > (f, g));",
-            "fn(a < b, (c = d), e > (f, g));",
-        ),
-        (
-            "fn(a < b, (c) => c ? d : e, f > (g, h));",
-            "fn(a < b, (c) => (c ? d : e), f > (g, h));",
-        ),
+    // The pairs the printer would add around an assignment or an arrow function's
+    // conditional body are left out between the two comparisons
+    // (`tests/relational_region_pairs.rs`), so both lines print as written.
+    for source in [
+        "fn(a < b, c = d, e > (f, g));",
+        "fn(a < b, (c) => c ? d : e, f > (g, h));",
     ] {
-        assert_two_comparisons(source, printed);
+        assert_two_comparisons(source, source);
     }
 }
 

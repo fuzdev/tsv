@@ -1,0 +1,3322 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1744,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 1592,
+				"end": 1594,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 1594,
+				"end": 1636,
+				"expression": {
+					"type": "CallExpression",
+					"start": 1595,
+					"end": 1635,
+					"callee": {
+						"type": "Identifier",
+						"start": 1595,
+						"end": 1600,
+						"name": "check"
+					},
+					"arguments": [
+						{
+							"type": "BinaryExpression",
+							"start": 1601,
+							"end": 1608,
+							"left": {
+								"type": "Identifier",
+								"start": 1601,
+								"end": 1603,
+								"name": "lo"
+							},
+							"operator": "<",
+							"right": {
+								"type": "Identifier",
+								"start": 1606,
+								"end": 1608,
+								"name": "hi"
+							}
+						},
+						{
+							"type": "ArrayExpression",
+							"start": 1610,
+							"end": 1634,
+							"elements": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 1611,
+									"end": 1633,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 1611,
+											"end": 1612,
+											"name": "x"
+										}
+									],
+									"body": {
+										"type": "BinaryExpression",
+										"start": 1616,
+										"end": 1633,
+										"left": {
+											"type": "Identifier",
+											"start": 1616,
+											"end": 1617,
+											"name": "x"
+										},
+										"operator": ">",
+										"right": {
+											"type": "BinaryExpression",
+											"start": 1620,
+											"end": 1633,
+											"left": {
+												"type": "BinaryExpression",
+												"start": 1621,
+												"end": 1628,
+												"left": {
+													"type": "Identifier",
+													"start": 1621,
+													"end": 1623,
+													"name": "lo"
+												},
+												"operator": "+",
+												"right": {
+													"type": "Identifier",
+													"start": 1626,
+													"end": 1628,
+													"name": "hi"
+												}
+											},
+											"operator": "/",
+											"right": {
+												"type": "Literal",
+												"start": 1632,
+												"end": 1633,
+												"value": 2,
+												"raw": "2"
+											}
+										}
+									}
+								}
+							]
+						}
+					],
+					"optional": false
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1636,
+				"end": 1637,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1637,
+				"end": 1689,
+				"name": "div",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 1642,
+						"end": 1682,
+						"name": "data-attr",
+						"value": {
+							"type": "ExpressionTag",
+							"start": 1652,
+							"end": 1682,
+							"expression": {
+								"type": "CallExpression",
+								"start": 1653,
+								"end": 1681,
+								"callee": {
+									"type": "Identifier",
+									"start": 1653,
+									"end": 1655,
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "BinaryExpression",
+										"start": 1656,
+										"end": 1661,
+										"left": {
+											"type": "Identifier",
+											"start": 1656,
+											"end": 1657,
+											"name": "a"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 1660,
+											"end": 1661,
+											"name": "b"
+										}
+									},
+									{
+										"type": "ArrayExpression",
+										"start": 1663,
+										"end": 1680,
+										"elements": [
+											{
+												"type": "ArrowFunctionExpression",
+												"start": 1664,
+												"end": 1679,
+												"id": null,
+												"expression": true,
+												"generator": false,
+												"async": false,
+												"params": [
+													{
+														"type": "Identifier",
+														"start": 1664,
+														"end": 1665,
+														"name": "c"
+													}
+												],
+												"body": {
+													"type": "BinaryExpression",
+													"start": 1669,
+													"end": 1679,
+													"left": {
+														"type": "Identifier",
+														"start": 1669,
+														"end": 1670,
+														"name": "c"
+													},
+													"operator": ">",
+													"right": {
+														"type": "SequenceExpression",
+														"start": 1674,
+														"end": 1678,
+														"expressions": [
+															{
+																"type": "Identifier",
+																"start": 1674,
+																"end": 1675,
+																"name": "d"
+															},
+															{
+																"type": "Identifier",
+																"start": 1677,
+																"end": 1678,
+																"name": "e"
+															}
+														]
+													}
+												}
+											}
+										]
+									}
+								],
+								"optional": false
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1689,
+				"end": 1690,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 1690,
+				"end": 1743,
+				"test": {
+					"type": "CallExpression",
+					"start": 1695,
+					"end": 1726,
+					"callee": {
+						"type": "Identifier",
+						"start": 1695,
+						"end": 1697,
+						"name": "fn"
+					},
+					"arguments": [
+						{
+							"type": "BinaryExpression",
+							"start": 1698,
+							"end": 1703,
+							"left": {
+								"type": "Identifier",
+								"start": 1698,
+								"end": 1699,
+								"name": "a"
+							},
+							"operator": "<",
+							"right": {
+								"type": "Identifier",
+								"start": 1702,
+								"end": 1703,
+								"name": "b"
+							}
+						},
+						{
+							"type": "ArrayExpression",
+							"start": 1705,
+							"end": 1725,
+							"elements": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 1706,
+									"end": 1712,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 1706,
+											"end": 1707,
+											"name": "c"
+										}
+									],
+									"body": {
+										"type": "Identifier",
+										"start": 1711,
+										"end": 1712,
+										"name": "c"
+									}
+								},
+								{
+									"type": "BinaryExpression",
+									"start": 1714,
+									"end": 1724,
+									"left": {
+										"type": "Identifier",
+										"start": 1714,
+										"end": 1715,
+										"name": "d"
+									},
+									"operator": ">",
+									"right": {
+										"type": "SequenceExpression",
+										"start": 1719,
+										"end": 1723,
+										"expressions": [
+											{
+												"type": "Identifier",
+												"start": 1719,
+												"end": 1720,
+												"name": "e"
+											},
+											{
+												"type": "Identifier",
+												"start": 1722,
+												"end": 1723,
+												"name": "f"
+											}
+										]
+									}
+								}
+							]
+						}
+					],
+					"optional": false
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 1727,
+							"end": 1738,
+							"name": "p",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1730,
+										"end": 1734,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						}
+					]
+				},
+				"alternate": null
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Between a sibling holding a `<` and a later sibling's `>` that may close the region, an arrow",
+			"start": 20,
+			"end": 116
+		},
+		{
+			"type": "Line",
+			"value": " function's lone parameter written without a pair prints without one",
+			"start": 118,
+			"end": 188
+		},
+		{
+			"type": "Line",
+			"value": " A list element of its own, between the two comparisons or holding the closer",
+			"start": 269,
+			"end": 348
+		},
+		{
+			"type": "Line",
+			"value": " The carriers",
+			"start": 507,
+			"end": 522
+		},
+		{
+			"type": "Line",
+			"value": " The arrow ahead of the closer, after another element, curried, behind `async`",
+			"start": 746,
+			"end": 826
+		},
+		{
+			"type": "Line",
+			"value": " The follower is not read",
+			"start": 1013,
+			"end": 1040
+		},
+		{
+			"type": "Line",
+			"value": " The region is the parser's flag, so a `<` side no list can be read from keeps it bare too",
+			"start": 1132,
+			"end": 1224
+		},
+		{
+			"type": "Line",
+			"value": " The pair stays where no later sibling holds a closer or no sibling opens a region",
+			"start": 1261,
+			"end": 1345
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1592,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1583,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 190,
+					"end": 231,
+					"expression": {
+						"type": "CallExpression",
+						"start": 190,
+						"end": 230,
+						"callee": {
+							"type": "Identifier",
+							"start": 190,
+							"end": 195,
+							"name": "check"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 196,
+								"end": 203,
+								"left": {
+									"type": "Identifier",
+									"start": 196,
+									"end": 198,
+									"name": "lo"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 201,
+									"end": 203,
+									"name": "hi"
+								}
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 205,
+								"end": 229,
+								"elements": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 206,
+										"end": 228,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 206,
+												"end": 207,
+												"name": "x"
+											}
+										],
+										"body": {
+											"type": "BinaryExpression",
+											"start": 211,
+											"end": 228,
+											"left": {
+												"type": "Identifier",
+												"start": 211,
+												"end": 212,
+												"name": "x"
+											},
+											"operator": ">",
+											"right": {
+												"type": "BinaryExpression",
+												"start": 215,
+												"end": 228,
+												"left": {
+													"type": "BinaryExpression",
+													"start": 216,
+													"end": 223,
+													"left": {
+														"type": "Identifier",
+														"start": 216,
+														"end": 218,
+														"name": "lo"
+													},
+													"operator": "+",
+													"right": {
+														"type": "Identifier",
+														"start": 221,
+														"end": 223,
+														"name": "hi"
+													}
+												},
+												"operator": "/",
+												"right": {
+													"type": "Literal",
+													"start": 227,
+													"end": 228,
+													"value": 2,
+													"raw": "2"
+												}
+											}
+										}
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Between a sibling holding a `<` and a later sibling's `>` that may close the region, an arrow",
+							"start": 20,
+							"end": 116
+						},
+						{
+							"type": "Line",
+							"value": " function's lone parameter written without a pair prints without one",
+							"start": 118,
+							"end": 188
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 233,
+					"end": 267,
+					"expression": {
+						"type": "CallExpression",
+						"start": 233,
+						"end": 266,
+						"callee": {
+							"type": "Identifier",
+							"start": 233,
+							"end": 235,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 236,
+								"end": 241,
+								"left": {
+									"type": "Identifier",
+									"start": 236,
+									"end": 237,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 240,
+									"end": 241,
+									"name": "b"
+								}
+							},
+							{
+								"type": "ObjectExpression",
+								"start": 243,
+								"end": 265,
+								"properties": [
+									{
+										"type": "Property",
+										"start": 245,
+										"end": 263,
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 245,
+											"end": 246,
+											"name": "q"
+										},
+										"value": {
+											"type": "ArrowFunctionExpression",
+											"start": 248,
+											"end": 263,
+											"id": null,
+											"expression": true,
+											"generator": false,
+											"async": false,
+											"params": [
+												{
+													"type": "Identifier",
+													"start": 248,
+													"end": 249,
+													"name": "c"
+												}
+											],
+											"body": {
+												"type": "BinaryExpression",
+												"start": 253,
+												"end": 263,
+												"left": {
+													"type": "Identifier",
+													"start": 253,
+													"end": 254,
+													"name": "c"
+												},
+												"operator": ">",
+												"right": {
+													"type": "SequenceExpression",
+													"start": 258,
+													"end": 262,
+													"expressions": [
+														{
+															"type": "Identifier",
+															"start": 258,
+															"end": 259,
+															"name": "d"
+														},
+														{
+															"type": "Identifier",
+															"start": 261,
+															"end": 262,
+															"name": "e"
+														}
+													]
+												}
+											}
+										},
+										"kind": "init"
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 350,
+					"end": 405,
+					"expression": {
+						"type": "CallExpression",
+						"start": 350,
+						"end": 404,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 350,
+							"end": 359,
+							"object": {
+								"type": "Identifier",
+								"start": 350,
+								"end": 352,
+								"name": "xs"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 353,
+								"end": 359,
+								"name": "filter"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 363,
+								"end": 375,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 363,
+										"end": 364,
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 368,
+									"end": 375,
+									"left": {
+										"type": "Identifier",
+										"start": 368,
+										"end": 369,
+										"name": "x"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 372,
+										"end": 375,
+										"name": "max"
+									}
+								}
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 379,
+								"end": 401,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 379,
+										"end": 380,
+										"name": "y"
+									}
+								],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 384,
+									"end": 401,
+									"left": {
+										"type": "Identifier",
+										"start": 384,
+										"end": 385,
+										"name": "y"
+									},
+									"operator": ">",
+									"right": {
+										"type": "BinaryExpression",
+										"start": 388,
+										"end": 401,
+										"left": {
+											"type": "BinaryExpression",
+											"start": 389,
+											"end": 396,
+											"left": {
+												"type": "Identifier",
+												"start": 389,
+												"end": 391,
+												"name": "lo"
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 394,
+												"end": 396,
+												"name": "hi"
+											}
+										},
+										"operator": "/",
+										"right": {
+											"type": "Literal",
+											"start": 400,
+											"end": 401,
+											"value": 2,
+											"raw": "2"
+										}
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A list element of its own, between the two comparisons or holding the closer",
+							"start": 269,
+							"end": 348
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 407,
+					"end": 439,
+					"expression": {
+						"type": "CallExpression",
+						"start": 407,
+						"end": 438,
+						"callee": {
+							"type": "Identifier",
+							"start": 407,
+							"end": 409,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 410,
+								"end": 415,
+								"left": {
+									"type": "Identifier",
+									"start": 410,
+									"end": 411,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 414,
+									"end": 415,
+									"name": "b"
+								}
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 417,
+								"end": 437,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 417,
+										"end": 418,
+										"name": "c"
+									}
+								],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 422,
+									"end": 437,
+									"left": {
+										"type": "Identifier",
+										"start": 422,
+										"end": 423,
+										"name": "c"
+									},
+									"operator": ">",
+									"right": {
+										"type": "BinaryExpression",
+										"start": 426,
+										"end": 437,
+										"left": {
+											"type": "BinaryExpression",
+											"start": 427,
+											"end": 432,
+											"left": {
+												"type": "Identifier",
+												"start": 427,
+												"end": 428,
+												"name": "d"
+											},
+											"operator": "-",
+											"right": {
+												"type": "Identifier",
+												"start": 431,
+												"end": 432,
+												"name": "e"
+											}
+										},
+										"operator": "*",
+										"right": {
+											"type": "Literal",
+											"start": 436,
+											"end": 437,
+											"value": 2,
+											"raw": "2"
+										}
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 441,
+					"end": 471,
+					"expression": {
+						"type": "CallExpression",
+						"start": 441,
+						"end": 470,
+						"callee": {
+							"type": "Identifier",
+							"start": 441,
+							"end": 443,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 444,
+								"end": 449,
+								"left": {
+									"type": "Identifier",
+									"start": 444,
+									"end": 445,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 448,
+									"end": 449,
+									"name": "b"
+								}
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 451,
+								"end": 457,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 451,
+										"end": 452,
+										"name": "c"
+									}
+								],
+								"body": {
+									"type": "Identifier",
+									"start": 456,
+									"end": 457,
+									"name": "d"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 459,
+								"end": 469,
+								"left": {
+									"type": "Identifier",
+									"start": 459,
+									"end": 460,
+									"name": "e"
+								},
+								"operator": ">",
+								"right": {
+									"type": "SequenceExpression",
+									"start": 464,
+									"end": 468,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 464,
+											"end": 465,
+											"name": "f"
+										},
+										{
+											"type": "Identifier",
+											"start": 467,
+											"end": 468,
+											"name": "g"
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 473,
+					"end": 505,
+					"expression": {
+						"type": "CallExpression",
+						"start": 473,
+						"end": 504,
+						"callee": {
+							"type": "Identifier",
+							"start": 473,
+							"end": 475,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 476,
+								"end": 481,
+								"left": {
+									"type": "Identifier",
+									"start": 476,
+									"end": 477,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 480,
+									"end": 481,
+									"name": "b"
+								}
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 483,
+								"end": 491,
+								"elements": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 484,
+										"end": 490,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 484,
+												"end": 485,
+												"name": "c"
+											}
+										],
+										"body": {
+											"type": "Identifier",
+											"start": 489,
+											"end": 490,
+											"name": "d"
+										}
+									}
+								]
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 493,
+								"end": 503,
+								"left": {
+									"type": "Identifier",
+									"start": 493,
+									"end": 494,
+									"name": "e"
+								},
+								"operator": ">",
+								"right": {
+									"type": "SequenceExpression",
+									"start": 498,
+									"end": 502,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 498,
+											"end": 499,
+											"name": "f"
+										},
+										{
+											"type": "Identifier",
+											"start": 501,
+											"end": 502,
+											"name": "g"
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 524,
+					"end": 558,
+					"expression": {
+						"type": "NewExpression",
+						"start": 524,
+						"end": 557,
+						"callee": {
+							"type": "Identifier",
+							"start": 528,
+							"end": 531,
+							"name": "Cls"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 532,
+								"end": 537,
+								"left": {
+									"type": "Identifier",
+									"start": 532,
+									"end": 533,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 536,
+									"end": 537,
+									"name": "b"
+								}
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 539,
+								"end": 556,
+								"elements": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 540,
+										"end": 555,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 540,
+												"end": 541,
+												"name": "c"
+											}
+										],
+										"body": {
+											"type": "BinaryExpression",
+											"start": 545,
+											"end": 555,
+											"left": {
+												"type": "Identifier",
+												"start": 545,
+												"end": 546,
+												"name": "c"
+											},
+											"operator": ">",
+											"right": {
+												"type": "SequenceExpression",
+												"start": 550,
+												"end": 554,
+												"expressions": [
+													{
+														"type": "Identifier",
+														"start": 550,
+														"end": 551,
+														"name": "d"
+													},
+													{
+														"type": "Identifier",
+														"start": 553,
+														"end": 554,
+														"name": "e"
+													}
+												]
+											}
+										}
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The carriers",
+							"start": 507,
+							"end": 522
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 560,
+					"end": 591,
+					"expression": {
+						"type": "ChainExpression",
+						"start": 560,
+						"end": 590,
+						"expression": {
+							"type": "CallExpression",
+							"start": 560,
+							"end": 590,
+							"callee": {
+								"type": "Identifier",
+								"start": 560,
+								"end": 562,
+								"name": "fn"
+							},
+							"arguments": [
+								{
+									"type": "BinaryExpression",
+									"start": 565,
+									"end": 570,
+									"left": {
+										"type": "Identifier",
+										"start": 565,
+										"end": 566,
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 569,
+										"end": 570,
+										"name": "b"
+									}
+								},
+								{
+									"type": "ArrayExpression",
+									"start": 572,
+									"end": 589,
+									"elements": [
+										{
+											"type": "ArrowFunctionExpression",
+											"start": 573,
+											"end": 588,
+											"id": null,
+											"expression": true,
+											"generator": false,
+											"async": false,
+											"params": [
+												{
+													"type": "Identifier",
+													"start": 573,
+													"end": 574,
+													"name": "c"
+												}
+											],
+											"body": {
+												"type": "BinaryExpression",
+												"start": 578,
+												"end": 588,
+												"left": {
+													"type": "Identifier",
+													"start": 578,
+													"end": 579,
+													"name": "c"
+												},
+												"operator": ">",
+												"right": {
+													"type": "SequenceExpression",
+													"start": 583,
+													"end": 587,
+													"expressions": [
+														{
+															"type": "Identifier",
+															"start": 583,
+															"end": 584,
+															"name": "d"
+														},
+														{
+															"type": "Identifier",
+															"start": 586,
+															"end": 587,
+															"name": "e"
+														}
+													]
+												}
+											}
+										}
+									]
+								}
+							],
+							"optional": true
+						}
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 593,
+					"end": 636,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 599,
+							"end": 635,
+							"id": {
+								"type": "Identifier",
+								"start": 599,
+								"end": 601,
+								"name": "a1"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 604,
+								"end": 635,
+								"elements": [
+									{
+										"type": "BinaryExpression",
+										"start": 605,
+										"end": 610,
+										"left": {
+											"type": "Identifier",
+											"start": 605,
+											"end": 606,
+											"name": "a"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 609,
+											"end": 610,
+											"name": "b"
+										}
+									},
+									{
+										"type": "ObjectExpression",
+										"start": 612,
+										"end": 634,
+										"properties": [
+											{
+												"type": "Property",
+												"start": 614,
+												"end": 632,
+												"method": false,
+												"shorthand": false,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 614,
+													"end": 615,
+													"name": "q"
+												},
+												"value": {
+													"type": "ArrowFunctionExpression",
+													"start": 617,
+													"end": 632,
+													"id": null,
+													"expression": true,
+													"generator": false,
+													"async": false,
+													"params": [
+														{
+															"type": "Identifier",
+															"start": 617,
+															"end": 618,
+															"name": "c"
+														}
+													],
+													"body": {
+														"type": "BinaryExpression",
+														"start": 622,
+														"end": 632,
+														"left": {
+															"type": "Identifier",
+															"start": 622,
+															"end": 623,
+															"name": "c"
+														},
+														"operator": ">",
+														"right": {
+															"type": "SequenceExpression",
+															"start": 627,
+															"end": 631,
+															"expressions": [
+																{
+																	"type": "Identifier",
+																	"start": 627,
+																	"end": 628,
+																	"name": "d"
+																},
+																{
+																	"type": "Identifier",
+																	"start": 630,
+																	"end": 631,
+																	"name": "e"
+																}
+															]
+														}
+													}
+												},
+												"kind": "init"
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 638,
+					"end": 665,
+					"expression": {
+						"type": "SequenceExpression",
+						"start": 639,
+						"end": 663,
+						"expressions": [
+							{
+								"type": "BinaryExpression",
+								"start": 639,
+								"end": 644,
+								"left": {
+									"type": "Identifier",
+									"start": 639,
+									"end": 640,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 643,
+									"end": 644,
+									"name": "b"
+								}
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 646,
+								"end": 663,
+								"elements": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 647,
+										"end": 662,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 647,
+												"end": 648,
+												"name": "c"
+											}
+										],
+										"body": {
+											"type": "BinaryExpression",
+											"start": 652,
+											"end": 662,
+											"left": {
+												"type": "Identifier",
+												"start": 652,
+												"end": 653,
+												"name": "c"
+											},
+											"operator": ">",
+											"right": {
+												"type": "SequenceExpression",
+												"start": 657,
+												"end": 661,
+												"expressions": [
+													{
+														"type": "Identifier",
+														"start": 657,
+														"end": 658,
+														"name": "d"
+													},
+													{
+														"type": "Identifier",
+														"start": 660,
+														"end": 661,
+														"name": "e"
+													}
+												]
+											}
+										}
+									}
+								]
+							}
+						]
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 667,
+					"end": 710,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 673,
+							"end": 709,
+							"id": {
+								"type": "Identifier",
+								"start": 673,
+								"end": 675,
+								"name": "a2"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 678,
+								"end": 709,
+								"expressions": [
+									{
+										"type": "SequenceExpression",
+										"start": 682,
+										"end": 706,
+										"expressions": [
+											{
+												"type": "BinaryExpression",
+												"start": 682,
+												"end": 687,
+												"left": {
+													"type": "Identifier",
+													"start": 682,
+													"end": 683,
+													"name": "a"
+												},
+												"operator": "<",
+												"right": {
+													"type": "Identifier",
+													"start": 686,
+													"end": 687,
+													"name": "b"
+												}
+											},
+											{
+												"type": "ArrayExpression",
+												"start": 689,
+												"end": 706,
+												"elements": [
+													{
+														"type": "ArrowFunctionExpression",
+														"start": 690,
+														"end": 705,
+														"id": null,
+														"expression": true,
+														"generator": false,
+														"async": false,
+														"params": [
+															{
+																"type": "Identifier",
+																"start": 690,
+																"end": 691,
+																"name": "c"
+															}
+														],
+														"body": {
+															"type": "BinaryExpression",
+															"start": 695,
+															"end": 705,
+															"left": {
+																"type": "Identifier",
+																"start": 695,
+																"end": 696,
+																"name": "c"
+															},
+															"operator": ">",
+															"right": {
+																"type": "SequenceExpression",
+																"start": 700,
+																"end": 704,
+																"expressions": [
+																	{
+																		"type": "Identifier",
+																		"start": 700,
+																		"end": 701,
+																		"name": "d"
+																	},
+																	{
+																		"type": "Identifier",
+																		"start": 703,
+																		"end": 704,
+																		"name": "e"
+																	}
+																]
+															}
+														}
+													}
+												]
+											}
+										]
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 679,
+										"end": 679,
+										"value": {
+											"raw": "",
+											"cooked": ""
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 708,
+										"end": 708,
+										"value": {
+											"raw": "",
+											"cooked": ""
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 712,
+					"end": 744,
+					"expression": {
+						"type": "CallExpression",
+						"start": 712,
+						"end": 743,
+						"callee": {
+							"type": "Identifier",
+							"start": 712,
+							"end": 714,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 715,
+								"end": 720,
+								"left": {
+									"type": "Identifier",
+									"start": 715,
+									"end": 716,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 719,
+									"end": 720,
+									"name": "b"
+								}
+							},
+							{
+								"type": "TemplateLiteral",
+								"start": 722,
+								"end": 742,
+								"expressions": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 725,
+										"end": 740,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 725,
+												"end": 726,
+												"name": "c"
+											}
+										],
+										"body": {
+											"type": "BinaryExpression",
+											"start": 730,
+											"end": 740,
+											"left": {
+												"type": "Identifier",
+												"start": 730,
+												"end": 731,
+												"name": "c"
+											},
+											"operator": ">",
+											"right": {
+												"type": "SequenceExpression",
+												"start": 735,
+												"end": 739,
+												"expressions": [
+													{
+														"type": "Identifier",
+														"start": 735,
+														"end": 736,
+														"name": "d"
+													},
+													{
+														"type": "Identifier",
+														"start": 738,
+														"end": 739,
+														"name": "e"
+													}
+												]
+											}
+										}
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 723,
+										"end": 723,
+										"value": {
+											"raw": "",
+											"cooked": ""
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 741,
+										"end": 741,
+										"value": {
+											"raw": "",
+											"cooked": ""
+										},
+										"tail": true
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 828,
+					"end": 860,
+					"expression": {
+						"type": "CallExpression",
+						"start": 828,
+						"end": 859,
+						"callee": {
+							"type": "Identifier",
+							"start": 828,
+							"end": 830,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 831,
+								"end": 836,
+								"left": {
+									"type": "Identifier",
+									"start": 831,
+									"end": 832,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 835,
+									"end": 836,
+									"name": "b"
+								}
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 838,
+								"end": 858,
+								"elements": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 839,
+										"end": 845,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 839,
+												"end": 840,
+												"name": "c"
+											}
+										],
+										"body": {
+											"type": "Identifier",
+											"start": 844,
+											"end": 845,
+											"name": "c"
+										}
+									},
+									{
+										"type": "BinaryExpression",
+										"start": 847,
+										"end": 857,
+										"left": {
+											"type": "Identifier",
+											"start": 847,
+											"end": 848,
+											"name": "d"
+										},
+										"operator": ">",
+										"right": {
+											"type": "SequenceExpression",
+											"start": 852,
+											"end": 856,
+											"expressions": [
+												{
+													"type": "Identifier",
+													"start": 852,
+													"end": 853,
+													"name": "e"
+												},
+												{
+													"type": "Identifier",
+													"start": 855,
+													"end": 856,
+													"name": "f"
+												}
+											]
+										}
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The arrow ahead of the closer, after another element, curried, behind `async`",
+							"start": 746,
+							"end": 826
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 862,
+					"end": 902,
+					"expression": {
+						"type": "CallExpression",
+						"start": 862,
+						"end": 901,
+						"callee": {
+							"type": "Identifier",
+							"start": 862,
+							"end": 864,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 865,
+								"end": 870,
+								"left": {
+									"type": "Identifier",
+									"start": 865,
+									"end": 866,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 869,
+									"end": 870,
+									"name": "b"
+								}
+							},
+							{
+								"type": "ObjectExpression",
+								"start": 872,
+								"end": 900,
+								"properties": [
+									{
+										"type": "Property",
+										"start": 874,
+										"end": 883,
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 874,
+											"end": 875,
+											"name": "q"
+										},
+										"value": {
+											"type": "ArrowFunctionExpression",
+											"start": 877,
+											"end": 883,
+											"id": null,
+											"expression": true,
+											"generator": false,
+											"async": false,
+											"params": [
+												{
+													"type": "Identifier",
+													"start": 877,
+													"end": 878,
+													"name": "c"
+												}
+											],
+											"body": {
+												"type": "Identifier",
+												"start": 882,
+												"end": 883,
+												"name": "c"
+											}
+										},
+										"kind": "init"
+									},
+									{
+										"type": "Property",
+										"start": 885,
+										"end": 898,
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 885,
+											"end": 886,
+											"name": "r"
+										},
+										"value": {
+											"type": "BinaryExpression",
+											"start": 888,
+											"end": 898,
+											"left": {
+												"type": "Identifier",
+												"start": 888,
+												"end": 889,
+												"name": "d"
+											},
+											"operator": ">",
+											"right": {
+												"type": "SequenceExpression",
+												"start": 893,
+												"end": 897,
+												"expressions": [
+													{
+														"type": "Identifier",
+														"start": 893,
+														"end": 894,
+														"name": "e"
+													},
+													{
+														"type": "Identifier",
+														"start": 896,
+														"end": 897,
+														"name": "f"
+													}
+												]
+											}
+										},
+										"kind": "init"
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 904,
+					"end": 936,
+					"expression": {
+						"type": "CallExpression",
+						"start": 904,
+						"end": 935,
+						"callee": {
+							"type": "Identifier",
+							"start": 904,
+							"end": 906,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 907,
+								"end": 912,
+								"left": {
+									"type": "Identifier",
+									"start": 907,
+									"end": 908,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 911,
+									"end": 912,
+									"name": "b"
+								}
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 914,
+								"end": 934,
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 915,
+										"end": 916,
+										"name": "y"
+									},
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 918,
+										"end": 933,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 918,
+												"end": 919,
+												"name": "c"
+											}
+										],
+										"body": {
+											"type": "BinaryExpression",
+											"start": 923,
+											"end": 933,
+											"left": {
+												"type": "Identifier",
+												"start": 923,
+												"end": 924,
+												"name": "c"
+											},
+											"operator": ">",
+											"right": {
+												"type": "SequenceExpression",
+												"start": 928,
+												"end": 932,
+												"expressions": [
+													{
+														"type": "Identifier",
+														"start": 928,
+														"end": 929,
+														"name": "d"
+													},
+													{
+														"type": "Identifier",
+														"start": 931,
+														"end": 932,
+														"name": "e"
+													}
+												]
+											}
+										}
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 938,
+					"end": 974,
+					"expression": {
+						"type": "CallExpression",
+						"start": 938,
+						"end": 973,
+						"callee": {
+							"type": "Identifier",
+							"start": 938,
+							"end": 940,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 941,
+								"end": 946,
+								"left": {
+									"type": "Identifier",
+									"start": 941,
+									"end": 942,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 945,
+									"end": 946,
+									"name": "b"
+								}
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 948,
+								"end": 972,
+								"elements": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 949,
+										"end": 971,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 949,
+												"end": 950,
+												"name": "c"
+											}
+										],
+										"body": {
+											"type": "ArrowFunctionExpression",
+											"start": 954,
+											"end": 971,
+											"id": null,
+											"expression": true,
+											"generator": false,
+											"async": false,
+											"params": [
+												{
+													"type": "Identifier",
+													"start": 955,
+													"end": 956,
+													"name": "d"
+												}
+											],
+											"body": {
+												"type": "BinaryExpression",
+												"start": 961,
+												"end": 971,
+												"left": {
+													"type": "Identifier",
+													"start": 961,
+													"end": 962,
+													"name": "d"
+												},
+												"operator": ">",
+												"right": {
+													"type": "SequenceExpression",
+													"start": 966,
+													"end": 970,
+													"expressions": [
+														{
+															"type": "Identifier",
+															"start": 966,
+															"end": 967,
+															"name": "e"
+														},
+														{
+															"type": "Identifier",
+															"start": 969,
+															"end": 970,
+															"name": "f"
+														}
+													]
+												}
+											}
+										}
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 976,
+					"end": 1011,
+					"expression": {
+						"type": "CallExpression",
+						"start": 976,
+						"end": 1010,
+						"callee": {
+							"type": "Identifier",
+							"start": 976,
+							"end": 978,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 979,
+								"end": 984,
+								"left": {
+									"type": "Identifier",
+									"start": 979,
+									"end": 980,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 983,
+									"end": 984,
+									"name": "b"
+								}
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 986,
+								"end": 1009,
+								"elements": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 987,
+										"end": 1008,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": true,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 993,
+												"end": 994,
+												"name": "c"
+											}
+										],
+										"body": {
+											"type": "BinaryExpression",
+											"start": 998,
+											"end": 1008,
+											"left": {
+												"type": "Identifier",
+												"start": 998,
+												"end": 999,
+												"name": "c"
+											},
+											"operator": ">",
+											"right": {
+												"type": "SequenceExpression",
+												"start": 1003,
+												"end": 1007,
+												"expressions": [
+													{
+														"type": "Identifier",
+														"start": 1003,
+														"end": 1004,
+														"name": "d"
+													},
+													{
+														"type": "Identifier",
+														"start": 1006,
+														"end": 1007,
+														"name": "e"
+													}
+												]
+											}
+										}
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1042,
+					"end": 1076,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1042,
+						"end": 1075,
+						"callee": {
+							"type": "Identifier",
+							"start": 1042,
+							"end": 1044,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1045,
+								"end": 1050,
+								"left": {
+									"type": "Identifier",
+									"start": 1045,
+									"end": 1046,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1049,
+									"end": 1050,
+									"name": "b"
+								}
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 1052,
+								"end": 1074,
+								"elements": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 1053,
+										"end": 1073,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 1053,
+												"end": 1054,
+												"name": "c"
+											}
+										],
+										"body": {
+											"type": "BinaryExpression",
+											"start": 1058,
+											"end": 1073,
+											"left": {
+												"type": "Identifier",
+												"start": 1058,
+												"end": 1059,
+												"name": "c"
+											},
+											"operator": ">",
+											"right": {
+												"type": "BinaryExpression",
+												"start": 1062,
+												"end": 1073,
+												"left": {
+													"type": "BinaryExpression",
+													"start": 1063,
+													"end": 1068,
+													"left": {
+														"type": "Identifier",
+														"start": 1063,
+														"end": 1064,
+														"name": "d"
+													},
+													"operator": "-",
+													"right": {
+														"type": "Identifier",
+														"start": 1067,
+														"end": 1068,
+														"name": "e"
+													}
+												},
+												"operator": "*",
+												"right": {
+													"type": "Literal",
+													"start": 1072,
+													"end": 1073,
+													"value": 2,
+													"raw": "2"
+												}
+											}
+										}
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The follower is not read",
+							"start": 1013,
+							"end": 1040
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1078,
+					"end": 1104,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1078,
+						"end": 1103,
+						"callee": {
+							"type": "Identifier",
+							"start": 1078,
+							"end": 1080,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1081,
+								"end": 1086,
+								"left": {
+									"type": "Identifier",
+									"start": 1081,
+									"end": 1082,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1085,
+									"end": 1086,
+									"name": "b"
+								}
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 1088,
+								"end": 1102,
+								"elements": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 1089,
+										"end": 1101,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 1089,
+												"end": 1090,
+												"name": "c"
+											}
+										],
+										"body": {
+											"type": "BinaryExpression",
+											"start": 1094,
+											"end": 1101,
+											"left": {
+												"type": "Identifier",
+												"start": 1094,
+												"end": 1095,
+												"name": "c"
+											},
+											"operator": ">",
+											"right": {
+												"type": "TemplateLiteral",
+												"start": 1098,
+												"end": 1101,
+												"expressions": [],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 1099,
+														"end": 1100,
+														"value": {
+															"raw": "t",
+															"cooked": "t"
+														},
+														"tail": true
+													}
+												]
+											}
+										}
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1106,
+					"end": 1130,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1106,
+						"end": 1129,
+						"callee": {
+							"type": "Identifier",
+							"start": 1106,
+							"end": 1108,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1109,
+								"end": 1114,
+								"left": {
+									"type": "Identifier",
+									"start": 1109,
+									"end": 1110,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1113,
+									"end": 1114,
+									"name": "b"
+								}
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 1116,
+								"end": 1128,
+								"elements": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 1117,
+										"end": 1127,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 1117,
+												"end": 1118,
+												"name": "c"
+											}
+										],
+										"body": {
+											"type": "BinaryExpression",
+											"start": 1122,
+											"end": 1127,
+											"left": {
+												"type": "Identifier",
+												"start": 1122,
+												"end": 1123,
+												"name": "c"
+											},
+											"operator": ">",
+											"right": {
+												"type": "Identifier",
+												"start": 1126,
+												"end": 1127,
+												"name": "d"
+											}
+										}
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1226,
+					"end": 1259,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1226,
+						"end": 1258,
+						"callee": {
+							"type": "Identifier",
+							"start": 1226,
+							"end": 1228,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1229,
+								"end": 1238,
+								"left": {
+									"type": "Identifier",
+									"start": 1229,
+									"end": 1230,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 1233,
+									"end": 1238,
+									"left": {
+										"type": "Identifier",
+										"start": 1233,
+										"end": 1234,
+										"name": "b"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Literal",
+										"start": 1237,
+										"end": 1238,
+										"value": 1,
+										"raw": "1"
+									}
+								}
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 1240,
+								"end": 1257,
+								"elements": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 1241,
+										"end": 1256,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 1241,
+												"end": 1242,
+												"name": "c"
+											}
+										],
+										"body": {
+											"type": "BinaryExpression",
+											"start": 1246,
+											"end": 1256,
+											"left": {
+												"type": "Identifier",
+												"start": 1246,
+												"end": 1247,
+												"name": "c"
+											},
+											"operator": ">",
+											"right": {
+												"type": "SequenceExpression",
+												"start": 1251,
+												"end": 1255,
+												"expressions": [
+													{
+														"type": "Identifier",
+														"start": 1251,
+														"end": 1252,
+														"name": "d"
+													},
+													{
+														"type": "Identifier",
+														"start": 1254,
+														"end": 1255,
+														"name": "e"
+													}
+												]
+											}
+										}
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The region is the parser's flag, so a `<` side no list can be read from keeps it bare too",
+							"start": 1132,
+							"end": 1224
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1347,
+					"end": 1369,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1347,
+						"end": 1368,
+						"callee": {
+							"type": "Identifier",
+							"start": 1347,
+							"end": 1349,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1350,
+								"end": 1355,
+								"left": {
+									"type": "Identifier",
+									"start": 1350,
+									"end": 1351,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1354,
+									"end": 1355,
+									"name": "b"
+								}
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 1357,
+								"end": 1367,
+								"elements": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 1358,
+										"end": 1366,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 1359,
+												"end": 1360,
+												"name": "c"
+											}
+										],
+										"body": {
+											"type": "Identifier",
+											"start": 1365,
+											"end": 1366,
+											"name": "c"
+										}
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The pair stays where no later sibling holds a closer or no sibling opens a region",
+							"start": 1261,
+							"end": 1345
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1371,
+					"end": 1398,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1371,
+						"end": 1397,
+						"callee": {
+							"type": "Identifier",
+							"start": 1371,
+							"end": 1373,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1374,
+								"end": 1379,
+								"left": {
+									"type": "Identifier",
+									"start": 1374,
+									"end": 1375,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1378,
+									"end": 1379,
+									"name": "b"
+								}
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 1381,
+								"end": 1396,
+								"elements": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 1382,
+										"end": 1395,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 1383,
+												"end": 1384,
+												"name": "c"
+											}
+										],
+										"body": {
+											"type": "BinaryExpression",
+											"start": 1389,
+											"end": 1395,
+											"left": {
+												"type": "Identifier",
+												"start": 1389,
+												"end": 1390,
+												"name": "c"
+											},
+											"operator": ">=",
+											"right": {
+												"type": "Identifier",
+												"start": 1394,
+												"end": 1395,
+												"name": "d"
+											}
+										}
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1400,
+					"end": 1432,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1400,
+						"end": 1431,
+						"callee": {
+							"type": "Identifier",
+							"start": 1400,
+							"end": 1402,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1403,
+								"end": 1409,
+								"left": {
+									"type": "Identifier",
+									"start": 1403,
+									"end": 1404,
+									"name": "a"
+								},
+								"operator": "<=",
+								"right": {
+									"type": "Identifier",
+									"start": 1408,
+									"end": 1409,
+									"name": "b"
+								}
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 1411,
+								"end": 1430,
+								"elements": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 1412,
+										"end": 1429,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 1413,
+												"end": 1414,
+												"name": "c"
+											}
+										],
+										"body": {
+											"type": "BinaryExpression",
+											"start": 1419,
+											"end": 1429,
+											"left": {
+												"type": "Identifier",
+												"start": 1419,
+												"end": 1420,
+												"name": "c"
+											},
+											"operator": ">",
+											"right": {
+												"type": "SequenceExpression",
+												"start": 1424,
+												"end": 1428,
+												"expressions": [
+													{
+														"type": "Identifier",
+														"start": 1424,
+														"end": 1425,
+														"name": "d"
+													},
+													{
+														"type": "Identifier",
+														"start": 1427,
+														"end": 1428,
+														"name": "e"
+													}
+												]
+											}
+										}
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1434,
+					"end": 1465,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1434,
+						"end": 1464,
+						"callee": {
+							"type": "Identifier",
+							"start": 1434,
+							"end": 1436,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1437,
+								"end": 1442,
+								"left": {
+									"type": "Identifier",
+									"start": 1437,
+									"end": 1438,
+									"name": "a"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 1441,
+									"end": 1442,
+									"name": "b"
+								}
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 1444,
+								"end": 1463,
+								"elements": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 1445,
+										"end": 1462,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 1446,
+												"end": 1447,
+												"name": "c"
+											}
+										],
+										"body": {
+											"type": "BinaryExpression",
+											"start": 1452,
+											"end": 1462,
+											"left": {
+												"type": "Identifier",
+												"start": 1452,
+												"end": 1453,
+												"name": "c"
+											},
+											"operator": ">",
+											"right": {
+												"type": "SequenceExpression",
+												"start": 1457,
+												"end": 1461,
+												"expressions": [
+													{
+														"type": "Identifier",
+														"start": 1457,
+														"end": 1458,
+														"name": "d"
+													},
+													{
+														"type": "Identifier",
+														"start": 1460,
+														"end": 1461,
+														"name": "e"
+													}
+												]
+											}
+										}
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1467,
+					"end": 1501,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1467,
+						"end": 1500,
+						"callee": {
+							"type": "Identifier",
+							"start": 1467,
+							"end": 1469,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "CallExpression",
+								"start": 1470,
+								"end": 1478,
+								"callee": {
+									"type": "Identifier",
+									"start": 1470,
+									"end": 1471,
+									"name": "g"
+								},
+								"arguments": [
+									{
+										"type": "BinaryExpression",
+										"start": 1472,
+										"end": 1477,
+										"left": {
+											"type": "Identifier",
+											"start": 1472,
+											"end": 1473,
+											"name": "a"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 1476,
+											"end": 1477,
+											"name": "b"
+										}
+									}
+								],
+								"optional": false
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 1480,
+								"end": 1499,
+								"elements": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 1481,
+										"end": 1498,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 1482,
+												"end": 1483,
+												"name": "c"
+											}
+										],
+										"body": {
+											"type": "BinaryExpression",
+											"start": 1488,
+											"end": 1498,
+											"left": {
+												"type": "Identifier",
+												"start": 1488,
+												"end": 1489,
+												"name": "c"
+											},
+											"operator": ">",
+											"right": {
+												"type": "SequenceExpression",
+												"start": 1493,
+												"end": 1497,
+												"expressions": [
+													{
+														"type": "Identifier",
+														"start": 1493,
+														"end": 1494,
+														"name": "d"
+													},
+													{
+														"type": "Identifier",
+														"start": 1496,
+														"end": 1497,
+														"name": "e"
+													}
+												]
+											}
+										}
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1503,
+					"end": 1534,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1503,
+						"end": 1533,
+						"callee": {
+							"type": "Identifier",
+							"start": 1503,
+							"end": 1505,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrayExpression",
+								"start": 1506,
+								"end": 1525,
+								"elements": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 1507,
+										"end": 1524,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 1508,
+												"end": 1509,
+												"name": "c"
+											}
+										],
+										"body": {
+											"type": "BinaryExpression",
+											"start": 1514,
+											"end": 1524,
+											"left": {
+												"type": "Identifier",
+												"start": 1514,
+												"end": 1515,
+												"name": "c"
+											},
+											"operator": ">",
+											"right": {
+												"type": "SequenceExpression",
+												"start": 1519,
+												"end": 1523,
+												"expressions": [
+													{
+														"type": "Identifier",
+														"start": 1519,
+														"end": 1520,
+														"name": "d"
+													},
+													{
+														"type": "Identifier",
+														"start": 1522,
+														"end": 1523,
+														"name": "e"
+													}
+												]
+											}
+										}
+									}
+								]
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 1527,
+								"end": 1532,
+								"left": {
+									"type": "Identifier",
+									"start": 1527,
+									"end": 1528,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1531,
+									"end": 1532,
+									"name": "b"
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1536,
+					"end": 1582,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1542,
+							"end": 1581,
+							"id": {
+								"type": "Identifier",
+								"start": 1542,
+								"end": 1544,
+								"name": "b1"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 1547,
+								"end": 1581,
+								"properties": [
+									{
+										"type": "Property",
+										"start": 1549,
+										"end": 1557,
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 1549,
+											"end": 1550,
+											"name": "p"
+										},
+										"value": {
+											"type": "BinaryExpression",
+											"start": 1552,
+											"end": 1557,
+											"left": {
+												"type": "Identifier",
+												"start": 1552,
+												"end": 1553,
+												"name": "a"
+											},
+											"operator": "<",
+											"right": {
+												"type": "Identifier",
+												"start": 1556,
+												"end": 1557,
+												"name": "b"
+											}
+										},
+										"kind": "init"
+									},
+									{
+										"type": "Property",
+										"start": 1559,
+										"end": 1579,
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 1559,
+											"end": 1560,
+											"name": "q"
+										},
+										"value": {
+											"type": "ArrowFunctionExpression",
+											"start": 1562,
+											"end": 1579,
+											"id": null,
+											"expression": true,
+											"generator": false,
+											"async": false,
+											"params": [
+												{
+													"type": "Identifier",
+													"start": 1563,
+													"end": 1564,
+													"name": "c"
+												}
+											],
+											"body": {
+												"type": "BinaryExpression",
+												"start": 1569,
+												"end": 1579,
+												"left": {
+													"type": "Identifier",
+													"start": 1569,
+													"end": 1570,
+													"name": "c"
+												},
+												"operator": ">",
+												"right": {
+													"type": "SequenceExpression",
+													"start": 1574,
+													"end": 1578,
+													"expressions": [
+														{
+															"type": "Identifier",
+															"start": 1574,
+															"end": 1575,
+															"name": "d"
+														},
+														{
+															"type": "Identifier",
+															"start": 1577,
+															"end": 1578,
+															"name": "e"
+														}
+													]
+												}
+											}
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

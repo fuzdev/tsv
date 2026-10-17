@@ -1097,10 +1097,13 @@ impl<'a> Printer<'a> {
         // Nested arrows hug ONLY when outer has no return type annotation.
         // With return type: const f = (x: T): H => (y) => expr; // breaks
         // Without:          const f = (x: T) => (y) => expr;    // hugs
+        //
+        // A body inside the pair a comma-list region keeps is no chain head: the pair closes
+        // the chain there ([`Printer::chain_holds_region_kept_body`]).
         let is_arrow_body = matches!(
             expr.kind,
             internal::ExpressionKind::ArrowFunctionExpression(_)
-        );
+        ) && !self.relational_sibling_pair_is_kept(expr);
 
         // Check if this is a curried arrow where ANY arrow triggers chain breaking.
         // Triggers: return type with params, type parameters, non-identifier params.
@@ -1290,10 +1293,7 @@ impl<'a> Printer<'a> {
                 })
             });
             parts.push(d.indent_hardline(body_doc));
-        } else if matches!(
-            expr.kind,
-            internal::ExpressionKind::ConditionalExpression(_)
-        ) && !has_leftmost_arrow_body_parens(expr)
+        } else if self.arrow_body_takes_ternary_pair(expr) && !has_leftmost_arrow_body_parens(expr)
         {
             // Prettier's shouldAddParensIfNotBreak: ternary body gets conditional
             // parens when inline, no parens when on its own line.
@@ -1584,7 +1584,7 @@ impl<'a> Printer<'a> {
             internal::ArrowFunctionBody::Expression(b)
                 if matches!(b.kind, internal::ExpressionKind::ArrowFunctionExpression(_))
         );
-        if !body_is_arrow {
+        if !body_is_arrow || self.chain_holds_region_kept_body(arrow) {
             return false;
         }
         if matches!(
@@ -1595,6 +1595,29 @@ impl<'a> Printer<'a> {
             return false;
         }
         !self.chain_comment_outside_emitted_regions(arrow, span)
+    }
+
+    /// Whether an arrow body down `arrow`'s curried chain prints inside the pair the author
+    /// wrote around it, kept by a comma-list owner's region rules
+    /// ([`Printer::relational_sibling_pair_is_kept`]): `fn(() => (c => c < d), e > (f, g))`,
+    /// `fn(a < b, () => (c => c > (d, e)))`. The chain layout prints every head's body bare,
+    /// which between the `<` and the later `>` reads as one generic call, or puts a head's
+    /// `=>` past another inside the region, a line tsv's own parse can refuse; so such a chain
+    /// takes the ordinary arrow layout, whose body builds through the kept pair.
+    fn chain_holds_region_kept_body(&self, arrow: &internal::ArrowFunctionExpression<'_>) -> bool {
+        if !self.has_relational_sibling_pairs.get() {
+            return false;
+        }
+        let mut current = arrow;
+        while let internal::ArrowFunctionBody::Expression(body) = &current.body
+            && let internal::ExpressionKind::ArrowFunctionExpression(inner) = &body.kind
+        {
+            if self.relational_sibling_pair_is_kept(body) {
+                return true;
+            }
+            current = inner;
+        }
+        false
     }
 
     /// Whether the chain holds a comment in a gap [`Printer::build_arrow_chain_doc`] has
@@ -2162,10 +2185,8 @@ impl<'a> Printer<'a> {
                         hoisted_run,
                         glued_run,
                     )
-                } else if matches!(
-                    expr.kind,
-                    internal::ExpressionKind::ConditionalExpression(_)
-                ) && !has_leftmost_arrow_body_parens(expr)
+                } else if self.arrow_body_takes_ternary_pair(expr)
+                    && !has_leftmost_arrow_body_parens(expr)
                     && !should_break_chain
                 {
                     // Ternary body: parens when inline, none when broken
@@ -2288,6 +2309,8 @@ impl<'a> Printer<'a> {
             internal::ArrowFunctionBody::BlockStatement(_) => true,
             internal::ArrowFunctionBody::Expression(expr) => {
                 self.arrow_body_hugs(expr)
+                    // A conditional body a comma-list region leaves bare stays on the
+                    // head line too: the line is the one the pair would have held it on.
                     || (!should_break_chain
                         && matches!(
                             expr.kind,
@@ -2374,6 +2397,17 @@ impl<'a> Printer<'a> {
         // comments between `)` and `=>` belong to the arrow printer
         // ([`Self::append_pre_arrow_comments`]).
         let build = || {
+            // A lone parameter written bare inside a comma-list region prints as written
+            // (`Printer::region_param_is_bare`). It is an identifier with no annotation —
+            // the only bare parameter the grammar admits — so its doc is the whole list,
+            // and every comment around it is the arrow's: before it the arrow's own, after
+            // it the pre-`=>` gap's.
+            if self.region_param_is_bare(arrow, span)
+                && let [param] = arrow.params
+            {
+                self.test_call_flat_params.set(false);
+                return self.build_function_parameter_doc(param);
+            }
             self.build_params_doc_with_comments(
                 arrow.params,
                 arrow.params_start,
@@ -2818,11 +2852,9 @@ impl<'a> Printer<'a> {
         // build_arrow_doc_wrapping. This branch handles ternaries reached
         // via other callers (curried innermost arrow, post-arrow comments)
         // where the body always breaks via hardline — if_break selects
-        // the break variant (no parens).
-        if matches!(
-            expr.kind,
-            internal::ExpressionKind::ConditionalExpression(_)
-        ) {
+        // the break variant (no parens). A body a comma-list region leaves bare takes the
+        // standard arm below, which adds no pair a conditional does not need.
+        if self.arrow_body_takes_ternary_pair(expr) {
             // A multi-line comment the body owns prints outside the ternary's own group,
             // after the run ([`Printer::build_value_with_outermost_owned_comment`]).
             let body_doc = self.build_expression_doc_claiming_outermost(expr);

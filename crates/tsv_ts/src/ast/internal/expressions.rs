@@ -695,8 +695,10 @@ pub struct BinaryExpression<'arena> {
     /// tsv's own parse as well. The pair `relexes_as_type_arguments` earns does not reach
     /// it: that pair ends the OUTER `>`'s region on a `)`, and this `>` is met first.
     ///
-    /// Nothing between the two tokens can be reworded, and a `(` or template follower
-    /// commits on any line, so the printer's free choices are two, and it makes both:
+    /// Between the two tokens the printer prints what was written — inside a comma-list
+    /// region the pairs its style decides follow the source
+    /// (`Printer::mark_region_source_pairs`) — and a `(` or template follower commits on
+    /// any line, so the printer's free choices at this token are two, and it makes both:
     ///
     /// - where the line breaks: it breaks AHEAD of such a `>` (`aaa⏎> bbb`), its follower
     ///   sharing its line — the binary-chain emitters' `ChainOperator::leads_line`;

@@ -1,0 +1,14 @@
+# relational_region_prefix_shell_regex_follow_prettier_divergence
+
+[relational_region_prefix_shell](../relational_region_prefix_shell_prettier_divergence/) with a regular expression behind the later element's `>`: the pair behind `typeof` or a unary `-` stays, and prettier's stripped output is one no parser accepts.
+
+tsv: `fn(a < b, typeof (c) > /r/.test(d))`
+Prettier: `fn(a < b, typeof c > /r/.test(d))`
+
+## Reason
+
+**Semantic preservation.** Without the pair, the `<` and the `>` bound a type-argument list — `typeof c` and `-1` are types — and a `/` past the `>` is no expression that list can be followed by: tsc reports `Expression expected`, acorn-typescript `Unexpected token`, and tsv rejects the line too. So prettier's output is not a program, in a call and in an array alike. tsv keeps the authored pair, which no type grammar reads past, and the line stays the two comparisons the author wrote. The rule does not read what follows the `>`: the regex is one more follower the same pair answers.
+
+Prettier throws on its own output, so its chain stops at `output_prettier.svelte` and no `audit_signature.txt` can follow it — the erroring pass F4b tolerates. Keeping these cells out of the main fixture is what lets that fixture pin prettier's full chain.
+
+See [conformance_prettier_ts.md](../../../../../../docs/conformance_prettier_ts.md) §TypeScript (Relational chain type-argument parens, "An authored pair behind `typeof` or a sign") and [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Prettier bug index.

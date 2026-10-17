@@ -516,7 +516,11 @@ impl<'a> Printer<'a> {
             } else {
                 d.group(shell)
             }
-        } else if arg_needs_parens {
+        } else if arg_needs_parens || self.region_keeps_shell(unary.argument) {
+            // The author's shell a comma-list region keeps takes the pair the position's own
+            // answer would: a non-binary operand's ([`Printer::mark_region_source_pairs`]).
+            // The comment-holder arm above needs no such test, its shell being the pair.
+            //
             // Binary expressions need parens - grouping lets the parens expand when the arg is long
             if let ExpressionKind::BinaryExpression(binary) = &unary.argument.kind {
                 // Wrap any binaryish arg (logical or not) in a single paren group.
@@ -2135,7 +2139,8 @@ impl<'a> Printer<'a> {
             },
             |frozen| self.build_frozen_expression_doc(expr, frozen),
         );
-        if matches!(expr.kind, ExpressionKind::AssignmentExpression(_))
+        if (matches!(expr.kind, ExpressionKind::AssignmentExpression(_))
+            && !self.region_withholds_pair(expr))
             || self.relational_sibling_pair_is_kept(expr)
         {
             d.parens(core)

@@ -955,7 +955,14 @@ fn build_chain_args_single(
         return with_chain_head(
             d,
             head,
-            build_ternary_arrow_hug_ladder(d, opener, sig_doc, body_doc, arrow_doc),
+            build_ternary_arrow_hug_ladder(
+                d,
+                opener,
+                sig_doc,
+                body_doc,
+                arrow_doc,
+                printer.arrow_body_takes_ternary_pair(body_expr),
+            ),
         );
     }
 

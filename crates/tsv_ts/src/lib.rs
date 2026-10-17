@@ -1071,6 +1071,48 @@ pub fn build_expression_doc(
     })
 }
 
+/// Build the docs of a **bare** comma list's operands — a Svelte function binding's
+/// `bind:value={get, set}`, which the host prints without the sequence's pair and with
+/// its own separators — in the caller's arena.
+///
+/// Every operand is built by ONE printer, after the comma-list region rules have marked
+/// the list as a sequence's own printer marks it: between an operand holding a `<` / `<<`
+/// and a later one holding a `>` that may close the type-argument region the `<` opens,
+/// the pairs the printer would otherwise decide inside an operand print as the author wrote
+/// them, and an operand the author wrapped in a pair the rules keep — around a comparison
+/// (`(a < b), c > (d, e)`), or around an assignment operand (`(x = a < b), c > (d, e)`),
+/// which a sequence prints in its style's pair — is built inside it. An operand built on a
+/// printer of its own sees no list, so a pair it adds or strips there (`(v) =>`,
+/// `typeof c`, `(a < b)`) turns the two comparisons into one generic call.
+///
+/// `build(i)` answers whether this call builds operand `i`; where it answers `false` the
+/// slot is `None` and the host builds that operand itself (a frozen operand, one printed
+/// as its own source bytes). The marks read only the tree and the source, so an operand
+/// the host builds is still counted in the list.
+pub fn build_bare_sequence_operand_docs(
+    arena: &DocArena,
+    sequence: &ast::internal::SequenceExpression<'_>,
+    inputs: &PrinterInputs<'_>,
+    embed: EmbedContext,
+    mut build: impl FnMut(usize) -> bool,
+) -> Vec<Option<DocId>> {
+    with_doc_printer(arena, inputs, embed, |printer| {
+        printer
+            .mark_relational_sibling_authored_pairs(sequence.expressions.iter().copied().map(Some));
+        sequence
+            .expressions
+            .iter()
+            .enumerate()
+            .map(|(i, expr)| {
+                build(i).then(|| {
+                    let doc = printer.build_root_expression_doc(expr);
+                    printer.wrap_bare_list_operand(expr, doc)
+                })
+            })
+            .collect()
+    })
+}
+
 /// The comment-broken layout of a Svelte **block binding pattern** (`{#each … as P}`,
 /// `{#await … then P}`, `{:then P}`, `{:catch P}`), in the caller's arena — `Some` exactly when
 /// a comment in `pattern` breaks its TypeScript twin (`const P = x`) open: then the twin's

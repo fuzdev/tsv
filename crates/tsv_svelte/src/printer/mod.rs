@@ -914,10 +914,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         if frozen {
             self.build_frozen_node_doc(expr.span())
-        } else if let Some(path) = plain_path_span(expr)
-            && !self.owns_leading_comment_at(path.start)
-            && fuses_source_spans()
-        {
+        } else if let Some(path) = self.fused_plain_path(expr) {
             // A plain path that owns no comment prints as its own bytes under every embed —
             // a name has one printed form, and so does a lone lookup off one. Every value
             // built through this function takes the arm, a binding pattern's leaves and
@@ -926,6 +923,14 @@ impl<'a> Printer<'a> {
         } else {
             tsv_ts::build_expression_doc(self.d(), expr, &self.ts_inputs(), *embed)
         }
+    }
+
+    /// The span of `expr` when it is a plain path ([`plain_path_span`]) that owns no comment
+    /// and may print as its own bytes ([`fuses_source_spans`]) — the fast arm of
+    /// [`Self::build_head_value_doc`].
+    pub(in crate::printer) fn fused_plain_path(&self, expr: &Expression<'_>) -> Option<Span> {
+        plain_path_span(expr)
+            .filter(|path| !self.owns_leading_comment_at(path.start) && fuses_source_spans())
     }
 
     /// One text over `span`, for a construct a gate proved prints as its own source bytes

@@ -233,10 +233,9 @@ impl<'a> Printer<'a> {
                                 assign_span.end,
                                 false,
                             ),
-                            None => self.build_expression_doc_with_paren_comments(
+                            None => self.build_value_doc_keeping_relational_sibling_pair(
                                 assign.right,
                                 assign_span.end,
-                                false,
                             ),
                         };
                     self.prepend_rhs_comments(value_doc, gap_start, rhs_comment_end)
@@ -355,10 +354,9 @@ impl<'a> Printer<'a> {
             let build_hung_value = || {
                 self.build_hung_value_doc(assign.right, effective_rhs_start, || {
                     self.build_value_with_outermost_owned_comment(assign.right, || {
-                        self.build_expression_doc_with_paren_comments(
+                        self.build_value_doc_keeping_relational_sibling_pair(
                             assign.right,
                             assign_span.end,
-                            false,
                         )
                     })
                 })
@@ -421,7 +419,7 @@ impl<'a> Printer<'a> {
                 AssignmentContext::Chain,
             )
         } else {
-            self.build_expression_doc_with_paren_comments(assign.right, assign_span.end, false)
+            self.build_value_doc_keeping_relational_sibling_pair(assign.right, assign_span.end)
         };
 
         // Prepend inline comments to right doc if present

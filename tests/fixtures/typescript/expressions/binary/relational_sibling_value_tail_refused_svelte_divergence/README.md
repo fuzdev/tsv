@@ -13,10 +13,10 @@ checkpoint and, where the type grammar stops past that separator, rewinds and re
 **refused where the printer's own rewrite of the abandoned tokens could complete the
 list**, which is read off where the type grammar stopped:
 
-- **at a `=>`** — an arrow function's bare parameter, which prints in a paren pair, and
-  `(c) => c` is a function type: `fn(a < b, c => c > (d - e) * 2)` would print as
-  `fn(a < b, (c) => c > (d - e) * 2)`, the generic call `a<b, (c) => c>(d - e)` times
-  two. The arrow may be a sibling between the two comparisons or an element of one;
+- **at a `=>` past another** — inside an arrow function's block body, which the type
+  grammar read as a function type returning a type literal, and where the printer pairs a
+  lone parameter as its style decides: `fn(a < b, () => { x: y => y }, f > (g, h))` would
+  print `x: (y) => y`, a type literal's member (pinned in the test, not here);
 - **at a `.` or a `<` right behind a `)`** — a paren shell the printer strips, where the
   name left bare takes the member or the list behind it: `(c).d` prints as `c.d`, a
   qualified name, and `(c) < d >> (e, f)` as `c < d >> (e, f)`, a nested list closed with
@@ -29,15 +29,17 @@ list**, which is read off where the type grammar stopped:
 Each rewritten line is one every parser reads as another program, so the rejection is
 loud where the alternative is silent. It is also wider than the hazard: it asks where
 the list stopped, and never whether the rewritten tokens would in fact reach the `>` or
-whether the printer strips the pair at all, so `fn(a < b, c => c + 1 > (d, e))` and
-`fn(a < b, (c | d).e > (f, g))` are rejected with the rest.
+whether the printer strips the pair at all, so `fn(a < b, (c | d).e > (f, g))` is
+rejected with the rest. A list that stops at the first `=>` it meets is no refusal: between
+the two comparisons the printer keeps an arrow function's lone parameter written bare, so
+`fn(a < b, c => c > (d - e) * 2)` prints as written
+([relational_region_arrow_param_pair](../relational_region_arrow_param_pair_prettier_divergence/)).
 
 **Authoring around it.** Nothing between the two tokens has to change: write the first
-comparison from the other side (`fn(b > a, c => c > (d - e) * 2)`), or hoist either
-comparison into a variable (`const lt = a < b; fn(lt, c => c > (d - e) * 2)`). An arrow
-function may also be a `function` expression, which no type spells. A pair around the
-first comparison (`fn((a < b), c => c > (d - e) * 2)`) is retained by the comma-list
-owner and keeps the two comparisons apart.
+comparison from the other side (`fn(b > a, (c).d > (e, f))`), or hoist either comparison
+into a variable (`const lt = a < b; fn(lt, (c).d > (e, f))`). A pair around the first
+comparison (`fn((a < b), (c).d > (e, f))`) is retained by the comma-list owner and keeps
+the two comparisons apart.
 
 `tsv_rejects.txt` pins tsv's own error on the first line, and every line is pinned on its
 own by `a_tail_the_printer_would_complete_stays_rejected` in

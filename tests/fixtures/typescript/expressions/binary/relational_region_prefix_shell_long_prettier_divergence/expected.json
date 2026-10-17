@@ -1,0 +1,445 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 578,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " At 100 columns the line holds with the pair behind `typeof`; at 101 the list breaks",
+			"start": 20,
+			"end": 106
+		},
+		{
+			"type": "Line",
+			"value": " The same boundary behind a unary `-`",
+			"start": 318,
+			"end": 357
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 577,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 568,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 108,
+					"end": 206,
+					"expression": {
+						"type": "CallExpression",
+						"start": 108,
+						"end": 205,
+						"callee": {
+							"type": "Identifier",
+							"start": 108,
+							"end": 110,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 111,
+								"end": 124,
+								"left": {
+									"type": "Identifier",
+									"start": 111,
+									"end": 116,
+									"name": "lower"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 119,
+									"end": 124,
+									"name": "upper"
+								}
+							},
+							{
+								"type": "UnaryExpression",
+								"start": 126,
+								"end": 175,
+								"operator": "typeof",
+								"prefix": true,
+								"argument": {
+									"type": "Identifier",
+									"start": 134,
+									"end": 174,
+									"name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 177,
+								"end": 204,
+								"left": {
+									"type": "Identifier",
+									"start": 177,
+									"end": 182,
+									"name": "limit"
+								},
+								"operator": ">",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 185,
+									"end": 204,
+									"left": {
+										"type": "BinaryExpression",
+										"start": 186,
+										"end": 199,
+										"left": {
+											"type": "Identifier",
+											"start": 186,
+											"end": 191,
+											"name": "lower"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 194,
+											"end": 199,
+											"name": "upper"
+										}
+									},
+									"operator": "/",
+									"right": {
+										"type": "Literal",
+										"start": 203,
+										"end": 204,
+										"value": 2,
+										"raw": "2"
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At 100 columns the line holds with the pair behind `typeof`; at 101 the list breaks",
+							"start": 20,
+							"end": 106
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 208,
+					"end": 316,
+					"expression": {
+						"type": "CallExpression",
+						"start": 208,
+						"end": 315,
+						"callee": {
+							"type": "Identifier",
+							"start": 208,
+							"end": 210,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 214,
+								"end": 227,
+								"left": {
+									"type": "Identifier",
+									"start": 214,
+									"end": 219,
+									"name": "lower"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 222,
+									"end": 227,
+									"name": "upper"
+								}
+							},
+							{
+								"type": "UnaryExpression",
+								"start": 231,
+								"end": 281,
+								"operator": "typeof",
+								"prefix": true,
+								"argument": {
+									"type": "Identifier",
+									"start": 239,
+									"end": 280,
+									"name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 285,
+								"end": 312,
+								"left": {
+									"type": "Identifier",
+									"start": 285,
+									"end": 290,
+									"name": "limit"
+								},
+								"operator": ">",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 293,
+									"end": 312,
+									"left": {
+										"type": "BinaryExpression",
+										"start": 294,
+										"end": 307,
+										"left": {
+											"type": "Identifier",
+											"start": 294,
+											"end": 299,
+											"name": "lower"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 302,
+											"end": 307,
+											"name": "upper"
+										}
+									},
+									"operator": "/",
+									"right": {
+										"type": "Literal",
+										"start": 311,
+										"end": 312,
+										"value": 2,
+										"raw": "2"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 359,
+					"end": 457,
+					"expression": {
+						"type": "CallExpression",
+						"start": 359,
+						"end": 456,
+						"callee": {
+							"type": "Identifier",
+							"start": 359,
+							"end": 361,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 362,
+								"end": 375,
+								"left": {
+									"type": "Identifier",
+									"start": 362,
+									"end": 367,
+									"name": "lower"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 370,
+									"end": 375,
+									"name": "upper"
+								}
+							},
+							{
+								"type": "UnaryExpression",
+								"start": 377,
+								"end": 381,
+								"operator": "-",
+								"prefix": true,
+								"argument": {
+									"type": "Literal",
+									"start": 379,
+									"end": 380,
+									"value": 1,
+									"raw": "1"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 383,
+								"end": 455,
+								"left": {
+									"type": "Identifier",
+									"start": 383,
+									"end": 388,
+									"name": "limit"
+								},
+								"operator": ">",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 391,
+									"end": 455,
+									"left": {
+										"type": "BinaryExpression",
+										"start": 392,
+										"end": 405,
+										"left": {
+											"type": "Identifier",
+											"start": 392,
+											"end": 397,
+											"name": "lower"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 400,
+											"end": 405,
+											"name": "upper"
+										}
+									},
+									"operator": "/",
+									"right": {
+										"type": "Identifier",
+										"start": 409,
+										"end": 455,
+										"name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The same boundary behind a unary `-`",
+							"start": 318,
+							"end": 357
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 459,
+					"end": 567,
+					"expression": {
+						"type": "CallExpression",
+						"start": 459,
+						"end": 566,
+						"callee": {
+							"type": "Identifier",
+							"start": 459,
+							"end": 461,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 465,
+								"end": 478,
+								"left": {
+									"type": "Identifier",
+									"start": 465,
+									"end": 470,
+									"name": "lower"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 473,
+									"end": 478,
+									"name": "upper"
+								}
+							},
+							{
+								"type": "UnaryExpression",
+								"start": 482,
+								"end": 486,
+								"operator": "-",
+								"prefix": true,
+								"argument": {
+									"type": "Literal",
+									"start": 484,
+									"end": 485,
+									"value": 1,
+									"raw": "1"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 490,
+								"end": 563,
+								"left": {
+									"type": "Identifier",
+									"start": 490,
+									"end": 495,
+									"name": "limit"
+								},
+								"operator": ">",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 498,
+									"end": 563,
+									"left": {
+										"type": "BinaryExpression",
+										"start": 499,
+										"end": 512,
+										"left": {
+											"type": "Identifier",
+											"start": 499,
+											"end": 504,
+											"name": "lower"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 507,
+											"end": 512,
+											"name": "upper"
+										}
+									},
+									"operator": "/",
+									"right": {
+										"type": "Identifier",
+										"start": 516,
+										"end": 563,
+										"name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

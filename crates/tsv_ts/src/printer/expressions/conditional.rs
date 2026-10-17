@@ -215,8 +215,10 @@ impl<'a> Printer<'a> {
     }
 
     /// Wrap a ternary consequent/alternate doc in clarity parens when its `expr`
-    /// needs them. The single seam both layouts (inline + line-comment) route
-    /// through, so a branch can't get parenthesized in one and bare in the other.
+    /// needs them, or in the author's pair a comma-list owner keeps around it
+    /// ([`Printer::relational_sibling_pair_is_kept`]). The single seam both layouts
+    /// (inline + line-comment) route through, so a branch can't get parenthesized in one
+    /// and bare in the other.
     ///
     /// `shell_boundary` is the branch's trailing-gap end when `doc` came from
     /// [`Printer::build_ternary_branch_expr_doc`] — the builder that RETAINS the grouping
@@ -241,7 +243,7 @@ impl<'a> Printer<'a> {
         doc: DocId,
         shell_boundary: Option<u32>,
     ) -> DocId {
-        if !ternary_branch_needs_parens(expr) {
+        if !ternary_branch_needs_parens(expr) && !self.relational_sibling_pair_is_kept(expr) {
             return doc;
         }
         if shell_boundary.is_some_and(|end| self.shell_value_keeps_own_parens(expr, end, false)) {
@@ -350,8 +352,9 @@ impl<'a> Printer<'a> {
     }
 
     /// Wrap a ternary test doc in parens when its `expr` needs them (arrow/yield are
-    /// load-bearing — see `ternary_test_needs_parens`). The shared seam for both
-    /// layouts, mirroring `parenthesize_ternary_branch`.
+    /// load-bearing — see `ternary_test_needs_parens`), or in the author's pair a comma-list
+    /// owner keeps around it ([`Printer::relational_sibling_pair_is_kept`]). The shared seam
+    /// for both layouts, mirroring `parenthesize_ternary_branch`.
     ///
     /// A test that is itself a CONDITIONAL takes an **expanding** pair instead of a flat one
     /// — `group(["(", indent([softline, test]), softline, ")"])`
@@ -363,7 +366,7 @@ impl<'a> Printer<'a> {
     /// group carries it. Every other test in `ternary_test_needs_parens` — a `??`, an `=`,
     /// an `as` — hugs flat in both tools and keeps the plain pair.
     fn parenthesize_ternary_test(&self, expr: &internal::Expression<'_>, doc: DocId) -> DocId {
-        if !ternary_test_needs_parens(expr) {
+        if !ternary_test_needs_parens(expr) && !self.relational_sibling_pair_is_kept(expr) {
             return doc;
         }
         if matches!(

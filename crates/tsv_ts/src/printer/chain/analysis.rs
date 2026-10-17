@@ -25,8 +25,11 @@ use tsv_lang::{Comment, Span, TAB_WIDTH, has_line_spanning_comments_to_emit_in_r
 
 /// What the linearizer reads beyond the AST it walks: the source (to locate the `)` of a
 /// pair a base owns), the comment table (for the gates asking whether a gap holds a
-/// `//`), and the printer's withheld clarity pairs (for a base that is a called function
-/// expression, whose pair is one — `Printer::withheld_clarity_pair_targets`).
+/// `//`), the printer's withheld clarity pairs (for a base that is a called function
+/// expression, whose pair is one — `Printer::withheld_clarity_pair_targets`), and the heads
+/// that keep an authored shell behind `typeof` or a unary `-` in a comma-list region
+/// (`Printer::region_kept_shell_targets`): a base, a member object, a callee or a non-null
+/// operand, each printed as one parenthesized base.
 ///
 /// A struct rather than separate parameters because every recursive step needs the first
 /// two and none is ever passed alone — the same reason `ParenLeadingValue` travels as one.
@@ -35,6 +38,10 @@ pub struct LinearizeInput<'i> {
     pub source: &'i str,
     pub comments: &'i [Comment],
     pub(crate) withheld_clarity_pairs: &'i SpanMarks,
+    /// The heads that keep the author's shell behind a `typeof` or a unary `-` in a
+    /// comma-list region (`Printer::region_kept_shell_targets`), `None` in the document
+    /// with no region marks, so an ordinary chain probes no set.
+    pub(crate) region_kept_shells: Option<&'i SpanMarks>,
 }
 
 /// Linearize a chain expression into a flat list of nodes
@@ -309,7 +316,11 @@ fn fix_callee_base_parens(nodes: &mut [ChainNode<'_>], input: LinearizeInput<'_>
             && instantiation_keeps_pair_before_type_args(source, expr, SecondTypeArgs::Expression);
         let callee_pair = needs_parens(expr, ParenContext::Callee, false)
             && !(is_called_function(expr) && input.withheld_clarity_pairs.is_marked(expr.span()));
-        *np = callee_pair || second_list;
+        *np = callee_pair
+            || second_list
+            || input
+                .region_kept_shells
+                .is_some_and(|marks| marks.is_marked(expr.span()));
     }
 }
 
@@ -498,7 +509,16 @@ fn linearize_recursive<'a>(
                 ));
                 nodes.push(ChainNode::non_null_after_paren_operand());
             } else {
-                linearize_recursive(inner, input, nodes, paren_gaps);
+                if input
+                    .region_kept_shells
+                    .is_some_and(|marks| marks.is_marked(inner.span()))
+                {
+                    // A kept shell around a longer head (`typeof (c.d)!.e`), as at a
+                    // member object.
+                    nodes.push(ChainNode::base(inner, true));
+                } else {
+                    linearize_recursive(inner, input, nodes, paren_gaps);
+                }
                 // A comment from the stripped grouping parens (`(x + y /* c */)!.foo`)
                 // lives between the operand and the `!`. When the operand is a
                 // parenthesized base, keep the comment INSIDE the parens, where the
@@ -527,7 +547,10 @@ fn linearize_recursive<'a>(
         _ => {
             // ChainBase always parenthesizes a binary base for precedence, so
             // the for-init `in` rule never changes the verdict here — pass `false`.
-            let needs_parens = needs_parens(expr, ParenContext::ChainBase, false);
+            let needs_parens = needs_parens(expr, ParenContext::ChainBase, false)
+                || input
+                    .region_kept_shells
+                    .is_some_and(|marks| marks.is_marked(expr.span()));
             nodes.push(ChainNode::base(expr, needs_parens));
         }
     }
@@ -551,6 +574,13 @@ fn linearize_member_object<'a>(
     let object: &Expression<'_> = member.object;
     if let Some(start) = member_object_paren_leading_start(member, span) {
         push_sealed_chain_base(object, start, nodes);
+    } else if input
+        .region_kept_shells
+        .is_some_and(|marks| marks.is_marked(object.span()))
+    {
+        // A kept shell around a longer head (`typeof (c.d).e`) stays one parenthesized
+        // base: flattened, the pair would have no node to print on.
+        nodes.push(ChainNode::base(object, true));
     } else {
         linearize_recursive(object, input, nodes, paren_gaps);
     }
@@ -570,6 +600,14 @@ fn linearize_call_callee<'a>(
 ) {
     if child_stops_optional_chain(span.start, call.optional, call.callee) {
         push_sealed_chain_base(call.callee, span.start, nodes);
+        return;
+    }
+    // A kept shell around a longer callee (`typeof (c.d)()`), as at a member object.
+    if input
+        .region_kept_shells
+        .is_some_and(|marks| marks.is_marked(call.callee.span()))
+    {
+        nodes.push(ChainNode::base(call.callee, true));
         return;
     }
     // A `TSInstantiationExpression` callee (`expr<T>(args)`) is transparent: the Call
@@ -1194,6 +1232,7 @@ mod tests {
                 source: "",
                 comments: &[],
                 withheld_clarity_pairs: &SpanMarks::default(),
+                region_kept_shells: None,
             },
         );
 
@@ -1221,6 +1260,7 @@ mod tests {
                 source: "",
                 comments: &[],
                 withheld_clarity_pairs: &SpanMarks::default(),
+                region_kept_shells: None,
             },
         );
 
@@ -1246,6 +1286,7 @@ mod tests {
                 source: "",
                 comments: &[],
                 withheld_clarity_pairs: &SpanMarks::default(),
+                region_kept_shells: None,
             },
         );
 
@@ -1272,6 +1313,7 @@ mod tests {
                 source: "",
                 comments: &[],
                 withheld_clarity_pairs: &SpanMarks::default(),
+                region_kept_shells: None,
             },
         );
         let arena_docs = DocArena::new();
@@ -1308,6 +1350,7 @@ mod tests {
                 source: "",
                 comments: &[],
                 withheld_clarity_pairs: &SpanMarks::default(),
+                region_kept_shells: None,
             },
         );
         let arena_docs = DocArena::new();

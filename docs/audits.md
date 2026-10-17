@@ -1393,9 +1393,11 @@ Philosophy](./conformance_prettier.md#authoring-convergence-philosophy); this is
 non-whitespace instance, and unlike the whitespace one it has **no dual-stable remainder** — a
 redundant paren carries no authoring signal either formatter honors. (Authored pairs in an
 open type-argument region ARE held per authoring, for soundness rather than as a signal, and
-neither site class below splices them: the clarity pair behind a flagged `>`, and the pair
+neither site class below splices them: the clarity pair behind a flagged `>`, the pair
 around a non-last comma-list element holding a `<` ahead of a later element's flagged closer —
-item 8 of the doctrine's enumerated remainder.)
+item 8 of the doctrine's enumerated remainder — and, between those two elements, the pairs the
+printer's style decides: behind `typeof` or a unary `-`, around an assignment, an arrow
+function's conditional body or its lone parameter.)
 
 **Why it exists.** tsv cannot rebalance: acorn keeps the right-nested shape and tsv's wire must
 match it (the drop-in AST contract, priority #1). So every rule prettier asks of the rebalanced

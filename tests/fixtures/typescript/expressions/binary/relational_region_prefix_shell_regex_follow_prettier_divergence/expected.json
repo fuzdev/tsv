@@ -1,0 +1,255 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 151,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A regular expression behind the closer",
+			"start": 20,
+			"end": 61
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 150,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 141,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 63,
+					"end": 99,
+					"expression": {
+						"type": "CallExpression",
+						"start": 63,
+						"end": 98,
+						"callee": {
+							"type": "Identifier",
+							"start": 63,
+							"end": 65,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 66,
+								"end": 71,
+								"left": {
+									"type": "Identifier",
+									"start": 66,
+									"end": 67,
+									"name": "a"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 70,
+									"end": 71,
+									"name": "b"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 73,
+								"end": 97,
+								"left": {
+									"type": "UnaryExpression",
+									"start": 73,
+									"end": 83,
+									"operator": "typeof",
+									"prefix": true,
+									"argument": {
+										"type": "Identifier",
+										"start": 81,
+										"end": 82,
+										"name": "c"
+									}
+								},
+								"operator": ">",
+								"right": {
+									"type": "CallExpression",
+									"start": 86,
+									"end": 97,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 86,
+										"end": 94,
+										"object": {
+											"type": "Literal",
+											"start": 86,
+											"end": 89,
+											"value": {},
+											"raw": "/r/",
+											"regex": {
+												"pattern": "r",
+												"flags": ""
+											}
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 90,
+											"end": 94,
+											"name": "test"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 95,
+											"end": 96,
+											"name": "d"
+										}
+									],
+									"optional": false
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A regular expression behind the closer",
+							"start": 20,
+							"end": 61
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 101,
+					"end": 140,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 107,
+							"end": 139,
+							"id": {
+								"type": "Identifier",
+								"start": 107,
+								"end": 109,
+								"name": "a1"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 112,
+								"end": 139,
+								"elements": [
+									{
+										"type": "BinaryExpression",
+										"start": 113,
+										"end": 118,
+										"left": {
+											"type": "Identifier",
+											"start": 113,
+											"end": 114,
+											"name": "a"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 117,
+											"end": 118,
+											"name": "b"
+										}
+									},
+									{
+										"type": "BinaryExpression",
+										"start": 120,
+										"end": 138,
+										"left": {
+											"type": "UnaryExpression",
+											"start": 120,
+											"end": 124,
+											"operator": "-",
+											"prefix": true,
+											"argument": {
+												"type": "Literal",
+												"start": 122,
+												"end": 123,
+												"value": 1,
+												"raw": "1"
+											}
+										},
+										"operator": ">",
+										"right": {
+											"type": "CallExpression",
+											"start": 127,
+											"end": 138,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 127,
+												"end": 135,
+												"object": {
+													"type": "Literal",
+													"start": 127,
+													"end": 130,
+													"value": {},
+													"raw": "/r/",
+													"regex": {
+														"pattern": "r",
+														"flags": ""
+													}
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 131,
+													"end": 135,
+													"name": "test"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 136,
+													"end": 137,
+													"name": "d"
+												}
+											],
+											"optional": false
+										}
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

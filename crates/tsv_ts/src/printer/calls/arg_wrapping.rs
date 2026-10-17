@@ -1917,12 +1917,17 @@ pub(super) fn build_break_body_ladder(
 /// plain-call and `new` spellings ask it of the BODY, the chain of the whole ARROW. A forced
 /// break there means `fits()` would pick the flat state on a truncated measurement and then
 /// print the parens around an already-broken body.
+///
+/// `flat_pair` is whether the flat state takes those parens: a body a comma-list region
+/// leaves bare ([`Printer::arrow_body_takes_ternary_pair`]) keeps the ladder's layout and
+/// prints flat as written.
 pub(super) fn build_ternary_arrow_hug_ladder(
     d: &DocArena,
     opener: ArgOpener,
     sig_doc: DocId,
     body_doc: DocId,
     break_subject: DocId,
+    flat_pair: bool,
 ) -> DocId {
     let prefix = opener.open_prefix(d);
     // Break: the first hardline breaks after `=>`, the second drops `)` to its own line.
@@ -1939,7 +1944,11 @@ pub(super) fn build_ternary_arrow_hug_ladder(
         return state_break;
     }
     // Flat: the parens the grammar wants around a ternary body, then the call's own `)`.
-    let state_flat = d.concat(&[prefix, sig_doc, d.text(" => ("), body_doc, d.text("))")]);
+    let state_flat = if flat_pair {
+        d.concat(&[prefix, sig_doc, d.text(" => ("), body_doc, d.text("))")])
+    } else {
+        d.concat(&[prefix, sig_doc, d.text(" => "), body_doc, d.text(")")])
+    };
     // All broken: the signature drops to its own line too — the state an enclosing break
     // mode falls through to.
     let state_all_broken = d.concat(&[

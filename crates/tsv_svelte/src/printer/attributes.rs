@@ -1429,14 +1429,13 @@ impl<'a> Printer<'a> {
             }
 
             let len = seq.expressions.len();
+            let operands = self.build_bind_operand_docs(seq, |_| false);
 
             // Build items: each expression with trailing comma (except last)
-            let items: DocBuf = seq
-                .expressions
-                .iter()
+            let items: DocBuf = operands
+                .into_iter()
                 .enumerate()
-                .map(|(i, sub_expr)| {
-                    let expr_doc = self.build_ts_expression_doc(sub_expr);
+                .map(|(i, expr_doc)| {
                     if i < len - 1 {
                         let comma = d.text(",");
                         d.concat(&[expr_doc, comma])
@@ -1551,17 +1550,22 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let bytes = self.source.as_bytes();
+        // Rule A: an honored directive in the comma gap freezes the operand after it. The
+        // first operand has no such gap — a directive before it is the value head, resolved
+        // as `head_frozen` above.
+        let operands = self.build_bind_operand_docs(seq, |i| {
+            i > 0
+                && self.honored_directive_in_gap(
+                    seq.expressions[i - 1].span().end,
+                    seq.expressions[i].span().start,
+                )
+        });
         let mut items: DocBuf = DocBuf::new();
         let mut prev_doc = None;
-        for (i, sub_expr) in seq.expressions.iter().enumerate() {
-            // Rule A: an honored directive in the comma gap freezes this operand. The
-            // first operand has no such gap — a directive before it is the value head,
-            // resolved as `head_frozen` above.
-            let mut frozen = false;
+        for (i, (sub_expr, doc)) in seq.expressions.iter().zip(operands).enumerate() {
             if i > 0 {
                 let prev_end = seq.expressions[i - 1].span().end;
                 let cur_start = sub_expr.span().start;
-                frozen = self.honored_directive_in_gap(prev_end, cur_start);
                 // The separator comma, located in source so a comment on either side
                 // is attributed to the right operand (a comment's `,` can't fool it).
                 let comma_pos =
@@ -1587,13 +1591,38 @@ impl<'a> Printer<'a> {
                 );
             }
 
-            // Rule A resolved the operand's own freeze, so this is the ordinary value stage
-            // under the host's embed — the operand is measured where it sits.
-            let doc = self.build_head_value_doc(sub_expr, frozen, &self.embed);
             items.push(doc);
             prev_doc = Some(doc);
         }
         d.group(d.concat(&items))
+    }
+
+    /// The docs of a function binding's operands, each the ordinary value stage under the
+    /// host's embed ([`Self::build_head_value_doc`]) — the operand is measured where it
+    /// sits — except that every operand `tsv_ts` builds is built by one printer
+    /// ([`tsv_ts::build_bare_sequence_operand_docs`]), so the comma-list region rules reach
+    /// across the operands as they reach a sequence's. An operand `frozen_at` names prints
+    /// as its frozen slice, and a plain path as its own bytes.
+    fn build_bind_operand_docs(
+        &self,
+        seq: &tsv_ts::ast::internal::SequenceExpression<'_>,
+        frozen_at: impl Fn(usize) -> bool,
+    ) -> Vec<DocId> {
+        let built = tsv_ts::build_bare_sequence_operand_docs(
+            self.d(),
+            seq,
+            &self.ts_inputs(),
+            self.embed,
+            |i| !frozen_at(i) && self.fused_plain_path(seq.expressions[i]).is_none(),
+        );
+        seq.expressions
+            .iter()
+            .zip(built)
+            .enumerate()
+            .map(|(i, (expr, doc))| {
+                doc.unwrap_or_else(|| self.build_head_value_doc(expr, frozen_at(i), &self.embed))
+            })
+            .collect()
     }
 
     /// Build Doc parts using block structure: `={\n\texpr\n}`

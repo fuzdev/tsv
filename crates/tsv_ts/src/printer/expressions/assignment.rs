@@ -1141,9 +1141,13 @@ impl<'a> Printer<'a> {
         let build_right = |hoisted_run: Option<DocId>| {
             let build = || {
                 if let Some(boundary) = rhs_info.boundary {
-                    self.build_expression_doc_with_paren_comments(right_expr, boundary, false)
+                    self.build_value_doc_keeping_relational_sibling_pair(right_expr, boundary)
                 } else {
-                    self.build_expression_doc(right_expr)
+                    self.wrap_relational_sibling_pair(
+                        right_expr,
+                        false,
+                        self.build_expression_doc(right_expr),
+                    )
                 }
             };
             if !is_curried_chain {

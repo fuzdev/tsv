@@ -1,9 +1,10 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
 #![expect(clippy::expect_used)]
 
-//! The authored pair a comma list keeps around an element holding a `<` / `<<` when a later
-//! element holds a binary the parser flagged as able to close the type-argument region the
-//! `<` opens (`Printer::mark_relational_sibling_authored_pairs`,
+//! The authored pair a comma list keeps around an element holding a `<` / `<<`, and around
+//! every node holding one inside it, when a later element holds a binary the parser flagged
+//! as able to close the type-argument region the `<` opens
+//! (`Printer::mark_relational_sibling_authored_pairs`,
 //! `docs/conformance_prettier_ts.md` §Relational chain type-argument parens, "An authored pair
 //! around an earlier comma sibling").
 //!
@@ -131,6 +132,20 @@ fn an_element_that_prints_its_own_pair_takes_no_second() {
         // An assignment's clarity pair and a sequence's own pair already end the element.
         ("fn((a = b), c > (d, e));", "fn((a = b), c > (d, e));"),
         ("fn(((a, b)), c > (d, e));", "fn((a, b), c > (d, e));"),
+        // A sequence holding the comparison anywhere in the region keeps its one pair.
+        ("fn((a < b, c), d > (e, f));", "fn((a < b, c), d > (e, f));"),
+        (
+            "fn(x = (a < b, c), d > (e, f));",
+            "fn(x = (a < b, c), d > (e, f));",
+        ),
+        (
+            "fn(y + (a < b, c), d > (e, f));",
+            "fn(y + (a < b, c), d > (e, f));",
+        ),
+        (
+            "fn(y ? (a < b, c) : z, d > (e, f));",
+            "fn(y ? (a < b, c) : z, d > (e, f));",
+        ),
         // A `for` header's `[~In]` pair around the element is the kept pair, printed once.
         (
             "for (a, (x < y || p in q), c > (d, e); ;) {}",
@@ -227,13 +242,267 @@ fn a_plain_script_reads_the_same_lines() {
 }
 
 #[test]
-fn a_paired_comparison_escapes_a_bare_arrow_parameter() {
-    // The arrow parameter takes its own pair on print; the kept pair ahead of it is what
-    // keeps the line two arguments.
+fn a_paired_comparison_keeps_a_bare_arrow_parameter_bare() {
+    // The kept pair ahead of the arrow is what keeps the line two arguments; the arrow stands
+    // in the region the comparison opens, so its lone parameter prints as written
+    // (`tests/relational_region_pairs.rs`), and with the pair either spelling is the same
+    // program.
+    for source in [
+        "check((lo < hi), x => x > (lo + hi) / 2);",
+        "check((lo < hi), (x) => x > (lo + hi) / 2);",
+    ] {
+        assert_eq!(stable(source), source);
+    }
+}
+
+#[test]
+fn a_pair_around_the_comparison_an_element_ends_on_stays() {
+    // One level in: the comparison is the last thing the element prints, so with the pair gone
+    // its right operand would run on to the comma. The shift's stripped form is one prettier
+    // cannot reparse, so it is pinned here rather than in the tail fixture.
+    for (source, expected) in [
+        (
+            "fn((x) => a && (x << d), (e) => e > (f, g));",
+            "fn(\n\t(x) => a && (x << d),\n\t(e) => e > (f, g)\n);",
+        ),
+        (
+            "fn(a ? b : (c << d), e >> (f, g));",
+            "fn(a ? b : (c << d), e >> (f, g));",
+        ),
+        (
+            "fn(a < b, (x) => (x < max), (e) => e > (f, g));",
+            "fn(\n\ta < b,\n\t(x) => (x < max),\n\t(e) => e > (f, g)\n);",
+        ),
+        (
+            "fn(a < b, x = (c < d), e > (f, g));",
+            "fn(a < b, x = (c < d), e > (f, g));",
+        ),
+        (
+            "fn(a < b, (x) => x = (c < d), e > (f, g));",
+            "fn(a < b, (x) => x = (c < d), e > (f, g));",
+        ),
+        (
+            "fn(a < b, x = y = (c < d), e > (f, g));",
+            "fn(a < b, x = y = (c < d), e > (f, g));",
+        ),
+        (
+            "fn(a < b, x = y = z = (c < d), e > (f, g));",
+            "fn(a < b, x = y = z = (c < d), e > (f, g));",
+        ),
+        (
+            "for (let i = fn(x = (b < c), e > (f, g)); ; ) {}",
+            "for (let i = fn(x = (b < c), e > (f, g)); ;) {}",
+        ),
+    ] {
+        assert_eq!(stable(source), expected, "{source}");
+    }
+}
+
+#[test]
+fn every_authored_pair_around_a_comparison_stays_and_no_other() {
+    // Inside the region a pair around a node holding a `<` / `<<` prints as the author wrote
+    // it, wherever the node stands in the element: on its tail, left of another operator, a
+    // conditional's test, inside an element whose own pair is kept. A pair around a node
+    // that holds none follows the ordinary rules.
+    for (source, expected) in [
+        // A sole argument's own list parens are not an authored pair around its chain.
+        (
+            "fn(a < b, new G(c => d => e), e > (f, g));",
+            "fn(a < b, new G(c => d => e), e > (f, g));",
+        ),
+        (
+            "fn((x) => ((c < d) || e), (e) => e > (f, g));",
+            "fn(\n\t(x) => ((c < d) || e),\n\t(e) => e > (f, g)\n);",
+        ),
+        (
+            "fn(((x) => (x < max)), (e) => e > (f, g));",
+            "fn(\n\t((x) => (x < max)),\n\t(e) => e > (f, g)\n);",
+        ),
+        (
+            "fn((x) => (x < (y)), (e) => e > (f, g));",
+            "fn(\n\t(x) => (x < y),\n\t(e) => e > (f, g)\n);",
+        ),
+        (
+            "fn((x) => (a ? b : c < d), (e) => e > (f, g));",
+            "fn(\n\t(x) => (a ? b : c < d),\n\t(e) => e > (f, g)\n);",
+        ),
+        // The left operand of another comparison or shift, where tsc's type grammar reads a
+        // nested list or closes `>>` as two `>`s.
+        (
+            "fn(y = (c < d) < e, e >> (f, g));",
+            "fn(y = (c < d) < e, e >> (f, g));",
+        ),
+        (
+            "fn((c < d) < e, e >> (f, g));",
+            "fn((c < d) < e, e >> (f, g));",
+        ),
+        ("(c < d) < e, e >> (f, g);", "((c < d) < e, e >> (f, g));"),
+        (
+            "x = [(c < d) < e, e >> (f, g)];",
+            "x = [(c < d) < e, e >> (f, g)];",
+        ),
+        (
+            "fn(y = (c << d) > e, e > (f, g));",
+            "fn(y = (c << d) > e, e > (f, g));",
+        ),
+        (
+            "fn(a < b, x => (c < d) || (e < f), e >> (f, g));",
+            "fn(a < b, x => (c < d) || (e < f), e >> (f, g));",
+        ),
+        // A shift on the tail below the comparison, and an assignment inside an assignment.
+        (
+            "fn(x => c < (d << e), f >> (g, h));",
+            "fn(x => c < (d << e), f >> (g, h));",
+        ),
+        (
+            "fn(y = (z = (c < d)), f > (g, h));",
+            "fn(y = (z = (c < d)), f > (g, h));",
+        ),
+        // A conditional's test.
+        (
+            "fn((c < d) ? e : f, (e) => e > (f, g));",
+            "fn((c < d) ? e : f, (e) => e > (f, g));",
+        ),
+        (
+            "fn(a < b, (c < d) ? e : f, g > (h, i));",
+            "fn(a < b, (c < d) ? e : f, g > (h, i));",
+        ),
+        // An arrow that is another arrow's body, which a curried chain would print bare.
+        (
+            "fn(() => (c => c < d), (e).f > (g, h));",
+            "fn(() => (c => c < d), e.f > (g, h));",
+        ),
+        (
+            "fn(() => ((x) => x < y), e > (f, g));",
+            "fn(() => ((x) => x < y), e > (f, g));",
+        ),
+        (
+            "fn(async () => ((x) => x < y), e > (f, g));",
+            "fn(async () => ((x) => x < y), e > (f, g));",
+        ),
+        (
+            "fn(() => () => (c => c < d), (e).f > (g, h));",
+            "fn(() => () => (c => c < d), e.f > (g, h));",
+        ),
+        (
+            "fn(x = () => (c => c < d), (e).f > (g, h));",
+            "fn(x = () => (c => c < d), e.f > (g, h));",
+        ),
+        (
+            "useEffect(() => (cleanup => cleanup < limit), deps > (min, max));",
+            "useEffect(() => (cleanup => cleanup < limit), deps > (min, max));",
+        ),
+        // The pair around a curried chain, or around its next head, where the head holds the
+        // closer: printed bare, a head's `=>` follows another inside the region.
+        (
+            "fn(a < b, () => (c => c > (f, g)));",
+            "fn(a < b, () => (c => c > (f, g)));",
+        ),
+        (
+            "fn(a < b, () => () => (c => c > (f, g)));",
+            "fn(a < b, () => () => (c => c > (f, g)));",
+        ),
+        (
+            "fn(a < b, (() => c => c > (f, g)));",
+            "fn(a < b, (() => c => c > (f, g)));",
+        ),
+        (
+            "fn(a < b, () => (c => (c > (f, g))));",
+            "fn(a < b, () => (c => c > (f, g)));",
+        ),
+        (
+            "useMemo(lo < hi, () => (v => v > (lo + hi) / 2));",
+            "useMemo(lo < hi, () => (v => v > (lo + hi) / 2));",
+        ),
+        // A typed or generic head inside the kept pair: the pair ends the chain, so the head
+        // is no curried chain's to break open.
+        (
+            "fn(() => ((c): boolean => c < d), e > (f, g));",
+            "fn(() => ((c): boolean => c < d), e > (f, g));",
+        ),
+        (
+            "fn(() => (<T>(c: T) => c < d), e > (f, g));",
+            "fn(() => (<T>(c: T) => c < d), e > (f, g));",
+        ),
+        (
+            "fn(a < b, () => ((c): boolean => c > (f, g)));",
+            "fn(a < b, () => ((c): boolean => c > (f, g)));",
+        ),
+        (
+            "fn(() => ( // k\n c => c < d), e > (f, g));",
+            "fn(\n\t() => // k\n\t\t(c => c < d),\n\te > (f, g)\n);",
+        ),
+        // An `await` operand and an `as` operand.
+        (
+            "async () => fn(a < b, await ((c << d) < e), f >> (g, h));",
+            "async () => fn(a < b, await ((c << d) < e), f >> (g, h));",
+        ),
+        (
+            "fn(a < b, ((c << d) < e) as T, f >> (g, h));",
+            "fn(a < b, ((c << d) < e) as T, f >> (g, h));",
+        ),
+        (
+            "fn(a < b, (typeof (c)) as T, e > (f, g));",
+            "fn(a < b, typeof (c) as T, e > (f, g));",
+        ),
+    ] {
+        assert_eq!(stable(source), expected, "{source}");
+    }
+}
+
+#[test]
+fn a_kept_pair_leaves_the_other_curried_chains_alone() {
+    // The curried-chain decline asks of each chain's own bodies, so a document that keeps a
+    // pair elsewhere still prints its chains in the chain layout.
+    let source = "fn((a < b), c > (d, e));\nexport const middleware = (storeApiParameterName) => (nextDispatchFunctionName) => (actionObjectParameter) => nextDispatchFunctionName(actionObjectParameter);\nconst add = (x) => (y) => x + y;\nconst f = (x: T): H => (y) => x + y;\nconst h = <T>(x: T) => (y) => x;";
     assert_eq!(
-        stable("check((lo < hi), x => x > (lo + hi) / 2);"),
-        "check((lo < hi), (x) => x > (lo + hi) / 2);"
+        stable(source),
+        "fn((a < b), c > (d, e));\nexport const middleware =\n\t(storeApiParameterName) => (nextDispatchFunctionName) => (actionObjectParameter) =>\n\t\tnextDispatchFunctionName(actionObjectParameter);\nconst add = (x) => (y) => x + y;\nconst f =\n\t(x: T): H =>\n\t(y) =>\n\t\tx + y;\nconst h =\n\t<T>(x: T) =>\n\t(y) =>\n\t\tx;"
     );
+}
+
+#[test]
+fn a_comment_in_a_kept_tail_pair_prints_once() {
+    for (source, expected) in [
+        (
+            "fn(a && (/* k */ c < d), (e) => e > (f, g));",
+            "fn(a && (/* k */ c < d), (e) => e > (f, g));",
+        ),
+        (
+            "fn(a ? b : (c < d /* k */), (e) => e > (f, g));",
+            "fn(a ? b : (c < d /* k */), (e) => e > (f, g));",
+        ),
+        (
+            "fn(x = (b < c /* k */), e > (f, g));",
+            "fn(x = (b < c /* k */), e > (f, g));",
+        ),
+        (
+            "fn(x = /* k */ (b < c), e > (f, g));",
+            "fn(x = /* k */ (b < c), e > (f, g));",
+        ),
+        (
+            "fn((x) => /* k */ (x < max), (e) => e > (f, g));",
+            "fn(\n\t(x) => /* k */ (x < max),\n\t(e) => e > (f, g)\n);",
+        ),
+        (
+            "fn((x) => (x < max // k\n), (e) => e > (f, g));",
+            "fn(\n\t(x) => (\n\t\tx < max // k\n\t),\n\t(e) => e > (f, g)\n);",
+        ),
+        (
+            "fn(a && (c < d // k\n), (e) => e > (f, g));",
+            "fn(\n\ta &&\n\t\t(\n\t\t\tc < d // k\n\t\t),\n\t(e) => e > (f, g)\n);",
+        ),
+        (
+            "fn(x = (b < c // k\n), e > (f, g));",
+            "fn(\n\tx = (\n\t\tb < c // k\n\t),\n\te > (f, g)\n);",
+        ),
+        (
+            "fn(x = // k\n(b < c), e > (f, g));",
+            "fn(\n\tx = // k\n\t\t(b < c),\n\te > (f, g)\n);",
+        ),
+    ] {
+        assert_eq!(stable(source), expected, "{source}");
+    }
 }
 
 #[test]
@@ -275,8 +544,21 @@ fn realistic_range_checks_keep_their_program() {
         "assert((a.lo < a.hi), a.max > (a.hi - a.lo) * a.step);",
         "assert((lo < 10), max > (hi - lo) * step);",
         "assert((items.length < limit), this.size > (limit - 1) * 2);",
+        // The pair around the comparison an element ends on.
+        "xs.filter((x) => (x < max), (y) => y > (lo + hi) / 2);",
+        "xs.filter(x => (x < max), y => y > (lo + hi) / 2);",
+        "assert(ready && (lo < hi), max > (hi - lo) * step);",
+        "items.filter((item) => item.active && (item.count < limit), (other) => other > (lo + hi) / 2);",
+        "const r = xs.find((x) => (x.start < t), (y) => y.end > (t + span) * 2);",
     ] {
         stable(source);
+    }
+    // A pair around a shift that is a comparison's left operand prints as written.
+    for source in [
+        "check(ok = (1 << bits) < limit, value >> (bits - 8));",
+        "check((1 << bits) < limit, value >> (bits - 8));",
+    ] {
+        assert_eq!(stable(source), source);
     }
 }
 

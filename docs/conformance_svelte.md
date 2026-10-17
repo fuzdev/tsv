@@ -1517,10 +1517,13 @@ tokens between the `<` and the `>` print as written, so a tail that is no list i
 source is none in the output. The printer's rewrites are the exception, and the ones
 refused are those that can be read off where the type grammar stopped:
 
-- **at a `=>`** — an arrow function's bare parameter prints in a paren pair, and
-  `(c) => c` is a function type: `fn(a < b, c => c > (d, e))` would print as the generic
-  call `a<b, (c) => c>(d, e)`, as would the arrow standing as a sibling between the two
-  comparisons (`fn(a < b, c => d, e > (f, g))`);
+- **at a `=>` past another** — inside an arrow function's block body, which the type
+  grammar read as a function type returning a type literal, and where the printer pairs a
+  lone parameter or a conditional body as its style decides
+  (`fn(a < b, () => { x: y => y }, f > (g, h))` would print `x: (y) => y`, a type literal's
+  member). The test is a `=>` anywhere in the source from the `<` on, so it also refuses an
+  expression-body arrow earlier in the tail (`fn(a < b, (c) => c, d => d > (e, f))`) and a
+  `=>` inside a string or a comment (`fn(a < '=>', c => c > (d, e))`);
 - **at a `.` or a `<` right behind a `)`** — a paren shell the printer strips, where the
   name left bare takes the member or the list behind it (`(c).d` prints as the qualified
   name `c.d`, `(c) < d >> (e, f)` as a nested list closed with the outer one). Those two
@@ -1536,32 +1539,37 @@ error stands instead —
 [relational_sibling_value_tail_refused](../tests/fixtures/typescript/expressions/binary/relational_sibling_value_tail_refused_svelte_divergence/).
 The refusal asks where the list stopped, and never whether the rewritten tokens would
 reach the `>` or whether the printer strips the pair at all, so it is wider than the
-hazard (`fn(a < b, c => c + 1 > (d, e))` and `fn(a < b, (c | d).e > (f, g))` are refused
-with the rest), and narrower in one place: a shell behind a PREFIX operator stops the
-list AT its `(`, which reads there as a call's. Wherever such a shell stands in the tail
+hazard (`fn(a < b, (c | d).e > (f, g))` is refused with the rest), and narrower in one
+place: a shell behind a PREFIX operator stops the list AT its `(`, which reads there as a
+call's. Wherever such a shell stands in the tail
 — `fn(a < b, typeof (c) > (d, e))`, `fn(a < b, -(1) > (d, e))`, the operator glued to it
 (`typeof(c)`), in a sibling between the two comparisons, behind an arrow, inside an
-object or an array — the line parses, prints with the shell stripped, and reads back as
-a generic call: a **known gap**. The pairs the printer ADDS are not read either. A
-number's member access prints in one (`5..toFixed()` as `(5).toFixed()`), which is then
-a shell ahead of a `.`, so that output is rejected on a second pass; and the pair around
-an assignment or an arrow function's conditional body
-(`fn(a < b, c = d, e > (f, g))` prints `(c = d)`) is text the compiler's recovering list
-parse claims and rejects, where tsv and acorn-typescript read the two comparisons back.
+object or an array — the line parses, and the comma-list owner keeps the shell, so it
+reads back as the two comparisons. A Svelte function binding (`bind:value={get, set}`) is
+such an owner too: its host prints the two operands bare, as the list they are, and the
+owner's rules reach across them as across a sequence's — the pair the author wrote around an
+operand included (`bind:value={(() => lo < hi), (v) => v > (lo + hi) / 2 && set(v)}`), whose
+`<` would otherwise reach the setter's `>`. One gap remains: an operand frozen by a
+`prettier-ignore` prints its own source slice, which starts inside that pair, so the frozen
+operand loses it. A list that stops at the first `=>` it meets is no
+refusal: between the two comparisons the owner keeps an arrow function's lone parameter
+written bare as written, so `fn(a < b, c => c > (d, e))` and `fn(a < b, c => d, e > (f, g))` print as
+written and read back as the comparisons. The pairs the printer ADDS are not read either;
+between the two comparisons the owner adds none of its style's own — around an assignment
+(`fn(a < b, c = d, e > (f, g))`), an arrow function's conditional body or its lone
+parameter — and keeps each the author wrote
+([conformance_prettier_ts.md §Relational chain type-argument parens](./conformance_prettier_ts.md)).
+One pair it still adds is a **known gap**: a number's member access prints in one
+(`5..toFixed()` as `(5).toFixed()`), which is then a shell ahead of a `.`, so that output
+is rejected on a second pass.
 One oracle split runs the other way from the non-null type's: a negative number behind a
 postfix (`fn(a < b, -1(c) > (d, e))`, `-5..x`) is a literal type to acorn-typescript
-alone, which reads a generic call where tsv reads the compiler's comparisons. An arrow
-function behind a token the list stopped at first is no part of any of this
-(`x = { p: a < b, q: c => c > (d, e) }` stops at the `:`).
+alone, which reads a generic call where tsv reads the compiler's comparisons.
 The refused comparisons need no token changed to be written: the first from its other
-side (`fn(b > a, c => c > (d, e))`), either one hoisted into a variable, or a `function`
-expression in the arrow's place. A pair around the first comparison is another escape
-(`fn((a < b), c => c > (d, e))`): its comma-list owner retains it. That holds where the
-comparison is the list element itself; one inside an earlier arrow's body takes the pair
-around that whole arrow (`fn((c => c < d), e => e > (f, g))`). A pair around the
-comparison alone (`fn(c => (c < d), e => e > (f, g))`) sits one level in, where nothing
-retains it: the line parses, prints with the pair stripped, and reads back as a generic
-call — the same **known gap**.
+side (`fn(b > a, (c).d > (e, f))`), or either one hoisted into a variable. A pair around
+the first comparison is another escape, which its comma-list owner retains: around the
+list element itself (`fn((a < b), (c).d > (e, f))`), or around the comparison anywhere
+inside an earlier element (`fn(c => (c < d), (e).f > (g, h))`).
 `a_tail_the_printer_would_complete_stays_rejected` and
 its neighbors in
 [type_arguments_tail_fallback.rs](../tests/type_arguments_tail_fallback.rs) pin both

@@ -2450,7 +2450,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         match self.parse_type_argument_list_tail(start, first) {
             Ok(type_arguments) => Ok(Some(type_arguments)),
             Err(error)
-                if error.is_goal_gated() || self.printed_tail_could_complete_type_arguments() =>
+                if error.is_goal_gated() || self.printed_tail_could_complete_type_arguments(lt) =>
             {
                 Err(error)
             }
@@ -2521,9 +2521,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// the exception, and the ones refused are those that can be read off where the
     /// type grammar stopped:
     ///
-    /// - **at a `=>`** — an arrow function's bare parameter, which prints in a paren
-    ///   pair, and `(c) => d` is a function type: `fn(a < b, c => c > (d, e))` would
-    ///   print as the generic call `a<b, (c) => c>(d, e)`;
+    /// - **at a `=>` past another** — an arrow function's lone parameter or conditional
+    ///   body inside an arrow function's block body: the type grammar read the earlier
+    ///   `=>` as a function type's and the braces as a type literal, and inside a body
+    ///   the printer's region rules do not reach, its style pairs both (`(c) => c` is a
+    ///   function type, `return (c)` a method signature). Any `=>` byte from the `<` on
+    ///   refuses, which over-approximates that: an expression-body arrow earlier in the
+    ///   tail (`fn(a < b, (c) => c, d => d > (e, f))`) and a `=>` in a string or a comment
+    ///   refuse too;
     /// - **at a `.` or a `<` right behind a `)`** — a paren shell, which the printer
     ///   strips where it is redundant, leaving a name that takes what the parenthesized
     ///   type could not: `(c).d` prints as the qualified name `c.d`, and
@@ -2537,15 +2542,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// It asks where the list stopped, and never whether the rewritten tokens would
     /// reach the `>` or whether the printer strips the pair at all, so it also refuses
-    /// tails no rewrite completes (`fn(a < b, c => c + 1 > (d, e))`,
-    /// `fn(a < b, (c | d).e > (f, g))`). That errs toward the loud answer: a rejection
-    /// the author can write around, against a second program printed in silence.
-    // TODO: a shell behind a PREFIX operator is the same rewrite and is not read here,
-    // wherever it stands in the tail: `fn(a < b, typeof (c) > (d, e))` and
-    // `fn(a < b, -(1) > (d, e))` stop AT the `(`, parse as comparisons, print as
-    // `typeof c` / `-1`, and read back as a generic call. Telling that `(` from a
-    // call's needs the token ahead of it, which the parser does not keep.
-    fn printed_tail_could_complete_type_arguments(&self) -> bool {
+    /// tails no rewrite completes (`fn(a < b, (c | d).e > (f, g))`). That errs toward the
+    /// loud answer: a rejection the author can write around, against a second program
+    /// printed in silence.
+    ///
+    /// Two rewrites the printer leaves out between the two comparisons are not read
+    /// here, so the lists they would complete parse as comparisons: a shell behind a
+    /// PREFIX operator (`fn(a < b, typeof (c) > (d, e))`, `fn(a < b, -(1) > (d, e))`,
+    /// which stop AT the `(`, where only the token ahead of it would tell it from a
+    /// call's), and the pair around an arrow function's bare lone parameter, a function
+    /// type's spelling (`fn(a < b, c => c > (d, e))`, which stops at its first `=>`).
+    /// Inside the region the printer keeps both as the author wrote them
+    /// (`Printer::mark_region_source_pairs`). `lt` is the list's `<`.
+    fn printed_tail_could_complete_type_arguments(&self, lt: u32) -> bool {
         // whether the token before the one the list stopped at is a `)`
         let behind_paren = || {
             self.prev_end
@@ -2554,7 +2563,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 == Some(&b')')
         };
         match self.current_kind() {
-            TokenKind::Arrow => true,
+            TokenKind::Arrow => self
+                .source
+                .as_bytes()
+                .get(lt as usize..self.current.start as usize)
+                .is_some_and(|tail| tail.windows(2).any(|pair| pair == b"=>")),
             TokenKind::BracketOpen => self.had_line_terminator,
             TokenKind::LessThan | TokenKind::LeftShift => {
                 self.had_line_terminator || behind_paren()
