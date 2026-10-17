@@ -597,7 +597,7 @@ fn test_format_refuses_a_lone_cr_in_an_in_tag_line_comment() {
     let stderr = String::from_utf8_lossy(&content.stderr);
     assert_eq!(content.status.code(), Some(2), "{stderr}");
     assert!(content.stdout.is_empty(), "nothing is printed: {stderr}");
-    // positionless, and no parse error: the bytes parse
+    // no parse error: the bytes parse
     assert!(stderr.starts_with(&format!("Error: {REFUSAL}")), "{stderr}");
     assert!(
         stderr.contains("\n1:10 <div // c\n"),

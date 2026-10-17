@@ -210,14 +210,15 @@ leading byte-order mark, in any language (the header alone carries the wire's re
 The caret is padded by the display width of what the excerpt prints ahead of it (a tab echoed
 as a tab), so it sits under the error's character even where the header's UTF-16 column and
 the screen column differ. The text comes from `tsv_lang`'s `ParseError` and is the same
-on both bins and in every package — where it is the message of the `SyntaxError` the facade
-throws, whose `start` and `loc` properties carry the same point (`crates/tsv_wasm/npm/api.js`).
+on both bins and in every package — where it is the `message` of the `{kind: 'parse'}` error
+the facade returns, whose `start` and `loc` carry the same point (`crates/tsv_wasm/npm/api.js`).
 
 Two errors are not parse errors, and a single input prints them after `Error: ` rather than
 `Parse error: ` (a path-mode `format` names the file either way): a source over the 4 GiB
-size cap the parsers' `u32` offsets index, and a `format` refusal. Both are positionless (no
-`ParseError` position), which is how the native bin tells them from a parse error
-(`cli::out::exit_with_parse_error`); `cli.js` tells them by the facade's `SyntaxError`.
+size cap the parsers' `u32` offsets index, and a `format` refusal. Neither is a syntax error
+(`ParseError::is_syntax_error`), which is how the native bin tells them from a parse error
+(`cli::out::exit_with_parse_error`); `cli.js` tells them by the facade: the size cap throws,
+and the refusal is a returned error of `kind` `'refused'` where a parse failure's is `'parse'`.
 
 The refusal: a Svelte document holding a lone CR (not part of a CRLF) with comment text after
 it inside a `//` comment between a tag's attributes. Svelte ends that comment at LF alone, so
@@ -225,9 +226,9 @@ the CR is comment text, and the format path's CR fold would end the comment ther
 the rest of its line as markup. (A CR with only whitespace after it, as in a doubled
 `CR CR LF` ending, ends the comment where the fold does, and formats.) The message names the
 CR's `line:col`; `parse` accepts the same bytes. It is a per-file error (exit 2) like any
-other, and in the packages a plain `Error` with no `start` / `loc` rather than the
-`SyntaxError` (`tsv_svelte::parse_folded`). A document whose own bytes do not parse reports
-that parse error first, exactly as `parse` does.
+other, and in the packages a returned `{kind: 'refused', message, start, loc}` error at the
+CR rather than a `kind: 'parse'` one (`tsv_svelte::parse_folded`). A document whose own
+bytes do not parse reports that parse error first, exactly as `parse` does.
 
 ## Stripping types (`tsv strip`)
 

@@ -11,8 +11,18 @@ Each `## Unreleased` section must be non-empty and carry a
 `## Unreleased` (reset to `bump: patch`) for the next cycle.
 
 ## Unreleased
-<!-- bump: patch -->
+<!-- bump: minor -->
 
+- **breaking** feat: `parse_<lang>`, `parse_<lang>_json` and `format_<lang>` return a result
+  instead of throwing, like `strip_typescript` — `{ok: true, ast}`, `{ok: true, json}` and
+  `{ok: true, code}`, or `{ok: false, error}` where a parse failure is the plain object
+  `{kind: 'parse', message, start, loc}` (no stack, structured-clone-able; `SyntaxError` is no
+  longer thrown). `format_svelte`'s refusal of a lone CR inside an in-tag `//` comment is now
+  `{kind: 'refused', message, start, loc}`, pointing at the CR. Argument misuse still throws a
+  `TypeError`, and an engine failure with no position (the size cap, a trap) still throws. The
+  type `TsvSyntaxError` is replaced by `TsvParseError`, with `FormatResult` (its error a
+  `FormatError`: `TsvParseError | FormatRefusedError`), `ParseResult` and `ParseJsonResult`
+  beside `StripResult`
 - feat: type stripping — `strip_typescript(source, options?)` in `@fuzdev/tsv-wasm` and
   `@fuzdev/tsv`, and `tsv strip` in both CLIs, turn TypeScript into JS by blanking every type
   to whitespace, so every line and column stays where it was. TypeScript that blanking cannot

@@ -4,11 +4,12 @@
  *
  * The published surface of every tsv npm package is one hand-written facade
  * (`crates/tsv_wasm/npm/api.js` + `api_parse.js`): per call it checks the source is a
- * well-formed UTF-16 string, reads the options bag, wraps the engine call to rethrow a
- * parse failure as the typed `SyntaxError`, and for the native package `JSON.parse`s the
- * wire inside a try/catch. The bench's `tsv` / `tsv-wasm` / `+locations` rows time that
- * facade over each binding (`lib/tsv_api.ts`). This probe prices it, per binding,
- * operation and language, under whichever runtime runs it.
+ * well-formed UTF-16 string, reads the options bag, wraps the engine call to turn a parse
+ * failure into a returned `{ok: false, error}` (a success into `{ok: true, …}`), and for the
+ * native package `JSON.parse`s the wire inside a try/catch. The bench's `tsv` / `tsv-wasm`
+ * / `+locations` rows time that facade over each binding (`lib/tsv_api.ts`), unwrapping the
+ * result as a consumer does. This probe prices it, per binding, operation and language,
+ * under whichever runtime runs it.
  *
  * The ARMS of one cell, all over one loaded engine instance per binding:
  *
@@ -181,15 +182,21 @@ const engine_call = (impl: TsvBinding, operation: Operation, language: Language)
 	return (source) => reconstruct_locations(parse(source), source, { language });
 };
 
+/** A package result's product, unwrapped as a consumer does (and as the row does). */
+const unwrap = (result: any, key: 'ast' | 'code'): unknown => {
+	if (result.ok) return result[key];
+	throw new Error(result.error.message);
+};
+
 /** A package consumer's own spelling of each operation. */
 const package_call = (pkg: Package, operation: Operation, language: Language): Call => {
 	if (operation === 'format') {
 		const format = pkg[`format_${language}`];
-		return (source) => format(source);
+		return (source) => unwrap(format(source), 'code');
 	}
 	const parse = pkg[`parse_${language}`];
-	if (operation === 'parse') return (source) => parse(source);
-	return (source) => parse(source, { locations: true });
+	if (operation === 'parse') return (source) => unwrap(parse(source), 'ast');
+	return (source) => unwrap(parse(source, { locations: true }), 'ast');
 };
 
 const harness_arms = (impl: TsvBinding): BindingArms['arms'] => ({

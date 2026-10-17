@@ -24,7 +24,12 @@
  * would reject the forwarded `{sourceType: undefined}` the runtime accepts. The
  * TypeScript bags are standalone rather than `extends` of their base, since a settable
  * `sourceType` is incompatible with the `undefined`-only one.
+ *
+ * Relative specifiers carry the **`.js`** extension, as in every shipped `.d.ts`: under
+ * `moduleResolution: node16`/`nodenext` an extensionless one is TS2834 at the consumer.
  */
+
+import type { TsvParseError } from './facade_error.js';
 
 /**
  * Options accepted by `format_svelte` / `format_css`. Formatting itself is
@@ -59,36 +64,72 @@ export interface TypeScriptFormatOptions {
 	sourceType?: 'script' | 'module' | undefined;
 }
 
+/** A source that formatted: the formatted text. */
+export interface FormatSuccess {
+	ok: true;
+	/** The formatted source — the same string when it was already formatted. */
+	code: string;
+}
+
+/** A source that did not format, and why. */
+export interface FormatFailure {
+	ok: false;
+	error: FormatError;
+}
+
+/**
+ * What every `format_<lang>` returns: it never throws for what it finds in the source (an
+ * argument refusal is a thrown `TypeError`, and an engine failure with no point — the 4 GiB
+ * size cap, a WASM trap, stack exhaustion — throws too).
+ */
+export type FormatResult = FormatSuccess | FormatFailure;
+
+/** Why a format failed — `kind` says which. */
+export type FormatError = TsvParseError | FormatRefusedError;
+
+/**
+ * The source parses, but the formatter cannot print it without changing what it means, so
+ * it refuses: a lone CR inside a Svelte in-tag `//` comment, which the format's line-ending
+ * normalization would turn into a line break that ends the comment early. Only
+ * `format_svelte` refuses.
+ */
+export interface FormatRefusedError {
+	kind: 'refused';
+	/**
+	 * What is refused (`Lone carriage return inside a '//' comment in a tag: …`), then a line
+	 * `<line>:<column> <excerpt>` whose header is `loc.line:loc.column + 1`, then a caret under
+	 * the refused CR. The excerpt is bounded as `TsvParseError.message`'s is — by ANY line
+	 * terminator, so it ends at the refused CR itself, while the header counts LF lines.
+	 */
+	message: string;
+	/** UTF-16 offset of the refused character, in the parse wire's coordinates. */
+	start: number;
+	/** Line (1-based) and column (0-based, UTF-16 units) of `start`, LF lines. */
+	loc: { line: number; column: number };
+}
+
 /**
  * Format a Svelte component.
  * @throws TypeError when `source` is not a well-formed UTF-16 string, `options` is not an
  *   object, or `options` carries an unknown key or a set `sourceType`
- * @throws SyntaxError when the source does not parse — a `TsvSyntaxError`, its position on
- *   `start` and `loc`
- * @throws Error when the source exceeds the 4 GiB size cap, or parses but cannot be
- *   formatted faithfully — a lone CR inside an in-tag `//` comment, which the format's CR
- *   fold would end early
+ * @throws Error when the source exceeds the 4 GiB size cap
  */
-export declare function format_svelte(source: string, options?: FormatOptions): string;
+export declare function format_svelte(source: string, options?: FormatOptions): FormatResult;
 /**
  * Format TypeScript (or JavaScript).
  * @throws TypeError when `source` is not a well-formed UTF-16 string, `options` is not an
  *   object, or `options` carries an unknown key or a `sourceType` other than `'script'` or
  *   `'module'`
- * @throws SyntaxError when the source does not parse — a `TsvSyntaxError`, its position on
- *   `start` and `loc`
  * @throws Error when the source exceeds the 4 GiB size cap
  */
 export declare function format_typescript(
 	source: string,
 	options?: TypeScriptFormatOptions
-): string;
+): FormatResult;
 /**
  * Format CSS.
  * @throws TypeError when `source` is not a well-formed UTF-16 string, `options` is not an
  *   object, or `options` carries an unknown key or a set `sourceType`
- * @throws SyntaxError when the source does not parse — a `TsvSyntaxError`, its position on
- *   `start` and `loc`
  * @throws Error when the source exceeds the 4 GiB size cap
  */
-export declare function format_css(source: string, options?: FormatOptions): string;
+export declare function format_css(source: string, options?: FormatOptions): FormatResult;

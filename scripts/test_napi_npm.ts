@@ -85,9 +85,12 @@ import {
 import {
 	LONE_CR_REFUSAL,
 	LONE_CR_TAG_COMMENT,
-	register_syntax_error_suite,
-	syntax_errors
-} from './syntax_error_suite.ts';
+	ok_ast,
+	ok_code,
+	ok_json,
+	parse_failures,
+	register_parse_failure_suite
+} from './parse_failure_suite.ts';
 
 const pkg_root = NAPI_PKG_ROOT;
 // The staged dir name is the BUILD script's triple detection (Deno-side);
@@ -263,9 +266,9 @@ const throws_with = (fn: () => unknown, needle: string): void => {
 
 describe('@fuzdev/tsv loader (staged npm shape)', () => {
 	it('formats every language', () => {
-		assert.equal(api.format_typescript('const   x=1'), 'const x = 1;\n');
-		assert.equal(api.format_css('a{color:red}'), 'a {\n\tcolor: red;\n}\n');
-		assert.equal(api.format_svelte('<div   >x</div   >'), '<div>x</div>\n');
+		assert.equal(ok_code(api.format_typescript('const   x=1')), 'const x = 1;\n');
+		assert.equal(ok_code(api.format_css('a{color:red}')), 'a {\n\tcolor: red;\n}\n');
+		assert.equal(ok_code(api.format_svelte('<div   >x</div   >')), '<div>x</div>\n');
 	});
 
 	// The four WASM lifecycle exports are deliberately ABSENT, and the absence is API:
@@ -359,28 +362,32 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		}
 	);
 
-	// One input, one error: the class, the message, the `start` and the `loc`, from both
+	// One input, one error: the kind, the message, the `start` and the `loc`, from both
 	// engines alike — the facade builds the published error from the same three engine
 	// properties on both. Gated on the wasm package being current, as the export parity
 	// above is.
-	it('throws the same parse failures as @fuzdev/tsv-wasm', { skip: wasm_parity_skip }, async () => {
-		const wasm = await import(pathToFileURL(wasm_package_index).href);
-		assert.deepEqual(syntax_errors(api), syntax_errors(wasm));
-	});
+	it(
+		'returns the same parse failures as @fuzdev/tsv-wasm',
+		{ skip: wasm_parity_skip },
+		async () => {
+			const wasm = await import(pathToFileURL(wasm_package_index).href);
+			assert.deepEqual(parse_failures(api), parse_failures(wasm));
+		}
+	);
 
 	it('parses to span-only objects, and _json siblings return the string', () => {
-		const ast = api.parse_typescript('const x = 1;');
+		const ast = ok_ast(api.parse_typescript('const x = 1;'));
 		assert.equal(ast.type, 'Program');
 		assert.equal(ast.body[0].loc, undefined, 'the default wire is span-only');
 		assert.equal(typeof ast.body[0].start, 'number');
-		const svelte = api.parse_svelte('<div>x</div>');
+		const svelte = ok_ast(api.parse_svelte('<div>x</div>'));
 		assert.equal(svelte.type, 'Root');
 		assert.equal(svelte.fragment.nodes[0].loc, undefined);
 		assert.equal(svelte.fragment.nodes[0].name_loc, undefined);
-		const css = api.parse_css('a { color: red }');
+		const css = ok_ast(api.parse_css('a { color: red }'));
 		assert.equal(css.type, 'StyleSheetFile');
 		assert.equal(css.children[0].loc, undefined);
-		const json = api.parse_typescript_json('const x = 1;');
+		const json = ok_json(api.parse_typescript_json('const x = 1;'));
 		assert.equal(typeof json, 'string');
 		assert.deepEqual(JSON.parse(json), ast);
 	});
@@ -394,10 +401,10 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 	// `parse --locations` directly.
 	it('the locations helpers ship, and {locations: true} runs them', () => {
 		const source = 'const x = 1;\nconst y = 2;\n';
-		const spans = api.parse_typescript(source);
+		const spans = ok_ast(api.parse_typescript(source));
 		assert.equal(spans.body[1].loc, undefined, 'the default wire starts without loc');
 		assert.equal(api.reconstruct_locations(spans, source), spans, 'mutates and returns the ast');
-		assert.deepEqual(spans, api.parse_typescript(source, { locations: true }));
+		assert.deepEqual(spans, ok_ast(api.parse_typescript(source, { locations: true })));
 		// The amortized entry point over the same source, the language named.
 		const locator = api.create_locator(source, { language: 'typescript' });
 		assert.deepEqual(locator.loc_of(spans.body[1]), spans.body[1].loc);
@@ -406,37 +413,40 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		// CSS through the facade.
 		const sv =
 			'<script>\nlet a = 1;\u2028let b = 2;\n</script>\n<div /* c */ {x}>\n{#each xs as { a }}{a}{/each}\n</div>\n<style>\np { }\n</style>\n';
-		const sv_located = api.parse_svelte(sv, { locations: true });
-		assert.deepEqual(api.reconstruct_locations(api.parse_svelte(sv), sv), sv_located);
+		const sv_located = ok_ast(api.parse_svelte(sv, { locations: true }));
+		assert.deepEqual(api.reconstruct_locations(ok_ast(api.parse_svelte(sv)), sv), sv_located);
 		assert.ok(sv_located.fragment.nodes.some((node: any) => node.name_loc));
 		const css = '/* c */\na {\n\tcolor: red;\n}\r\nb { }';
-		const css_located = api.parse_css(css, { locations: true });
-		assert.deepEqual(api.reconstruct_locations(api.parse_css(css), css), css_located);
+		const css_located = ok_ast(api.parse_css(css, { locations: true }));
+		assert.deepEqual(api.reconstruct_locations(ok_ast(api.parse_css(css)), css), css_located);
 		assert.ok(css_located.children[0].loc);
 		// The `_json` siblings return the span-only wire the object parse reads.
-		assert.equal(api.parse_css_json(css), JSON.stringify(api.parse_css(css)));
+		assert.equal(ok_json(api.parse_css_json(css)), JSON.stringify(ok_ast(api.parse_css(css))));
 	});
 
 	it('the TypeScript sourceType axis reaches parse AND format', () => {
 		const script_only = 'var await = 1;\n';
-		assert.equal(api.parse_typescript(script_only, { sourceType: 'script' }).type, 'Program');
-		assert.throws(() => api.parse_typescript(script_only, { sourceType: 'module' }));
-		assert.throws(() => api.parse_typescript(script_only));
 		assert.equal(
-			api.format_typescript('var   await=1', { sourceType: 'script' }),
+			ok_ast(api.parse_typescript(script_only, { sourceType: 'script' })).type,
+			'Program'
+		);
+		assert.equal(api.parse_typescript(script_only, { sourceType: 'module' }).ok, false);
+		assert.equal(api.parse_typescript(script_only).ok, false);
+		assert.equal(
+			ok_code(api.format_typescript('var   await=1', { sourceType: 'script' })),
 			'var await = 1;\n'
 		);
 		// A set source type is exact; an unset one takes the module-then-script
 		// fallback, so the same script-only source formats with no bag at all.
-		assert.throws(() => api.format_typescript('var   await=1', { sourceType: 'module' }));
-		assert.equal(api.format_typescript('var   await=1'), 'var await = 1;\n');
-		assert.equal(api.format_typescript('export const   x=1'), 'export const x = 1;\n');
+		assert.equal(api.format_typescript('var   await=1', { sourceType: 'module' }).ok, false);
+		assert.equal(ok_code(api.format_typescript('var   await=1')), 'var await = 1;\n');
+		assert.equal(ok_code(api.format_typescript('export const   x=1')), 'export const x = 1;\n');
 		// Broken under BOTH grammars: the script retry died at line 1's `import` — a goal
 		// gate, which settles the file as a module — so the module's error is the reported
 		// one (`with` at line 2).
-		throws_with(
-			() => api.format_typescript("import x from 'y';\nwith (a) {\n\tb;\n}\n"),
-			"The 'with' statement is not allowed in strict mode"
+		assert.match(
+			api.format_typescript("import x from 'y';\nwith (a) {\n\tb;\n}\n").error.message,
+			/The 'with' statement is not allowed in strict mode/
 		);
 		throws_with(
 			() => api.parse_typescript('const x = 1;', { sourceType: 'sloppy' }),
@@ -465,7 +475,7 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 			() => api.format_css('a{}', { sourceType: 'script' }),
 			"format option 'sourceType' is only supported for TypeScript"
 		);
-		assert.equal(api.parse_svelte('<div>x</div>', { sourceType: undefined }).type, 'Root');
+		assert.equal(ok_ast(api.parse_svelte('<div>x</div>', { sourceType: undefined })).type, 'Root');
 		throws_with(() => api.format_css(42), 'format source must be a string (got number)');
 	});
 
@@ -507,8 +517,8 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 			facade_type_names('facade_strip.d.ts').sort()
 		);
 		assert.deepEqual(
-			reexported('./syntax_error.js'),
-			facade_type_names('syntax_error.d.ts').sort()
+			reexported('./facade_error.js'),
+			facade_type_names('facade_error.d.ts').sort()
 		);
 	});
 
@@ -550,9 +560,9 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 
 	it('multibyte content survives, and formatting is idempotent', () => {
 		const src = "const x = '€🦀';\n";
-		const formatted = api.format_typescript(src);
+		const formatted = ok_code(api.format_typescript(src));
 		assert.ok(formatted.includes('€🦀'));
-		assert.equal(api.format_typescript(formatted), formatted);
+		assert.equal(ok_code(api.format_typescript(formatted)), formatted);
 	});
 
 	// The loader is ESM, so a CommonJS host reaches it by dynamic import — the
@@ -564,7 +574,7 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		const req = createRequire(loader_path);
 		const resolved = req.resolve('@fuzdev/tsv');
 		const from_cjs = await import(pathToFileURL(resolved).href);
-		assert.equal(from_cjs.format_typescript('const   x=1'), 'const x = 1;\n');
+		assert.equal(ok_code(from_cjs.format_typescript('const   x=1')), 'const x = 1;\n');
 	});
 
 	// The ESM half of the same claim. The CJS test above resolves through
@@ -584,7 +594,7 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 				`const tsv = await import('@fuzdev/tsv');
 const unexported = await import('@fuzdev/tsv/cli.js').then(() => 'resolved', (error) => error.code);
 const locations = Object.keys(await import('@fuzdev/tsv/locations')).sort();
-process.stdout.write(JSON.stringify({out: tsv.format_typescript('const   x=1'), unexported, locations}));`
+process.stdout.write(JSON.stringify({out: tsv.format_typescript('const   x=1').code, unexported, locations}));`
 			],
 			{ cwd: staged, encoding: 'utf-8' }
 		);
@@ -707,7 +717,7 @@ process.stdout.write(JSON.stringify({
 // DECISION can be driven over hosts the CI matrix will never have (an Alpine
 // container, a Debian box with the `musl` package installed, a runtime whose
 // `process.report` is absent or partial).
-register_syntax_error_suite('@fuzdev/tsv loader', api);
+register_parse_failure_suite('@fuzdev/tsv loader', api);
 
 // The type strip's API table (`scripts/strip_suite.ts`), shared with the wasm umbrella's suite.
 register_strip_api_suite('@fuzdev/tsv loader', api);

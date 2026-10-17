@@ -2,9 +2,12 @@
  * Types for the type-strip API the strip-capable tsv npm packages export
  * (`@fuzdev/tsv-wasm`, `@fuzdev/tsv`) — built by `api_strip.js`'s `create_strip_api`.
  * Declares the PUBLISHED function, not `api_strip.js`'s own export; named apart from it
- * for the reason `facade_format.d.ts` gives. Self-contained (no `tsv_ast.d.ts` import), so
- * the strip half carries no dependency on the parse half's declarations.
+ * for the reason `facade_format.d.ts` gives. It imports only the shared error type every
+ * package ships (`facade_error.d.ts`) — no `tsv_ast.d.ts` — so the strip half carries no
+ * dependency on the parse half's declarations.
  */
+
+import type { TsvParseError } from './facade_error.js';
 
 /**
  * Options accepted by `strip_typescript`: the parse goal, read as `format_typescript` reads it.
@@ -47,25 +50,14 @@ export interface StripFailure {
 /** What `strip_typescript` returns: it never throws for what it finds in the source. */
 export type StripResult = StripSuccess | StripFailure;
 
-/** Why a strip failed — `kind` says which. */
-export type StripError = StripParseError | StripUnsupportedError;
-
 /**
- * The source does not parse: exactly the `message`, `start` and `loc` the `TsvSyntaxError`
- * from `parse_typescript(source, {sourceType})` carries for the goal the error belongs to —
- * the named `sourceType`, or with none named the module's, unless the script retry reached
+ * Why a strip failed — `kind` says which. A `TsvParseError` is exactly the error
+ * `parse_typescript(source, {sourceType})` returns for the goal the error belongs to — the
+ * named `sourceType`, or with none named the module's, unless the script retry reached
  * further into the source without stopping at a construct only a module holds (a top-level
  * `import` / `export`, `import.meta`, a top-level `await`), which makes it the script's.
  */
-export interface StripParseError {
-	kind: 'parse';
-	/** The parse error's message: what went wrong, then `line:column + 1`, the line, a caret. */
-	message: string;
-	/** UTF-16 offset of the error (a leading BOM counted). */
-	start: number;
-	/** Line (1-based) and column (0-based, UTF-16 units) of `start`, ECMAScript's line terminators. */
-	loc: { line: number; column: number };
-}
+export type StripError = TsvParseError | StripUnsupportedError;
 
 /**
  * TypeScript that type blanking cannot erase — a construct with runtime semantics, or an

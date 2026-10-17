@@ -245,16 +245,6 @@ export const STRIP_PARSE_ERROR_ROWS: ReadonlyArray<StripParseErrorRow> = [
 	}
 ];
 
-/** The thrown value of `f`, failing the test when nothing is thrown. */
-function thrown_by(f: () => unknown): any {
-	try {
-		f();
-	} catch (error) {
-		return error;
-	}
-	assert.fail('expected a throw');
-}
-
 /** The first line of `message`, and the `line:col` header of its second, as a parse error's
  * message prints them. */
 function header_of(message: string): string {
@@ -335,17 +325,11 @@ export function register_strip_api_suite(
 				assert.equal(result.ok, false);
 				assert.deepStrictEqual(Object.keys(result.error), ['kind', 'message', 'start', 'loc']);
 				// the same error, at the same point, that parsing at the reported goal reports
-				const thrown = thrown_by(() =>
-					api.parse_typescript(row.source, { sourceType: row.reported ?? 'module' })
-				);
-				assert.ok(thrown instanceof SyntaxError, String(thrown));
-				const parsed = thrown as SyntaxError & { start: number; loc: unknown };
-				assert.deepStrictEqual(result.error, {
-					kind: 'parse',
-					message: parsed.message,
-					start: parsed.start,
-					loc: parsed.loc
+				const parsed = api.parse_typescript(row.source, {
+					sourceType: row.reported ?? 'module'
 				});
+				assert.equal(parsed.ok, false);
+				assert.deepStrictEqual(result.error, parsed.error);
 			});
 		}
 

@@ -1,11 +1,11 @@
 /**
- * The parse-failure table (`scripts/syntax_error_suite.ts`) over the staged npm packages
+ * The parse-failure table (`scripts/parse_failure_suite.ts`) over the staged npm packages
  * under BUN, for both engines — the one runtime that disagrees with the contract's
  * premise. Bun gives every `Error` its own non-enumerable numeric `line` and `column`, a
  * plain set writes through them and keeps them non-enumerable, and the facade's
- * `call_engine` converts only an own ENUMERABLE point into the `SyntaxError` — so each
- * engine deletes the three properties before it sets them (`parse_err` in
- * `crates/tsv_wasm/src/lib.rs`, `pointed_error` in `crates/tsv_napi/src/lib.rs`). Under
+ * `read_pointed_failure` reads only an own ENUMERABLE point into a result's `error` — so each
+ * engine deletes the three properties before it sets them (`pointed_error` in
+ * `crates/tsv_wasm/src/lib.rs`, `engine_error` in `crates/tsv_napi/src/lib.rs`). Under
  * Node and Deno that delete is a no-op, and every other package suite runs under Node:
  * this is the one place either engine's delete is graded. The type strip's API table
  * (`scripts/strip_suite.ts`) rides along over the two packages that carry the strip, since
@@ -48,7 +48,7 @@ import {
 	wasm_package_dir
 } from './check_staged_freshness.ts';
 import { register_strip_api_suite } from './strip_suite.ts';
-import { register_syntax_error_suite } from './syntax_error_suite.ts';
+import { register_parse_failure_suite } from './parse_failure_suite.ts';
 
 const PACKAGES = ['format', 'parse', 'all', 'napi'] as const;
 type Package = (typeof PACKAGES)[number];
@@ -158,7 +158,7 @@ async function register(packages: Array<string>): Promise<void> {
 		apis.push([name, await import(pathToFileURL(entry).href), p]);
 	}
 	for (const [name, api, p] of apis) {
-		register_syntax_error_suite(`${name} under Bun`, api);
+		register_parse_failure_suite(`${name} under Bun`, api);
 		// the strip's refusal is read off the engine's own enumerable point properties too,
 		// so Bun's non-enumerable `line` / `column` reach it as they reach a parse failure
 		if (STRIP_PACKAGES.has(p)) register_strip_api_suite(`${name} under Bun`, api);

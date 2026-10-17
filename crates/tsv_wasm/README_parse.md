@@ -26,18 +26,24 @@ In Node.js, Bun, and Deno, WASM is initialized synchronously at import time — 
 import {parse_css, parse_svelte, parse_typescript} from '@fuzdev/tsv-parse-wasm';
 import type {Program, Root, StyleSheetFile} from '@fuzdev/tsv-parse-wasm';
 
-const root: Root = parse_svelte('<script>const x = 1;</script>');
-const program: Program = parse_typescript('const x: number = 1;');
-const stylesheet: StyleSheetFile = parse_css('a { color: red }');
+const parsed = parse_svelte('<script>const x = 1;</script>');
+if (!parsed.ok) throw new Error(parsed.error.message);
+const root: Root = parsed.ast;
+
+const program = parse_typescript('const x: number = 1;'); // {ok: true, ast: Program} or {ok: false, error}
+const stylesheet = parse_css('a { color: red }');
+if (program.ok && stylesheet.ok) {
+	const nodes: [Program, StyleSheetFile] = [program.ast, stylesheet.ast];
+}
 ```
 
-Three parsers, each returning the AST its canonical parser returns: `parse_svelte` Svelte's modern `parse` AST, `parse_typescript` ESTree as acorn + acorn-typescript emit it, and `parse_css` Svelte's `parseCss` AST. Each takes a source `string` and an optional options object. The AST is **span-only** by default: `start`/`end` offsets on every node, no per-node `loc` (line/column) and no Svelte `name_loc` — pass `{locations: true}` for those.
+Three parsers, each returning the AST its canonical parser returns: `parse_svelte` Svelte's modern `parse` AST, `parse_typescript` ESTree as acorn + acorn-typescript emit it, and `parse_css` Svelte's `parseCss` AST. Each takes a source `string` and an optional options object, and returns a result: `{ok: true, ast}`, or `{ok: false, error}` for a source that doesn't parse ([below](#errors-and-depth-limits)). The AST is **span-only** by default: `start`/`end` offsets on every node, no per-node `loc` (line/column) and no Svelte `name_loc` — pass `{locations: true}` for those.
 
 AST types are bundled in `tsv_ast.d.ts` and re-exported from the package — `import type` any node directly.
 
 To parse across threads, compile once and share: the main entry exports `wasm_module`, the compiled `WebAssembly.Module`, and the `@fuzdev/tsv-parse-wasm/worker` subpath is the same API without import-time initialization, so a worker calls `init_sync({module: wasm_module})` on the module handed to it (`workerData` or `postMessage`) instead of compiling again. `wasm_module` is exported by the Node/Bun entry alone; in a browser Worker call `await init()`, or `postMessage` a `WebAssembly.Module` you compiled yourself.
 
-Each parser also has a `parse_*_json` variant (`parse_svelte_json`, `parse_typescript_json`, `parse_css_json`) returning the span-only AST as a compact JSON string, skipping the JS object tree — for writing it to disk or the wire. It takes `{sourceType}` alone; a `locations` key there throws.
+Each parser also has a `parse_*_json` variant (`parse_svelte_json`, `parse_typescript_json`, `parse_css_json`) returning the span-only AST as a compact JSON string — `{ok: true, json}` — skipping the JS object tree, for writing it to disk or the wire. It takes `{sourceType}` alone; a `locations` key there throws.
 
 ### Options
 
@@ -46,7 +52,7 @@ Every parser takes an optional acorn-style options object:
 - `locations` (default `false`) — add per-node `loc` (line/column), as acorn's `locations: true` does, and Svelte's `name_loc`. Computed in JS after the parse ([below](#reconstructing-linecolumn)).
 - `sourceType` (TypeScript only; omitted means `'module'`) — the parse goal. At `'script'`, `await` is an ordinary identifier, `import`/`export`/`import.meta` and a top-level `for await` are syntax errors, and the code is sloppy unless a `"use strict"` prologue makes it strict; a module is always strict. `parse_svelte` and `parse_css` throw on a set `sourceType`.
 
-A supported key set to `undefined` reads as its default — `sourceType: undefined` included on Svelte and CSS — so one options bag forwards to every object parser. Argument errors are `TypeError`s:
+A supported key set to `undefined` reads as its default — `sourceType: undefined` included on Svelte and CSS — so one options bag forwards to every object parser. Argument errors are thrown `TypeError`s:
 
 - an unknown key, whatever its value;
 - a wrong-typed or invalid value, or a source that is not a string or not well-formed UTF-16 (it holds a lone surrogate);
@@ -60,10 +66,13 @@ A supported key set to `undefined` reads as its default — `sourceType: undefin
 import {parse_typescript, reconstruct_locations} from '@fuzdev/tsv-parse-wasm';
 
 const src = 'const x = 1;\n';
-const ast = parse_typescript(src, {locations: true});
-// every node carries loc: {start: {line, column}, end: {line, column}}
+const located = parse_typescript(src, {locations: true});
+// on success every node carries loc: {start: {line, column}, end: {line, column}}
 // the same, in two steps:
-const same = reconstruct_locations(parse_typescript(src), src);
+const parsed = parse_typescript(src);
+if (parsed.ok) {
+	const same = reconstruct_locations(parsed.ast, src);
+}
 ```
 
 `reconstruct_locations(ast, source)` adds `loc` to every object with `start`/`end` and `name_loc` to Svelte elements, attributes, and directives, **in place** (keys appended last), and returns the tree; `structuredClone` it first to keep the input. The tree must be acyclic — the parse's own, or a clone of it; one given `parent` back-pointers never finishes.
@@ -80,8 +89,11 @@ import {create_locator, parse_typescript} from '@fuzdev/tsv-parse-wasm';
 
 const src = 'let a;\nlet b;';
 const locator = create_locator(src, {language: 'typescript'});
-const [, b] = parse_typescript(src).body;
-locator.loc_of(b); // {start: {line: 2, column: 0}, end: {line: 2, column: 6}}
+const parsed = parse_typescript(src);
+if (parsed.ok) {
+	const [, b] = parsed.ast.body;
+	locator.loc_of(b); // {start: {line: 2, column: 0}, end: {line: 2, column: 6}}
+}
 locator.position_at(7); // {line: 2, column: 0}
 ```
 
@@ -91,20 +103,22 @@ A locator's single lookups throw a `RangeError` for an offset or span the text d
 
 ### Errors and depth limits
 
-A source that doesn't parse throws a `SyntaxError` with two own properties, `start` and `loc` (typed `TsvSyntaxError`, exported), in the AST's coordinates ([above](#reconstructing-linecolumn)):
+A source that doesn't parse returns `{ok: false, error}` with `error` a plain object (no stack; `postMessage`-able) — `{kind: 'parse', message, start, loc}`, typed `TsvParseError` (exported) — in the AST's coordinates ([above](#reconstructing-linecolumn)):
 
 - `start` is the error's UTF-16 offset and `loc` its `{line, column}` (1-based line, 0-based UTF-16 column), equal to `create_locator(source, {language}).position_at(start)`.
 - The message's second line starts with `loc` as `line:column + 1`.
-- Read `start` and `loc`, not `line` / `column`, which some runtimes put on every `Error`.
 
 ```javascript
 import {parse_typescript} from '@fuzdev/tsv-parse-wasm';
 
-try { parse_typescript('let a;\nconst = ;'); } catch (e) {
-	e instanceof SyntaxError; // true — the message ends with the line and a caret
-	[e.start, e.loc]; // [13, {line: 2, column: 6}]
+const result = parse_typescript('let a;\nconst = ;');
+if (!result.ok) {
+	result.error.kind; // 'parse' — the message ends with the line and a caret
+	[result.error.start, result.error.loc]; // [13, {line: 2, column: 6}]
 }
 ```
+
+What still throws is what no result can report: an argument error (a `TypeError`, above), a source over the 4 GiB size cap, and the engine failures below.
 
 A Rust panic — always a tsv bug, please report it — surfaces as a `RuntimeError: unreachable` with the real message on `console.error`; the instance survives it, so the next call works.
 

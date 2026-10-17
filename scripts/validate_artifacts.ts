@@ -280,17 +280,26 @@ for (const { label, entry, has_format, has_parse, has_strip, is_npm } of smoke_t
 		fail(`${label} — import threw: ${error}`);
 		continue;
 	}
+	// the npm entry publishes through the facade, whose every export returns a result; the
+	// raw deno bundle returns the product itself
+	const code = (value: unknown): unknown => (is_npm ? (value as { code?: unknown }).code : value);
+	const ast_type = (value: unknown): unknown =>
+		((is_npm ? (value as { ast?: unknown }).ast : value) as { type?: unknown } | undefined)?.type;
 	if (has_format) {
 		check(
 			label,
 			'format_typescript',
-			() => mod.format_typescript('const   x=1') === 'const x = 1;\n'
+			() => code(mod.format_typescript('const   x=1')) === 'const x = 1;\n'
 		);
-		check(label, 'format_css', () => mod.format_css('a{color:red}') === 'a {\n\tcolor: red;\n}\n');
+		check(
+			label,
+			'format_css',
+			() => code(mod.format_css('a{color:red}')) === 'a {\n\tcolor: red;\n}\n'
+		);
 		check(
 			label,
 			'format_svelte',
-			() => mod.format_svelte('<div   >x</div   >') === '<div>x</div>\n'
+			() => code(mod.format_svelte('<div   >x</div   >')) === '<div>x</div>\n'
 		);
 		check(label, 'IgnoreStack', () => {
 			const ctor = (mod as Record<string, unknown>).IgnoreStack as
@@ -355,17 +364,13 @@ for (const { label, entry, has_format, has_parse, has_strip, is_npm } of smoke_t
 		check(
 			label,
 			'parse_typescript',
-			() => (mod.parse_typescript('const x = 1;') as { type: string }).type === 'Program'
+			() => ast_type(mod.parse_typescript('const x = 1;')) === 'Program'
 		);
-		check(
-			label,
-			'parse_svelte',
-			() => (mod.parse_svelte('<div>x</div>') as { type: string }).type === 'Root'
-		);
+		check(label, 'parse_svelte', () => ast_type(mod.parse_svelte('<div>x</div>')) === 'Root');
 		check(
 			label,
 			'parse_css',
-			() => (mod.parse_css('a { color: red }') as { type: string }).type === 'StyleSheetFile'
+			() => ast_type(mod.parse_css('a { color: red }')) === 'StyleSheetFile'
 		);
 	}
 	// The type strip, one call per outcome: through the facade's result object on the npm
@@ -418,10 +423,13 @@ for (const { label, entry, has_format, has_parse, has_strip, is_npm } of smoke_t
 				const reconstruct = (mod as Record<string, unknown>).reconstruct_locations as
 					((ast: unknown, source: string) => { loc?: unknown }) | undefined;
 				if (typeof reconstruct !== 'function') return false;
-				const parse = mod.parse_typescript as unknown as (
-					source: string,
-					options?: { locations?: boolean }
-				) => { loc?: unknown };
+				const parse = (source: string, options?: { locations?: boolean }): { loc?: unknown } =>
+					(
+						mod.parse_typescript as unknown as (
+							source: string,
+							options?: { locations?: boolean }
+						) => { ast: { loc?: unknown } }
+					)(source, options).ast;
 				const ast = parse('const x = 1;');
 				if (ast.loc) return false; // the default wire is span-only
 				const out = reconstruct(ast, 'const x = 1;');
@@ -449,8 +457,8 @@ for (const { label, entry, has_format, has_parse, has_strip, is_npm } of smoke_t
 			if (typeof reinstantiate !== 'function') return false;
 			(reinstantiate as () => void)();
 			return has_format
-				? mod.format_typescript('const   x=1') === 'const x = 1;\n'
-				: (mod.parse_typescript('const x = 1;') as { type: string }).type === 'Program';
+				? code(mod.format_typescript('const   x=1')) === 'const x = 1;\n'
+				: ast_type(mod.parse_typescript('const x = 1;')) === 'Program';
 		});
 	}
 }
@@ -483,11 +491,11 @@ for (const variant of VARIANTS) {
 	}
 	const has_format = variant !== 'parse';
 	const expected = has_format ? 'const x = 1;\n' : 'Program';
-	/** Whichever export this variant has, in the shape the auto-init loop uses. */
+	/** Whichever export this variant has, its result unwrapped as the auto-init loop does. */
 	const exercise = (mod: Record<string, (source: string) => unknown>): unknown =>
 		has_format
-			? mod.format_typescript('const   x=1')
-			: (mod.parse_typescript('const x = 1;') as { type: string }).type;
+			? (mod.format_typescript('const   x=1') as { code: string }).code
+			: (mod.parse_typescript('const x = 1;') as { ast: { type: string } }).ast.type;
 
 	let worker_mod: Record<string, (source: string) => unknown>;
 	let browser_mod: Record<string, (source: string) => unknown>;

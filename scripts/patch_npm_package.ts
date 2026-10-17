@@ -43,7 +43,7 @@
  * names those files declare (`facade_type_names`).
  *
  * Every variant gets the facade's shared part (`api.js`: the options reader and the
- * format family; `syntax_error.d.ts`); the format-capable variants (`format`, `all`) the
+ * format family; `facade_error.d.ts`, the parse-failure type every family's results carry); the format-capable variants (`format`, `all`) the
  * format declarations (`facade_format.d.ts`); the parse-capable ones (`parse`, `all`) its
  * parse half — `api_parse.js` + `facade_parse.d.ts`, the AST types they name (`tsv_ast.d.ts`),
  * and the pure-JS reconstruction helper (`locations.js` + `.d.ts`), whose functions it
@@ -482,12 +482,12 @@ const parse_fns = fns.filter((name) => name.startsWith('parse_'));
 const strip_fns = fns.filter((name) => name.startsWith('strip_'));
 const strip_languages = languages_of(/^strip_(\w+)$/);
 
-// The types the variant's facade declares — each family's option bags, and the
-// `TsvSyntaxError` every parse and format export throws — re-exported by NAME, so the
+// The types the variant's facade declares — each family's option bags and result types, and
+// the `TsvParseError` every family's result carries — re-exported by NAME, so the
 // tsv_ast/locations star exports can never ambiguate them away (the TS2308 rule). The
 // format bags ride the format-capable variants alone, as their declaration file does.
 const api_types = has_format_exports ? facade_type_names(format_dts) : [];
-const error_types = facade_type_names('syntax_error.d.ts');
+const error_types = facade_type_names('facade_error.d.ts');
 const api_parse_types = has_parse_exports ? facade_type_names(parse_dts) : [];
 const api_strip_types = has_strip_exports ? facade_type_names(strip_dts) : [];
 
@@ -743,7 +743,7 @@ const named_reexport = (names: Array<string>, from: string, type_only: boolean):
 // under a bundler that is a build error TypeScript said was fine, which is a
 // worse failure than a nullable type. Hence one `.d.ts` per entry, and the
 // per-condition `types` in `exports` that lets each be reached.
-const shared_dts = `${ast_reexport}${locations_reexport}${named_reexport(api_parse_types, dts_specifier(parse_dts), true)}${named_reexport(api_types, dts_specifier(format_dts), true)}${named_reexport(api_strip_types, dts_specifier(strip_dts), true)}${named_reexport(error_types, 'syntax_error.js', true)}${named_reexport(parse_fns, dts_specifier(parse_dts), false)}${named_reexport(format_fns, dts_specifier(format_dts), false)}${named_reexport(strip_fns, dts_specifier(strip_dts), false)}${
+const shared_dts = `${ast_reexport}${locations_reexport}${named_reexport(api_parse_types, dts_specifier(parse_dts), true)}${named_reexport(api_types, dts_specifier(format_dts), true)}${named_reexport(api_strip_types, dts_specifier(strip_dts), true)}${named_reexport(error_types, dts_specifier('facade_error.d.ts'), true)}${named_reexport(parse_fns, dts_specifier(parse_dts), false)}${named_reexport(format_fns, dts_specifier(format_dts), false)}${named_reexport(strip_fns, dts_specifier(strip_dts), false)}${
 	classes.length ? `export { ${classes.join(', ')} } from '${dts_module}';\n` : ''
 }${init_doc}
 export declare function init(module_or_path?: {

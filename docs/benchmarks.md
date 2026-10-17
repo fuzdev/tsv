@@ -222,8 +222,9 @@ Things the published numbers measure that aren't quite what they look like.
 - **tsv's rows call the packages' published API, not the engine exports beneath
   it.** Every tsv npm package publishes through one hand-written facade
   (`crates/tsv_wasm/npm/api.js` + `api_parse.js`): per call it checks the source is
-  a well-formed UTF-16 string, reads the options bag, rethrows a parse failure as
-  the typed `SyntaxError`, and over the native engine runs the `JSON.parse`. The
+  a well-formed UTF-16 string, reads the options bag, wraps the product in an
+  `{ok: true, …}` result, and over the native engine runs the `JSON.parse`; a row unwraps
+  the result as a consumer does, throwing a failure as its rejection. The
   `tsv` / `tsv-wasm` rows and their `+locations` siblings time that facade over each
   binding (`lib/tsv_api.ts`), wired as the package's entry wires it — so a row is
   the call a consumer makes (`parse_<lang>(source)`, `parse_<lang>(source,

@@ -10,11 +10,15 @@
  * caller asks for it. `parse_<lang>_json` returns the wire string untouched: it refuses
  * `locations` (pointing at `parse_<lang>`), since `loc` is a view over objects.
  *
+ * Both return a result, as every facade export does (`api.js`'s module doc): `{ok: true, ast}`
+ * / `{ok: true, json}`, or `{ok: false, error}` with a `kind: 'parse'` error for a source that
+ * does not parse.
+ *
  * A separate module from `api.js` so the format-only package, which ships no
  * `locations.js`, never loads one.
  */
 
-import { call_engine, read_options, read_source } from './api.js';
+import { read_options, read_source, to_failure } from './api.js';
 import { reconstruct_locations } from './locations.js';
 
 /**
@@ -26,18 +30,17 @@ import { reconstruct_locations } from './locations.js';
  * parses its wire itself (the WASM bindings run `JSON.parse` engine-side) supplies it,
  * and otherwise the facade `JSON.parse`s the string. A `JSON.parse` failure there is an
  * engine bug, never the caller's source: it throws a plain `Error` (the WASM engine's own
- * text for the same failure, the `SyntaxError` as its `cause`), so it cannot read as the
- * parse failure every other `SyntaxError` from here is.
+ * text for the same failure, the `SyntaxError` as its `cause`), never a result.
  *
  * @param {{
  * 	parse_json: Record<string, (source: string, source_type?: string) => string>,
  * 	parse?: Record<string, (source: string, source_type?: string) => any>
  * }} engine
- * @returns {Record<string, (source: string, options?: unknown) => any>}
+ * @returns {Record<string, (source: unknown, options?: unknown) => any>}
  * 	`parse_<lang>` and `parse_<lang>_json`.
  */
 export function create_parse_api(engine) {
-	/** @type {Record<string, (source: string, options?: unknown) => any>} */
+	/** @type {Record<string, (source: unknown, options?: unknown) => any>} */
 	const api = {};
 	for (const [language, parse_json] of Object.entries(engine.parse_json)) {
 		const engine_parse = engine.parse?.[language];
@@ -46,17 +49,29 @@ export function create_parse_api(engine) {
 			[`parse_${language}`]: (source, options) => {
 				const text = read_source(source, 'parse');
 				const parsed = read_options(options, 'parse', language);
-				const ast = engine_parse
-					? call_engine(engine_parse, text, parsed.source_type)
-					: parse_wire(call_engine(parse_json, text, parsed.source_type));
-				return parsed.locations ? reconstruct_locations(ast, text, { language }) : ast;
+				let ast;
+				try {
+					ast = engine_parse
+						? engine_parse(text, parsed.source_type)
+						: parse_json(text, parsed.source_type);
+				} catch (thrown) {
+					return to_failure(thrown, false);
+				}
+				if (!engine_parse) ast = parse_wire(ast);
+				if (parsed.locations) ast = reconstruct_locations(ast, text, { language });
+				return { ok: true, ast };
 			},
-			[`parse_${language}_json`]: (source, options) =>
-				call_engine(
-					parse_json,
-					read_source(source, 'parse'),
-					read_options(options, 'parse_json', language).source_type
-				)
+			[`parse_${language}_json`]: (source, options) => {
+				const text = read_source(source, 'parse');
+				const { source_type } = read_options(options, 'parse_json', language);
+				let json;
+				try {
+					json = parse_json(text, source_type);
+				} catch (thrown) {
+					return to_failure(thrown, false);
+				}
+				return { ok: true, json };
+			}
 		});
 	}
 	return api;
@@ -65,7 +80,7 @@ export function create_parse_api(engine) {
 /**
  * `JSON.parse` an engine's wire string. A failure is the engine's (it serialized an AST to
  * invalid JSON), so it is thrown as a plain `Error` carrying the WASM engine's text for the
- * same case, never as the bare `SyntaxError` that would read as a parse failure.
+ * same case, never reported as the source's parse failure.
  *
  * @param {string} json - the wire string
  * @returns {any}

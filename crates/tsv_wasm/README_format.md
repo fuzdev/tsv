@@ -22,7 +22,7 @@ TypeScript declarations are bundled. They name the DOM lib's `fetch` and `WebAss
 
 ## Usage
 
-Three formatting functions: `format_svelte`, `format_typescript`, `format_css`. Each takes a source `string` and returns the formatted `string`, throwing on a parse error.
+Three formatting functions: `format_svelte`, `format_typescript`, `format_css`. Each takes a source `string` and returns a result: `{ok: true, code}` with the formatted `string`, or `{ok: false, error}` for a source it cannot format (below).
 
 ### Node.js, Bun, Deno
 
@@ -31,7 +31,8 @@ Zero config — WASM is initialized synchronously at import time:
 ```javascript
 import {format_css, format_svelte, format_typescript} from '@fuzdev/tsv-format-wasm';
 
-const formatted = format_svelte('<script>\nconst   x=1\n</script>');
+const result = format_svelte('<script>\nconst   x=1\n</script>');
+if (result.ok) console.log(result.code);
 ```
 
 ### Browsers and bundlers
@@ -42,7 +43,7 @@ Call `await init()` once before formatting. Bundlers that understand `new URL('.
 import {format_svelte, init} from '@fuzdev/tsv-format-wasm';
 
 await init();
-const formatted = format_svelte('<script>\nconst   x=1\n</script>');
+const result = format_svelte('<script>\nconst   x=1\n</script>');
 ```
 
 `init_sync({ module })` is also exported for Workers and custom loading.
@@ -55,9 +56,9 @@ Each function also takes an optional trailing options object. Formatting itself 
 - `'script'` — `await` is an ordinary identifier, top-level `import`/`export`, `for await` and `import.meta` are syntax errors, and the code is sloppy unless its own `"use strict"` prologue makes it strict (so `with` and legacy octal literals/escapes parse).
 - omitted — not the same as `'module'`: the source is formatted as a module and, only if that parse fails, retried as a script. So a legacy sloppy script formats with no options at all, while anything the module grammar accepts is never reinterpreted (formatting reads no goal, so no output changes).
 
-A set value is exact. With none named and both grammars rejecting the source, the error thrown is the one that best explains the failure (the rule is in the repo's [docs/cli.md](https://github.com/fuzdev/tsv/blob/main/docs/cli.md#multi-file-formatting)).
+A set value is exact. With none named and both grammars rejecting the source, the error returned is the one that best explains the failure (the rule is in the repo's [docs/cli.md](https://github.com/fuzdev/tsv/blob/main/docs/cli.md#multi-file-formatting)).
 
-`format_svelte`/`format_css` throw on a set `sourceType`. A supported key set to `undefined` reads as its default, so one options object forwards to every formatter. Argument errors are `TypeError`s:
+`format_svelte`/`format_css` throw on a set `sourceType`. A supported key set to `undefined` reads as its default, so one options object forwards to every formatter. Argument errors are thrown `TypeError`s:
 
 - an unknown key, whatever its value;
 - a wrong-typed or invalid value, or a source that is not a string or not well-formed UTF-16 (it holds a lone surrogate);
@@ -65,24 +66,26 @@ A set value is exact. With none named and both grammars rejecting the source, th
 
 ### Errors and depth limits
 
-A source that doesn't parse throws a `SyntaxError` with two own properties, `start` and `loc` (typed `TsvSyntaxError`, exported):
+A source that doesn't parse returns `{ok: false, error}` with `error` a plain object (no stack; `postMessage`-able) — `{kind: 'parse', message, start, loc}`, typed `TsvParseError` (exported):
 
 - `start` is the error's UTF-16 offset and `loc` its `{line, column}` (1-based line, 0-based UTF-16 column).
 - TypeScript counts ECMAScript line terminators (LF, CR, CRLF, U+2028, U+2029) and a leading BOM; Svelte (`<script>`, `<style>` and template expressions included) and CSS count LF alone and leave a leading BOM out.
 - The message's second line starts with `loc` as `line:column + 1`.
 - The position is into your own source, CRLF line endings included — the one [`@fuzdev/tsv-parse-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-parse-wasm) reports, except that with no `sourceType`, `format_typescript` may report its script retry's error instead.
-- Read `start` and `loc`, not `line` / `column`, which some runtimes put on every `Error`.
 
 ```javascript
 import {format_typescript} from '@fuzdev/tsv-format-wasm';
 
-try { format_typescript('let a;\nconst = ;'); } catch (e) {
-	e instanceof SyntaxError; // true — the message ends with the line and a caret
-	[e.start, e.loc]; // [13, {line: 2, column: 6}]
+const result = format_typescript('let a;\nconst = ;');
+if (!result.ok) {
+	result.error.kind; // 'parse' — the message ends with the line and a caret
+	[result.error.start, result.error.loc]; // [13, {line: 2, column: 6}]
 }
 ```
 
-`format_svelte` refuses one source that does parse: a lone CR (not part of a CRLF) with comment text after it inside a `//` comment between a tag's attributes, which Svelte ends at LF alone — the formatter's CR-to-LF fold would end that comment early and turn the rest of its line into markup. The refusal is a plain `Error`, not a `SyntaxError`; its message names the CR's line and column.
+`format_svelte` refuses one source that does parse: a lone CR (not part of a CRLF) with comment text after it inside a `//` comment between a tag's attributes, which Svelte ends at LF alone — the formatter's CR-to-LF fold would end that comment early and turn the rest of its line into markup. The refusal is `{kind: 'refused', message, start, loc}` (typed `FormatRefusedError`), at the CR.
+
+What still throws is what no result can report: an argument error (a `TypeError`, above), a source over the 4 GiB size cap, and the engine failures below.
 
 A Rust panic — always a tsv bug, please report it — surfaces as a `RuntimeError: unreachable` with the real message on `console.error`; the instance survives it, so the next call works.
 

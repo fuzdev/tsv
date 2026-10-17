@@ -1,7 +1,8 @@
 /**
  * The npm packages' facade (`crates/tsv_wasm/npm/api.js` + `api_parse.js`) over a FAKE
  * engine: the options reader every package shares, its refusals word for word, the
- * source-type forwarding, and the `{locations: true}` sugar.
+ * source-type forwarding, the `{locations: true}` sugar, and the result every export returns
+ * (what it reads off an engine's thrown failure, and what it rethrows).
  *
  * A fake engine rather than a built package on purpose: what this grades is the
  * facade's own logic, which needs no artifact — so it gates in `deno task check`
@@ -253,9 +254,9 @@ Deno.test('parse: the span tree by default, `loc` reconstructed on request', () 
 		const api = create_parse_api(engine);
 		const source = 'let x = 1;\nx;';
 		const ast = api.parse_typescript(source);
-		deepStrictEqual(ast, JSON.parse(span_wire('Program', source)));
+		deepStrictEqual(ast, { ok: true, ast: JSON.parse(span_wire('Program', source)) });
 		strictEqual(calls.at(-1)?.op, with_object_parse ? 'parse' : 'parse_json');
-		const located = api.parse_typescript(source, { locations: true });
+		const located = api.parse_typescript(source, { locations: true }).ast;
 		deepStrictEqual(
 			located,
 			reconstruct_locations(JSON.parse(span_wire('Program', source)), source, {
@@ -271,8 +272,8 @@ Deno.test('parse: the language reaches the reconstruction (Svelte counts LF alon
 	const api = create_parse_api(engine);
 	// a lone CR: a line under ECMAScript's rule, none under Svelte's
 	const source = 'a\rb';
-	strictEqual(api.parse_svelte(source, { locations: true }).loc.end.line, 1);
-	strictEqual(api.parse_typescript(source, { locations: true }).loc.end.line, 2);
+	strictEqual(api.parse_svelte(source, { locations: true }).ast.loc.end.line, 1);
+	strictEqual(api.parse_typescript(source, { locations: true }).ast.loc.end.line, 2);
 });
 
 Deno.test('reconstruct_locations: the language is inferred from a root, never guessed', () => {
@@ -642,7 +643,10 @@ Deno.test('parse: the source type is forwarded, unset when not named', () => {
 Deno.test('parse_*_json: the wire string untouched, and `locations` refused with a pointer', () => {
 	const { engine, calls } = fake_engine(true);
 	const api = create_parse_api(engine);
-	strictEqual(api.parse_css_json('a{}'), span_wire('StyleSheetFile', 'a{}'));
+	deepStrictEqual(api.parse_css_json('a{}'), {
+		ok: true,
+		json: span_wire('StyleSheetFile', 'a{}')
+	});
 	// whatever the value, `undefined` included — the key itself is the mistake
 	for (const [language, value] of [
 		['typescript', false],
@@ -665,8 +669,11 @@ Deno.test('parse_*_json: the wire string untouched, and `locations` refused with
 Deno.test('format: the source type forwarded, `locations` unknown', () => {
 	const { engine, calls } = fake_engine(false);
 	const api = create_format_api(engine.format);
-	strictEqual(api.format_typescript('x', { sourceType: 'script' }), 'formatted:x');
-	strictEqual(api.format_css('a{}'), 'formatted:a{}');
+	deepStrictEqual(api.format_typescript('x', { sourceType: 'script' }), {
+		ok: true,
+		code: 'formatted:x'
+	});
+	deepStrictEqual(api.format_css('a{}'), { ok: true, code: 'formatted:a{}' });
 	deepStrictEqual(
 		calls.map((c) => [c.language, c.source_type]),
 		[
@@ -761,13 +768,13 @@ Deno.test('a source that is not well-formed UTF-16 is refused, naming its offset
 	}
 	strictEqual(calls.length, 0, 'a refused source never reaches the engine');
 	// a pair is well-formed, astral characters included
-	strictEqual(api.format_typescript!('"😀"'), 'formatted:"😀"');
+	deepStrictEqual(api.format_typescript!('"😀"'), { ok: true, code: 'formatted:"😀"' });
 	// the same answers on a runtime without `String.prototype.isWellFormed` (an older
 	// browser), where the scan alone decides
 	const descriptor = Object.getOwnPropertyDescriptor(String.prototype, 'isWellFormed');
 	delete (String.prototype as { isWellFormed?: unknown }).isWellFormed;
 	try {
-		strictEqual(api.format_typescript!('"😀"'), 'formatted:"😀"');
+		deepStrictEqual(api.format_typescript!('"😀"'), { ok: true, code: 'formatted:"😀"' });
 		throws_type_error(
 			() => api.parse_css!('a\uD800'),
 			'parse source must be well-formed UTF-16 (a lone surrogate at offset 1)'
@@ -847,24 +854,52 @@ function bun_shaped_error(extra: Record<string, unknown>): Error {
 	return Object.assign(error, extra);
 }
 
-Deno.test('a pointed engine error becomes a SyntaxError with exactly start and loc', () => {
+Deno.test("a pointed engine error becomes a result whose error is kind 'parse'", () => {
 	const message = "Expected ';', found 'y'\n2:3 x y\n      ^ here";
 	const pointed = () => Object.assign(new Error(message), { start: 9, line: 2, column: 2 });
 	for (const with_object_parse of [true, false]) {
 		const { api } = throwing_api(pointed, with_object_parse);
 		for (const name of PUBLISHED) {
-			const error = caught(() => api[name]('x\nx y'));
-			strictEqual(error instanceof SyntaxError, true, name);
-			const syntax_error = error as SyntaxError & { start: number; loc: unknown };
-			strictEqual(syntax_error.message, message, name);
-			deepStrictEqual(Object.keys(syntax_error), ['start', 'loc'], name);
-			strictEqual(syntax_error.start, 9, name);
-			deepStrictEqual(syntax_error.loc, { line: 2, column: 2 }, name);
-			// minimal by design: no cause, nothing else from the engine's object
-			strictEqual(syntax_error.cause, undefined, name);
+			const result = api[name]('x\nx y') as { ok: false; error: object };
+			deepStrictEqual(Object.keys(result), ['ok', 'error'], name);
+			// a plain object, exactly these keys in this order — nothing else from the engine's
+			deepStrictEqual(
+				result,
+				{
+					ok: false,
+					error: { kind: 'parse', message, start: 9, loc: { line: 2, column: 2 } }
+				},
+				name
+			);
+			deepStrictEqual(Object.keys(result.error), ['kind', 'message', 'start', 'loc'], name);
+			strictEqual(result.error instanceof Error, false, name);
+			deepStrictEqual(structuredClone(result), result, name);
 		}
 	}
 });
+
+Deno.test(
+	"a format engine error with kind 'refused' becomes a result whose error is kind 'refused'",
+	() => {
+		const message = 'Lone carriage return\n1:10 <div // c\n              ^ here';
+		const refused = () =>
+			Object.assign(new Error(message), { kind: 'refused', start: 9, line: 1, column: 9 });
+		for (const with_object_parse of [true, false]) {
+			const { api } = throwing_api(refused, with_object_parse);
+			// only a format refuses a source that parses: a parse export rethrows it (below)
+			for (const name of PUBLISHED.filter((n) => n.startsWith('format_'))) {
+				deepStrictEqual(
+					api[name]('x'),
+					{
+						ok: false,
+						error: { kind: 'refused', message, start: 9, loc: { line: 1, column: 9 } }
+					},
+					name
+				);
+			}
+		}
+	}
+);
 
 Deno.test('anything else an engine throws passes through as the same object', () => {
 	class RuntimeError extends Error {}
@@ -892,6 +927,9 @@ Deno.test('anything else an engine throws passes through as the same object', ()
 				enumerable: false
 			}),
 		() => Object.assign(Object.create({ start: 0 }), { line: 1, column: 0 }),
+		// a point under a `kind` no parse or format export throws (a strip refusal's)
+		() => Object.assign(new Error('x'), { kind: 'enum', start: 0, line: 1, column: 0 }),
+		() => Object.assign(new Error('x'), { kind: undefined, start: 0, line: 1, column: 0 }),
 		// not an object at all
 		() => 'a string',
 		() => undefined
@@ -908,6 +946,24 @@ Deno.test('anything else an engine throws passes through as the same object', ()
 	}
 });
 
+Deno.test("a parse export rethrows an engine error with kind 'refused' as the same object", () => {
+	for (const with_object_parse of [true, false]) {
+		let last: unknown;
+		const { api } = throwing_api(
+			() =>
+				(last = Object.assign(new Error('x'), { kind: 'refused', start: 0, line: 1, column: 0 })),
+			with_object_parse
+		);
+		for (const name of PUBLISHED.filter((n) => n.startsWith('parse_'))) {
+			strictEqual(
+				caught(() => api[name]('x')),
+				last,
+				name
+			);
+		}
+	}
+});
+
 Deno.test('argument refusals stay TypeErrors and never reach the engine', () => {
 	const { api, calls } = throwing_api(
 		() => Object.assign(new Error('bad'), { start: 0, line: 1, column: 0 }),
@@ -920,7 +976,7 @@ Deno.test('argument refusals stay TypeErrors and never reach the engine', () => 
 	strictEqual(calls.length, 0);
 });
 
-Deno.test("the facade's own JSON.parse failing is an internal Error, not a SyntaxError", () => {
+Deno.test("the facade's own JSON.parse failing is a thrown internal Error, not a result", () => {
 	const api = create_parse_api({
 		parse_json: { typescript: () => '{"type":"Program",' }
 	});
@@ -930,13 +986,13 @@ Deno.test("the facade's own JSON.parse failing is an internal Error, not a Synta
 	strictEqual((error as Error).message, 'internal error: AST serialized to invalid JSON');
 	strictEqual((error as Error).cause instanceof SyntaxError, true);
 	// the string export hands the wire back untouched — it parses nothing
-	strictEqual(api.parse_typescript_json('x'), '{"type":"Program",');
+	deepStrictEqual(api.parse_typescript_json('x'), { ok: true, json: '{"type":"Program",' });
 });
 
 Deno.test(
 	'an options read that throws reaches the caller as itself, before any engine call',
 	() => {
-		// the bag is read ahead of `call_engine`, so even a throw shaped exactly like an
+		// the bag is read ahead of the engine call, so even a throw shaped exactly like an
 		// engine's pointed failure is never converted, and no engine runs
 		const pointed = Object.assign(new Error('from the bag'), { start: 0, line: 1, column: 0 });
 		const bag = new Proxy(

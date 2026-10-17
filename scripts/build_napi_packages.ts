@@ -4,7 +4,8 @@
  * - `pkg/napi/` — the `@fuzdev/tsv` loader, ESM like the wasm packages (index.js + index.d.ts +
  *   platform.js (triple detection) + the shared facade with its parse half — `api.js` /
  *   `api_parse.js`, the `locations.js` helper, the declarations (`facade_format.d.ts`,
- *   `facade_parse.d.ts`, `syntax_error.d.ts`, `locations.d.ts`, `tsv_ast.d.ts`), the table
+ *   `facade_parse.d.ts`, `facade_strip.d.ts`, `facade_error.d.ts`, `locations.d.ts`,
+ *   `tsv_ast.d.ts`), the table
  *   `scripts/npm_facade.ts` names — + the shared `cli.js` + the `bin.js` dispatcher wired
  *   as the `tsv` bin + README + LICENSE + generated package.json with the exact-pinned
  *   platform `optionalDependencies`).

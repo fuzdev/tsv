@@ -503,7 +503,7 @@ All parsers are fail-fast. Error context is computed **once, on the error path**
 parser.parse().map_err(|e| e.with_context(source, WIRE_COORDINATES))
 ```
 
-The context holds two things. The error's **point** (`ParseError::wire_point`) is where it sits in the wire's coordinates — the `start` a wire node there would carry and the `loc` the document's line rule gives it ([§`loc` lines](#loc-lines-one-rule-per-document)) — and the message's `line:col` header prints it. The **excerpt** under the message is a display line, bounded by every ECMAScript terminator whatever the language and never echoing a leading BOM, with a caret padded by display width. A format entry point parses the CR-folded text, so its error is mapped back onto the caller's bytes (`FoldedSource::parse_with`): its point is in the caller's own coordinates, the one a parse at the same goal reports for the same error. The npm packages throw it as a `SyntaxError` carrying `start` and `loc` ([docs/cli.md §Parse errors](./cli.md#parse-errors)).
+The context holds two things. The error's **point** (`ParseError::wire_point`) is where it sits in the wire's coordinates — the `start` a wire node there would carry and the `loc` the document's line rule gives it ([§`loc` lines](#loc-lines-one-rule-per-document)) — and the message's `line:col` header prints it. The **excerpt** under the message is a display line, bounded by every ECMAScript terminator whatever the language and never echoing a leading BOM, with a caret padded by display width. A format entry point parses the CR-folded text, so its error is mapped back onto the caller's bytes (`FoldedSource::parse_with`): its point is in the caller's own coordinates, the one a parse at the same goal reports for the same error. The npm packages return it as the `{kind: 'parse', message, start, loc}` error of an `{ok: false}` result ([docs/cli.md §Parse errors](./cli.md#parse-errors)).
 
 ## Printer Architecture
 
@@ -632,11 +632,12 @@ text, and folding it would end the comment early and print the rest of its line 
 (a real attribute, or a document whose own bytes do not parse). So when the fold rewrote a
 lone `<CR>` in a Svelte document, the format parses the author's bytes first
 (`tsv_svelte::parse_folded`, the parse every Svelte format entry point runs): their parse
-error is the format's error, and an in-tag `//` comment holding a lone `<CR>` with comment text after it is refused with
-a positionless `ParseError::refusal` whose message names the `<CR>` — positionless because
-the source is valid Svelte, so no binding reports it as a syntax error. A `<CR><LF>` is one
-line break in both readings and never refuses; a document the fold rewrote no lone `<CR>` in
-pays nothing.
+error is the format's error, and an in-tag `//` comment holding a lone `<CR>` with comment
+text after it is refused with a `ParseError::refusal` whose message names the `<CR>` and
+whose point (`ParseError::refusal_point`) is the `<CR>`'s — no syntax error, since the source
+is valid Svelte: the CLI prints it after `Error:` and the npm facade returns it as
+`kind: 'refused'`. A `<CR><LF>` is one line break in both readings and never refuses; a
+document the fold rewrote no lone `<CR>` in pays nothing.
 
 **A leading byte-order mark is never rewritten either — but its *position* is read the way
 each oracle reads it.** Every lexer skips a U+FEFF at byte 0 and keeps its spans file-true;

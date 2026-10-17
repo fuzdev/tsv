@@ -72,8 +72,8 @@ pub fn format_source_with_source_type(
 /// arenas per file.
 ///
 /// The error is the `ParseError` itself rather than its text, so a caller printing it can
-/// still tell a parse error from the positionless kinds that are not one — the size cap
-/// and the Svelte refusal (`cli::out::exit_with_parse_error`).
+/// still tell a parse error from the kinds that are not one — the size cap and the Svelte
+/// refusal (`cli::out::exit_with_parse_error`).
 ///
 /// Crate-private: every caller outside reaches it through one of the two entry
 /// points above.

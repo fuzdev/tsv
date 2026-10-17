@@ -70,7 +70,7 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 	});
 
 	it('a parse failure throws an Error carrying its point as numeric own properties', () => {
-		// the contract the npm facade's `call_engine` reads to rethrow a `SyntaxError`
+		// the contract the npm facade's `read_pointed_failure` reads into a result's `error`
 		// (`crates/tsv_wasm/npm/api.js`), the same three names the WASM engine sets. The
 		// format call's source holds a CRLF: its point is still the caller's source's
 		const cases: [() => unknown, number][] = [
@@ -96,7 +96,23 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 			assert.deepEqual(Object.keys(thrown as object), ['start', 'line', 'column']);
 			assert.match(pointed.message, /\n2:7 const = ;\n/);
 		}
-		// a refusal carries no point
+		// a format's refusal of a source that parses: the CR's point, after an own enumerable
+		// `kind: 'refused'`
+		let refused: any;
+		try {
+			addon.format_svelte('<div // c\rclass="x"\n>hi</div>\n');
+		} catch (e) {
+			refused = e;
+		}
+		assert.ok(refused instanceof Error, String(refused));
+		const pointed = refused as Error & Record<'kind' | 'start' | 'line' | 'column', unknown>;
+		assert.deepEqual(Object.keys(pointed), ['kind', 'start', 'line', 'column']);
+		assert.deepEqual(
+			[pointed.kind, pointed.start, pointed.line, pointed.column],
+			['refused', 9, 1, 9]
+		);
+		assert.match(pointed.message, /^Lone carriage return/);
+		// an argument refusal carries no point
 		assert.throws(
 			() => addon.parse_css_json('a {}', 'script'),
 			(e: any) => e instanceof Error && Object.keys(e).length === 0,

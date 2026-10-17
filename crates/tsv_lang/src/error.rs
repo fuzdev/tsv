@@ -155,10 +155,13 @@ enum ParseErrorKind {
     // `u32` offsets sound (see `tsv_ts/src/lexer/token.rs`).
     #[error("File too large: {size} bytes (maximum: {max} bytes / 4 GiB)")]
     FileTooLarge { size: usize, max: usize },
-    // Constructed only by `ParseError::refusal`. Positionless on purpose, though its text
-    // names a position: see that constructor.
+    // Constructed only by `ParseError::refusal`. Not a located error, though it has a
+    // point: see that constructor.
     #[error("{rendered}")]
-    Refused { rendered: Box<str> },
+    Refused {
+        rendered: Box<str>,
+        point: WirePoint,
+    },
 }
 
 /// A parse error — **8 bytes**, because the payload lives behind the `Box`.
@@ -308,19 +311,19 @@ impl ParseError {
 
     /// The byte offset the error is reported at, in the coordinates the error was
     /// built in (host coordinates for a parser error; see [`ParseError::shift_position`]
-    /// for the lexer case). `None` for the positionless kinds, a source over the `u32` cap
-    /// and a [`ParseError::refusal`]. A caller holding two errors for one source reads this
-    /// to say which got further — the format fallback's module-vs-script choice.
+    /// for the lexer case). `None` for the kinds that are not syntax errors, a source over
+    /// the `u32` cap and a [`ParseError::refusal`]. A caller holding two errors for one source
+    /// reads this to say which got further — the format fallback's module-vs-script choice.
     pub fn position(&self) -> Option<usize> {
         self.0.kind.located().map(|(position, _)| *position)
     }
 
     /// Whether this is a **syntax error** — the source is malformed at a point — rather
-    /// than one of the positionless kinds: a source over the `u32` cap, or a
-    /// [`ParseError::refusal`] of a source that parses. The one question every surface
-    /// asks before choosing its channel: the CLI's `Parse error:` prefix, a binding's
-    /// thrown error with its point on it. A whole-document parse entry point fills every
-    /// syntax error's context, so on its errors this is exactly
+    /// than a source over the `u32` cap (positionless) or a [`ParseError::refusal`] of a
+    /// source that parses (pointed, but by [`ParseError::refusal_point`]). The one question
+    /// every surface asks before choosing its channel: the CLI's `Parse error:` prefix, a
+    /// binding's thrown parse failure with its point on it. A whole-document parse entry point
+    /// fills every syntax error's context, so on its errors this is exactly
     /// `wire_point().is_some()` — what a binding reads when it needs the point itself.
     pub fn is_syntax_error(&self) -> bool {
         self.0.kind.located().is_some()
@@ -337,10 +340,11 @@ impl ParseError {
     ///
     /// The message is rendered here, with the `line:col` header and excerpt of `position` in
     /// `source` under `coordinates` that a located error prints, so it reads like every other
-    /// format error. But the error itself is **positionless** — no [`ParseError::position`],
-    /// no [`ParseError::wire_point`] — like the size cap's: the source is not malformed, so no
-    /// binding may report it through its syntax-error channel (the published `SyntaxError`
-    /// with `start` / `loc` is a parse failure, and `parse` accepts this source).
+    /// format error, and the point it prints is kept ([`ParseError::refusal_point`]). But it is
+    /// **not a syntax error** — no [`ParseError::position`], no [`ParseError::wire_point`],
+    /// [`ParseError::is_syntax_error`] false: the source is not malformed (`parse` accepts it),
+    /// so every surface reports it apart from a parse failure — the CLI's `Error:` prefix, the
+    /// npm facade's `kind: 'refused'`.
     #[cold]
     #[inline(never)]
     pub fn refusal(
@@ -349,11 +353,21 @@ impl ParseError {
         position: usize,
         coordinates: WireCoordinates,
     ) -> Self {
-        let rendered =
-            ErrorContext::from_source(source, position, coordinates).format_with_caret(message);
+        let context = ErrorContext::from_source(source, position, coordinates);
         ParseError::new(ParseErrorKind::Refused {
-            rendered: rendered.into(),
+            rendered: context.format_with_caret(message).into(),
+            point: context.point,
         })
+    }
+
+    /// Where a [`ParseError::refusal`] points, in the wire coordinates it was built in — the
+    /// `line:col` its message header prints. `None` for every other error (a syntax error's
+    /// point is [`ParseError::wire_point`]).
+    pub fn refusal_point(&self) -> Option<WirePoint> {
+        match &self.0.kind {
+            ParseErrorKind::Refused { point, .. } => Some(*point),
+            _ => None,
+        }
     }
 
     /// Reject a source longer than the `u32` span offsets can index (> 4 GiB − 1).
@@ -438,9 +452,9 @@ impl ParseError {
     /// (`line` 1-based, `column` 0-based UTF-16 units) the document's line rule gives it —
     /// the numbers its message header prints, as `line:column+1`.
     ///
-    /// `None` for the positionless kinds (a source over the `u32` cap, a
-    /// [`ParseError::refusal`]) and for an error no
-    /// [`ParseError::with_context`] has filled — which only the embedded entry points
+    /// `None` for the kinds that are not syntax errors (a source over the `u32` cap, a
+    /// [`ParseError::refusal`] — whose point is [`ParseError::refusal_point`]) and for an
+    /// error no [`ParseError::with_context`] has filled — which only the embedded entry points
     /// return, ahead of their host's fill; no whole-document parse entry point does.
     pub fn wire_point(&self) -> Option<WirePoint> {
         self.0
@@ -468,11 +482,12 @@ impl ParseError {
 }
 
 impl ParseErrorKind {
-    /// The position and context slots of a located error, `None` for the positionless
-    /// kinds (`FileTooLarge`, `Refused`). Which variants carry a position is stated here
-    /// and in [`ParseErrorKind::located_mut`] — one match cannot lend both a shared and
-    /// an exclusive borrow — so `position`, `shift_position` and `with_context` restate
-    /// no variant list of their own, and a new variant is classified in these two.
+    /// The position and context slots of a located error, `None` for the kinds that are not
+    /// syntax errors (`FileTooLarge`; `Refused`, whose point is fixed at construction).
+    /// Which variants carry a position is stated here and in [`ParseErrorKind::located_mut`]
+    /// — one match cannot lend both a shared and an exclusive borrow — so `position`,
+    /// `shift_position` and `with_context` restate no variant list of their own, and a new
+    /// variant is classified in these two.
     fn located(&self) -> Option<(&usize, &Option<ErrorContext>)> {
         match self {
             ParseErrorKind::UnexpectedToken {
@@ -797,11 +812,12 @@ mod tests {
         }
     }
 
-    /// A refusal renders the located error's `line:col` header and excerpt, but carries no
-    /// position a binding could report as a syntax error's point — and an unfold, which
-    /// re-takes a located error's context, leaves its already-caller-side text alone.
+    /// A refusal renders the located error's `line:col` header and excerpt and keeps that
+    /// point as its refusal point, but carries no position a binding could report as a syntax
+    /// error's point — and an unfold, which re-takes a located error's context, leaves its
+    /// already-caller-side text alone.
     #[test]
-    fn a_refusal_renders_its_point_but_is_positionless() {
+    fn a_refusal_renders_its_point_but_is_no_syntax_error() {
         let source = "ab\nc\rd";
         // The `<CR>` itself, as `tsv_svelte::parse_folded` points: the header counts `\n`
         // lines, the excerpt stops at the `<CR>`.
@@ -809,6 +825,14 @@ mod tests {
         assert_eq!(refusal.to_string(), "no\n2:2 c\n     ^ here");
         assert_eq!(refusal.position(), None);
         assert_eq!(refusal.wire_point(), None);
+        assert!(!refusal.is_syntax_error());
+        assert_eq!(refusal.refusal_point(), Some(point(4, 2, 1)));
+        assert_eq!(
+            ParseError::invalid_syntax("x".to_string(), 1)
+                .with_context(source, LF)
+                .refusal_point(),
+            None
+        );
         assert_eq!(
             refusal.clone().unfold(source).to_string(),
             refusal.to_string()

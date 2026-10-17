@@ -54,12 +54,15 @@ import {format_svelte, parse_svelte} from '@fuzdev/tsv-wasm';
 import type {Root} from '@fuzdev/tsv-wasm';
 
 const formatted = format_svelte('<script>\nconst   x=1\n</script>');
-const root: Root = parse_svelte('<script>const x = 1;</script>');
+if (formatted.ok) console.log(formatted.code);
+const parsed = parse_svelte('<script>const x = 1;</script>');
+if (!parsed.ok) throw new Error(parsed.error.message);
+const root: Root = parsed.ast;
 ```
 
 ### Formatting and parsing
 
-Three formatters (`format_svelte`, `format_typescript`, `format_css`) take a source `string` and return the formatted `string`. Three parsers return the AST their canonical parser returns — `parse_svelte` Svelte's modern `parse` AST, `parse_typescript` ESTree as acorn + acorn-typescript emit it, `parse_css` Svelte's `parseCss` AST — span-only by default, `start`/`end` offsets on every node and no per-node `loc`; the `parse_*_json` variants return that AST as a compact JSON string instead (faster when writing to disk or the wire). All throw on a parse error. AST types are bundled in `tsv_ast.d.ts` and re-exported from the package — `import type` any node directly.
+Three formatters (`format_svelte`, `format_typescript`, `format_css`) take a source `string` and return `{ok: true, code}` with the formatted `string`. Three parsers return `{ok: true, ast}` with the AST their canonical parser returns — `parse_svelte` Svelte's modern `parse` AST, `parse_typescript` ESTree as acorn + acorn-typescript emit it, `parse_css` Svelte's `parseCss` AST — span-only by default, `start`/`end` offsets on every node and no per-node `loc`; the `parse_*_json` variants return that AST as a compact JSON string instead, `{ok: true, json}` (faster when writing to disk or the wire). For a source they cannot handle, all return `{ok: false, error}` ([below](#errors-and-depth-limits)), as the strip does. AST types are bundled in `tsv_ast.d.ts` and re-exported from the package — `import type` any node directly.
 
 ### Options
 
@@ -69,7 +72,7 @@ Every export takes `(source, options?)` with an acorn-style options object.
 
 The object parsers also take `{locations: true}`, adding per-node `loc` (line/column, as acorn's `locations: true` does) and Svelte's `name_loc`. Every other export throws on a `locations` key, whatever its value, so only a `sourceType`-only bag forwards to any export.
 
-A supported key set to `undefined` reads as its default — `sourceType: undefined` included on Svelte and CSS. Argument errors are `TypeError`s:
+A supported key set to `undefined` reads as its default — `sourceType: undefined` included on Svelte and CSS. Argument errors are thrown `TypeError`s:
 
 - an unknown key, whatever its value;
 - a wrong-typed or invalid value, or a source that is not a string or not well-formed UTF-16 (it holds a lone surrogate);
@@ -83,9 +86,12 @@ A supported key set to `undefined` reads as its default — `sourceType: undefin
 import {parse_typescript, reconstruct_locations} from '@fuzdev/tsv-wasm';
 
 const src = 'const x = 1;\n';
-const ast = parse_typescript(src, {locations: true});
+const located = parse_typescript(src, {locations: true});
 // the same, in two steps:
-const same = reconstruct_locations(parse_typescript(src), src);
+const parsed = parse_typescript(src);
+if (parsed.ok) {
+	const same = reconstruct_locations(parsed.ast, src);
+}
 ```
 
 It adds `loc` to every object with `start`/`end` and `name_loc` to Svelte elements, attributes, and directives, **in place** (keys appended last); `structuredClone` the tree first to keep the input. The tree must be acyclic — the parse's own, or a clone of it; one given `parent` back-pointers never finishes.
@@ -102,8 +108,11 @@ import {create_locator, parse_typescript} from '@fuzdev/tsv-wasm';
 
 const src = 'let a;\nlet b;';
 const locator = create_locator(src, {language: 'typescript'});
-const [, b] = parse_typescript(src).body;
-locator.loc_of(b); // {start: {line: 2, column: 0}, end: {line: 2, column: 6}}
+const parsed = parse_typescript(src);
+if (parsed.ok) {
+	const [, b] = parsed.ast.body;
+	locator.loc_of(b); // {start: {line: 2, column: 0}, end: {line: 2, column: 6}}
+}
 locator.position_at(7); // {line: 2, column: 0}
 ```
 
@@ -113,23 +122,25 @@ A locator's single lookups throw a `RangeError` for an offset or span the text d
 
 ### Errors and depth limits
 
-A source that doesn't parse throws a `SyntaxError` — from a parser and a formatter alike — with two own properties, `start` and `loc` (typed `TsvSyntaxError`, exported), in the AST's coordinates ([above](#reconstructing-linecolumn)):
+A source that doesn't parse returns `{ok: false, error}` — from a parser, a formatter and the strip alike — with `error` a plain object (no stack; `postMessage`-able): `{kind: 'parse', message, start, loc}`, typed `TsvParseError` (exported), in the AST's coordinates ([above](#reconstructing-linecolumn)):
 
 - `start` is the error's UTF-16 offset and `loc` its `{line, column}` (1-based line, 0-based UTF-16 column), equal to `create_locator(source, {language}).position_at(start)`.
 - The message's second line starts with `loc` as `line:column + 1`.
 - A formatter reports positions in your own source, CRLF line endings included — the error a parser reports, except that with no `sourceType`, `format_typescript` may report its script retry's error instead.
-- Read `start` and `loc`, not `line` / `column`, which some runtimes put on every `Error`.
 
 ```javascript
 import {format_typescript} from '@fuzdev/tsv-wasm';
 
-try { format_typescript('let a;\nconst = ;'); } catch (e) {
-	e instanceof SyntaxError; // true — the message ends with the line and a caret
-	[e.start, e.loc]; // [13, {line: 2, column: 6}]
+const result = format_typescript('let a;\nconst = ;');
+if (!result.ok) {
+	result.error.kind; // 'parse' — the message ends with the line and a caret
+	[result.error.start, result.error.loc]; // [13, {line: 2, column: 6}]
 }
 ```
 
-`format_svelte` refuses one source that does parse: a lone CR (not part of a CRLF) with comment text after it inside a `//` comment between a tag's attributes, which Svelte ends at LF alone — the formatter's CR-to-LF fold would end that comment early and turn the rest of its line into markup. The refusal is a plain `Error`, not a `SyntaxError`; its message names the CR's line and column.
+`format_svelte` refuses one source that does parse: a lone CR (not part of a CRLF) with comment text after it inside a `//` comment between a tag's attributes, which Svelte ends at LF alone — the formatter's CR-to-LF fold would end that comment early and turn the rest of its line into markup. The refusal is `{kind: 'refused', message, start, loc}` (typed `FormatRefusedError`), at the CR.
+
+What still throws is what no result can report: an argument error (a `TypeError`, above), a source over the 4 GiB size cap, and the engine failures below.
 
 A Rust panic — always a tsv bug, please report it — surfaces as a `RuntimeError: unreachable` with the real message on `console.error`; the instance survives it, so the next call works.
 
@@ -145,7 +156,7 @@ To run tsv across threads, compile once and share: the main entry exports `wasm_
 
 It never throws for what it finds in the source. It returns `{ok: true, code}`, or `{ok: false, error}` where `error.kind` says why:
 
-- `'parse'` — the source does not parse: the `message`, `start` and `loc` a `parse_typescript` of it would throw at the goal the error belongs to;
+- `'parse'` — the source does not parse: the error a `parse_typescript` of it returns at the goal the error belongs to;
 - `'unsupported'` — the source holds TypeScript that type blanking cannot erase: `error.construct` names it (`'enum'`, `'value_namespace'`, `'parameter_property'`, `'import_equals'`, `'export_equals'`, `'type_assertion'` for `<T>x`, or `'assertion_grouping'` for an `as` / `satisfies` whose removal would regroup its expression), `start`/`end` and `loc` give its span in the AST's coordinates, and `message` says it with the line and a caret.
 
 ```typescript

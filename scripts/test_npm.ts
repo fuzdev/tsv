@@ -57,8 +57,11 @@ import { register_strip_api_suite, register_strip_cli_suite } from './strip_suit
 import {
 	LONE_CR_REFUSAL,
 	LONE_CR_TAG_COMMENT,
-	register_syntax_error_suite
-} from './syntax_error_suite.ts';
+	ok_ast,
+	ok_code,
+	ok_json,
+	register_parse_failure_suite
+} from './parse_failure_suite.ts';
 
 const pkg_dir = process.env.PKG_DIR;
 if (!pkg_dir) {
@@ -320,20 +323,22 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 	});
 
 	it('format_typescript formats', { skip: !has_format }, () => {
-		assert.equal(node_entry.format_typescript('const   x=1'), 'const x = 1;\n');
+		assert.equal(ok_code(node_entry.format_typescript('const   x=1')), 'const x = 1;\n');
 	});
 
 	it('format_css formats', { skip: !has_format }, () => {
-		assert.equal(node_entry.format_css('a{color:red}'), 'a {\n\tcolor: red;\n}\n');
+		assert.equal(ok_code(node_entry.format_css('a{color:red}')), 'a {\n\tcolor: red;\n}\n');
 	});
 
 	it('format_svelte formats', { skip: !has_format }, () => {
-		assert.equal(node_entry.format_svelte('<div   >x</div   >'), '<div>x</div>\n');
+		assert.equal(ok_code(node_entry.format_svelte('<div   >x</div   >')), '<div>x</div>\n');
 	});
 
 	it('formatting is idempotent', { skip: !has_format }, () => {
-		const once = node_entry.format_svelte('<script>const   x=1</script>\n\n<div>{x}</div>');
-		assert.equal(node_entry.format_svelte(once), once);
+		const once = ok_code(
+			node_entry.format_svelte('<script>const   x=1</script>\n\n<div>{x}</div>')
+		);
+		assert.equal(ok_code(node_entry.format_svelte(once)), once);
 	});
 
 	// The poisoning-trap recovery contract. A stack overflow (input nested past
@@ -360,11 +365,11 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		// poisoned: an ordinary input now traps too, on the same instance
 		assert.throws(healthy, WebAssembly.RuntimeError, 'the trap must poison the instance');
 		node_entry.reinstantiate();
-		assert.ok(healthy(), 'the fresh instance must format/parse again');
+		assert.equal(healthy().ok, true, 'the fresh instance must format/parse again');
 		// recovery must be repeatable — one reinstantiation is not a fuse
 		assert.throws(probe, WebAssembly.RuntimeError);
 		node_entry.reinstantiate();
-		assert.ok(healthy());
+		assert.equal(healthy().ok, true);
 	});
 
 	// Handles are stamped with the instance generation they were minted under, so
@@ -389,7 +394,7 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 			fresh.push_gitignore('', 'build/\n');
 			assert.equal(fresh.is_ignored('build/out.js', false), true);
 			assert.doesNotThrow(() => fresh.free());
-			assert.ok(node_entry.format_typescript('const   x=1'));
+			assert.ok(ok_code(node_entry.format_typescript('const   x=1')));
 		}
 	);
 
@@ -397,21 +402,27 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		// at the script goal `await` is an ordinary identifier, so it parses as an
 		// arrow parameter (and prints parenthesized)
 		assert.equal(
-			node_entry.format_typescript('await => 1;', { sourceType: 'script' }),
+			ok_code(node_entry.format_typescript('await => 1;', { sourceType: 'script' })),
 			'(await) => 1;\n'
 		);
 		// An EXPLICIT module goal reserves `await` — a set source type is exact.
-		assert.throws(() => node_entry.format_typescript('await => 1;', { sourceType: 'module' }));
+		assert.equal(
+			node_entry.format_typescript('await => 1;', { sourceType: 'module' }).error.kind,
+			'parse'
+		);
 		// Unset, the module parse fails and the script retry formats it: a legacy
 		// sloppy script formats without the caller naming a grammar.
-		assert.equal(node_entry.format_typescript('await => 1;'), '(await) => 1;\n');
+		assert.equal(ok_code(node_entry.format_typescript('await => 1;')), '(await) => 1;\n');
 		// A module-valid source is never reinterpreted (the retry only runs on failure).
-		assert.equal(node_entry.format_typescript('export const   x=1'), 'export const x = 1;\n');
+		assert.equal(
+			ok_code(node_entry.format_typescript('export const   x=1')),
+			'export const x = 1;\n'
+		);
 		// Broken under BOTH grammars: `with` fails the module parse, the `import`
 		// declaration fails the script retry — a goal gate, which settles the file as a
 		// module — so the module's error is the reported one (line 2).
-		assert.throws(
-			() => node_entry.format_typescript("import x from 'y';\nwith (a) {\n\tb;\n}\n"),
+		assert.match(
+			node_entry.format_typescript("import x from 'y';\nwith (a) {\n\tb;\n}\n").error.message,
 			/The 'with' statement is not allowed in strict mode/
 		);
 	});
@@ -433,10 +444,10 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		// a supported key at `undefined` is its default, on a language that refuses a set
 		// one too — what lets `npm/cli.js` hand one bag to whichever formatter
 		assert.equal(
-			node_entry.format_svelte('<div   >x</div   >', { sourceType: undefined }),
+			ok_code(node_entry.format_svelte('<div   >x</div   >', { sourceType: undefined })),
 			'<div>x</div>\n'
 		);
-		assert.equal(node_entry.format_css('a{color:red}', null), 'a {\n\tcolor: red;\n}\n');
+		assert.equal(ok_code(node_entry.format_css('a{color:red}', null)), 'a {\n\tcolor: red;\n}\n');
 	});
 
 	// the node entry initializes at import, so both lifecycle calls are no-ops that hand
@@ -473,9 +484,9 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 				['svelte', '<div>x</div>', 'Root'],
 				['css', 'a { color: red }', 'StyleSheetFile']
 			]) {
-				const ast = node_entry[`parse_${language}`](source);
+				const ast = ok_ast(node_entry[`parse_${language}`](source));
 				assert.equal(ast.type, root);
-				const json = node_entry[`parse_${language}_json`](source);
+				const json = ok_json(node_entry[`parse_${language}_json`](source));
 				assert.equal(typeof json, 'string');
 				assert.deepEqual(JSON.parse(json), ast);
 			}
@@ -483,39 +494,50 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 	);
 
 	it('parse: the span-only wire by default, `loc` on request', { skip: !has_parse }, () => {
-		const span_only = node_entry.parse_typescript('const x = 1;');
-		const located = node_entry.parse_typescript('const x = 1;', { locations: true });
+		const span_only = ok_ast(node_entry.parse_typescript('const x = 1;'));
+		const located = ok_ast(node_entry.parse_typescript('const x = 1;', { locations: true }));
 		assert.equal('loc' in span_only, false);
 		assert.equal(typeof span_only.start, 'number');
 		assert.deepEqual(located.loc, { start: { line: 1, column: 0 }, end: { line: 1, column: 12 } });
 		// `{locations: false}` is the default spelled out
-		assert.deepEqual(node_entry.parse_typescript('const x = 1;', { locations: false }), span_only);
+		assert.deepEqual(
+			ok_ast(node_entry.parse_typescript('const x = 1;', { locations: false })),
+			span_only
+		);
 		// svelte's name_loc is a location field too
 		const sv = '<div class="a">x</div>';
-		assert.doesNotMatch(JSON.stringify(node_entry.parse_svelte(sv)), /"name_loc"|"loc"/);
-		assert.match(JSON.stringify(node_entry.parse_svelte(sv, { locations: true })), /"name_loc"/);
+		assert.doesNotMatch(JSON.stringify(ok_ast(node_entry.parse_svelte(sv))), /"name_loc"|"loc"/);
+		assert.match(
+			JSON.stringify(ok_ast(node_entry.parse_svelte(sv, { locations: true }))),
+			/"name_loc"/
+		);
 		// css carries none by default, and `loc` on every node on request
-		assert.doesNotMatch(JSON.stringify(node_entry.parse_css('a { color: red }')), /"loc"/);
-		assert.ok(node_entry.parse_css('a { color: red }', { locations: true }).children[0].loc);
+		assert.doesNotMatch(JSON.stringify(ok_ast(node_entry.parse_css('a { color: red }'))), /"loc"/);
+		assert.ok(
+			ok_ast(node_entry.parse_css('a { color: red }', { locations: true })).children[0].loc
+		);
 	});
 
 	it('parse options: sourceType switches the TypeScript parse goal', { skip: !has_parse }, () => {
-		const program = node_entry.parse_typescript('var await = 1;', { sourceType: 'script' });
+		const program = ok_ast(node_entry.parse_typescript('var await = 1;', { sourceType: 'script' }));
 		assert.equal(program.sourceType, 'script');
 		// module goal (default and explicit) reserves `await`
-		assert.throws(() => node_entry.parse_typescript('var await = 1;'));
-		assert.throws(() => node_entry.parse_typescript('var await = 1;', { sourceType: 'module' }));
+		assert.equal(node_entry.parse_typescript('var await = 1;').ok, false);
+		assert.equal(node_entry.parse_typescript('var await = 1;', { sourceType: 'module' }).ok, false);
 		// sourceType composes with locations (it drives the parser, locations the view)
-		const composed = node_entry.parse_typescript('var await = 1;', {
-			sourceType: 'script',
-			locations: true
-		});
+		const composed = ok_ast(
+			node_entry.parse_typescript('var await = 1;', {
+				sourceType: 'script',
+				locations: true
+			})
+		);
 		assert.equal(composed.sourceType, 'script');
 		assert.ok(composed.loc);
 		// the `_json` export takes the source type too
 		assert.equal(
-			JSON.parse(node_entry.parse_typescript_json('var await = 1;', { sourceType: 'script' }))
-				.sourceType,
+			JSON.parse(
+				ok_json(node_entry.parse_typescript_json('var await = 1;', { sourceType: 'script' }))
+			).sourceType,
 			'script'
 		);
 	});
@@ -539,8 +561,8 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		});
 		// the forwarding idiom over the real engine (`npm/cli.js` hands one bag to whichever
 		// parser)
-		assert.ok(node_entry.parse_svelte('<div>x</div>', { sourceType: undefined }));
-		assert.equal(node_entry.parse_typescript('x;', null).type, 'Program');
+		assert.ok(ok_ast(node_entry.parse_svelte('<div>x</div>', { sourceType: undefined })));
+		assert.equal(ok_ast(node_entry.parse_typescript('x;', null)).type, 'Program');
 		// a non-string source is the facade's refusal, not the glue's (which would read
 		// `42` as the empty document off Node)
 		assert.throws(() => node_entry.parse_typescript(42), {
@@ -550,9 +572,9 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 	});
 });
 
-// The parse-failure contract (`scripts/syntax_error_suite.ts`) over the auto-init entry;
+// The parse-failure contract (`scripts/parse_failure_suite.ts`) over the auto-init entry;
 // the lazy entry runs the same table once initialized (the browser entry's block below).
-register_syntax_error_suite(`index.js: ${pkg_dir}`, node_entry);
+register_parse_failure_suite(`index.js: ${pkg_dir}`, node_entry);
 
 // The type strip (`scripts/strip_suite.ts`) is the umbrella's alone: the subset packages
 // build without the `strip` cargo feature, so they neither link the strip nor export it.
@@ -594,6 +616,31 @@ describe(`raw engine parse failure (tsv_wasm.js): ${pkg_dir}`, () => {
 			]
 		);
 	});
+
+	// a format's refusal of a source that parses: the same point, after an own enumerable
+	// `kind: 'refused'`
+	it(
+		'a format refusal: an Error with own enumerable kind, start, line and column',
+		{
+			skip: !has_format
+		},
+		async () => {
+			const raw = await import(`../${pkg_dir}/tsv_wasm.js`);
+			let thrown: any;
+			try {
+				raw.format_svelte(LONE_CR_TAG_COMMENT);
+			} catch (error) {
+				thrown = error;
+			}
+			assert.ok(thrown instanceof Error, String(thrown));
+			const pointed = thrown as Error & Record<'kind' | 'start' | 'line' | 'column', unknown>;
+			assert.deepEqual(Object.keys(pointed), ['kind', 'start', 'line', 'column']);
+			assert.deepEqual(
+				{ kind: pointed.kind, start: pointed.start, line: pointed.line, column: pointed.column },
+				{ kind: 'refused', start: 9, line: 1, column: 9 }
+			);
+		}
+	);
 });
 
 // Locations helper (locations.js, re-exported from index.js) and the `{locations: true}`
@@ -605,10 +652,10 @@ describe(`raw engine parse failure (tsv_wasm.js): ${pkg_dir}`, () => {
 describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => {
 	it('`{locations: true}` is the reconstruction of the default parse', () => {
 		const ts = 'const x = 1;\nconst y = 2;\n';
-		const located = node_entry.parse_typescript(ts, { locations: true });
+		const located = ok_ast(node_entry.parse_typescript(ts, { locations: true }));
 		assert.deepEqual(
 			located,
-			node_entry.reconstruct_locations(node_entry.parse_typescript(ts), ts)
+			node_entry.reconstruct_locations(ok_ast(node_entry.parse_typescript(ts)), ts)
 		);
 		// acorn's `loc`: 1-based line, 0-based UTF-16 column, on every node
 		assert.deepEqual(located.body[1].loc, {
@@ -624,19 +671,23 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 	it('a named subtree reconstructs as it sits in the located parse', () => {
 		const sv = '<p>x</p>';
 		// named, the subtree reconstructs under Svelte's rule, `name_loc` included
-		const fragment = node_entry.reconstruct_locations(node_entry.parse_svelte(sv).fragment, sv, {
-			language: 'svelte'
-		});
+		const fragment = node_entry.reconstruct_locations(
+			ok_ast(node_entry.parse_svelte(sv)).fragment,
+			sv,
+			{
+				language: 'svelte'
+			}
+		);
 		assert.deepEqual(
 			fragment.nodes[0].name_loc,
-			node_entry.parse_svelte(sv, { locations: true }).fragment.nodes[0].name_loc
+			ok_ast(node_entry.parse_svelte(sv, { locations: true })).fragment.nodes[0].name_loc
 		);
 	});
 
 	it("a locator's lookups agree with the located parse", () => {
 		const ts = 'const x = 1;\nconst y = 2;\n';
-		const located = node_entry.parse_typescript(ts, { locations: true });
-		const spans = node_entry.parse_typescript(ts);
+		const located = ok_ast(node_entry.parse_typescript(ts, { locations: true }));
+		const spans = ok_ast(node_entry.parse_typescript(ts));
 		const locator = node_entry.create_locator(ts, { language: 'typescript' });
 		assert.deepEqual(locator.loc_of(spans.body[0]), located.body[0].loc);
 		assert.deepEqual(locator.loc_of(spans.body[1]), located.body[1].loc);
@@ -646,8 +697,11 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 
 	it('CSS: `loc` on every node on request, LF-only', () => {
 		const css = 'a {\r\n\tcolor: red;\r}\n';
-		const located = node_entry.parse_css(css, { locations: true });
-		assert.deepEqual(located, node_entry.reconstruct_locations(node_entry.parse_css(css), css));
+		const located = ok_ast(node_entry.parse_css(css, { locations: true }));
+		assert.deepEqual(
+			located,
+			node_entry.reconstruct_locations(ok_ast(node_entry.parse_css(css)), css)
+		);
 		// a lone CR opens no line in a CSS document (it is a column), and the CRLF's LF ends
 		// line 1: the rule closes on line 2 after `\tcolor: red;\r}`
 		assert.deepEqual(located.children[0].loc, {
@@ -665,14 +719,16 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 			'<svelte:options /* o */ runes />\n<div /* c */ class="a">\n\t{#each xs as { a, b: [c] }, i (a)}{a}{/each}\n</div>\n<style>\n/* s */\np { color: red; }\n</style>\n'
 		];
 		for (const sv of sources) {
-			const located = node_entry.parse_svelte(sv, { locations: true });
+			const located = ok_ast(node_entry.parse_svelte(sv, { locations: true }));
 			assert.deepEqual(
 				located,
-				node_entry.reconstruct_locations(node_entry.parse_svelte(sv), sv, { language: 'svelte' }),
+				node_entry.reconstruct_locations(ok_ast(node_entry.parse_svelte(sv)), sv, {
+					language: 'svelte'
+				}),
 				JSON.stringify(sv.slice(0, 60))
 			);
 		}
-		const located = node_entry.parse_svelte(sources[0], { locations: true });
+		const located = ok_ast(node_entry.parse_svelte(sources[0], { locations: true }));
 		const div = located.fragment.nodes.find((n: any) => n.type === 'RegularElement');
 		const name_at = sources[0].indexOf('<div') + 1;
 		assert.deepEqual(div.name_loc, {
@@ -687,12 +743,14 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 		// starts at 0 and its `name_loc` is column 1; the helper indexes the same
 		// BOM-less string, or every line-1 column and name span would read one off.
 		const sv = '\ufeff<div class="a">x</div>\n<span>y</span>';
-		const sv_located = node_entry.parse_svelte(sv, { locations: true });
+		const sv_located = ok_ast(node_entry.parse_svelte(sv, { locations: true }));
 		assert.equal(sv_located.fragment.nodes[0].start, 0);
 		assert.equal(sv_located.fragment.nodes[0].name_loc.start.column, 1);
 		assert.equal(sv_located.fragment.nodes[0].loc.start.column, 0);
 		// acorn counts the BOM as whitespace: the first statement sits at offset 1, column 1
-		const ts_located = node_entry.parse_typescript('\ufeffconst x = 1;', { locations: true });
+		const ts_located = ok_ast(
+			node_entry.parse_typescript('\ufeffconst x = 1;', { locations: true })
+		);
 		assert.equal(ts_located.body[0].start, 1);
 		assert.equal(ts_located.body[0].loc.start.column, 1);
 	});
@@ -701,10 +759,10 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 	// Svelte document `\n` alone — in its `<script>`, template expressions and `<style>` too.
 	it('a lone CR / U+2028 / U+2029 follows its document rule in both languages', () => {
 		const script = 'let a = 1;\rlet b = 2;\u2028let c = 3;\u2029let d = 4;\r\nlet e = 5;';
-		const ts_located = node_entry.parse_typescript(script, { locations: true });
+		const ts_located = ok_ast(node_entry.parse_typescript(script, { locations: true }));
 		assert.equal(ts_located.body[4].loc.start.line, 5, 'TypeScript counts every terminator');
 		const sv = `<script>\n${script}\n</script>\n<p>{x\r+\u2028y}</p>\n`;
-		const sv_located = node_entry.parse_svelte(sv, { locations: true });
+		const sv_located = ok_ast(node_entry.parse_svelte(sv, { locations: true }));
 		// the script's lone CR / LS / PS open no line; its CRLF is one LF
 		assert.equal(sv_located.instance.content.body[3].loc.start.line, 2, 'Svelte counts LF alone');
 		assert.equal(sv_located.instance.content.body[4].loc.start.line, 3);
@@ -735,10 +793,10 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 
 		const parse = (language: string, source: string, options: object): any =>
 			language === 'svelte'
-				? node_entry.parse_svelte(source, options)
+				? ok_ast(node_entry.parse_svelte(source, options))
 				: language === 'css'
-					? node_entry.parse_css(source, options)
-					: node_entry.parse_typescript(source, options);
+					? ok_ast(node_entry.parse_css(source, options))
+					: ok_ast(node_entry.parse_typescript(source, options));
 		// every object with numeric `start`/`end`, in walk order
 		const spanned = (node: any, out: Array<any> = []): Array<any> => {
 			if (Array.isArray(node)) {
@@ -873,34 +931,36 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 
 	// the parse-failure table over the lazy entry, now initialized — the same facade over
 	// the same guarded engine functions, reached through the other entry's wiring
-	register_syntax_error_suite(`browser.js (lazy entry): ${pkg_dir}`, () => browser);
+	register_parse_failure_suite(`browser.js (lazy entry): ${pkg_dir}`, () => browser);
 	if (variant === 'all')
 		register_strip_api_suite(`browser.js (lazy entry): ${pkg_dir}`, () => browser);
 
 	it('format functions work after init', { skip: !has_format }, () => {
-		assert.equal(browser.format_typescript('const   x=1'), 'const x = 1;\n');
-		assert.equal(browser.format_css('a{color:red}'), 'a {\n\tcolor: red;\n}\n');
-		assert.equal(browser.format_svelte('<div   >x</div   >'), '<div>x</div>\n');
+		assert.equal(ok_code(browser.format_typescript('const   x=1')), 'const x = 1;\n');
+		assert.equal(ok_code(browser.format_css('a{color:red}')), 'a {\n\tcolor: red;\n}\n');
+		assert.equal(ok_code(browser.format_svelte('<div   >x</div   >')), '<div>x</div>\n');
 	});
 
 	it('parse works after init', { skip: !has_parse }, () => {
-		assert.equal(browser.parse_typescript('const x = 1;').type, 'Program');
+		assert.equal(ok_ast(browser.parse_typescript('const x = 1;')).type, 'Program');
 	});
 
 	// Regression: the guard wrappers once hardcoded a single `(source)` param,
 	// silently dropping every later argument in the browser entry only.
 	it('the init guard forwards extra args (parse options)', { skip: !has_parse }, () => {
-		const program = browser.parse_typescript('var await = 1;', {
-			sourceType: 'script',
-			locations: true
-		});
+		const program = ok_ast(
+			browser.parse_typescript('var await = 1;', {
+				sourceType: 'script',
+				locations: true
+			})
+		);
 		assert.equal(program.sourceType, 'script');
 		assert.ok(program.loc);
 	});
 
 	it('the init guard forwards extra args (format options)', { skip: !has_format }, () => {
 		assert.equal(
-			browser.format_typescript('await => 1;', { sourceType: 'script' }),
+			ok_code(browser.format_typescript('await => 1;', { sourceType: 'script' })),
 			'(await) => 1;\n'
 		);
 	});
@@ -921,9 +981,9 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 		// Should resolve without re-fetching — just returns early
 		await browser.init();
 		if (has_format) {
-			assert.equal(browser.format_typescript('const   x=1'), 'const x = 1;\n');
+			assert.equal(ok_code(browser.format_typescript('const   x=1')), 'const x = 1;\n');
 		} else {
-			assert.equal(browser.parse_typescript('const x = 1;').type, 'Program');
+			assert.equal(ok_ast(browser.parse_typescript('const x = 1;')).type, 'Program');
 		}
 	});
 });
@@ -939,8 +999,8 @@ describe(`overlapping init (browser.js): ${pkg_dir}`, () => {
 	const browser_url = new URL(`../${pkg_dir}/browser.js`, import.meta.url).href;
 	/** A worker-side expression: whether this variant's engine answers correctly. */
 	const works = has_format
-		? `tsv.format_typescript('const   x=1') === 'const x = 1;\\n'`
-		: `tsv.parse_typescript('const x = 1;').type === 'Program'`;
+		? `tsv.format_typescript('const   x=1').code === 'const x = 1;\\n'`
+		: `tsv.parse_typescript('const x = 1;').ast.type === 'Program'`;
 	/** Run `body` in a worker over a fresh import of the lazy entry bound to `tsv`, with
 	 * `module` (the compiled module) and `instantiations` (a running count of
 	 * `WebAssembly.instantiate` calls) in scope; resolves to what `body` posts. */
@@ -1033,11 +1093,11 @@ describe(`worker entry (worker.js): ${pkg_dir}`, () => {
 			? `import {workerData, parentPort} from 'node:worker_threads';
 				const tsv = await import(${JSON.stringify(worker_url)});
 				tsv.init_sync({module: workerData.module});
-				parentPort.postMessage(tsv.format_typescript('const   x=1'));`
+				parentPort.postMessage(tsv.format_typescript('const   x=1').code);`
 			: `import {workerData, parentPort} from 'node:worker_threads';
 				const tsv = await import(${JSON.stringify(worker_url)});
 				tsv.init_sync({module: workerData.module});
-				parentPort.postMessage(tsv.parse_typescript('const x = 1;').type);`;
+				parentPort.postMessage(tsv.parse_typescript('const x = 1;').ast.type);`;
 		const result = await new Promise((resolve, reject) => {
 			// `eval: true` resolves bare specifiers against the cwd, which is why
 			// the worker entry goes in as an absolute URL rather than a relative one
@@ -1119,8 +1179,8 @@ describe(`bare-specifier resolution (exports map): ${pkg_dir}`, () => {
 	/** Whichever export this variant has, on an already-initialized module. */
 	const exercise = (mod: string) =>
 		has_format
-			? `${mod}.format_typescript('const   x=1')`
-			: `${mod}.parse_typescript('const x = 1;').type`;
+			? `${mod}.format_typescript('const   x=1').code`
+			: `${mod}.parse_typescript('const x = 1;').ast.type`;
 	const expected = has_format ? 'const x = 1;\n' : 'Program';
 
 	const worker_source = `import {workerData, parentPort} from 'node:worker_threads';
@@ -1772,7 +1832,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		assert.equal(bare.status, 0, bare.stderr);
 		assert.doesNotMatch(bare.stdout, /"loc"/);
 		// the default output is the engine's wire string, verbatim
-		assert.equal(bare.stdout, `${node_entry.parse_typescript_json('const x = 1;')}\n`);
+		assert.equal(bare.stdout, `${ok_json(node_entry.parse_typescript_json('const x = 1;'))}\n`);
 		// --locations is the facade's `{locations: true}`, stringified
 		const composed = run_cli([
 			'parse',
@@ -1787,7 +1847,9 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		assert.equal(composed.status, 0, composed.stderr);
 		assert.deepEqual(
 			JSON.parse(composed.stdout),
-			node_entry.parse_typescript('var await = 1;', { sourceType: 'script', locations: true })
+			ok_ast(
+				node_entry.parse_typescript('var await = 1;', { sourceType: 'script', locations: true })
+			)
 		);
 		assert.match(composed.stdout, /"sourceType":"script"/);
 		// svelte carries name_loc on request; css loc
@@ -1800,7 +1862,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			assert.doesNotMatch(span.stdout, /"name_loc"|"loc"/);
 			const located = run_cli(['parse', '--locations', '--content', source, '--parser', parser]);
 			assert.equal(located.status, 0, located.stderr);
-			assert.deepEqual(JSON.parse(located.stdout), parse(source, { locations: true }));
+			assert.deepEqual(JSON.parse(located.stdout), ok_ast(parse(source, { locations: true })));
 		}
 		// --pretty --locations: the same tree, tab-indented
 		const pretty = run_cli([
@@ -1816,7 +1878,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		assert.match(pretty.stdout, /\n\t"type": "Program"/);
 		assert.deepEqual(
 			JSON.parse(pretty.stdout),
-			node_entry.parse_typescript('const x = 1;', { locations: true })
+			ok_ast(node_entry.parse_typescript('const x = 1;', { locations: true }))
 		);
 	});
 

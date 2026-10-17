@@ -3,11 +3,11 @@
  *
  * Every tsv npm package publishes through one hand-written facade
  * (`crates/tsv_wasm/npm/api.js` + `api_parse.js`): per call it checks the source is a
- * well-formed UTF-16 string, reads the options bag, rethrows a parse failure as the
- * typed `SyntaxError`, and — over an engine that hands back the wire as a string —
- * `JSON.parse`s it. A consumer's `parse_typescript(source)` pays that, as every
- * third-party row here pays its own package's front door, so the three tsv bindings
- * (`lib/ffi.ts`, `lib/napi.ts`, `lib/wasm.ts`) hand their flat exports to
+ * well-formed UTF-16 string, reads the options bag, wraps the product in a `{ok: true, …}`
+ * result (a parse failure is `{ok: false, error}`), and — over an engine that hands back
+ * the wire as a string — `JSON.parse`s it. A consumer's `parse_typescript(source)` pays
+ * that, as every third-party row here pays its own package's front door, so the three tsv
+ * bindings (`lib/ffi.ts`, `lib/napi.ts`, `lib/wasm.ts`) hand their flat exports to
  * `TsvBinding.bind` and time the result: the same two factories, wired the way each
  * package's entry wires them (`crates/tsv_napi/npm/index.js`, the staged wasm
  * `index.js`), imported from the source the packages stage verbatim.
@@ -65,12 +65,23 @@ export interface TsvEngine {
 /** A published function: the source, then the options bag. */
 type Published<T> = (source: string, options?: object) => T;
 
+/** What a published function returns: its product under `key`, or the source's failure. */
+type Outcome<K extends string, T> =
+	({ ok: true } & { [key in K]: T }) | { ok: false; error: { message: string } };
+
 /** What `bind` leaves: the engine as given, and the facade's functions over it. */
 interface Bound {
 	engine: TsvEngine;
-	parse: Record<Language, Published<unknown>>;
-	format: Record<Language, Published<string>>;
+	parse: Record<Language, Published<Outcome<'ast', unknown>>>;
+	format: Record<Language, Published<Outcome<'code', string>>>;
 }
+
+/**
+ * A failed result as the row's rejection: the harness reads a rejection from a THROW, as it
+ * does from every third-party row (`lib/reject_probe.ts`), so a row unwraps the result as a
+ * consumer does and throws the failure's message. Only the failure path pays it.
+ */
+const rejected = (error: { message: string }): Error => new Error(error.message);
 
 // The bags a call passes, built once: a consumer writes its bag as a literal, but one
 // allocated per timed call here would be the harness's allocation charged to the row
@@ -124,14 +135,18 @@ export abstract class TsvBinding extends BaseImplementation {
 		};
 		this.#bound = {
 			engine,
-			parse: per_language((language) => published[`parse_${language}`]),
-			format: per_language((language) => published[`format_${language}`] as Published<string>)
+			parse: per_language(
+				(language) => published[`parse_${language}`] as Published<Outcome<'ast', unknown>>
+			),
+			format: per_language(
+				(language) => published[`format_${language}`] as Published<Outcome<'code', string>>
+			)
 		};
 	}
 
 	/**
 	 * The wrapper's init self-checks, run once `bind` has published the engine: every
-	 * published call still THROWS on a source tsv rejects (`lib/reject_probe.ts`), and
+	 * row's call still THROWS on a source tsv rejects (`lib/reject_probe.ts`), and
 	 * the parse wire is the span-only one (`lib/locations_probe.ts`). Through the
 	 * wrapper's own methods, so each probes the call the rows make, facade included.
 	 *
@@ -181,7 +196,8 @@ export abstract class TsvBinding extends BaseImplementation {
 	}
 
 	/**
-	 * `parse_<lang>(source)` — the package's default parse, the span-only tree.
+	 * `parse_<lang>(source)` — the package's default parse, the span-only tree, unwrapped
+	 * from its result (a failure thrown, see `rejected`).
 	 *
 	 * A call with no goal passes no bag at all, which is every call on the perf surface.
 	 * `goal_for` withholds the goal for Svelte and CSS, which refuse a set source type;
@@ -190,27 +206,32 @@ export abstract class TsvBinding extends BaseImplementation {
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {
 		const parse = this.bound.parse[language];
 		const source_type = goal_for(language, goal);
-		return source_type === undefined
-			? parse(source)
-			: parse(source, SOURCE_TYPE_OPTIONS[source_type]);
+		const result =
+			source_type === undefined ? parse(source) : parse(source, SOURCE_TYPE_OPTIONS[source_type]);
+		if (result.ok) return result.ast;
+		throw rejected(result.error);
 	}
 
 	/** `parse_<lang>(source, {locations: true})` — the default parse plus `loc`. */
 	parse_with_locations(source: string, language: Language, goal?: ParseGoal): unknown {
 		const source_type = goal_for(language, goal);
-		return this.bound.parse[language](
+		const result = this.bound.parse[language](
 			source,
 			source_type === undefined ? LOCATIONS_OPTIONS : LOCATIONS_SOURCE_TYPE_OPTIONS[source_type]
 		);
+		if (result.ok) return result.ast;
+		throw rejected(result.error);
 	}
 
 	/**
 	 * `format_<lang>(source)` — no source type named: the shipped default on every
 	 * surface, and the one that reaches the module-then-script fallback
-	 * (`tsv_ts::parse_with_goal_or_fallback`).
+	 * (`tsv_ts::parse_with_goal_or_fallback`). Unwrapped as `parse` is.
 	 */
 	format(source: string, language: Language): string {
-		return this.bound.format[language](source);
+		const result = this.bound.format[language](source);
+		if (result.ok) return result.code;
+		throw rejected(result.error);
 	}
 
 	/**

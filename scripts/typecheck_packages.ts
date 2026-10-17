@@ -10,7 +10,8 @@
  *
  * - every exported subpath — the root, `./worker` (wasm), `./locations` (parse-capable) —
  *   through lean consumer modules that call the surface with typed returns, forwarded
- *   option bags, `TsvSyntaxError`, the `IgnoreStack` verdict union and the type strip's
+ *   option bags, the format / parse result narrowing (`TsvParseError`, the format's
+ *   `FormatRefusedError`), the `IgnoreStack` verdict union and the type strip's
  *   result narrowing (in the two packages that carry it), plus
  *   `// @ts-expect-error` negatives for what must NOT compile (an unused one is itself an
  *   error, so the negatives are pinned too);
@@ -175,41 +176,55 @@ const BOTH: ReadonlyArray<Resolution> = ['nodenext', 'bundler'];
 const EXACT = `type Exact<A, B> =
 	(<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;`;
 
-/** The format family, over the package root. */
+/** The format family, over the package root: the result narrows on `ok`, the error on
+ * `kind`. */
 const format_module = (pkg: PackageSpec): string => `
 import {format_css, format_svelte, format_typescript, IgnoreStack} from '${pkg.name}';
-import type {FormatOptions, TsvSyntaxError, TypeScriptFormatOptions} from '${pkg.name}';
+import type {
+	FormatError,
+	FormatOptions,
+	FormatRefusedError,
+	FormatResult,
+	TsvParseError,
+	TypeScriptFormatOptions
+} from '${pkg.name}';
 
 ${EXACT}
 
 const returns: [
-	Exact<ReturnType<typeof format_svelte>, string>,
-	Exact<ReturnType<typeof format_typescript>, string>,
-	Exact<ReturnType<typeof format_css>, string>,
-	Exact<TsvSyntaxError['start'], number>,
-	Exact<TsvSyntaxError['loc'], {line: number; column: number}>,
+	Exact<ReturnType<typeof format_svelte>, FormatResult>,
+	Exact<ReturnType<typeof format_typescript>, FormatResult>,
+	Exact<ReturnType<typeof format_css>, FormatResult>,
+	Exact<TsvParseError['start'], number>,
+	Exact<TsvParseError['loc'], {line: number; column: number}>,
+	Exact<FormatError['kind'], 'parse' | 'refused'>,
 	Exact<ReturnType<IgnoreStack['classify_dir']>, 'descend' | 'prune' | 'prune_warn'>
-] = [true, true, true, true, true, true];
+] = [true, true, true, true, true, true, true];
 
-const formatted: string = format_svelte('<p>x</p>');
+const result = format_svelte('<p>x</p>');
+// @ts-expect-error the code is there only once \`ok\` says so
+void result.code;
+const formatted: string = result.ok ? result.code : '';
 const typescript_options: TypeScriptFormatOptions = {sourceType: 'script'};
-const script: string = format_typescript('let a', typescript_options);
+const script = format_typescript('let a', typescript_options);
 // one bag forwarded to every formatter spells the TypeScript-only key as undefined
 const forwarded: FormatOptions = {sourceType: undefined};
-const css: string = format_css('a {}', forwarded);
+const css = format_css('a {}', forwarded);
 format_typescript('let a', forwarded);
 // @ts-expect-error the source type is TypeScript-only
 format_css('a {}', {sourceType: 'module'});
 // @ts-expect-error an unknown option key
 format_svelte('<p>x</p>', {sourceTyp: undefined});
-try {
-	format_typescript('const = ;');
-} catch (error) {
-	if (error instanceof SyntaxError) {
-		const {start, loc}: {start: number; loc: {line: number; column: number}} =
-			error as TsvSyntaxError;
-		void [start, loc];
+const failed = format_typescript('const = ;');
+if (!failed.ok) {
+	const error: FormatError = failed.error;
+	if (error.kind === 'refused') {
+		const refusal: FormatRefusedError = error;
+		void refusal;
 	}
+	const {start, loc}: {start: number; loc: {line: number; column: number}} = error;
+	const message: string = error.message;
+	void [start, loc, message];
 }
 
 ${pkg.engine === 'wasm' ? 'using stack = new IgnoreStack();' : 'const stack = new IgnoreStack();'}
@@ -233,13 +248,15 @@ import {
 } from '${pkg.name}';
 import type {
 	ParseJsonOptions,
+	ParseJsonResult,
 	ParseOptions,
+	ParseResult,
 	Position,
 	Program,
 	Root,
 	SourceLocation,
 	StyleSheetFile,
-	TsvSyntaxError,
+	TsvParseError,
 	TypeScriptParseJsonOptions,
 	TypeScriptParseOptions
 } from '${pkg.name}';
@@ -247,28 +264,38 @@ import type {
 ${EXACT}
 
 const returns: [
-	Exact<ReturnType<typeof parse_svelte>, Root>,
-	Exact<ReturnType<typeof parse_typescript>, Program>,
-	Exact<ReturnType<typeof parse_css>, StyleSheetFile>,
-	Exact<ReturnType<typeof parse_svelte_json>, string>,
-	Exact<ReturnType<typeof parse_typescript_json>, string>,
-	Exact<ReturnType<typeof parse_css_json>, string>,
-	Exact<TsvSyntaxError['start'], number>,
-	Exact<TsvSyntaxError['loc'], {line: number; column: number}>
-] = [true, true, true, true, true, true, true, true];
+	Exact<ReturnType<typeof parse_svelte>, ParseResult<Root>>,
+	Exact<ReturnType<typeof parse_typescript>, ParseResult<Program>>,
+	Exact<ReturnType<typeof parse_css>, ParseResult<StyleSheetFile>>,
+	Exact<ReturnType<typeof parse_svelte_json>, ParseJsonResult>,
+	Exact<ReturnType<typeof parse_typescript_json>, ParseJsonResult>,
+	Exact<ReturnType<typeof parse_css_json>, ParseJsonResult>,
+	Exact<TsvParseError['kind'], 'parse'>,
+	Exact<TsvParseError['start'], number>,
+	Exact<TsvParseError['loc'], {line: number; column: number}>
+] = [true, true, true, true, true, true, true, true, true];
 const typescript_options: TypeScriptParseOptions = {sourceType: 'script', locations: true};
-const root: Root = parse_svelte('<p>x</p>', {locations: true});
-const program: Program = parse_typescript('let a', typescript_options);
-const sheet: StyleSheetFile = parse_css('a {}');
+const parsed = parse_svelte('<p>x</p>', {locations: true});
+// @ts-expect-error the tree is there only once \`ok\` says so
+void parsed.ast;
+if (!parsed.ok) throw new Error(parsed.error.message);
+const root: Root = parsed.ast;
+const program_result = parse_typescript('let a', typescript_options);
+if (!program_result.ok) throw new Error(program_result.error.message);
+const program: Program = program_result.ast;
+const sheet_result = parse_css('a {}');
+if (!sheet_result.ok) throw new Error(sheet_result.error.message);
+const sheet: StyleSheetFile = sheet_result.ast;
 // one bag forwarded to every parser spells the TypeScript-only key as undefined
 const forwarded: ParseOptions = {sourceType: undefined, locations: true};
 parse_svelte('<p>x</p>', forwarded);
 parse_typescript('let a', forwarded);
 const typescript_json_options: TypeScriptParseJsonOptions = {sourceType: 'module'};
-const wire: string = parse_typescript_json('let a', typescript_json_options);
+const wire_result = parse_typescript_json('let a', typescript_json_options);
+const wire: string = wire_result.ok ? wire_result.json : '';
 const json_options: ParseJsonOptions = {sourceType: undefined};
-const css_wire: string = parse_css_json('a {}', json_options);
-const svelte_wire: string = parse_svelte_json('<p>x</p>');
+const css_wire = parse_css_json('a {}', json_options);
+const svelte_wire = parse_svelte_json('<p>x</p>');
 parse_typescript_json('let a', {sourceType: undefined});
 // @ts-expect-error a _json export returns the wire and takes no locations
 parse_css_json('a {}', {locations: true});
@@ -276,14 +303,11 @@ parse_css_json('a {}', {locations: true});
 parse_svelte('<p>x</p>', {sourceType: 'module'});
 // @ts-expect-error an unknown option key
 parse_typescript('let a', {locatons: true});
-try {
-	parse_css('a {');
-} catch (error) {
-	if (error instanceof SyntaxError) {
-		const {start, loc}: {start: number; loc: {line: number; column: number}} =
-			error as TsvSyntaxError;
-		void [start, loc];
-	}
+const failed = parse_css('a {');
+if (!failed.ok) {
+	const error: TsvParseError = failed.error;
+	const {start, loc}: {start: number; loc: {line: number; column: number}} = error;
+	void [start, loc];
 }
 
 const locator = create_locator('let a', {language: 'typescript'});

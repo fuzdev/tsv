@@ -58,23 +58,24 @@ The package is ESM, and there is no initialization step (a CommonJS host loads i
 ```javascript
 import {format_svelte, format_typescript, parse_typescript} from '@fuzdev/tsv';
 
-const formatted = format_svelte('<script>\nconst   x=1\n</script>');
-const ast = parse_typescript('const x = 1;'); // acorn-typescript-shaped JSON AST, span-only
+const formatted = format_svelte('<script>\nconst   x=1\n</script>'); // {ok: true, code}
+const parsed = parse_typescript('const x = 1;'); // {ok: true, ast}: acorn-typescript-shaped, span-only
+if (!parsed.ok) throw new Error(parsed.error.message);
 ```
 
 ### Formatting
 
-`format_svelte` / `format_typescript` / `format_css` take a source `string` and return the formatted `string`, throwing on a parse error. Formatting itself is non-configurable; the only option is TypeScript's parse goal, `format_typescript(source, {sourceType: 'script' | 'module'})`:
+`format_svelte` / `format_typescript` / `format_css` take a source `string` and return `{ok: true, code}` with the formatted `string`, or `{ok: false, error}` for a source they cannot format ([Errors](#errors)). Formatting itself is non-configurable; the only option is TypeScript's parse goal, `format_typescript(source, {sourceType: 'script' | 'module'})`:
 
 - `'module'` — the source is a module, always strict.
 - `'script'` — `await` is an ordinary identifier, top-level `import`/`export`, `for await` and `import.meta` are syntax errors, and the code is sloppy unless its own `"use strict"` prologue makes it strict (so `with` and legacy octal literals/escapes parse).
 - omitted — not the same as `'module'`: the source is formatted as a module and, only if that parse fails, retried as a script. So a legacy sloppy script formats with no options at all, while anything the module grammar accepts is never reinterpreted.
 
-A set value is exact. With none named and both grammars rejecting the source, the error thrown is the one that best explains the failure (the rule is in the repo's [docs/cli.md](https://github.com/fuzdev/tsv/blob/main/docs/cli.md#multi-file-formatting)). `parse_typescript` has no such fallback; there an omitted `sourceType` means `'module'`.
+A set value is exact. With none named and both grammars rejecting the source, the error returned is the one that best explains the failure (the rule is in the repo's [docs/cli.md](https://github.com/fuzdev/tsv/blob/main/docs/cli.md#multi-file-formatting)). `parse_typescript` has no such fallback; there an omitted `sourceType` means `'module'`.
 
 ### Parsing
 
-`parse_svelte` / `parse_typescript` / `parse_css` return the language's public JSON AST as an object — span-only by default, `start`/`end` offsets on every node and no per-node `loc`; the `parse_*_json` siblings return that wire as a JSON string for consumers that forward it without paying `JSON.parse`. The object parsers take an optional `{locations?, sourceType?}` bag, the `_json` ones `{sourceType?}`, and `sourceType` is TypeScript-only. TypeScript types for the AST are bundled in `tsv_ast.d.ts` and re-exported from the package (`import type {...} from '@fuzdev/tsv'`).
+`parse_svelte` / `parse_typescript` / `parse_css` return `{ok: true, ast}` with the language's public JSON AST as an object — span-only by default, `start`/`end` offsets on every node and no per-node `loc`; the `parse_*_json` siblings return that wire as a JSON string, `{ok: true, json}`, for consumers that forward it without paying `JSON.parse`. A source that doesn't parse returns `{ok: false, error}` ([Errors](#errors)). The object parsers take an optional `{locations?, sourceType?}` bag, the `_json` ones `{sourceType?}`, and `sourceType` is TypeScript-only. TypeScript types for the AST are bundled in `tsv_ast.d.ts` and re-exported from the package (`import type {...} from '@fuzdev/tsv'`).
 
 `locations: true` adds `loc` (and Svelte's `name_loc`), computed in JS after the parse by `reconstruct_locations`. It is exported too, with `create_locator(source, {language})` for sparse lookups (`language` required), whose `position_at(offset)` / `loc_of(node)` throw a `RangeError` for an offset or span the source doesn't hold (a `TypeError` for an offset that isn't a number, or a node whose `start`/`end` getter throws); the whole-tree forms (`reconstruct_locations`, the locator's `reconstruct(ast)`) check nothing per node, and take an acyclic tree — the parse's own, or a clone of it. Both are also the `@fuzdev/tsv/locations` entry point, pure JS that loads no native addon.
 
@@ -82,7 +83,7 @@ A set value is exact. With none named and both grammars rejecting the source, th
 
 `strip_typescript(source)` turns TypeScript into JS by blanking every type to whitespace — no transform, no sourcemap: every surviving character keeps its line and UTF-16 column, line terminators are kept verbatim, and a type-free source comes back unchanged. Where blanking alone would let the next line continue the statement, one `;`, `(` or `)` takes a blanked character's place.
 
-It returns a result rather than throwing for what it finds in the source: `{ok: true, code}`, or `{ok: false, error}` with `error.kind` `'parse'` (the `message`, `start` and `loc` a `parse_typescript` of the source would throw at the goal the error belongs to) or `'unsupported'` (TypeScript that type blanking cannot erase — an `enum`, a value `namespace`, a parameter property, `import =`, `export =`, `<T>x`, or an `as` / `satisfies` whose removal would regroup its expression — named by `error.construct`, with its span as `start`/`end` and `loc`, and a `message` with the line and a caret).
+It returns a result rather than throwing for what it finds in the source: `{ok: true, code}`, or `{ok: false, error}` with `error.kind` `'parse'` (the error a `parse_typescript` of the source returns at the goal the error belongs to) or `'unsupported'` (TypeScript that type blanking cannot erase — an `enum`, a value `namespace`, a parameter property, `import =`, `export =`, `<T>x`, or an `as` / `satisfies` whose removal would regroup its expression — named by `error.construct`, with its span as `start`/`end` and `loc`, and a `message` with the line and a caret).
 
 ```javascript
 import {strip_typescript} from '@fuzdev/tsv';
@@ -98,7 +99,7 @@ The one option is `sourceType`, read as `format_typescript` reads it: omitted, t
 
 ### Options
 
-Options behave as in `@fuzdev/tsv-wasm`: a supported key set to `undefined` reads as its default, and a `sourceType`-only bag forwards to any function (`sourceType: undefined` included on Svelte and CSS; a `locations` key, whatever its value, throws anywhere but an object parser). Argument errors are `TypeError`s:
+Options behave as in `@fuzdev/tsv-wasm`: a supported key set to `undefined` reads as its default, and a `sourceType`-only bag forwards to any function (`sourceType: undefined` included on Svelte and CSS; a `locations` key, whatever its value, throws anywhere but an object parser). Argument errors are thrown `TypeError`s:
 
 - an unknown key, whatever its value;
 - a wrong-typed or invalid value, or a source that is not a string or not well-formed UTF-16 (it holds a lone surrogate);
@@ -110,24 +111,26 @@ Options behave as in `@fuzdev/tsv-wasm`: a supported key set to `undefined` read
 
 ### Errors
 
-A source that doesn't parse throws a `SyntaxError` — from a parser and a formatter alike, the same one `@fuzdev/tsv-wasm` throws — with two own properties, `start` and `loc` (typed `TsvSyntaxError`, exported), in the same coordinates as the AST's own positions:
+A source that doesn't parse returns `{ok: false, error}` — from a parser, a formatter and the strip alike, the same result `@fuzdev/tsv-wasm` returns — with `error` a plain object (no stack; `postMessage`-able): `{kind: 'parse', message, start, loc}`, typed `TsvParseError` (exported), in the same coordinates as the AST's own positions:
 
 - `start` is the error's UTF-16 offset and `loc` its `{line, column}` (1-based line, 0-based UTF-16 column), equal to `create_locator(source, {language}).position_at(start)`.
 - TypeScript counts ECMAScript line terminators (LF, CR, CRLF, U+2028, U+2029) and a leading BOM; Svelte (`<script>`, `<style>` and template expressions included) and CSS count LF alone and leave a leading BOM out.
 - The message's second line starts with `loc` as `line:column + 1`.
 - A formatter reports positions in your own source, CRLF line endings included — the error a parser reports, except that with no `sourceType`, `format_typescript` may report its script retry's error instead.
-- Read `start` and `loc`, not `line` / `column`, which some runtimes put on every `Error`.
 
 ```javascript
 import {format_typescript} from '@fuzdev/tsv';
 
-try { format_typescript('let a;\nconst = ;'); } catch (e) {
-	e instanceof SyntaxError; // true — the message ends with the line and a caret
-	[e.start, e.loc]; // [13, {line: 2, column: 6}]
+const result = format_typescript('let a;\nconst = ;');
+if (!result.ok) {
+	result.error.kind; // 'parse' — the message ends with the line and a caret
+	[result.error.start, result.error.loc]; // [13, {line: 2, column: 6}]
 }
 ```
 
-`format_svelte` refuses one source that does parse: a lone CR (not part of a CRLF) with comment text after it inside a `//` comment between a tag's attributes, which Svelte ends at LF alone — the formatter's CR-to-LF fold would end that comment early and turn the rest of its line into markup. The refusal is a plain `Error`, not a `SyntaxError`; its message names the CR's line and column.
+`format_svelte` refuses one source that does parse: a lone CR (not part of a CRLF) with comment text after it inside a `//` comment between a tag's attributes, which Svelte ends at LF alone — the formatter's CR-to-LF fold would end that comment early and turn the rest of its line into markup. The refusal is `{kind: 'refused', message, start, loc}` (typed `FormatRefusedError`), at the CR.
+
+What still throws is what no result can report: an argument error (a `TypeError`, above), a source over the 4 GiB size cap, and the engine failures below.
 
 A Rust panic — always a tsv bug, please report it — is also thrown rather than aborting the process; stack overflow is the one crash that still aborts, as a bare `SIGSEGV`. Its depth is your thread's, not the addon's: a main thread has the process stack limit (commonly 8 MiB) and a `worker_threads` worker has Node's 4 MiB default, so a worker reaches about half as deep; the deepest shapes — nested arrow bodies and member chains — cost several times more stack per level than nested parens (the per-shape stack costs and each surface's ceiling are in the repo's [docs/cli.md](https://github.com/fuzdev/tsv/blob/main/docs/cli.md#recursion-depth)). Raise the worker's stack with `new Worker(path, {resourceLimits: {stackSizeMb: 16}})` if you format generated or minified input. The bundled `tsv` CLI is unaffected; it sizes its own. Reconstructing `loc` — `{locations: true}`, or `reconstruct_locations` — runs in JS without recursion, so it reaches as deep as the parse does.
 

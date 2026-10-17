@@ -113,12 +113,16 @@ npx @fuzdev/tsv format src    # or without installing first
 
 ```typescript
 import {format_svelte} from '@fuzdev/tsv';
-const formatted = format_svelte('<script>\nconst   x=1\n</script>');
+const result = format_svelte('<script>\nconst   x=1\n</script>');
+if (result.ok) console.log(result.code); // else result.error: {kind, message, start, loc}
 ```
 
 ```typescript
 import {parse_svelte, type Root} from '@fuzdev/tsv';
-const ast: Root = parse_svelte('<script>const x = 1;</script>');
+const result = parse_svelte('<script>const x = 1;</script>');
+if (result.ok) {
+	const ast: Root = result.ast;
+}
 ```
 
 `@fuzdev/tsv` and `@fuzdev/tsv-wasm` are drop-in swaps.

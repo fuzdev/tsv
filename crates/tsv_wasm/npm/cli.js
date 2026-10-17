@@ -715,14 +715,16 @@ function format_single(values, positionals) {
 	}
 	refuse_source_type_language(values.parser, source_type, 2);
 	const input = values.content !== undefined ? values.content : read_stdin(2);
-	let formatted;
+	let result;
 	try {
 		// one bag, handed to whichever formatter — the refusal above leaves
 		// `source_type` undefined on the goalless languages, which reads as the default
-		formatted = FORMATTERS[values.parser](input, { sourceType: source_type });
+		result = FORMATTERS[values.parser](input, { sourceType: source_type });
 	} catch (error) {
 		exit_with_error(2, single_input_failure(error));
 	}
+	if (!result.ok) exit_with_error(2, result_failure(result.error));
+	const formatted = result.code;
 	if (values.check) {
 		if (formatted !== input) {
 			exit_with_error(1, 'would change');
@@ -872,16 +874,16 @@ function format_one(path, check) {
 	} catch (error) {
 		return { kind: 'error', message: `read failed: ${error_message(error)}` };
 	}
-	let formatted;
+	let result;
 	const parser = parser_from_extension(path);
 	try {
-		formatted = FORMATTERS[parser](source, {
+		result = FORMATTERS[parser](source, {
 			// TypeScript only; the other two formatters reject a SET key, and the
 			// goalless extensions resolve to `undefined`, which reads as the default
 			sourceType: parser === 'typescript' ? source_type_from_extension(path) : undefined
 		});
 	} catch (error) {
-		// A trap (`WebAssembly.RuntimeError` — a parse error is a `SyntaxError`)
+		// A trap (`WebAssembly.RuntimeError` — a parse error is a returned result)
 		// is not a per-file failure: a stack overflow (input nested past ~2,500
 		// levels — generated or minified code) leaves `__stack_pointer` where the
 		// deep call left it, poisoning the instance so every later file throws
@@ -905,6 +907,9 @@ function format_one(path, check) {
 		}
 		return { kind: 'error', message: error_message(error) };
 	}
+	// a parse failure or a refusal: the file's own, reported by its message alone
+	if (!result.ok) return { kind: 'error', message: result.error.message };
+	const formatted = result.code;
 	if (formatted === source) return { kind: 'unchanged' };
 	if (!check) {
 		try {
@@ -926,31 +931,37 @@ function error_message(error) {
 /**
  * Whether a throw out of the engine is the engine failing rather than the input being
  * rejected: a WASM trap (`WebAssembly.RuntimeError` — a deep input overran the module's
- * own stack) or V8's `RangeError` (its native stack ran out first). A parse error is the
- * facade's `SyntaxError`, and the engine's other refusals plain `Error`s — neither is
- * either class. `format_one` reads the same split to recover the engine between files.
+ * own stack) or V8's `RangeError` (its native stack ran out first). A parse error or a
+ * format's refusal is a returned result, never a throw, and the size cap a plain `Error` —
+ * neither class. `format_one` reads the same split to recover the engine between files.
  */
 function is_engine_failure(error) {
 	return error instanceof WebAssembly.RuntimeError || error instanceof RangeError;
 }
 
 /**
- * The line a single-input run — `--content`/`--stdin` (`format_single`), or `parse` on
- * any of its three inputs, a file path included (`run_parse`) — dies with when the
- * engine throws: `Parse error:` for the facade's `SyntaxError`, a source that does not
- * parse, and `Error:` for the engine's other refusals — the size cap and a format's
- * refusal of a source that parses, plain `Error`s with no point — as the native CLI
- * splits the two (`exit_with_parse_error`); and `Error:` naming the engine for a trap or
- * a stack overflow — the one mode where the message is the whole output, so calling
- * `memory access out of bounds` a parse error blamed the input for the engine's
- * ceiling. No recovery is attempted: the process exits on this line. (On the N-API
- * engine a native overflow is a SIGSEGV that reaches no catch — docs/cli.md §Recursion
- * Depth.)
+ * The line a single-input run — `--content`/`--stdin` (`format_single`), `parse` on any of
+ * its three inputs, a file path included (`run_parse`), or `strip` — dies with when the
+ * facade returns a failure: `Parse error:` for a source that does not parse (`kind`
+ * `'parse'`), and `Error:` for a format's refusal of a source that parses (`'refused'`), as
+ * the native CLI splits the two (`exit_with_parse_error`) — and for a strip's refusal
+ * (`'unsupported'`).
+ */
+function result_failure(error) {
+	return `${error.kind === 'parse' ? 'Parse error' : 'Error'}: ${error.message}`;
+}
+
+/**
+ * The line a single-input run dies with when the engine THROWS: `Error:` for the size cap,
+ * a plain `Error` with no point; and `Error:` naming the engine for a trap or a stack
+ * overflow — the one mode where the message is the whole output, so calling
+ * `memory access out of bounds` a parse error blamed the input for the engine's ceiling.
+ * No recovery is attempted: the process exits on this line. (On the N-API engine a native
+ * overflow is a SIGSEGV that reaches no catch — docs/cli.md §Recursion Depth.)
  */
 function single_input_failure(error) {
 	if (!is_engine_failure(error)) {
-		const prefix = error instanceof SyntaxError ? 'Parse error' : 'Error';
-		return `${prefix}: ${error_message(error)}`;
+		return `Error: ${error_message(error)}`;
 	}
 	const message = error_message(error);
 	// a trap and V8's `Maximum call stack size exceeded` are the input's nesting; the one
@@ -1533,14 +1544,16 @@ function run_parse({ values, positionals }) {
 	// The engine call and the serialization are caught apart: a throw out of the first is the
 	// engine's (or the input's), one out of the second is this process's own JS failing on a
 	// tree the engine produced fine — reported as the engine's, it would blame the input.
-	let parsed;
+	let result;
 	try {
-		parsed = values.locations
+		result = values.locations
 			? OBJECT_PARSERS[parser](input, { locations: true, sourceType: source_type })
 			: PARSERS[parser](input, { sourceType: source_type });
 	} catch (error) {
 		exit_with_error(1, single_input_failure(error));
 	}
+	if (!result.ok) exit_with_error(1, result_failure(result.error));
+	const parsed = values.locations ? result.ast : result.json;
 	let json;
 	try {
 		if (values.locations) {
@@ -1635,10 +1648,8 @@ function run_strip({ values, positionals }) {
 	}
 	if (result.ok) {
 		if (!values.check) print(result.code);
-	} else if (result.error.kind === 'parse') {
-		exit_with_error(2, `Parse error: ${result.error.message}`);
 	} else {
-		exit_with_error(1, `Error: ${result.error.message}`);
+		exit_with_error(result.error.kind === 'parse' ? 2 : 1, result_failure(result.error));
 	}
 }
 

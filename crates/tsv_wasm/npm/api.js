@@ -27,20 +27,29 @@
  * format emits no wire at all. A `_json` export refuses the key with that explanation, a
  * format export as an unknown key.
  *
- * Every argument refusal — the bag's and the source's — is a `TypeError`.
+ * Every argument refusal — the bag's and the source's — is a `TypeError`, thrown.
  *
- * Every parse failure — from a `parse_*`, a `parse_*_json` or a `format_*` — is a
- * `SyntaxError` with two own enumerable properties, `start` then `loc`: the error's position
- * in the wire's coordinates (`start` the UTF-16 offset a wire node there would carry, `loc`
- * its `{line, column}` under the document's line rule — exactly what `locations.js`'s
- * `create_locator(source, {language}).position_at(start)` answers), and a message whose
- * `line:col` header prints `loc.line:loc.column + 1`. The engines throw a plain error with
- * own enumerable integer `start`, `line` and `column` set on it; `call_engine` rethrows that
- * as the `SyntaxError`. Anything else an engine throws passes through as itself. The
- * facade's own checks leave an engine no argument to refuse, so that is a source over the
- * size cap or a format's refusal of a source that parses (a lone CR inside a Svelte in-tag
- * `//` comment, which the format's CR fold would end early) — plain `Error`s with no point —
- * a caught panic, a WASM trap (`RuntimeError`) or stack exhaustion (`RangeError`).
+ * Every parse, parse-JSON and format export RETURNS what it concludes about the source, as
+ * the strip does (`api_strip.js`): `{ok: true, …}` with the product (`ast`, `json` or `code`),
+ * or `{ok: false, error}` for a source it cannot handle. `error` is a plain object — no stack
+ * captured per failure, and structured-clone-able, so a worker can post it:
+ *
+ * - `{kind: 'parse', message, start, loc}` — the source does not parse. `start` is the UTF-16
+ *   offset a wire node at the error would carry, `loc` its `{line, column}` under the
+ *   document's line rule (exactly what `locations.js`'s
+ *   `create_locator(source, {language}).position_at(start)` answers), and the message's
+ *   `line:col` header prints `loc.line:loc.column + 1`.
+ * - `{kind: 'refused', message, start, loc}` — a format's refusal of a source that parses: a
+ *   lone CR inside a Svelte in-tag `//` comment, which the format's CR fold would end early;
+ *   the point is the CR's.
+ *
+ * The engines throw both as a plain error with own enumerable integer `start`, `line` and
+ * `column` set on it — a refusal with an own enumerable `kind: 'refused'` ahead of them
+ * (`read_pointed_failure` reads the shape, `to_failure` turns it into the result; only a
+ * format export takes a refusal, so a parse export rethrows one as an engine bug). What still
+ * THROWS is an engine failure with no point, passed through as itself: a source over the
+ * size cap (a plain `Error`), a caught panic, a WASM trap (`RuntimeError`) or stack
+ * exhaustion (`RangeError`). The facade's own checks leave an engine no argument to refuse.
  *
  * A `source` that is not a string is refused before the engine sees it
  * (`read_source`), since the engines would each answer it differently.
@@ -275,50 +284,86 @@ function lone_surrogate_offset(source) {
 }
 
 /**
- * Call an engine function, rethrowing a parse failure as the published `SyntaxError`
- * (see the module doc): an error whose own enumerable `start`, `line` and `column` are all
- * integers is one, and becomes `SyntaxError(message)` with `start` and then
- * `loc: {line, column}` as its own properties — nothing else, so both engines' failures
- * for one input are the same error. Anything else is rethrown as the same object. Wraps
- * the engine call alone, never the argument reads ahead of it, whose refusals are
- * `TypeError`s of their own.
+ * An engine's pointed failure, read off what it threw: `undefined` for anything without a
+ * point (rethrown by the caller as itself), else `{kind, message, start, loc, failure}` with
+ * `kind` the thrown value's own enumerable string `kind` (`undefined` for a parse failure,
+ * which carries none) and `failure` the thrown value, for a reader that wants more of its
+ * properties (`api_strip.js`'s span end). An own enumerable `kind` that is not a string is
+ * no failure either: no engine throws one.
  *
- * @template T
- * @param {(...args: any[]) => T} engine_fn - the engine function
- * @param {string} source - the source, already read
- * @param {'script' | 'module' | undefined} source_type - the decoded source type
- * @returns {T}
- * @throws SyntaxError when the source does not parse
+ * A point is three OWN, ENUMERABLE, integer properties — `start`, `line`, `column`, the shape
+ * both engines set. Anything looser is not read as one: Bun gives every `Error` its own
+ * non-enumerable numeric `line` and `column`, so a check of the values alone would take any
+ * error that merely carries a numeric `start` for a parse failure.
+ *
+ * @param {unknown} thrown - what the engine threw
+ * @returns {{
+ * 	kind: string | undefined,
+ * 	message: string,
+ * 	start: number,
+ * 	loc: {line: number, column: number},
+ * 	failure: Record<string, any>
+ * } | undefined}
  */
-export function call_engine(engine_fn, source, source_type) {
-	try {
-		return engine_fn(source, source_type);
-	} catch (error) {
-		throw to_syntax_error(error);
-	}
+export function read_pointed_failure(thrown) {
+	if (typeof thrown !== 'object' || thrown === null) return undefined;
+	if (!is_point_property(thrown, 'start')) return undefined;
+	if (!is_point_property(thrown, 'line')) return undefined;
+	if (!is_point_property(thrown, 'column')) return undefined;
+	const failure = /** @type {Record<string, any>} */ (thrown);
+	const has_kind = Object.prototype.propertyIsEnumerable.call(thrown, 'kind');
+	if (has_kind && typeof failure.kind !== 'string') return undefined;
+	return {
+		kind: has_kind ? failure.kind : undefined,
+		message: typeof failure.message === 'string' ? failure.message : String(thrown),
+		start: failure.start,
+		loc: { line: failure.line, column: failure.column },
+		failure
+	};
 }
 
 /**
- * The published `SyntaxError` for an engine's pointed parse failure, or `error` itself.
+ * The result's `error` for a parse failure (`kind` `'parse'`) — the one shape every export's
+ * parse failure takes, the strip's included.
  *
- * A point is three OWN, ENUMERABLE, integer properties — the shape both engines set.
- * Anything looser is not read as one: Bun gives every `Error` its own non-enumerable
- * numeric `line` and `column`, so a check of the values alone would take any error that
- * merely carries a numeric `start` for a parse failure.
- *
- * @param {unknown} error - what the engine threw
- * @returns {unknown}
+ * @param {{message: string, start: number, loc: {line: number, column: number}}} pointed -
+ * 	what `read_pointed_failure` read
+ * @returns {{kind: 'parse', message: string, start: number, loc: {line: number, column: number}}}
  */
-function to_syntax_error(error) {
-	if (typeof error !== 'object' || error === null) return error;
-	if (!is_point_property(error, 'start')) return error;
-	if (!is_point_property(error, 'line')) return error;
-	if (!is_point_property(error, 'column')) return error;
-	const { start, line, column, message } = /** @type {Record<string, any>} */ (error);
-	const syntax_error = new SyntaxError(typeof message === 'string' ? message : String(error));
-	/** @type {any} */ (syntax_error).start = start;
-	/** @type {any} */ (syntax_error).loc = { line, column };
-	return syntax_error;
+export function to_parse_error({ message, start, loc }) {
+	return { kind: 'parse', message, start, loc };
+}
+
+/**
+ * The failure result for what a parse or format engine threw: a parse failure, or — for a
+ * format export alone (`takes_refused`) — a format's refusal of a source that parses (own
+ * enumerable `kind: 'refused'`).
+ *
+ * @param {unknown} thrown - what the engine threw
+ * @param {boolean} takes_refused - whether the export refuses a source that parses: the format
+ * 	exports, never a parse one
+ * @returns {{
+ * 	ok: false,
+ * 	error: {
+ * 		kind: 'parse' | 'refused',
+ * 		message: string,
+ * 		start: number,
+ * 		loc: {line: number, column: number}
+ * 	}
+ * }}
+ * @throws unknown `thrown` itself, when it is neither — an engine failure with no point, or a
+ * 	`kind` this export never throws (a refusal from a parse export included)
+ */
+export function to_failure(thrown, takes_refused) {
+	const pointed = read_pointed_failure(thrown);
+	if (pointed !== undefined) {
+		if (pointed.kind === undefined) return { ok: false, error: to_parse_error(pointed) };
+		if (takes_refused && pointed.kind === 'refused') {
+			const { message, start, loc } = pointed;
+			return { ok: false, error: { kind: 'refused', message, start, loc } };
+		}
+	}
+	throw thrown;
 }
 
 /**
@@ -328,7 +373,7 @@ function to_syntax_error(error) {
  * @param {string} key
  * @returns {boolean}
  */
-function is_point_property(object, key) {
+export function is_point_property(object, key) {
 	return (
 		Object.prototype.propertyIsEnumerable.call(object, key) &&
 		Number.isInteger(/** @type {Record<string, unknown>} */ (object)[key])
@@ -337,25 +382,31 @@ function is_point_property(object, key) {
 
 /**
  * Build the format family over one engine's `format_<lang>(source, source_type?)`
- * functions, keyed by language.
+ * functions, keyed by language. Each returns `{ok: true, code}` or `{ok: false, error}`
+ * (`to_failure`).
  *
  * Each function is defined under a computed key, which names it: `format_css.name` is
  * `'format_css'`, as a caller's stack trace and a `function.name` check expect of an export.
  *
  * @param {Record<string, (source: string, source_type?: string) => string>} format
- * @returns {Record<string, (source: string, options?: unknown) => string>} `format_<lang>`
+ * @returns {Record<string, (source: unknown, options?: unknown) => any>} `format_<lang>`
  */
 export function create_format_api(format) {
-	/** @type {Record<string, (source: string, options?: unknown) => string>} */
+	/** @type {Record<string, (source: unknown, options?: unknown) => any>} */
 	const api = {};
 	for (const [language, format_language] of Object.entries(format)) {
 		Object.assign(api, {
-			[`format_${language}`]: (source, options) =>
-				call_engine(
-					format_language,
-					read_source(source, 'format'),
-					read_options(options, 'format', language).source_type
-				)
+			[`format_${language}`]: (source, options) => {
+				const text = read_source(source, 'format');
+				const { source_type } = read_options(options, 'format', language);
+				let code;
+				try {
+					code = format_language(text, source_type);
+				} catch (thrown) {
+					return to_failure(thrown, true);
+				}
+				return { ok: true, code };
+			}
 		});
 	}
 	return api;

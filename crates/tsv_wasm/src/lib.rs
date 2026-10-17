@@ -96,13 +96,14 @@ fn install_panic_hook() {
 }
 
 /// A refusal or an internal failure — a source type the export cannot take, a source over
-/// the size cap, a format refusal — as a plain JS `Error` carrying `message`.
+/// the size cap — as a plain JS `Error` carrying `message`.
 fn err(message: impl ToString) -> JsValue {
     JsError::new(&message.to_string()).into()
 }
 
 // The JS `Error` a parse failure is thrown as, with its point set on it as own properties
-// (and a strip refusal, with its construct and span). Declared by hand rather than taken
+// (a format refusal, with its `kind` beside the point; a strip refusal, with its construct
+// and span). Declared by hand rather than taken
 // from `js_sys::Error`: the format-only build carries no `js-sys`, and a constructor, a
 // few setters and `Reflect.deleteProperty` are all this needs (the `console_error`
 // binding above is the same trade).
@@ -124,7 +125,6 @@ extern "C" {
     #[wasm_bindgen(method, setter)]
     fn set_column(this: &PointedError, value: u32);
 
-    #[cfg(feature = "strip")]
     #[wasm_bindgen(method, setter)]
     fn set_kind(this: &PointedError, value: &str);
 
@@ -146,10 +146,12 @@ extern "C" {
 
 /// A parse failure as the JS `Error` the export throws: its message, plus — for every
 /// located error — own enumerable numeric `start`, `line` and `column` properties, the
-/// error's point in the document's wire coordinates (`ParseError::wire_point`). The npm
-/// facade (`npm/api.js`) reads those three to rethrow it as the published `SyntaxError`, so
-/// these names are its contract, shared with `tsv_napi`. A positionless error (a source over
-/// the size cap, a format refusal) stays a plain `Error`.
+/// error's point in the document's wire coordinates (`ParseError::wire_point`). A format
+/// refusal of a source that parses (`ParseError::refusal`) carries the same three for the
+/// point it refuses at (`ParseError::refusal_point`), after an own enumerable `kind` of
+/// `'refused'`, which says it is no parse failure. The npm facade (`npm/api.js`) reads them
+/// into its result's `error`, so these names are its contract, shared with `tsv_napi`. A
+/// positionless error (a source over the size cap) stays a plain `Error`.
 ///
 /// Each property is deleted before it is set, so all three are own ENUMERABLE data
 /// properties — what the facade requires of a point. Bun gives every `Error` its own
@@ -159,10 +161,26 @@ extern "C" {
 #[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
 fn parse_err(e: &ParseError) -> JsValue {
     let message = e.to_string();
-    let Some(point) = e.wire_point() else {
-        return err(message);
-    };
-    let error = PointedError::new(&message);
+    if let Some(point) = e.wire_point() {
+        return pointed_error(&message, None, point);
+    }
+    // only a format export refuses a source that parses
+    #[cfg(feature = "format")]
+    if let Some(point) = e.refusal_point() {
+        return pointed_error(&message, Some("refused"), point);
+    }
+    err(message)
+}
+
+/// [`parse_err`]'s thrown value: an `Error` carrying `message`, then `kind` when given, then
+/// the point's `start`, `line` and `column`, each an own enumerable property (deleted first).
+#[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
+fn pointed_error(message: &str, kind: Option<&str>, point: tsv_ts::WirePoint) -> JsValue {
+    let error = PointedError::new(message);
+    if let Some(kind) = kind {
+        delete_property(&error, "kind");
+        error.set_kind(kind);
+    }
     for key in ["start", "line", "column"] {
         delete_property(&error, key);
     }

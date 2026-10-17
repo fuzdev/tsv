@@ -60,62 +60,67 @@ whose conversion would silently turn it into U+FFFD. The raw decoders below keep
 own texts (`decode_source_type`, the string-axis decoder both raw engines share), which no
 facade call reaches, since the facade grades the source type first.
 
-**Every argument refusal is a `TypeError`** — the bag's, `read_source`'s (a non-string or
+**Every argument refusal is a thrown `TypeError`** — the bag's, `read_source`'s (a non-string or
 ill-formed source), and `locations.js`'s (a non-string source, a non-object bag or unknown key,
 a missing or unknown `language`, an uninferable root, a non-number offset to `position_at`);
-**every parse failure is a `SyntaxError`** — from `parse_*`, `parse_*_json` and `format_*`
-alike — so a caller can tell "you called it wrong" from "the source doesn't parse" by class.
+**everything a call concludes about the source is a RETURNED result** — `parse_*`, `parse_*_json`,
+`format_*` and `strip_*` alike return `{ok: true, ast | json | code}` or `{ok: false, error}` — so
+a caller tells "you called it wrong" (a throw) from "the source doesn't parse" (a result).
 `locations.js`'s single lookups add the one `RangeError` (a numeric offset the text doesn't
 hold — [the helper](#linecolumn-reconstruction-helper-npmlocationsjs)).
 
-**The parse failure's shape.** The published error's own enumerable keys are exactly
-`start` then `loc`: the error's point in the wire's coordinates (`ParseError::wire_point` —
-`start` the UTF-16 offset a wire node there would carry, `loc` its `{line, column}` under the
-document's line rule, so `loc` is `create_locator(source, {language}).position_at(start)`); its
-message keeps the Rust `ParseError` text, whose `line:col` header prints the same point
-([docs/cli.md §Parse errors](../../docs/cli.md#parse-errors)).
+**The result's error.** A plain object — no stack captured per failure, structured-clone-able
+across a worker. A parse failure (every family) is `{kind: 'parse', message, start, loc}`: the
+error's point in the wire's coordinates (`ParseError::wire_point` — `start` the UTF-16 offset a
+wire node there would carry, `loc` its `{line, column}` under the document's line rule, so `loc`
+is `create_locator(source, {language}).position_at(start)`); the message keeps the Rust
+`ParseError` text, whose `line:col` header prints the same point
+([docs/cli.md §Parse errors](../../docs/cli.md#parse-errors)). A format's refusal of a source that
+parses is `{kind: 'refused', message, start, loc}`, the same shape at the refused character:
+`format_svelte` refuses a lone CR inside an in-tag `//` comment, which the format's CR fold would
+end early (`tsv_svelte::parse_folded`, a `ParseError::refusal` — no syntax error, its point
+`ParseError::refusal_point`). The strip adds its own `'unsupported'` (below). One reader builds
+them: `api.js`'s `read_pointed_failure` reads an engine's thrown point, `to_failure` turns it into
+the parse / format result, and `to_parse_error` is the one `kind: 'parse'` constructor the strip
+half shares.
 
 The engines throw a plain `Error` with own ENUMERABLE integer `start`, `line` and `column`
-properties — `call_engine` converts nothing looser, since Bun puts its own non-enumerable numeric
+properties — and for a format refusal an own enumerable `kind: 'refused'` set ahead of them;
+`read_pointed_failure` reads nothing looser, since Bun puts its own non-enumerable numeric
 `line` / `column` on every `Error`. Here it is a hand-declared `#[wasm_bindgen] extern` `Error`
-(`PointedError` in `src/lib.rs`: a constructor, three setters and `Reflect.deleteProperty`, which
-clears Bun's own `line` / `column` ahead of each set, since the format-only build carries no
-`js-sys`); in `tsv_napi`, an `Error` built on the injected `Env` the same way. `api.js`'s
-`call_engine`, wrapped around the engine call alone, rebuilds it as the `SyntaxError`, so both
-engines' errors for one input are identical (`scripts/syntax_error_suite.ts` holds both package
-suites to one table, and the napi suite compares the two engines directly; `deno task test:bun`
-runs that table under Bun, the one runtime where the delete is not a no-op, so it is what fails
-without it).
+(`PointedError` in `src/lib.rs`, built by `pointed_error`: a constructor, the setters and
+`Reflect.deleteProperty`, which clears Bun's own `line` / `column` ahead of each set, since the
+format-only build carries no `js-sys`); in `tsv_napi`, an `Error` built on the injected `Env` the
+same way (`engine_error`). The facade wraps the engine call alone, so both engines' results for
+one input are identical (`scripts/parse_failure_suite.ts` holds both package suites to one
+table, the refusal included, and the napi suite compares the two engines directly;
+`deno task test:bun` runs that table under Bun, the one runtime where the delete is not a no-op,
+so it is what fails without it).
 
-Anything else an engine throws passes through as itself: the raw engines' own source-type
-refusals, a source over the 4 GiB cap and a format's refusal of a source that parses (plain
-`Error`s with no point), a caught panic, a WASM trap (`RuntimeError`) or stack exhaustion
-(`RangeError`). A format parses the CR-folded text through the language's `parse_folded`
-(`FoldedSource::parse_with`), which maps the error back onto the caller's source, so it reports
-the point a parse of that source would. `format_svelte` refuses a lone CR inside an in-tag `//`
-comment, which the fold would end early (`tsv_svelte::parse_folded`): the message names the CR's
-`line:col`, but the source is valid Svelte, so the error is positionless (`ParseError::refusal`)
-and never the `SyntaxError`. Where the facade `JSON.parse`s an engine's wire itself (the native
-engine), a failure there is rethrown as
-`Error('internal error: AST serialized to invalid JSON', {cause})` — the WASM engine's own text for that case — never as the bare `SyntaxError`
-that would read as a parse failure.
+Anything else an engine throws passes through as itself, THROWN: the raw engines' own
+source-type refusals, a source over the 4 GiB cap (a plain `Error` with no point), a caught
+panic, a WASM trap (`RuntimeError`) or stack exhaustion (`RangeError`) — and a point under a
+`kind` the export never throws, an engine bug. A format parses the CR-folded text through the
+language's `parse_folded` (`FoldedSource::parse_with`), which maps the error back onto the
+caller's source, so it reports the point a parse of that source would. Where the facade
+`JSON.parse`s an engine's wire itself (the native engine), a failure there is thrown as
+`Error('internal error: AST serialized to invalid JSON', {cause})` — the WASM engine's own text
+for that case — never returned as a parse failure.
 
 **The strip family** (`npm/api_strip.js` + `npm/facade_strip.d.ts`, in `@fuzdev/tsv-wasm` and the
 native `@fuzdev/tsv` alone — [docs/strip.md](../../docs/strip.md)). `strip_typescript(source,
-options?)` is the one export that RETURNS its failure: `{ok: true, code}` or `{ok: false, error}`,
-`error.kind` `'parse'` (the `message` / `start` / `loc` of the `SyntaxError` a parse of the
-source throws at the goal the error belongs to) or `'unsupported'` (`construct`, `message`, `start`, `end`, `loc: {start, end}`), a
-plain object — no stack captured per failure, structured-clone-able across a worker. The
-line it draws: argument misuse is still a `TypeError` (the shared `read_source` /
-`read_options`, whose `'strip'` kind takes `sourceType` as a format's does), an engine failure with no point still throws as itself, and anything the strip
-concludes about the source is the result. The raw export is `strip_typescript(source, source_type?)` — the
-flat shape, its unset source type read as a format reads one (`tsv_arena::Family::Strip`) —
-returning the code or throwing the parse failure's pointed `Error`, or for a
-refusal an `Error` whose own ENUMERABLE `kind` (the construct's snake_case name), `start`,
-`line`, `column`, `end`, `end_line` and `end_column` carry it (`PointedError`'s strip-gated
-setters; `tsv_napi`'s `Failure::Refusal`), each deleted before it is set for the Bun reason
-above. `api_strip.js` imports nothing but `api.js`'s readers, and the patcher stages it into
-the `all` variant alone.
+options?)` returns `{ok: true, code}` or `{ok: false, error}`, `error.kind` `'parse'` (the error a
+parse of the source returns at the goal the error belongs to) or `'unsupported'` (`construct`,
+`message`, `start`, `end`, `loc: {start, end}`). Argument misuse is still a `TypeError` (the shared
+`read_source` / `read_options`, whose `'strip'` kind takes `sourceType` as a format's does), and an
+engine failure with no point still throws as itself. The raw export is
+`strip_typescript(source, source_type?)` — the flat shape, its unset source type read as a format
+reads one (`tsv_arena::Family::Strip`) — returning the code or throwing the parse failure's
+pointed `Error`, or for a refusal an `Error` whose own ENUMERABLE `kind` (the construct's
+snake_case name), `start`, `line`, `column`, `end`, `end_line` and `end_column` carry it
+(`PointedError`'s strip-gated setters; `tsv_napi`'s `Failure::Refusal`), each deleted before it is
+set for the Bun reason above. `api_strip.js` imports nothing but `api.js`'s readers, and the
+patcher stages it into the `all` variant alone.
 
 **Why the reader is JS.** Both package sets need it, and the native one has no WASM to host a
 Rust reader — a Rust reader would need a hand restatement in the napi loader plus a parity test.
@@ -156,15 +161,18 @@ one shared row (`scripts/facade_surface_suite.ts`, beside the lone-surrogate ref
 node entry's `init` / `init_sync` included (declared there rather than re-exported
 under an alias, since the glue's own are `__wbg_init` / `initSync`).
 
-**Typed returns.** The parse failure is declared once, `TsvSyntaxError` in
-`npm/syntax_error.d.ts` (its own file, so every package ships it beside whichever family's
-declarations it carries), re-exported by name from every entry and from the
-napi `index.d.ts`, and named in each published function's `@throws`. The published declarations are the facade's hand-written
-`npm/facade_format.d.ts` (format; in the format-capable packages) and
-`npm/facade_parse.d.ts` (parse), re-exported **by name** from
+**Typed returns.** The parse failure is declared once, `TsvParseError` in
+`npm/facade_error.d.ts` (its own file, so every package ships it beside whichever family's
+declarations it carries, each of which imports it), re-exported by name from every entry and from
+the napi `index.d.ts`. The published declarations are the facade's hand-written
+`npm/facade_format.d.ts` (format and its `FormatResult` / `FormatRefusedError`; in the
+format-capable packages), `npm/facade_parse.d.ts` (parse, `ParseResult<T>` / `ParseJsonResult`)
+and `npm/facade_strip.d.ts`, re-exported **by name** from
 each entry's `index.d.ts` / `browser.d.ts` (the napi `index.d.ts` the same way):
-`parse_svelte(...): Root`, `parse_typescript(...): Program`, `parse_css(...):
-StyleSheetFile`. They are named apart from `api.js` / `api_parse.js` on purpose: they
+`parse_svelte(...): ParseResult<Root>`, `parse_typescript(...): ParseResult<Program>`,
+`parse_css(...): ParseResult<StyleSheetFile>`, `format_<lang>(...): FormatResult`. Each result
+narrows on `ok`, its error on `kind`.
+They are named apart from `api.js` / `api_parse.js` on purpose: they
 declare the entries' re-exports, not those modules' own exports (`read_options`,
 `create_*_api`), and a `.d.ts` sharing a `.js`'s basename is read as that module's types —
 under `moduleResolution: node10`, which ignores `exports`, a deep import of `api.js` would
@@ -172,7 +180,7 @@ type-check as the published functions and be `undefined` at runtime.
 
 No overloads: `tsv_ast.d.ts` declares `loc?` optional on every node, as
 estree and acorn's own declarations do, so a caller who passed `{locations: true}` narrows
-or `!`s. `patch_npm_package.ts` fails the build when a published function or option type
+or `!`s the `ast`. `patch_npm_package.ts` fails the build when a published function or option type
 has no declaration there. The wasm-bindgen-generated `tsv_wasm.d.ts` types only the raw
 module (`source_type: any`, required, from the `JsValue` decoder; an `any` return) — no entry re-exports a function
 from it. Their exact option shapes are [The Option Interfaces](#the-option-interfaces).
@@ -447,7 +455,7 @@ under `nodenext`, and both package suites also assert it over every declared `.d
 regex, not a typechecker, but it runs wherever the suites do, with no TypeScript install
 (`scripts/dts_specifiers.ts`, one test both suites register). The facade's functions and
 its option and error types are re-exported **by name** from `facade_format.d.ts` /
-`facade_parse.d.ts` / `syntax_error.d.ts`, an explicit form star-export ambiguation can't
+`facade_parse.d.ts` / `facade_strip.d.ts` / `facade_error.d.ts`, an explicit form star-export ambiguation can't
 drop. The type names are read off those files (`scripts/npm_facade.ts`'s `facade_type_names`), so a type
 the facade declares reaches every wasm entry with no list to keep; the napi loader's
 hand-written `index.d.ts` is held to the same derived set by `scripts/test_napi_npm.ts`.
@@ -704,7 +712,7 @@ require dual updates.
   - **Engine binding.** A worker binds by whether the main thread's `./index.js` exported a `wasm_module`: here it did, so the worker takes it through the [`./worker` entry](#the-worker-entry) and recompiles nothing; in the native package it didn't, so the worker loads the addon. Hence the **dynamic** engine import — a static one is hoisted above the branch, and the worker would pay for `./index.js` before it could ask.
   - **Shared with native.** Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — one source for both packages (it imports its engine from `./index.js`, so each copy binds to its own package's engine), which the ESM loader bought like `locations.js` below. There it is the *fallback*: the bin is a napi-only dispatcher (`tsv_napi/npm/bin.js`) that execs the platform package's real `tsv_cli` binary, deferring to cli.js only when no binary is reachable — the dispatcher deliberately does NOT live in this shared source, so the wasm copy stays byte-identical and can never resolve a sibling-installed native binary.
   - **Path quoting.** Every path it names itself — the `--list` and changed-path lines, `error:` lines, its traversal and argument errors, `parse`'s read failure — goes through its hand restatement of `tsv_discover::quote_path` (a name holding a control character or a double quote is C-quoted as `git ls-files` prints it; the binding's warnings arrive quoted), pinned beside the native rule by `scripts/test_npm.ts` (see [../../docs/cli.md §Multi-File Formatting](../../docs/cli.md#multi-file-formatting))
-- `npm/api.js` + `npm/facade_format.d.ts`, `npm/api_parse.js` + `npm/facade_parse.d.ts`, `npm/syntax_error.d.ts` (the `TsvSyntaxError` type) — The hand-written facade every package publishes through: the options reader + the format family, and the parse family with the `{locations: true}` sugar (see [The npm Facade](#the-npm-facade-options--typed-returns), which also says why the declarations are named apart from their modules). Staged verbatim by `patch_npm_package.ts` (`api_parse.js` + `facade_parse.d.ts` into the parse-capable packages only, `facade_format.d.ts` into the format-capable ones) and by `scripts/build_napi_packages.ts` into the native `@fuzdev/tsv` — one source for both package sets. `scripts/npm_facade.ts` owns what both staging scripts share: the facade file table (with `locations.*` and `types/tsv_ast.d.ts` in the parse half), the `./locations` exports entry, and the re-exported type names
+- `npm/api.js` + `npm/facade_format.d.ts`, `npm/api_parse.js` + `npm/facade_parse.d.ts`, `npm/facade_error.d.ts` (the `TsvParseError` type every family's result carries) — The hand-written facade every package publishes through: the options reader, the failure readers and the format family, and the parse family with the `{locations: true}` sugar (see [The npm Facade](#the-npm-facade-options--typed-returns), which also says why the declarations are named apart from their modules). Staged verbatim by `patch_npm_package.ts` (`api_parse.js` + `facade_parse.d.ts` into the parse-capable packages only, `facade_format.d.ts` into the format-capable ones) and by `scripts/build_napi_packages.ts` into the native `@fuzdev/tsv` — one source for both package sets. `scripts/npm_facade.ts` owns what both staging scripts share: the facade file table (with `locations.*` and `types/tsv_ast.d.ts` in the parse half), the `./locations` exports entry, and the re-exported type names
 - `npm/api_strip.js` + `npm/facade_strip.d.ts` — The facade's strip half (`create_strip_api`, the result object; [The npm Facade](#the-npm-facade-options--typed-returns)), staged into `@fuzdev/tsv-wasm` and the native `@fuzdev/tsv` alone, as `scripts/npm_facade.ts`'s strip family
 - `npm/locations.js` + `npm/locations.d.ts` — Pure-JS line/column reconstruction for the span-only wire; ships in the parse-capable packages, run by `api_parse.js` for `{locations: true}`, re-exported from index.js/browser.js by `patch_npm_package.ts`, and exported alone as the `./locations` subpath. Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — this file is the single source for both, which is what the napi loader being ESM bought (see [Line/Column Reconstruction Helper](#linecolumn-reconstruction-helper-npmlocationsjs))
 - `README_format.md` — Shipped as `README.md` in `@fuzdev/tsv-format-wasm` (copied by `patch_npm_package.ts`)

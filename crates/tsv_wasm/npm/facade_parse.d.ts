@@ -19,6 +19,8 @@
  * and TypeScript resolves `./tsv_ast.js` to `./tsv_ast.d.ts`.
  */
 
+import type { TsvParseError } from './facade_error.js';
+
 /**
  * Options accepted by `parse_svelte` / `parse_css`. The parse goal is TypeScript's
  * alone, so a set `sourceType` throws; spelling it `undefined` forwards one bag to
@@ -71,29 +73,58 @@ export interface TypeScriptParseJsonOptions {
 	sourceType?: 'script' | 'module' | undefined;
 }
 
+/** A source that parsed: its tree. */
+export interface ParseSuccess<T> {
+	ok: true;
+	/** The span-only tree; with `{locations: true}`, `loc` (and Svelte's `name_loc`) added. */
+	ast: T;
+}
+
+/** A source that parsed, as its span-only wire. */
+export interface ParseJsonSuccess {
+	ok: true;
+	/** The span-only wire, as a compact JSON string. */
+	json: string;
+}
+
+/** A source that did not parse. */
+export interface ParseFailure {
+	ok: false;
+	error: TsvParseError;
+}
+
+/**
+ * What every `parse_<lang>` returns: it never throws for what it finds in the source (an
+ * argument refusal is a thrown `TypeError`, and an engine failure with no point — the 4 GiB
+ * size cap, a WASM trap, stack exhaustion — throws too).
+ */
+export type ParseResult<T> = ParseSuccess<T> | ParseFailure;
+
+/** What every `parse_<lang>_json` returns, as `ParseResult` reads. */
+export type ParseJsonResult = ParseJsonSuccess | ParseFailure;
+
 /**
  * Parse a Svelte component into its AST — the span-only tree (`start`/`end` offsets);
  * `{locations: true}` adds `loc` / `name_loc`.
  * @throws TypeError when `source` is not a well-formed UTF-16 string, `options` is not an
  *   object, or `options` carries an unknown key, a non-boolean `locations` or a set
  *   `sourceType`
- * @throws SyntaxError when the source does not parse — a `TsvSyntaxError`, its position on
- *   `start` and `loc`
  * @throws Error when the source exceeds the 4 GiB size cap
  */
 export declare function parse_svelte(
 	source: string,
 	options?: ParseOptions
-): import('./tsv_ast.js').Root;
+): ParseResult<import('./tsv_ast.js').Root>;
 /**
  * Parse a Svelte component into its span-only wire, as a compact JSON string.
  * @throws TypeError when `source` is not a well-formed UTF-16 string, `options` is not an
  *   object, or `options` carries `locations`, an unknown key or a set `sourceType`
- * @throws SyntaxError when the source does not parse — a `TsvSyntaxError`, its position on
- *   `start` and `loc`
  * @throws Error when the source exceeds the 4 GiB size cap
  */
-export declare function parse_svelte_json(source: string, options?: ParseJsonOptions): string;
+export declare function parse_svelte_json(
+	source: string,
+	options?: ParseJsonOptions
+): ParseJsonResult;
 
 /**
  * Parse TypeScript (or JavaScript) into its ESTree AST — the span-only tree
@@ -101,27 +132,23 @@ export declare function parse_svelte_json(source: string, options?: ParseJsonOpt
  * @throws TypeError when `source` is not a well-formed UTF-16 string, `options` is not an
  *   object, or `options` carries an unknown key, a non-boolean `locations` or a
  *   `sourceType` other than `'script'` or `'module'`
- * @throws SyntaxError when the source does not parse — a `TsvSyntaxError`, its position on
- *   `start` and `loc`
  * @throws Error when the source exceeds the 4 GiB size cap
  */
 export declare function parse_typescript(
 	source: string,
 	options?: TypeScriptParseOptions
-): import('./tsv_ast.js').Program;
+): ParseResult<import('./tsv_ast.js').Program>;
 /**
  * Parse TypeScript into its span-only wire, as a compact JSON string.
  * @throws TypeError when `source` is not a well-formed UTF-16 string, `options` is not an
  *   object, or `options` carries `locations`, an unknown key or a `sourceType` other than
  *   `'script'` or `'module'`
- * @throws SyntaxError when the source does not parse — a `TsvSyntaxError`, its position on
- *   `start` and `loc`
  * @throws Error when the source exceeds the 4 GiB size cap
  */
 export declare function parse_typescript_json(
 	source: string,
 	options?: TypeScriptParseJsonOptions
-): string;
+): ParseJsonResult;
 
 /**
  * Parse CSS into its AST — the span-only tree (`start`/`end` offsets);
@@ -129,20 +156,16 @@ export declare function parse_typescript_json(
  * @throws TypeError when `source` is not a well-formed UTF-16 string, `options` is not an
  *   object, or `options` carries an unknown key, a non-boolean `locations` or a set
  *   `sourceType`
- * @throws SyntaxError when the source does not parse — a `TsvSyntaxError`, its position on
- *   `start` and `loc`
  * @throws Error when the source exceeds the 4 GiB size cap
  */
 export declare function parse_css(
 	source: string,
 	options?: ParseOptions
-): import('./tsv_ast.js').StyleSheetFile;
+): ParseResult<import('./tsv_ast.js').StyleSheetFile>;
 /**
  * Parse CSS into its span-only wire, as a compact JSON string.
  * @throws TypeError when `source` is not a well-formed UTF-16 string, `options` is not an
  *   object, or `options` carries `locations`, an unknown key or a set `sourceType`
- * @throws SyntaxError when the source does not parse — a `TsvSyntaxError`, its position on
- *   `start` and `loc`
  * @throws Error when the source exceeds the 4 GiB size cap
  */
-export declare function parse_css_json(source: string, options?: ParseJsonOptions): string;
+export declare function parse_css_json(source: string, options?: ParseJsonOptions): ParseJsonResult;

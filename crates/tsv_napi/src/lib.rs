@@ -103,6 +103,9 @@ enum Failure {
     /// A parse failure at a point in the document's wire coordinates
     /// (`ParseError::wire_point`).
     Syntax { message: String, point: WirePoint },
+    /// A format's refusal of a source that parses, at the point it refuses
+    /// (`ParseError::refusal_point`).
+    Refused { message: String, point: WirePoint },
     /// A strip refusal: TypeScript the strip cannot erase — the construct's wire name
     /// (`tsv_ts::UnsupportedKind::name`) and the refused span's two points.
     #[cfg(feature = "strip")]
@@ -115,13 +118,16 @@ enum Failure {
 }
 
 impl Failure {
-    /// A parse error: located ones carry their point, the positionless ones (a source over
-    /// the size cap, a format refusal) are plain.
+    /// A parse error: located ones carry their point, a format refusal its own, and the
+    /// positionless one (a source over the size cap) is plain.
     #[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
     fn parse(e: &ParseError) -> Self {
         let message = e.to_string();
-        match e.wire_point() {
-            Some(point) => Failure::Syntax { message, point },
+        if let Some(point) = e.wire_point() {
+            return Failure::Syntax { message, point };
+        }
+        match e.refusal_point() {
+            Some(point) => Failure::Refused { message, point },
             None => Failure::Plain(message),
         }
     }
@@ -130,7 +136,9 @@ impl Failure {
     #[cfg(test)]
     fn message(&self) -> &str {
         match self {
-            Failure::Plain(message) | Failure::Syntax { message, .. } => message,
+            Failure::Plain(message)
+            | Failure::Syntax { message, .. }
+            | Failure::Refused { message, .. } => message,
             #[cfg(feature = "strip")]
             Failure::Refusal { message, .. } => message,
         }
@@ -138,28 +146,30 @@ impl Failure {
 
     /// The value the export throws: a plain JS `Error` carrying the message — and, for a
     /// parse failure, own enumerable numeric `start`, `line` and `column` properties, which
-    /// the npm facade (`npm/api.js`) reads to rethrow it as the published `SyntaxError`, so
-    /// these names are its contract, shared with `tsv_wasm`. Built on `env` and handed to
+    /// the npm facade (`npm/api.js`) reads into its result's `error`, so these names are its
+    /// contract, shared with `tsv_wasm`. A format refusal carries the same three after an
+    /// own enumerable `kind` of `'refused'`. Built on `env` and handed to
     /// napi-rs as a reference (`napi::Error::from(Unknown)`), so the object thrown is this
     /// one ([`engine_error`]). Were building it to fail, the message still throws, without
     /// the point.
     ///
     /// A strip refusal adds its construct and span: own enumerable `kind`, and `end`,
     /// `end_line` and `end_column` beside the point of the span's start
-    /// ([`engine_error`]'s `refusal`), which the facade's `npm/api_strip.js` reads.
+    /// ([`engine_error`]'s `kind` and `end`), which the facade's `npm/api_strip.js` reads.
     fn into_napi(self, env: Env) -> napi::Error {
-        let (message, point, refusal) = match self {
-            Failure::Plain(message) => (message, None, None),
-            Failure::Syntax { message, point } => (message, Some(point), None),
+        let (message, kind, point, end) = match self {
+            Failure::Plain(message) => (message, None, None, None),
+            Failure::Syntax { message, point } => (message, None, Some(point), None),
+            Failure::Refused { message, point } => (message, Some("refused"), Some(point), None),
             #[cfg(feature = "strip")]
             Failure::Refusal {
                 message,
                 kind,
                 start,
                 end,
-            } => (message, Some(start), Some((kind, end))),
+            } => (message, Some(kind), Some(start), Some(end)),
         };
-        engine_error(env, &message, point, refusal)
+        engine_error(env, &message, kind, point, end)
             .unwrap_or_else(|_| napi::Error::from_reason(message))
     }
 }
@@ -179,18 +189,20 @@ impl Failure {
 /// that property and keeps it non-enumerable; with nothing to delete (Node, Deno) the
 /// delete is a no-op.
 ///
-/// A strip refusal (`refusal`: the construct's name and the span's end point) sets `kind`
-/// first, then the start point's three, then `end`, `end_line` and `end_column` — the
-/// order `tsv_wasm`'s `strip_typescript` sets them in, each deleted first the same way.
+/// A refusal (`kind`: `'refused'` for a format's, the construct's name for a strip's) sets
+/// `kind` first, then the point's three, then — a strip refusal's span end — `end`,
+/// `end_line` and `end_column`: the order `tsv_wasm` sets them in, each deleted first the
+/// same way.
 fn engine_error(
     env: Env,
     message: &str,
+    kind: Option<&str>,
     point: Option<WirePoint>,
-    refusal: Option<(&str, WirePoint)>,
+    end: Option<WirePoint>,
 ) -> napi::Result<napi::Error> {
     let mut error = env.create_error(napi::Error::from_reason(message))?;
     error.delete_named_property("code")?;
-    if let Some((kind, _)) = refusal {
+    if let Some(kind) = kind {
         error.delete_named_property("kind")?;
         error.set("kind", kind)?;
     }
@@ -205,7 +217,7 @@ fn engine_error(
             error.set(name, value)?;
         }
     }
-    if let Some((_, end)) = refusal {
+    if let Some(end) = end {
         for (name, value) in [
             ("end", end.start),
             ("end_line", end.line),
@@ -233,7 +245,7 @@ fn engine_error(
 // `(source, sourceType?)` arguments. The `$goalness` axis decides only whether a
 // `sourceType` ARGUMENT is accepted, never the arity: there is no goalless twin
 // of a goal-aware export to drift from it, and the `@fuzdev/tsv` loader (through the
-// shared npm facade's `call_engine`, `crates/tsv_wasm/npm/api.js`) calls every export
+// shared npm facade, `crates/tsv_wasm/npm/api.js`) calls every export
 // the same way — the source, then the decoded source type as a string or `undefined`.
 //
 // At Script goal `await` is an ordinary identifier — so a top-level `await` with an
@@ -988,6 +1000,29 @@ mod tests {
         assert_eq!(
             at_default(typescript_engine::format, src).unwrap_err(),
             parse_err
+        );
+    }
+
+    /// A format's refusal of a source that parses (a lone CR inside a Svelte in-tag `//`
+    /// comment) carries the CR's point as a refusal, never as a parse failure — the parse of
+    /// the same bytes succeeds.
+    #[test]
+    fn format_refusal_carries_its_point() {
+        let src = "<p>a</p>\n<div // c\rclass=\"x\"\n>hi</div>\n";
+        assert!(at_default(svelte_engine::parse_json, src).is_ok());
+        let refused = at_default(svelte_engine::format, src).unwrap_err();
+        let Failure::Refused { message, point } = &refused else {
+            panic!("expected a refusal: {refused:?}");
+        };
+        assert!(message.starts_with("Lone carriage return"), "{message}");
+        assert!(message.contains("\n2:10 <div // c\n"), "{message}");
+        assert_eq!(
+            *point,
+            WirePoint {
+                start: 18,
+                line: 2,
+                column: 9,
+            }
         );
     }
 

@@ -19,10 +19,10 @@ and Node's `module.stripTypeScriptTypes` share. The implementation is `tsv_ts::s
 - **npm**: `strip_typescript(source, options?)` in `@fuzdev/tsv-wasm` and the native
   `@fuzdev/tsv` — the `strip` cargo feature of `tsv_wasm` and `tsv_napi`, in each crate's
   default set, which the format-only and parse-only wasm packages build without. It
-  returns a result instead of throwing for what it finds in the source: `{ok: true, code}`
-  or `{ok: false, error}` with `error.kind` `'parse'` (the `message`, `start` and `loc` the
-  `SyntaxError` from `parse_typescript` carries for the goal the error belongs to) or `'unsupported'` (`construct`, and the
-  span as `start` / `end` / `loc: {start, end}`). The bag takes `sourceType` as a format's
+  returns a result instead of throwing for what it finds in the source, as every facade
+  export does: `{ok: true, code}` or `{ok: false, error}` with `error.kind` `'parse'` (the
+  error `parse_typescript` returns for the goal the error belongs to) or `'unsupported'`
+  (`construct`, and the span as `start` / `end` / `loc: {start, end}`). The bag takes `sourceType` as a format's
   does. Argument misuse throws a `TypeError`, as on
   every export ([crates/tsv_wasm/CLAUDE.md §The npm Facade](../crates/tsv_wasm/CLAUDE.md#the-npm-facade-options--typed-returns)).
 - **CLI**: `tsv strip <file> | --content <s> | --stdin [--source-type <t>] [--check]`, in the

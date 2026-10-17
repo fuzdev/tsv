@@ -6,24 +6,25 @@
  * table.
  *
  * Every `parse_*`, `parse_*_json` and `format_*` call on a source that does not parse
- * throws a `SyntaxError` whose own enumerable keys are exactly `start` then `loc`, where
- * `loc` is `create_locator(source, {language}).position_at(start)` and the message's
- * `line:col` header is `loc.line:loc.column + 1`, with no leading BOM echoed in the
- * excerpt after it. The rows reach what the definition turns on: an astral character ahead
- * of the error (two UTF-16 units), a leading BOM (counted by TypeScript, elided by Svelte
- * and CSS), a lone CR, U+2028 and U+2029 (a line for TypeScript, a character for Svelte
- * and CSS), CRLF on the format path (whose parse reads the CR-folded text, yet reports the
- * caller's own coordinates), errors inside a Svelte `<script>` (plain and `lang="ts"`),
- * `<style>`, template expression, attribute expression and `{#snippet}` head, errors at
- * the end of the source, the format path's Module→Script fallback beside a source type
- * named outright (exact on every export), and malformed string and template escapes,
- * reported at their own backslash. Invisible characters — a BOM, U+2028, U+2029, a CR —
- * are spelled as escapes, never written literally.
+ * returns `{ok: false, error}` (those two keys, in that order), whose `error` is a plain
+ * object with exactly `kind` (`'parse'`), `message`, `start` and `loc`, where `loc` is
+ * `create_locator(source, {language}).position_at(start)` and the message's `line:col`
+ * header is `loc.line:loc.column + 1`, with no leading BOM echoed in the excerpt after it.
+ * The rows reach what the definition turns on: an astral character ahead of the error (two
+ * UTF-16 units), a leading BOM (counted by TypeScript, elided by Svelte and CSS), a lone CR,
+ * U+2028 and U+2029 (a line for TypeScript, a character for Svelte and CSS), CRLF on the
+ * format path (whose parse reads the CR-folded text, yet reports the caller's own
+ * coordinates), errors inside a Svelte `<script>` (plain and `lang="ts"`), `<style>`,
+ * template expression, attribute expression and `{#snippet}` head, errors at the end of the
+ * source, the format path's Module→Script fallback beside a source type named outright
+ * (exact on every export), and malformed string and template escapes, reported at their
+ * own backslash. Invisible characters — a BOM, U+2028, U+2029, a CR — are spelled as
+ * escapes, never written literally.
  *
  * Beside the table, the one format **refusal** of a source that parses: a lone CR inside a
  * Svelte in-tag `//` comment, which the format path's CR fold would end early
- * (`tsv_svelte::parse_folded`). The source is valid Svelte, so the refusal is a plain
- * `Error` with no point — never the `SyntaxError` a parse failure is.
+ * (`tsv_svelte::parse_folded`). The source is valid Svelte, so the refusal is an error of
+ * its own kind, `'refused'`, at the CR's point — never the `'parse'` a parse failure is.
  */
 
 import { describe, it } from 'node:test';
@@ -33,7 +34,7 @@ import { create_locator as source_create_locator } from '../crates/tsv_wasm/npm/
 
 export type Language = 'typescript' | 'svelte' | 'css';
 
-export interface SyntaxErrorRow {
+export interface ParseFailureRow {
 	name: string;
 	language: Language;
 	source: string;
@@ -49,7 +50,7 @@ export interface SyntaxErrorRow {
 	options?: { sourceType: 'script' | 'module' };
 }
 
-export const SYNTAX_ERROR_ROWS: ReadonlyArray<SyntaxErrorRow> = [
+export const PARSE_FAILURE_ROWS: ReadonlyArray<ParseFailureRow> = [
 	{
 		name: 'an astral character ahead of the error',
 		language: 'typescript',
@@ -187,18 +188,8 @@ export const SYNTAX_ERROR_ROWS: ReadonlyArray<SyntaxErrorRow> = [
 	{ name: 'CRLF', language: 'css', source: 'a {\r\n\tcolor: red;\r\n}\r\n𝒜 } b {}', at: '} b' }
 ];
 
-/** What `f` throws. */
-export const thrown_by = (f: () => unknown): unknown => {
-	try {
-		f();
-	} catch (error) {
-		return error;
-	}
-	throw new assert.AssertionError({ message: 'expected a throw' });
-};
-
 /** The `start` a row's `at` names: a UTF-16 index into the text the wire indexes. */
-const expected_start = (row: SyntaxErrorRow, at: string): number => {
+const expected_start = (row: ParseFailureRow, at: string): number => {
 	const index =
 		at === '' ? row.source.length : row.last ? row.source.lastIndexOf(at) : row.source.indexOf(at);
 	assert.ok(index >= 0, `${row.name}: \`${at}\` is in the source`);
@@ -206,26 +197,37 @@ const expected_start = (row: SyntaxErrorRow, at: string): number => {
 	return elided ? index - 1 : index;
 };
 
-/** The shape every thrown parse failure has, whatever export threw it. */
-export interface ThrownSyntaxError {
+/** The error every parse failure returns, whatever export returned it. */
+export interface ReturnedParseError {
+	kind: 'parse';
 	message: string;
 	start: number;
 	loc: { line: number; column: number };
 }
 
 /**
- * Assert `error` is the published parse failure for `row` — and return it, for a caller
- * comparing two engines' errors.
+ * Assert `result` is the published parse failure for `row` — and return its error, for a
+ * caller comparing two engines' errors.
  */
-export function assert_syntax_error(
-	error: unknown,
-	row: SyntaxErrorRow,
+export function assert_parse_failure(
+	result: unknown,
+	row: ParseFailureRow,
 	at: string | undefined,
 	label: string
-): ThrownSyntaxError {
-	assert.ok(error instanceof SyntaxError, `${label}: a SyntaxError, got ${String(error)}`);
-	assert.deepEqual(Object.keys(error), ['start', 'loc'], label);
-	const { start, loc } = error as unknown as ThrownSyntaxError;
+): ReturnedParseError {
+	assert.ok(
+		typeof result === 'object' && result !== null,
+		`${label}: a result, got ${String(result)}`
+	);
+	assert.deepEqual(Object.keys(result), ['ok', 'error'], label);
+	const { ok, error } = result as { ok: unknown; error: ReturnedParseError };
+	assert.equal(ok, false, label);
+	assert.ok(!(error instanceof Error), `${label}: a plain object, not an Error`);
+	assert.deepEqual(Object.keys(error), ['kind', 'message', 'start', 'loc'], label);
+	assert.deepEqual(structuredClone(error), error, `${label}: structured-clone-able`);
+	const { kind, message, start, loc } = error;
+	assert.equal(kind, 'parse', label);
+	assert.equal(typeof message, 'string', label);
 	assert.equal(typeof start, 'number', label);
 	assert.deepEqual(
 		loc,
@@ -233,24 +235,18 @@ export function assert_syntax_error(
 		`${label}: loc is the locator's point at start`
 	);
 	if (at !== undefined) assert.equal(start, expected_start(row, at), `${label}: start`);
-	const located = error.message.split('\n')[1] ?? '';
+	const located = message.split('\n')[1] ?? '';
 	const header = located.split(' ')[0];
 	assert.equal(header, `${loc.line}:${loc.column + 1}`, `${label}: the message header`);
 	assert.ok(
 		!located.slice(header.length + 1).startsWith('\uFEFF'),
 		`${label}: the excerpt echoes no leading BOM`
 	);
-	// V8 opens a stack with the error's own line; JavaScriptCore's holds frames alone
-	const stack = String(error.stack);
-	assert.ok(
-		!stack.startsWith('SyntaxError') || stack.startsWith(`SyntaxError: ${error.message}\n`),
-		`${label}: ${stack}`
-	);
-	return { message: error.message, start, loc };
+	return error;
 }
 
 /** The exports a row runs through, and where each one's error sits. */
-const calls = (api: Record<string, any>, row: SyntaxErrorRow) =>
+const calls = (api: Record<string, any>, row: ParseFailureRow) =>
 	(
 		[
 			[`parse_${row.language}`, row.at],
@@ -260,23 +256,15 @@ const calls = (api: Record<string, any>, row: SyntaxErrorRow) =>
 	).filter(([name]) => typeof api[name] === 'function');
 
 /**
- * Every error `api` throws over the table, keyed `<row> <export>` — for a suite comparing
+ * Every error `api` returns over the table, keyed `<row> <export>` — for a suite comparing
  * two packages' errors.
  */
-export function syntax_errors(api: Record<string, any>): Map<string, ThrownSyntaxError> {
-	const out = new Map<string, ThrownSyntaxError>();
-	for (const row of SYNTAX_ERROR_ROWS) {
+export function parse_failures(api: Record<string, any>): Map<string, ReturnedParseError> {
+	const out = new Map<string, ReturnedParseError>();
+	for (const row of PARSE_FAILURE_ROWS) {
 		for (const [name, at] of calls(api, row)) {
 			const label = `${row.language}: ${row.name} — ${name}`;
-			out.set(
-				label,
-				assert_syntax_error(
-					thrown_by(() => api[name](row.source, row.options)),
-					row,
-					at,
-					label
-				)
-			);
+			out.set(label, assert_parse_failure(api[name](row.source, row.options), row, at, label));
 		}
 	}
 	return out;
@@ -285,10 +273,9 @@ export function syntax_errors(api: Record<string, any>): Map<string, ThrownSynta
 /** A `div` with no attributes: Svelte's reader runs the `//` comment past the CR to the `\n`. */
 export const LONE_CR_TAG_COMMENT = '<div // c\rclass="x"\n>hi</div>\n';
 
-/** The first line of the refusal's message, and its `line:col` header (the CR's point). */
+/** The first line of the refusal's message. */
 export const LONE_CR_REFUSAL =
 	"Lone carriage return inside a '//' comment in a tag: formatting folds it to a line feed, which would end the comment early";
-const LONE_CR_REFUSAL_HEADER = '1:10';
 
 /**
  * Register the table against one package's published API. `api` is the module, or a
@@ -297,23 +284,22 @@ const LONE_CR_REFUSAL_HEADER = '1:10';
  * format-only package) are skipped. Where the package exports `create_locator`, its own
  * copy must agree with the source tree's.
  */
-export function register_syntax_error_suite(
+export function register_parse_failure_suite(
 	label: string,
 	api_or_getter: Record<string, any> | (() => Record<string, any>)
 ): void {
-	describe(`parse failures are SyntaxErrors with start and loc: ${label}`, () => {
-		for (const row of SYNTAX_ERROR_ROWS) {
+	describe(`parse failures are results with kind 'parse', start and loc: ${label}`, () => {
+		for (const row of PARSE_FAILURE_ROWS) {
 			it(`${row.language}: ${row.name}`, () => {
 				const api = typeof api_or_getter === 'function' ? api_or_getter() : api_or_getter;
-				const found = calls(api, row).map(([name, at]) => {
-					const where = `${row.language}: ${row.name} — ${name}`;
-					return assert_syntax_error(
-						thrown_by(() => api[name](row.source, row.options)),
+				const found = calls(api, row).map(([name, at]) =>
+					assert_parse_failure(
+						api[name](row.source, row.options),
 						row,
 						at,
-						where
-					);
-				});
+						`${row.language}: ${row.name} — ${name}`
+					)
+				);
 				assert.ok(found.length > 0, 'the package exports this language');
 				if (typeof api.create_locator === 'function') {
 					for (const { start, loc } of found) {
@@ -331,24 +317,64 @@ export function register_syntax_error_suite(
 			});
 		}
 	});
-	describe(`a format refusal of a source that parses is a plain Error: ${label}`, () => {
+	describe(`a format refusal of a source that parses is kind 'refused': ${label}`, () => {
 		it('svelte: a lone CR inside an in-tag // comment', () => {
 			const api = typeof api_or_getter === 'function' ? api_or_getter() : api_or_getter;
 			if (typeof api.format_svelte === 'function') {
-				const error = thrown_by(() => api.format_svelte(LONE_CR_TAG_COMMENT));
-				assert.ok(error instanceof Error, `an Error, got ${String(error)}`);
-				assert.ok(!(error instanceof SyntaxError), `not a SyntaxError: ${String(error)}`);
-				// no point, the source not being malformed — and no own keys at all, on either
-				// engine (napi-rs's `code` is deleted, as the wasm engine's errors carry none)
-				assert.deepEqual(Object.keys(error), []);
-				const [message, located = ''] = error.message.split('\n');
-				assert.equal(message, LONE_CR_REFUSAL);
-				assert.equal(located.split(' ')[0], LONE_CR_REFUSAL_HEADER, 'the CR is named');
+				const result = api.format_svelte(LONE_CR_TAG_COMMENT);
+				assert.deepEqual(Object.keys(result), ['ok', 'error']);
+				assert.equal(result.ok, false);
+				// the CR's point, the header naming it
+				const { message, ...rest } = result.error;
+				assert.deepEqual(Object.keys(result.error), ['kind', 'message', 'start', 'loc']);
+				assert.deepEqual(rest, { kind: 'refused', start: 9, loc: { line: 1, column: 9 } });
+				const [first, located = ''] = message.split('\n');
+				assert.equal(first, LONE_CR_REFUSAL);
+				assert.equal(located.split(' ')[0], '1:10', 'the CR is named');
+				assert.deepEqual(structuredClone(result.error), result.error);
 			}
 			if (typeof api.parse_svelte === 'function') {
-				const ast = api.parse_svelte(LONE_CR_TAG_COMMENT);
-				assert.deepEqual(ast.fragment.nodes[0].attributes, [], 'the bytes parse');
+				const result = api.parse_svelte(LONE_CR_TAG_COMMENT);
+				assert.equal(result.ok, true, 'the bytes parse');
+				assert.deepEqual(result.ast.fragment.nodes[0].attributes, []);
+			}
+		});
+		it('svelte: the refusal point past a leading BOM, astral and non-ASCII text and a CRLF', () => {
+			const api = typeof api_or_getter === 'function' ? api_or_getter() : api_or_getter;
+			if (typeof api.format_svelte !== 'function') return;
+			const source = '\uFEFF<p>é😀</p>\r\n<div // c\rclass="x"\n>hi</div>\n';
+			const result = api.format_svelte(source);
+			assert.equal(result.ok, false);
+			const { message, ...rest } = result.error;
+			// the wire's coordinates: the BOM elided, UTF-16 units, LF lines
+			assert.deepEqual(rest, { kind: 'refused', start: 21, loc: { line: 2, column: 9 } });
+			assert.equal(source.slice(1)[rest.start], '\r', 'start is the CR, the BOM elided');
+			assert.equal(message.split('\n')[1].split(' ')[0], '2:10', 'the header prints loc');
+			if (typeof api.create_locator === 'function') {
+				assert.deepEqual(
+					api.create_locator(source, { language: 'svelte' }).position_at(rest.start),
+					rest.loc
+				);
+			}
+			if (typeof api.parse_svelte === 'function') {
+				assert.equal(api.parse_svelte(source).ok, true, 'the bytes parse');
 			}
 		});
 	});
 }
+
+/** The product under `key` of an `{ok: true}` result, failing the test on anything else. */
+function ok_value(result: unknown, key: 'code' | 'ast' | 'json'): any {
+	const ok = result as { ok?: unknown; error?: unknown } | null | undefined;
+	assert.ok(ok?.ok === true, `expected {ok: true}, got ${JSON.stringify(result)}`);
+	return (result as Record<string, unknown>)[key];
+}
+
+/** A format result's `code`, failing the test on a failure. */
+export const ok_code = (result: unknown): string => ok_value(result, 'code');
+
+/** A `parse_<lang>` result's `ast`, failing the test on a failure. */
+export const ok_ast = (result: unknown): any => ok_value(result, 'ast');
+
+/** A `parse_<lang>_json` result's `json`, failing the test on a failure. */
+export const ok_json = (result: unknown): string => ok_value(result, 'json');

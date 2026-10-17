@@ -1161,10 +1161,12 @@ each package (`@fuzdev/tsv-format-wasm`, `-parse-wasm`, `-wasm`, and the napi lo
 `files` it declares — and compiles lean consumer modules against it through the `exports` map,
 every subpath (the root, `./worker`, `./locations`). What they type:
 
-- every facade function's return (`string` from each formatter and `_json` export, `Root` /
-  `Program` / `StyleSheetFile` from the object parsers) and every option type by name, with a
-  forwarded `{sourceType: undefined}` bag on the goalless exports;
-- `TsvSyntaxError`'s `start` and `loc` fields, the `IgnoreStack` verdict union, the locator's
+- every facade function's return (`FormatResult` from each formatter, `ParseJsonResult` from
+  each `_json` export, `ParseResult<Root>` / `<Program>` / `<StyleSheetFile>` from the object
+  parsers, each narrowing on `ok`) and every option type by name, with a forwarded
+  `{sourceType: undefined}` bag on the goalless exports;
+- `TsvParseError`'s `kind`, `start` and `loc` fields, the format error's `kind` union, the
+  `IgnoreStack` verdict union, the locator's
   `position_at` / `loc_of` / `reconstruct` and `reconstruct_locations`;
 - the WASM lifecycle per condition: under `node`, `init` / `init_sync` / `reinstantiate` and
   `wasm_module` handed to the `./worker` entry's `init_sync`; under `bundler`, the lazy entry
