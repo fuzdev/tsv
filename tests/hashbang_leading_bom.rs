@@ -2,11 +2,12 @@
 #![expect(clippy::expect_used)]
 
 //! A hashbang behind a leading BOM: a whole file's BOM is its encoding mark, so the `#!`
-//! after it still opens the source text (`Lexer::hashbang_start`; the fixture claim is
+//! after it still opens the source text (`Lexer::hashbang_at`; the fixture claim is
 //! `typescript/syntax/comments/hashbang_bom_prettier_divergence`). Inside a Svelte
 //! `<script>` a U+FEFF is content, not an encoding mark, so no hashbang follows it there.
 //! What is pinned here is what that fixture cannot carry: the BOM-led file's wire
-//! positions, which no oracle reads, and the `<script>` cells.
+//! positions, which no oracle reads, and the island cells: a `<script>` or template
+//! expression is never a whole source text, so no hashbang opens one.
 
 use serde_json::Value;
 
@@ -53,9 +54,20 @@ fn a_script_reads_no_hashbang_behind_a_bom() {
 }
 
 #[test]
-fn a_script_opening_on_a_hashbang_reads_as_it_does_without_a_bom() {
-    // A `<script>` whose content opens on `#!` is read as a hashbang, though Svelte's parser
-    // rejects it — the BOM rule leaves this reading as it is.
+fn an_island_opening_on_a_hashbang_is_rejected() {
+    // A hashbang opens only a whole source text. A `<script>` or a template expression is never
+    // that, so a `#!` at its first byte is no hashbang, and Svelte's parser rejects it too.
     let arena = bumpalo::Bump::new();
-    assert!(tsv_svelte::parse("<script>#!/x\nlet a;</script>", &arena).is_ok());
+    for source in [
+        "<script>#!/x\nlet a;</script>",
+        "<script lang=\"ts\">#!/x\nlet a;</script>",
+        "<script module>#!/x\nlet a;</script>",
+        "{#if #!x\nready}ok{/if}",
+        "{@html #!x\ncontent}",
+    ] {
+        assert!(
+            tsv_svelte::parse(source, &arena).is_err(),
+            "accepted: {source:?}"
+        );
+    }
 }

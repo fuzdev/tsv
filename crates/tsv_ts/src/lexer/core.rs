@@ -434,17 +434,15 @@ impl<'a> Lexer<'a> {
         err.shift_position(self.base_offset)
     }
 
-    /// The offset a hashbang opens at. In a whole file — the lexer at `base_offset` 0,
-    /// since an island such as a Svelte `<script>`'s content always sits past its tag —
-    /// that is past a leading BOM, which the lexer skips as the file's encoding mark, not
-    /// its text (a UTF-8 decode strips it before the hashbang is read). In an island it is
-    /// the island's first byte: a BOM there is content, not an encoding mark.
-    fn hashbang_start(&self) -> usize {
-        if self.base_offset == 0 {
-            tsv_lang::leading_bom_len(self.source)
-        } else {
-            0
-        }
+    /// Whether a `#` at `start` can open a hashbang. A hashbang opens only a whole source
+    /// text (ecma262 `InputElementHashbangOrRegExp`), read here as the lexer at `base_offset`
+    /// 0: an island such as a Svelte `<script>`'s content or a template expression always
+    /// sits past at least one host byte, so it is never a source text's start and reads no
+    /// hashbang at all (Svelte's parser rejects the `#!` there too). In a whole file the
+    /// hashbang opens past a leading BOM, which the lexer skips as the file's encoding mark,
+    /// not its text (a UTF-8 decode strips it before the hashbang is read).
+    fn hashbang_at(&self, start: usize) -> bool {
+        self.base_offset == 0 && start == tsv_lang::leading_bom_len(self.source)
     }
 
     /// The byte at the cursor, or `None` at EOF.
@@ -1616,8 +1614,8 @@ impl<'a> Lexer<'a> {
             }
             b'#' => {
                 // A hashbang at the start of the file: #!/usr/bin/env node
-                // ([`Lexer::hashbang_start`]).
-                if start == self.hashbang_start() && self.byte_ahead(1) == Some(b'!') {
+                // ([`Lexer::hashbang_at`]).
+                if self.hashbang_at(start) && self.byte_ahead(1) == Some(b'!') {
                     return self.next_token_dispatch(bytes, start, b'#', dst);
                 }
                 // # for private identifiers
@@ -1718,7 +1716,7 @@ impl<'a> Lexer<'a> {
             b'`' => self.read_template_into(start, dst),
             // Hashbang comment at the start of the file - read until end of line
             b'#' => {
-                debug_assert!(start == self.hashbang_start() && self.byte_ahead(1) == Some(b'!'));
+                debug_assert!(self.hashbang_at(start) && self.byte_ahead(1) == Some(b'!'));
                 self.read_hashbang_into(start, dst)
             }
             // Non-ASCII lead byte: a Unicode IdentifierStart, otherwise an error.
