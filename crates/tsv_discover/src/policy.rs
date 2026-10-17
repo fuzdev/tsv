@@ -81,14 +81,32 @@ impl DirVerdict {
 /// (`ParserType::from_extension`, `tsv_ts::Goal::from_extension`, `cli.js`'s twins), so a
 /// walk and a named path agree on what `A.TS` is.
 pub fn is_formattable(name: &str) -> bool {
-    Path::new(name)
+    has_extension_in(name, &FORMATTABLE_EXTENSIONS)
+}
+
+/// Whether `path`'s extension (`Path::extension`, so a bare dotfile has none) is one of
+/// `set`, read without regard to ASCII case — the one match [`is_formattable`] and
+/// [`strip_unsupported_extension_error`] share.
+fn has_extension_in(path: &str, set: &[&str]) -> bool {
+    Path::new(path)
         .extension()
         .and_then(|e| e.to_str())
-        .is_some_and(|ext| {
-            FORMATTABLE_EXTENSIONS
-                .iter()
-                .any(|known| known.eq_ignore_ascii_case(ext))
-        })
+        .is_some_and(|ext| set.iter().any(|known| known.eq_ignore_ascii_case(ext)))
+}
+
+/// `set` rendered as dotted names joined by `separator` (`".ts, .mts, …"`) — the one
+/// rendering [`formattable_extension_list`] and [`strip_unsupported_extension_error`]
+/// share.
+fn extension_list(set: &[&str], separator: &str) -> String {
+    let mut list = String::new();
+    for ext in set {
+        if !list.is_empty() {
+            list.push_str(separator);
+        }
+        list.push('.');
+        list.push_str(ext);
+    }
+    list
 }
 
 /// The error for an **explicitly named file argument** whose extension tsv does
@@ -134,20 +152,8 @@ pub const STRIPPABLE_EXTENSIONS: [&str; 6] = ["ts", "mts", "cts", "js", "mjs", "
 /// reach the TypeScript parser and fail on its markup.
 #[must_use]
 pub fn strip_unsupported_extension_error(path: &str) -> Option<String> {
-    let strippable = Path::new(path)
-        .extension()
-        .and_then(|e| e.to_str())
-        .is_some_and(|ext| {
-            STRIPPABLE_EXTENSIONS
-                .iter()
-                .any(|known| known.eq_ignore_ascii_case(ext))
-        });
-    (!strippable).then(|| {
-        let list = STRIPPABLE_EXTENSIONS
-            .iter()
-            .map(|ext| format!(".{ext}"))
-            .collect::<Vec<_>>()
-            .join(", ");
+    (!has_extension_in(path, &STRIPPABLE_EXTENSIONS)).then(|| {
+        let list = extension_list(&STRIPPABLE_EXTENSIONS, ", ");
         format!(
             "{}: unsupported file extension (tsv strip handles {list})",
             quote_path(path)
@@ -165,15 +171,7 @@ pub fn strip_unsupported_extension_error(path: &str) -> Option<String> {
 /// never does.
 #[must_use]
 pub fn formattable_extension_list(separator: &str) -> String {
-    let mut list = String::new();
-    for ext in FORMATTABLE_EXTENSIONS {
-        if !list.is_empty() {
-            list.push_str(separator);
-        }
-        list.push('.');
-        list.push_str(ext);
-    }
-    list
+    extension_list(&FORMATTABLE_EXTENSIONS, separator)
 }
 
 /// Whether a directory `name` is an always-pruned [safety net](SAFETY_NET_DIRS)
