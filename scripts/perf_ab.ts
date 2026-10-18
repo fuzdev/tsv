@@ -37,8 +37,9 @@
  * `tsv_debug profile`'s statistic), parse only, and zero iterations (the process's fixed cost:
  * start-up, the corpus walk, the reads). Parse instructions are parse-only minus
  * zero-iteration, format instructions full minus parse-only, both per iteration. The wall delta
- * is paired per round; while a row's verdict is within its own spread of flipping, the run adds
- * balanced pairs of rounds up to `MAX_ROUNDS` (`perf_ab_verdict.ts`, which holds the rule).
+ * is paired per round; while a row's verdict is within its standard error of flipping and the
+ * cap could settle it, the run adds balanced pairs of rounds up to `MAX_ROUNDS`
+ * (`perf_ab_verdict.ts`, which holds the rule).
  *
  * ## The rule
  *
@@ -52,10 +53,12 @@
  * wall happened to stay under its line, and more rounds would not change it — only a row whose
  * verdict the wall line still decides earns the extra rounds.
  *
- * A wall FAIL whose instructions sit inside the WARN band still exits 1 but is marked
- * SITTING-SENSITIVE, with a line telling the reader to re-run in a fresh sitting: the wall's
- * drift between sittings exceeds the in-run spread the rounds measure, so on such a row one
- * sitting does not settle the verdict. A pass in a fresh sitting clears it.
+ * A wall FAIL whose instructions sit inside the WARN band, its wall within a layout move of
+ * them, still exits 1 but is marked SIGN-OFF: the instruction rise is the change's real cost,
+ * which a person accepts or fixes. A re-run cannot clear it — the wall drifts between sittings
+ * by more than the in-run spread, so a pass there would be a re-rolled wall, not a cheaper
+ * change. The run also prints its LAYOUT READING: the widest wall move among the
+ * flat-instruction rows, what code placement alone gave this pair of builds.
  *
  * ## Exit codes
  *
@@ -94,6 +97,7 @@ import {
 	lang_presence,
 	type Lang,
 	LANGS,
+	layout_reading,
 	MAX_ROUNDS,
 	noisy_rows,
 	NOISY_SPREAD_PCT,
@@ -102,10 +106,14 @@ import {
 	PHASES,
 	render_table,
 	row_is_ambiguous,
+	row_is_settleable,
 	type RowSamples,
-	sitting_sensitive_rows,
+	SIGN_OFF_EXCESS_PCT,
+	sign_off_rows,
 	trees_to_evict,
+	unsettled_rows,
 	WALL_REGRESSION_PCT,
+	wall_delta_error,
 	wants_more_rounds
 } from './perf_ab_verdict.ts';
 
@@ -763,13 +771,23 @@ async function main(): Promise<number> {
 	}
 	let rows = grade(langs, samples);
 	while (wants_more_rounds(rows, rounds)) {
-		const ambiguous = rows.filter(row_is_ambiguous).map((row) => `${row.lang} ${row.phase}`);
+		const ambiguous = rows
+			.filter((row) => row_is_ambiguous(row) && row_is_settleable(row))
+			.map((row) => `${row.lang} ${row.phase}`);
 		console.error(
-			`perf:ab: ${ambiguous.join(', ')} within its spread of the ${WALL_REGRESSION_PCT}% line — two more rounds`
+			`perf:ab: ${ambiguous.join(', ')} within its error of the ${WALL_REGRESSION_PCT}% line — two more rounds`
 		);
 		await run_round(rounds++, langs, binaries, sides, samples, cache, options, use_perf);
 		await run_round(rounds++, langs, binaries, sides, samples, cache, options, use_perf);
 		rows = grade(langs, samples);
+	}
+	const unsettled = unsettled_rows(rows);
+	for (const row of unsettled) {
+		console.error(
+			`perf:ab: ${row.lang} ${row.phase}: ${format_pct(row.wall_pct)} sits within its error ` +
+				`(±${wall_delta_error(row).toFixed(3)} points) of the ${WALL_REGRESSION_PCT}% line, ` +
+				`which rounds up to the ${MAX_ROUNDS}-round cap could not narrow enough — graded on the point estimate`
+		);
 	}
 	const load_after = load_1m();
 	await report_load('after', load_after, LOAD_WARN_AFTER);
@@ -798,14 +816,24 @@ async function main(): Promise<number> {
 		);
 	}
 	const passes = overall_passes(rows);
-	const sensitive = sitting_sensitive_rows(rows);
-	const sitting_line = (row: AbRow): string =>
+	const sign_offs = sign_off_rows(rows);
+	const layout = layout_reading(rows);
+	const layout_line =
+		layout === null
+			? null
+			: `perf:ab: layout reading: ${layout.lang} ${layout.phase} moved ${format_pct(layout.wall_pct)} ` +
+				`on flat instructions (${format_pct(layout.instructions_pct!)}) — the wall move code ` +
+				`placement alone gave these two builds`;
+	const sign_off_line = (row: AbRow): string =>
 		`perf:ab: ${row.lang} ${row.phase}: FAIL on wall (${format_pct(row.wall_pct)}) with instructions ` +
-		`inside the WARN band (${format_pct(row.instructions_pct!)}) — SITTING-SENSITIVE: re-run in a ` +
-		`fresh sitting; a pass there clears it (docs/performance.md §Gating a change against a base)`;
+		`inside the WARN band (${format_pct(row.instructions_pct!)}), the wall ` +
+		`${(row.wall_pct - row.instructions_pct!).toFixed(3)} points beyond them — SIGN-OFF: the ` +
+		`instruction rise is the real cost; accept it or fix it. A re-run re-rolls only the wall, so ` +
+		`it cannot clear this (docs/performance.md §Gating a change against a base)`;
 
 	if (options.json) {
-		for (const row of sensitive) console.error(sitting_line(row));
+		if (layout_line !== null) console.error(layout_line);
+		for (const row of sign_offs) console.error(sign_off_line(row));
 		console.log(
 			JSON.stringify(
 				{
@@ -819,6 +847,7 @@ async function main(): Promise<number> {
 						wall_pct: WALL_REGRESSION_PCT,
 						instructions_layout_pct: INSTRUCTIONS_LAYOUT_PCT,
 						instructions_regression_pct: INSTRUCTIONS_REGRESSION_PCT,
+						sign_off_excess_pct: SIGN_OFF_EXCESS_PCT,
 						noisy_spread_pct: NOISY_SPREAD_PCT
 					},
 					load_before,
@@ -826,7 +855,12 @@ async function main(): Promise<number> {
 					files: Object.fromEntries(langs.map((lang) => [lang, samples[0]![lang].file_set])),
 					absent,
 					noisy: noisy.map((row) => `${row.lang} ${row.phase}`),
-					sitting_sensitive: sensitive.map((row) => `${row.lang} ${row.phase}`),
+					unsettled: unsettled.map((row) => `${row.lang} ${row.phase}`),
+					sign_off: sign_offs.map((row) => `${row.lang} ${row.phase}`),
+					layout_reading:
+						layout === null
+							? null
+							: { row: `${layout.lang} ${layout.phase}`, wall_pct: layout.wall_pct },
 					rows,
 					passes
 				},
@@ -854,10 +888,12 @@ async function main(): Promise<number> {
 		console.log(
 			`\nrule: Δ wall > ${WALL_REGRESSION_PCT}% fails unless |Δ instr| < ${INSTRUCTIONS_LAYOUT_PCT}% ` +
 				`(LAYOUT); Δ instr > ${INSTRUCTIONS_REGRESSION_PCT}% fails whatever the wall; ` +
-				`Δ instr ≥ ${INSTRUCTIONS_LAYOUT_PCT}% under a passing wall warns` +
+				`Δ instr ≥ ${INSTRUCTIONS_LAYOUT_PCT}% under a passing wall warns; a wall FAIL with Δ instr ` +
+				`in that band and Δ wall − Δ instr ≤ ${SIGN_OFF_EXCESS_PCT} points is a SIGN-OFF` +
 				(use_perf ? '' : ' — NO INSTRUCTION COUNTS THIS RUN: wall alone')
 		);
-		for (const row of sensitive) console.log(sitting_line(row));
+		if (layout_line !== null) console.log(layout_line);
+		for (const row of sign_offs) console.log(sign_off_line(row));
 		console.log(passes ? 'perf:ab: PASS' : 'perf:ab: FAIL — a row regressed');
 	}
 	return passes ? 0 : 1;

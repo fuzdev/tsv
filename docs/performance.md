@@ -892,11 +892,16 @@ the wall column from `profile`'s.
 
 The wall delta is **paired**: each round's two back-to-back runs give a candidate/base ratio, and
 the row grades the median of those ratios, so drift that moves both runs of a round cancels inside
-it. A row whose delta sits within its own round-to-round spread of the threshold — and whose
-verdict would change across it — extends the run by balanced pairs of rounds up to a cap, so a
-row whose true delta sits near the line is decided by more rounds rather than by one round's
-draw. A row the instruction column already decides (flat, so both sides of the line pass; or over the
-instruction threshold, so both fail) needs no more rounds: the count would not move. Rows
+it. A row whose delta sits within its **standard error** of the threshold — and whose verdict
+would change across it — extends the run by balanced pairs of rounds up to a cap, so a row whose
+true delta sits near the line is decided by more rounds rather than by one round's draw. The
+error is the median's (the paired spread × 1.4826 × 1.2533 / √rounds), not the spread itself:
+the round-to-round spread is a property of the machine and does not narrow as rounds are added,
+so a row graded against it stays near the line however long the run. A row closer to the line
+than its error *at the cap* would be is not extended at all — the cap's rounds cannot settle
+it — and is graded on its point estimate, with a line saying so. A row the instruction column
+already decides (flat, so both sides of the line pass; or over the instruction threshold, so both
+fail) needs no more rounds: the count would not move. Rows
 report each side's median and round spread, and a side whose spread exceeds half the threshold
 warns that the machine was too noisy for the wall column. Every spread is a median absolute
 deviation, not a range: a range widens with the round count on the same machine, so it would
@@ -918,17 +923,24 @@ happened to land under its line on this run does not excuse it. A rise from 0.5%
 a passing wall stays a warning: real, small, and a judgment call rather than a block. Only a
 rise fails; a fall in instructions is never a regression by itself.
 
-**Sitting-sensitive failures.** A row that fails on its wall while its instructions sit inside
-the warning band (0.5% to 1.5%) still fails — exit 1 — but is marked **sitting-sensitive**, with a
-line telling the reader to re-run it in a fresh sitting. The procedure: re-run the same command
-later, on a quiet machine; a pass there clears the failure, a second failure stands. The reason:
-the wall reading drifts between sittings by more than the in-run spread measures — the same two
-binaries (the printed sha256s say so) read differently an hour later — so a small real rise
-that one sitting carries over the line another leaves under it. More rounds within one run
-narrow only the in-run error, and the instruction count, which does not drift, says only that
-the work grew a little. Every other verdict is settled in one sitting: flat instructions pass
-either way, a rise over 1.5% fails either way, and a wall failure at fallen instructions, or
-with none counted, is no small-rise reading to re-test.
+**Sign-off failures.** A row that fails on its wall while its instructions sit inside the
+warning band (0.5% to 1.5%), and whose wall exceeds its instruction delta by no more than 1.5
+points (a layout move), still fails — exit 1 — but is marked **sign-off**: the instruction rise
+is the change's real cost, and a person either accepts it or fixes it. Re-running does not clear
+it. The wall reading drifts between sittings by more than the in-run spread measures — the same
+two binaries (the printed sha256s say so) read differently an hour later — so a small real
+rise that one sitting carries over the line another leaves under it, and a re-run until one
+passes would grade the sitting, not the change: the instruction count, which does not drift,
+would read the same. A wall more than 1.5 points beyond the instructions is a plain failure —
+cost the count does not see (cache or branch misses), not a layout draw. Every other verdict is
+settled in one sitting: flat instructions pass either way, a rise over 1.5% fails either way,
+and a wall failure at fallen instructions, or with none counted, is no small-rise reading.
+
+**The layout reading.** Every run prints the widest wall move among its flat-instruction rows
+(|Δ instr| under 0.5%): what code placement alone gave this pair of builds. It is the context a
+sign-off is read in — a +1.6% wall at +0.8% instructions beside a −1.9% layout reading is a
+small real cost on a noisy axis — and not a gate input: layout moves per function, so one row's
+draw does not bound another's.
 
 CSS rows grade a small absolute amount of work — the CSS corpus is small, and its parse count
 is what remains after the fixed cost — so their percentages, wall and instructions alike, move

@@ -17,12 +17,13 @@
  * Without instruction counts there is no layout escape and no instruction gate, so the wall
  * alone decides.
  *
- * A row that FAILS on its wall while its instructions sit inside the WARN band is still a
- * failure, but it is marked SITTING-SENSITIVE (`row_is_sitting_sensitive`): the count says the
- * change added a little work, and whether the wall carries it over the line moves between
- * sittings by more than the in-run spread measures — the same two binaries read differently an
- * hour apart, which no number of rounds within one run can see. A pass in a fresh sitting
- * clears it (`docs/performance.md` §Gating a change against a base).
+ * A row that FAILS on its wall while its instructions sit inside the WARN band, and whose wall
+ * exceeds what its instructions explain by no more than a layout move (`SIGN_OFF_EXCESS_PCT`),
+ * is still a failure, but a SIGN-OFF one (`needs_sign_off`): the count says the change added a
+ * little work, and whether the wall carries it over the line moves between sittings by more
+ * than the in-run spread measures — the same two binaries read differently an hour apart. A
+ * re-run re-rolls only the wall, so it cannot clear the row; a person accepts the instruction
+ * rise as the cost or fixes it (`docs/performance.md` §Gating a change against a base).
  *
  * The wall delta is PAIRED: each round measures both sides back to back, so the row's delta is
  * the median of the per-round candidate/base ratios, not a ratio of two medians — drift that
@@ -42,6 +43,17 @@ export const INSTRUCTIONS_LAYOUT_PCT = 0.5;
  * whatever the wall delta. Equal to `WALL_REGRESSION_PCT` in value but its own rule: the wall
  * threshold sits on run-to-run noise, this one on a deterministic count. */
 export const INSTRUCTIONS_REGRESSION_PCT = 1.5;
+
+/** How far, in points, a WARN-band row's wall delta may exceed its instruction delta and still
+ * read as a sign-off rather than a plain failure: the wall move code placement alone gives a
+ * build, about the wall threshold (`docs/performance.md` §Reading `cycles:u`). Past it the wall
+ * carries cost the instructions do not count — cache or branch misses — which a person should
+ * not wave through as layout. Equal to `WALL_REGRESSION_PCT` in value, its own rule. */
+export const SIGN_OFF_EXCESS_PCT = 1.5;
+
+/** The standard error of a median of normal samples, per unit of their median absolute
+ * deviation: the MAD reads σ at ×1.4826, and a median's error is ×1.2533 a mean's (σ/√n). */
+const MEDIAN_ERROR_PER_MAD = 1.4826 * 1.2533;
 
 /** A side whose round spread (`spread_pct`) exceeds this many percent warns: the machine was
  * too noisy for the wall threshold to mean much. Half the wall threshold. */
@@ -147,8 +159,8 @@ export interface AbRow {
 	cand_instructions: number | null;
 	instructions_pct: number | null;
 	verdict: RowVerdict;
-	/** A wall FAIL whose instructions sit in the WARN band (`row_is_sitting_sensitive`). */
-	sitting_sensitive: boolean;
+	/** A wall FAIL that a person signs off rather than re-runs (`needs_sign_off`). */
+	sign_off: boolean;
 }
 
 /** Fold one row's samples into its medians, its paired delta and its verdict. Throws when the
@@ -194,15 +206,16 @@ export function ab_row(lang: Lang, phase: Phase, base: RowSamples, cand: RowSamp
 		cand_instructions,
 		instructions_pct,
 		verdict,
-		sitting_sensitive: is_sitting_sensitive(verdict, wall_pct, instructions_pct)
+		sign_off: needs_sign_off(verdict, wall_pct, instructions_pct)
 	};
 }
 
-/** Whether a verdict is a wall FAIL with instructions inside the WARN band — the one failure
- * the instruction column neither excuses (as LAYOUT) nor decides on its own. Such a row still
- * fails, but its wall delta near the line is a reading of the sitting as much as of the change:
- * the between-sitting drift of the wall exceeds the in-run spread the rounds measure. */
-export function is_sitting_sensitive(
+/** Whether a verdict is a wall FAIL with instructions inside the WARN band and a wall no more
+ * than `SIGN_OFF_EXCESS_PCT` beyond them — the one failure the instruction column neither
+ * excuses (as LAYOUT) nor decides on its own. Such a row still fails, but its wall delta near
+ * the line is a reading of the sitting as much as of the change, while its instruction delta is
+ * the change's alone: the cost to accept or fix is the count, and no re-run moves it. */
+export function needs_sign_off(
 	verdict: RowVerdict,
 	wall_pct: number,
 	instructions_pct: number | null
@@ -212,13 +225,28 @@ export function is_sitting_sensitive(
 		wall_pct > WALL_REGRESSION_PCT &&
 		instructions_pct !== null &&
 		instructions_pct >= INSTRUCTIONS_LAYOUT_PCT &&
-		instructions_pct <= INSTRUCTIONS_REGRESSION_PCT
+		instructions_pct <= INSTRUCTIONS_REGRESSION_PCT &&
+		wall_pct - instructions_pct <= SIGN_OFF_EXCESS_PCT
 	);
 }
 
-/** The rows to re-run in a fresh sitting before the failure is believed. */
-export function sitting_sensitive_rows(rows: ReadonlyArray<AbRow>): Array<AbRow> {
-	return rows.filter((row) => row.sitting_sensitive);
+/** The failing rows a person signs off rather than re-runs. */
+export function sign_off_rows(rows: ReadonlyArray<AbRow>): Array<AbRow> {
+	return rows.filter((row) => row.sign_off);
+}
+
+/** The flat-instruction row (|Δ instr| under `INSTRUCTIONS_LAYOUT_PCT`) whose wall moved the
+ * most, or null when no row is flat: the wall move code placement alone gave this pair of
+ * builds, the run's own reading of the layout noise its wall column sits on. A reading, not a
+ * gate input — layout moves per function, so one row's draw does not bound another's. */
+export function layout_reading(rows: ReadonlyArray<AbRow>): AbRow | null {
+	let widest: AbRow | null = null;
+	for (const row of rows) {
+		if (row.instructions_pct === null) continue;
+		if (Math.abs(row.instructions_pct) >= INSTRUCTIONS_LAYOUT_PCT) continue;
+		if (widest === null || Math.abs(row.wall_pct) > Math.abs(widest.wall_pct)) widest = row;
+	}
+	return widest;
 }
 
 /** The run fails when any row does. */
@@ -226,9 +254,18 @@ export function overall_passes(rows: ReadonlyArray<AbRow>): boolean {
 	return rows.every((row) => row.verdict !== 'fail');
 }
 
+/** The standard error of a row's paired wall delta, in points, after `rounds` rounds at its
+ * measured spread: the spread is a property of the machine and stays put, the error of their
+ * median shrinks with √rounds. Zero for a zero spread. */
+export function wall_delta_error(row: AbRow, rounds: number = row.rounds): number {
+	return (MEDIAN_ERROR_PER_MAD * row.wall_pct_spread) / Math.sqrt(rounds);
+}
+
 /**
- * Whether a row's verdict is still a coin toss: its wall delta sits within its own paired
- * spread of `WALL_REGRESSION_PCT`, AND crossing the threshold would change the verdict. At
+ * Whether a row's verdict is still a coin toss: its wall delta sits within its own standard
+ * error (`wall_delta_error`) of `WALL_REGRESSION_PCT`, AND crossing the threshold would change
+ * the verdict. The error, not the round-to-round spread: the spread never narrows with more
+ * rounds, so a row graded against it stays ambiguous however long the run. At
  * flat instructions both sides of the line pass (pass / LAYOUT); over
  * `INSTRUCTIONS_REGRESSION_PCT` both sides fail, decided by a count more rounds would not move.
  * So only a row with instructions risen within the instruction gate, or fallen, or none
@@ -240,13 +277,31 @@ export function row_is_ambiguous(row: AbRow): boolean {
 		instructions === null ||
 		(Math.abs(instructions) >= INSTRUCTIONS_LAYOUT_PCT &&
 			instructions <= INSTRUCTIONS_REGRESSION_PCT);
-	return flips && Math.abs(row.wall_pct - WALL_REGRESSION_PCT) < row.wall_pct_spread;
+	return flips && Math.abs(row.wall_pct - WALL_REGRESSION_PCT) < wall_delta_error(row);
 }
 
-/** Whether to run another balanced pair of rounds: some row is ambiguous and the pair fits
- * under `MAX_ROUNDS`. */
+/** Whether an ambiguous row could be settled by the cap: at `MAX_ROUNDS` its error, at the
+ * spread measured so far, would fall under its distance from the line. A row closer than that
+ * is graded on its point estimate now — more rounds would spend the time and not decide it. */
+export function row_is_settleable(row: AbRow): boolean {
+	return (
+		row.rounds < MAX_ROUNDS &&
+		Math.abs(row.wall_pct - WALL_REGRESSION_PCT) >= wall_delta_error(row, MAX_ROUNDS)
+	);
+}
+
+/** The ambiguous rows the run ends without settling: graded on their point estimate. */
+export function unsettled_rows(rows: ReadonlyArray<AbRow>): Array<AbRow> {
+	return rows.filter(row_is_ambiguous);
+}
+
+/** Whether to run another balanced pair of rounds: some row is ambiguous, the cap could settle
+ * it, and the pair fits under `MAX_ROUNDS`. */
 export function wants_more_rounds(rows: ReadonlyArray<AbRow>, rounds_done: number): boolean {
-	return rounds_done + 2 <= MAX_ROUNDS && rows.some(row_is_ambiguous);
+	return (
+		rounds_done + 2 <= MAX_ROUNDS &&
+		rows.some((row) => row_is_ambiguous(row) && row_is_settleable(row))
+	);
 }
 
 /** The rows with a side noisier than `NOISY_SPREAD_PCT`. */
@@ -395,9 +450,9 @@ const VERDICT_LABELS: Record<RowVerdict, string> = {
 	fail: 'FAIL'
 };
 
-/** The verdict cell: a sitting-sensitive FAIL says so. */
+/** The verdict cell: a sign-off FAIL says so. */
 function verdict_label(row: AbRow): string {
-	return row.sitting_sensitive ? 'FAIL (sitting-sensitive)' : VERDICT_LABELS[row.verdict];
+	return row.sign_off ? 'FAIL (sign-off)' : VERDICT_LABELS[row.verdict];
 }
 
 /** The result table, Markdown-shaped so it pastes into a report as is. */

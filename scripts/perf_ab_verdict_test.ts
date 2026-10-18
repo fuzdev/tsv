@@ -13,12 +13,13 @@ import {
 	format_us,
 	INSTRUCTIONS_LAYOUT_PCT,
 	INSTRUCTIONS_REGRESSION_PCT,
-	is_sitting_sensitive,
 	KEEP_TREES,
 	lang_presence,
+	layout_reading,
 	MAX_ROUNDS,
 	mad,
 	median,
+	needs_sign_off,
 	noisy_rows,
 	NOISY_SPREAD_PCT,
 	overall_passes,
@@ -26,11 +27,15 @@ import {
 	pct_delta,
 	render_table,
 	row_is_ambiguous,
+	row_is_settleable,
 	row_verdict,
-	sitting_sensitive_rows,
+	SIGN_OFF_EXCESS_PCT,
+	sign_off_rows,
 	spread_pct,
 	trees_to_evict,
+	unsettled_rows,
 	WALL_REGRESSION_PCT,
+	wall_delta_error,
 	wants_more_rounds
 } from './perf_ab_verdict.ts';
 
@@ -61,6 +66,7 @@ Deno.test('the thresholds are the ruled ones', () => {
 	deepStrictEqual(INSTRUCTIONS_LAYOUT_PCT, 0.5);
 	deepStrictEqual(INSTRUCTIONS_REGRESSION_PCT, 1.5);
 	deepStrictEqual(NOISY_SPREAD_PCT, 0.75);
+	deepStrictEqual(SIGN_OFF_EXCESS_PCT, 1.5);
 });
 
 Deno.test('the rounds policy is balanced', () => {
@@ -200,26 +206,34 @@ Deno.test('ab_row refuses a non-positive or non-finite instruction sample', () =
 	deepStrictEqual(ab_row('css', 'parse', counted([]), counted([])).instructions_pct, null);
 });
 
-Deno.test('is_sitting_sensitive: a wall FAIL with instructions in the WARN band', () => {
-	const sensitive = (wall: number, instr: number | null) =>
-		is_sitting_sensitive(row_verdict(wall, instr), wall, instr);
-	// the band is inclusive at both ends, as the WARN band is
-	deepStrictEqual(sensitive(1.6, 0.5), true);
-	deepStrictEqual(sensitive(1.6, 0.753), true);
-	deepStrictEqual(sensitive(2.5, 1.5), true);
-	// under the wall line it is a WARN, not a failure
-	deepStrictEqual(sensitive(1.5, 0.753), false);
-	// flat instructions: LAYOUT, a pass
-	deepStrictEqual(sensitive(1.6, 0.49), false);
-	// over the instruction gate the count decides, whatever the sitting
-	deepStrictEqual(sensitive(1.6, 1.501), false);
-	deepStrictEqual(sensitive(0, 2.94), false);
-	// fallen instructions and no counts are plain wall failures, outside the band
-	deepStrictEqual(sensitive(1.6, -0.5), false);
-	deepStrictEqual(sensitive(1.6, null), false);
-});
+Deno.test(
+	'needs_sign_off: a wall FAIL with instructions in the WARN band, a layout move apart',
+	() => {
+		const sensitive = (wall: number, instr: number | null) =>
+			needs_sign_off(row_verdict(wall, instr), wall, instr);
+		// the band is inclusive at both ends, as the WARN band is
+		deepStrictEqual(sensitive(1.6, 0.5), true);
+		deepStrictEqual(sensitive(1.6, 0.753), true);
+		deepStrictEqual(sensitive(2.5, 1.5), true);
+		// under the wall line it is a WARN, not a failure
+		deepStrictEqual(sensitive(1.5, 0.753), false);
+		// flat instructions: LAYOUT, a pass
+		deepStrictEqual(sensitive(1.6, 0.49), false);
+		// over the instruction gate the count decides, whatever the sitting
+		deepStrictEqual(sensitive(1.6, 1.501), false);
+		deepStrictEqual(sensitive(0, 2.94), false);
+		// fallen instructions and no counts are plain wall failures, outside the band
+		deepStrictEqual(sensitive(1.6, -0.5), false);
+		deepStrictEqual(sensitive(1.6, null), false);
+		// the wall may exceed the instructions by a layout move, inclusive, and no more: past it the
+		// wall carries cost the count does not, a plain failure
+		deepStrictEqual(sensitive(0.5 + SIGN_OFF_EXCESS_PCT, 0.5), true);
+		deepStrictEqual(sensitive(0.501 + SIGN_OFF_EXCESS_PCT, 0.5), false);
+		deepStrictEqual(sensitive(6, 0.8), false);
+	}
+);
 
-Deno.test('a sitting-sensitive row still fails the run, and says so', () => {
+Deno.test('a sign-off row still fails the run, and says so', () => {
 	const row = ab_row(
 		'svelte',
 		'parse',
@@ -227,17 +241,27 @@ Deno.test('a sitting-sensitive row still fails the run, and says so', () => {
 		{ wall_us: [101.6, 101.6], instructions: [1007.5, 1007.5] }
 	);
 	deepStrictEqual(row.verdict, 'fail');
-	deepStrictEqual(row.sitting_sensitive, true);
+	deepStrictEqual(row.sign_off, true);
 	deepStrictEqual(overall_passes([row]), false);
-	deepStrictEqual(sitting_sensitive_rows([row, row_with(0, 0.1, 0)]), [row]);
-	deepStrictEqual(render_table([row]).includes('FAIL (sitting-sensitive)'), true);
+	deepStrictEqual(sign_off_rows([row, row_with(0, 0.1, 0)]), [row]);
+	deepStrictEqual(render_table([row]).includes('FAIL (sign-off)'), true);
 	const plain = ab_row(
 		'svelte',
 		'parse',
 		{ wall_us: [100, 100], instructions: [1000, 1000] },
 		{ wall_us: [101.6, 101.6], instructions: [1000, 1000] }
 	);
-	deepStrictEqual(plain.sitting_sensitive, false);
+	deepStrictEqual(plain.sign_off, false);
+});
+
+Deno.test('layout_reading takes the widest wall move among flat-instruction rows', () => {
+	const flat_slow = row_with(-1.9, 0.5, 0);
+	const flat_fast = row_with(1.2, 0.5, 0.3);
+	const risen = row_with(4, 0.5, 0.8);
+	deepStrictEqual(layout_reading([flat_fast, risen, flat_slow]), flat_slow);
+	// a row with risen, fallen or no counts reads work, not layout
+	deepStrictEqual(layout_reading([risen, row_with(3, 0.5, -0.6), row_with(3, 0.5, null)]), null);
+	deepStrictEqual(layout_reading([]), null);
 });
 
 Deno.test('overall_passes fails on any failing row and only then', () => {
@@ -310,11 +334,12 @@ Deno.test('render_table prints one aligned row per entry', () => {
 const row_with = (
 	wall_pct: number,
 	wall_pct_spread: number,
-	instructions_pct: number | null
+	instructions_pct: number | null,
+	rounds = DEFAULT_ROUNDS
 ): AbRow => ({
 	lang: 'svelte',
 	phase: 'parse',
-	rounds: 6,
+	rounds,
 	base_wall_us: 100,
 	cand_wall_us: 100 + wall_pct,
 	base_wall_spread_pct: 0.3,
@@ -325,14 +350,23 @@ const row_with = (
 	cand_instructions: instructions_pct === null ? null : 100 + instructions_pct,
 	instructions_pct,
 	verdict: row_verdict(wall_pct, instructions_pct),
-	sitting_sensitive: is_sitting_sensitive(
-		row_verdict(wall_pct, instructions_pct),
-		wall_pct,
-		instructions_pct
-	)
+	sign_off: needs_sign_off(row_verdict(wall_pct, instructions_pct), wall_pct, instructions_pct)
 });
 
-Deno.test('row_is_ambiguous: within its spread of the line, and the line decides', () => {
+Deno.test('wall_delta_error is the median error at the spread, shrinking with √rounds', () => {
+	// 1.4826 × 1.2533 × 0.5 / √6
+	deepStrictEqual(wall_delta_error(row_with(1.6, 0.5, 0.8)).toFixed(4), '0.3793');
+	deepStrictEqual(
+		wall_delta_error(row_with(1.6, 0.5, 0.8), 24).toFixed(4),
+		(wall_delta_error(row_with(1.6, 0.5, 0.8)) / 2).toFixed(4)
+	);
+	deepStrictEqual(wall_delta_error(row_with(1.6, 0, 0.8)), 0);
+});
+
+Deno.test('row_is_ambiguous: within its error of the line, and the line decides', () => {
+	// the error, not the spread: 0.4 from the line at a 0.5 spread is outside 0.379
+	deepStrictEqual(row_is_ambiguous(row_with(1.1, 0.5, 0.76)), false);
+	deepStrictEqual(row_is_ambiguous(row_with(1.2, 0.5, 0.76)), true);
 	// risen instructions: crossing the line flips WARN to FAIL
 	deepStrictEqual(row_is_ambiguous(row_with(1.3, 0.3, 0.76)), true);
 	deepStrictEqual(row_is_ambiguous(row_with(1.7, 0.3, 0.76)), true);
@@ -355,13 +389,27 @@ Deno.test('row_is_ambiguous: within its spread of the line, and the line decides
 	deepStrictEqual(row_is_ambiguous(row_with(1.4, 0, 0.76)), false);
 });
 
+Deno.test('row_is_settleable: the cap could narrow the error under the distance', () => {
+	// at a 0.3 spread the error is 0.228 at 6 rounds and 0.176 at the cap of 10
+	deepStrictEqual(row_is_settleable(row_with(1.3, 0.3, 0.76)), true);
+	// the Svelte-parse shape this rule came from: 0.11 from the line at a 0.525 spread (error
+	// 0.398 now, 0.308 at the cap) — more rounds spend the time and do not decide it
+	deepStrictEqual(row_is_ambiguous(row_with(1.61, 0.525, 0.772)), true);
+	deepStrictEqual(row_is_settleable(row_with(1.61, 0.525, 0.772)), false);
+	deepStrictEqual(unsettled_rows([row_with(1.61, 0.525, 0.772)]).length, 1);
+	// at the cap nothing is left to settle with
+	deepStrictEqual(row_is_settleable(row_with(1.45, 0.3, 0.76, MAX_ROUNDS)), false);
+});
+
 Deno.test('wants_more_rounds extends in pairs up to the cap', () => {
-	const ambiguous = [row_with(0, 0.1, 0), row_with(1.4, 0.3, 0.76)];
+	const ambiguous = [row_with(0, 0.1, 0), row_with(1.3, 0.3, 0.76)];
 	deepStrictEqual(wants_more_rounds(ambiguous, DEFAULT_ROUNDS), true);
 	deepStrictEqual(wants_more_rounds(ambiguous, MAX_ROUNDS - 2), true);
 	deepStrictEqual(wants_more_rounds(ambiguous, MAX_ROUNDS - 1), false);
 	deepStrictEqual(wants_more_rounds(ambiguous, MAX_ROUNDS), false);
 	deepStrictEqual(wants_more_rounds([row_with(0, 0.1, 0)], DEFAULT_ROUNDS), false);
+	// an ambiguous row the cap cannot settle does not extend the run
+	deepStrictEqual(wants_more_rounds([row_with(1.61, 0.525, 0.772)], DEFAULT_ROUNDS), false);
 });
 
 Deno.test('noisy_rows names a row with either side over the spread line', () => {
