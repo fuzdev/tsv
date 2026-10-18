@@ -1,0 +1,437 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 733,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " type parameters - 100 chars to the `&`: the first member stays on the `=` line",
+			"start": 20,
+			"end": 101
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 202,
+			"end": 206
+		},
+		{
+			"type": "Line",
+			"value": " type parameters - 101 chars to the `&`: the intersection breaks after `=`",
+			"start": 214,
+			"end": 290
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 394,
+			"end": 398
+		},
+		{
+			"type": "Line",
+			"value": " no type parameters - 100 chars to the `&`",
+			"start": 407,
+			"end": 451
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 552,
+			"end": 556
+		},
+		{
+			"type": "Line",
+			"value": " no type parameters - 101 chars to the `&`",
+			"start": 564,
+			"end": 608
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 712,
+			"end": 716
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 732,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 723,
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 103,
+					"end": 211,
+					"id": {
+						"type": "Identifier",
+						"start": 108,
+						"end": 109,
+						"name": "A"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 109,
+						"end": 122,
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 110,
+								"end": 121,
+								"name": "T",
+								"constraint": {
+									"type": "TSTypeReference",
+									"start": 120,
+									"end": 121,
+									"typeName": {
+										"type": "Identifier",
+										"start": 120,
+										"end": 121,
+										"name": "U"
+									}
+								}
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 125,
+						"end": 210,
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 125,
+								"end": 199,
+								"typeName": {
+									"type": "Identifier",
+									"start": 125,
+									"end": 196,
+									"name": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 196,
+									"end": 199,
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 197,
+											"end": 198,
+											"typeName": {
+												"type": "Identifier",
+												"start": 197,
+												"end": 198,
+												"name": "T"
+											}
+										}
+									]
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 209,
+								"end": 210,
+								"typeName": {
+									"type": "Identifier",
+									"start": 209,
+									"end": 210,
+									"name": "Y"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 202,
+										"end": 206
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " type parameters - 100 chars to the `&`: the first member stays on the `=` line",
+							"start": 20,
+							"end": 101
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 292,
+					"end": 404,
+					"id": {
+						"type": "Identifier",
+						"start": 297,
+						"end": 298,
+						"name": "B"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 298,
+						"end": 311,
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 299,
+								"end": 310,
+								"name": "T",
+								"constraint": {
+									"type": "TSTypeReference",
+									"start": 309,
+									"end": 310,
+									"typeName": {
+										"type": "Identifier",
+										"start": 309,
+										"end": 310,
+										"name": "U"
+									}
+								}
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 316,
+						"end": 403,
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 316,
+								"end": 391,
+								"typeName": {
+									"type": "Identifier",
+									"start": 316,
+									"end": 388,
+									"name": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 388,
+									"end": 391,
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 389,
+											"end": 390,
+											"typeName": {
+												"type": "Identifier",
+												"start": 389,
+												"end": 390,
+												"name": "T"
+											}
+										}
+									]
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 402,
+								"end": 403,
+								"typeName": {
+									"type": "Identifier",
+									"start": 402,
+									"end": 403,
+									"name": "Y"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 394,
+										"end": 398
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " type parameters - 101 chars to the `&`: the intersection breaks after `=`",
+							"start": 214,
+							"end": 290
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 453,
+					"end": 561,
+					"id": {
+						"type": "Identifier",
+						"start": 458,
+						"end": 459,
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 462,
+						"end": 560,
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 462,
+								"end": 549,
+								"typeName": {
+									"type": "Identifier",
+									"start": 462,
+									"end": 546,
+									"name": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 546,
+									"end": 549,
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 547,
+											"end": 548,
+											"typeName": {
+												"type": "Identifier",
+												"start": 547,
+												"end": 548,
+												"name": "T"
+											}
+										}
+									]
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 559,
+								"end": 560,
+								"typeName": {
+									"type": "Identifier",
+									"start": 559,
+									"end": 560,
+									"name": "Y"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 552,
+										"end": 556
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " no type parameters - 100 chars to the `&`",
+							"start": 407,
+							"end": 451
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 610,
+					"end": 722,
+					"id": {
+						"type": "Identifier",
+						"start": 615,
+						"end": 616,
+						"name": "D"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 621,
+						"end": 721,
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 621,
+								"end": 709,
+								"typeName": {
+									"type": "Identifier",
+									"start": 621,
+									"end": 706,
+									"name": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 706,
+									"end": 709,
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 707,
+											"end": 708,
+											"typeName": {
+												"type": "Identifier",
+												"start": 707,
+												"end": 708,
+												"name": "T"
+											}
+										}
+									]
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 720,
+								"end": 721,
+								"typeName": {
+									"type": "Identifier",
+									"start": 720,
+									"end": 721,
+									"name": "Y"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 712,
+										"end": 716
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " no type parameters - 101 chars to the `&`",
+							"start": 564,
+							"end": 608
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

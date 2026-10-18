@@ -723,12 +723,19 @@ impl<'a> Printer<'a> {
                         // reparse (seeing the bare shell) reproduces at the shell, not the
                         // `=` (F1).
                         //
-                        // A member that collapses to an INTERSECTION takes that arm's rule
-                        // for the same reason, read off the doc the collapse just built:
-                        // the intersection arm below hugs a `will_break` value and the bare
-                        // authoring goes straight there, so hanging here split the `=` for
-                        // a break the reparse — which no longer sees a union at all —
-                        // reproduces inside the intersection (`= | ((// c⏎A | B) & C)`).
+                        // A member that collapses to an INTERSECTION keeps the `=` for
+                        // the same reason, read off the doc the collapse just built: the
+                        // bare authoring goes to the intersection arm below, whose `fluid`
+                        // keeps a value that breaks on its own on the `=` line while its
+                        // first break fits, so hanging here split the `=` for a break the
+                        // reparse — which no longer sees a union at all — reproduces inside
+                        // the intersection (`= | ((// c⏎A | B) & C)`).
+                        //
+                        // TODO: no input reaches this disjunct — the sole-member peel
+                        // (`unwrap_redundant_parens`) hands every unfrozen one-member union to
+                        // the dispatch as its member, and a directive that would freeze it
+                        // takes the force-break branch first — so it is dead as far as every
+                        // probe shows; prove it and drop it.
                         // The kind is asked because the break must be the MEMBER's: a
                         // member collapsing to a union breaks from the union's own
                         // leading-`|` layout, which is what the hang indents.
@@ -786,18 +793,27 @@ impl<'a> Printer<'a> {
                 // constrained-param header that fits stays inline instead of breaking the
                 // type-param list when the first member overflows.
                 //
-                // A comment inside the intersection forces it to break; there the marker
-                // must stay flat so the first member keeps hugging the `=` line (prettier's
-                // behavior — `type B = a & // c⏎\tb`). The over-break this arm fixes is
-                // always comment-free (a fit-driven break), so gate the marker on the
-                // absence of a forced break and glue the comment case as before.
-                let inter_doc = build_intersection(i);
-                if d.will_break(inter_doc) {
-                    parts.push(d.text(" "));
-                    parts.push(make_rhs(inter_doc));
-                } else {
-                    parts.push(fluid(make_rhs(inter_doc)));
-                }
+                // A value that breaks on its own — an authored-expanded object member, a
+                // comment — takes the same marker: its measurement runs to the value's
+                // first break (the object's `{`, the `&` a `//` trails), so the first
+                // member stays on the `=` line while that much fits and the value breaks
+                // after `=` once it does not, as prettier's `fluid` does. The marker's `line`
+                // is the only break before the value, so the type-parameter list keeps its
+                // own fit.
+                parts.push(fluid(make_rhs(build_intersection(i))));
+            } else if let TSType::Parenthesized(p) = value_type
+                && matches!(
+                    unwrap_parenthesized(p.type_annotation),
+                    TSType::Intersection(_)
+                )
+            {
+                // A paren shell around an intersection that the redundant-paren peel keeps —
+                // a comment inside it — takes the intersection arm's `fluid` too: a shell
+                // whose block comment moves out prints without its parens, and the reparse
+                // of that output reaches the intersection arm above, so the comment-hug arm
+                // below would glue the value to the `=` past the width where its own output
+                // breaks after `=` (F1).
+                parts.push(fluid(make_rhs(build_value())));
             } else if matches!(value_type, TSType::Conditional(_)) {
                 // A conditional with plain halves: `fluid`, which keeps the ternary on the
                 // `=` line while its head fits and breaks after `=` once the head

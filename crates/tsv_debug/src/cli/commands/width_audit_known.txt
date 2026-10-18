@@ -39,7 +39,7 @@
 # FAILS (a fix landed, or the fixture that carried it moved — re-pin).
 #
 # Regenerate with `deno task width:audit:update`.
-# shapes: 41
+# shapes: 42
 svelte	'	-	'
 svelte	'	-	*/
 svelte	)	-	;
@@ -77,6 +77,7 @@ svelte	declare	-	;
 svelte	export	-	;
 svelte	import	-	;
 svelte	let	-	WORD
+svelte	type	-	WORD
 svelte	{	-	WORD
 svelte	{@debug	-	}
 svelte	|	-	WORD
