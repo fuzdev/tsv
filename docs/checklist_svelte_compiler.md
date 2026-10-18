@@ -1091,7 +1091,7 @@ A **static** component invocation compiles to `Name($$renderer, props)` (`shared
 - **Refused**: `bind: directive on <{name}> component` — the oracle emits a `do…while` settle loop.
 - **Refused**: `directive on <{name}> component` — a non-`bind:` directive (`use:`/`transition:`/…; mostly oracle-rejected input).
 - **Supported**: carried script comments alongside a component invocation — the component call's prop values are template-region borrows, so no comment window sweeps a script comment (see [Comment placement classes](#comment-placement-classes)).
-- **Mismatch (open)**: the compiled default export's **name collides with an imported component** — a component whose module imports `Input` (flowbite-svelte's `Input` component, used by 35 of its files) is named `Input` by tsv where the oracle deduplicates it to `Input_1`. The largest open mismatch class by file count.
+- **Mismatch (open)**: the compiled default export's **name collides with an imported component** — a component whose module imports `Input` (flowbite-svelte's `Input` component, used across its own files) is named `Input` by tsv where the oracle deduplicates it to `Input_1`. The largest open mismatch class by file count.
 
 ### Attributes
 

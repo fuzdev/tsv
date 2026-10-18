@@ -1355,9 +1355,8 @@ gates over every file.**
   public SvelteKit sites and apps: ryanatkn.com, webdevladder.net, earbetter, cosmicplayground)
   plus upstream framework source (kit, svelte, and the svelte.dev subpaths), all from the
   snapshot's collections. NOT the `gated` collections the gates read (the third-party Svelte
-  libraries, two thirds of the snapshot's `.svelte`, and any collection awaiting its bench
-  triage): flowbite alone would be over 40% of this view's `.svelte` files, and the every-file
-  invariant below is unmeasured over them. `.d.ts` files are IN scope (the product formats them; declaration-heavy
+  libraries and tools, and any collection awaiting its bench triage): the every-file
+  invariant below is unmeasured over them until each is triaged onto the bench. `.d.ts` files are IN scope (the product formats them; declaration-heavy
   shapes carry real divergence signal), and the curated entries skip the `/build/`+`/dist/`
   build-output pruning (a `build/` segment inside a reviewed `src/` tree is real source, e.g.
   kit's `src/exports/vite/build/`; `DirectoryLoader`'s arbitrary-path scans still prune both). The

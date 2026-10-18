@@ -9,9 +9,8 @@ cosmicplayground css match=1 known=1 partial=0 unknown=0 errors=0 expected_error
 earbetter svelte match=33 known=11 partial=0 unknown=0 errors=0 expected_errors=0
 earbetter typescript match=24 known=2 partial=0 unknown=0 errors=0 expected_errors=0
 earbetter css match=2 known=0 partial=0 unknown=0 errors=0 expected_errors=0
-flowbite-svelte svelte match=933 known=363 partial=0 unknown=0 errors=0 expected_errors=0
-flowbite-svelte typescript match=338 known=0 partial=0 unknown=0 errors=0 expected_errors=0
-flowbite-svelte css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0
+flowbite-svelte svelte match=166 known=17 partial=0 unknown=0 errors=0 expected_errors=0
+flowbite-svelte typescript match=176 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 fuz_app svelte match=23 known=10 partial=0 unknown=0 errors=0 expected_errors=0
 fuz_app typescript match=661 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 fuz_app css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0

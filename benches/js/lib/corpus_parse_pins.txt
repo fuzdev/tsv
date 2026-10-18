@@ -9,9 +9,8 @@ cosmicplayground css compared=2 tsv_errors=0 canonical_errors=0 both_errors=0
 earbetter svelte compared=44 tsv_errors=0 canonical_errors=0 both_errors=0
 earbetter typescript compared=26 tsv_errors=0 canonical_errors=0 both_errors=0
 earbetter css compared=2 tsv_errors=0 canonical_errors=0 both_errors=0
-flowbite-svelte svelte compared=1296 tsv_errors=0 canonical_errors=0 both_errors=0
-flowbite-svelte typescript compared=338 tsv_errors=0 canonical_errors=0 both_errors=0
-flowbite-svelte css compared=1 tsv_errors=0 canonical_errors=0 both_errors=0
+flowbite-svelte svelte compared=183 tsv_errors=0 canonical_errors=0 both_errors=0
+flowbite-svelte typescript compared=176 tsv_errors=0 canonical_errors=0 both_errors=0
 fuz_app svelte compared=33 tsv_errors=0 canonical_errors=0 both_errors=0
 fuz_app typescript compared=661 tsv_errors=0 canonical_errors=0 both_errors=0
 fuz_app css compared=1 tsv_errors=0 canonical_errors=0 both_errors=0

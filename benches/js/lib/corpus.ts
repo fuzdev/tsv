@@ -577,8 +577,8 @@ const COLLECTIONS: Record<string, CollectionPlacement> = {
 	kit: { perf: true },
 	svelte: { perf: true },
 	'svelte.dev': { perf: true },
-	// Third-party Svelte libraries and tooling — the gates' breadth, not yet on the bench
-	// (flowbite alone would be a large share of its `.svelte`)
+	// Third-party Svelte libraries and tooling — the gates' breadth, not yet on the bench:
+	// the every-file perf invariant is unmeasured over them until each is triaged onto it
 	'flowbite-svelte': { perf: false },
 	layerchart: { perf: false },
 	layercake: { perf: false },

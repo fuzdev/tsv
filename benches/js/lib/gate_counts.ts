@@ -97,7 +97,7 @@ export const GATE_CHECKOUT_IDS: Record<
 	// `collections/` tree (see above); what each collection vendors is its manifest.
 	[CORPORA_ROOT]: {
 		tree: CORPORA_TREE,
-		hash: 'ba7a9a6c8',
+		hash: 'e5847b3dd',
 		pins: [
 			'corpus_format_pins.txt',
 			'corpus_parse_pins.txt',
@@ -318,7 +318,7 @@ export const SVELTE_STYLES_BLOCKS_PIN = 401;
  * both sides at once (a ts-blank-space bump), the one move the per-file agreement cannot
  * see. Measured over ../corpora `collections/`, ts-blank-space 0.9.0.
  */
-export const STRIP_CORPUS_PINS = { files: 2769, refusals: 70 };
+export const STRIP_CORPUS_PINS = { files: 2623, refusals: 70 };
 
 /**
  * bench:harvest:wpt — exact `<style>` blocks from the default `../wpt/css`. Measured
