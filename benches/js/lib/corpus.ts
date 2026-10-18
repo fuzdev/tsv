@@ -43,7 +43,7 @@
 import { fs_exists } from '@fuzdev/fuz_util/fs.ts';
 import { Buffer } from 'node:buffer';
 import { execFile } from 'node:child_process';
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -252,7 +252,8 @@ interface WalkOptions {
 	prune_build_output?: boolean;
 }
 
-/** Walk a directory and yield source files one at a time.
+/** Walk a directory and yield source files one at a time — or yield the one file, when
+ * the path names a file (a manifest subpath may: `typescript-parser` vendors one).
  *
  * Uses `node:fs/promises` recursive `readdir` (identical output under Deno and
  * Node) for the directory traversal, then reads each file's content lazily so
@@ -268,11 +269,15 @@ async function* walk_corpus(
 	const extensions = options.extensions ?? DEFAULT_EXTENSIONS;
 	const ext_set = new Set(extensions.map((e) => `.${e.toLowerCase()}`));
 
-	const relative_paths = await readdir(dir_path, { recursive: true });
+	const is_file = (await stat(dir_path)).isFile();
+	const root = is_file ? dirname(dir_path) : dir_path;
+	const relative_paths = is_file
+		? [basename(dir_path)]
+		: await readdir(dir_path, { recursive: true });
 	relative_paths.sort();
 
 	for (const relative of relative_paths) {
-		const path = join(dir_path, relative);
+		const path = join(root, relative);
 		if (!ext_set.has(extname(path).toLowerCase())) continue;
 		if (should_exclude(path, options.prune_build_output ?? true)) continue;
 
@@ -584,7 +589,12 @@ const COLLECTIONS: Record<string, CollectionPlacement> = {
 	layercake: { perf: false },
 	'svelte-ux': { perf: false },
 	'svelte-maplibre': { perf: false },
-	'language-tools': { perf: false }
+	'language-tools': { perf: false },
+	// Neutral TypeScript the formatter benchmarks elsewhere compare on (TypeScript's own
+	// parser, Storybook, Continue) — not tsv-shaped, and not the author's
+	'typescript-parser': { perf: false },
+	storybook: { perf: false },
+	continue: { perf: false }
 };
 
 /** The tier a placed collection's entries land in. */

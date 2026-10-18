@@ -318,7 +318,7 @@ export const SVELTE_STYLES_BLOCKS_PIN = 401;
  * both sides at once (a ts-blank-space bump), the one move the per-file agreement cannot
  * see. Measured over ../corpora `collections/`, ts-blank-space 0.9.0.
  */
-export const STRIP_CORPUS_PINS = { files: 2623, refusals: 70 };
+export const STRIP_CORPUS_PINS = { files: 4852, refusals: 175 };
 
 /**
  * bench:harvest:wpt — exact `<style>` blocks from the default `../wpt/css`. Measured

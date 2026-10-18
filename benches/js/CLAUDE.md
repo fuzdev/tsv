@@ -1340,7 +1340,8 @@ contribute `.mjs`/`.cjs`/`.mts`/`.cts` files that way).
 checkout (`fuzdev/corpora`): one collection per upstream repo — the author's dev repos (zzz,
 fuz\_\*, gro, the personal sites), the framework source (kit, svelte, the svelte.dev subpaths) and
 the third-party Svelte libraries and tools (flowbite-svelte, layerchart, layercake, svelte-ux,
-svelte-maplibre, language-tools) — every collection vendored at a commit its `manifest.json`
+svelte-maplibre, language-tools) and neutral TypeScript other formatter benchmarks compare on
+(TypeScript's `parser.ts`, Storybook, Continue) — every collection vendored at a commit its `manifest.json`
 names, the whole `collections/` tree pinned by its git tree id in `GATE_CHECKOUT_IDS['../corpora']`
 (verified by `pins:audit:checkouts` — the tree, not the commit, so a tooling or doc commit in the
 snapshot repo moves no pin here). So every tier a bench or gate view holds is version-pinned,

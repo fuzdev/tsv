@@ -3,6 +3,7 @@
 #
 # <row> <language> match=<n> known=<n> partial=<n> unknown=<n> errors=<n> expected_errors=<n>
 benches/js/.cache/svelte_styles css match=18 known=2 partial=0 unknown=0 errors=0 expected_errors=0
+continue typescript match=938 known=2 partial=0 unknown=11 errors=0 expected_errors=0
 cosmicplayground svelte match=83 known=48 partial=0 unknown=0 errors=0 expected_errors=0
 cosmicplayground typescript match=82 known=2 partial=0 unknown=0 errors=0 expected_errors=0
 cosmicplayground css match=1 known=1 partial=0 unknown=0 errors=0 expected_errors=0
@@ -63,6 +64,8 @@ prettier/tests/format/typescript typescript match=688 known=56 partial=7 unknown
 ryanatkn.com svelte match=26 known=5 partial=0 unknown=0 errors=0 expected_errors=0
 ryanatkn.com typescript match=20 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 ryanatkn.com css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0
+storybook typescript match=1318 known=2 partial=1 unknown=27 errors=0 expected_errors=0
+storybook css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 svelte typescript match=415 known=1 partial=0 unknown=0 errors=0 expected_errors=0
 svelte-docinfo svelte match=12 known=10 partial=0 unknown=0 errors=0 expected_errors=0
 svelte-docinfo typescript match=96 known=0 partial=0 unknown=0 errors=0 expected_errors=0
@@ -79,6 +82,7 @@ svelte.dev css match=11 known=2 partial=0 unknown=0 errors=0 expected_errors=0
 tsv.fuz.dev svelte match=12 known=5 partial=0 unknown=0 errors=0 expected_errors=0
 tsv.fuz.dev typescript match=15 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 tsv.fuz.dev css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0
+typescript-parser typescript match=0 known=1 partial=0 unknown=0 errors=0 expected_errors=0
 webdevladder.net svelte match=13 known=11 partial=0 unknown=0 errors=0 expected_errors=0
 webdevladder.net typescript match=14 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 webdevladder.net css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0

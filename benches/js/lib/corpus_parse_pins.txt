@@ -3,6 +3,7 @@
 #
 # <row> <language> compared=<n> tsv_errors=<n> canonical_errors=<n> both_errors=<n>
 benches/js/.cache/svelte_styles css compared=20 tsv_errors=0 canonical_errors=0 both_errors=0
+continue typescript compared=951 tsv_errors=0 canonical_errors=0 both_errors=0
 cosmicplayground svelte compared=131 tsv_errors=0 canonical_errors=0 both_errors=0
 cosmicplayground typescript compared=84 tsv_errors=0 canonical_errors=0 both_errors=0
 cosmicplayground css compared=2 tsv_errors=0 canonical_errors=0 both_errors=0
@@ -63,6 +64,8 @@ prettier/tests/format/typescript typescript compared=716 tsv_errors=0 canonical_
 ryanatkn.com svelte compared=31 tsv_errors=0 canonical_errors=0 both_errors=0
 ryanatkn.com typescript compared=20 tsv_errors=0 canonical_errors=0 both_errors=0
 ryanatkn.com css compared=1 tsv_errors=0 canonical_errors=0 both_errors=0
+storybook typescript compared=1348 tsv_errors=0 canonical_errors=0 both_errors=0
+storybook css compared=1 tsv_errors=0 canonical_errors=0 both_errors=0
 svelte typescript compared=415 tsv_errors=0 canonical_errors=1 both_errors=0
 svelte-docinfo svelte compared=22 tsv_errors=0 canonical_errors=0 both_errors=0
 svelte-docinfo typescript compared=96 tsv_errors=0 canonical_errors=0 both_errors=0
@@ -79,6 +82,7 @@ svelte.dev css compared=13 tsv_errors=0 canonical_errors=0 both_errors=0
 tsv.fuz.dev svelte compared=17 tsv_errors=0 canonical_errors=0 both_errors=0
 tsv.fuz.dev typescript compared=15 tsv_errors=0 canonical_errors=0 both_errors=0
 tsv.fuz.dev css compared=1 tsv_errors=0 canonical_errors=0 both_errors=0
+typescript-parser typescript compared=1 tsv_errors=0 canonical_errors=0 both_errors=0
 webdevladder.net svelte compared=24 tsv_errors=0 canonical_errors=0 both_errors=0
 webdevladder.net typescript compared=14 tsv_errors=0 canonical_errors=0 both_errors=0
 webdevladder.net css compared=1 tsv_errors=0 canonical_errors=0 both_errors=0
