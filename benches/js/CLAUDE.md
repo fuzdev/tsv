@@ -1360,9 +1360,8 @@ gates over every file.**
   the svelte.dev subpaths), third-party Svelte libraries and tools (flowbite-svelte's `src/lib`,
   layerchart, layercake, svelte-ux, svelte-maplibre, language-tools) and neutral TypeScript
   (TypeScript's `parser.ts`, Storybook, Continue). Each group times ONE mixed set; the report
-  discloses its composition by manifest `origin` (`corpus_by_origin`, the **By origin:** line),
-  since the author's code is what tsv is developed against and mostly already formats to, which
-  may favor tsv's format rows. NOT a `gated` collection (one placed off the bench while its
+  discloses its composition by manifest `origin` (`corpus_by_origin`, the **By origin:** line).
+  NOT a `gated` collection (one placed off the bench while its
   triage is pending): the every-file invariant below is unmeasured over it. `.d.ts` files are IN
   scope (the product formats them; declaration-heavy shapes carry real divergence signal), and the curated entries skip the `/build/`+`/dist/`
   build-output pruning (a `build/` segment inside a reviewed `src/` tree is real source, e.g.

@@ -1053,10 +1053,9 @@ interface BaselineVersions extends ReportVersions {
  * carry a higher sweep floor than the rest — every row's floor is the same per pass.
  *
  * 22: `corpus_by_origin` — the corpus's files and bytes per manifest `origin` (`own`, the
- * code tsv is developed against and mostly already formats to, or `third_party`) and
- * language, over the corpus each group's timed set is drawn from. The perf corpus is one
- * mixed set per group, so this is the disclosure of what the headline blends, not a split
- * of its timings. Perf reports only.
+ * fuz ecosystem's own code, or `third_party`) and language, over the corpus each group's
+ * timed set is drawn from. The perf corpus is one mixed set per group, so this is the
+ * disclosure of what the headline blends, not a split of its timings. Perf reports only.
  */
 const REPORT_SCHEMA_VERSION = 22;
 
@@ -1104,8 +1103,8 @@ interface Baseline {
 	/**
 	 * The corpus by who wrote it — files and bytes per manifest `origin` and language,
 	 * over the files the run read. Every timed group sweeps one MIXED set, so this says
-	 * what each headline number blends rather than splitting it: `own` is the code tsv is
-	 * developed against and mostly already formats to, which may favor tsv's format rows.
+	 * what each headline number blends rather than splitting it: `own` is the fuz
+	 * ecosystem's own code, `third_party` everyone else's.
 	 * Perf reports only (a conformance run reads no snapshot collection); since `version` 22.
 	 */
 	corpus_by_origin?: CorpusByOrigin;

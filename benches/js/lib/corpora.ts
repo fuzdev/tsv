@@ -78,8 +78,7 @@ export interface CorporaCollection {
 	 */
 	exclude: string[];
 	/**
-	 * Who wrote the collection: `own` for the fuz ecosystem's authors, the code tsv is
-	 * developed against, or `third_party`. What the `live` diff selects on.
+	 * Who wrote the collection: `own` for the fuz ecosystem's authors, or `third_party`. What the `live` diff selects on.
 	 */
 	origin: CorporaOrigin;
 }

@@ -105,18 +105,15 @@ Things the published numbers measure that aren't quite what they look like.
   printing, so format ratios are partly parser ratios. The numbers answer "how
   fast can X format my file end-to-end," which is what users care about.
   Documented in the report footnotes.
-- **Self-corpus / representativeness.** The perf corpus is real-world code only
+- **Representativeness.** The perf corpus is real-world code only
   (fixture suites live in the `gates`/`conformance` views — [corpus
   views](../benches/js/CLAUDE.md#corpus)), read from the pinned `fuzdev/corpora`
   snapshot (the report's `corpus_snapshot` names the one commit; each source's
   `repo` names the upstream it vendored), and it mixes two kinds of code in every timed
-  set: the author's own fuz ecosystem — the code tsv is developed and fixture-tuned
-  against, mostly tsv-formatted already — and third-party code (the Svelte framework,
+  set: the author's own fuz ecosystem and third-party code (the Svelte framework,
   community Svelte libraries and tools, and TypeScript other formatter benchmarks
-  compare on), mostly prettier-formatted. The report discloses the mix by manifest
-  `origin` (`corpus_by_origin`); the snapshot also tags each collection `shaped_by`,
-  which is the axis a style bias actually follows (a few `own` collections are
-  prettier-shaped). Throughput tracks the syntactic mix of
+  compare on). The report discloses the mix by manifest `origin`
+  (`corpus_by_origin`). Throughput tracks the syntactic mix of
   _this_ corpus, so ratios are "N× on this corpus," not universal. CSS is by far
   the weakest sample: few real standalone files exist in this ecosystem (most CSS
   is authored inside `.svelte` `<style>` blocks), so the corpus adds the
