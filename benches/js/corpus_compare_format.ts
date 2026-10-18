@@ -36,11 +36,8 @@ import {
 	filter_diff_context,
 	format_diff_for_terminal
 } from './lib/diff.ts';
-import {
-	CORPUS_FORMAT_MATCH_MIN,
-	CORPUS_FORMAT_PARTIAL_PIN,
-	CORPUS_FORMAT_UNKNOWN_PIN
-} from './lib/gate_counts.ts';
+import { corpus_missing_entries } from './lib/corpus.ts';
+import { CorpusPinTally, grade_corpus_pins } from './lib/corpus_pins.ts';
 import { type Language, LANGUAGES } from './lib/types.ts';
 import {
 	check_expected_error,
@@ -50,6 +47,51 @@ import {
 	is_native_panic_error,
 	type SafetyViolation
 } from './lib/divergence/mod.ts';
+
+/**
+ * The per-source pins `--all` grades (`lib/corpus_pins.ts`): exact counts per source and
+ * language of every bucket but SAFETY, which gates over every file on its own — so on a
+ * passing run each row pins its file count too.
+ */
+const FORMAT_PINS_FILE = 'benches/js/lib/corpus_format_pins.txt';
+const FORMAT_PIN_BUCKETS = [
+	'match',
+	'known',
+	'partial',
+	'unknown',
+	'errors',
+	'expected_errors'
+] as const;
+type FormatPinBucket = (typeof FORMAT_PIN_BUCKETS)[number];
+
+/** The pinned bucket a file's result lands in — `null` for SAFETY, which is not pinned. */
+function format_pin_bucket(status: CompareResult['status'] | 'match'): FormatPinBucket | null {
+	switch (status) {
+		case 'match':
+			return 'match';
+		case 'known_divergence':
+			return 'known';
+		case 'partial_divergence':
+			return 'partial';
+		case 'unknown_diff':
+			return 'unknown';
+		case 'error':
+			return 'errors';
+		case 'expected_error':
+			return 'expected_errors';
+		case 'safety_violation':
+			return null;
+	}
+}
+
+/**
+ * Per-file errors that say the ENVIRONMENT misbehaved rather than tsv (benches/js/CLAUDE.md
+ * §Known Issues) — a run carrying one is re-run, never re-pinned.
+ */
+const ENVIRONMENT_ERROR_MARKERS = [
+	'native format nondeterminism',
+	'prettier returned empty output'
+];
 
 const CorpusCompareArgs = s.strip_object({
 	...COMPARE_BASE_ARG_FIELDS,
@@ -207,6 +249,7 @@ Options:
   --audit-patterns  Show per-pattern corpus coverage with sample diffs for spot-checking
   --json            Emit a single JSON report to stdout (stats + safety/partial/
                     unknown/error file lists); all human/progress output → stderr
+  --update          With --all (unnarrowed): rewrite ${FORMAT_PINS_FILE} from this run
   --help            Show this help message
 
 Examples:
@@ -356,6 +399,16 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 	const audit_patterns = args['audit-patterns'];
 	const summary = args.summary;
 	const json_mode = args.json;
+	// The pins are a claim about the whole `gates` view under the full classification, so
+	// only an unnarrowed `--all` grades them, and only one may rewrite them.
+	const full_run = use_all_repos && !filter_lang && !limit && !safety_only && !strict;
+	if (args.update && !full_run) {
+		console.error(
+			'Error: --update rewrites the pins from a full run — it needs --all, and none of ' +
+				'--filter / --limit / --safety-only / --strict'
+		);
+		Deno.exit(1);
+	}
 
 	if (json_mode) redirect_logs_to_stderr();
 
@@ -436,6 +489,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 
 	// Track per-language file counts for filtering/limiting
 	const lang_counts: Record<Language, number> = { svelte: 0, typescript: 0, css: 0 };
+	const pin_tally = new CorpusPinTally(FORMAT_PIN_BUCKETS);
 
 	// Stream and process files (file content is GC'd after each iteration)
 	for await (const file of loader.stream(verbose ? console.log : () => {})) {
@@ -447,6 +501,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 		const lang_stats = stats.get(lang)!;
 		const lang_results = results.get(lang)!;
 		lang_stats.total++;
+		const stored_before = lang_results.length;
 
 		if (verbose) {
 			console.log(`  ${file.path}`);
@@ -656,6 +711,16 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 					should_exit = true;
 				}
 			}
+		}
+
+		// A file is stored unless it matched exactly, so the newest stored result (if this
+		// file added one) is its verdict.
+		if (file.source !== undefined) {
+			const bucket = format_pin_bucket(
+				lang_results.length > stored_before ? lang_results.at(-1)!.status : 'match'
+			);
+			if (bucket) pin_tally.add(file.source, lang, bucket);
+			else pin_tally.see(file.source, lang);
 		}
 
 		if (should_exit) {
@@ -938,40 +1003,51 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 	// above), and prettier can't panic, so this is the whole candidate set.
 	gate_on_panics(all_errors, impls, base_path);
 
-	// Pinned counts (--all only — see lib/gate_counts.ts). Every file in the gates
-	// view comes from a pinned checkout (the `../corpora` snapshot + the prettier
-	// suites, tracked by GATE_CHECKOUT_IDS + pins:audit:checkouts), so the pins
-	// gate on the aggregate: per-language MINIMUM `match` (a drop = a formatter/oracle
-	// collapse in pinned code) + EXACT `unknown`/`partial` (up = a new unexplained
-	// divergence to fix/catalog; down = backlog shrank, re-pin). SAFETY gates over
-	// EVERY file (see below). A trip on a run that also reports per-file `native format
-	// nondeterminism` or empty-prettier-output errors can be the environment rather than the
-	// code (benches/js/CLAUDE.md §Known Issues) — re-run before treating it as real.
-	if (use_all_repos) {
-		const pin = (lang: Language) => stats.get(lang)!;
-		const pin_failures = [
-			...LANGUAGES.filter((lang) => pin(lang).match < CORPUS_FORMAT_MATCH_MIN[lang]).map(
-				(lang) =>
-					`${lang} match ${pin(lang).match} < pinned minimum ${CORPUS_FORMAT_MATCH_MIN[lang]}`
-			),
-			...LANGUAGES.filter((lang) => pin(lang).unknown_diff !== CORPUS_FORMAT_UNKNOWN_PIN[lang]).map(
-				(lang) =>
-					`${lang} unknown ${pin(lang).unknown_diff} ≠ pinned ${CORPUS_FORMAT_UNKNOWN_PIN[lang]}`
-			),
-			...LANGUAGES.filter(
-				(lang) => pin(lang).partial_divergence !== CORPUS_FORMAT_PARTIAL_PIN[lang]
-			).map(
-				(lang) =>
-					`${lang} partial ${pin(lang).partial_divergence} ≠ pinned ${CORPUS_FORMAT_PARTIAL_PIN[lang]}`
-			)
-		];
+	// Pinned counts (a full `--all` run only): exact per-source bucket counts over the gates
+	// view (`lib/corpus_pins.ts`, docs/gate_counts.md). Every file comes from a pinned
+	// checkout, so a move is real: a `match` drop is a formatter/oracle collapse, a `partial`
+	// / `unknown` / `errors` rise a new finding to triage, and a fall a win to re-pin.
+	// Graded after SAFETY, the harsher verdict, which a SAFETY file would otherwise hide
+	// behind the `match` it left. A trip on a run that also reports per-file `native format
+	// nondeterminism` or empty-prettier-output errors can be the environment rather than
+	// the code (benches/js/CLAUDE.md §Known Issues) — re-run first.
+	if (full_run && total_safety_violation === 0) {
+		const environment_errors = results_by_status(results, 'error').filter((r) =>
+			ENVIRONMENT_ERROR_MARKERS.some((marker) => r.error?.includes(marker))
+		);
+		const { optional_missing } = await corpus_missing_entries('gates');
+		const pin_failures = await grade_corpus_pins({
+			file: FORMAT_PINS_FILE,
+			gate: 'corpus:compare:format',
+			tally: pin_tally,
+			update: args.update,
+			update_blockers: [
+				...optional_missing.map((entry) => `the run is missing ${entry}`),
+				...(environment_errors.length > 0
+					? [`${environment_errors.length} environment error(s) — re-run (§Known Issues)`]
+					: [])
+			],
+			stats: (lang) => {
+				const st = stats.get(lang)!;
+				return {
+					match: st.match,
+					known: st.known_divergence,
+					partial: st.partial_divergence,
+					unknown: st.unknown_diff,
+					errors: st.errors,
+					expected_errors: st.expected_errors
+				};
+			}
+		});
 		if (pin_failures.length > 0) {
 			console.log(
-				`\n\x1b[31mFAIL: pinned counts — ${pin_failures.join('; ')}. ` +
-					`If deliberate, re-pin in lib/gate_counts.ts.\x1b[0m`
+				`\n\x1b[31mFAIL: pinned counts (${FORMAT_PINS_FILE}):\n  ${pin_failures.join('\n  ')}\n` +
+					`If deliberate, re-pin with \`deno task corpus:compare:format --all --update\`.\x1b[0m`
 			);
 			exit_compare_failure(impls);
 		}
+	} else if (full_run) {
+		console.log('\nPins: not graded — the SAFETY violations below come first.');
 	}
 
 	// Final status

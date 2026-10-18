@@ -10,14 +10,14 @@ fixture-first TDD flow rather than this file's hunk workflow.
 
 Exit-code notes for `--all` runs: besides SAFETY (which always gates), the
 tools fail on an empty scope, an all-errored / zero-compared run (systemic
-sidecar/FFI failure), and on the **pinned per-language counts**
-(`benches/js/lib/gate_counts.ts` — see [gate_counts.md](gate_counts.md)): exact pins on
-`compared` and on the negative buckets (parse's tsv-failure count; format's
-`unknown`/`partial` counts — a new one fails until triaged; fixing some means
-re-pinning to record the win, which is exactly the loop this document drives), and a
-minimum on `match`. All of them hold over the whole `gates` view, because every file in
-it comes from a pinned checkout: the `../corpora` real-code snapshot plus the prettier
-suites. A snapshot refresh is the one legitimate corpus move, re-pinned deliberately.
+sidecar/FFI failure), and on the **pinned per-source counts**
+(`benches/js/lib/corpus_{format,parse}_pins.txt` — see [gate_counts.md](gate_counts.md)):
+exact pins per corpus source and language on every bucket but SAFETY (parse's `compared`
+and failure counts; format's `match`, `known`, `partial`, `unknown` and error counts — a new
+`unknown`/`partial` fails until triaged; fixing some means re-pinning with `--all --update`
+to record the win, which is exactly the loop this document drives). All of them hold over
+the whole `gates` view, because every file in it comes from a pinned checkout: the
+`../corpora` real-code snapshot plus the prettier suites. A snapshot refresh is the one legitimate corpus move, re-pinned deliberately.
 
 Repeat runs are cheap: prettier outputs are served from a content-addressed
 cache (../benches/js/CLAUDE.md §Corpus Comparison, "Prettier-output cache"), so the

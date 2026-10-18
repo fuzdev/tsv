@@ -55,7 +55,21 @@ Deno.test('gate_counts exports the pins this test expects to grade', () => {
 	// A regex that matched nothing would pass both directions vacuously.
 	ok(exported_pins.length >= 10, `found only ${exported_pins.length} exported pins`);
 	ok(exported_pins.includes('CSS_REJECTS_PIN'));
-	ok(exported_pins.includes('CORPUS_FORMAT_MATCH_MIN'));
+	ok(exported_pins.includes('STRIP_CORPUS_PINS'));
+});
+
+/**
+ * The generated per-source pins files beside the module (`corpus_pins.ts`) — pins too, so
+ * any `*_pins.txt` placed here must name the checkouts it was measured against.
+ */
+const pin_files = [...Deno.readDirSync(new URL('.', import.meta.url))]
+	.map((e) => e.name)
+	.filter((name) => name.endsWith('_pins.txt'));
+
+Deno.test('every pins file names the checkouts it was measured against', () => {
+	ok(pin_files.length >= 2, `found only ${pin_files.length} pins files`);
+	const orphans = pin_files.filter((file) => !all_entries.some(({ entry }) => entry === file));
+	deepStrictEqual(orphans, [], `pins files with no checkout in GATE_CHECKOUT_IDS: ${orphans}`);
 });
 
 Deno.test('NON_PIN_EXPORTS lists only constants that exist', () => {
@@ -80,11 +94,13 @@ Deno.test('every exported pin names the checkout it was measured against', () =>
 });
 
 Deno.test('every listed pin name resolves to an export', () => {
-	const ghosts = all_entries.filter(({ entry }) => !exported_pins.some((pin) => names(entry, pin)));
+	const ghosts = all_entries.filter(
+		({ entry }) => !exported_pins.some((pin) => names(entry, pin)) && !pin_files.includes(entry)
+	);
 	deepStrictEqual(
 		ghosts.map(({ repo, entry }) => `${repo}: ${entry}`),
 		[],
-		'GATE_CHECKOUT_IDS names a pin gate_counts.ts no longer exports'
+		'GATE_CHECKOUT_IDS names a pin gate_counts.ts no longer exports, or a missing pins file'
 	);
 });
 

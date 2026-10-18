@@ -67,7 +67,8 @@ import {
 import { is_native_panic_error } from './lib/divergence/panic_errors.ts';
 import { first_line } from './lib/error_text.ts';
 import { fixture_document } from './lib/fixture_documents.ts';
-import { CORPUS_PARSE_COMPARED_PIN, CORPUS_PARSE_TSV_ERRORS_PIN } from './lib/gate_counts.ts';
+import { corpus_missing_entries } from './lib/corpus.ts';
+import { CorpusPinTally, grade_corpus_pins } from './lib/corpus_pins.ts';
 import { first_difference, loc_definition_violation } from './lib/loc_cross_grade.ts';
 import { LocWireClient } from './lib/loc_wire_client.ts';
 import { LOC_ROWS, type LocRow } from './lib/loc_tolerance.ts';
@@ -96,6 +97,16 @@ import {
  * makes its finding set stable enough to grade (see `lib/wire_inject.ts`).
  */
 const DEFAULT_INJECT_LIMIT = 12;
+
+/**
+ * The per-source pins `--all` grades (`lib/corpus_pins.ts`): exact counts per source and
+ * language of `compared` (both sides parsed and the ASTs diffed) and of each parse-failure
+ * bucket, so each row pins its file count too. Up on `tsv_errors` = tsv newly rejects real
+ * code (triage with `diagnostics/skip_triage.ts`); down = a gap closed, re-pin so the win
+ * stays recorded.
+ */
+const PARSE_PINS_FILE = 'benches/js/lib/corpus_parse_pins.txt';
+const PARSE_PIN_BUCKETS = ['compared', 'tsv_errors', 'canonical_errors', 'both_errors'] as const;
 
 const CorpusCompareParseArgs = s.strip_object({
 	...COMPARE_BASE_ARG_FIELDS,
@@ -558,6 +569,7 @@ Options:
                      stable across fixture edits, and what wire:audit runs
   --verbose          Show each file as it's processed + per-file diff detail
   --json             Emit a single JSON report to stdout; human output → stderr
+  --update           With --all (unnarrowed): rewrite ${PARSE_PINS_FILE} from this run
   --help             Show this help message
 
 Examples:
@@ -757,6 +769,16 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		);
 		Deno.exit(1);
 	}
+	// The pins are a claim about the whole `gates` view as authored, so only an unnarrowed
+	// `--all` grades them, and only one may rewrite them.
+	const full_run = use_all_repos && !filter_lang && !limit && !multibyte_only && !injecting;
+	if (args.update && !full_run) {
+		console.error(
+			'Error: --update rewrites the pins from a full run — it needs --all, and none of ' +
+				'--filter / --limit / --multibyte-only / --inject*'
+		);
+		Deno.exit(1);
+	}
 	if (fixtures_mode) {
 		console.log(
 			"Mode: fixture tree — each fixture's parse-pinned documents, at its `goal` marker's goal"
@@ -780,6 +802,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	const loc_wires = await LocWireClient.start();
 
 	const loc_arm = new LocArmBooks();
+	const pin_tally = new CorpusPinTally(PARSE_PIN_BUCKETS);
 	const span_arm = new SpanArmBooks();
 	// Span-wire panics, held for `gate_on_panics` beside the loc arm's failures: a file
 	// whose loc wire throws a plain rejection while the span wire panics reads as
@@ -821,6 +844,9 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		const arm_file: ArmFile = { path: file.path, bytes: file.bytes, multibyte, is_control };
 
 		loc_arm.record_seen(lang, arm_file);
+		// the pinned source, for a full run's tally (controls are never counted)
+		const pin_source = is_control ? undefined : file.source;
+		if (pin_source !== undefined) pin_tally.see(pin_source, lang);
 
 		if (verbose) console.log(`  ${file.path}`);
 
@@ -903,6 +929,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 						? 'tsv_error'
 						: 'canonical_error';
 			loc_arm.record_failure(lang, arm_file, status, tsv_error ?? canonical_error ?? undefined);
+			if (pin_source !== undefined) pin_tally.add(pin_source, lang, FAILURE_COUNT[status]);
 			continue;
 		}
 
@@ -918,6 +945,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		// exact matches are counted, not stored — and so is a file whose only differences
 		// are tolerated `loc` rows, which is documented rather than exact
 		loc_arm.record(lang, arm_file, loc, Object.keys(loc.loc_rows).length > 0);
+		if (pin_source !== undefined) pin_tally.add(pin_source, lang, 'compared');
 
 		if (verbose) {
 			for (const d of loc.diffs) {
@@ -1053,7 +1081,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 
 	// A caught panic hard-fails ahead of the "compared nothing" floor and the
 	// count pins — a tsv-side parse failure is otherwise dimmed as "skipped", and
-	// only `--all`'s exact `CORPUS_PARSE_TSV_ERRORS_PIN` would notice, reporting a
+	// only `--all`'s exact per-source `tsv_errors` pins would notice, reporting a
 	// crash as one more over-rejection. `canonical_error` files are excluded: their
 	// recorded message is the JS oracle's, which can't be a panic. The span-only arm's
 	// panics ride along — no other check of that arm reaches a file both wires reject.
@@ -1078,30 +1106,51 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		exit_compare_failure(impls);
 	}
 
-	// Pinned counts (--all only — see lib/gate_counts.ts): EXACT per-language
-	// `compared` (the corpus is the pinned `../corpora` snapshot + the prettier
-	// suites, so any move is a corpus refresh or a one-language parse collapse that
-	// can't hide under the cross-language total), and EXACT per-language tsv-side
-	// parse-failure counts (up = a new over-rejection on real code — triage with
-	// diagnostics/skip_triage.ts; down = a gap closed, re-pin to record the win).
-	if (use_all_repos) {
-		const pin_failures = [
-			...LANGUAGES.filter(
-				(lang) => loc_arm.stats.get(lang)!.compared !== CORPUS_PARSE_COMPARED_PIN[lang]
-			).map(
-				(lang) =>
-					`${lang} compared ${loc_arm.stats.get(lang)!.compared} ≠ pinned ${CORPUS_PARSE_COMPARED_PIN[lang]}`
-			),
-			...LANGUAGES.filter(
-				(lang) => loc_arm.stats.get(lang)!.tsv_errors !== CORPUS_PARSE_TSV_ERRORS_PIN[lang]
-			).map(
-				(lang) =>
-					`${lang} tsv-parse-failures ${loc_arm.stats.get(lang)!.tsv_errors} ≠ pinned ${CORPUS_PARSE_TSV_ERRORS_PIN[lang]}`
-			)
-		];
+	// The run's own verdicts, reported last — computed here so a red run cannot re-pin.
+	const failures = [
+		...(totals.undocumented > 0
+			? [`${totals.undocumented} file(s) with undocumented AST diffs vs canonical`]
+			: []),
+		...(span_totals.undocumented > 0
+			? [`${span_totals.undocumented} file(s) with undocumented span-only AST diffs vs canonical`]
+			: []),
+		...(span_totals.verdict_mismatch > 0
+			? [`${span_totals.verdict_mismatch} file(s) the loc and span-only wires parse differently`]
+			: []),
+		...(loc_books.violations.length > 0
+			? [`${loc_books.violations.length} file(s) whose loc wire breaks the loc definition`]
+			: [])
+	];
+
+	// Pinned counts (a full `--all` run only): exact per-source `compared` and parse-failure
+	// counts over the gates view (`lib/corpus_pins.ts`, docs/gate_counts.md). The corpus is
+	// the pinned `../corpora` snapshot + the prettier suites, so a `compared` move is a
+	// corpus refresh or a parse collapse, named by the source it happened in.
+	if (full_run) {
+		const { optional_missing } = await corpus_missing_entries('gates');
+		const pin_failures = await grade_corpus_pins({
+			file: PARSE_PINS_FILE,
+			gate: 'corpus:compare:parse',
+			tally: pin_tally,
+			update: args.update,
+			update_blockers: [
+				...optional_missing.map((entry) => `the run is missing ${entry}`),
+				...failures
+			],
+			stats: (lang) => {
+				const st = loc_arm.stats.get(lang)!;
+				return {
+					compared: st.compared,
+					tsv_errors: st.tsv_errors,
+					canonical_errors: st.canonical_errors,
+					both_errors: st.both_errors
+				};
+			}
+		});
 		if (pin_failures.length > 0) {
 			console.log(
-				`\x1b[31mFAIL: pinned counts — ${pin_failures.join('; ')}. If deliberate, re-pin in lib/gate_counts.ts.\x1b[0m`
+				`\x1b[31mFAIL: pinned counts (${PARSE_PINS_FILE}):\n  ${pin_failures.join('\n  ')}\n` +
+					`If deliberate, re-pin with \`deno task corpus:compare:parse --all --update\`.\x1b[0m`
 			);
 			exit_compare_failure(impls);
 		}
@@ -1173,20 +1222,6 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	}
 
 	console.log();
-	const failures = [
-		...(totals.undocumented > 0
-			? [`${totals.undocumented} file(s) with undocumented AST diffs vs canonical`]
-			: []),
-		...(span_totals.undocumented > 0
-			? [`${span_totals.undocumented} file(s) with undocumented span-only AST diffs vs canonical`]
-			: []),
-		...(span_totals.verdict_mismatch > 0
-			? [`${span_totals.verdict_mismatch} file(s) the loc and span-only wires parse differently`]
-			: []),
-		...(loc_books.violations.length > 0
-			? [`${loc_books.violations.length} file(s) whose loc wire breaks the loc definition`]
-			: [])
-	];
 	if (failures.length > 0) {
 		console.log(`\x1b[31mFAIL: ${failures.join('; ')}\x1b[0m`);
 		exit_compare_failure(impls);

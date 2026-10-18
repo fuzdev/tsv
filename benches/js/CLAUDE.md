@@ -214,8 +214,10 @@ deno task corpus:compare:format:run ../some-project   # skip the FFI rebuild (fr
 invocation): `--explain` (known divergences + patterns), `--summary` (compact, no diffs),
 `--limit N` (per language), `--filter <lang>`, `--strict` (fail on any difference),
 `--safety-only` (data loss only), `--json`, `--audit-patterns` (per-pattern corpus coverage with
-sample diffs — spot-check for overmatching). The `:run` freshness guard is §Artifact Freshness
-Guard; `BENCH_STALE_OK=1` overrides.
+sample diffs — spot-check for overmatching), `--update` (an unnarrowed `--all` only: rewrite the
+per-source pins file, `lib/corpus_format_pins.txt`, from the run — `corpus:compare:parse` takes
+the same flag for `lib/corpus_parse_pins.txt`; ../../docs/gate_counts.md §Update ritual). The
+`:run` freshness guard is §Artifact Freshness Guard; `BENCH_STALE_OK=1` overrides.
 
 **`TSV_FFI_PROFILE=corpus` lives on the `:run` task, not the wrapper.** Every corpus/conformance
 FFI entry (`corpus:compare:{format,parse}:run`, `conformance:{svelte-fixtures,ts-fixtures,ts-repo}:run`)
@@ -597,7 +599,7 @@ reported per file rather than killing the run — but the SHIPPED artifacts are 
 and take the host process down on that same input, so the caught panic would land in the run's
 mildest bucket while describing the release's harshest failure. Ungated it reads as one more
 `errors` WARN at exit 0 in `corpus:compare:format`, and as a dimmed `parse-fail skipped` line in
-`corpus:compare:parse` — where only `--all`'s exact `CORPUS_PARSE_TSV_ERRORS_PIN` notices, and
+`corpus:compare:parse` — where only `--all`'s exact per-source `tsv_errors` pins notice, and
 then as "a new over-rejection".
 
 The gate is `gate_on_panics` in `lib/compare_cli.ts` (each tool passes the failures that could be
@@ -1603,6 +1605,9 @@ benches/js/
     │                      # (the baseline) and every format impl (biome, oxfmt, dprint,
     │                      # malva, markup_fmt); unit-tested by format_config_probe_test.ts
     ├── gate_counts.ts     # Pinned gate counts — see ../../docs/gate_counts.md
+    ├── corpus_pins.ts     # The corpus gates' per-source pins: grammar, tally, grade/--update over
+    │                      # the generated corpus_{format,parse}_pins.txt beside it (node-modules-free,
+    │                      # unit-tested by corpus_pins_test.ts)
     ├── harvest_stamp.ts   # Harvest freshness stamps (checkout ids + pins + view entry lists) + the HARVEST_STAMPS table
     ├── implementations.ts # Implementation registry (branches native FFI vs N-API by runtime)
     ├── bench_child.ts     # The orchestrator's spawn: one child at a time, blocking, its outcome

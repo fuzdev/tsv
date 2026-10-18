@@ -38,6 +38,8 @@ export const COMPARE_BASE_ARG_FIELDS = {
 	limit: meta(s.optional(s.number), { aliases: ['l'] }),
 	verbose: meta(s.with_default(s.boolean, false), { aliases: ['v'] }),
 	json: s.with_default(s.boolean, false),
+	/** Rewrite the gate's per-source pins file from this run (`lib/corpus_pins.ts`) — `--all`, unnarrowed. */
+	update: s.with_default(s.boolean, false),
 	help: meta(s.with_default(s.boolean, false), { aliases: ['h'] })
 } as const;
 

@@ -191,7 +191,7 @@ Four buckets, in rough priority order:
    bucket instead of `known`. Widening `comment_position` to split prettier's *merged*
    trailing-line-comment form (`a // c1 // c2`) closed fixture partials and moved one
    real corpus file (`js/for-of/comments.js`) partial→known, ratcheting
-   `CORPUS_FORMAT_PARTIAL_PIN` down.
+   the pinned `partial` count down.
 
    The **indentation** shape is not leftover reflow: for those fixtures the indent
    shift *is* the whole divergence — the sanctioned [§Uniform Forced-Continuation
