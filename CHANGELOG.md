@@ -11,7 +11,9 @@ Each `## Unreleased` section must be non-empty and carry a
 `## Unreleased` (reset to `bump: patch`) for the next cycle.
 
 ## Unreleased
-<!-- bump: minor -->
+<!-- bump: patch -->
+
+## 0.7.0
 
 - **breaking** feat: `parse_<lang>`, `parse_<lang>_json` and `format_<lang>` return a result
   instead of throwing, as `strip_typescript` does: `{ok: true, ast | json | code}` or
