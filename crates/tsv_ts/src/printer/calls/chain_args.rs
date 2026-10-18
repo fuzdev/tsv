@@ -877,42 +877,16 @@ fn build_chain_args_single(
         let sig_doc = build_arrow_sig_doc(printer, arrow, arg.span);
         let sig_doc = prepend_leading(d, leading_comment_doc, sig_doc);
 
-        // State 1: sig hugged, body indented — (sig =>\n  body\n)
-        let break_state = d.concat(&[
-            prefix,
-            sig_doc,
-            d.text(" =>"),
-            d.indent_hardline(body_doc),
-            d.hardline(),
-            d.text(")"),
-        ]);
-
-        // State 2: all args broken out — (\n  sig => body,\n)
-        // Matches prettier's allArgsBrokenOut(): a group with shouldBreak
-        // that puts a line right after "(" so fits() returns true early
-        // when evaluated in Break mode during look-ahead.
-        let all_broken_state = d.group_break(d.concat(&[
-            prefix,
-            d.indent(d.concat(&[d.line(), arrow_doc])),
-            d.line(),
-            d.text(")"),
-        ]));
-
-        // If body will break (multiline content), use break state directly
-        // so the hugged-signature layout is preserved when content is multiline
-        let doc = if d.will_break(body_doc) {
-            break_state
-        } else {
-            d.conditional_group(&[
-                // State 0: flat — (arrow)
-                d.concat(&[prefix, arrow_doc, d.text(")")]),
-                // State 1: body breaks
-                break_state,
-                // State 2: all broken out
-                all_broken_state,
-            ])
-        };
-        return with_chain_head(d, head, doc);
+        // The ladder — flat, the signature hugged with the body broken after `=>`, then the
+        // argument broken out — shared with the plain-call / `new` spelling of this same
+        // layout ([`build_break_body_ladder`]). The broken-out state is what a signature too
+        // wide for the call's line falls through to, the flat one dropped when the argument
+        // will break.
+        return with_chain_head(
+            d,
+            head,
+            build_break_body_ladder(d, opener, &[], sig_doc, body_doc, arrow_doc, arrow_doc),
+        );
     }
 
     // Special case: arrow function with ternary body

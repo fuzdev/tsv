@@ -432,7 +432,11 @@ impl Printer<'_> {
 /// whole arrow routes those through `build_arrow_body_doc`'s object-parens arm, not the
 /// conditional arm, so the injected raw wouldn't match. Returns `None` (unchanged behavior)
 /// when the last arg isn't such an arrow, or when the call carries any comment (the commented
-/// last-arg path composes the body differently; the exponential shapes are comment-free).
+/// last-arg path composes the body differently).
+///
+/// TODO: declining on a comment rebuilds the body in both docs, so nested call-bodied
+/// callbacks after a lead argument with one comment in the innermost body
+/// (`a(l, (x) => b(l, (y) => … z(/* c */ q)))`) are O(2^depth).
 pub(super) fn prebuild_expand_last_break_body(
     printer: &Printer<'_>,
     last_arg: Option<&internal::Expression<'_>>,
@@ -1885,7 +1889,10 @@ fn build_break_body_state(
 ///
 /// The flat state is dropped when the last argument's own doc will break — prettier's rule,
 /// and not an optimization: `fits()` would select it (its first line is short) but it prints
-/// the wrong closing brackets (`}));` instead of `}),⏎)`).
+/// the wrong closing brackets (`}));` instead of `}),⏎)`). When that break is not the body's,
+/// it sits in the signature (a parameter or return type the author expanded), which the hug
+/// state prints from `sig_doc` with the break removed — so only the all-broken-out state is
+/// left, prettier's `ArgExpansionBailout` reading of a signature that will break.
 pub(super) fn build_break_body_ladder(
     d: &DocArena,
     opener: ArgOpener,
@@ -1898,6 +1905,9 @@ pub(super) fn build_break_body_ladder(
     let state_break_body = build_break_body_state(d, opener, head_parts, sig_doc, body_doc);
     let state_expand_all = opener.expand_all(d, all_args_broken);
     if d.will_break(last_arg_doc) {
+        if !d.will_break(body_doc) {
+            return state_expand_all;
+        }
         return d.conditional_group(&[state_break_body, state_expand_all]);
     }
     d.conditional_group(&[
@@ -1965,69 +1975,41 @@ pub(super) fn build_ternary_arrow_hug_ladder(
     d.conditional_group(&[state_flat, state_break, state_all_broken])
 }
 
-/// Build doc for arrow functions with call expression bodies.
+/// The ladder for a **lone** arrow argument whose expression body is a call (through a
+/// trailing `!`): the plain-call and `new` spellings of the member chain's call-body arm.
 ///
-/// Used when an arrow's body is a call expression (simple or with complex args).
+/// Prettier's expand-last ladder for one argument: flat, the signature hugged with the body
+/// broken after `=>` (`callee((sig) =>⏎\tbody⏎)`), then `allArgsBrokenOut()` — the argument
+/// on its own line, which is what a signature too wide for the `callee(` line falls through
+/// to. One ladder with the call's other expand-last spellings ([`build_break_body_ladder`]),
+/// which also drops the flat state when the argument will break.
 ///
-/// When the body has hardlines (e.g., comments forcing multi-line args), uses a
-/// group-based approach with softline to separate the outer closing paren. Without
-/// this, the conditional_group's flat state would be selected by `fits()` (the first
-/// line fits) but merge the inner and outer closing parens as `))`.
+/// Two printings, as prettier's: the hug states reassemble the signature and the body, and
+/// the broken-out state prints the whole argument. The body is built ONCE and injected into
+/// the whole-argument build ([`prebuild_expand_last_break_body`]): building it in both
+/// recursed into itself for a call-bodied arrow whose body is another such call
+/// (`a(x => b(y => …))`), making the doc-node count O(2^depth). A commented argument is
+/// injected too — one comment in the innermost body puts every enclosing argument's span on
+/// page, so skipping it there rebuilt every level twice; the comment positions that need a
+/// different composition never reach this arm (`arrow_hug_refused_by_comments`).
 ///
-/// When the body fits on one line, creates a conditional group with two states:
-/// - State 0 (flat): `callee((params) => body)`
-/// - State 1 (break): `callee((params) =>\n  body,\n)`
-///
-/// Both states compose the same `sig_doc`/`body_doc` (the body is built ONCE by the
-/// caller) — the flat state is `sig => body`, so the caller does NOT build a separate
-/// whole-arrow doc. Building the whole arrow *and* the body was a redundant double-build
-/// that recursed into itself for a call-bodied arrow whose body is another such call
-/// (`a(x => b(y => …))`), making the doc-node count O(2^depth). See the build-fanout audit.
-///
-/// Parameters:
-/// - `callee`: The call expression's callee doc
-/// - `sig_doc`: The arrow's signature doc (`(params)`)
-/// - `body_doc`: The arrow body expression doc
-#[inline]
+/// `printed` builds the whole argument as the caller's argument builder prints it.
 pub(super) fn build_arrow_call_body_states(
-    d: &DocArena,
-    callee: DocId,
-    sig_doc: DocId,
-    body_doc: DocId,
+    printer: &Printer<'_>,
+    opener: ArgOpener,
+    arg: &internal::Expression<'_>,
+    arrow: &internal::ArrowFunctionExpression<'_>,
+    body_expr: &internal::Expression<'_>,
+    printed: impl FnOnce() -> DocId,
 ) -> DocId {
-    // Body has hardlines (comments, nested callbacks): softline separates outer )
-    if d.will_break(body_doc) {
-        return d.group(d.concat(&[
-            callee,
-            d.text("("),
-            d.concat(&[sig_doc, d.text(" =>")]),
-            d.group(d.indent_line(body_doc)),
-            d.softline(),
-            d.text(")"),
-        ]));
-    }
-
-    d.conditional_group(&[
-        // Flat: callee((params) => body)
-        d.concat(&[
-            callee,
-            d.text("("),
-            sig_doc,
-            d.text(" => "),
-            body_doc,
-            d.text(")"),
-        ]),
-        // Break: callee((params) =>\n  body,\n)
-        d.concat(&[
-            callee,
-            d.text("("),
-            sig_doc,
-            d.text(" =>"),
-            d.indent_hardline(body_doc),
-            d.hardline(),
-            d.text(")"),
-        ]),
-    ])
+    let d = printer.d();
+    let body_reuse = prebuild_expand_last_break_body(printer, Some(arg), false);
+    let arrow_doc = printer.with_arrow_body_inject(body_reuse, printed);
+    let body_doc =
+        body_reuse.map_or_else(|| printer.build_expression_doc(body_expr), |(_, doc)| doc);
+    let body_doc = prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
+    let sig_doc = build_arrow_sig_doc(printer, arrow, arg.span);
+    build_break_body_ladder(d, opener, &[], sig_doc, body_doc, arrow_doc, arrow_doc)
 }
 
 /// Build argument docs joined with breaks, preserving inter-argument comments.

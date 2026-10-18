@@ -924,15 +924,15 @@ fn try_single_arg_hug(
                 // reassemble past (`arrow_hug_refused_by_comments`).
                 && !arrow_hug_refused_by_comments(printer, arrow, arg.span, body_expr)
             {
-                // Build the body ONCE and compose both hug/wrap states from it; building
-                // the whole arrow separately for the flat state re-built this same body
-                // and recursed into itself → O(2^depth) for `a(x => b(y => …))`.
-                let body_doc = printer.build_expression_doc(body_expr);
-                let body_doc =
-                    prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
-                let sig_doc = build_arrow_sig_doc(printer, arrow, arg.span);
-
-                return Some(build_arrow_call_body_states(d, callee, sig_doc, body_doc));
+                // The body is built once and shared by every state (see the ladder's doc).
+                return Some(build_arrow_call_body_states(
+                    printer,
+                    ArgOpener::Callee(callee),
+                    arg,
+                    arrow,
+                    body_expr,
+                    || printer.build_expression_doc(arg),
+                ));
             }
             // Other expression types: fall through to standard wrapping
         }

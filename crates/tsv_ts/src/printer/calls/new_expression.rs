@@ -480,7 +480,7 @@ impl<'a> Printer<'a> {
                             );
                         }
 
-                        // Simple call body: 2-state break at =>
+                        // Call body: the expand-last ladder (hug, break at `=>`, break out)
                         // couldExpandArg keys on the body type, looking through the
                         // return-type annotation and a trailing non-null `!`.
                         if arrow_body_is_call_through_non_null(body_expr)
@@ -488,22 +488,16 @@ impl<'a> Printer<'a> {
                             && !(new_has_comments
                                 && arrow_hug_refused_by_comments(self, arrow, new_expr.arguments[0].span, body_expr))
                         {
-                            // Build the body ONCE (see `build_arrow_call_body_states`) — a
-                            // separate whole-arrow doc re-built this body and recursed → O(2^depth).
-                            let body_doc = self.build_expression_doc(body_expr);
-                            let body_doc = prepend_arrow_body_comments(
-                                self,
-                                arrow,
-                                body_expr.span().start,
-                                body_doc,
-                            );
-                            let sig_doc =
-                                build_arrow_sig_doc(self, arrow, new_expr.arguments[0].span);
+                            // The body is built once and shared by every state (see the
+                            // ladder's doc).
+                            let arg0 = new_expr.arguments[0];
                             return build_arrow_call_body_states(
-                                d,
-                                callee_with_types,
-                                sig_doc,
-                                body_doc,
+                                self,
+                                ArgOpener::Callee(callee_with_types),
+                                arg0,
+                                arrow,
+                                body_expr,
+                                || self.build_expression_doc(arg0),
                             );
                         }
                     }

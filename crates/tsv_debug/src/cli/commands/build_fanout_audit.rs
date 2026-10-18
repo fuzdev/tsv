@@ -200,6 +200,18 @@ fn gen_ts_nested_arrow(depth: usize) -> String {
     format!("const v = {expr};\n")
 }
 
+/// The commented twin of `gen_ts_nested_arrow`: one block comment in the innermost body
+/// (`a(x => b(y => … z(/* c */ q)))`) puts every enclosing argument's span on page, so a
+/// lone call-body arm that declines to share its body build for a commented argument
+/// rebuilds every level twice.
+fn gen_ts_nested_arrow_inner_comment(depth: usize) -> String {
+    let mut expr = String::from("z(/* c */ q)");
+    for i in 0..depth {
+        expr = format!("call{i}(p{i} => {expr})");
+    }
+    format!("const v = {expr};\n")
+}
+
 /// MULTI-arg last-arg arrow whose body is another such call — a leading arg at every
 /// level routes through `try_expand_last_function_arg` (the `build_args_split_last` /
 /// `build_break_body_ladder` expand-last path). The multi-arg twin of `gen_ts_nested_arrow`:
@@ -643,6 +655,12 @@ const CONSTRUCTS: &[Construct] = &[
         name: "ts_nested_arrow",
         parser: ParserType::TypeScript,
         generate: gen_ts_nested_arrow,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_arrow_inner_comment",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_arrow_inner_comment,
         depths: &[4, 8, 12],
     },
     Construct {
