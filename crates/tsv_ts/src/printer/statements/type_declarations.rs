@@ -829,8 +829,20 @@ impl<'a> Printer<'a> {
                 // (a function type whose header pushes `(` past the width). Either way the
                 // marker's `line` keeps the LHS `<…>` inline instead of breaking the
                 // type-param list.
-                let type_doc = build_value();
-                parts.push(fluid(make_rhs(type_doc)));
+                let value_doc = make_rhs(build_value());
+                // A reference whose sole type argument is a nullable reference union
+                // breaks after `=` only while it then fits (the `<…>` measured unbroken, so
+                // the whole type), and otherwise keeps the `=` line and breaks inside its
+                // `<…>` — after the `=` too where even the line up to the `<` overflows
+                // ([`Printer::after_operator_nullable_union_doc`]). The pre-`=` comment's
+                // continuation path keeps `fluid`.
+                let nullable_union_tail = match value_type {
+                    TSType::TypeReference(r) if lead_space => {
+                        self.after_operator_nullable_union_doc(value_doc, r.type_arguments.as_ref())
+                    }
+                    _ => None,
+                };
+                parts.push(nullable_union_tail.unwrap_or_else(|| fluid(value_doc)));
             } else {
                 // Remaining types break after `=` with a hanging indent when too
                 // long — unless a comment keeps the value on the `=` line, in which

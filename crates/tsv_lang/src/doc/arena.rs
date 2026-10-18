@@ -316,21 +316,52 @@ pub enum DocNode {
     /// fill. Zero-width and skipped by every measurement walk; invisible to `will_break`.
     FlowProbeEnd,
 
-    /// A conditional-group state guarded by a never-fits probe — the
-    /// member-chain flat-object hug window.
+    /// A conditional-group state guarded by a probe line.
     ///
-    /// Meaningful only as a non-final state of a conditional group. At state
-    /// selection the renderer first measures `probe` flat on a hypothetical
-    /// fresh line one indent level deeper than the group; if THAT fits, the
-    /// state is skipped entirely — the layout the probe stands for (the
-    /// expanded member chain keeping its last argument flat on the
-    /// continuation line) is the settled form, and admitting this state would
-    /// steal it. Only when the probe cannot fit anywhere is `contents`
-    /// measured and rendered like any other state. Everywhere else — fits
-    /// walks, `will_break`, rebuilds — the node is transparent to `contents`;
-    /// `probe` is measured only, never rendered (its nodes are shared with the
-    /// group's flat state, so nothing exists only inside it).
-    GatedState { probe: DocId, contents: DocId },
+    /// Meaningful only as a state of a conditional group — a non-final one,
+    /// except a [`GateAdmit::Never`] state, which is final. At state selection
+    /// the renderer first measures `probe` flat on a hypothetical fresh line one
+    /// indent level deeper than the group, completed by the group's rest
+    /// commands, and `admit` reads that answer:
+    ///
+    /// - [`GateAdmit::ProbeOverflows`] — the member-chain flat-object hug window.
+    ///   If the probe fits, the state is skipped entirely: the layout the probe
+    ///   stands for (the expanded member chain keeping its last argument flat on
+    ///   the continuation line) is the settled form, and admitting this state
+    ///   would steal it.
+    /// - [`GateAdmit::ProbeFits`] — a state that breaks onto that very line (a
+    ///   value hung after an operator), which no fits walk can measure past the
+    ///   break: the probe stands in for the line the state puts its value on.
+    /// - [`GateAdmit::Never`] — no probe is measured and the state is never
+    ///   selected: it is the group's FINAL state, which an enclosing look-ahead
+    ///   reads (a break-mode fits walk takes a conditional group's last state)
+    ///   but the render never prints — when no earlier state fits, the render
+    ///   takes the state before it in break mode instead. For a group whose
+    ///   look-ahead form and last-resort form differ (an unbreakable `<…>` to the
+    ///   layout around it that still breaks inside past print width).
+    ///
+    /// An admitted state's `contents` is measured and rendered like any other
+    /// state. Everywhere else — fits walks, `will_break`, rebuilds — the node is
+    /// transparent to `contents`; `probe` is measured only, never rendered (its
+    /// nodes are shared with the group's other states, so nothing exists only
+    /// inside it).
+    GatedState {
+        probe: DocId,
+        contents: DocId,
+        admit: GateAdmit,
+    },
+}
+
+/// Which answer of a [`DocNode::GatedState`]'s probe admits the state.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GateAdmit {
+    /// Admitted only while the probe cannot fit on the fresh line.
+    ProbeOverflows,
+    /// Admitted only while the probe fits on the fresh line.
+    ProbeFits,
+    /// Never admitted: a final state for enclosing measurement alone, whose
+    /// no-fit render falls back to the state before it.
+    Never,
 }
 
 // `DocNode` must stay free of drop glue: dynamically-built text lives in the
@@ -2926,7 +2957,30 @@ impl DocArena {
     /// flat on a fresh line one indent level deeper than the enclosing
     /// conditional group — see [`DocNode::GatedState`].
     pub fn gated_state(&self, probe: DocId, contents: DocId) -> DocId {
-        self.alloc(DocNode::GatedState { probe, contents })
+        self.gated_state_admitting(probe, contents, GateAdmit::ProbeOverflows)
+    }
+
+    /// Create a conditional-group state admitted only while `probe` FITS flat on a
+    /// fresh line one indent level deeper than the enclosing conditional group —
+    /// see [`DocNode::GatedState`].
+    pub fn gated_state_when_fits(&self, probe: DocId, contents: DocId) -> DocId {
+        self.gated_state_admitting(probe, contents, GateAdmit::ProbeFits)
+    }
+
+    /// Create a conditional group's FINAL state that only an enclosing look-ahead
+    /// reads: the render never prints it, taking the state before it when no
+    /// earlier state fits — see [`GateAdmit::Never`]. The group needs at least two
+    /// other states.
+    pub fn measure_only_state(&self, contents: DocId) -> DocId {
+        self.gated_state_admitting(contents, contents, GateAdmit::Never)
+    }
+
+    fn gated_state_admitting(&self, probe: DocId, contents: DocId, admit: GateAdmit) -> DocId {
+        self.alloc(DocNode::GatedState {
+            probe,
+            contents,
+            admit,
+        })
     }
 
     /// Increase indentation for nested doc.
@@ -3965,6 +4019,177 @@ impl DocArena {
         self.flatten_lines_impl(id, FlattenMode::RemoveLines)
     }
 
+    /// `root` with every occurrence of the node `target` replaced by `replacement` — a
+    /// copy of the PATH from `root` down to each occurrence, every subtree off it shared.
+    ///
+    /// For a layout that needs a second form of a doc differing in one built piece (an
+    /// enclosing conditional group's fallback state), without building the rest twice.
+    /// `root` itself when `target` does not occur under it. `None` when a path to it
+    /// crosses a KEYED group — a copied keyed group is a new [`GroupId`], so a reader keyed
+    /// on the original would read a group that never renders — or a CONDITIONAL group,
+    /// whose states a builder chose from the doc as built (a member chain's one-line state,
+    /// admitted because nothing in it would break): the copy would keep a choice the
+    /// swapped piece made wrong. The caller keeps its one form.
+    pub fn replace_subdoc(&self, root: DocId, target: DocId, replacement: DocId) -> Option<DocId> {
+        let mut memo = std::collections::HashMap::new();
+        match self.replace_subdoc_walk(root, target, replacement, &mut memo) {
+            Ok(copy) => Some(copy.unwrap_or(root)),
+            Err(()) => None,
+        }
+    }
+
+    /// [`Self::replace_subdoc`]'s walk: `Ok(Some(copy))` when `id`'s subtree holds
+    /// `target`, `Ok(None)` when it does not (the caller shares `id`), `Err(())` when a
+    /// path to it crosses a keyed group. Memoized, since a doc is a DAG.
+    fn replace_subdoc_walk(
+        &self,
+        id: DocId,
+        target: DocId,
+        replacement: DocId,
+        memo: &mut std::collections::HashMap<DocId, Option<DocId>>,
+    ) -> Result<Option<DocId>, ()> {
+        if id == target {
+            return Ok(Some(replacement));
+        }
+        if let Some(&known) = memo.get(&id) {
+            return Ok(known);
+        }
+        let node = self.nodes.borrow()[id.index()].clone();
+        let mut walk = |child: DocId| -> Result<(DocId, bool), ()> {
+            Ok(
+                match self.replace_subdoc_walk(child, target, replacement, memo)? {
+                    Some(copy) => (copy, true),
+                    None => (child, false),
+                },
+            )
+        };
+        let copy = match node {
+            DocNode::Text(_)
+            | DocNode::MultilineText { .. }
+            | DocNode::Line(_)
+            | DocNode::LineSuffixBoundary
+            | DocNode::EmbedEnd { .. }
+            | DocNode::BreakParent
+            | DocNode::FlushBreak
+            | DocNode::FlowProbeEnd => None,
+            DocNode::Indent(inner) => match walk(inner)? {
+                (copy, true) => Some(DocNode::Indent(copy)),
+                _ => None,
+            },
+            DocNode::Dedent(inner) => match walk(inner)? {
+                (copy, true) => Some(DocNode::Dedent(copy)),
+                _ => None,
+            },
+            DocNode::LineSuffix(inner) => match walk(inner)? {
+                (copy, true) => Some(DocNode::LineSuffix(copy)),
+                _ => None,
+            },
+            DocNode::AlignRoot { n, contents } => match walk(contents)? {
+                (copy, true) => Some(DocNode::AlignRoot { n, contents: copy }),
+                _ => None,
+            },
+            DocNode::Align { n, contents } => match walk(contents)? {
+                (copy, true) => Some(DocNode::Align { n, contents: copy }),
+                _ => None,
+            },
+            DocNode::WithContext { doc, context } => match walk(doc)? {
+                (copy, true) => Some(DocNode::WithContext { doc: copy, context }),
+                _ => None,
+            },
+            DocNode::IndentIfBreak { contents, group_id } => match walk(contents)? {
+                (copy, true) => Some(DocNode::IndentIfBreak {
+                    contents: copy,
+                    group_id,
+                }),
+                _ => None,
+            },
+            DocNode::IfBreak {
+                break_doc,
+                flat_doc,
+                group_id,
+            } => {
+                let (break_copy, break_changed) = walk(break_doc)?;
+                let (flat_copy, flat_changed) = walk(flat_doc)?;
+                (break_changed || flat_changed).then_some(DocNode::IfBreak {
+                    break_doc: break_copy,
+                    flat_doc: flat_copy,
+                    group_id,
+                })
+            }
+            DocNode::GatedState {
+                probe,
+                contents,
+                admit,
+            } => {
+                let (probe_copy, probe_changed) = walk(probe)?;
+                let (contents_copy, contents_changed) = walk(contents)?;
+                (probe_changed || contents_changed).then_some(DocNode::GatedState {
+                    probe: probe_copy,
+                    contents: contents_copy,
+                    admit,
+                })
+            }
+            DocNode::Concat(range) | DocNode::Fill(range) => {
+                let kids: DocBuf = range
+                    .resolve(&self.children.borrow())
+                    .iter()
+                    .copied()
+                    .collect();
+                let mut changed = false;
+                let mut copies = DocBuf::new();
+                for kid in kids {
+                    let (copy, kid_changed) = walk(kid)?;
+                    changed |= kid_changed;
+                    copies.push(copy);
+                }
+                changed.then(|| {
+                    let range = self.alloc_children(&copies);
+                    if matches!(node, DocNode::Concat(_)) {
+                        DocNode::Concat(range)
+                    } else {
+                        DocNode::Fill(range)
+                    }
+                })
+            }
+            DocNode::Group {
+                contents,
+                expanded_states,
+                keyed,
+                should_break,
+            } => {
+                let states: DocBuf = expanded_states
+                    .resolve(&self.children.borrow())
+                    .iter()
+                    .copied()
+                    .collect();
+                let (contents_copy, mut changed) = walk(contents)?;
+                let mut state_copies = DocBuf::new();
+                for state in states {
+                    let (copy, state_changed) = walk(state)?;
+                    changed |= state_changed;
+                    state_copies.push(copy);
+                }
+                // A conditional group's states were chosen and ordered at build time from
+                // the doc it holds (a member chain's one-line and expanded forms, picked by
+                // whether the one-line form will break): a copy with a piece swapped keeps
+                // that choice, so its render can admit a state the swapped piece made
+                // wrong. Declined like a keyed group.
+                if changed && (keyed || !state_copies.is_empty()) {
+                    return Err(());
+                }
+                changed.then(|| DocNode::Group {
+                    contents: contents_copy,
+                    expanded_states: self.alloc_children(&state_copies),
+                    keyed,
+                    should_break,
+                })
+            }
+        };
+        let result = copy.map(|node| self.alloc(node));
+        memo.insert(id, result);
+        Ok(result)
+    }
+
     /// Force a doc onto **one line at any width** — every line flattened, hard ones
     /// included.
     ///
@@ -4024,7 +4249,7 @@ impl DocArena {
             WithContext(DocId, DocContext),
             LineSuffix(DocId),
             BreakParent,
-            GatedState(DocId, DocId),
+            GatedState(DocId, DocId, GateAdmit),
         }
 
         let info = {
@@ -4078,7 +4303,11 @@ impl DocArena {
                 // Both are pure layout-forcing markers with no content: flattening
                 // drops them the same way (`Info::BreakParent` → `empty()`).
                 DocNode::BreakParent | DocNode::FlushBreak => Info::BreakParent,
-                DocNode::GatedState { probe, contents } => Info::GatedState(*probe, *contents),
+                DocNode::GatedState {
+                    probe,
+                    contents,
+                    admit,
+                } => Info::GatedState(*probe, *contents, *admit),
             }
         }; // nodes borrow dropped here
 
@@ -4202,10 +4431,10 @@ impl DocArena {
             // keeps conditional-group states) the state must stay gated; under
             // `atomize` the node is unreachable through a group (states dropped)
             // and the rebuild is inert.
-            Info::GatedState(probe, contents) => {
+            Info::GatedState(probe, contents, admit) => {
                 let new_probe = self.flatten_lines_impl(probe, mode);
                 let new_contents = self.flatten_lines_impl(contents, mode);
-                self.gated_state(new_probe, new_contents)
+                self.gated_state_admitting(new_probe, new_contents, admit)
             }
         };
 

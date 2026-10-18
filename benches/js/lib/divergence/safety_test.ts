@@ -51,8 +51,8 @@ Deno.test('vs_prettier: real loss beyond prettier is flagged', () => {
 });
 
 Deno.test('vs_prettier: leading-pipe union break (ours breaks, prettier inline) is safe', () => {
-	// The `return_type_generic_union` divergence in method-signature position: tsv
-	// keeps the params inline and breaks the return-type union with leading pipes
+	// A return-type union in method-signature position: tsv keeps the params
+	// inline and breaks the return-type union with leading pipes
 	// (`Resolvable<| A⏎| B⏎| C>`), where prettier breaks the params and keeps the
 	// union inline. Ours grows one `|` per broken union — pure break layout, NOT
 	// content. Excluding leading pipes cancels it (this is the gated SAFETY bug the

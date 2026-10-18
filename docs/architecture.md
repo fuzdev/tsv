@@ -372,7 +372,7 @@ pub enum DocNode {
     BreakParent,                                // Force parent group to break
     FlushBreak,                                 // Break only the group a pending suffix flushes in
     FlowProbeEnd,                               // Renderer-pushed sentinel (never built by a printer)
-    GatedState { probe, contents },             // Conditional-group state skipped when its probe fits
+    GatedState { probe, contents, admit },      // Conditional-group state admitted by its probe's fit (or measure-only)
 }
 ```
 

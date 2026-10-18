@@ -366,6 +366,18 @@ pub struct Printer<'a> {
     /// through the counter. Read by [`Self::span_holds_forced_list_break`]; empty in almost
     /// every document.
     pub(crate) forced_list_elements: RefCell<Vec<u32>>,
+    /// Every nullable-union `<…>` built so far, as `(list start, conditional doc, broken
+    /// doc)` — [`Self::build_nullable_union_type_args_doc`] records each build, and
+    /// [`Self::value_with_nullable_union_broken`] swaps the conditional for the broken form
+    /// inside an enclosing value's doc, the one piece an after-operator fallback state
+    /// needs in its other form. Empty in almost every document.
+    pub(crate) nullable_union_type_args: RefCell<Vec<(u32, DocId, DocId)>>,
+    /// The start of the one type-argument list prettier's `isArrowFunctionVariable`
+    /// opts out of the inline and nullable-union layouts — the top-level `<…>` of a
+    /// declarator binding's annotation when the initializer is an arrow function
+    /// ([`Self::arrow_variable_type_args_start`]); it takes the ordinary group. Set only
+    /// while that binding builds.
+    pub(crate) arrow_variable_type_args: Cell<Option<u32>>,
     /// Span of the node at the leftmost position of an arrow body that must be wrapped in
     /// parens because a concise body cannot start with its first token — an object's `{`
     /// (read as a block body) or a decorated class's `@`: `() => ({}) as Logger`,
@@ -755,6 +767,8 @@ impl<'a> Printer<'a> {
             unforced_param_type_literal: Cell::new(None),
             deferred_paren_runs: Cell::new(0),
             forced_list_elements: RefCell::new(Vec::new()),
+            nullable_union_type_args: RefCell::new(Vec::new()),
+            arrow_variable_type_args: Cell::new(None),
             arrow_body_leftmost_parens_target: Cell::new(None),
             expr_stmt_paren_target: Cell::new(None),
             ternary_hang_target: Cell::new(None),

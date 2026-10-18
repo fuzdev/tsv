@@ -2118,29 +2118,48 @@ const member_chain_hug_convergence: DivergencePattern = {
 	}
 };
 
-const return_type_generic_union: DivergencePattern = {
-	id: 'return_type_generic_union',
-	description: 'Return type generic with union wraps at print width',
+const nullable_union_type_argument: DivergencePattern = {
+	id: 'nullable_union_type_argument',
+	description:
+		'Nullable union type argument: tsv breaks inside the `<>` where prettier overflows, and keeps a member with breakable type arguments whole',
 	languages: ['typescript', 'svelte'],
 	conformance_sections: ['TypeScript'],
-	fixtures: ['typescript/declarations/function/return_type_generic_union_long_prettier_divergence'],
+	fixtures: [
+		'typescript/declarations/function/return_type_generic_union_long_prettier_divergence',
+		'typescript/types/type_argument_nullable_union_annotation_long_prettier_divergence',
+		'typescript/types/type_argument_nested_nullable_union_long_prettier_divergence'
+	],
 	detect(ctx) {
-		// Look for generic types with union (| null, | void, | undefined) in hunks
-		// where prettier's line exceeds 100 chars and ours re-wrapped it.
-		const union_in_generic = /[<>].*\|\s*(?:null|void|undefined)/;
+		// Prettier keeps a lone type argument that is one object-like type united only with
+		// `null` / `void` (either order) unbreakable. Two shapes:
+		// - where nothing before it can break, prettier's line runs past 100 and ours broke
+		//   inside the `<>`;
+		// - when the member's own type arguments can break, prettier breaks inside them
+		//   (`Map<⏎…⏎> | null>`) while ours keeps the member whole on one line.
+		const union_in_generic = /[<>].*(?:\|\s*(?:null|void)\b|\b(?:null|void)\s*\|)/;
+		const prettier_inner_close = /^\s*>\s*\|\s*(?:null|void)\b/;
+		const ours_member_whole =
+			/\w<[^<>]*>\s*\|\s*(?:null|void)\b|\b(?:null|void)\s*\|\s*\w+<[^<>]*>/;
 
-		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) =>
-			long_line_rewrapped(hunk, ctx, {
-				line_predicate: (l) => union_in_generic.test(l)
-			})
+		const hunk_indices = find_matching_hunks(
+			ctx.hunks,
+			(hunk) =>
+				long_line_rewrapped(hunk, ctx, {
+					line_predicate: (l) => union_in_generic.test(l)
+				}) ||
+				(prettier_lines_in_hunk(ctx.prettier_lines!, hunk).some((l) =>
+					prettier_inner_close.test(l)
+				) &&
+					ours_lines_in_hunk(ctx.ours_lines!, hunk).some((l) => ours_member_whole.test(l)) &&
+					ours_spent_every_break(hunk, overrun_regime(hunk, ctx)))
 		);
 
 		if (hunk_indices.length > 0) {
 			return {
-				pattern: 'return_type_generic_union',
+				pattern: 'nullable_union_type_argument',
 				confidence: 'likely',
 				hunk_indices,
-				reason: 'Return type generic with union wraps at print width'
+				reason: 'Nullable union type argument breaks inside the `<>` or keeps its member whole'
 			};
 		}
 		return null;
@@ -4375,7 +4394,7 @@ export const PATTERNS: DivergencePattern[] = [
 	block_expression_logical,
 	member_expression_call,
 	member_chain_hug_convergence,
-	return_type_generic_union,
+	nullable_union_type_argument,
 	non_null_paren_base,
 	union_paren_member_inline,
 	forced_continuation_indent,

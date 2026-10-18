@@ -2039,24 +2039,55 @@ Deno.test('empty_statement_removal: negative - normal statement semicolons', () 
 	assertEquals(match, null);
 });
 
-// ─── return_type_generic_union ──────────────────────────────────────────────
+// ─── nullable_union_type_argument ───────────────────────────────────────────
 
-Deno.test('return_type_generic_union: positive - generic with | null wraps', () => {
+Deno.test('nullable_union_type_argument: positive - generic with | null wraps', () => {
 	// Need prettier line > 100 chars with generic union
 	const prettier =
 		'function processWithVeryLongFunctionName(input: SomeVeryLongParameterType): Promise<VeryLongReturnTypeName | null> {';
 	const ours =
 		'function processWithVeryLongFunctionName(\n\tinput: SomeVeryLongParameterType,\n): Promise<\n\tVeryLongReturnTypeName | null\n> {';
 	const ctx = make_context(ours, prettier, 'typescript');
-	const match = run_pattern('return_type_generic_union', ctx);
+	const match = run_pattern('nullable_union_type_argument', ctx);
 	assertNotEquals(match, null);
 });
 
-Deno.test('return_type_generic_union: negative - generic without union', () => {
+Deno.test('nullable_union_type_argument: positive - `null` first', () => {
+	const prettier =
+		'\taaaaaaaaaaaaaaaaaaaaaaaa03: Promise<null | Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb>;';
+	const ours =
+		'\taaaaaaaaaaaaaaaaaaaaaaaa03: Promise<\n\t\tnull | Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n\t>;';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('nullable_union_type_argument', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test(
+	'nullable_union_type_argument: positive - member with breakable type arguments kept whole',
+	() => {
+		const prettier = 'type A = Promise<Map<\n\tKkkk,\n\tVvvv\n> | null>;';
+		const ours = 'type A =\n\tPromise<Map<Kkkk, Vvvv> | null>;';
+		const ctx = make_context(ours, prettier, 'typescript');
+		const match = run_pattern('nullable_union_type_argument', ctx);
+		assertNotEquals(match, null);
+	}
+);
+
+Deno.test('nullable_union_type_argument: negative - generic without union', () => {
 	const prettier = 'function foo(): Promise<string> {';
 	const ours = 'function foo(): Promise<\n\tstring\n> {';
 	const ctx = make_context(ours, prettier, 'typescript');
-	const match = run_pattern('return_type_generic_union', ctx);
+	const match = run_pattern('nullable_union_type_argument', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('nullable_union_type_argument: negative - `| undefined` is not in the set', () => {
+	const prettier =
+		'function processWithVeryLongFunctionName(input: SomeVeryLongParameterType): Promise<VeryLongReturnTypeName | undefined> {';
+	const ours =
+		'function processWithVeryLongFunctionName(\n\tinput: SomeVeryLongParameterType,\n): Promise<\n\tVeryLongReturnTypeName | undefined\n> {';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('nullable_union_type_argument', ctx);
 	assertEquals(match, null);
 });
 

@@ -118,19 +118,17 @@ pub fn is_simple_type_arg(ty: &TSType<'_>) -> bool {
         )
 }
 
-/// Whether any union member is **brace-delimited** (`TypeLiteral`/`Mapped`) — the extra
-/// narrowing a *type-argument* hug requires on top of [`union_hug_shape`]: the object
-/// member carries its own group and breaks block-style inside the hugged `<…>`, so the
-/// `<…>` itself never needs a break point.
+/// Whether any union member is **brace-delimited** (`TypeLiteral`/`Mapped`) — what splits
+/// prettier's hugging type-argument union (`isObjectLikeType`, which also accepts a bare
+/// `TSTypeReference`) into its two tsv layouts: a brace member carries its own group and
+/// breaks block-style inside the inlined `<…>`, so the `<…>` itself never needs a break
+/// point ([`Printer::type_arg_union_prints_hugged`](super::super::Printer::type_arg_union_prints_hugged));
+/// a reference member (`Promise<… | null>`) has none of its own to offer, so its `<…>` is
+/// unbreakable first and broken inside only past print width — the nullable union type
+/// argument print-width divergence
+/// ([`Printer::type_arg_is_nullable_reference_union`](super::super::Printer::type_arg_is_nullable_reference_union)).
 ///
-/// **Deliberately stricter than** prettier's `isObjectLikeType`, which also accepts a bare
-/// `TSTypeReference`: excluding it is the sanctioned `return_type_generic_union_long`
-/// print-width family (a `Promise<…> | null` argument keeps its break point). Don't widen it
-/// to match prettier.
-///
-/// Sole caller is
-/// [`Printer::type_arg_union_prints_hugged`](super::super::Printer::type_arg_union_prints_hugged)
-/// — this is one *clause* of that gate, never the gate. It is safe to ask bare (unlike
+/// One *clause* of those gates, never a gate itself. It is safe to ask bare (unlike
 /// [`union_hug_shape`], it makes no claim to answer "does this hug?").
 ///
 /// ⚠️ **Reads through the paren shell, via [`is_huggable_type`]** — the same

@@ -1329,11 +1329,18 @@ impl<'a> Printer<'a> {
                 //   lineSuffixBoundary,
                 //   indentIfBreak(rightDoc, { groupId }),      // Conditional indent
                 // ])
-                d.group(d.concat(&[
-                    d.group(left_doc),
-                    operator,
-                    fluid_after_operator(d, right_doc_with_comments),
-                ]))
+                // A call or `new` whose sole type argument is a nullable reference union
+                // breaks after the operator while the line up to the value's first break
+                // (a call's `(`) then fits, and otherwise keeps the operator's line and
+                // breaks inside its `<…>` — after the operator too where even the line up
+                // to the `<` overflows ([`Printer::after_operator_nullable_union_doc`]).
+                let tail = self
+                    .after_operator_nullable_union_doc(
+                        right_doc_with_comments,
+                        Self::value_type_arguments(right_expr),
+                    )
+                    .unwrap_or_else(|| fluid_after_operator(d, right_doc_with_comments));
+                d.group(d.concat(&[d.group(left_doc), operator, tail]))
             }
         }
     }

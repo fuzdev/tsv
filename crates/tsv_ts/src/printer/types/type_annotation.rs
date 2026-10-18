@@ -465,10 +465,9 @@ impl<'a> Printer<'a> {
     /// printer prints a hugging union with no group of its own, so nothing above the member
     /// can break — a break after the operator for a union that DOES hug was a tsv-only
     /// second state, pinned by no fixture and matching prettier nowhere.
-    /// ⚠️ Not the sanctioned `return_type_generic_union_long` family: that one is a `null`
-    /// member INSIDE a type argument (`Promise<A | null>`), where prettier hugs the `<…>` past
-    /// the print width, and it lives in [`union_has_brace_member`]'s narrowing of the
-    /// type-ARGUMENT hug, not at any operator seam.
+    /// ⚠️ Not the nullable union type ARGUMENT (`Promise<A | null>`), where prettier keeps
+    /// the `<…>` unbreakable past the print width: that one is the type-argument builders'
+    /// ([`Self::build_nullable_union_type_args_doc`]), not any operator seam's.
     ///
     /// `hugged` is whether the union's doc prints hugged — the value seams read it off
     /// [`UnionValueDoc`] (a glued block run handed into the union declines the hug: prettier
@@ -482,8 +481,6 @@ impl<'a> Printer<'a> {
     /// comment run, built lazily: only the hug emits it here — its layout never synthesizes
     /// the break the hang emission's soft separators key on — and the comment-free common
     /// path carries no empty child.
-    ///
-    /// [`union_has_brace_member`]: super::helpers::union_has_brace_member
     pub(in crate::printer) fn build_hugged_union_after_operator_doc(
         &self,
         operator: &'static str,

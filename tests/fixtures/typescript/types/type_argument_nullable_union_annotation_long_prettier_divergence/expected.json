@@ -1,0 +1,1050 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 2034,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A type annotation has no break point before the type, so a nullable union type argument",
+			"start": 20,
+			"end": 110
+		},
+		{
+			"type": "Line",
+			"value": " breaks inside the `<>` at the 101-char boundary.",
+			"start": 112,
+			"end": 163
+		},
+		{
+			"type": "Line",
+			"value": " 100 chars - stays inline (both us and Prettier)",
+			"start": 182,
+			"end": 232
+		},
+		{
+			"type": "Line",
+			"value": " 101 chars - breaks inside `<>` (Prettier leaves the line over print width)",
+			"start": 335,
+			"end": 412
+		},
+		{
+			"type": "Line",
+			"value": " a member with a type-argument list that can break keeps the union whole and breaks",
+			"start": 737,
+			"end": 822
+		},
+		{
+			"type": "Line",
+			"value": " inside the outer `<>` (Prettier breaks inside the inner `Map<>`)",
+			"start": 825,
+			"end": 892
+		},
+		{
+			"type": "Line",
+			"value": " a type literal, a class property, and a variable annotation take the same layout",
+			"start": 1005,
+			"end": 1088
+		},
+		{
+			"type": "Line",
+			"value": " a return type with no parameters to break, the members in any order",
+			"start": 1547,
+			"end": 1617
+		},
+		{
+			"type": "Line",
+			"value": " a member with a type-argument list that can break, in a return type",
+			"start": 1847,
+			"end": 1917
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 2033,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 2024,
+			"body": [
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 166,
+					"end": 1002,
+					"id": {
+						"type": "Identifier",
+						"start": 176,
+						"end": 177,
+						"name": "I"
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 178,
+						"end": 1002,
+						"body": [
+							{
+								"type": "TSPropertySignature",
+								"start": 235,
+								"end": 331,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 235,
+									"end": 261,
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaa01"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 261,
+									"end": 330,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 263,
+										"end": 330,
+										"typeName": {
+											"type": "Identifier",
+											"start": 263,
+											"end": 270,
+											"name": "Promise"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 270,
+											"end": 330,
+											"params": [
+												{
+													"type": "TSUnionType",
+													"start": 271,
+													"end": 329,
+													"types": [
+														{
+															"type": "TSTypeReference",
+															"start": 271,
+															"end": 322,
+															"typeName": {
+																"type": "Identifier",
+																"start": 271,
+																"end": 322,
+																"name": "Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+															}
+														},
+														{
+															"type": "TSNullKeyword",
+															"start": 325,
+															"end": 329
+														}
+													]
+												}
+											]
+										}
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " 100 chars - stays inline (both us and Prettier)",
+										"start": 182,
+										"end": 232
+									}
+								]
+							},
+							{
+								"type": "TSPropertySignature",
+								"start": 415,
+								"end": 519,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 415,
+									"end": 441,
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaa02"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 441,
+									"end": 518,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 443,
+										"end": 518,
+										"typeName": {
+											"type": "Identifier",
+											"start": 443,
+											"end": 450,
+											"name": "Promise"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 450,
+											"end": 518,
+											"params": [
+												{
+													"type": "TSUnionType",
+													"start": 455,
+													"end": 514,
+													"types": [
+														{
+															"type": "TSTypeReference",
+															"start": 455,
+															"end": 507,
+															"typeName": {
+																"type": "Identifier",
+																"start": 455,
+																"end": 507,
+																"name": "Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+															}
+														},
+														{
+															"type": "TSNullKeyword",
+															"start": 510,
+															"end": 514
+														}
+													]
+												}
+											]
+										}
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " 101 chars - breaks inside `<>` (Prettier leaves the line over print width)",
+										"start": 335,
+										"end": 412
+									}
+								]
+							},
+							{
+								"type": "TSPropertySignature",
+								"start": 522,
+								"end": 626,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 522,
+									"end": 548,
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaa03"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 548,
+									"end": 625,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 550,
+										"end": 625,
+										"typeName": {
+											"type": "Identifier",
+											"start": 550,
+											"end": 557,
+											"name": "Promise"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 557,
+											"end": 625,
+											"params": [
+												{
+													"type": "TSUnionType",
+													"start": 562,
+													"end": 621,
+													"types": [
+														{
+															"type": "TSNullKeyword",
+															"start": 562,
+															"end": 566
+														},
+														{
+															"type": "TSTypeReference",
+															"start": 569,
+															"end": 621,
+															"typeName": {
+																"type": "Identifier",
+																"start": 569,
+																"end": 621,
+																"name": "Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+															}
+														}
+													]
+												}
+											]
+										}
+									}
+								}
+							},
+							{
+								"type": "TSPropertySignature",
+								"start": 629,
+								"end": 733,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 629,
+									"end": 655,
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaa04"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 655,
+									"end": 732,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 657,
+										"end": 732,
+										"typeName": {
+											"type": "Identifier",
+											"start": 657,
+											"end": 664,
+											"name": "Promise"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 664,
+											"end": 732,
+											"params": [
+												{
+													"type": "TSUnionType",
+													"start": 669,
+													"end": 728,
+													"types": [
+														{
+															"type": "TSTypeReference",
+															"start": 669,
+															"end": 721,
+															"typeName": {
+																"type": "Identifier",
+																"start": 669,
+																"end": 721,
+																"name": "Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+															}
+														},
+														{
+															"type": "TSVoidKeyword",
+															"start": 724,
+															"end": 728
+														}
+													]
+												}
+											]
+										}
+									}
+								}
+							},
+							{
+								"type": "TSPropertySignature",
+								"start": 895,
+								"end": 999,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 895,
+									"end": 921,
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaa11"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 921,
+									"end": 998,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 923,
+										"end": 998,
+										"typeName": {
+											"type": "Identifier",
+											"start": 923,
+											"end": 930,
+											"name": "Promise"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 930,
+											"end": 998,
+											"params": [
+												{
+													"type": "TSUnionType",
+													"start": 935,
+													"end": 994,
+													"types": [
+														{
+															"type": "TSTypeReference",
+															"start": 935,
+															"end": 987,
+															"typeName": {
+																"type": "Identifier",
+																"start": 935,
+																"end": 938,
+																"name": "Map"
+															},
+															"typeArguments": {
+																"type": "TSTypeParameterInstantiation",
+																"start": 938,
+																"end": 987,
+																"params": [
+																	{
+																		"type": "TSTypeReference",
+																		"start": 939,
+																		"end": 949,
+																		"typeName": {
+																			"type": "Identifier",
+																			"start": 939,
+																			"end": 949,
+																			"name": "Kkkkkkkkkk"
+																		}
+																	},
+																	{
+																		"type": "TSTypeReference",
+																		"start": 951,
+																		"end": 986,
+																		"typeName": {
+																			"type": "Identifier",
+																			"start": 951,
+																			"end": 986,
+																			"name": "Vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
+																		}
+																	}
+																]
+															}
+														},
+														{
+															"type": "TSNullKeyword",
+															"start": 990,
+															"end": 994
+														}
+													]
+												}
+											]
+										}
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " a member with a type-argument list that can break keeps the union whole and breaks",
+										"start": 737,
+										"end": 822
+									},
+									{
+										"type": "Line",
+										"value": " inside the outer `<>` (Prettier breaks inside the inner `Map<>`)",
+										"start": 825,
+										"end": 892
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A type annotation has no break point before the type, so a nullable union type argument",
+							"start": 20,
+							"end": 110
+						},
+						{
+							"type": "Line",
+							"value": " breaks inside the `<>` at the 101-char boundary.",
+							"start": 112,
+							"end": 163
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1090,
+					"end": 1211,
+					"id": {
+						"type": "Identifier",
+						"start": 1095,
+						"end": 1096,
+						"name": "T"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 1099,
+						"end": 1210,
+						"members": [
+							{
+								"type": "TSPropertySignature",
+								"start": 1103,
+								"end": 1207,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 1103,
+									"end": 1129,
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaa05"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 1129,
+									"end": 1206,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 1131,
+										"end": 1206,
+										"typeName": {
+											"type": "Identifier",
+											"start": 1131,
+											"end": 1138,
+											"name": "Promise"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 1138,
+											"end": 1206,
+											"params": [
+												{
+													"type": "TSUnionType",
+													"start": 1143,
+													"end": 1202,
+													"types": [
+														{
+															"type": "TSTypeReference",
+															"start": 1143,
+															"end": 1195,
+															"typeName": {
+																"type": "Identifier",
+																"start": 1143,
+																"end": 1195,
+																"name": "Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+															}
+														},
+														{
+															"type": "TSNullKeyword",
+															"start": 1198,
+															"end": 1202
+														}
+													]
+												}
+											]
+										}
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a type literal, a class property, and a variable annotation take the same layout",
+							"start": 1005,
+							"end": 1088
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 1213,
+					"end": 1332,
+					"id": {
+						"type": "Identifier",
+						"start": 1219,
+						"end": 1220,
+						"name": "C"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 1221,
+						"end": 1332,
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 1225,
+								"end": 1329,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 1225,
+									"end": 1251,
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaa06"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 1251,
+									"end": 1328,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 1253,
+										"end": 1328,
+										"typeName": {
+											"type": "Identifier",
+											"start": 1253,
+											"end": 1260,
+											"name": "Promise"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 1260,
+											"end": 1328,
+											"params": [
+												{
+													"type": "TSUnionType",
+													"start": 1265,
+													"end": 1324,
+													"types": [
+														{
+															"type": "TSTypeReference",
+															"start": 1265,
+															"end": 1317,
+															"typeName": {
+																"type": "Identifier",
+																"start": 1265,
+																"end": 1317,
+																"name": "Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+															}
+														},
+														{
+															"type": "TSNullKeyword",
+															"start": 1320,
+															"end": 1324
+														}
+													]
+												}
+											]
+										}
+									}
+								},
+								"value": null
+							}
+						]
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1334,
+					"end": 1438,
+					"declare": true,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1348,
+							"end": 1437,
+							"id": {
+								"type": "Identifier",
+								"start": 1348,
+								"end": 1437,
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaa07",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 1374,
+									"end": 1437,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 1376,
+										"end": 1437,
+										"typeName": {
+											"type": "Identifier",
+											"start": 1376,
+											"end": 1383,
+											"name": "Promise"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 1383,
+											"end": 1437,
+											"params": [
+												{
+													"type": "TSUnionType",
+													"start": 1387,
+													"end": 1434,
+													"types": [
+														{
+															"type": "TSTypeReference",
+															"start": 1387,
+															"end": 1427,
+															"typeName": {
+																"type": "Identifier",
+																"start": 1387,
+																"end": 1427,
+																"name": "Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+															}
+														},
+														{
+															"type": "TSNullKeyword",
+															"start": 1430,
+															"end": 1434
+														}
+													]
+												}
+											]
+										}
+									}
+								}
+							},
+							"init": null
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1440,
+					"end": 1544,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1444,
+							"end": 1543,
+							"id": {
+								"type": "Identifier",
+								"start": 1444,
+								"end": 1543,
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaa08",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 1470,
+									"end": 1543,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 1472,
+										"end": 1543,
+										"typeName": {
+											"type": "Identifier",
+											"start": 1472,
+											"end": 1479,
+											"name": "Promise"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 1479,
+											"end": 1543,
+											"params": [
+												{
+													"type": "TSUnionType",
+													"start": 1483,
+													"end": 1540,
+													"types": [
+														{
+															"type": "TSTypeReference",
+															"start": 1483,
+															"end": 1533,
+															"typeName": {
+																"type": "Identifier",
+																"start": 1483,
+																"end": 1533,
+																"name": "Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+															}
+														},
+														{
+															"type": "TSNullKeyword",
+															"start": 1536,
+															"end": 1540
+														}
+													]
+												}
+											]
+										}
+									}
+								}
+							},
+							"init": null
+						}
+					],
+					"kind": "let"
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 1619,
+					"end": 1723,
+					"id": {
+						"type": "Identifier",
+						"start": 1628,
+						"end": 1654,
+						"name": "aaaaaaaaaaaaaaaaaaaaaaaa09"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 1656,
+						"end": 1720,
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 1658,
+							"end": 1720,
+							"typeName": {
+								"type": "Identifier",
+								"start": 1658,
+								"end": 1665,
+								"name": "Promise"
+							},
+							"typeArguments": {
+								"type": "TSTypeParameterInstantiation",
+								"start": 1665,
+								"end": 1720,
+								"params": [
+									{
+										"type": "TSUnionType",
+										"start": 1669,
+										"end": 1717,
+										"types": [
+											{
+												"type": "TSNullKeyword",
+												"start": 1669,
+												"end": 1673
+											},
+											{
+												"type": "TSTypeReference",
+												"start": 1676,
+												"end": 1717,
+												"typeName": {
+													"type": "Identifier",
+													"start": 1676,
+													"end": 1717,
+													"name": "Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+												}
+											}
+										]
+									}
+								]
+							}
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 1721,
+						"end": 1723,
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a return type with no parameters to break, the members in any order",
+							"start": 1547,
+							"end": 1617
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 1725,
+					"end": 1844,
+					"id": {
+						"type": "Identifier",
+						"start": 1731,
+						"end": 1732,
+						"name": "D"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 1733,
+						"end": 1844,
+						"body": [
+							{
+								"type": "MethodDefinition",
+								"start": 1737,
+								"end": 1841,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 1737,
+									"end": 1763,
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaa10"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 1763,
+									"end": 1841,
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"returnType": {
+										"type": "TSTypeAnnotation",
+										"start": 1765,
+										"end": 1838,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 1767,
+											"end": 1838,
+											"typeName": {
+												"type": "Identifier",
+												"start": 1767,
+												"end": 1774,
+												"name": "Promise"
+											},
+											"typeArguments": {
+												"type": "TSTypeParameterInstantiation",
+												"start": 1774,
+												"end": 1838,
+												"params": [
+													{
+														"type": "TSUnionType",
+														"start": 1779,
+														"end": 1834,
+														"types": [
+															{
+																"type": "TSTypeReference",
+																"start": 1779,
+																"end": 1827,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 1779,
+																	"end": 1827,
+																	"name": "Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+																}
+															},
+															{
+																"type": "TSVoidKeyword",
+																"start": 1830,
+																"end": 1834
+															}
+														]
+													}
+												]
+											}
+										}
+									},
+									"body": {
+										"type": "BlockStatement",
+										"start": 1839,
+										"end": 1841,
+										"body": []
+									}
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 1919,
+					"end": 2023,
+					"id": {
+						"type": "Identifier",
+						"start": 1928,
+						"end": 1954,
+						"name": "aaaaaaaaaaaaaaaaaaaaaaaa12"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 1956,
+						"end": 2020,
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 1958,
+							"end": 2020,
+							"typeName": {
+								"type": "Identifier",
+								"start": 1958,
+								"end": 1965,
+								"name": "Promise"
+							},
+							"typeArguments": {
+								"type": "TSTypeParameterInstantiation",
+								"start": 1965,
+								"end": 2020,
+								"params": [
+									{
+										"type": "TSUnionType",
+										"start": 1969,
+										"end": 2017,
+										"types": [
+											{
+												"type": "TSTypeReference",
+												"start": 1969,
+												"end": 2010,
+												"typeName": {
+													"type": "Identifier",
+													"start": 1969,
+													"end": 1972,
+													"name": "Map"
+												},
+												"typeArguments": {
+													"type": "TSTypeParameterInstantiation",
+													"start": 1972,
+													"end": 2010,
+													"params": [
+														{
+															"type": "TSTypeReference",
+															"start": 1973,
+															"end": 1983,
+															"typeName": {
+																"type": "Identifier",
+																"start": 1973,
+																"end": 1983,
+																"name": "Kkkkkkkkkk"
+															}
+														},
+														{
+															"type": "TSTypeReference",
+															"start": 1985,
+															"end": 2009,
+															"typeName": {
+																"type": "Identifier",
+																"start": 1985,
+																"end": 2009,
+																"name": "Vvvvvvvvvvvvvvvvvvvvvvvv"
+															}
+														}
+													]
+												}
+											},
+											{
+												"type": "TSNullKeyword",
+												"start": 2013,
+												"end": 2017
+											}
+										]
+									}
+								]
+							}
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 2021,
+						"end": 2023,
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a member with a type-argument list that can break, in a return type",
+							"start": 1847,
+							"end": 1917
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

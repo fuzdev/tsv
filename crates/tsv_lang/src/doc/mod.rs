@@ -1352,6 +1352,88 @@ mod arena_tests {
     }
 
     #[test]
+    fn test_gated_state_when_fits_admits_on_a_fitting_probe() {
+        // The converse gate: a state that breaks onto the continuation line, admitted only
+        // while its value (the probe) fits there. `x = ` + `vvvv(a)` (12 wide) flat;
+        // broken after `=`, the value sits on a line one indent deeper (tab = 2).
+        fn build(a: &DocArena) -> DocId {
+            let value = a.concat(&[a.text("vvvv("), a.text("a"), a.text(")")]);
+            let one_line = a.concat(&[a.text("x = "), value]);
+            let hung = a.concat(&[a.text("x ="), a.indent(a.concat(&[a.hardline(), value]))]);
+            let fallback = a.concat(&[a.text("x = "), a.text("vvvv("), a.hardline(), a.text("a)")]);
+            a.conditional_group(&[one_line, a.gated_state_when_fits(value, hung), fallback])
+        }
+        let a = DocArena::new();
+        let doc = build(&a);
+        // Everything fits flat → state 0.
+        assert_eq!(render_pw_tab(&a, doc, 12), "x = vvvv(a)");
+        // Flat overflows, the value fits on the continuation line (2 + 7 = 9 ≤ 10) → hung.
+        assert_eq!(render_pw_tab(&a, doc, 10), "x =\n\tvvvv(a)");
+        // The value cannot fit there either (9 > 8) → the gate withdraws the state.
+        assert_eq!(render_pw_tab(&a, doc, 8), "x = vvvv(\na)");
+    }
+
+    #[test]
+    fn test_measure_only_state_is_read_by_a_look_ahead_but_never_rendered() {
+        // `x<…>` whose last state is the unbreakable `x<a>` for an enclosing look-ahead, but
+        // whose no-fit render takes the broken state before it.
+        fn build(a: &DocArena) -> DocId {
+            let atomic = a.text("x<a>");
+            let broken = a.group_break(a.concat(&[
+                a.text("x<"),
+                a.indent(a.concat(&[a.softline(), a.text("a")])),
+                a.softline(),
+                a.text(">"),
+            ]));
+            let list = a.conditional_group(&[atomic, broken, a.measure_only_state(atomic)]);
+            a.group(a.concat(&[
+                a.text("fn("),
+                a.indent(a.concat(&[a.softline(), list])),
+                a.softline(),
+                a.text(")"),
+            ]))
+        }
+        let a = DocArena::new();
+        let doc = build(&a);
+        assert_eq!(render_pw(&a, doc, 8), "fn(x<a>)");
+        // The enclosing group breaks first and the list stays whole on its line (2 + 4 ≤ 7).
+        assert_eq!(render_pw(&a, doc, 7), "fn(\n\tx<a>\n)");
+        // The list cannot fit whole there (2 + 4 > 5); its broken state fits up to the `<`.
+        assert_eq!(render_pw(&a, doc, 5), "fn(\n\tx<\n\t\ta\n\t>\n)");
+        // Not even the line up to the `<` fits (2 + 2 > 3): no state fits, and the render
+        // falls back to the broken state, never the measure-only atomic one.
+        assert_eq!(render_pw(&a, doc, 3), "fn(\n\tx<\n\t\ta\n\t>\n)");
+    }
+
+    #[test]
+    fn test_replace_subdoc_copies_the_path_and_shares_the_rest() {
+        let a = DocArena::new();
+        let target = a.text("t");
+        let shared = a.group(a.concat(&[a.text("s"), a.line(), a.text("s")]));
+        let root = a.concat(&[
+            shared,
+            a.indent(a.concat(&[a.text("<"), target, a.text(">")])),
+        ]);
+        let copy = a
+            .replace_subdoc(root, target, a.text("u"))
+            .expect("no keyed group on the path");
+        assert_ne!(copy, root);
+        assert_eq!(render_pw(&a, root, 80), "s s<t>");
+        assert_eq!(render_pw(&a, copy, 80), "s s<u>");
+        // Absent: the root itself.
+        assert_eq!(a.replace_subdoc(shared, target, a.text("u")), Some(shared));
+        // A keyed group on the path declines the swap.
+        let keyed = a.group_with_id(a.concat(&[a.text("k"), target]));
+        assert_eq!(a.replace_subdoc(keyed.doc(), target, a.text("u")), None);
+        // So does a conditional group, whether the target sits in its first state or a
+        // later one.
+        let in_first = a.conditional_group(&[a.concat(&[a.text("c"), target]), a.text("d")]);
+        assert_eq!(a.replace_subdoc(in_first, target, a.text("u")), None);
+        let in_later = a.conditional_group(&[a.text("c"), a.concat(&[a.text("d"), target])]);
+        assert_eq!(a.replace_subdoc(in_later, target, a.text("u")), None);
+    }
+
+    #[test]
     fn test_gated_state_admission_tracks_the_probe() {
         // A miniature member-chain hug window (see `DocNode::GatedState`):
         //   state 0 — everything flat:        `x.f().m({ aaaa })`   (17 wide)

@@ -28,6 +28,27 @@ fn build_fluid_assignment_doc(d: &DocArena, id_doc: DocId, init_doc: DocId) -> D
     d.group(d.concat(&[id_doc, d.text(" ="), fluid_after_operator(d, init_doc)]))
 }
 
+impl Printer<'_> {
+    /// [`build_fluid_assignment_doc`] for a value-keyed fluid arm, which also owns the
+    /// one value whose break point is a last resort: a call or `new` whose sole type
+    /// argument is a nullable reference union breaks after `=` while the line up to the
+    /// value's first break (a call's `(`) then fits, and otherwise keeps the `=` line and
+    /// breaks inside its `<…>` — after the `=` too where even the line up to the `<`
+    /// overflows ([`Printer::after_operator_nullable_union_doc`]).
+    fn build_value_fluid_assignment_doc(
+        &self,
+        id_doc: DocId,
+        init_doc: DocId,
+        init: &Expression<'_>,
+    ) -> DocId {
+        let d = self.d();
+        match self.after_operator_nullable_union_doc(init_doc, Self::value_type_arguments(init)) {
+            Some(tail) => d.group(d.concat(&[id_doc, d.text(" ="), tail])),
+            None => build_fluid_assignment_doc(d, id_doc, init_doc),
+        }
+    }
+}
+
 /// One declarator's `=` and what sits around it — the spans
 /// [`Printer::build_declarator_init_doc`] bounds its comment reads with, plus the two
 /// answers its caller already resolved. Grouped because they are one fact about one gap,
@@ -609,10 +630,10 @@ impl<'a> Printer<'a> {
                 id_doc
             };
             let init_doc = make_init_doc(value());
-            parts.push(build_fluid_assignment_doc(
-                d,
+            parts.push(self.build_value_fluid_assignment_doc(
                 lhs_doc_with_comments(fluid_id_doc),
                 init_doc,
+                init,
             ));
         } else if needs_break_after_operator {
             // Break-after-operator layout for binary/conditional expressions:
@@ -632,10 +653,10 @@ impl<'a> Printer<'a> {
             // applies, use fluid so the marker can break at `=` only if needed,
             // while allowing the RHS to break internally first.
             let init_doc = make_init_doc(value());
-            parts.push(build_fluid_assignment_doc(
-                d,
+            parts.push(self.build_value_fluid_assignment_doc(
                 lhs_doc_with_comments(id_doc),
                 init_doc,
+                init,
             ));
         } else {
             // Prettier's `never-break-after-operator`: a simple value (`is_simple_value`)
@@ -717,6 +738,41 @@ impl<'a> Printer<'a> {
             }
         });
         self.wrap_value_position_parens(init, boundary_end, position_parens, inner)
+    }
+
+    /// The start of the type-argument list prettier's `isArrowFunctionVariable` opts out of
+    /// the inline and nullable-union layouts (`print/type-parameters.js`): the `<…>` of the
+    /// type an identifier binding is annotated with, when the initializer is an arrow
+    /// function — unless its sole argument is an object type (`isObjectType`), which hugs
+    /// as anywhere. That list takes the ordinary group, so its `<…>` can break ahead of the
+    /// `=` (`const a: Foo<⏎\tB | null⏎> = () => …`).
+    fn arrow_variable_type_args_start(
+        &self,
+        declarator: &internal::VariableDeclarator<'_>,
+    ) -> Option<u32> {
+        if !matches!(
+            declarator.init.map(|init| &init.kind),
+            Some(ExpressionKind::ArrowFunctionExpression(_))
+        ) {
+            return None;
+        }
+        let ExpressionKind::Identifier(ident) = &declarator.id.kind else {
+            return None;
+        };
+        let args = match self.unwrap_redundant_parens(ident.type_annotation()?.type_annotation) {
+            internal::TSType::TypeReference(reference) => reference.type_arguments.as_ref(),
+            internal::TSType::TypeQuery(query) => query.type_arguments.as_ref(),
+            internal::TSType::Import(import) => import.type_arguments.as_ref(),
+            _ => None,
+        }?;
+        let sole_object_type = matches!(
+            args.params,
+            [param] if matches!(
+                self.unwrap_redundant_parens(param),
+                internal::TSType::TypeLiteral(_) | internal::TSType::Mapped(_)
+            )
+        );
+        (!sole_object_type).then_some(args.span.start)
     }
 
     /// Build a doc for a variable binding pattern with optional definite assignment assertion.
@@ -978,7 +1034,11 @@ impl<'a> Printer<'a> {
             }
 
             // Build id doc once for reuse and analysis
+            let arrow_variable_args = self
+                .arrow_variable_type_args
+                .replace(self.arrow_variable_type_args_start(declarator));
             let id_doc = self.build_variable_binding_doc(declarator.id, declarator.definite);
+            self.arrow_variable_type_args.set(arrow_variable_args);
 
             // Initializer with comment handling around =
             if let Some(init) = &declarator.init {

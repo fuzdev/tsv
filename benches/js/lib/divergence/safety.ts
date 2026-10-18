@@ -18,9 +18,9 @@
  * The count also excludes **leading union-member pipes** — the `|` a union type
  * grows when it breaks across lines (`A | B` → `| A⏎| B`). That extra pipe is pure
  * break layout (`| A | B` ≡ `A | B`), so when tsv breaks a union that prettier keeps
- * inline (the `return_type_generic_union` divergence, whose method-signature form
- * shows up in dense declaration files) the added `|` would otherwise fake a
- * `content_added` — and SAFETY is a gated bucket. Only the first, operand-less pipe
+ * inline (a return-type union in a method signature, where tsv breaks the union and
+ * prettier the parameters — a form that shows up in dense declaration files) the
+ * added `|` would otherwise fake a `content_added` — and SAFETY is a gated bucket. Only the first, operand-less pipe
  * of a break is dropped; the inter-member separators stay counted, so a genuinely
  * dropped union member still lowers the count. See `is_leading_union_pipe`.
  *

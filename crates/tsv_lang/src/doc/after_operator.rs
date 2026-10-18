@@ -77,3 +77,55 @@ pub fn hang_after_operator_unindented(d: &DocArena, content: DocId) -> DocId {
 pub fn fluid_after_operator_unindented(d: &DocArena, value: DocId) -> DocId {
     d.concat(&[d.group(d.line()), d.line_suffix_boundary(), value])
 }
+
+/// The after-operator layout for a value whose only break point is a LAST RESORT —
+/// one an enclosing layout never takes while a break of its own keeps the line within
+/// print width (a sole nullable union type argument, which the value's doc already
+/// prints unbreakable first and broken inside only past print width). The break after
+/// the operator is gated on the value's HEAD: everything up to its first break point.
+///
+/// Five states, tried in order:
+///
+/// 0. the whole value flat on the operator's line — the conditional group's `contents`,
+///    prettier's `conditionalGroup` contents tried flat first. It must carry no forced
+///    break: [`DocArena::will_break`] reads a group's `contents` alone, and a forced break
+///    there would force every group ENCLOSING this one to break (an `if` body, a call's
+///    arguments, an arrow body, an object property) however short the line;
+/// 1. the value on the operator's line, laid out by its own groups — taken while the
+///    value's head (measured as a break-mode look-ahead does) fits there, so a call's
+///    arguments break before the operator does, exactly as [`fluid_after_operator`]
+///    decides;
+/// 2. break after the operator, the value on the continuation line laid out by its own
+///    groups — taken while the value's head fits there, measured as state 1 measures it
+///    (a when-fits gate standing in for the line the break puts it on, since no fits walk
+///    measures past a break): prettier's break-after-operator, so a call whose `(` fits
+///    on the continuation line breaks its arguments below it;
+/// 3. the value stays on the operator's line and breaks inside, where its last-resort
+///    break point is (`value_broken`, the value's doc with that break point forced) —
+///    taken while the line up to that break fits;
+/// 4. otherwise state 2 ungated: break after the operator, the value laid out by its own
+///    groups — which break it inside at its last-resort point, since its head did not fit
+///    on that line (state 2's gate failed). Only a value whose last-resort break leaves a
+///    line over print width by itself overflows here.
+///
+/// The last state is also what a look-ahead reaching this group from outside in break
+/// mode reads (a breakable binding deciding whether it fits): it starts with a forced
+/// break, so that look-ahead measures up to the operator alone, as prettier's break-mode
+/// `line` after an operator does. Were state 3 last, a binding whose line fits up to the
+/// operator but not up to the value's last-resort break would break open itself while the
+/// render took state 2. A flat look-ahead reads state 0, the value whole, as prettier's
+/// does. Fluid's marker answers only state 1's question, so a value that does not fit
+/// after the operator either would break after it anyway and overflow there.
+pub fn after_operator_head_gated(d: &DocArena, value: DocId, value_broken: DocId) -> DocId {
+    let on_line =
+        |value: DocId| d.concat(&[d.text(" "), d.line_suffix_boundary(), d.group_break(value)]);
+    let value_open = d.group_break(value);
+    let hung = d.indent(d.concat(&[d.hardline(), value_open]));
+    d.conditional_group(&[
+        d.concat(&[d.text(" "), d.line_suffix_boundary(), value]),
+        on_line(value),
+        d.gated_state_when_fits(value_open, hung),
+        on_line(value_broken),
+        hung,
+    ])
+}

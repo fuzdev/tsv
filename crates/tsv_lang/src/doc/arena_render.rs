@@ -5,7 +5,9 @@ use crate::config::TAB_WIDTH;
 use crate::printing::{next_width_relevant, split_lf, visual_width};
 use smallvec::SmallVec;
 
-use super::arena::{ArenaCommand, CmdStack, DocArena, DocId, DocNode, LineSuffixBuf, RenderIndent};
+use super::arena::{
+    ArenaCommand, CmdStack, DocArena, DocId, DocNode, GateAdmit, LineSuffixBuf, RenderIndent,
+};
 use super::arena_fits::arena_fits_with_lookahead;
 use super::arena_render_fill::render_fill_iterative;
 use super::arena_render_suffix::{
@@ -46,11 +48,15 @@ pub(super) struct RenderCtx<'a> {
 /// when the state is inadmissible and the ladder must skip it.
 ///
 /// Every state but a [`DocNode::GatedState`] is measured as itself. A gated state
-/// carries a never-fits admission probe: it stands for a layout that is correct
-/// only because that probe CANNOT be laid flat on the fallback's continuation line
-/// — one indent level deeper than the group, completed by the same rest commands.
-/// So the probe's line is measured first, and a probe that *fits* there withdraws
-/// the state: the fallback layout it would have stolen is the settled form.
+/// carries an admission probe, measured first on the continuation line — one indent
+/// level deeper than the group, completed by the same rest commands — and its
+/// [`GateAdmit`] reads the answer. A never-fits gate stands for a layout that is
+/// correct only because that probe CANNOT be laid flat there, so a probe that *fits*
+/// withdraws the state: the fallback layout it would have stolen is the settled form.
+/// A when-fits gate is the converse: the state puts its value on that line, past a
+/// break no fits walk measures beyond, so the probe is the measurement. A
+/// [`GateAdmit::Never`] state is never admitted (it is a final, measure-only
+/// state — [`fallback_group_state`]).
 ///
 /// The probe measurement passes `has_line_suffix: false`, unlike the caller's fits
 /// on the returned state. That one measures from the CURRENT column, where a
@@ -66,19 +72,49 @@ fn admissible_group_state(
     indent: RenderIndent,
     rest_commands: &[ArenaCommand],
 ) -> Option<DocId> {
-    let DocNode::GatedState { probe, contents } = &nodes[state.index()] else {
+    let DocNode::GatedState {
+        probe,
+        contents,
+        admit,
+    } = &nodes[state.index()]
+    else {
         return Some(state);
     };
-    let fresh_pos = line_start_column(indent.indented(), ctx.render, ctx.embed);
-    let probe_fits = arena_fits_with_lookahead(
-        ctx.arena,
-        *probe,
-        Mode::Flat,
-        rest_commands,
-        remaining_width(fresh_pos, ctx.render, ctx.embed),
-        false,
-    );
-    (!probe_fits).then_some(*contents)
+    let probe_fits = || {
+        let fresh_pos = line_start_column(indent.indented(), ctx.render, ctx.embed);
+        arena_fits_with_lookahead(
+            ctx.arena,
+            *probe,
+            Mode::Flat,
+            rest_commands,
+            remaining_width(fresh_pos, ctx.render, ctx.embed),
+            false,
+        )
+    };
+    let admitted = match admit {
+        GateAdmit::ProbeOverflows => !probe_fits(),
+        GateAdmit::ProbeFits => probe_fits(),
+        GateAdmit::Never => false,
+    };
+    admitted.then_some(*contents)
+}
+
+/// The state a conditional group renders in break mode when no state fits (or its
+/// own `should_break` skips the ladder): the last state — prettier's
+/// `expandedStates.at(-1)` — unless that is a measure-only [`GateAdmit::Never`]
+/// state, which only an enclosing look-ahead reads; the render then takes the
+/// state before it.
+fn fallback_group_state(nodes: &[DocNode], contents: DocId, states: &[DocId]) -> DocId {
+    let Some((&last, earlier)) = states.split_last() else {
+        return contents;
+    };
+    match &nodes[last.index()] {
+        DocNode::GatedState {
+            admit: GateAdmit::Never,
+            ..
+        } => earlier.last().copied().unwrap_or(contents),
+        _ => last,
+    }
 }
 
 /// Render text content and update position.
@@ -1228,7 +1264,7 @@ fn render_doc_core<P: RenderPolicy>(
                     if P::CONDITIONAL_GROUP_HONORS_SHOULD_BREAK && should_break {
                         // Prettier: if (doc.break) → use most expanded in break mode
                         let states = expanded_states.resolve(children_vec);
-                        (Mode::Break, states.last().copied().unwrap_or(contents))
+                        (Mode::Break, fallback_group_state(nodes, contents, states))
                     } else {
                         // Fits check regardless of parent mode — matches Prettier
                         let remaining = remaining_width(*pos, render, embed);
@@ -1251,7 +1287,8 @@ fn render_doc_core<P: RenderPolicy>(
                             // — the `!expanded_states.is_empty()` guard above).
                             let states = expanded_states.resolve(children_vec);
                             let last = states.len() - 1;
-                            let mut chosen = (Mode::Break, states[last]);
+                            let mut chosen =
+                                (Mode::Break, fallback_group_state(nodes, contents, states));
                             for &state in &states[..last] {
                                 // A gated state whose probe fits is inadmissible —
                                 // see `admissible_group_state`.

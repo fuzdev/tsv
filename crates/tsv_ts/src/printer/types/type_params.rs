@@ -16,7 +16,7 @@ use crate::printer::layout::bracketed_list_body;
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
-use tsv_lang::doc::after_operator::fluid_after_operator;
+use tsv_lang::doc::after_operator::{after_operator_head_gated, fluid_after_operator};
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 
@@ -768,6 +768,18 @@ impl<'a> Printer<'a> {
             return self.build_single_type_arg_inline(inst, has_comments);
         }
 
+        // A sole nullable reference union (`B | null`, prettier's `shouldHugUnionType`)
+        // is unbreakable to every layout around it — the call's arguments break, an
+        // assignment breaks after `=` — and breaks inside the `<…>` only past print width
+        // (`build_nullable_union_type_args_doc`, shared with the type-position builder).
+        if self.sole_nullable_reference_union_routes(inst, has_comments) {
+            return self.build_nullable_union_type_args_doc(
+                inst,
+                has_comments,
+                ShiftRescan::Splits,
+            );
+        }
+
         // Multi-argument (or non-hugging single) tail: the type-argument families' shared
         // width-decided core (`build_type_arguments_group_doc`), byte-for-byte the body the
         // type-position list runs. The doc printer's look-ahead (fits_with_lookahead)
@@ -783,6 +795,95 @@ impl<'a> Printer<'a> {
         // [`ShiftRescan::Splits`]: a call, `new`, an instantiation and a tagged template all
         // reach tsc's list through its re-scan, so the pair prints glued here.
         self.build_type_arguments_group_doc(inst, has_comments, ShiftRescan::Splits)
+    }
+
+    /// Whether a type-argument list takes [`Self::build_nullable_union_type_args_doc`]
+    /// — the routing both builders ask past their comment-forced and hugging arms: a sole
+    /// nullable reference union ([`Self::type_arg_is_nullable_reference_union`]) whose
+    /// comment run does not break after a block ([`Self::single_type_arg_run_breaks_after`]).
+    /// `has_comments` is the caller's whole-`<…>` window answer.
+    pub(in crate::printer) fn sole_nullable_reference_union_routes(
+        &self,
+        args: &internal::TSTypeParameterInstantiation<'_>,
+        has_comments: bool,
+    ) -> bool {
+        args.params.len() == 1
+            && self.type_arg_is_nullable_reference_union(args.span.start + 1, args.params[0])
+            && !self.single_type_arg_run_breaks_after(args, has_comments)
+    }
+
+    /// The after-operator tail for a value whose last-resort break point is a sole
+    /// nullable reference union type argument
+    /// ([`tsv_lang::doc::after_operator::after_operator_head_gated`]) — `None` unless
+    /// `value_doc` holds that list's conditional doc
+    /// ([`Self::build_nullable_union_type_args_doc`], found and swapped for its broken
+    /// form by [`Self::value_with_nullable_union_broken`]), and the caller keeps its own
+    /// layout. Keyed on the doc the builders emitted, not a re-derivation of their
+    /// routing, so the two cannot disagree.
+    ///
+    /// The break after the operator is prettier's: taken while the line up to the value's
+    /// first break (a call's `(`) fits after it, the arguments free to break below; the
+    /// value stays on the operator's line and breaks inside the outer `<…>` only when that
+    /// line is itself over print width, and breaks after the operator AND inside the `<…>`
+    /// only when even the line up to the `<` is. A union whose member has a type-argument list that
+    /// can break (`Map<K, V> | null`, where prettier breaks inside the member instead)
+    /// takes the same test.
+    pub(in crate::printer) fn after_operator_nullable_union_doc(
+        &self,
+        value_doc: DocId,
+        args: Option<&internal::TSTypeParameterInstantiation<'_>>,
+    ) -> Option<DocId> {
+        let value_broken = self.value_with_nullable_union_broken(value_doc, args?)?;
+        Some(after_operator_head_gated(self.d(), value_doc, value_broken))
+    }
+
+    /// The type arguments of a value whose `<…>` an assignment's `=` meets as the value's
+    /// break point: a call's or a `new` expression's, seen through the wrappers that print
+    /// ahead of nothing but the value's head — `await`, `as` / `satisfies`, a non-null `!`,
+    /// and a member chain's head (the `<…>` of `fn<…>(a).then(b)` is the chain's first
+    /// break point, so it is the leftmost call's) — and an arrow function's return type
+    /// (`(): Promise<B | null> => …`; a parameter list that can break still breaks
+    /// first, its `(` being the value's first break point). A list found here is not
+    /// always swapped: a value laid out by a conditional group (a member chain of more
+    /// than two calls) keeps its caller's layout
+    /// ([`Self::value_with_nullable_union_broken`]).
+    pub(in crate::printer) fn value_type_arguments<'v>(
+        value: &'v internal::Expression<'v>,
+    ) -> Option<&'v internal::TSTypeParameterInstantiation<'v>> {
+        use internal::ExpressionKind as Kind;
+        match &value.kind {
+            Kind::CallExpression(call) => {
+                Self::chain_head_type_arguments(call.callee).or(call.type_arguments.as_ref())
+            }
+            Kind::NewExpression(new) => new.type_arguments.as_ref(),
+            Kind::MemberExpression(member) => Self::chain_head_type_arguments(member.object),
+            Kind::AwaitExpression(await_expr) => Self::value_type_arguments(await_expr.argument),
+            Kind::TSAsExpression(cast) => Self::value_type_arguments(cast.expression),
+            Kind::TSSatisfiesExpression(cast) => Self::value_type_arguments(cast.expression),
+            Kind::TSNonNullExpression(non_null) => Self::value_type_arguments(non_null.expression),
+            Kind::ArrowFunctionExpression(arrow) => {
+                match arrow.return_type.as_ref()?.type_annotation {
+                    TSType::TypeReference(reference) => reference.type_arguments.as_ref(),
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// [`Self::value_type_arguments`] of a member chain's object or a call's callee: the
+    /// type arguments of the call or `new` at the chain's head, if any.
+    fn chain_head_type_arguments<'v>(
+        object: &'v internal::Expression<'v>,
+    ) -> Option<&'v internal::TSTypeParameterInstantiation<'v>> {
+        use internal::ExpressionKind as Kind;
+        match &object.kind {
+            Kind::CallExpression(_)
+            | Kind::NewExpression(_)
+            | Kind::MemberExpression(_)
+            | Kind::TSNonNullExpression(_) => Self::value_type_arguments(object),
+            _ => None,
+        }
     }
 
     /// The shared width-decided angle-list body: `<` + softline-indented,

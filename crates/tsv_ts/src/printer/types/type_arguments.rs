@@ -1,7 +1,7 @@
 // Type-argument instantiation (`<T, U>`) rendering
 
 use super::Printer;
-use super::helpers::{is_huggable_type, is_simple_type_arg};
+use super::helpers::{is_huggable_type, is_simple_type_arg, union_has_brace_member};
 use crate::ast::internal::{self, TSType};
 use smallvec::smallvec;
 use tsv_lang::doc::arena::DocId;
@@ -177,9 +177,11 @@ impl<'a> Printer<'a> {
     /// 3. a **hugged union** ([`Self::type_arg_union_prints_hugged`] — `{ … } | null`), whose
     ///    object member likewise owns the expansion.
     ///
-    /// For TypeScript this *is* prettier's `shouldInline` at `len == 1`: its remaining
-    /// disjunct, `NullableTypeAnnotation`, is Flow-only, and its `isParameterInTestCall` /
-    /// `isArrowFunctionVariable` clauses gate call-site `<…>`, not a type-position one.
+    /// For TypeScript this is prettier's `shouldInline` at `len == 1` minus one half of its
+    /// hugged union: a union whose object-like member is a type REFERENCE takes its own
+    /// layout ([`Self::type_arg_is_nullable_reference_union`]). Its remaining disjunct,
+    /// `NullableTypeAnnotation`, is Flow-only, and its `isArrowFunctionVariable` clause is
+    /// the type-position builder's own check ahead of this one (`arrow_variable_type_args`).
     ///
     /// ⚠️ A non-hugging argument (an intersection, a function type, a conditional) must
     /// **not** inline: `build_single_type_arg_inline` emits no group and no softlines, so an
@@ -200,6 +202,98 @@ impl<'a> Printer<'a> {
         is_simple_type_arg(ty)
             || is_huggable_type(ty)
             || self.type_arg_union_prints_hugged(gap_start, ty)
+    }
+
+    /// Whether a **single type argument** is a nullable reference union — the half of
+    /// prettier's `shouldHugUnionType` set ([`Self::union_seam_hugs`]: exactly one
+    /// object-like member plus only `null` / `void`, no member comment) whose object-like
+    /// member is a type REFERENCE (`B | null`, `null | Map<K, V>`) rather than a
+    /// brace-delimited type, which [`Self::type_arg_hugs`] already inlines.
+    ///
+    /// Prettier prints such an argument as an unbreakable `<…>` in every type-argument
+    /// list, so an enclosing layout breaks around it — the call's arguments, the
+    /// assignment's `=` — and where nothing encloses a break the line overflows. tsv takes
+    /// the unbreakable form wherever it fits and breaks inside the `<…>` only past print
+    /// width ([`Self::build_nullable_union_type_args_doc`]). Asked of the effective
+    /// argument, as [`Self::type_arg_hugs`] is.
+    pub(in crate::printer) fn type_arg_is_nullable_reference_union(
+        &self,
+        gap_start: u32,
+        ty: &TSType<'_>,
+    ) -> bool {
+        matches!(self.unwrap_redundant_parens(ty), TSType::Union(u)
+            if !union_has_brace_member(u) && self.union_seam_hugs(gap_start, u))
+    }
+
+    /// The `<…>` of a sole nullable reference union
+    /// ([`Self::type_arg_is_nullable_reference_union`]): **unbreakable first, broken inside
+    /// as the fallback** — a conditional group of the atomic inline list (its member's own
+    /// type arguments flattened, so the union stays whole), the list broken one argument
+    /// per line, and the atomic list again as a measure-only last state
+    /// (`DocArena::measure_only_state`).
+    ///
+    /// The last state is what an enclosing measurement reads (a break-mode look-ahead
+    /// takes a conditional group's last state), so to every layout around it the `<…>`
+    /// has no break point: a call breaks its arguments, an assignment or type alias
+    /// breaks after the `=`, a hugged parameter pattern expands — exactly prettier's
+    /// unbreakable `<…>`. Rendered, the atomic state wins whenever it fits; past print
+    /// width the broken state takes the line (a return type after an empty parameter
+    /// list, a property signature, an annotation), where prettier overflows — also when
+    /// the line up to the `<` is already past print width, since the render never prints
+    /// the measure-only state and falls back to the broken one. The broken state is a
+    /// forced break, so the ladder measures it only up to the `<`. A union that must
+    /// break anyway has no unbreakable form and keeps the ordinary group.
+    pub(in crate::printer) fn build_nullable_union_type_args_doc(
+        &self,
+        args: &internal::TSTypeParameterInstantiation<'_>,
+        has_comments: bool,
+        rescan: ShiftRescan,
+    ) -> DocId {
+        let d = self.d();
+        let inline = self.build_single_type_arg_inline(args, has_comments);
+        // A union that must break (an authored-expanded object inside its member's type
+        // arguments) has no unbreakable form: the list takes its ordinary group.
+        if d.will_break(inline) {
+            return self.build_type_arguments_group_doc(args, has_comments, rescan);
+        }
+        let atomic = d.remove_lines(inline);
+        let broken = d.group_break(self.build_type_arguments_list_doc(args, has_comments, rescan));
+        let doc = d.conditional_group(&[atomic, broken, d.measure_only_state(atomic)]);
+        self.nullable_union_type_args
+            .borrow_mut()
+            .push((args.span.start, doc, broken));
+        doc
+    }
+
+    /// `value_doc` with the nullable-union `<…>` at `args` broken inside
+    /// ([`Self::build_nullable_union_type_args_doc`]'s broken state in place of its
+    /// conditional, every build of it — `DocArena::replace_subdoc`), for an
+    /// after-operator layout's fallback states, whose fit test must see the `<…>`
+    /// open. `None` when no build of that list is found in `value_doc`, or
+    /// when one cannot be swapped (`replace_subdoc` declines a path through a keyed
+    /// group, and through a conditional group — a member chain's or a hugging last
+    /// argument's layouts, chosen from the unbroken `<…>`).
+    pub(in crate::printer) fn value_with_nullable_union_broken(
+        &self,
+        value_doc: DocId,
+        args: &internal::TSTypeParameterInstantiation<'_>,
+    ) -> Option<DocId> {
+        let d = self.d();
+        let builds: smallvec::SmallVec<[(DocId, DocId); 2]> = self
+            .nullable_union_type_args
+            .borrow()
+            .iter()
+            .filter(|&&(start, ..)| start == args.span.start)
+            .map(|&(_, doc, broken)| (doc, broken))
+            .collect();
+        let mut value = value_doc;
+        let mut replaced = false;
+        for (doc, broken) in builds {
+            let copy = d.replace_subdoc(value, doc, broken)?;
+            replaced |= copy != value;
+            value = copy;
+        }
+        replaced.then_some(value)
     }
 
     /// Comments that force the `<...>` list to the multiline layout: line
@@ -311,6 +405,11 @@ impl<'a> Printer<'a> {
             return self.build_type_arguments_doc_with_line_comments(args);
         }
 
+        // An arrow-function variable's annotation takes the ordinary group whatever its
+        // argument (prettier's `isArrowFunctionVariable`, `Self::arrow_variable_type_args`).
+        if self.arrow_variable_type_args.get() == Some(args.span.start) {
+            return self.build_type_arguments_group_doc(args, has_comments, rescan);
+        }
         // A single argument inlines only when it hugs; a non-hugging one (an intersection, a
         // function type, a conditional) falls through to the group below, which is what gives
         // the `<…>` a break point of its own — as does a hugging one whose comment run breaks
@@ -320,6 +419,11 @@ impl<'a> Printer<'a> {
             && !self.single_type_arg_run_breaks_after(args, has_comments)
         {
             return self.build_single_type_arg_inline(args, has_comments);
+        }
+        // A sole nullable reference union: unbreakable first, broken inside past print
+        // width (`build_nullable_union_type_args_doc`).
+        if self.sole_nullable_reference_union_routes(args, has_comments) {
+            return self.build_nullable_union_type_args_doc(args, has_comments, rescan);
         }
 
         self.build_type_arguments_group_doc(args, has_comments, rescan)
@@ -342,12 +446,22 @@ impl<'a> Printer<'a> {
         has_comments: bool,
         rescan: ShiftRescan,
     ) -> DocId {
-        let d = self.d();
+        self.d()
+            .group(self.build_type_arguments_list_doc(args, has_comments, rescan))
+    }
+
+    /// [`Self::build_type_arguments_group_doc`]'s list without its group.
+    fn build_type_arguments_list_doc(
+        &self,
+        args: &internal::TSTypeParameterInstantiation<'_>,
+        has_comments: bool,
+        rescan: ShiftRescan,
+    ) -> DocId {
         // The only layout that can glue the pair: the expansion builder starts every
         // argument on its own line, and a function type never takes the inline hug.
         let open_separated = rescan == ShiftRescan::Never
             && self.angle_open_meets_angle(args.span.start + 1, args.params[0]);
-        d.group(self.build_angle_list_doc(
+        self.build_angle_list_doc(
             args.span,
             args.params.len(),
             |i| args.params[i].span(),
@@ -369,7 +483,7 @@ impl<'a> Printer<'a> {
             |i| self.frozen_list_member_multiline(args.params[i]),
             has_comments,
             open_separated,
-        ))
+        )
     }
 
     /// Build doc for type arguments with expanding comments (line or own-line block),
