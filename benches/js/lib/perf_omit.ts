@@ -235,6 +235,20 @@ export const PERF_OMITS: PerfOmit[] = [
 		path: '.cache/svelte_styles/cosmicplayground.css',
 		category: 'harvest_artifact',
 		reason: "biome: expected a selector but found '>' (the harvested StarshipMenu.svelte styles)"
+	},
+	// Svelte's leading-combinator `:global(> svg)` — the same `>` biome's parser refuses
+	{
+		task: 'format/svelte/biome',
+		path: 'svelte-ux/packages/svelte-ux/src/lib/components/Icon.svelte',
+		category: 'unsupported_syntax',
+		reason: "biome: expected a selector but found '>' (`:global(> svg)` in a <style> block)"
+	},
+	// and again in its collection's harvested `<style>` concatenation
+	{
+		task: 'format/css/biome',
+		path: '.cache/svelte_styles/svelte-ux.css',
+		category: 'harvest_artifact',
+		reason: "biome: expected a selector but found '>' (the harvested Icon.svelte styles)"
 	}
 ];
 

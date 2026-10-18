@@ -1008,7 +1008,9 @@ beyond timing stats:
   numbers are machine-relative, so this travels with them; excludes hostname and volatile fields
   so it doesn't churn); `corpus_kind` (`perf` | `conformance`); per-language `corpus` totals;
   `corpus_sources` (per-entry loaded file counts + a `by_language` split summing to `files` — the
-  composition disclosure — each with its upstream `repo` link); `corpus_snapshot` (the
+  composition disclosure — each with its upstream `repo` link); from `version` 22,
+  `corpus_by_origin` (files and bytes per manifest `origin` and language — the corpus each
+  group's one mixed timed set is drawn from; perf only); `corpus_snapshot` (the
   `fuzdev/corpora` commit every real-code source was read from, absent on conformance-only runs);
   `versions`; and `binary_sizes` (each with `gzip_bytes`).
 - per `entries[]` row: `runtime`; `files_processed`/`files_total` (per-impl preflight coverage —
@@ -1351,14 +1353,18 @@ whose churn would make an aggregate pin a re-pin treadmill, survive as the `live
 `robustness` view only and only as a diff against the snapshot (below). **SAFETY (content loss)
 gates over every file.**
 
-- **`perf`** — `benched`, all real code: application & library source (the fuz.dev
-  repos' `src/` — zzz, the fuz ecosystem, gro, svelte-docinfo, tsv.fuz.dev — plus the author's
-  public SvelteKit sites and apps: ryanatkn.com, webdevladder.net, earbetter, cosmicplayground)
-  plus upstream framework source (kit, svelte, and the svelte.dev subpaths), all from the
-  snapshot's collections. NOT the `gated` collections the gates read (the third-party Svelte
-  libraries and tools, and any collection awaiting its bench triage): the every-file
-  invariant below is unmeasured over them until each is triaged onto the bench. `.d.ts` files are IN scope (the product formats them; declaration-heavy
-  shapes carry real divergence signal), and the curated entries skip the `/build/`+`/dist/`
+- **`perf`** — `benched`, all real code, from the snapshot's collections: the author's own
+  application & library source (the fuz.dev repos' `src/` — zzz, the fuz ecosystem, gro,
+  svelte-docinfo, tsv.fuz.dev — plus the public SvelteKit sites and apps: ryanatkn.com,
+  webdevladder.net, earbetter, cosmicplayground), upstream framework source (kit, svelte, and
+  the svelte.dev subpaths), third-party Svelte libraries and tools (flowbite-svelte's `src/lib`,
+  layerchart, layercake, svelte-ux, svelte-maplibre, language-tools) and neutral TypeScript
+  (TypeScript's `parser.ts`, Storybook, Continue). Each group times ONE mixed set; the report
+  discloses its composition by manifest `origin` (`corpus_by_origin`, the **By origin:** line),
+  since the author's code is what tsv is developed against and mostly already formats to, which
+  may favor tsv's format rows. NOT a `gated` collection (one placed off the bench while its
+  triage is pending): the every-file invariant below is unmeasured over it. `.d.ts` files are IN
+  scope (the product formats them; declaration-heavy shapes carry real divergence signal), and the curated entries skip the `/build/`+`/dist/`
   build-output pruning (a `build/` segment inside a reviewed `src/` tree is real source, e.g.
   kit's `src/exports/vite/build/`; `DirectoryLoader`'s arbitrary-path scans still prune both). The
   CSS set additionally carries the `svelte_styles` per-collection concats harvested from those
@@ -1394,9 +1400,8 @@ gates over every file.**
     is about, so only a full run grades that half) and the TASK (every alternative impl is
     optional, and one that fails to load registers no task at all, so on that machine its entries
     are unasked rather than stale).
-- **`gates`** — `benched` + `gated` + `prettier_fixture`: the perf view, plus the `gated`
-  collections (prettier-shaped code whose `known` divergences the ecosystem repos
-  never carry — the breadth a correctness gate wants and a throughput headline does not), plus
+- **`gates`** — `benched` + `gated` + `prettier_fixture`: the perf view, plus any `gated`
+  collection (placed for its breadth while its bench triage is pending), plus
   Prettier's `tests/format/{typescript,js,css,html}` suites and prettier-plugin-svelte's `test/`
   (`.html` treated as Svelte, files with a companion `options.json` skipped) — deliberately tricky
   edge cases. Every file comes from a pinned checkout, so the count pins gate over the whole view.

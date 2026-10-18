@@ -46,6 +46,7 @@ import {
 	USE_INTERSECTION
 } from './lib/bench_config.ts';
 import {
+	type CorpusByOrigin,
 	file_set_digest,
 	type PreflightGroup,
 	type PreflightSnapshot,
@@ -63,6 +64,7 @@ import {
 } from './lib/check_artifact_freshness.ts';
 import { check_node_modules } from './lib/check_node_modules.ts';
 import {
+	corpus_file_origin_resolver,
 	corpus_missing_entries,
 	CorpusLoader,
 	type ExclusionCacheState,
@@ -149,6 +151,43 @@ function limit_files(files: SourceFile[]): SourceFile[] {
 const svelte_files = limit_files(by_language.svelte);
 const ts_files = limit_files(by_language.typescript);
 const css_files = limit_files(by_language.css);
+
+// Who wrote what the run reads: every file of a snapshot collection (and the styles
+// harvest cut from one) is attributed to its manifest `origin`. On the perf surface every
+// file must be, since the report's composition line would otherwise silently leave some
+// out — a run where none is (an absent snapshot under BENCH_ALLOW_MISSING) included; the
+// conformance surface reads no collection, so it publishes none.
+async function compute_corpus_by_origin(files: SourceFile[]): Promise<CorpusByOrigin | null> {
+	if (IS_CONFORMANCE) return null;
+	const origin_of = await corpus_file_origin_resolver();
+	const zero = () => ({ files: 0, bytes: 0 });
+	const by_origin: CorpusByOrigin = {
+		own: { svelte: zero(), typescript: zero(), css: zero() },
+		third_party: { svelte: zero(), typescript: zero(), css: zero() }
+	};
+	const unattributed: string[] = [];
+	for (const file of files) {
+		const origin = origin_of(file);
+		if (origin === null) {
+			unattributed.push(file.path);
+			continue;
+		}
+		by_origin[origin][file.language].files++;
+		by_origin[origin][file.language].bytes += file.bytes;
+	}
+	if (unattributed.length > 0) {
+		throw new Error(
+			`${unattributed.length} perf file(s) belong to no snapshot collection, so the report ` +
+				`cannot say who wrote them (first: ${unattributed[0]})`
+		);
+	}
+	return by_origin;
+}
+const corpus_by_origin = await compute_corpus_by_origin([
+	...svelte_files,
+	...ts_files,
+	...css_files
+]);
 
 // Calculate total bytes per language for throughput metrics
 const bytes_by_language: Record<Language, number> = {
@@ -1542,6 +1581,7 @@ const snapshot: PreflightSnapshot = {
 	},
 	bytes_by_language,
 	corpus_sources: corpus_loader.sources,
+	corpus_by_origin,
 	exclusion_caches: corpus_loader.exclusion_caches,
 	corpus_snapshot: (await detect_corpus_snapshot(corpus_loader.sources)) ?? null,
 	versions: {

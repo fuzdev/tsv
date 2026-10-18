@@ -299,16 +299,14 @@ export const TS_REPO_PINS = {
  * id), a collection joining the bench, or a broken extraction, and the harvest fails
  * BEFORE writing so a wrong cache never replaces a good one. Stamped on the snapshot's
  * `collections/` tree id and the perf view's entry list (`lib/harvest_stamp.ts`).
- * Measured 2026-10-16: ../corpora `collections/` at ba7a9a6c8, over the perf view's
- * 929 `.svelte` files.
+ * Measured 2026-10-17: ../corpora `collections/` at e5847b3dd.
  *
- * 278 → 401: earbetter and cosmicplayground join the bench, so the perf view gains
- * their `.svelte` files (58 + 65 blocks) with the snapshot's tree id unmoved — the
- * view-composition move the stamp's `perf_entries` input exists to notice.
- *
- * 401 holds over kit's fixture drop: none of its 22 removed pages carries a `<style>`.
+ * 401 → 619: the third-party collections join the bench, so the perf view gains their
+ * `.svelte` blocks with the snapshot's tree id unmoved (layercake, layerchart,
+ * svelte-maplibre, svelte-ux and flowbite-svelte's `src/lib`; language-tools carries
+ * none), the `lang="postcss"` blocks skipped.
  */
-export const SVELTE_STYLES_BLOCKS_PIN = 401;
+export const SVELTE_STYLES_BLOCKS_PIN = 619;
 
 /**
  * strip:corpus — exact counts over the strippable TypeScript of the `gates` view's snapshot

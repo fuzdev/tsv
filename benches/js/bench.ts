@@ -164,6 +164,7 @@ import {
 } from './lib/bench_plan.ts';
 import type {
 	ChildSpec,
+	CorpusByOrigin,
 	PreflightGroup,
 	PreflightRow,
 	PreflightSnapshot,
@@ -485,6 +486,31 @@ const suppressed_noise: Map<string, number> = new Map(Object.entries(snapshot.su
  */
 function format_throughput(bytes_per_sec: number): string {
 	return `${(bytes_per_sec / 1_000_000).toFixed(1)} MB/s`;
+}
+
+/**
+ * The report's per-origin composition line: per language, the third-party share of the
+ * bytes and both sides' sizes — the corpus each group's one mixed timed set is drawn from
+ * (its intersection then drops the files a row failed, which `omissions` publishes).
+ */
+function format_corpus_by_origin(by_origin: CorpusByOrigin): string {
+	const labels: Record<Language, string> = {
+		svelte: 'Svelte',
+		typescript: 'TypeScript',
+		css: 'CSS'
+	};
+	return LANGUAGES.flatMap((lang) => {
+		const own = by_origin.own[lang];
+		const third = by_origin.third_party[lang];
+		const bytes = own.bytes + third.bytes;
+		if (bytes === 0) return [];
+		const share = Math.round((third.bytes / bytes) * 100);
+		return [
+			`${labels[lang]} ${share}% third-party by bytes ` +
+				`(${third.files} files, ${format_mb(third.bytes)} third-party · ` +
+				`${own.files} files, ${format_mb(own.bytes)} the author's own)`
+		];
+	}).join('; ');
 }
 
 /**
@@ -1025,8 +1051,14 @@ interface BaselineVersions extends ReportVersions {
  * as the commit is read; and `settled_heap_bytes` is the heap
  * of the row's own process, the median over its passes. The canonical rows no longer
  * carry a higher sweep floor than the rest — every row's floor is the same per pass.
+ *
+ * 22: `corpus_by_origin` — the corpus's files and bytes per manifest `origin` (`own`, the
+ * code tsv is developed against and mostly already formats to, or `third_party`) and
+ * language, over the corpus each group's timed set is drawn from. The perf corpus is one
+ * mixed set per group, so this is the disclosure of what the headline blends, not a split
+ * of its timings. Perf reports only.
  */
-const REPORT_SCHEMA_VERSION = 21;
+const REPORT_SCHEMA_VERSION = 22;
 
 interface Baseline {
 	/** See `REPORT_SCHEMA_VERSION`. */
@@ -1069,6 +1101,14 @@ interface Baseline {
 	 * produced on a partial machine would be indistinguishable from a full one.
 	 */
 	corpus_sources: CorpusSource[];
+	/**
+	 * The corpus by who wrote it — files and bytes per manifest `origin` and language,
+	 * over the files the run read. Every timed group sweeps one MIXED set, so this says
+	 * what each headline number blends rather than splitting it: `own` is the code tsv is
+	 * developed against and mostly already formats to, which may favor tsv's format rows.
+	 * Perf reports only (a conformance run reads no snapshot collection); since `version` 22.
+	 */
+	corpus_by_origin?: CorpusByOrigin;
 	/**
 	 * The exclusion caches the conformance view applied, by label, each its size
 	 * (held to its exact pin) — `null` for an absent one, which only a
@@ -1395,6 +1435,7 @@ async function build_results_data(
 		machine: current_machine(),
 		corpus,
 		corpus_sources: snapshot.corpus_sources,
+		corpus_by_origin: snapshot.corpus_by_origin ?? undefined,
 		exclusion_caches: IS_CONFORMANCE
 			? Object.fromEntries(snapshot.exclusion_caches.map((c) => [c.label, c.size]))
 			: undefined,
@@ -1471,6 +1512,9 @@ function generate_markdown_report(data: Baseline, groups: GroupResults[]): strin
 			`**Corpus snapshot:** [${snap.slug}@${snap.commit.slice(0, 9)}](${snap.url}/tree/${snap.commit}) — ` +
 				`the real-code sources are its collections, vendored at this commit\n`
 		);
+	}
+	if (data.corpus_by_origin) {
+		lines.push(`**By origin:** ${format_corpus_by_origin(data.corpus_by_origin)}\n`);
 	}
 	if (data.corpus_sources.length > 0) {
 		lines.push(

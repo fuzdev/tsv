@@ -45,7 +45,7 @@ import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { relative, resolve, sep } from 'node:path';
 
 import { CORPORA_COLLECTIONS, CORPORA_ROOT, CORPORA_URL } from '../lib/corpora.ts';
-import { CorpusLoader, corpus_view_paths } from '../lib/corpus.ts';
+import { CorpusLoader, corpus_view_paths, SVELTE_STYLES_CACHE } from '../lib/corpus.ts';
 import { GATE_CHECKOUT_IDS, SVELTE_STYLES_BLOCKS_PIN } from '../lib/gate_counts.ts';
 import {
 	HARVEST_STAMPS,
@@ -57,7 +57,6 @@ import {
 	write_stamp
 } from '../lib/harvest_stamp.ts';
 
-const CACHE_DIR = 'benches/js/.cache/svelte_styles';
 /** The snapshot every perf-view `.svelte` file comes from — the tree the stamp records. */
 const collections_root = resolve(CORPORA_COLLECTIONS);
 
@@ -107,7 +106,7 @@ async function main(): Promise<void> {
 		perf_entries: (await corpus_view_paths('perf')).join(' '),
 		filters: await corpus_filter_fingerprint('perf')
 	};
-	if (!force && (await harvest_up_to_date(stamp.path, inputs, [CACHE_DIR]))) {
+	if (!force && (await harvest_up_to_date(stamp.path, inputs, [SVELTE_STYLES_CACHE]))) {
 		console.error(
 			`svelte_styles_harvest: up to date (${checkout_label(tree_input)} at ${short_commit(corpora_tree)}, ` +
 				`${SVELTE_STYLES_BLOCKS_PIN} blocks, same perf entries) — skipping; --force to re-harvest`
@@ -168,7 +167,7 @@ async function main(): Promise<void> {
 		Deno.exit(1);
 	}
 
-	const out_dir = resolve(CACHE_DIR);
+	const out_dir = resolve(SVELTE_STYLES_CACHE);
 	await mkdir(out_dir, { recursive: true });
 	let written = 0;
 	let unchanged = 0;

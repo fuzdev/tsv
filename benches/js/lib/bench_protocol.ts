@@ -21,6 +21,7 @@ import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { argv } from 'node:process';
 import type { CollectedBinarySizes } from './binary_sizes.ts';
 import type { ArtifactIdentity } from './check_artifact_freshness.ts';
+import type { CorporaOrigin } from './corpora.ts';
 import type { CorpusRepoRef, CorpusSource, ExclusionCacheState } from './corpus.ts';
 import type {
 	BenchmarkTaskOptions,
@@ -128,6 +129,15 @@ export interface PreflightGroup {
 }
 
 /**
+ * A corpus's composition by who wrote it: files and bytes per manifest `origin` and
+ * language, over the files the run read (`corpus_file_origin_resolver`).
+ */
+export type CorpusByOrigin = Record<
+	CorporaOrigin,
+	Record<Language, { files: number; bytes: number }>
+>;
+
+/**
  * Everything the pre-flight process learned, as the orchestrator needs it: the plan
  * for the timed phase (`groups[].rows[].timed`) and every fact the report states
  * that only a process holding the corpus and the implementations could establish.
@@ -141,6 +151,8 @@ export interface PreflightSnapshot {
 	/** Bytes per language, of the same files. */
 	bytes_by_language: Record<Language, number>;
 	corpus_sources: CorpusSource[];
+	/** `null` when no file the run read belongs to a snapshot collection (conformance runs). */
+	corpus_by_origin: CorpusByOrigin | null;
 	exclusion_caches: ExclusionCacheState[];
 	corpus_snapshot: CorpusRepoRef | null;
 	/** The canonical oracles' versions and whichever alternatives loaded. */

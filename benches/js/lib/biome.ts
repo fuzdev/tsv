@@ -101,6 +101,14 @@ const BIOME_CONFIGURATION: Configuration = {
 		}
 	},
 	css: {
+		// A GRAMMAR input, not a style one: Tailwind's directives (`@tailwind`, `@apply`)
+		// are refused unless enabled, and the Tailwind projects in the corpus would enable
+		// it in their own config. prettier and tsv read them as ordinary at-rules, so off,
+		// biome's rows would lose those files to a parse error no other row has — the
+		// svelte row too, whose `<style>` blocks biome parses with these options.
+		parser: {
+			tailwindDirectives: true
+		},
 		formatter: {
 			indentStyle: 'tab',
 			lineWidth: 100,
@@ -276,6 +284,18 @@ export class BiomeImplementation extends BaseImplementation {
 				"Either biome's severity vocabulary has moved or `formatContent` no longer returns " +
 					'diagnostics — see `biome_fatal_diagnostics` in lib/biome.ts.'
 			);
+		}
+		// The parser option above is as silently droppable as a formatter key, and the
+		// format probes cannot see it: assert biome now takes a Tailwind directive.
+		if (scope === undefined || scope.language === 'css') {
+			try {
+				this.format('@tailwind base;\n', 'css');
+			} catch (e) {
+				throw new Error(
+					'biome: `css.parser.tailwindDirectives` did not land — a Tailwind directive still ' +
+						`fails to parse (${e instanceof Error ? e.message : String(e)})`
+				);
+			}
 		}
 	}
 

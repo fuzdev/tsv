@@ -54,7 +54,8 @@ import {
 	type CorporaCollection,
 	type CorporaOrigin,
 	is_under,
-	load_corpora_manifest
+	load_corpora_manifest,
+	split_collection_path
 } from './corpora.ts';
 import { clone_hint } from './corpus_repos.ts';
 import { PRETTIER_JSX_PIN, SVELTE_REJECTS_PIN } from './gate_counts.ts';
@@ -401,10 +402,11 @@ export function group_by_language(files: SourceFile[]): Record<Language, SourceF
  *   `collections/` tree, recorded in `GATE_CHECKOUT_IDS['../corpora']` and verified by
  *   `deno task pins:audit:checkouts` — real code the perf numbers reflect, AND a
  *   reproducible tier the count pins hold over.
- * - `gated` — snapshot code the correctness gates read but the bench does not: the
- *   gates' breadth, and reproducible there. In `gates` and `robustness`, NOT `perf`,
- *   because the perf invariant that every in-scope tool fully processes every file is
- *   unmeasured over these until a collection is triaged onto the bench (`COLLECTIONS`).
+ * - `gated` — snapshot code the correctness gates read but the bench does not: a
+ *   collection placed for the gates' breadth while its bench triage is pending. In
+ *   `gates` and `robustness`, NOT `perf`, because the perf invariant that every in-scope
+ *   tool fully processes every file is unmeasured over it until it is triaged onto the
+ *   bench (`COLLECTIONS`).
  * - `live` — the `own` collections as WORKING TREES (`../zzz/src`, …): unpinned,
  *   machine-dependent, and in no bench or gate view. Read only by the real-code
  *   robustness sweeps (the `robustness` view), and only as a DIFF against the
@@ -582,19 +584,18 @@ const COLLECTIONS: Record<string, CollectionPlacement> = {
 	kit: { perf: true },
 	svelte: { perf: true },
 	'svelte.dev': { perf: true },
-	// Third-party Svelte libraries and tooling — the gates' breadth, not yet on the bench:
-	// the every-file perf invariant is unmeasured over them until each is triaged onto it
-	'flowbite-svelte': { perf: false },
-	layerchart: { perf: false },
-	layercake: { perf: false },
-	'svelte-ux': { perf: false },
-	'svelte-maplibre': { perf: false },
-	'language-tools': { perf: false },
+	// Third-party Svelte libraries and tooling — prettier-shaped, not the author's
+	'flowbite-svelte': { perf: true },
+	layerchart: { perf: true },
+	layercake: { perf: true },
+	'svelte-ux': { perf: true },
+	'svelte-maplibre': { perf: true },
+	'language-tools': { perf: true },
 	// Neutral TypeScript the formatter benchmarks elsewhere compare on (TypeScript's own
 	// parser, Storybook, Continue) — not tsv-shaped, and not the author's
-	'typescript-parser': { perf: false },
-	storybook: { perf: false },
-	continue: { perf: false }
+	'typescript-parser': { perf: true },
+	storybook: { perf: true },
+	continue: { perf: true }
 };
 
 /** The tier a placed collection's entries land in. */
@@ -636,6 +637,8 @@ interface PlacedCollection extends CorporaCollection {
 interface CorpusCatalog {
 	/** The tagged entry list every view selects from. */
 	entries: CorpusEntry[];
+	/** Every manifest collection's `origin`, placed or not — `corpus_file_origin`'s answer. */
+	origins: Map<string, CorporaOrigin>;
 	/** The `live` tier's trees, one per subpath of each `LIVE_DIFF_ORIGINS` collection. */
 	live_trees: LiveTree[];
 	/** Manifest collections `COLLECTIONS` does not place — vendored, in no view. */
@@ -681,7 +684,12 @@ async function build_catalog(): Promise<CorpusCatalog> {
 			path: `${CORPORA_COLLECTIONS}/${name}`,
 			tier: snapshot_tier(placement)
 		}));
-		return { entries: assemble_entries(placeholders, []), live_trees: [], unplaced: [] };
+		return {
+			entries: assemble_entries(placeholders, []),
+			origins: new Map(),
+			live_trees: [],
+			unplaced: []
+		};
 	}
 	const { collections } = read;
 	const placed: PlacedCollection[] = [];
@@ -718,7 +726,13 @@ async function build_catalog(): Promise<CorpusCatalog> {
 			}))
 		);
 	const unplaced = [...collections.keys()].filter((name) => !(name in COLLECTIONS));
-	return { entries: assemble_entries(snapshot_entries, live_trees), live_trees, unplaced };
+	const origins = new Map([...collections].map(([name, c]) => [name, c.origin]));
+	return {
+		entries: assemble_entries(snapshot_entries, live_trees),
+		origins,
+		live_trees,
+		unplaced
+	};
 }
 
 /**
@@ -738,7 +752,7 @@ function assemble_entries(snapshot_entries: CorpusEntry[], live_trees: LiveTree[
 		// path on real content (embedded CSS rides EmbedContext — a different path).
 		// The same bytes are also timed in the svelte rows; rows are never summed.
 		{
-			path: 'benches/js/.cache/svelte_styles',
+			path: SVELTE_STYLES_CACHE,
 			tier: 'benched',
 			extensions: ['css'],
 			optional: true,
@@ -825,6 +839,33 @@ function assemble_entries(snapshot_entries: CorpusEntry[], live_trees: LiveTree[
 			hint: 'run `deno task bench:harvest:ts-repo` (needs ../typescript)'
 		}
 	];
+}
+
+/**
+ * The `svelte_styles` harvest's cache directory: one `<collection>.css` per snapshot
+ * collection, its `<style>` blocks concatenated (`bench:harvest:svelte-styles`).
+ */
+export const SVELTE_STYLES_CACHE = 'benches/js/.cache/svelte_styles';
+
+/**
+ * Who wrote a loaded file — its collection's manifest `origin` — or `null` for a file no
+ * collection holds (a prettier suite, a parse-conformance suite, a `live` working tree).
+ * A `svelte_styles` file is its source collection's (the cache names each concatenation
+ * for the collection its blocks came from), so the harvested CSS is attributed like
+ * the `.svelte` it was cut from. Reads `SourceFile.source`, which only `CorpusLoader`
+ * sets. The report's per-origin composition (`corpus_by_origin`) is built from this.
+ */
+export async function corpus_file_origin_resolver(): Promise<
+	(file: SourceFile) => CorporaOrigin | null
+> {
+	const { origins } = await corpus_catalog();
+	return (file) => {
+		if (file.source === undefined) return null;
+		const collection =
+			split_collection_path(file.source)?.name ??
+			(file.source === SVELTE_STYLES_CACHE ? basename(file.path, '.css') : undefined);
+		return collection === undefined ? null : (origins.get(collection) ?? null);
+	};
 }
 
 /** The tagged corpus entry list — see `assemble_entries`; built once, from the snapshot's manifest. */

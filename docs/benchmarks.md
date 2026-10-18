@@ -67,7 +67,13 @@ Things the published numbers measure that aren't quite what they look like.
   silently. The svelte probe doubles as the only guard on biome's
   `html.experimentalFullSupportEnabled` — without it biome returns only the formatted
   `<script>` for `.svelte` (an EMPTY string for a script-less file), which the timed
-  row would otherwise score as a successful format.
+  row would otherwise score as a successful format. One non-layout key is pinned too, a
+  grammar input: biome's `css.parser.tailwindDirectives`, since biome alone refuses
+  Tailwind's `@tailwind`/`@apply` unless it is on, and the corpus's Tailwind projects
+  would turn it on in their own config (prettier and tsv read them as ordinary at-rules);
+  it reaches the svelte row as well, whose `<style>` blocks biome parses with the CSS
+  options, and changes no output on CSS that has no Tailwind directive. The layout probes
+  can't see a parser key, so init also asserts a Tailwind directive formats.
 
   A tool whose pins stop landing goes ABSENT, the option and language named in the
   report's `unavailable`, rather than publishing a number produced at some other
@@ -103,10 +109,14 @@ Things the published numbers measure that aren't quite what they look like.
   (fixture suites live in the `gates`/`conformance` views — [corpus
   views](../benches/js/CLAUDE.md#corpus)), read from the pinned `fuzdev/corpora`
   snapshot (the report's `corpus_snapshot` names the one commit; each source's
-  `repo` names the upstream it vendored), but it's dominated by
-  the author's own fuz ecosystem plus svelte/kit source — the same code tsv is
-  developed and fixture-tuned against, and mostly tsv-formatted already (the
-  snapshot tags each collection `shaped_by`). Throughput tracks the syntactic mix of
+  `repo` names the upstream it vendored), and it mixes two kinds of code in every timed
+  set: the author's own fuz ecosystem — the code tsv is developed and fixture-tuned
+  against, mostly tsv-formatted already — and third-party code (the Svelte framework,
+  community Svelte libraries and tools, and TypeScript other formatter benchmarks
+  compare on), mostly prettier-formatted. The report discloses the mix by manifest
+  `origin` (`corpus_by_origin`); the snapshot also tags each collection `shaped_by`,
+  which is the axis a style bias actually follows (a few `own` collections are
+  prettier-shaped). Throughput tracks the syntactic mix of
   _this_ corpus, so ratios are "N× on this corpus," not universal. CSS is by far
   the weakest sample: few real standalone files exist in this ecosystem (most CSS
   is authored inside `.svelte` `<style>` blocks), so the corpus adds the

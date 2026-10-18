@@ -2,7 +2,7 @@
 # Exact per-source counts over the `gates` view; see docs/gate_counts.md.
 #
 # <row> <language> compared=<n> tsv_errors=<n> canonical_errors=<n> both_errors=<n>
-benches/js/.cache/svelte_styles css compared=20 tsv_errors=0 canonical_errors=0 both_errors=0
+benches/js/.cache/svelte_styles css compared=25 tsv_errors=0 canonical_errors=0 both_errors=0
 continue typescript compared=951 tsv_errors=0 canonical_errors=0 both_errors=0
 cosmicplayground svelte compared=131 tsv_errors=0 canonical_errors=0 both_errors=0
 cosmicplayground typescript compared=84 tsv_errors=0 canonical_errors=0 both_errors=0
