@@ -124,14 +124,14 @@ Things the published numbers measure that aren't quite what they look like.
   The harvest dedents each block by the one level it carried inside `<style>`, so
   the concats read as standalone CSS and measure the same already-formatted
   steady state the standalone `.css` files do.
-- **PGO native flagship (forthcoming — policy; no such row ships today).** The
+- **PGO native flagship (on hold — policy; no such row ships today).** The
   standalone native flagship — the `tsv` binary the `@fuzdev/tsv` platform
   packages already ship, un-PGO'd, under the one name rather than a second
-  package — is planned to ship with profile-guided optimization: native-only, a
-  measured ~17–19% wall-time
-  win, **byte-identical** output, **Linux-only first** on that single-target
-  build (the cross-platform prebuilt `.node` binaries stay non-PGO — the `napi`
-  profile — until matrix PGO is a later step). When that row lands the policy is: **(1) both
+  package — could ship with profile-guided optimization, held for now over its
+  binary-size cost: native-only, a measured ~17–19% wall-time win,
+  **byte-identical** output, **Linux-only first** on that single-target build (the
+  cross-platform prebuilt `.node` binaries stay non-PGO — the `napi` profile —
+  until matrix PGO is a later step). If that row lands, the policy is: **(1) both
   rows** — a standard-release native row *and* a PGO one, never PGO silently
   folded into the single native number; **(2) measure what ships** — publish PGO
   numbers only once a shipped artifact carries the recipe, labeled with which
