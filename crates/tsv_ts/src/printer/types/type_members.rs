@@ -260,23 +260,14 @@ impl<'a> Printer<'a> {
             paren_pos.unwrap_or(key_region_end),
         );
 
-        // Print type parameters if present: `<T>` or `<T, U>`
-        if let Some(type_params) = &method.type_parameters {
-            parts.push(self.build_type_parameter_declaration_doc(type_params));
-        }
-
-        let sig_doc = self.build_signature_params_return_group(
-            method.params,
+        // The type parameters (`<T>` or `<T, U>`), the `>`→`(` gap's comments, and the
+        // signature.
+        self.push_member_type_params_and_signature(
+            &mut parts,
             method.type_parameters.as_ref(),
+            method.params,
             method.return_type.as_ref(),
             paren_pos,
-        );
-        // Comments between type_params `>` and `(` go after type_params
-        self.append_signature_head_gap_comments(
-            &mut parts,
-            type_params_end.zip(paren_pos),
-            None,
-            sig_doc,
         );
         // Comments between return type (or params) and `;`
         self.append_signature_end_comments(
@@ -378,11 +369,6 @@ impl<'a> Printer<'a> {
             (None, _) => None,
         };
 
-        // Print type parameters if present: `<T>` or `<T, U>`
-        if let Some(type_params) = type_parameters {
-            parts.push(self.build_type_parameter_declaration_doc(type_params));
-        }
-
         // Find `(` (skip comments so a `(` inside one isn't matched).
         let paren_search_start = type_parameters.map_or(span.start, |tp| tp.span.end);
         let paren_pos = find_char_skipping_comments(
@@ -393,27 +379,36 @@ impl<'a> Printer<'a> {
         )
         .map(|p| p as u32);
 
-        let sig_doc = self.build_signature_params_return_group(
-            params,
-            type_parameters,
-            return_type,
-            paren_pos,
-        );
-        // The signature HEAD gap — `>`→`(` with type parameters, `new`→`(` without. The two
-        // differ only in what separates the head from the tail when nothing breaks: `<T>(` is
-        // glued, `new (` is not. A CALL signature has neither head, and takes no separator —
-        // its `(` opens the member.
-        let (head, flat_separator) = match (type_parameters.map(|t| t.span.end), new_paren_gap) {
-            (Some(type_params_end), _) => (Some(type_params_end), None),
-            (None, Some(new_end)) => (Some(new_end), Some(d.text(" "))),
-            (None, None) => (None, None),
-        };
-        self.append_signature_head_gap_comments(
-            &mut parts,
-            head.zip(paren_pos),
-            flat_separator,
-            sig_doc,
-        );
+        // The signature HEAD gap — `>`→`(` with type parameters (the shared member
+        // builder's), `new`→`(` without. The two differ only in what separates the head
+        // from the tail when nothing breaks: `<T>(` is glued, `new (` is not. A CALL
+        // signature has neither head, and takes no separator — its `(` opens the member.
+        if type_parameters.is_some() {
+            self.push_member_type_params_and_signature(
+                &mut parts,
+                type_parameters,
+                params,
+                return_type,
+                paren_pos,
+            );
+        } else {
+            let sig_doc = self.build_signature_params_return_group(
+                params,
+                type_parameters,
+                return_type,
+                paren_pos,
+            );
+            let (head, flat_separator) = match new_paren_gap {
+                Some(new_end) => (Some(new_end), Some(d.text(" "))),
+                None => (None, None),
+            };
+            self.append_signature_head_gap_comments(
+                &mut parts,
+                head.zip(paren_pos),
+                flat_separator,
+                sig_doc,
+            );
+        }
         // Comments between return type (or params) and `;`
         self.append_signature_end_comments(
             &mut parts,
@@ -424,6 +419,49 @@ impl<'a> Printer<'a> {
             None,
         );
         d.group(d.concat(&parts))
+    }
+
+    /// Push a type-member signature's type parameters (when present), the comments in
+    /// their `>`→`(` gap, and the parameter list with its return type.
+    ///
+    /// With type parameters the list and the parameters share ONE group, the parameters
+    /// ungrouped inside it unless the sole-parameter grouping holds
+    /// (`group_params_if_should`): an overflowing `<…>` breaks one parameter per line and
+    /// the parameters break with it (`>(⏎\tinput: T⏎): R;`) — prettier's
+    /// `printMethodSignature`, the layout tsv's function types already take. A class or
+    /// object method keeps its parameters in their own group instead (`printMethodValue`),
+    /// so there they stay flat under a broken list. Without type parameters the signature
+    /// keeps its own group ([`Printer::build_signature_params_return_group`]).
+    fn push_member_type_params_and_signature(
+        &self,
+        parts: &mut DocBuf,
+        type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
+        params: &[internal::Expression<'_>],
+        return_type: Option<&internal::TSTypeAnnotation<'_>>,
+        paren_pos: Option<u32>,
+    ) {
+        let d = self.d();
+        let Some(type_params) = type_parameters else {
+            parts.push(self.build_signature_params_return_group(
+                params,
+                type_parameters,
+                return_type,
+                paren_pos,
+            ));
+            return;
+        };
+        let sig_doc =
+            self.build_signature_params_return_doc(params, type_parameters, return_type, paren_pos);
+        let mut head: DocBuf =
+            smallvec![self.build_type_parameter_declaration_doc_wrapping(type_params)];
+        // Comments between type_params `>` and `(` go after type_params
+        self.append_signature_head_gap_comments(
+            &mut head,
+            Some(type_params.span.end).zip(paren_pos),
+            None,
+            sig_doc,
+        );
+        parts.push(d.group(d.concat(&head)));
     }
 
     /// Build doc for a type member without its trailing `;` — the type-literal

@@ -2,9 +2,8 @@
 
 A **glued** ignore directive before a type parameter is **inert**: tsv honors a
 directive only when it is alone on its line, so the parameter formats normally —
-a multi-line parameter expands the declaration's `<…>` by ordinary layout
-(function host), and the always-inline method-signature path keeps the brackets
-glued.
+a multi-line parameter expands the declaration's `<…>` by ordinary layout, on a
+function and a class method alike.
 
 Prettier honors the glued placement, freezing the parameter and gluing the
 angle brackets flat around the frozen slice. `prettier_variant_frozen.svelte`

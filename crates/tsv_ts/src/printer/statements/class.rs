@@ -841,9 +841,11 @@ impl<'a> Printer<'a> {
             method.value.params_start,
         );
 
-        // Type parameters if present: method<T>()
+        // Type parameters if present: method<T>(). Their own group, as on a function
+        // declaration: an overflowing `<…>` breaks one parameter per line while the
+        // parameters keep theirs (prettier's `printMethodValue`).
         if let Some(type_params) = &method.value.type_parameters {
-            parts.push(self.build_type_parameter_declaration_doc(type_params));
+            parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
         }
 
         // Parameters and return type - shared callable-signature builder (same path

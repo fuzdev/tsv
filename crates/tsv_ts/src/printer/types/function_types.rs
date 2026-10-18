@@ -790,6 +790,24 @@ impl<'a> Printer<'a> {
         return_type: Option<&internal::TSTypeAnnotation<'_>>,
         paren_pos: Option<u32>,
     ) -> DocId {
+        self.d().group(self.build_signature_params_return_doc(
+            params,
+            type_parameters,
+            return_type,
+            paren_pos,
+        ))
+    }
+
+    /// [`Self::build_signature_params_return_group`]'s content WITHOUT the signature
+    /// group: for a type-member signature with type parameters, whose parameters share
+    /// one group with the `<…>` list ([`Printer::push_member_type_params_and_signature`]).
+    pub(in crate::printer) fn build_signature_params_return_doc(
+        &self,
+        params: &[internal::Expression<'_>],
+        type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
+        return_type: Option<&internal::TSTypeAnnotation<'_>>,
+        paren_pos: Option<u32>,
+    ) -> DocId {
         let d = self.d();
         let params_doc = self.build_signature_params_doc(params, paren_pos);
         let return_type_doc =
@@ -807,11 +825,10 @@ impl<'a> Printer<'a> {
             d,
         );
 
-        let mut sig_parts: DocBuf = smallvec![params_doc];
-        if let Some(rt_doc) = return_type_doc {
-            sig_parts.push(rt_doc);
+        match return_type_doc {
+            Some(rt_doc) => d.concat(&[params_doc, rt_doc]),
+            None => params_doc,
         }
-        d.group(d.concat(&sig_parts))
     }
 
     /// Build a return type (`: T`) with `)`→`:` comment handling, using the return-type

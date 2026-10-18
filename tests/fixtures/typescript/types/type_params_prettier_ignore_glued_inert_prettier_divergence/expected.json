@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 374,
+	"end": 341,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -30,26 +30,26 @@
 		},
 		{
 			"type": "Line",
-			"value": " method host: the always-inline signature path keeps the brackets glued",
+			"value": " method host: the same layout",
 			"start": 207,
-			"end": 280
+			"end": 238
 		},
 		{
 			"type": "Block",
 			"value": " prettier-ignore ",
-			"start": 298,
-			"end": 319
+			"start": 260,
+			"end": 281
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 373,
+		"end": 340,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 364,
+			"end": 331,
 			"body": [
 				{
 					"type": "FunctionDeclaration",
@@ -178,71 +178,71 @@
 				},
 				{
 					"type": "ClassDeclaration",
-					"start": 282,
-					"end": 363,
+					"start": 240,
+					"end": 330,
 					"id": {
 						"type": "Identifier",
-						"start": 288,
-						"end": 289,
+						"start": 246,
+						"end": 247,
 						"name": "C"
 					},
 					"superClass": null,
 					"body": {
 						"type": "ClassBody",
-						"start": 290,
-						"end": 363,
+						"start": 248,
+						"end": 330,
 						"body": [
 							{
 								"type": "MethodDefinition",
-								"start": 294,
-								"end": 360,
+								"start": 252,
+								"end": 327,
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
-									"start": 294,
-									"end": 297,
+									"start": 252,
+									"end": 255,
 									"name": "fn2"
 								},
 								"kind": "method",
 								"typeParameters": {
 									"type": "TSTypeParameterDeclaration",
-									"start": 297,
-									"end": 345,
+									"start": 255,
+									"end": 312,
 									"params": [
 										{
 											"type": "TSTypeParameter",
-											"start": 320,
-											"end": 344,
+											"start": 282,
+											"end": 308,
 											"name": "T",
 											"constraint": {
 												"type": "TSTypeLiteral",
-												"start": 330,
-												"end": 344,
+												"start": 292,
+												"end": 308,
 												"members": [
 													{
 														"type": "TSPropertySignature",
-														"start": 335,
-														"end": 340,
+														"start": 298,
+														"end": 303,
 														"computed": false,
 														"key": {
 															"type": "Identifier",
-															"start": 335,
-															"end": 336,
+															"start": 298,
+															"end": 299,
 															"name": "x"
 														},
 														"typeAnnotation": {
 															"type": "TSTypeAnnotation",
-															"start": 336,
-															"end": 339,
+															"start": 299,
+															"end": 302,
 															"typeAnnotation": {
 																"type": "TSLiteralType",
-																"start": 338,
-																"end": 339,
+																"start": 301,
+																"end": 302,
 																"literal": {
 																	"type": "Literal",
-																	"start": 338,
-																	"end": 339,
+																	"start": 301,
+																	"end": 302,
 																	"value": 1,
 																	"raw": "1"
 																}
@@ -255,8 +255,8 @@
 												{
 													"type": "Block",
 													"value": " prettier-ignore ",
-													"start": 298,
-													"end": 319
+													"start": 260,
+													"end": 281
 												}
 											]
 										}
@@ -264,8 +264,8 @@
 								},
 								"value": {
 									"type": "FunctionExpression",
-									"start": 345,
-									"end": 360,
+									"start": 312,
+									"end": 327,
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -273,21 +273,21 @@
 									"params": [
 										{
 											"type": "Identifier",
-											"start": 346,
-											"end": 350,
+											"start": 313,
+											"end": 317,
 											"name": "a",
 											"typeAnnotation": {
 												"type": "TSTypeAnnotation",
-												"start": 347,
-												"end": 350,
+												"start": 314,
+												"end": 317,
 												"typeAnnotation": {
 													"type": "TSTypeReference",
-													"start": 349,
-													"end": 350,
+													"start": 316,
+													"end": 317,
 													"typeName": {
 														"type": "Identifier",
-														"start": 349,
-														"end": 350,
+														"start": 316,
+														"end": 317,
 														"name": "T"
 													}
 												}
@@ -296,18 +296,18 @@
 									],
 									"returnType": {
 										"type": "TSTypeAnnotation",
-										"start": 351,
-										"end": 357,
+										"start": 318,
+										"end": 324,
 										"typeAnnotation": {
 											"type": "TSVoidKeyword",
-											"start": 353,
-											"end": 357
+											"start": 320,
+											"end": 324
 										}
 									},
 									"body": {
 										"type": "BlockStatement",
-										"start": 358,
-										"end": 360,
+										"start": 325,
+										"end": 327,
 										"body": []
 									}
 								}
@@ -317,9 +317,9 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " method host: the always-inline signature path keeps the brackets glued",
+							"value": " method host: the same layout",
 							"start": 207,
-							"end": 280
+							"end": 238
 						}
 					]
 				}

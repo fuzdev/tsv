@@ -5,10 +5,10 @@
 			x: 1;
 		}>(a: T): void {}
 
-	// method host: the always-inline signature path keeps the brackets glued
+	// method host: the same layout
 	class C {
 		fn2</* prettier-ignore */ T extends {
-			x: 1;
-		}>(a: T): void {}
+				x: 1;
+			}>(a: T): void {}
 	}
 </script>
