@@ -1047,15 +1047,18 @@ impl<'a> Printer<'a> {
     ) -> bool {
         // Both reads below are newline-derived authoring intent (a source newline
         // after `{` / before the first member). The canonical reprint erases them
-        // so an object type breaks only by width.
+        // so an object type breaks only by width, and so does the hug policy's question
+        // for the one literal it names (`Printer::unforced_param_type_literal`).
+        let authored =
+            !self.canonical && self.unforced_param_type_literal.get() != Some(obj.span.start);
         let source_is_multiline =
-            !self.canonical && super::super::is_brace_block_multiline(self.source, obj.span);
+            authored && super::super::is_brace_block_multiline(self.source, obj.span);
         // Prettier breaks an object type when its first member starts on a line
         // below the opening brace. `is_brace_block_multiline` only sees a newline
         // *immediately* after `{`, so a block comment on the brace line
         // (`{ /* c */\n a: T }`) defeats it — detect the newline before the first
         // member directly here.
-        let first_member_on_new_line = !self.canonical
+        let first_member_on_new_line = authored
             && obj.members.first().is_some_and(|m| {
                 self.source[obj.span.start as usize..m.span().start as usize].contains('\n')
             });

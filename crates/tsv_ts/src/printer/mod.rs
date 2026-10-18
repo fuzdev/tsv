@@ -337,6 +337,17 @@ pub struct Printer<'a> {
     /// It is the *list* that goes flat, never a parameter's own doc — a destructured pattern
     /// still expands on its own, which is why this is not a `remove_lines` over the signature.
     pub(crate) test_call_flat_params: Cell<bool>,
+    /// The span start of one object-type literal whose **authored** expansion is not read —
+    /// set only while the arrow-hug signature policy asks whether a hugged sole parameter
+    /// will break (`expressions/functions.rs`, `sole_param_object_type_start`).
+    ///
+    /// Prettier's `printObject` returns a hugged sole parameter's top-level object type
+    /// without a group, so the author's expansion of that one literal never reaches
+    /// `willBreak` and never bails the hug out; tsv prints it expanded all the same (the
+    /// cataloged divergence). Every other break the parameter carries is still read. Keyed
+    /// by the literal's own position, so a nested literal built under the question keeps
+    /// its authored expansion — and refuses the hug, as prettier's does.
+    pub(crate) unforced_param_type_literal: Cell<Option<u32>>,
     /// How many trailing runs [`Self::append_trailing_paren_comments`] has DEFERRED out of a
     /// grouping pair the printer strips (`x + (y * z // c⏎)`): a `line_suffix` that no
     /// break inside the operand ends, so it rides to wherever the enclosing line ends.
@@ -741,6 +752,7 @@ impl<'a> Printer<'a> {
             skip_arrow_chain: Cell::new(false),
             expand_last_arg_flat_params: Cell::new(false),
             test_call_flat_params: Cell::new(false),
+            unforced_param_type_literal: Cell::new(None),
             deferred_paren_runs: Cell::new(0),
             forced_list_elements: RefCell::new(Vec::new()),
             arrow_body_leftmost_parens_target: Cell::new(None),

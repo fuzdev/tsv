@@ -3,7 +3,7 @@
 #
 # <row> <language> match=<n> known=<n> partial=<n> unknown=<n> errors=<n> expected_errors=<n>
 benches/js/.cache/svelte_styles css match=22 known=2 partial=0 unknown=1 errors=0 expected_errors=0
-continue typescript match=938 known=2 partial=0 unknown=11 errors=0 expected_errors=0
+continue typescript match=939 known=2 partial=0 unknown=10 errors=0 expected_errors=0
 cosmicplayground svelte match=83 known=48 partial=0 unknown=0 errors=0 expected_errors=0
 cosmicplayground typescript match=82 known=2 partial=0 unknown=0 errors=0 expected_errors=0
 cosmicplayground css match=1 known=1 partial=0 unknown=0 errors=0 expected_errors=0
@@ -64,7 +64,7 @@ prettier/tests/format/typescript typescript match=688 known=56 partial=7 unknown
 ryanatkn.com svelte match=26 known=5 partial=0 unknown=0 errors=0 expected_errors=0
 ryanatkn.com typescript match=20 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 ryanatkn.com css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0
-storybook typescript match=1320 known=2 partial=1 unknown=25 errors=0 expected_errors=0
+storybook typescript match=1324 known=2 partial=1 unknown=21 errors=0 expected_errors=0
 storybook css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 svelte typescript match=415 known=1 partial=0 unknown=0 errors=0 expected_errors=0
 svelte-docinfo svelte match=12 known=10 partial=0 unknown=0 errors=0 expected_errors=0

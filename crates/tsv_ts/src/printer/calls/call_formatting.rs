@@ -548,11 +548,14 @@ fn build_call_args_doc(
     // e.g., setTimeout(() => { tick(); }, 100);
     // The inline tail can carry neither a comment running to EOL nor one leading the first
     // argument. Named rather than inlined, matching the `new` twin.
+    // The first argument's own signature refusing the hug is asked last, behind the shape
+    // test: it builds that signature.
     let expand_first_blocked = arg_trailing_line_comment
-        || (call_has_comments
-            && (first_arg_has_any_comments(call.arguments, printer, paren_open)
-                || first_arg_signature_refuses_expand_first(printer, call.arguments)));
-    if should_expand_first_arg(printer, call.arguments) && !expand_first_blocked {
+        || (call_has_comments && first_arg_has_any_comments(call.arguments, printer, paren_open));
+    if should_expand_first_arg(printer, call.arguments)
+        && !expand_first_blocked
+        && !first_arg_signature_refuses_expand_first(printer, call.arguments)
+    {
         return build_expand_first_arg_doc(
             printer,
             ArgOpener::Callee(callee),

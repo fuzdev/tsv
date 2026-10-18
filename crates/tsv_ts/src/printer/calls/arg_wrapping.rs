@@ -19,8 +19,8 @@ use super::arg_predicates::{
 };
 use crate::ast::internal;
 use crate::printer::expressions::functions::{
-    arrow_signature_has_breaking_comments, arrow_token_end, has_leftmost_arrow_body_parens,
-    prepend_leading,
+    arrow_signature_has_breaking_comments, arrow_signature_refuses_hug, arrow_token_end,
+    has_leftmost_arrow_body_parens, prepend_leading,
 };
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
@@ -1204,7 +1204,9 @@ pub(super) fn build_expand_last_arg_doc(
 
 /// The **flat-parameter** half of [`build_expand_last_arg_doc`] alone — for the chain's
 /// forced-expansion loop, which renders a lone arrow argument's signature flat (prettier's
-/// `expandLastArg` `removeLines`) while leaving its chain layout alone.
+/// `expandLastArg` `removeLines`) while leaving its chain layout alone, and for the
+/// expand-FIRST hug states ([`build_expand_first_arg_doc`], prettier's `expandFirstArg`),
+/// whose broken-out state reads a printing of its own.
 ///
 /// ⚠️ It **restores** the previous value rather than clearing, which is the difference between
 /// a scoped flag and a global one: an outer hug can still hold the flag when this layout runs
@@ -1805,7 +1807,21 @@ pub(super) fn build_expand_first_arg_doc(
     call_end: u32,
 ) -> DocId {
     let d = printer.d();
-    let first_arg_doc = printer.build_arg_expression_doc(arguments[0]);
+    // The hug states read prettier's `expandFirstArg` printing of the first argument: an
+    // arrow's parameters flat (`removeLines`), so a head too wide for the callee's line falls
+    // through to the broken-out state rather than shattering its parameters inside the hug.
+    // That state rebuilds the argument as `printedArguments` prints it, with its parameters
+    // breakable on a line of their own. A `function` first argument takes no flattening —
+    // `printFunction` flattens under `expandLastArg` alone — so its parameters still break
+    // inside the hug.
+    let first_arg_doc = if matches!(
+        arguments[0].kind,
+        internal::ExpressionKind::ArrowFunctionExpression(_)
+    ) {
+        build_flat_params_arg_doc(printer, || printer.build_arg_expression_doc(arguments[0]))
+    } else {
+        printer.build_arg_expression_doc(arguments[0])
+    };
 
     let mut tail_parts = DocBuf::new();
     let mut prev_end = arguments[0].span().end;
@@ -2259,9 +2275,16 @@ pub(super) fn should_expand_first_arg(
 /// `ArgExpansionBailout` reached through `expandFirstArg` instead of `expandLastArg`.
 ///
 /// The expand-first hug renders the first argument's signature head on the callee's line,
-/// so a break forced inside that signature cannot be honored, exactly as at the expand-last
-/// states ([`arrow_signature_has_breaking_comments`], which this delegates to so the two
-/// directions ask one question).
+/// so a signature that will break cannot be honored there, exactly as at the expand-last
+/// states ([`arrow_signature_refuses_hug`], which this delegates to so the two directions ask
+/// one question — its sole-parameter carve-out included, since an expand-first argument is
+/// always block-bodied). Every argument breaks out instead, where the signature may break on
+/// a line of its own.
+///
+/// A comment in an EMPTY parameter list refuses too, though no bailout reads it (the list
+/// returns ahead of the throw): it is a comment on the argument itself, and
+/// `shouldExpandFirstArg` opens with `!hasComment(firstArg)`. The expand-last direction has
+/// no such gate, so there the argument hugs with the comment on its own line.
 ///
 /// **Arrow only, deliberately.** `printArrowFunctionSignature` takes
 /// `shouldExpandParameters = expandLastArg || expandFirstArg`, so an arrow bails out in both
@@ -2277,7 +2300,8 @@ pub(super) fn first_arg_signature_refuses_expand_first(
     matches!(
         args.first(),
         Some(internal::Expression { span, kind: internal::ExpressionKind::ArrowFunctionExpression(arrow) })
-            if arrow_signature_has_breaking_comments(printer, arrow, *span)
+            if arrow_signature_refuses_hug(printer, arrow, *span)
+                || printer.arrow_empty_params_hold_comments(arrow)
     )
 }
 

@@ -1425,7 +1425,7 @@ fn build_chain_args_multi(
             || (has_any_comment_text
                 && first_arg_has_any_comments(call.arguments, printer, paren_open))
             // Prettier's `ArgExpansionBailout` reached through `expandFirstArg`; the plain-call
-            // and `new` twins fold the same call into their `expand_first_blocked`.
+            // and `new` twins ask the same predicate behind the same shape test.
             || first_arg_signature_refuses_expand_first(printer, call.arguments))
     {
         // The expand-first ladder, shared with the plain-call and `new` twins — including

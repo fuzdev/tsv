@@ -417,6 +417,115 @@ pub(in crate::printer) fn callback_signature_has_breaking_comments(
     }
 }
 
+/// Whether `arrow`'s signature **will break** as a hugged call argument — the doc half of
+/// prettier's `ArgExpansionBailout`, beside the source half
+/// [`arrow_signature_has_breaking_comments`].
+///
+/// Under `expandLastArg` / `expandFirstArg` prettier throws the bailout when
+/// `willBreak(returnTypeDoc)` (`printArrowFunctionSignature`) or, with parameters present,
+/// `willBreak(typeParametersDoc) || willBreak(printed)` (`printFunctionParameters`), and the
+/// call breaks every argument out. A break forced inside the signature — an object or object
+/// type the author expanded, a blank line between parameters, a matrix array, a member chain
+/// the chain printer breaks — is the same fact as a break a comment forces there, and the
+/// call answers it the same way: whatever forced it, the hug would render the signature's
+/// head on the callee's line.
+///
+/// Asked of the signature's own docs, built here — parameters and return type, never the
+/// body, so asking costs a signature and not the subtree. No source scan can stand in for
+/// the build: the doc layer forces breaks from source that holds no newline at all
+/// (`[[1, 2], [3, 4]]`, `x.a(() => 1).b(() => 2).c(() => 3)`). Each half the oracle gates is
+/// gated here too: an **empty** parameter list takes `printFunctionParameters`'
+/// `parameters.length === 0` return ahead of the throw, so only the return type is asked.
+///
+/// **One carve-out, tsv's:** a block-bodied arrow keeps the hug when the only break in its
+/// hugged sole parameter is the author's expansion of that parameter's own top-level object
+/// type ([`sole_param_object_type_start`]). Prettier prints that literal without
+/// a group, so the expansion never reaches its bailout; tsv keeps the expansion, keeps the
+/// hug for a block body, and breaks the call out for an expression body (see
+/// `docs/conformance_prettier_ts.md` §Hugged sole-parameter object type). Any other break in
+/// that parameter refuses as prettier's does, and so do the return type and the type
+/// parameters.
+fn arrow_signature_will_break(
+    printer: &Printer<'_>,
+    arrow: &internal::ArrowFunctionExpression<'_>,
+    span: Span,
+) -> bool {
+    let d = printer.d();
+    if let Some(return_type) = &arrow.return_type
+        && d.will_break(printer.build_arrow_return_type_doc(return_type, arrow.params_start))
+    {
+        return true;
+    }
+    if arrow.params.is_empty() {
+        return false;
+    }
+    if let Some(type_params) = &arrow.type_parameters
+        && d.will_break(printer.build_type_parameter_declaration_doc_wrapping(type_params))
+    {
+        return true;
+    }
+    let unforced = if arrow.body.is_expression() {
+        None
+    } else {
+        sole_param_object_type_start(
+            printer,
+            arrow.params,
+            arrow.params_start,
+            printer.arrow_params_end(arrow),
+        )
+    };
+    printer.ask_signature_params(unforced, || {
+        d.will_break(printer.build_arrow_params_doc_ungrouped(arrow, span))
+    })
+}
+
+/// The position of the object-type literal annotating a **hugged** sole parameter at its top
+/// level — `(a: { … })`, `({ a }: { … })` — whose authored expansion the hug policy does not
+/// read ([`Printer::unforced_param_type_literal`]); `None` when the list has no such literal.
+///
+/// Exactly prettier's group-less node: `printObject` drops the group of an object type whose
+/// path is `typeAnnotation → typeAnnotation → shouldHugTheOnlyParameter`, so the literal must
+/// annotate the parameter itself — an identifier or a destructuring pattern straight in the
+/// list, not one under a default. Its members are not that node, so a nested literal the
+/// author expanded still breaks the signature, as do a pattern's own breaks (an expanded
+/// default object, a nested pattern, a blank line between properties).
+fn sole_param_object_type_start(
+    printer: &Printer<'_>,
+    params: &[internal::Expression<'_>],
+    open: Option<u32>,
+    close: Option<u32>,
+) -> Option<u32> {
+    if !printer.hugs_sole_parameter(params, open, close, true) {
+        return None;
+    }
+    let annotation = match &params[0].kind {
+        internal::ExpressionKind::Identifier(id) => id.type_annotation(),
+        internal::ExpressionKind::ObjectPattern(pattern) => pattern.type_annotation.as_ref(),
+        internal::ExpressionKind::ArrayPattern(pattern) => pattern.type_annotation.as_ref(),
+        _ => None,
+    }?;
+    match unwrap_parenthesized(annotation.type_annotation) {
+        internal::TSType::TypeLiteral(literal) => Some(literal.span.start),
+        _ => None,
+    }
+}
+
+/// Whether `arrow`'s signature refuses a hug that renders its head on the callee's line —
+/// prettier's `ArgExpansionBailout`, whatever forces the break: a comment
+/// ([`arrow_signature_has_breaking_comments`]) or a break the signature's own docs carry
+/// (an authored-expanded object, a blank line between parameters).
+///
+/// The question the expand-first hug asks before it renders the signature hugged, in every
+/// callee spelling, so no site can answer it from one half alone.
+pub(in crate::printer) fn arrow_signature_refuses_hug(
+    printer: &Printer<'_>,
+    arrow: &internal::ArrowFunctionExpression<'_>,
+    span: Span,
+) -> bool {
+    arrow_signature_has_breaking_comments(printer, arrow, span)
+        || arrow_signature_will_break(printer, arrow, span)
+}
+
 /// Check if an expression has a huggable type annotation.
 ///
 /// Parameters with huggable type annotations like `a?: { b: T }` should be hugged:
@@ -476,6 +585,37 @@ impl HeadForcedChainLead {
 }
 
 impl<'a> Printer<'a> {
+    /// Run `ask` — a parameter list built only to be ASKED whether it will break — with
+    /// `test_call_flat_params` cleared and `unforced` naming the literal whose authored
+    /// expansion the question does not read ([`Self::unforced_param_type_literal`]),
+    /// restoring both afterwards.
+    ///
+    /// The test-call flag is consumed by the first parameter list built under it, so the
+    /// question must not take it from the build that prints: it asks the list as an ordinary
+    /// one, and the printing build still finds the flag set.
+    fn ask_signature_params(&self, unforced: Option<u32>, ask: impl FnOnce() -> bool) -> bool {
+        let prev_flat = self.test_call_flat_params.replace(false);
+        let prev_unforced = self.unforced_param_type_literal.replace(unforced);
+        let answer = ask();
+        self.unforced_param_type_literal.set(prev_unforced);
+        self.test_call_flat_params.set(prev_flat);
+        answer
+    }
+
+    /// Whether `arrow` has an empty parameter list with a comment inside its parens (or in the
+    /// gap behind them) — the one signature prettier's `expandLastArg` / `expandFirstArg`
+    /// printing does not flatten, since `printFunctionParameters` returns an empty list
+    /// before its `removeLines`. **On page**: an owned comment occupies the line as well.
+    pub(in crate::printer) fn arrow_empty_params_hold_comments(
+        &self,
+        arrow: &internal::ArrowFunctionExpression<'_>,
+    ) -> bool {
+        arrow.params.is_empty()
+            && arrow
+                .params_start
+                .is_some_and(|open| self.has_comments_on_page_between(open, arrow.arrow_token))
+    }
+
     /// Whether both delimiter gaps around a lone parameter are free of comments to emit —
     /// the shared precondition of the sole-parameter hug at all three parameter builders.
     ///

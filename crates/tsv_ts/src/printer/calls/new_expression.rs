@@ -555,13 +555,17 @@ impl<'a> Printer<'a> {
         // comment). An after-comma inline block leading the second arg is carried below.
         // Named once, like the plain call's twin — and factored on `new_has_comments`, the
         // cascade's zero-comment fast gate, so a comment-free `new` asks neither predicate.
+        // The first argument's own signature refusing the hug is asked last, behind the
+        // shape test: it builds that signature.
         let expand_first_blocked = new_has_comments
             && (has_trailing_line_comments_slice(new_expr.arguments, new_expr_span.end, self)
-                || first_arg_has_any_comments(new_expr.arguments, self, paren_open)
-                || first_arg_signature_refuses_expand_first(self, new_expr.arguments));
+                || first_arg_has_any_comments(new_expr.arguments, self, paren_open));
         // One `printCallArguments` prints both spellings, so the layout is the plain call's
         // (`build_expand_first_arg_doc`), not a copy of it.
-        if should_expand_first_arg(self, new_expr.arguments) && !expand_first_blocked {
+        if should_expand_first_arg(self, new_expr.arguments)
+            && !expand_first_blocked
+            && !first_arg_signature_refuses_expand_first(self, new_expr.arguments)
+        {
             return build_expand_first_arg_doc(
                 self,
                 ArgOpener::Callee(callee_with_types),
