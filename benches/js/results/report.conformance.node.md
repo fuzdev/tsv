@@ -6,11 +6,11 @@
 
 **Corpus kind:** conformance — fixtures-only corpus (disjoint from perf; a suite with a validity oracle or harness filtered to what it calls valid), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)
 
-**Date:** 2026-10-10T19:00:43.347Z — tsv 0.6.0 (c93c1649)
+**Date:** 2026-10-18T07:36:58.821Z — tsv 0.7.0 (7103b4aa)
 
-**Corpus:** 4643 Svelte (1.1 MB), 53323 TypeScript (70.8 MB), 22450 CSS (7.7 MB) — 80416 files, 79.5 MB total
+**Corpus:** 4644 Svelte (1.1 MB), 53323 TypeScript (70.8 MB), 22450 CSS (7.7 MB) — 80417 files, 79.5 MB total
 
-**Sources:** ../prettier-plugin-svelte/test (318), ../prettier/tests/format/typescript (591), ../prettier/tests/format/js (756), ../prettier/tests/format/css (139), ../prettier/tests/format/html (82), ../svelte/packages/svelte/tests (4567), benches/js/.cache/wpt_css (22127), benches/js/.cache/test262_files.json (43739), benches/js/.cache/ts_repo_files.json (8097)
+**Sources:** ../prettier-plugin-svelte/test (318), ../prettier/tests/format/typescript (591), ../prettier/tests/format/js (756), ../prettier/tests/format/css (139), ../prettier/tests/format/html (82), ../svelte/packages/svelte/tests (4568), benches/js/.cache/wpt_css (22127), benches/js/.cache/test262_files.json (43739), benches/js/.cache/ts_repo_files.json (8097)
 
 **Excluded by cache:** canonical-reject (144), prettier-jsx (39)
 
@@ -28,7 +28,7 @@
 
 ## parse/svelte
 
-**Coverage:** svelte/compiler 4643/4643 (100%), tsv 4643/4643 (100%), tsv-wasm 4643/4643 (100%), tsv-internal 4643/4643 (100%), tsv-wasm-internal 4643/4643 (100%), rsvelte-parse 4643/4643 (100%), rsvelte-parse-skip-expr-loc 4643/4643 (100%)
+**Coverage:** svelte/compiler 4644/4644 (100%), tsv 4644/4644 (100%), tsv-wasm 4644/4644 (100%), tsv-internal 4644/4644 (100%), tsv-wasm-internal 4644/4644 (100%), rsvelte-parse 4644/4644 (100%), rsvelte-parse-skip-expr-loc 4644/4644 (100%)
 
 ## parse/typescript
 
@@ -44,7 +44,7 @@
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `../prettier-plugin-svelte/test` | 318 | 318 (100%) | 318 (100%) | 318 (100%) | 318 (100%) | 318 (100%) | 318 (100%) | 318 (100%) |
 | `../prettier/tests/format/html` | 82 | 82 (100%) | 82 (100%) | 82 (100%) | 82 (100%) | 82 (100%) | 82 (100%) | 82 (100%) |
-| `../svelte/packages/svelte/tests` | 4243 | 4243 (100%) | 4243 (100%) | 4243 (100%) | 4243 (100%) | 4243 (100%) | 4243 (100%) | 4243 (100%) |
+| `../svelte/packages/svelte/tests` | 4244 | 4244 (100%) | 4244 (100%) | 4244 (100%) | 4244 (100%) | 4244 (100%) | 4244 (100%) | 4244 (100%) |
 
 ### parse/typescript by corpus source
 
@@ -70,26 +70,26 @@
 
 | Binary | Size | Gzipped | vs tsv | vs tsv (gz) |
 | --- | ---: | ---: | ---: | ---: |
-| tsv-format-wasm | 2.4 MB | 948.1 KB | 0.9x | 0.9x |
-| tsv-parse-wasm | 1.0 MB | 397.4 KB | 0.4x | 0.4x |
-| tsv-wasm | 2.7 MB | 1.0 MB | — | — |
-| biome (wasm) | 46.9 MB | 11.9 MB | 17.4x | 11.4x |
+| tsv-format-wasm | 2.5 MB | 961.7 KB | 0.9x | 0.9x |
+| tsv-parse-wasm | 1.0 MB | 404.8 KB | 0.4x | 0.4x |
+| tsv-wasm | 2.8 MB | 1.1 MB | — | — |
+| biome (wasm) | 46.9 MB | 11.9 MB | 16.9x | 11.1x |
 | dprint (wasm) | 4.2 MB | 1.2 MB | 1.5x | 1.1x |
-| oxc-parser (wasm) | 1.5 MB | 481.4 KB | 0.6x | 0.5x |
+| oxc-parser (wasm) | 1.5 MB | 481.4 KB | 0.5x | 0.4x |
 | yuku-parser (wasm) | 698.9 KB | 202.8 KB | 0.3x | 0.2x |
 | malva (wasm) | 1.5 MB | 414.0 KB | 0.5x | 0.4x |
 | markup_fmt (wasm) | 2.0 MB | 557.3 KB | 0.7x | 0.5x |
 | tsv (ffi) | 3.6 MB | 1.7 MB | 0.9x | 0.9x |
-| tsv format (ffi) | 3.3 MB | 1.5 MB | 0.8x | 0.8x |
-| tsv parse (ffi) | 1.6 MB | 698.7 KB | 0.4x | 0.4x |
-| tsv (napi) | 4.0 MB | 1.8 MB | — | — |
-| oxc-parser+oxfmt (napi) | 10.9 MB | 4.5 MB | 2.8x | 2.5x |
+| tsv format (ffi) | 3.3 MB | 1.6 MB | 0.8x | 0.8x |
+| tsv parse (ffi) | 1.6 MB | 711.3 KB | 0.4x | 0.4x |
+| tsv (napi) | 4.1 MB | 1.9 MB | — | — |
+| oxc-parser+oxfmt (napi) | 10.9 MB | 4.5 MB | 2.7x | 2.4x |
 | oxc-parser (napi) | 2.1 MB | 880.8 KB | 0.5x | 0.5x |
-| oxfmt (napi) | 8.8 MB | 3.7 MB | 2.2x | 2.0x |
+| oxfmt (napi) | 8.8 MB | 3.7 MB | 2.2x | 1.9x |
 | yuku-parser (napi) | 681.1 KB | 286.0 KB | 0.2x | 0.2x |
-| rsvelte-fmt (binary) | 9.1 MB | 3.6 MB | 2.3x | 2.0x |
-| rsvelte compiler (napi) | 17.8 MB | 7.5 MB | 4.5x | 4.1x |
-| swc (napi) | 10.5 MB | 10.2 MB | 2.7x | 5.5x |
+| rsvelte-fmt (binary) | 9.1 MB | 3.6 MB | 2.2x | 1.9x |
+| rsvelte compiler (napi) | 17.8 MB | 7.5 MB | 4.4x | 4.0x |
+| swc (napi) | 10.5 MB | 10.2 MB | 2.6x | 5.4x |
 | svelte + acorn-typescript parsers (js bundle) | 500.5 KB | 124.9 KB | 0.2x | 0.1x |
 | prettier + svelte plugin (js bundle) | 2.2 MB | 567.4 KB | 0.8x | 0.5x |
 | prettier + parsers (js bundle) | 2.2 MB | 567.5 KB | 0.8x | 0.5x |
