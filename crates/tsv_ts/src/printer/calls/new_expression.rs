@@ -26,9 +26,7 @@ use super::arg_wrapping::{
 use super::expand_last::{ArgOwner, try_expand_last_arg};
 use crate::ast::internal;
 use crate::printer::chain::{child_stops_optional_chain, tag_paren_leading_start};
-use crate::printer::expressions::functions::{
-    arrow_signature_has_breaking_comments, prepend_leading,
-};
+use crate::printer::expressions::functions::{arrow_signature_refuses_hug, prepend_leading};
 use crate::printer::needs_parens::instantiation_operand_is_sealed_chain;
 use crate::printer::{
     ParenContext, Printer, SecondTypeArgs, instantiation_keeps_pair_before_type_args,
@@ -374,19 +372,15 @@ impl<'a> Printer<'a> {
                     let has_leading_comment = new_has_comments
                         && self.has_comments_on_page_between(paren_open, arg_start);
 
-                    // If the arrow has trailing param comments or leading comments,
-                    // force wrapped state
-                    let has_trailing_param_comments = new_has_comments
-                        && arrow_signature_has_breaking_comments(
-                            self,
-                            arrow,
-                            new_expr.arguments[0].span,
-                        );
+                    // A signature that will break, or a leading comment, forces the wrapped
+                    // state.
+                    let signature_refuses =
+                        arrow_signature_refuses_hug(self, arrow, new_expr.arguments[0].span);
 
-                    // ⚠️ All three refusals are asked BEFORE the printing pair below and read
-                    // only the `printedArguments` one — the pair is a second build of the
-                    // argument ([`build_arrow_hug_printed_doc`]).
-                    if has_trailing_param_comments || has_leading_comment {
+                    // ⚠️ Both refusals are asked BEFORE the printing pair below and read only
+                    // the `printedArguments` one — the pair is a second build of the argument
+                    // ([`build_arrow_hug_printed_doc`]).
+                    if signature_refuses || has_leading_comment {
                         let printed = prepend_leading(
                             d,
                             glued,
@@ -447,7 +441,8 @@ impl<'a> Printer<'a> {
                         // return-type annotation, so typed-return arrows are eligible.
                         // The reassembling arm's refusal pair — a break forced inside the
                         // signature, or a comment on the body's own tail, either of which
-                        // these states cannot honor (`arrow_hug_refused_by_comments`).
+                        // these states cannot honor (`arrow_hug_refused_by_comments`) — and a
+                        // signature that will break, which every state prints flattened.
                         if is_ternary_arrow_body(body_expr)
                             && !(new_has_comments
                                 && arrow_hug_refused_by_comments(
@@ -456,6 +451,7 @@ impl<'a> Printer<'a> {
                                     new_expr.arguments[0].span,
                                     body_expr,
                                 ))
+                            && !arrow_signature_refuses_hug(self, arrow, new_expr.arguments[0].span)
                         {
                             let sig_doc =
                                 build_arrow_sig_doc(self, arrow, new_expr.arguments[0].span);
@@ -468,13 +464,11 @@ impl<'a> Printer<'a> {
                             );
 
                             // The ladder, shared with the plain call's
-                            // `build_ternary_arrow_hug_states` and the member chain's arm —
-                            // asked, like the call's, of the BODY.
+                            // `build_ternary_arrow_hug_states` and the member chain's arm.
                             return build_ternary_arrow_hug_ladder(
                                 d,
                                 ArgOpener::Callee(callee_with_types),
                                 sig_doc,
-                                body_doc,
                                 body_doc,
                                 self.arrow_body_takes_ternary_pair(body_expr),
                             );

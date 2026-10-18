@@ -34,7 +34,7 @@ use super::test_patterns::{
 use crate::ast::internal;
 use crate::printer::comments::ShareSite;
 use crate::printer::expressions::functions::{
-    arrow_signature_has_breaking_comments, function_signature_has_breaking_comments,
+    arrow_signature_refuses_hug, callback_signature_refuses_hug,
 };
 use crate::printer::ignore::FrozenOperandPair;
 use smallvec::smallvec;
@@ -809,11 +809,10 @@ fn try_single_arg_hug(
     // reassembling layout and printed the signature past the print width with no state to
     // fall through to (`calls/arrow_object_body_own_line_comment_long`).
     //
-    // A break forced inside the SIGNATURE still wins, as it did when this lived one level
-    // down: that layout renders the signature's head on the callee's line, which the break
-    // makes impossible, so the block-arrow arm's own refusal keeps it.
-    if let internal::ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind
-        && !arrow_signature_has_breaking_comments(printer, arrow, arg.span)
+    // A signature that will break still wins: that layout renders the signature's head on the
+    // callee's line, which the break makes impossible, so the helper refuses the state for
+    // every callee spelling and the block-arrow arm's own refusal keeps it.
+    if let internal::ExpressionKind::ArrowFunctionExpression(_) = &arg.kind
         && let Some(gap_break) = last_arg_arrow_gap_break(printer, arg)
     {
         return Some(build_arrow_gap_break_single_arg_doc(
@@ -845,13 +844,12 @@ fn try_single_arg_hug(
         // list break while `callee(function name(` stays on one line
         // (`prettier/tests/format/js/last-argument-expansion/overflow.js`).
         //
-        // A comment forcing the parameter list multiline refuses the hug outright: every hug
-        // state renders the callee and the signature's head on one line, which the break makes
-        // impossible.
-        internal::ExpressionKind::FunctionExpression(func) => {
+        // A signature that refuses the hug refuses it outright: every hug state renders the
+        // callee and the signature's head on one line, which the break makes impossible.
+        internal::ExpressionKind::FunctionExpression(_) => {
             let arg_doc = printer.build_expression_doc(arg);
             let opener = ArgOpener::Callee(callee);
-            if function_signature_has_breaking_comments(printer, func) {
+            if callback_signature_refuses_hug(printer, arg, 1) {
                 return Some(opener.break_out(d, arg_doc));
             }
             return Some(opener.lone_hug_ladder(d, arg_doc, lone_arg_params_render_flat(arg)));
@@ -896,9 +894,12 @@ fn try_single_arg_hug(
                 // break forced inside the signature this conditional-group cannot honor, and
                 // a comment on the body's tail — every state below reassembles the argument
                 // from a signature and a body doc, synthesizing its own parens around the
-                // ternary, so such a comment reaches no emitter.
+                // ternary, so such a comment reaches no emitter. A signature that will break
+                // refuses too: the states print it flattened, and none prints the argument
+                // whole, so the call breaks every argument out below.
                 if is_ternary_arrow_body(body_expr)
                     && !arrow_hug_refused_by_comments(printer, arrow, arg.span, body_expr)
+                    && !arrow_signature_refuses_hug(printer, arrow, arg.span)
                 {
                     return Some(build_ternary_arrow_hug_states(
                         printer, callee, arrow, arg.span, body_expr,
@@ -968,10 +969,9 @@ fn build_block_arrow_hug_states(
     // `printedArguments` printing — the pair is a second build of the argument, which
     // recurses into any call nested in its body ([`build_arrow_hug_printed_doc`]).
 
-    // If the arrow has trailing param comments, the params will be multiline,
-    // so we should force the wrapped state (prettier behavior)
-    if arrow_signature_has_breaking_comments(printer, arrow, span) {
-        // Force wrapped state when arrow has trailing param comments
+    // A signature that will break — a comment forcing it, or a break its own docs carry —
+    // refuses the hug: every hug state renders the signature's head on the callee's line.
+    if arrow_signature_refuses_hug(printer, arrow, span) {
         let printed = build_arrow_hug_printed_doc(printer, arg, arrow, build);
         return d.concat(&[
             callee,
@@ -1013,13 +1013,10 @@ fn build_ternary_arrow_hug_states(
     let body_doc = printer.build_arrow_arg_body_doc(body_expr);
     let body_doc = prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
 
-    // A forced break collapses the ladder to its break state alone — asked here of the BODY,
-    // where the member-chain spelling asks it of the whole arrow.
     build_ternary_arrow_hug_ladder(
         d,
         ArgOpener::Callee(callee),
         sig_doc,
-        body_doc,
         body_doc,
         printer.arrow_body_takes_ternary_pair(body_expr),
     )

@@ -123,7 +123,14 @@ pub(super) fn build_arrow_sig_doc(
     // fixture here reaches (the TODO records two such "equivalent" deletions that had to be
     // reversed). This keeps each arm's historical layout exactly — the fix above is the gap
     // claim, not the break policy.
-    let sig = if arrow_has_return_or_type_params(arrow) {
+    //
+    // An empty list holding a comment takes the grouped arm too: prettier's
+    // `printFunctionParameters` returns an empty list ahead of its `removeLines`, so a
+    // dangling `//` keeps its own line (`(⏎\t// c⏎) =>`) where `remove_lines` welded it to
+    // the `(` and left the `)` at the line start.
+    let sig = if arrow_has_return_or_type_params(arrow)
+        || printer.arrow_empty_params_hold_comments(arrow)
+    {
         d.group(sig)
     } else {
         d.remove_lines(sig)
@@ -134,6 +141,25 @@ pub(super) fn build_arrow_sig_doc(
     // prints is a *dropped* comment (`f(/** @param {any} n */ (n) => g(n))`), so the
     // claim must live on the same seam the reassembly does. See `comments/owned.rs`.
     printer.prepend_owned_leading_comment_at(span.start, sig)
+}
+
+/// The signature a reassembling hug state prints ([`build_arrow_sig_doc`]), or `None` when
+/// the signature refuses the hug ([`arrow_signature_refuses_hug`]).
+///
+/// The states print the signature flattened on the callee's line, so a signature that will
+/// break has no state here: printed there it would either collapse the break the author
+/// wrote or break mid-hug. The caller's ladder is left with the all-broken-out state, which
+/// prints the argument whole — and nothing is built for a signature no state prints. The one
+/// break that is not refused is a comment in an empty parameter list, which prettier's
+/// bailout never reads: the signature keeps it on its own line and the ladder hugs the
+/// argument broken open ([`build_break_body_ladder`]).
+pub(super) fn build_hugged_arrow_sig_doc(
+    printer: &Printer<'_>,
+    arrow: &internal::ArrowFunctionExpression<'_>,
+    span: Span,
+) -> Option<DocId> {
+    (!arrow_signature_refuses_hug(printer, arrow, span))
+        .then(|| build_arrow_sig_doc(printer, arrow, span))
 }
 
 /// Prepend any comments between arrow `=>` and body expression to `body_doc`, for a state
@@ -807,7 +833,7 @@ pub(super) fn last_arg_arrow_gap_break(
     printer: &Printer<'_>,
     last_arg: &internal::Expression<'_>,
 ) -> Option<ArrowGapBreak> {
-    let internal::ExpressionKind::ArrowFunctionExpression(arrow) = &last_arg.kind else {
+    let internal::ExpressionKind::ArrowFunctionExpression(outer) = &last_arg.kind else {
         return None;
     };
     // The softline is appended for every body KIND, but only inside a printing prettier
@@ -818,15 +844,21 @@ pub(super) fn last_arg_arrow_gap_break(
     // question is asked below this gate, not above it — hugging a non-expandable body
     // because a comment happens to sit in its gap makes the comment decide a layout it has
     // nothing to do with, and contradicts the same call's own comment-free answer.
-    if !could_expand_arrow_arg(arrow) {
+    if !could_expand_arrow_arg(outer) {
         return None;
     }
-    let (arrow, terminal_span) = terminal_arrow(arrow);
+    let (arrow, terminal_span) = terminal_arrow(outer);
     let arrow_span = terminal_span.unwrap_or(last_arg.span);
     let sig_end = arrow_token_end(arrow);
     let body_start = arrow.body.span().start;
+    // The state renders the signature's head on the callee's line, so a signature that will
+    // break refuses it as it refuses every other hug ([`arrow_signature_refuses_hug`]) — and
+    // the call breaks every argument out, where the signature breaks on a line of its own.
+    // Asked here, once for every callee spelling, and last: it builds a signature, which the
+    // cheap gap questions spare every call whose gap does not break.
+    let refused = || arrow_signature_refuses_hug(printer, outer, last_arg.span);
     if printer.has_own_line_post_arrow_comment(sig_end, body_start) {
-        return Some(ArrowGapBreak {
+        return (!refused()).then(|| ArrowGapBreak {
             inject: prebuild_arrow_gap_break_body(printer, Some(last_arg)),
         });
     }
@@ -835,7 +867,7 @@ pub(super) fn last_arg_arrow_gap_break(
     // the hug arm asks of the same DocId once the caller arms it.
     printer.arrow_gap_broke_after_run(arrow, arrow_span, sig_end, body_start)?;
     let inject = prebuild_arrow_gap_break_body(printer, Some(last_arg))?;
-    printer.d().will_break(inject.1).then_some(ArrowGapBreak {
+    (printer.d().will_break(inject.1) && !refused()).then_some(ArrowGapBreak {
         inject: Some(inject),
     })
 }
@@ -1905,27 +1937,37 @@ fn build_break_body_state(
 ///
 /// The flat state is dropped when the last argument's own doc will break — prettier's rule,
 /// and not an optimization: `fits()` would select it (its first line is short) but it prints
-/// the wrong closing brackets (`}));` instead of `}),⏎)`). When that break is not the body's,
-/// it sits in the signature (a parameter or return type the author expanded), which the hug
-/// state prints from `sig_doc` with the break removed — so only the all-broken-out state is
-/// left, prettier's `ArgExpansionBailout` reading of a signature that will break.
+/// the wrong closing brackets (`}));` instead of `}),⏎)`).
+///
+/// `sig_doc` is [`build_hugged_arrow_sig_doc`]'s: `None` for a signature that refuses the
+/// hug, which leaves only the all-broken-out state, prettier's `ArgExpansionBailout`.
 pub(super) fn build_break_body_ladder(
     d: &DocArena,
     opener: ArgOpener,
     head_parts: &[DocId],
-    sig_doc: DocId,
+    sig_doc: Option<DocId>,
     body_doc: DocId,
     last_arg_doc: DocId,
     all_args_broken: DocId,
 ) -> DocId {
-    let state_break_body = build_break_body_state(d, opener, head_parts, sig_doc, body_doc);
     let state_expand_all = opener.expand_all(d, all_args_broken);
+    let Some(sig_doc) = sig_doc else {
+        return state_expand_all;
+    };
     if d.will_break(last_arg_doc) {
-        if !d.will_break(body_doc) {
-            return state_expand_all;
-        }
-        return d.conditional_group(&[state_break_body, state_expand_all]);
+        // A break the body does not carry is the signature's own — a comment in an empty
+        // parameter list, the one forced break a hugged signature keeps
+        // ([`build_arrow_sig_doc`]). Prettier hugs the argument broken open
+        // (`group(lastArg, { shouldBreak: true })`), so the comment keeps its line and the
+        // body decides its own break below it; the break-body state would force one.
+        let state_hug = if d.will_break(body_doc) {
+            build_break_body_state(d, opener, head_parts, sig_doc, body_doc)
+        } else {
+            opener.hug(d, head_parts, last_arg_doc)
+        };
+        return d.conditional_group(&[state_hug, state_expand_all]);
     }
+    let state_break_body = build_break_body_state(d, opener, head_parts, sig_doc, body_doc);
     d.conditional_group(&[
         opener.inline(d, head_parts, last_arg_doc),
         state_break_body,
@@ -1937,12 +1979,19 @@ pub(super) fn build_break_body_ladder(
 /// flat with the grammar-clarifying parens (`map((x) => (x ? y : z))`), the body broken after
 /// `=>` with the parens dropped, then the whole signature indented onto its own line.
 ///
-/// The third parallel copy of this sat one per printer. What a caller owns is its `opener`,
-/// its signature and body docs, and — the one place they genuinely disagree — the doc whose
-/// forced break collapses the ladder to the break state alone (`break_subject`): the
-/// plain-call and `new` spellings ask it of the BODY, the chain of the whole ARROW. A forced
-/// break there means `fits()` would pick the flat state on a truncated measurement and then
-/// print the parens around an already-broken body.
+/// The third parallel copy of this sat one per printer. What a caller owns is its `opener`
+/// and its signature and body docs. A forced break in the BODY collapses the ladder to the
+/// break state alone: `fits()` would otherwise pick the flat state on a truncated measurement
+/// and then print the parens around an already-broken body.
+///
+/// The question is asked of the body, never the whole arrow: a break the signature carries is
+/// not one the break state answers. Read off the whole arrow it selected the break state on a
+/// break the state then collapsed, and the collapsed output took the flat state on the next
+/// pass. Every caller refuses a signature that will break ([`arrow_signature_refuses_hug`]),
+/// so the call breaks every argument out with the argument printed whole — all but the one
+/// break a hugged signature keeps, a comment in an empty parameter list
+/// ([`build_arrow_sig_doc`]), which the flat state prints on its own line as prettier's hug
+/// does (`fn((⏎\t// c⏎) => (a ? b : c))`).
 ///
 /// `flat_pair` is whether the flat state takes those parens: a body a comma-list region
 /// leaves bare ([`Printer::arrow_body_takes_ternary_pair`]) keeps the ladder's layout and
@@ -1952,7 +2001,6 @@ pub(super) fn build_ternary_arrow_hug_ladder(
     opener: ArgOpener,
     sig_doc: DocId,
     body_doc: DocId,
-    break_subject: DocId,
     flat_pair: bool,
 ) -> DocId {
     let prefix = opener.open_prefix(d);
@@ -1966,7 +2014,7 @@ pub(super) fn build_ternary_arrow_hug_ladder(
         d.hardline(),
         d.text(")"),
     ]);
-    if d.will_break(break_subject) {
+    if d.will_break(body_doc) {
         return state_break;
     }
     // Flat: the parens the grammar wants around a ternary body, then the call's own `)`.
@@ -2024,7 +2072,7 @@ pub(super) fn build_arrow_call_body_states(
     let body_doc =
         body_reuse.map_or_else(|| printer.build_expression_doc(body_expr), |(_, doc)| doc);
     let body_doc = prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
-    let sig_doc = build_arrow_sig_doc(printer, arrow, arg.span);
+    let sig_doc = build_hugged_arrow_sig_doc(printer, arrow, arg.span);
     build_break_body_ladder(d, opener, &[], sig_doc, body_doc, arrow_doc, arrow_doc)
 }
 
@@ -2291,7 +2339,7 @@ pub(super) fn should_expand_first_arg(
 /// directions; `printFunction` gates its own on `args.expandLastArg` **alone**, so a
 /// `function` first argument never bails out and keeps the hug with its signature broken —
 /// in every callee spelling (plain call, `new`, member chain). Reaching for the kind-agnostic
-/// [`callback_signature_has_breaking_comments`](crate::printer::expressions::functions::callback_signature_has_breaking_comments)
+/// [`callback_signature_refuses_hug`](crate::printer::expressions::functions::callback_signature_refuses_hug)
 /// here would expand a list prettier hugs.
 pub(super) fn first_arg_signature_refuses_expand_first(
     printer: &Printer<'_>,

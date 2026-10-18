@@ -12,15 +12,15 @@ use super::arg_predicates::{
 };
 use super::arg_wrapping::{
     ArgOpener, arrow_body_expands_internally, arrow_hug_refused_by_comments, build_args_split_last,
-    build_arrow_gap_break_multi_arg_doc, build_arrow_sig_doc, build_break_body_ladder,
-    build_expand_last_obj_array_doc, could_expand_arrow_chain, last_arg_arrow_gap_break,
+    build_arrow_gap_break_multi_arg_doc, build_break_body_ladder, build_expand_last_obj_array_doc,
+    build_hugged_arrow_sig_doc, could_expand_arrow_chain, last_arg_arrow_gap_break,
     last_two_args_same_type, prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
     prepend_arrow_body_comments,
 };
 use crate::ast::internal;
 use crate::printer::Printer;
 use crate::printer::expressions::functions::{
-    arrow_signature_has_breaking_comments, callback_signature_has_breaking_comments,
+    arrow_signature_refuses_hug, callback_signature_refuses_hug,
 };
 use tsv_lang::doc::arena::DocId;
 
@@ -42,7 +42,7 @@ pub(super) enum ArgOwner {
 }
 
 impl ArgOwner {
-    /// Whether a break forced inside the last argument's signature invalidates the hug states,
+    /// Whether a break inside the last argument's signature invalidates the hug states,
     /// which render that signature's head on the callee's line.
     ///
     /// See the type's doc for why the `function` half is asked only for a plain call.
@@ -50,12 +50,13 @@ impl ArgOwner {
         self,
         printer: &Printer<'_>,
         arg: &internal::Expression<'_>,
+        arg_count: usize,
     ) -> bool {
         match self {
-            Self::Call => callback_signature_has_breaking_comments(printer, arg),
+            Self::Call => callback_signature_refuses_hug(printer, arg, arg_count),
             Self::New => match &arg.kind {
                 internal::ExpressionKind::ArrowFunctionExpression(arrow) => {
-                    arrow_signature_has_breaking_comments(printer, arrow, arg.span)
+                    arrow_signature_refuses_hug(printer, arrow, arg.span)
                 }
                 _ => false,
             },
@@ -261,7 +262,7 @@ pub(super) fn try_expand_last_arg(
             // block be entered at all.
             && !(has_comments && arrow_hug_refused_by_comments(printer, arrow, *arrow_span, body_expr))
         {
-            let sig_doc = build_arrow_sig_doc(printer, arrow, *arrow_span);
+            let sig_doc = build_hugged_arrow_sig_doc(printer, arrow, *arrow_span);
             // Reuse the pre-built call body (see above); conditional bodies build fresh.
             let body_doc = body_reuse.map_or_else(
                 || printer.build_arrow_arg_body_doc(body_expr),
@@ -289,13 +290,13 @@ pub(super) fn try_expand_last_arg(
         if let Some(arg) = last_arg
             && let internal::ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind
             && arrow_body_expands_internally(arrow)
-            // A break forced inside the signature — the hug renders the callee and the
-            // signature run on one line. NOT the body-tail question its reassembling
-            // siblings ask ([`arrow_hug_refused_by_comments`]): these states render the
-            // argument's own `expandLastArg` printing, so the body-end→arrow-end gap has an
-            // emitter here. See [`arrow_body_tail_has_comments`] for why refusing it was a
-            // bug rather than conservatism.
-            && !(has_comments && arrow_signature_has_breaking_comments(printer, arrow, arg.span))
+            // A break inside the signature — the hug renders the callee and the signature
+            // run on one line. NOT the body-tail question its reassembling siblings ask
+            // ([`arrow_hug_refused_by_comments`]): these states render the argument's own
+            // `expandLastArg` printing, so the body-end→arrow-end gap has an emitter here.
+            // See [`arrow_body_tail_has_comments`] for why refusing it was a bug rather than
+            // conservatism.
+            && !arrow_signature_refuses_hug(printer, arrow, arg.span)
         {
             // The ladder, shared with the member chain's spelling of this same layout.
             return Some(build_expand_last_obj_array_doc(
@@ -310,7 +311,9 @@ pub(super) fn try_expand_last_arg(
 
         // Block-body arrows, block-terminal arrow chains, and function expressions: inline vs
         // expand-all, since the argument's own doc expands.
-        if last_arg.is_some_and(|arg| owner.callback_signature_refuses_hug(printer, arg)) {
+        if last_arg
+            .is_some_and(|arg| owner.callback_signature_refuses_hug(printer, arg, arguments.len()))
+        {
             return Some(opener.expand_all(d, all_args_broken));
         }
         return Some(opener.inline_or_expand_all(d, &head_parts, last_arg_doc, all_args_broken));

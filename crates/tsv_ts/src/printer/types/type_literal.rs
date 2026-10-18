@@ -1040,6 +1040,9 @@ impl<'a> Printer<'a> {
     /// - Source has newline immediately after opening brace
     /// - Contains line comments or multi-line block comments
     /// - Contains block comments on their own line
+    ///
+    /// For the one literal the hug policy names (`Printer::unforced_param_type_literal`)
+    /// the source reads count only when a blank line also separates two members.
     pub(super) fn type_literal_force_multiline(
         &self,
         obj: &TSTypeLiteral<'_>,
@@ -1048,27 +1051,35 @@ impl<'a> Printer<'a> {
         // Both reads below are newline-derived authoring intent (a source newline
         // after `{` / before the first member). The canonical reprint erases them
         // so an object type breaks only by width, and so does the hug policy's question
-        // for the one literal it names (`Printer::unforced_param_type_literal`).
-        let authored =
-            !self.canonical && self.unforced_param_type_literal.get() != Some(obj.span.start);
-        let source_is_multiline =
-            authored && super::super::is_brace_block_multiline(self.source, obj.span);
+        // for the one literal it names (`Printer::unforced_param_type_literal`), except for
+        // a blank line between its members (below).
+        let unforced = self.unforced_param_type_literal.get() == Some(obj.span.start);
         // Prettier breaks an object type when its first member starts on a line
         // below the opening brace. `is_brace_block_multiline` only sees a newline
         // *immediately* after `{`, so a block comment on the brace line
         // (`{ /* c */\n a: T }`) defeats it — detect the newline before the first
         // member directly here.
-        let first_member_on_new_line = authored
-            && obj.members.first().is_some_and(|m| {
-                self.source[obj.span.start as usize..m.span().start as usize].contains('\n')
-            });
+        let expanded = !self.canonical
+            && (super::super::is_brace_block_multiline(self.source, obj.span)
+                || obj.members.first().is_some_and(|m| {
+                    self.source[obj.span.start as usize..m.span().start as usize].contains('\n')
+                }));
+        if unforced {
+            // The hug policy's question drops the authored expansion alone. A blank line
+            // between the expanded literal's own members prints as a `hardline` in both
+            // formatters (prettier's `isNextLineEmpty` separator), which no dropped group
+            // erases — so it still breaks the signature, and the call breaks out.
+            if expanded && self.type_literal_members_hold_blank_line(obj) {
+                return true;
+            }
+        } else if expanded {
+            return true;
+        }
         let has_line_or_multiline_block = comments_present
             && self
                 .comments_on_page_between(obj.span.start, obj.span.end)
                 .any(|c| !c.is_block || c.multiline);
-        source_is_multiline
-            || first_member_on_new_line
-            || has_line_or_multiline_block
+        has_line_or_multiline_block
             // Lazy: the per-member span collection only runs when the cheaper checks
             // above didn't already force multiline (and only when the construct has
             // comments at all). The glue rule is `ItemStart`, not the object literal's
@@ -1084,6 +1095,19 @@ impl<'a> Printer<'a> {
                     StandaloneGlue::ItemStart,
                 )
             })
+    }
+
+    /// Whether a blank line separates two of `obj`'s members — measured past the gap's
+    /// comments, as the member walk measures the blank it keeps
+    /// ([`MemberBlankScan::PastComments`]).
+    fn type_literal_members_hold_blank_line(&self, obj: &TSTypeLiteral<'_>) -> bool {
+        obj.members.windows(2).any(|pair| {
+            let next_start = pair[1].span().start;
+            self.has_blank_line_between(
+                self.blank_scan_start(pair[0].span().end, next_start),
+                next_start,
+            )
+        })
     }
 
     /// Build aligned object literal doc with a custom opening.

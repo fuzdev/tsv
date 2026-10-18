@@ -27,16 +27,16 @@ use super::arg_wrapping::{
     arrow_hug_refused_by_comments, build_args_split_last, build_arrow_gap_break_multi_arg_doc,
     build_arrow_gap_break_single_arg_doc, build_arrow_sig_doc, build_break_body_ladder,
     build_expand_first_arg_doc, build_expand_last_obj_array_doc, build_flat_params_arg_doc,
-    build_joined_argument_doc, build_printed_argument_doc, build_single_arrow_hug_doc,
-    build_ternary_arrow_hug_ladder, classify_chain_arg, first_arg_signature_refuses_expand_first,
-    last_arg_arrow_gap_break, last_two_args_same_type, prebuild_expand_last_break_body,
-    prebuild_expand_last_obj_array_body, prepend_arrow_body_comments,
-    prepend_hugged_arrow_body_comments, should_expand_first_arg, try_hook_deps_args_doc,
+    build_hugged_arrow_sig_doc, build_joined_argument_doc, build_printed_argument_doc,
+    build_single_arrow_hug_doc, build_ternary_arrow_hug_ladder, classify_chain_arg,
+    first_arg_signature_refuses_expand_first, last_arg_arrow_gap_break, last_two_args_same_type,
+    prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
+    prepend_arrow_body_comments, prepend_hugged_arrow_body_comments, should_expand_first_arg,
+    try_hook_deps_args_doc,
 };
 use crate::ast::internal::{self, Expression, ExpressionKind};
 use crate::printer::expressions::functions::{
-    arrow_signature_has_breaking_comments, callback_signature_has_breaking_comments,
-    function_signature_has_breaking_comments, prepend_leading,
+    arrow_signature_refuses_hug, callback_signature_refuses_hug, prepend_leading,
 };
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
@@ -874,14 +874,14 @@ fn build_chain_args_single(
         let body_doc = printer.build_expression_doc(body_expr);
         let body_doc =
             prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
-        let sig_doc = build_arrow_sig_doc(printer, arrow, arg.span);
-        let sig_doc = prepend_leading(d, leading_comment_doc, sig_doc);
+        let sig_doc = build_hugged_arrow_sig_doc(printer, arrow, arg.span)
+            .map(|sig_doc| prepend_leading(d, leading_comment_doc, sig_doc));
 
         // The ladder — flat, the signature hugged with the body broken after `=>`, then the
         // argument broken out — shared with the plain-call / `new` spelling of this same
         // layout ([`build_break_body_ladder`]). The broken-out state is what a signature too
-        // wide for the call's line falls through to, the flat one dropped when the argument
-        // will break.
+        // wide for the call's line falls through to, and all that is left when the signature
+        // will break; the flat one is dropped when the argument will break.
         return with_chain_head(
             d,
             head,
@@ -903,11 +903,12 @@ fn build_chain_args_single(
         && !last_arg_commented
         // …and the same refusal pair as above — here its body-tail half bites at every state,
         // since the flat one synthesizes its own `(`/`)` around the body rather than printing
-        // the arrow (`arrow_hug_refused_by_comments`).
+        // the arrow (`arrow_hug_refused_by_comments`)…
         && !(has_any_comment_text && arrow_hug_refused_by_comments(printer, arrow, arg.span, body_expr))
+        // …and a signature that will break, which every state prints flattened: the call
+        // breaks every argument out below, the argument printed whole.
+        && !arrow_signature_refuses_hug(printer, arrow, arg.span)
     {
-        let arrow_doc = printer.build_arg_expression_doc(arg);
-        let arrow_doc = prepend_leading(d, leading_comment_doc, arrow_doc);
         let body_doc = printer.build_arrow_arg_body_doc(body_expr);
         let body_doc =
             prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
@@ -915,17 +916,7 @@ fn build_chain_args_single(
         let sig_doc = prepend_leading(d, leading_comment_doc, sig_doc);
 
         // The ladder, shared with the plain-call and `new` spellings
-        // ([`build_ternary_arrow_hug_ladder`]) — but the chain collapses it on a break
-        // anywhere in the whole ARROW, where the other two ask only the body. Kept as
-        // authored: the two questions differ exactly when the signature breaks on its own.
-        //
-        // TODO: `arrow_doc` is built for NOTHING ELSE — a whole second build of the argument
-        // (its body included) that only answers `will_break`. Swapping it for `body_doc`
-        // moves zero bytes over ~23k files, so the two agree on every shape real code and the
-        // fixture suite write; but that is a render-side reading, and a `conditional_group`
-        // state measured under an outer FLAT `fits` is exactly where such a claim has been
-        // wrong before (the fits flat-walk is not render). Collapsing it is a
-        // fanout win with its own probe to run, not part of this dedup.
+        // ([`build_ternary_arrow_hug_ladder`]).
         return with_chain_head(
             d,
             head,
@@ -934,7 +925,6 @@ fn build_chain_args_single(
                 opener,
                 sig_doc,
                 body_doc,
-                arrow_doc,
                 printer.arrow_body_takes_ternary_pair(body_expr),
             ),
         );
@@ -954,11 +944,10 @@ fn build_chain_args_single(
         // leading comment defeats the expand-last hug just like an ordinary one, so the
         // hug must refuse it too — a to-emit gate would hug blind.
         && !last_arg_commented
-        // A comment LEADING the arg isn't the only shape that defeats the hug: one INSIDE
-        // the signature forces a break the one-line hug can't honor. Same predicate as the
-        // non-chain path — see `arrow_signature_has_breaking_comments`.
-        && !(has_any_comment_text
-            && arrow_signature_has_breaking_comments(printer, arrow, arg.span))
+        // A comment LEADING the arg isn't the only shape that defeats the hug: a signature
+        // that will break is one the one-line hug can't honor. Same predicate as the
+        // non-chain path — see `arrow_signature_refuses_hug`.
+        && !arrow_signature_refuses_hug(printer, arrow, arg.span)
     {
         // The two printings and the state ladder they feed — the same entry point the
         // non-chain and `new` sites take, differing only in the chain's argument builder and
@@ -1012,24 +1001,21 @@ fn build_chain_args_single(
         (None, None) => arg_doc,
     };
 
-    // Check if it's a block-bodied callback whose parameter list a comment forces multiline.
-    // These need soft-break wrapping to expand the call. A `function` expression is always
+    // Check if it's a block-bodied callback whose signature refuses the hug. These need
+    // soft-break wrapping to expand the call. A `function` expression is always
     // block-bodied, so it asks the question unconditionally — the arrow's `is_expression`
     // guard is about the arrow's *body* kind, not about the callee, and reading it as the
     // whole gate is what left the `function` twin ungated here.
-    let callback_param_comment_forces_break = match &arg.kind {
+    let callback_signature_refuses = match &arg.kind {
         ExpressionKind::ArrowFunctionExpression(arrow) => {
-            !arrow.body.is_expression()
-                && arrow_signature_has_breaking_comments(printer, arrow, arg.span)
+            !arrow.body.is_expression() && callback_signature_refuses_hug(printer, arg, 1)
         }
-        ExpressionKind::FunctionExpression(func) => {
-            function_signature_has_breaking_comments(printer, func)
-        }
+        ExpressionKind::FunctionExpression(_) => callback_signature_refuses_hug(printer, arg, 1),
         _ => false,
     };
 
-    if callback_param_comment_forces_break {
-        // Callback with a forced-multiline parameter list - force expansion
+    if callback_signature_refuses {
+        // Callback whose signature will break - force expansion
         return with_chain_head(d, head, opener.wrap_soft(d, arg_with_comments));
     }
 
@@ -1126,10 +1112,10 @@ fn build_chain_args_single(
     // three places that must agree on when a hug is legal (the expand-last gate above, and
     // `call_formatting.rs`'s non-chain arm) — all asking the one predicate, because the
     // hug that mangled `arr.map(…)` while `fn(…)` stayed correct was precisely two of them
-    // disagreeing. See `arrow_signature_has_breaking_comments`.
-    let signature_forces_break = has_any_comment_text
-        && matches!(&arg.kind, ExpressionKind::ArrowFunctionExpression(arrow)
-            if arrow_signature_has_breaking_comments(printer, arrow, arg.span));
+    // disagreeing. See `arrow_signature_refuses_hug`, which also answers a break the
+    // signature's own docs carry.
+    let signature_forces_break = matches!(&arg.kind, ExpressionKind::ArrowFunctionExpression(arrow)
+            if arrow_signature_refuses_hug(printer, arrow, arg.span));
     let kind = if has_leading_comment_on_page || signature_forces_break {
         ChainArgKind::NeedsSoftWrap
     } else {
@@ -1280,7 +1266,7 @@ fn build_chain_args_multi(
         if call
             .arguments
             .last()
-            .is_some_and(|arg| callback_signature_has_breaking_comments(printer, arg))
+            .is_some_and(|arg| callback_signature_refuses_hug(printer, arg, call.arguments.len()))
         {
             return with_chain_head(d, head, opener.expand_all(d, all_args_broken));
         }
@@ -1335,7 +1321,7 @@ fn build_chain_args_multi(
             return with_chain_head(d, head, bail);
         }
 
-        let sig_doc = build_arrow_sig_doc(printer, arrow, *arrow_span);
+        let sig_doc = build_hugged_arrow_sig_doc(printer, arrow, *arrow_span);
         // Reuse the pre-built call body (see above); conditional bodies build fresh.
         let body_doc =
             body_reuse.map_or_else(|| printer.build_expression_doc(body_expr), |(_, doc)| doc);
@@ -1371,13 +1357,13 @@ fn build_chain_args_multi(
         && let Some(last_arg) = call.arguments.last()
         && let ExpressionKind::ArrowFunctionExpression(arrow) = &last_arg.kind
         && arrow_body_expands_internally(arrow)
-        // A break forced inside the signature — the hug renders the prefix and the signature
-        // run on one line. NOT the body-tail question its reassembling siblings ask
+        // A signature that will break — the hug renders the prefix and the signature run on
+        // one line. NOT the body-tail question its reassembling siblings ask
         // ([`arrow_hug_refused_by_comments`]): these states render the argument's own
         // `expandLastArg` printing, so the body-end→arrow-end gap has an emitter here. See
         // [`arrow_body_tail_has_comments`] for why refusing it was a bug rather than
         // conservatism.
-        && !arrow_signature_has_breaking_comments(printer, arrow, last_arg.span)
+        && !arrow_signature_refuses_hug(printer, arrow, last_arg.span)
     {
         // Expand-last arrow with an object/array terminal: build the terminal body ONCE and
         // inject it so BOTH printings of the argument reuse it — building it per printing

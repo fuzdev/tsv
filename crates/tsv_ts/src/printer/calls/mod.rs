@@ -44,6 +44,7 @@ pub(in crate::printer) use import_expr::{ImportOptionsArg, build_import_args_com
 use super::chain::{self, ChainCall, call_callee_paren_leading_start};
 use super::{ArrowChainContext, ParenContext, Printer, SecondTypeArgs, is_curried_arrow_chain};
 use crate::ast::internal;
+use crate::printer::expressions::functions::callback_signature_refuses_hug;
 use arg_comments::{any_arg_empty_line, any_comment_forces_expansion, last_arg_has_comments};
 use arg_predicates::is_block_function;
 use arg_wrapping::{
@@ -662,6 +663,12 @@ impl<'a> Printer<'a> {
                 && !(call_has_comments
                     && last_arg_has_comments(call.arguments, self, span.end, paren_open))
                 && !inner_has_multiline_arg
+                // The hug renders the callback's signature head on this line, so a
+                // signature that will break refuses it here as at every expand-last site;
+                // the fall-through breaks every argument out.
+                && !call.arguments.last().is_some_and(|arg| {
+                    callback_signature_refuses_hug(self, arg, call.arguments.len())
+                })
             {
                 let d = self.d();
                 let callee_doc = self.build_expression_doc(call.callee);

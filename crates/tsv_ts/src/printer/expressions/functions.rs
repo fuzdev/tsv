@@ -395,28 +395,6 @@ pub(in crate::printer) fn function_signature_has_breaking_comments(
         || printer.function_trailing_param_comment_forces_break(func)
 }
 
-/// Whether a call argument is a callback whose signature a comment forces multiline, so the
-/// expand-last-argument hug — which renders that signature's head on the callee's line —
-/// cannot be honored and the call must expand instead.
-///
-/// The kind-agnostic entry point, so a hug state gates on "is this argument's signature
-/// broken?" rather than re-deciding per callback kind. Every arm that reached for the arrow
-/// predicate alone left the `function` spelling ungated.
-pub(in crate::printer) fn callback_signature_has_breaking_comments(
-    printer: &Printer<'_>,
-    arg: &internal::Expression<'_>,
-) -> bool {
-    match &arg.kind {
-        internal::ExpressionKind::ArrowFunctionExpression(arrow) => {
-            arrow_signature_has_breaking_comments(printer, arrow, arg.span)
-        }
-        internal::ExpressionKind::FunctionExpression(func) => {
-            function_signature_has_breaking_comments(printer, func)
-        }
-        _ => false,
-    }
-}
-
 /// Whether `arrow`'s signature **will break** as a hugged call argument — the doc half of
 /// prettier's `ArgExpansionBailout`, beside the source half
 /// [`arrow_signature_has_breaking_comments`].
@@ -486,9 +464,13 @@ fn arrow_signature_will_break(
 /// Exactly prettier's group-less node: `printObject` drops the group of an object type whose
 /// path is `typeAnnotation → typeAnnotation → shouldHugTheOnlyParameter`, so the literal must
 /// annotate the parameter itself — an identifier or a destructuring pattern straight in the
-/// list, not one under a default. Its members are not that node, so a nested literal the
-/// author expanded still breaks the signature, as do a pattern's own breaks (an expanded
-/// default object, a nested pattern, a blank line between properties).
+/// list, not one under a default. Only the author's expansion of that literal goes unread:
+/// a blank line between its own members still breaks the signature when the literal prints
+/// expanded (prettier's `isNextLineEmpty` separator is a `hardline`, outside the dropped
+/// group; one written flat prints flat, its blank dropped, so the hug stays), and its members
+/// are not that node, so a nested literal the author expanded breaks it too, as do a
+/// pattern's own breaks (an expanded default object, a nested pattern, a blank line between
+/// a destructured parameter's properties).
 fn sole_param_object_type_start(
     printer: &Printer<'_>,
     params: &[internal::Expression<'_>],
@@ -515,8 +497,9 @@ fn sole_param_object_type_start(
 /// ([`arrow_signature_has_breaking_comments`]) or a break the signature's own docs carry
 /// (an authored-expanded object, a blank line between parameters).
 ///
-/// The question the expand-first hug asks before it renders the signature hugged, in every
-/// callee spelling, so no site can answer it from one half alone.
+/// THE question every arrow hug asks before it renders the signature hugged — the
+/// expand-last ladders, the lone-argument hugs, and the expand-first hug alike, in every
+/// callee spelling — so no site can answer it from one half alone.
 pub(in crate::printer) fn arrow_signature_refuses_hug(
     printer: &Printer<'_>,
     arrow: &internal::ArrowFunctionExpression<'_>,
@@ -524,6 +507,75 @@ pub(in crate::printer) fn arrow_signature_refuses_hug(
 ) -> bool {
     arrow_signature_has_breaking_comments(printer, arrow, span)
         || arrow_signature_will_break(printer, arrow, span)
+}
+
+/// [`arrow_signature_refuses_hug`] for a `function` expression argument of a plain call with
+/// `arg_count` arguments — the expand-last bailout only, since `printFunction` sets
+/// `shouldExpandParameters` under `expandLastArg` alone.
+///
+/// The comment half is [`function_signature_has_breaking_comments`], asked as before. The
+/// doc half is gated by `printFunction`'s own condition: the call has more than one
+/// argument, or every parameter is an untyped identifier — so a lone callback with a typed
+/// or patterned parameter keeps the hug with its parameters broken, in both formatters. Only
+/// the parameter list is asked (`printFunction` reads neither type parameters nor return type
+/// at the throw), and the block-bodied arrow's carve-out holds here too: the authored
+/// expansion of a hugged sole parameter's own object type is not read.
+fn function_signature_refuses_hug(
+    printer: &Printer<'_>,
+    func: &internal::FunctionExpression<'_>,
+    arg_count: usize,
+) -> bool {
+    if function_signature_has_breaking_comments(printer, func) {
+        return true;
+    }
+    if func.params.is_empty()
+        || !(arg_count > 1 || func.params.iter().all(is_untyped_identifier_param))
+    {
+        return false;
+    }
+    let close = printer
+        .find_closing_paren(func.params_start, func.body.span.start)
+        .map(|after_paren| after_paren - 1);
+    let unforced =
+        sole_param_object_type_start(printer, func.params, Some(func.params_start), close);
+    printer.ask_signature_params(unforced, || {
+        printer
+            .d()
+            .will_break(printer.build_params_doc_with_comments(
+                func.params,
+                Some(func.params_start),
+                close,
+            ))
+    })
+}
+
+/// A parameter `printFunction` counts toward its "every parameter is an untyped identifier"
+/// test.
+fn is_untyped_identifier_param(param: &internal::Expression<'_>) -> bool {
+    matches!(&param.kind, internal::ExpressionKind::Identifier(id) if id.type_annotation().is_none())
+}
+
+/// Whether a callback argument of a plain call with `arg_count` arguments refuses the
+/// expand-last hug — [`arrow_signature_refuses_hug`] or [`function_signature_refuses_hug`] by
+/// the callback's kind.
+///
+/// The kind-agnostic entry point, so a hug state gates on one question rather than
+/// re-deciding per callback kind. Every arm that reached for the arrow predicate alone left
+/// the `function` spelling ungated.
+pub(in crate::printer) fn callback_signature_refuses_hug(
+    printer: &Printer<'_>,
+    arg: &internal::Expression<'_>,
+    arg_count: usize,
+) -> bool {
+    match &arg.kind {
+        internal::ExpressionKind::ArrowFunctionExpression(arrow) => {
+            arrow_signature_refuses_hug(printer, arrow, arg.span)
+        }
+        internal::ExpressionKind::FunctionExpression(func) => {
+            function_signature_refuses_hug(printer, func, arg_count)
+        }
+        _ => false,
+    }
 }
 
 /// Check if an expression has a huggable type annotation.
@@ -1042,8 +1094,10 @@ impl<'a> Printer<'a> {
         // `expandLastArg` path prints params with `removeLines`, which is what lets a
         // force-broken arrow keep its destructuring param inline and fall through to
         // the all-args-broken-out layout instead of shattering the param.
+        // An empty list is not flattened when it holds a comment: prettier returns an empty
+        // list ahead of its `removeLines`, so a dangling `//` keeps its own line.
         let flat_params = self.expand_last_arg_flat_params.get();
-        if flat_params {
+        if flat_params && !self.arrow_empty_params_hold_comments(arrow) {
             parts.push(d.remove_lines(sig_doc));
         } else {
             parts.push(d.group(sig_doc));
