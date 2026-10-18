@@ -114,7 +114,7 @@ npx @fuzdev/tsv format src    # or without installing first
 ```typescript
 import {format_svelte} from '@fuzdev/tsv';
 const result = format_svelte('<script>\nconst   x=1\n</script>');
-if (result.ok) console.log(result.code); // else result.error: {kind, message, start, loc}
+if (result.ok) console.log(result.code); // else result.error: {kind, message, frame, start, end, loc}
 ```
 
 ```typescript

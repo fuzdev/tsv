@@ -72,7 +72,7 @@ A source that doesn't parse returns `{ok: false, error}` with `error` a plain ob
 - `start` and `end` are the error's UTF-16 offsets — a parse error is a point, so `end === start` — and `loc` is their `{start: {line, column}, end: {line, column}}` (1-based line, 0-based UTF-16 column), shaped like an AST node's span.
 - TypeScript counts ECMAScript line terminators (LF, CR, CRLF, U+2028, U+2029) and a leading BOM; Svelte (`<script>`, `<style>` and template expressions included) and CSS count LF alone and leave a leading BOM out.
 - The frame's header is `loc.start` as `line:column + 1`.
-- The position is into your own source, CRLF line endings included — the one [`@fuzdev/tsv-parse-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-parse-wasm) reports, except that with no `sourceType`, `format_typescript` may report its script retry's error instead.
+- The position is into your own source, CRLF line endings included — the one [`@fuzdev/tsv-parse-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-parse-wasm) reports (its `message` can differ where it quotes source text, which a formatter reads with line endings folded to LF), except that with no `sourceType`, `format_typescript` may report its script retry's error instead.
 
 ```javascript
 import {format_typescript} from '@fuzdev/tsv-format-wasm';

@@ -18,7 +18,8 @@
 //!
 //! Every export is flat, `(source, source_type?)`, and RETURNS a failure the source causes
 //! (a parse failure, a refusal) as `{ok: false, error}` in its product's place
-//! ([`failure_result`]) — only an argument refusal or the size cap throws. The published
+//! ([`failure_result`]) — only an argument refusal, the size cap or an internal failure throws (a
+//! WASM trap is the engine's own). The published
 //! packages wrap them in a hand-written JS facade (`npm/api.js`, shared with the native
 //! `@fuzdev/tsv`) that owns the options bag, its errors, and the `{locations: true}` sugar.
 
@@ -47,9 +48,10 @@ use tsv_arena::parse_format;
 use tsv_arena::{parse_convert, parse_internal};
 
 // The one parse-error type, shared by every language crate: each re-exports
-// `tsv_lang::ParseError` (and the `WirePoint` its `wire_point` returns), so the shared
-// error helpers below take a Svelte or CSS failure as readily as a TypeScript one. Named
-// through `tsv_ts` only because this crate takes no `tsv_lang` edge of its own.
+// `tsv_lang::ParseError` (and the `ErrorReport` its `report` returns, whose span is two
+// `WirePoint`s), so the shared error helpers below take a Svelte or CSS failure as readily as
+// a TypeScript one. Named through `tsv_ts` only because this crate takes no `tsv_lang` edge of
+// its own.
 #[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
 use tsv_ts::ParseError;
 
@@ -97,7 +99,7 @@ fn install_panic_hook() {
     std::panic::set_hook(Box::new(|info| console_error(&info.to_string())));
 }
 
-/// A refusal or an internal failure — a source type the export cannot take, a source over
+/// An argument refusal or an internal failure — a source type the export cannot take, a source over
 /// the size cap — as a plain JS `Error` carrying `message`.
 fn err(message: impl ToString) -> JsValue {
     JsError::new(&message.to_string()).into()

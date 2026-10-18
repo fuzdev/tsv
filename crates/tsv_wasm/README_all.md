@@ -127,7 +127,7 @@ A source that doesn't parse returns `{ok: false, error}` — from a parser, a fo
 - `message` says what went wrong, on one line; `frame` is the excerpt under it — a `line:column` header and the source line, then a caret line — so `` `${message}\n${frame}` `` is the text the CLI prints.
 - `start` and `end` are the error's UTF-16 offsets — a parse error is a point, so `end === start` — and `loc` is their `{start: {line, column}, end: {line, column}}` (1-based line, 0-based UTF-16 column), shaped like a node's: `create_locator(source, {language}).loc_of(result.error)` equals it.
 - The frame's header is `loc.start` as `line:column + 1`.
-- A formatter reports positions in your own source, CRLF line endings included — the error a parser reports, except that with no `sourceType`, `format_typescript` may report its script retry's error instead.
+- A formatter reports positions in your own source, CRLF line endings included — the error a parser reports (its `message` can differ where it quotes source text, which a formatter reads with line endings folded to LF), except that with no `sourceType`, `format_typescript` may report its script retry's error instead.
 
 ```javascript
 import {format_typescript} from '@fuzdev/tsv-wasm';

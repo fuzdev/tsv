@@ -14,44 +14,31 @@ Each `## Unreleased` section must be non-empty and carry a
 <!-- bump: minor -->
 
 - **breaking** feat: `parse_<lang>`, `parse_<lang>_json` and `format_<lang>` return a result
-  instead of throwing, like `strip_typescript` — `{ok: true, ast}`, `{ok: true, json}` and
-  `{ok: true, code}`, or `{ok: false, error}`. Every error is a plain object (no stack,
-  structured-clone-able; `SyntaxError` is no longer thrown) shaped like an AST node:
-  `{kind, message, frame, start, end, loc: {start, end}}`, with `message` the one-line summary
-  and `frame` the source excerpt and caret, so
-  `create_locator(source, {language}).loc_of(error)` equals `error.loc`. A parse failure is
-  `kind: 'parse'` (a point, `end === start`); `format_svelte`'s
-  refusal of a lone CR inside an in-tag `//` comment is `kind: 'refused'`, spanning the CR.
-  Argument misuse still throws a `TypeError`, and an engine failure with no position (the size
-  cap, a trap) still throws. The type `TsvSyntaxError` is replaced by `TsvParseError`, every
-  error extending `TsvError`, with `FormatResult`, `ParseResult` and `ParseJsonResult` beside
-  `StripResult`
+  instead of throwing, as `strip_typescript` does: `{ok: true, ast | json | code}` or
+  `{ok: false, error}`. `error` is a plain object shaped like an AST node —
+  `{kind, message, frame, start, end, loc}`, `message` the one-line summary and `frame` the
+  excerpt and caret — with `kind: 'parse'` for a syntax error and `'refused'` for
+  `format_svelte`'s one refusal (a lone CR in an in-tag `//` comment). Argument errors and
+  positionless engine failures (the size cap, a trap) still throw. `TsvSyntaxError` is replaced
+  by `TsvParseError`, and every error type extends `TsvError`
 - feat: type stripping — `strip_typescript(source, options?)` in `@fuzdev/tsv-wasm` and
   `@fuzdev/tsv`, and `tsv strip` in both CLIs, turn TypeScript into JS by blanking every type
   to whitespace, so every line and column stays where it was. TypeScript that blanking cannot
   erase (`enum`, a value `namespace`, parameter properties, `import =`, `export =`, `<T>x` —
   what `erasableSyntaxOnly` rejects — and an `as` / `satisfies` whose blanking would regroup
-  its expression) is refused rather than transformed; the result is an object,
-  `{ok: true, code}` or `{ok: false, error}`, never a throw. Like `format`, an unnamed goal
-  reads a module first and retries as a script, and a `.mts` path is always a module;
-  `tsv strip` takes `.ts`/`.mts`/`.cts` paths (exit 0 stripped, 1 refused, 2 an error). The
-  format-only and parse-only packages do not carry it. See `docs/strip.md`
+  its expression) is refused rather than transformed, returned as an error, not thrown. Like
+  `format`, an unnamed goal reads a module first and retries as a script, and a `.mts` path is
+  always a module; `tsv strip` takes `.ts`/`.mts`/`.cts` paths (exit 0 stripped, 1 refused,
+  2 an error). The format-only and parse-only packages do not carry it. See `docs/strip.md`
 - feat: a `TSMethodSignature` carries `readonly: true` when written (tsc's parser accepts it;
   acorn-typescript rejects it)
 - **breaking** fix: code that parsed at 0.6.0 and now rejects, as tsc or Svelte does — a bare
   type assertion as an assignment target (`a as T = 1`, `<T>a += 1`; parenthesized it still
   parses), and a hashbang at the start of a Svelte `<script>` or template expression
-- fix: a type argument list followed by a `<`, or by a `+` or `-` on the next line, parses as
-  tsc reads it — a comparison, not a list — so `f<T><U>(x)` is `(f < T) > <U>(x)`,
-  `new f<T><U>(x)` is `(new f < T) > <U>(x)`, and `f<T>` with `+c` on the next line is
-  `(f < T) > +c`; format prints them `(f < T) > <U>x` and `(f < T) > +c`. Where tsc rejects
-  the text over such a follower (`new a.b<T><U>()`, `f<T><U>`, `const a = f<T, U><V>(x)`),
-  every list in it reads as acorn-typescript reads it, and `new a.b<T><U>()` prints
-  `new (a.b<T>)<U>()`
-- fix: a call, member access, template or type argument list no longer continues a prefix
-  operator over a postfix update — `a = !b++` followed by `(z) => z` on the next line parses
-  as two statements, and `!b++(z)` is a syntax error instead of a call, also with the `(z)`
-  on the next line where no statement can end (inside `g(…)`)
+- fix: a type argument list followed by `<`, or by `+`/`-` on the next line, parses as tsc
+  reads it (`f<T><U>(x)` is a comparison)
+- fix: a prefix operator over a postfix update no longer continues into a call on the next
+  line (`a = !b++` then `(z) => z` is two statements)
 
 ## 0.6.0
 

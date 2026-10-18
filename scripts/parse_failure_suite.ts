@@ -12,6 +12,7 @@
  * `create_locator(source, {language}).loc_of(error)` — and whose frame's `line:col` header
  * is `loc.start.line:loc.start.column + 1`, with no leading BOM echoed in the excerpt after
  * it.
+ *
  * The rows reach what the definition turns on: an astral character ahead of the error (two
  * UTF-16 units), a leading BOM (counted by TypeScript, elided by Svelte and CSS), a lone CR,
  * U+2028 and U+2029 (a line for TypeScript, a character for Svelte and CSS), CRLF on the

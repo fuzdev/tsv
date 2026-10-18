@@ -118,9 +118,9 @@ for that case — never returned as a parse failure.
 native `@fuzdev/tsv` alone — [docs/strip.md](../../docs/strip.md)). `strip_typescript(source,
 options?)` returns `{ok: true, code}` or `{ok: false, error}`, `error.kind` `'parse'` (the error a
 parse of the source returns at the goal the error belongs to) or `'unsupported'` (`construct`,
-`message`, `frame`, `start`, `end`, `loc: {start, end}` — `tsv_ts::UnsupportedKind::report`). Argument
-misuse is still a `TypeError` (the shared `read_source` / `read_options`, whose `'strip'` kind
-takes `sourceType` as a format's does), and an engine failure with no point still throws as
+`message`, `frame`, `start`, `end`, `loc: {start, end}` — `tsv_ts::UnsupportedKind::report`).
+Argument misuse is still a `TypeError` (the shared `read_source` / `read_options`, whose `'strip'`
+kind takes `sourceType` as a format's does), and an engine failure with no point still throws as
 itself. The raw export is `strip_typescript(source, source_type?)` — the flat shape, its unset
 source type read as a format reads one (`tsv_arena::Family::Strip`) — returning the code or the
 `{ok: false, error}` it built, the refusal's `construct` the construct's snake_case name
@@ -167,7 +167,7 @@ node entry's `init` / `init_sync` included (declared there rather than re-export
 under an alias, since the glue's own are `__wbg_init` / `initSync`).
 
 **Typed returns.** The returned error's shape is declared once, `TsvError` in
-`npm/facade_error.d.ts` (`message`, `frame`, `start`, `end`, `loc`, with the field docs), beside
+`npm/facade_error.d.ts` (`kind`, `message`, `frame`, `start`, `end`, `loc`, with the field docs), beside
 the parse failure `TsvParseError` that extends it (its own file, so every package ships it beside
 whichever family's declarations it carries, each of which imports it); `FormatRefusedError` and
 `StripUnsupportedError` extend it too, adding only their `kind` (+ `construct`) and what their
@@ -251,12 +251,12 @@ The AST crosses the JS↔WASM boundary as **one compact JSON string** — the sp
 `parse_*` builds it with the lang crate's `convert_ast_json_string` (each
 language's wire-JSON writer emits it directly from the internal AST — no intermediate
 `serde_json::Value` or typed public tree) and calls the engine's native `JSON.parse` from
-Rust via `js_sys::JSON::parse`, so the export returns the object (as `{ok: true, ast}`). Building the JS object
-graph node-by-node with `serde_wasm_bindgen` is measurably slower. `js-sys` rides the
+Rust via `js_sys::JSON::parse`, so the export returns the object (as `{ok: true, ast}`). Building
+the JS object graph node-by-node with `serde_wasm_bindgen` is measurably slower. `js-sys` rides the
 `parse` feature alone; the format-only build does not link it.
 
-`parse_*_json` exports return the JSON string itself — for consumers that
-forward the wire format (disk, network, another tool) without paying
+`parse_*_json` exports return the JSON string itself (`{ok: true, json}` through the facade) — for
+consumers that forward the wire format (disk, network, another tool) without paying
 `JSON.parse` for an object they don't need.
 
 ## Format Options
@@ -720,7 +720,7 @@ require dual updates.
   - **Engine binding.** A worker binds by whether the main thread's `./index.js` exported a `wasm_module`: here it did, so the worker takes it through the [`./worker` entry](#the-worker-entry) and recompiles nothing; in the native package it didn't, so the worker loads the addon. Hence the **dynamic** engine import — a static one is hoisted above the branch, and the worker would pay for `./index.js` before it could ask.
   - **Shared with native.** Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — one source for both packages (it imports its engine from `./index.js`, so each copy binds to its own package's engine), which the ESM loader bought like `locations.js` below. There it is the *fallback*: the bin is a napi-only dispatcher (`tsv_napi/npm/bin.js`) that execs the platform package's real `tsv_cli` binary, deferring to cli.js only when no binary is reachable — the dispatcher deliberately does NOT live in this shared source, so the wasm copy stays byte-identical and can never resolve a sibling-installed native binary.
   - **Path quoting.** Every path it names itself — the `--list` and changed-path lines, `error:` lines, its traversal and argument errors, `parse`'s read failure — goes through its hand restatement of `tsv_discover::quote_path` (a name holding a control character or a double quote is C-quoted as `git ls-files` prints it; the binding's warnings arrive quoted), pinned beside the native rule by `scripts/test_npm.ts` (see [../../docs/cli.md §Multi-File Formatting](../../docs/cli.md#multi-file-formatting))
-- `npm/api.js` + `npm/facade_format.d.ts`, `npm/api_parse.js` + `npm/facade_parse.d.ts`, `npm/facade_error.d.ts` (the `TsvParseError` type every family's result carries) — The hand-written facade every package publishes through: the options reader, the failure readers and the format family, and the parse family with the `{locations: true}` sugar (see [The npm Facade](#the-npm-facade-options--typed-returns), which also says why the declarations are named apart from their modules). Staged verbatim by `patch_npm_package.ts` (`api_parse.js` + `facade_parse.d.ts` into the parse-capable packages only, `facade_format.d.ts` into the format-capable ones) and by `scripts/build_napi_packages.ts` into the native `@fuzdev/tsv` — one source for both package sets. `scripts/npm_facade.ts` owns what both staging scripts share: the facade file table (with `locations.*` and `types/tsv_ast.d.ts` in the parse half), the `./locations` exports entry, and the re-exported type names
+- `npm/api.js` + `npm/facade_format.d.ts`, `npm/api_parse.js` + `npm/facade_parse.d.ts`, `npm/facade_error.d.ts` (the `TsvError` base shape and the `TsvParseError` every family's result carries) — The hand-written facade every package publishes through: the options reader, the failure readers and the format family, and the parse family with the `{locations: true}` sugar (see [The npm Facade](#the-npm-facade-options--typed-returns), which also says why the declarations are named apart from their modules). Staged verbatim by `patch_npm_package.ts` (`api_parse.js` + `facade_parse.d.ts` into the parse-capable packages only, `facade_format.d.ts` into the format-capable ones) and by `scripts/build_napi_packages.ts` into the native `@fuzdev/tsv` — one source for both package sets. `scripts/npm_facade.ts` owns what both staging scripts share: the facade file table (with `locations.*` and `types/tsv_ast.d.ts` in the parse half), the `./locations` exports entry, and the re-exported type names
 - `npm/api_strip.js` + `npm/facade_strip.d.ts` — The facade's strip half (`create_strip_api`, the result object; [The npm Facade](#the-npm-facade-options--typed-returns)), staged into `@fuzdev/tsv-wasm` and the native `@fuzdev/tsv` alone, as `scripts/npm_facade.ts`'s strip family
 - `npm/locations.js` + `npm/locations.d.ts` — Pure-JS line/column reconstruction for the span-only wire; ships in the parse-capable packages, run by `api_parse.js` for `{locations: true}`, re-exported from index.js/browser.js by `patch_npm_package.ts`, and exported alone as the `./locations` subpath. Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — this file is the single source for both, which is what the napi loader being ESM bought (see [Line/Column Reconstruction Helper](#linecolumn-reconstruction-helper-npmlocationsjs))
 - `README_format.md` — Shipped as `README.md` in `@fuzdev/tsv-format-wasm` (copied by `patch_npm_package.ts`)

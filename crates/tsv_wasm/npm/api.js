@@ -298,8 +298,8 @@ const FORMAT_KINDS = new Set(['parse', 'refused']);
  * An engine's returned failure, checked: the `{ok: false, error}` the engine built, handed
  * back as it is when its `error` is the shape every failure takes — a `kind` this export
  * returns (`kinds`), a string `message` and `frame`, integer `start` and `end`, and a `loc`
- * whose `start` and `end` each hold an integer `line` and `column` — and thrown otherwise, since only an engine bug returns anything else in its
- * product's place.
+ * whose `start` and `end` each hold an integer `line` and `column` — and thrown otherwise, since
+ * only an engine bug returns anything else in its product's place.
  *
  * @param {unknown} value - what the engine returned in place of its product
  * @param {ReadonlySet<string>} kinds - the error kinds this export returns

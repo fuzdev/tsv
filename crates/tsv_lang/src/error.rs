@@ -440,8 +440,8 @@ impl ParseError {
 
     /// Whether this is a **syntax error** — the source is malformed at a point — rather
     /// than a source over the `u32` cap (positionless) or a [`ParseError::refusal`] of a
-    /// source that parses (pointed, but by its own span in [`ParseError::report`]). The one question
-    /// every surface asks before choosing its channel: the CLI's `Parse error:` prefix (a
+    /// source that parses (pointed, but by its own span in [`ParseError::report`]). The one
+    /// question every surface asks before choosing its channel: the CLI's `Parse error:` prefix (a
     /// binding reads the same split from [`ErrorReport::refused`]). A whole-document parse
     /// entry point fills every syntax error's context, so on its errors this is exactly
     /// `wire_point().is_some()`.
@@ -457,8 +457,9 @@ impl ParseError {
     /// A **refusal**: `source` parses, but an operation cannot handle what it holds — a
     /// format that cannot print it without changing what it means (a Svelte in-tag `//`
     /// comment holding a lone `<CR>`, which the format path's line-terminator fold would end
-    /// early — `tsv_svelte::parse_folded`), or the type strip refusing TypeScript it cannot
-    /// erase (`tsv_ts::StripError`). It covers the bytes `start..end`.
+    /// early — `tsv_svelte::parse_folded`). It covers the bytes `start..end`. The type strip's
+    /// refusals take the same report shape without a `ParseError` ([`ErrorReport::refusal`], via
+    /// `tsv_ts::UnsupportedKind::report`).
     ///
     /// The message is rendered here, with the `line:col` header and excerpt of `start` in
     /// `source` under `coordinates` that a located error prints, so it reads like every other

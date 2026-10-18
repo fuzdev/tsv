@@ -20,7 +20,8 @@
  *   an unwritten status throws instead of inheriting the last call's verdict. This
  *   probe is what covers the first, and it covers it BEHAVIORALLY — the only way to
  *   ask whether a refusal still arrives as one.
- * - **N-API** and **WASM** throw natively today. Probed anyway, and for the reason
+ * - **N-API** and **WASM** return a failure as `{ok: false, error}`, and `lib/tsv_api.ts`
+ *   turns it into the throw a row reads (`rejected`). Probed anyway, and for the reason
  *   the yuku wrapper gives for probing an option whose loss would be loud: a shared
  *   question asked at one site and not the others is free to drift, and the cost
  *   here is one call per row at init.

@@ -25,9 +25,8 @@ and Node's `module.stripTypeScriptTypes` share. The implementation is `tsv_ts::s
   export does: `{ok: true, code}` or `{ok: false, error}` with `error.kind` `'parse'` (the
   error `parse_typescript` returns for the goal the error belongs to) or `'unsupported'`
   (`construct`, a one-line `message` and its `frame`, and the span as `start` / `end` /
-  `loc: {start, end}`). The bag takes `sourceType` as a format's
-  does. Argument misuse throws a `TypeError`, as on
-  every export ([crates/tsv_wasm/CLAUDE.md §The npm Facade](../crates/tsv_wasm/CLAUDE.md#the-npm-facade-options--typed-returns)).
+  `loc: {start, end}`). The bag takes `sourceType` as a format's does. Argument misuse throws a
+  `TypeError`, as on every export ([crates/tsv_wasm/CLAUDE.md §The npm Facade](../crates/tsv_wasm/CLAUDE.md#the-npm-facade-options--typed-returns)).
 - **CLI**: `tsv strip <file> | --content <s> | --stdin [--source-type <t>] [--check]`, in the
   native binary and
   the JS mirror alike ([cli.md §Stripping types](./cli.md#stripping-types-tsv-strip)).

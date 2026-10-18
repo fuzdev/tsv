@@ -30,9 +30,10 @@ import { type InitScope, LANGUAGES } from './types.ts';
  * native bindings': each takes the source type as a trailing OPTIONAL string
  * (`'script'` / `'module'`; omitted = none named). Svelte and CSS REJECT a set one
  * rather than ignoring it (`crates/tsv_wasm/src/lib.rs`'s `wasm_source_type`), so
- * `TsvBinding` withholds it for them. `parse_<lang>`
- * returns the span-only wire as an object, `JSON.parse`d engine-side via `js_sys`;
- * `parse_<lang>_json` returns the wire string itself.
+ * `TsvBinding` withholds it for them. `parse_<lang>` returns
+ * `{ok: true, ast}`, the span-only wire as an object `JSON.parse`d engine-side via `js_sys`;
+ * `parse_<lang>_json` returns the wire string itself; each returns a parse failure as
+ * `{ok: false, error}`.
  */
 interface WasmModule {
 	parse_svelte: EngineFn<{ ok: true; ast: unknown } | EngineFailure>;
@@ -110,9 +111,9 @@ export class WasmImplementation extends TsvBinding {
 		});
 
 		// Fairness guard for the parse rows: the wasm parse fns must return a
-		// js_sys-materialized OBJECT (the engine runs the host's JSON.parse from
-		// Rust, and returns it as `{ok: true, ast}`). If a glue/build regression ever handed back the raw JSON string
-		// instead, the timed `tsv-wasm` parse rows would silently skip
+		// js_sys-materialized OBJECT (the engine runs the host's JSON.parse from Rust, and
+		// returns it as `{ok: true, ast}`). If a glue/build regression ever handed back the raw
+		// JSON string instead, the timed `tsv-wasm` parse rows would silently skip
 		// materialization and read artificially fast vs their native sibling. Probed
 		// here, outside any timed loop, on the raw export (the facade passes through
 		// whatever the engine's `parse` returns) — and, like the probes below, only for
@@ -131,7 +132,8 @@ export class WasmImplementation extends TsvBinding {
 			}
 		}
 
-		// The bindings throw natively today; probed anyway so the three can't come to
+		// The bindings return a parse failure as `{ok: false, error}`, which the wrapper
+		// rethrows as the row's rejection; probed anyway so the three can't come to
 		// disagree about what surfacing a refusal MEANS. The guard above asks what a
 		// SUCCESS returns; the reject probe asks what a REFUSAL does. And the parse wire
 		// is span-only, so a stale bundle whose `parse_<lang>` still returns the

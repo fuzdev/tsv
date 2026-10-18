@@ -4,11 +4,11 @@
  *
  * The published surface of every tsv npm package is one hand-written facade
  * (`crates/tsv_wasm/npm/api.js` + `api_parse.js`): per call it checks the source is a
- * well-formed UTF-16 string, reads the options bag, wraps the engine call to turn a parse
- * failure into a returned `{ok: false, error}` (a success into `{ok: true, …}`), and for the
- * native package `JSON.parse`s the wire inside a try/catch. The bench's `tsv` / `tsv-wasm`
- * / `+locations` rows time that facade over each binding (`lib/tsv_api.ts`), unwrapping the
- * result as a consumer does. This probe prices it, per binding, operation and language,
+ * well-formed UTF-16 string, reads the options bag, checks the `{ok: false, error}` an engine
+ * returns and hands it back as it is (`read_failure`), wraps a success into `{ok: true, …}`,
+ * and for the native package `JSON.parse`s the wire inside a try/catch. The bench's `tsv` /
+ * `tsv-wasm` / `+locations` rows time that facade over each binding (`lib/tsv_api.ts`),
+ * unwrapping the result as a consumer does. This probe prices it, per binding, operation and language,
  * under whichever runtime runs it.
  *
  * The ARMS of one cell, all over one loaded engine instance per binding:

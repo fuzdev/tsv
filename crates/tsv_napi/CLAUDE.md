@@ -116,12 +116,13 @@ fallback.
 **`@fuzdev/tsv` is the full native distribution; `@fuzdev/tsv-wasm` is the
 fallback** — so parity runs the whole way, not just the engine calls. Same
 export names, same `(source, options?)` bags, same error strings: the loader
-publishes through the wasm packages' own facade (`api.js` / `api_parse.js`, staged
+publishes through the wasm packages' own facade (`api.js` / `api_parse.js` / `api_strip.js`, staged
 in from `crates/tsv_wasm/npm/`), so there is one options reader for both, and
-`scripts/test_napi_npm.ts` asserts the strings. `parse_<lang>` returns the
-JSON-parsed span-only object (`{locations: true}` adds `loc`, reconstructed in JS),
-`parse_<lang>_json` the wire string. The loader's `index.js` imports the two facade
-files, which sit beside it only once staged. The deliberately
+`scripts/test_napi_npm.ts` asserts the strings. `parse_<lang>` returns `{ok: true, ast}`, the
+JSON-parsed span-only object (`{locations: true}` adds `loc`, reconstructed in JS), and
+`parse_<lang>_json` returns `{ok: true, json}`, the wire string; a failure is
+`{ok: false, error}`. The loader's `index.js` imports the three facade files, which sit beside it
+only once staged. The deliberately
 absent exports are the four WASM lifecycle ones — `init()`/`init_sync()`
 (nothing to initialize), `wasm_module` (no compiled module), and
 `reinstantiate()` (no instance to poison; a native overflow is a process-fatal
@@ -365,7 +366,7 @@ Three properties a Node/Bun host inherits from this crate, none of them visible 
 ## Files
 
 - `src/lib.rs` — All bindings: the `lang_bindings!` macro (its engine halves the shared `tsv_arena` macros — `parse_convert!` / `parse_internal!` for the parse exports, `parse_format!` carrying the format path's unset source type — with `napi_source_type` decoding the optional `sourceType` string per `tsv_arena::Family`), the three `lang_bindings!` invocations, the `strip`-gated `strip_typescript` export (its engine half `strip_typescript_engine`), the `format`-gated `IgnoreStack` class, the `panic_probe` export, and a `#[cfg(test)]` module. `with_ast_arena` is imported only for the strip and the panic probe; every other export reaches the arenas through the macros
-- `npm/` — the `@fuzdev/tsv` loader package source (`index.js` + `index.d.ts` — hand-written: the loader plus the wasm packages' own facade over the addon, so the surface is theirs minus the WASM lifecycle (§The npm packages states the exact delta, and the suite diffs it as a set), and bound by the same `.js`-extension rule on relative specifiers ([../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Line/Column Reconstruction Helper), asserted by `scripts/test_napi_npm.ts` — + `platform.js` (triple detection) + `bin.js` (the `tsv` bin dispatcher) + `README.md`); staged with generated package.jsons by `scripts/build_napi_packages.ts`, which also copies in the shared facade (`api.js` / `api_parse.js`), the `locations.js` helper and the `cli.js` fallback (see §The npm packages)
+- `npm/` — the `@fuzdev/tsv` loader package source (`index.js` + `index.d.ts` — hand-written: the loader plus the wasm packages' own facade over the addon, so the surface is theirs minus the WASM lifecycle (§The npm packages states the exact delta, and the suite diffs it as a set), and bound by the same `.js`-extension rule on relative specifiers ([../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Line/Column Reconstruction Helper), asserted by `scripts/test_napi_npm.ts` — + `platform.js` (triple detection) + `bin.js` (the `tsv` bin dispatcher) + `README.md`); staged with generated package.jsons by `scripts/build_napi_packages.ts`, which also copies in the shared facade (`api.js` / `api_parse.js` / `api_strip.js` and the `facade_*.d.ts` declarations), the `locations.js` helper and the `cli.js` fallback (see §The npm packages)
 - `build.rs` — `napi_build::setup()` (linker config for the addon)
 - `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "deny"`, not `allow` — `#[napi]`'s generated items carry their own `#[allow(unsafe_code)]` (an inner `allow` overrides `deny`), so the macro output compiles while any hand-written `unsafe` stays a compile error; deps `napi` + `napi-derive` (3.x) + `tsv_arena`, plus the `format`-optional `tsv_ignore` + `tsv_discover` behind `IgnoreStack`, build-dep `napi-build` (2.x). `format` → `tsv_arena/format` + those two (no direct `tsv_lang` edge: `parse_format!`'s line-terminator fold reaches it through `tsv_arena`)
 

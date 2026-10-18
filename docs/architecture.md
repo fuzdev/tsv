@@ -634,10 +634,10 @@ lone `<CR>` in a Svelte document, the format parses the author's bytes first
 (`tsv_svelte::parse_folded`, the parse every Svelte format entry point runs): their parse
 error is the format's error, and an in-tag `//` comment holding a lone `<CR>` with comment
 text after it is refused with a `ParseError::refusal` whose message names the `<CR>` and
-whose span (`ParseError::report`) is the `<CR>` — no syntax error, since the source
-is valid Svelte: the CLI prints it after `Error:` and the npm facade returns it as
-`kind: 'refused'`. A `<CR><LF>` is one line break in both readings and never refuses; a
-document the fold rewrote no lone `<CR>` in pays nothing.
+whose span (`ParseError::report`) is the `<CR>` — no syntax error, since the source is valid
+Svelte: the CLI prints it after `Error:` and the npm facade returns it as `kind: 'refused'`. A
+`<CR><LF>` is one line break in both readings and never refuses; a document the fold rewrote no
+lone `<CR>` in pays nothing.
 
 **A leading byte-order mark is never rewritten either — but its *position* is read the way
 each oracle reads it.** Every lexer skips a U+FEFF at byte 0 and keeps its spans file-true;

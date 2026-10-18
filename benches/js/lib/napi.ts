@@ -11,9 +11,10 @@
  *
  * Unlike FFI there are no raw pointers and no manual free: napi-rs marshals the
  * JS string in and the returned `String` out. `parse_<lang>_json` returns the span-only
- * wire as a JSON string, and engine errors surface as thrown JS errors (napi-rs
- * converts the `napi::Error`), so there is no status out-param to read (the FFI
- * shape) — a throw just propagates. A Rust PANIC
+ * wire as a JSON string. A failure the source causes (a parse failure, a format's refusal)
+ * is RETURNED in the product's place as `{ok: false, error}`; only an argument refusal, the
+ * size cap and a caught panic surface as thrown JS errors (napi-rs converts the
+ * `napi::Error`), so there is no status out-param to read (the FFI shape). A Rust PANIC
  * surfaces the same way: every export carries `catch_unwind` and the `napi`
  * profile unwinds, so a panic throws instead of aborting the host (stack
  * overflow excepted — that still aborts).
@@ -99,8 +100,9 @@ export class NapiImplementation extends TsvBinding {
 			}
 		});
 
-		// The addon throws natively today; probed anyway so the three bindings can't
-		// come to disagree about what surfacing a refusal MEANS. And the parse wire is
+		// The addon returns a parse failure as `{ok: false, error}`, which the wrapper rethrows
+		// as the row's rejection (`rejected`, `lib/tsv_api.ts`); probed anyway so the three
+		// bindings can't come to disagree about what surfacing a refusal MEANS. And the parse wire is
 		// span-only, so a stale addon whose parse still emits `loc` can't be timed as the
 		// span-only default.
 		this.probe('tsv (N-API)', { path, rebuild: 'deno task build:napi' }, scope);
