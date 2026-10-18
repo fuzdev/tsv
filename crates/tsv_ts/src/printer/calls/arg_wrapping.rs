@@ -457,20 +457,19 @@ impl Printer<'_> {
 /// break-body state reuses the same DocId. Leftmost-object conditionals are excluded — the
 /// whole arrow routes those through `build_arrow_body_doc`'s object-parens arm, not the
 /// conditional arm, so the injected raw wouldn't match. Returns `None` (unchanged behavior)
-/// when the last arg isn't such an arrow, or when the call carries any comment (the commented
-/// last-arg path composes the body differently).
+/// when the last arg isn't such an arrow.
 ///
-/// TODO: declining on a comment rebuilds the body in both docs, so nested call-bodied
-/// callbacks after a lead argument with one comment in the innermost body
-/// (`a(l, (x) => b(l, (y) => … z(/* c */ q)))`) are O(2^depth).
+/// A commented call is injected too: one comment in the innermost body puts every enclosing
+/// call on page, so declining there rebuilt the body in both docs at every level of nested
+/// call-bodied callbacks (`a(l, (x) => b(l, (y) => … z(/* c */ q)))`, O(2^depth)). The
+/// comment positions that need a different composition never reach the states that read
+/// the injection: the reassembling arms refuse them first (`arrow_hug_refused_by_comments`,
+/// and a call's leading or trailing comment on the last argument), and the own-line
+/// `=>`→body gap takes its own state, built from its own prebuild.
 pub(super) fn prebuild_expand_last_break_body(
     printer: &Printer<'_>,
     last_arg: Option<&internal::Expression<'_>>,
-    call_has_comments: bool,
 ) -> Option<(u32, DocId)> {
-    if call_has_comments {
-        return None;
-    }
     if let Some(internal::Expression {
         kind: internal::ExpressionKind::ArrowFunctionExpression(arrow),
         ..
@@ -2067,7 +2066,7 @@ pub(super) fn build_arrow_call_body_states(
     printed: impl FnOnce() -> DocId,
 ) -> DocId {
     let d = printer.d();
-    let body_reuse = prebuild_expand_last_break_body(printer, Some(arg), false);
+    let body_reuse = prebuild_expand_last_break_body(printer, Some(arg));
     let arrow_doc = printer.with_arrow_body_inject(body_reuse, printed);
     let body_doc =
         body_reuse.map_or_else(|| printer.build_expression_doc(body_expr), |(_, doc)| doc);

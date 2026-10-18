@@ -1302,11 +1302,7 @@ fn build_chain_args_multi(
         // Expand-last arrow with a call body: build the body ONCE and inject it so the
         // whole-arrow arg doc reuses it (the break-body state below reuses it too) —
         // building it in both places recurses into itself → O(2^depth).
-        let body_reuse = prebuild_expand_last_break_body(
-            printer,
-            call.arguments.last().copied(),
-            has_any_comments,
-        );
+        let body_reuse = prebuild_expand_last_break_body(printer, call.arguments.last().copied());
         let inject_prev = body_reuse.map(|(span, doc)| printer.inject_arrow_body(span, doc));
 
         let (head_parts, last_arg_doc, all_args_broken) =

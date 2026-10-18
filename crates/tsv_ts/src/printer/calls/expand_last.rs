@@ -211,7 +211,7 @@ pub(super) fn try_expand_last_arg(
     let (body_reuse, obj_reuse) = if arrow_gap_break.is_some() {
         (None, None)
     } else {
-        let call_body = prebuild_expand_last_break_body(printer, last_arg, has_comments);
+        let call_body = prebuild_expand_last_break_body(printer, last_arg);
         let obj_body = if call_body.is_none() {
             prebuild_expand_last_obj_array_body(printer, last_arg)
         } else {

@@ -225,6 +225,29 @@ fn gen_ts_nested_arrow_multiarg(depth: usize) -> String {
     format!("const v = {expr};\n")
 }
 
+/// The commented twin of `gen_ts_nested_arrow_multiarg`: one block comment in the innermost
+/// body (`a(l, x => b(l, y => … z(/* c */ q)))`) puts every enclosing argument's span on page,
+/// so an expand-last arm that declines to share its body build for a commented argument
+/// rebuilds every level twice.
+fn gen_ts_nested_arrow_multiarg_inner_comment(depth: usize) -> String {
+    let mut expr = String::from("z(/* c */ q)");
+    for i in 0..depth {
+        expr = format!("call{i}(lead{i}, p{i} => {expr})");
+    }
+    format!("const v = {expr};\n")
+}
+
+/// The `new` spelling of `gen_ts_nested_arrow_multiarg_inner_comment`
+/// (`new A(l, x => f(new B(l, y => … z(/* c */ q))))`): a `new` expression's last-argument
+/// expansion shares the plain call's arm, and the arrow's call body carries the next level.
+fn gen_ts_nested_new_arrow_multiarg_inner_comment(depth: usize) -> String {
+    let mut expr = String::from("z(/* c */ q)");
+    for i in 0..depth {
+        expr = format!("new Call{i}(lead{i}, p{i} => f{i}({expr}))");
+    }
+    format!("const v = {expr};\n")
+}
+
 /// MULTI-arg last-arg arrow via a MEMBER callee (`p.then(a, x => q.then(a, …))`) —
 /// routes through `build_chain_args_multi` (chain_args.rs), the chain variant.
 fn gen_ts_nested_arrow_multiarg_chain(depth: usize) -> String {
@@ -667,6 +690,18 @@ const CONSTRUCTS: &[Construct] = &[
         name: "ts_nested_arrow_multiarg",
         parser: ParserType::TypeScript,
         generate: gen_ts_nested_arrow_multiarg,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_arrow_multiarg_inner_comment",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_arrow_multiarg_inner_comment,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_new_arrow_multiarg_inner_comment",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_new_arrow_multiarg_inner_comment,
         depths: &[4, 8, 12],
     },
     Construct {
