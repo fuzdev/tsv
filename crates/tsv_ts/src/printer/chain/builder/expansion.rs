@@ -209,7 +209,7 @@ pub(super) fn call_has_complex_args<'a>(node: &ChainNode<'a>) -> bool {
 pub(super) struct CallbackStatus {
     /// Whether the call has any callback argument (arrow/function)
     pub has_callback: bool,
-    /// Whether any callback will break (multiline body)
+    /// Whether any callback prints with a forced break
     pub will_break: bool,
 }
 
@@ -234,11 +234,15 @@ pub(super) fn call_callback_status<'a>(
                         ArrowFunctionBody::BlockStatement(block) => {
                             block_body_will_break(block, printer)
                         }
-                        // Expression body - check if it's multiline
-                        ArrowFunctionBody::Expression(expr) => {
-                            let span = expr.span();
-                            printer.has_newline_between(span.start, span.end)
-                        }
+                        // An expression body breaks only where what prints carries a forced
+                        // break (a preserved object, template text, a comment's line), never
+                        // because the source spans lines: prettier's `willBreak` over the
+                        // printed argument. Asked of the WHOLE arrow, so a forced break in
+                        // its parameters or return type counts too, and through the
+                        // argument builder the chain itself calls, so the build is shared.
+                        ArrowFunctionBody::Expression(_) => printer
+                            .arena()
+                            .will_break(printer.build_arg_expression_doc(arg)),
                     };
                 }
             }

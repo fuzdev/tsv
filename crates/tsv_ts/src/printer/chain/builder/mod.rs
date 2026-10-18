@@ -308,7 +308,7 @@ fn should_force_chain_expand<'a>(
     // Prettier's chain expansion rules (`printMemberChain`, `print/member-chain.js`):
     // 1. Blank lines BETWEEN methods (not just before first) force expansion
     // 2. 3+ calls with complex args force expansion
-    // 3. 2+ calls with callbacks, where any callback has a multiline body, force expansion
+    // 3. 2+ calls with callbacks, where any callback prints with a forced break, force expansion
     let has_blank_lines_between = has_blank_lines_between_methods(groups, printer);
 
     // Single pass: count calls and callbacks, and check if any callback breaks
