@@ -2,7 +2,7 @@
 
 > precise language tools for TypeScript/JS, CSS, and Svelte in Rust
 
-Rust-based formatter + parser + type stripper compiled to WASM — the full tool in one package, with a `tsv` CLI. A near-Prettier formatter that tracks **Prettier** + **prettier-plugin-svelte** closely (with documented divergences), plus a drop-in replacement parser for **Svelte's parser** + **acorn** + **acorn-typescript**.
+Rust-based formatter + parser + type stripper compiled to WASM — the full tool in one package, with a `tsv` CLI. A near-Prettier formatter that tracks **Prettier** + **prettier-plugin-svelte** closely (with documented divergences), plus a parser whose AST is compatible with **Svelte's parser** + **acorn** + **acorn-typescript**.
 
 tsv is non-configurable: formatter settings are fixed at Prettier's defaults except `printWidth: 100`, `useTabs: true`, `singleQuote: true`, and `trailingComma: 'none'` — no options, like `gofmt` and Black.
 
@@ -122,10 +122,11 @@ A locator's single lookups throw a `RangeError` for an offset or span the text d
 
 ### Errors and depth limits
 
-A source that doesn't parse returns `{ok: false, error}` — from a parser, a formatter and the strip alike — with `error` a plain object (no stack; `postMessage`-able): `{kind: 'parse', message, start, loc}`, typed `TsvParseError` (exported), in the AST's coordinates ([above](#reconstructing-linecolumn)):
+A source that doesn't parse returns `{ok: false, error}` — from a parser, a formatter and the strip alike — with `error` a plain object (no stack; `postMessage`-able): `{kind: 'parse', message, frame, start, end, loc}`, typed `TsvParseError` (exported), in the AST's coordinates ([above](#reconstructing-linecolumn)):
 
-- `start` is the error's UTF-16 offset and `loc` its `{line, column}` (1-based line, 0-based UTF-16 column), equal to `create_locator(source, {language}).position_at(start)`.
-- The message's second line starts with `loc` as `line:column + 1`.
+- `message` says what went wrong, on one line; `frame` is the excerpt under it — a `line:column` header and the source line, then a caret line — so `` `${message}\n${frame}` `` is the text the CLI prints.
+- `start` and `end` are the error's UTF-16 offsets — a parse error is a point, so `end === start` — and `loc` is their `{start: {line, column}, end: {line, column}}` (1-based line, 0-based UTF-16 column), shaped like a node's: `create_locator(source, {language}).loc_of(result.error)` equals it.
+- The frame's header is `loc.start` as `line:column + 1`.
 - A formatter reports positions in your own source, CRLF line endings included — the error a parser reports, except that with no `sourceType`, `format_typescript` may report its script retry's error instead.
 
 ```javascript
@@ -133,12 +134,14 @@ import {format_typescript} from '@fuzdev/tsv-wasm';
 
 const result = format_typescript('let a;\nconst = ;');
 if (!result.ok) {
-	result.error.kind; // 'parse' — the message ends with the line and a caret
-	[result.error.start, result.error.loc]; // [13, {line: 2, column: 6}]
+	result.error.kind; // 'parse'
+	result.error.message; // "Expected identifier or destructuring pattern, found '='"
+	result.error.frame; // '2:7 const = ;\n          ^ here'
+	[result.error.start, result.error.loc.start]; // [13, {line: 2, column: 6}]
 }
 ```
 
-`format_svelte` refuses one source that does parse: a lone CR (not part of a CRLF) with comment text after it inside a `//` comment between a tag's attributes, which Svelte ends at LF alone — the formatter's CR-to-LF fold would end that comment early and turn the rest of its line into markup. The refusal is `{kind: 'refused', message, start, loc}` (typed `FormatRefusedError`), at the CR.
+`format_svelte` refuses one source that does parse: a lone CR (not part of a CRLF) with comment text after it inside a `//` comment between a tag's attributes, which Svelte ends at LF alone — the formatter's CR-to-LF fold would end that comment early and turn the rest of its line into markup. The refusal is `{kind: 'refused', message, frame, start, end, loc}` (typed `FormatRefusedError`), its span the CR.
 
 What still throws is what no result can report: an argument error (a `TypeError`, above), a source over the 4 GiB size cap, and the engine failures below.
 
@@ -157,7 +160,7 @@ To run tsv across threads, compile once and share: the main entry exports `wasm_
 It never throws for what it finds in the source. It returns `{ok: true, code}`, or `{ok: false, error}` where `error.kind` says why:
 
 - `'parse'` — the source does not parse: the error a `parse_typescript` of it returns at the goal the error belongs to;
-- `'unsupported'` — the source holds TypeScript that type blanking cannot erase: `error.construct` names it (`'enum'`, `'value_namespace'`, `'parameter_property'`, `'import_equals'`, `'export_equals'`, `'type_assertion'` for `<T>x`, or `'assertion_grouping'` for an `as` / `satisfies` whose removal would regroup its expression), `start`/`end` and `loc` give its span in the AST's coordinates, and `message` says it with the line and a caret.
+- `'unsupported'` — the source holds TypeScript that type blanking cannot erase: `error.construct` names it (`'enum'`, `'value_namespace'`, `'parameter_property'`, `'import_equals'`, `'export_equals'`, `'type_assertion'` for `<T>x`, or `'assertion_grouping'` for an `as` / `satisfies` whose removal would regroup its expression), `start`/`end` and `loc` give its span in the AST's coordinates, `message` says it on one line, and `frame` shows the line and a caret.
 
 ```typescript
 import {strip_typescript} from '@fuzdev/tsv-wasm';
@@ -168,7 +171,7 @@ if (result.ok) {
 } else if (result.error.kind === 'unsupported') {
 	console.error(result.error.construct, result.error.loc.start);
 } else {
-	console.error(result.error.message);
+	console.error(`${result.error.message}\n${result.error.frame}`);
 }
 ```
 

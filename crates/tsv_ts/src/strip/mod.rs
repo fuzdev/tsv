@@ -63,7 +63,7 @@ mod walk;
 use std::borrow::Cow;
 use std::fmt;
 
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{ErrorReport, ParseError, Span};
 
 /// Strip the types from TypeScript `source`, keeping every surviving character at its line
 /// and UTF-16 column.
@@ -205,14 +205,29 @@ impl StripError {
     pub fn message(&self, source: &str) -> String {
         match self {
             Self::Parse(error) => error.to_string(),
-            Self::Unsupported { kind, span } => ParseError::refusal(
-                &format!("cannot strip {}", kind.description()),
-                source,
-                span.start as usize,
-                crate::WIRE_COORDINATES,
-            )
-            .to_string(),
+            Self::Unsupported { kind, span } => {
+                let report = kind.report(*span, source);
+                format!("{}\n{}", report.summary, report.frame)
+            }
         }
+    }
+}
+
+impl UnsupportedKind {
+    /// A refusal of this construct over `span` as a binding reports it
+    /// ([`ErrorReport::refusal`]): the summary `cannot strip <the construct>`, the frame
+    /// [`StripError::message`] prints under it, and the span, in
+    /// [`crate::WIRE_COORDINATES`]. Infallible, unlike a parse error's
+    /// [`ParseError::report`]: a refusal always has its span.
+    #[must_use]
+    pub fn report(self, span: Span, source: &str) -> ErrorReport {
+        ErrorReport::refusal(
+            &format!("cannot strip {}", self.description()),
+            source,
+            span.start as usize,
+            span.end as usize,
+            crate::WIRE_COORDINATES,
+        )
     }
 }
 

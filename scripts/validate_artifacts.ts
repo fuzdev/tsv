@@ -283,8 +283,9 @@ for (const { label, entry, has_format, has_parse, has_strip, is_npm } of smoke_t
 	// the npm entry publishes through the facade, whose every export returns a result; the
 	// raw deno bundle returns the product itself
 	const code = (value: unknown): unknown => (is_npm ? (value as { code?: unknown }).code : value);
+	// the raw `parse_<lang>` builds its `{ok: true, ast}` result engine-side, as the facade's
 	const ast_type = (value: unknown): unknown =>
-		((is_npm ? (value as { ast?: unknown }).ast : value) as { type?: unknown } | undefined)?.type;
+		((value as { ast?: unknown }).ast as { type?: unknown } | undefined)?.type;
 	if (has_format) {
 		check(
 			label,
@@ -374,8 +375,8 @@ for (const { label, entry, has_format, has_parse, has_strip, is_npm } of smoke_t
 		);
 	}
 	// The type strip, one call per outcome: through the facade's result object on the npm
-	// entry, and as the raw export's string-or-throw on the deno bundle — whose refusal
-	// carries the construct and span as own properties, the facade's contract.
+	// entry, and as the raw export's string-or-failure on the deno bundle — whose returned
+	// refusal is the `{ok: false, error}` the facade hands back as it is.
 	if (has_strip && is_npm) {
 		check(label, 'strip_typescript', () => {
 			const strip = mod.strip_typescript as unknown as (source: string) => {
@@ -401,13 +402,17 @@ for (const { label, entry, has_format, has_parse, has_strip, is_npm } of smoke_t
 	} else if (has_strip) {
 		check(label, 'strip_typescript (raw)', () => {
 			if (mod.strip_typescript('let x: T = 1;') !== 'let x    = 1;') return false;
-			try {
-				mod.strip_typescript('x;\nenum E {}');
-				return false;
-			} catch (error) {
-				const { kind, start, end } = error as Record<string, unknown>;
-				return kind === 'enum' && start === 3 && end === 12;
-			}
+			const refused = mod.strip_typescript('x;\nenum E {}') as unknown as {
+				ok: boolean;
+				error?: { kind: string; construct?: string; start: number; end?: number };
+			};
+			return (
+				refused.ok === false &&
+				refused.error?.kind === 'unsupported' &&
+				refused.error.construct === 'enum' &&
+				refused.error.start === 3 &&
+				refused.error.end === 12
+			);
 		});
 	} else {
 		check(label, 'strip_* absent (subset build)', () => mod.strip_typescript === undefined);

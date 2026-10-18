@@ -2,7 +2,7 @@
 
 > native formatter and parser for Svelte, TypeScript, and CSS, and a TypeScript type stripper (N-API)
 
-Rust-based formatter + parser + type stripper as a prebuilt native addon for Node.js and Bun. A near-Prettier formatter that tracks **Prettier** + **prettier-plugin-svelte** closely (documented divergences), and a drop-in replacement for the canonical parsers' JSON AST (acorn + acorn-typescript, Svelte's modern parser, `parseCss`).
+Rust-based formatter + parser + type stripper as a prebuilt native addon for Node.js and Bun. A near-Prettier formatter that tracks **Prettier** + **prettier-plugin-svelte** closely (documented divergences), and a parser whose AST is compatible with Svelte's parser + acorn + acorn-typescript (and `parseCss`).
 
 The API mirrors [`@fuzdev/tsv-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-wasm) export for export — same names, same options, same errors — minus only what a WASM engine needs and this one doesn't (`init`, `init_sync`, `wasm_module`, `reinstantiate`, the `./worker` subpath, and the WASM `IgnoreStack`'s `free()` / `[Symbol.dispose]()`, which a GC-managed native class doesn't need), so the two are drop-in swaps: this package is the fast native path; the WASM one runs everywhere (browsers included) and is the fallback for platforms without a prebuilt binding.
 
@@ -83,7 +83,7 @@ A set value is exact. With none named and both grammars rejecting the source, th
 
 `strip_typescript(source)` turns TypeScript into JS by blanking every type to whitespace — no transform, no sourcemap: every surviving character keeps its line and UTF-16 column, line terminators are kept verbatim, and a type-free source comes back unchanged. Where blanking alone would let the next line continue the statement, one `;`, `(` or `)` takes a blanked character's place.
 
-It returns a result rather than throwing for what it finds in the source: `{ok: true, code}`, or `{ok: false, error}` with `error.kind` `'parse'` (the error a `parse_typescript` of the source returns at the goal the error belongs to) or `'unsupported'` (TypeScript that type blanking cannot erase — an `enum`, a value `namespace`, a parameter property, `import =`, `export =`, `<T>x`, or an `as` / `satisfies` whose removal would regroup its expression — named by `error.construct`, with its span as `start`/`end` and `loc`, and a `message` with the line and a caret).
+It returns a result rather than throwing for what it finds in the source: `{ok: true, code}`, or `{ok: false, error}` with `error.kind` `'parse'` (the error a `parse_typescript` of the source returns at the goal the error belongs to) or `'unsupported'` (TypeScript that type blanking cannot erase — an `enum`, a value `namespace`, a parameter property, `import =`, `export =`, `<T>x`, or an `as` / `satisfies` whose removal would regroup its expression — named by `error.construct`, with its span as `start`/`end` and `loc`, a one-line `message`, and a `frame` with the line and a caret).
 
 ```javascript
 import {strip_typescript} from '@fuzdev/tsv';
@@ -111,11 +111,12 @@ Options behave as in `@fuzdev/tsv-wasm`: a supported key set to `undefined` read
 
 ### Errors
 
-A source that doesn't parse returns `{ok: false, error}` — from a parser, a formatter and the strip alike, the same result `@fuzdev/tsv-wasm` returns — with `error` a plain object (no stack; `postMessage`-able): `{kind: 'parse', message, start, loc}`, typed `TsvParseError` (exported), in the same coordinates as the AST's own positions:
+A source that doesn't parse returns `{ok: false, error}` — from a parser, a formatter and the strip alike, the same result `@fuzdev/tsv-wasm` returns — with `error` a plain object (no stack; `postMessage`-able): `{kind: 'parse', message, frame, start, end, loc}`, typed `TsvParseError` (exported), in the same coordinates as the AST's own positions:
 
-- `start` is the error's UTF-16 offset and `loc` its `{line, column}` (1-based line, 0-based UTF-16 column), equal to `create_locator(source, {language}).position_at(start)`.
+- `message` says what went wrong, on one line; `frame` is the excerpt under it — a `line:column` header and the source line, then a caret line — so `` `${message}\n${frame}` `` is the text the CLI prints.
+- `start` and `end` are the error's UTF-16 offsets — a parse error is a point, so `end === start` — and `loc` is their `{start: {line, column}, end: {line, column}}` (1-based line, 0-based UTF-16 column), shaped like a node's: `create_locator(source, {language}).loc_of(result.error)` equals it.
 - TypeScript counts ECMAScript line terminators (LF, CR, CRLF, U+2028, U+2029) and a leading BOM; Svelte (`<script>`, `<style>` and template expressions included) and CSS count LF alone and leave a leading BOM out.
-- The message's second line starts with `loc` as `line:column + 1`.
+- The frame's header is `loc.start` as `line:column + 1`.
 - A formatter reports positions in your own source, CRLF line endings included — the error a parser reports, except that with no `sourceType`, `format_typescript` may report its script retry's error instead.
 
 ```javascript
@@ -123,12 +124,14 @@ import {format_typescript} from '@fuzdev/tsv';
 
 const result = format_typescript('let a;\nconst = ;');
 if (!result.ok) {
-	result.error.kind; // 'parse' — the message ends with the line and a caret
-	[result.error.start, result.error.loc]; // [13, {line: 2, column: 6}]
+	result.error.kind; // 'parse'
+	result.error.message; // "Expected identifier or destructuring pattern, found '='"
+	result.error.frame; // '2:7 const = ;\n          ^ here'
+	[result.error.start, result.error.loc.start]; // [13, {line: 2, column: 6}]
 }
 ```
 
-`format_svelte` refuses one source that does parse: a lone CR (not part of a CRLF) with comment text after it inside a `//` comment between a tag's attributes, which Svelte ends at LF alone — the formatter's CR-to-LF fold would end that comment early and turn the rest of its line into markup. The refusal is `{kind: 'refused', message, start, loc}` (typed `FormatRefusedError`), at the CR.
+`format_svelte` refuses one source that does parse: a lone CR (not part of a CRLF) with comment text after it inside a `//` comment between a tag's attributes, which Svelte ends at LF alone — the formatter's CR-to-LF fold would end that comment early and turn the rest of its line into markup. The refusal is `{kind: 'refused', message, frame, start, end, loc}` (typed `FormatRefusedError`), its span the CR.
 
 What still throws is what no result can report: an argument error (a `TypeError`, above), a source over the 4 GiB size cap, and the engine failures below.
 

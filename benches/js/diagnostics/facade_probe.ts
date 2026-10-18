@@ -175,9 +175,11 @@ const engine_call = (impl: TsvBinding, operation: Operation, language: Language)
 	}
 	const parse_object = engine.parse?.[language];
 	const parse_json = engine.parse_json[language];
+	// the engines return a failure rather than throw; the gate keeps only files `row`
+	// accepts, so a failure here is never compared (each arm is one call, as the row is)
 	const parse: Call = parse_object
-		? (source) => parse_object(source)
-		: (source) => JSON.parse(parse_json(source));
+		? (source) => (parse_object(source) as { ast: unknown }).ast
+		: (source) => JSON.parse(parse_json(source) as string);
 	if (operation === 'parse') return parse;
 	return (source) => reconstruct_locations(parse(source), source, { language });
 };
@@ -185,7 +187,7 @@ const engine_call = (impl: TsvBinding, operation: Operation, language: Language)
 /** A package result's product, unwrapped as a consumer does (and as the row does). */
 const unwrap = (result: any, key: 'ast' | 'code'): unknown => {
 	if (result.ok) return result[key];
-	throw new Error(result.error.message);
+	throw new Error(`${result.error.message}\n${result.error.frame}`);
 };
 
 /** A package consumer's own spelling of each operation. */

@@ -3,11 +3,11 @@
  *
  * The in-crate `cargo test` (crates/tsv_napi/src/lib.rs) drives the plain Rust
  * functions the `#[napi]` macro wraps; it does NOT exercise the marshalling
- * layer napi-rs generates (the JS string ↔ Rust `String` conversion, and the
- * `napi::Error` → *thrown* JS error path). This script closes that gap: it loads
- * the built cdylib as an N-API addon and asserts a format, a JSON-AST parse, and
- * a thrown error across the actual JS boundary — the surface a Node/Bun consumer
- * (and the bench's Node runner) hits.
+ * layer napi-rs generates (the JS string ↔ Rust `String` conversion, the `Env`-built
+ * failure object RETURNED in a product's place, and the `napi::Error` → *thrown* JS error
+ * path). This script closes that gap: it loads the built cdylib as an N-API addon and
+ * asserts a format, a JSON-AST parse, a returned failure and a thrown error across the
+ * actual JS boundary — the surface a Node/Bun consumer (and the bench's Node runner) hits.
  *
  * Runs under Node (not Deno) on purpose — it validates the addon in the runtime
  * its consumers use. Node's native type stripping executes the `.ts` directly
@@ -31,6 +31,7 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { Worker } from 'node:worker_threads';
 import { get_napi_library_path, type NapiAddon } from '../benches/js/lib/napi.ts';
+import { create_locator } from '../crates/tsv_wasm/npm/locations.js';
 
 const lib_path = get_napi_library_path();
 if (!existsSync(lib_path)) {
@@ -58,71 +59,69 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 	});
 
 	it('parse_typescript_json returns a JSON AST string the host can JSON.parse', () => {
-		const ast = JSON.parse(addon.parse_typescript_json('const x = 1;'));
+		const ast = JSON.parse(addon.parse_typescript_json('const x = 1;') as string);
 		assert.equal(ast.type, 'Program');
 	});
 
-	it('an engine error surfaces as a thrown JS error (no {error} envelope)', () => {
-		// napi-rs converts `napi::Error` into a thrown JS Error — unlike FFI there
-		// is no `{"error": …}` envelope to inspect; the throw just propagates.
-		assert.throws(() => addon.format_typescript('const = ;'), /.+/);
-		assert.throws(() => addon.parse_typescript_json('const = ;'), /.+/);
+	it('parse_internal_typescript returns undefined on success', () => {
+		assert.equal(addon.parse_internal_typescript('const x = 1;'), undefined);
 	});
 
-	it('a parse failure throws an Error carrying its point as numeric own properties', () => {
-		// the contract the npm facade's `read_pointed_failure` reads into a result's `error`
-		// (`crates/tsv_wasm/npm/api.js`), the same three names the WASM engine sets. The
-		// format call's source holds a CRLF: its point is still the caller's source's
-		const cases: [() => unknown, number][] = [
-			[() => addon.parse_typescript_json('let a;\nconst = ;'), 13],
-			[() => addon.parse_internal_typescript('let a;\nconst = ;'), 13],
-			[() => addon.format_typescript('let a;\r\nconst = ;'), 14]
+	it("a parse failure is RETURNED as {ok: false, error}, its span a wire node's", () => {
+		// the contract the npm facade hands back as it is (`crates/tsv_wasm/npm/api.js`), the
+		// same shape the WASM engine builds. The format call's source holds a CRLF: its span
+		// is still the caller's source's
+		const cases: [() => unknown, string, number][] = [
+			[() => addon.parse_typescript_json('let a;\nconst = ;'), 'let a;\nconst = ;', 13],
+			[() => addon.parse_internal_typescript('let a;\nconst = ;'), 'let a;\nconst = ;', 13],
+			[() => addon.format_typescript('let a;\r\nconst = ;'), 'let a;\r\nconst = ;', 14]
 		];
-		for (const [call, start] of cases) {
-			let thrown: any;
-			try {
-				call();
-			} catch (e) {
-				thrown = e;
-			}
-			assert.ok(thrown instanceof Error && !(thrown instanceof SyntaxError), String(thrown));
-			const pointed = thrown as Error & { start: unknown; line: unknown; column: unknown };
-			assert.equal(pointed.start, start);
-			assert.equal(pointed.line, 2);
-			assert.equal(pointed.column, 6);
-			// own and enumerable, which the facade requires of a point; under Node there is
-			// nothing to delete, so Bun's own `line` / `column` are graded by `deno task test:bun`
-			// exactly the point — no napi-rs `code`, which the wasm engine's errors lack too
-			assert.deepEqual(Object.keys(thrown as object), ['start', 'line', 'column']);
-			assert.match(pointed.message, /\n2:7 const = ;\n/);
+		for (const [call, source, start] of cases) {
+			const result = call() as any;
+			assert.deepEqual(Object.keys(result), ['ok', 'error']);
+			assert.equal(result.ok, false);
+			const { error } = result;
+			assert.ok(!(error instanceof Error), 'a plain object, no Error built');
+			assert.deepEqual(Object.keys(error), ['kind', 'message', 'frame', 'start', 'end', 'loc']);
+			assert.deepEqual(error, {
+				kind: 'parse',
+				message: error.message,
+				frame: '2:7 const = ;\n          ^ here',
+				start,
+				end: start,
+				loc: { start: { line: 2, column: 6 }, end: { line: 2, column: 6 } }
+			});
+			assert.ok(!error.message.includes('\n'), error.message);
+			assert.deepEqual(create_locator(source, { language: 'typescript' }).loc_of(error), error.loc);
 		}
-		// a format's refusal of a source that parses: the CR's point, after an own enumerable
-		// `kind: 'refused'`
-		let refused: any;
-		try {
-			addon.format_svelte('<div // c\rclass="x"\n>hi</div>\n');
-		} catch (e) {
-			refused = e;
-		}
-		assert.ok(refused instanceof Error, String(refused));
-		const pointed = refused as Error & Record<'kind' | 'start' | 'line' | 'column', unknown>;
-		assert.deepEqual(Object.keys(pointed), ['kind', 'start', 'line', 'column']);
+		// a format's refusal of a source that parses: the CR's span, kind 'refused'
+		const refused = addon.format_svelte('<div // c\rclass="x"\n>hi</div>\n') as any;
+		assert.equal(refused.ok, false);
+		assert.deepEqual(Object.keys(refused.error), [
+			'kind',
+			'message',
+			'frame',
+			'start',
+			'end',
+			'loc'
+		]);
 		assert.deepEqual(
-			[pointed.kind, pointed.start, pointed.line, pointed.column],
-			['refused', 9, 1, 9]
+			[refused.error.kind, refused.error.start, refused.error.end, refused.error.loc],
+			['refused', 9, 10, { start: { line: 1, column: 9 }, end: { line: 1, column: 10 } }]
 		);
-		assert.match(pointed.message, /^Lone carriage return/);
-		// an argument refusal carries no point
+		assert.match(refused.error.message, /^Lone carriage return/);
+		// an argument refusal still THROWS, with no own keys (no napi-rs `code`, which the wasm
+		// engine's errors lack too)
 		assert.throws(
 			() => addon.parse_css_json('a {}', 'script'),
 			(e: any) => e instanceof Error && Object.keys(e).length === 0,
-			'a source type on CSS must throw, with no point and no own keys'
+			'a source type on CSS must throw, with no own keys'
 		);
 	});
 
 	it('multibyte content survives the JS-string marshalling boundary', () => {
 		const src = "const x = '€🦀';\n";
-		const formatted = addon.format_typescript(src);
+		const formatted = addon.format_typescript(src) as string;
 		assert.ok(formatted.includes('€🦀'), `multibyte content lost: ${formatted}`);
 		// Re-formatting is stable (idempotent) across the boundary.
 		assert.equal(addon.format_typescript(formatted), formatted);
@@ -146,7 +145,7 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 			assert.throws(() => addon.__panic_probe!(), /panic/i, 'second panic must throw');
 			// The process survived and the arenas recovered: parse (AST arena)
 			// and format (AST + doc arenas) still produce correct output.
-			const ast = JSON.parse(addon.parse_typescript_json('const x = 1;'));
+			const ast = JSON.parse(addon.parse_typescript_json('const x = 1;') as string);
 			assert.equal(ast.type, 'Program', 'parse must work after a panic');
 			assert.equal(
 				addon.format_typescript('const   x=1'),
@@ -193,7 +192,7 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 			);
 			assert.deepEqual(outcome.css, ['a {\n\tcolor: red;\n}\n'], `worker ${i} css result drifted`);
 			assert.deepEqual(outcome.parsed_types, ['Program'], `worker ${i} parse result drifted`);
-			assert.equal(outcome.errors, iterations, `worker ${i} lost the thrown-error path`);
+			assert.equal(outcome.errors, iterations, `worker ${i} lost the returned-failure path`);
 		}
 	});
 });
@@ -226,14 +225,11 @@ for (let i = 0; i < workerData.iterations; i++) {
 	formatted.add(addon.format_typescript('const   x=1'));
 	css.add(addon.format_css('a{color:red}'));
 	parsed_types.add(JSON.parse(addon.parse_typescript_json('const x = 1;')).type);
-	// A throw on every iteration too: the error path unwinds through the same
-	// arenas, so an arena the panic/error path fails to park would surface as a
-	// corrupted result on the NEXT iteration rather than as an error here.
-	try {
-		addon.format_typescript('const = ;');
-	} catch {
-		errors++;
-	}
+	// A failure on every iteration too: the error path leaves through the same
+	// arenas, so an arena the error path fails to park would surface as a
+	// corrupted result on the NEXT iteration rather than as a failure here.
+	const failed = addon.format_typescript('const = ;');
+	if (typeof failed === 'object' && failed !== null && failed.ok === false) errors++;
 }
 parentPort.postMessage({
 	formatted: [...formatted],

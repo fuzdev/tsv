@@ -587,58 +587,69 @@ describe(`strip scope: ${pkg_dir}`, () => {
 	});
 });
 
-// What the facade converts: the raw engine's parse failure carries its point as own,
-// ENUMERABLE integer properties — the shape `api.js` requires of one. Read off the glue
-// module the entry initialized, past the facade.
+// What the facade hands back: the raw engine RETURNS a parse failure in its product's place,
+// as the plain `{ok: false, error}` the facade passes through unchanged — no `Error` built,
+// nothing thrown. Read off the glue module the entry initialized, past the facade.
 describe(`raw engine parse failure (tsv_wasm.js): ${pkg_dir}`, () => {
-	it('an Error with own enumerable integer start, line and column', async () => {
+	const ERROR_KEYS = ['kind', 'message', 'frame', 'start', 'end', 'loc'];
+
+	it("a returned {ok: false, error} whose span is a wire node's", async () => {
 		const raw = await import(`../${pkg_dir}/tsv_wasm.js`);
-		const call = has_parse
-			? () => raw.parse_typescript_json('let a;\nconst = ;')
-			: () => raw.format_typescript('let a;\nconst = ;');
-		let thrown: any;
-		try {
-			call();
-		} catch (error) {
-			thrown = error;
+		const source = 'let a;\nconst = ;';
+		const calls: Array<() => any> = [];
+		if (has_parse) {
+			calls.push(() => raw.parse_typescript_json(source));
+			calls.push(() => raw.parse_typescript(source));
+			calls.push(() => raw.parse_internal_typescript(source));
 		}
-		assert.ok(thrown instanceof Error && !(thrown instanceof SyntaxError), String(thrown));
-		assert.deepEqual(
-			['start', 'line', 'column'].map((key) => [
-				key,
-				Object.prototype.propertyIsEnumerable.call(thrown, key),
-				(thrown as unknown as Record<string, unknown>)[key]
-			]),
-			[
-				['start', true, 13],
-				['line', true, 2],
-				['column', true, 6]
-			]
-		);
+		if (has_format) calls.push(() => raw.format_typescript(source));
+		for (const call of calls) {
+			const result = call();
+			assert.deepEqual(Object.keys(result), ['ok', 'error']);
+			assert.equal(result.ok, false);
+			assert.ok(!(result.error instanceof Error), 'a plain object, no Error built');
+			assert.deepEqual(Object.keys(result.error), ERROR_KEYS);
+			const { message: _message, ...rest } = result.error;
+			assert.deepEqual(rest, {
+				kind: 'parse',
+				frame: '2:7 const = ;\n          ^ here',
+				start: 13,
+				end: 13,
+				loc: { start: { line: 2, column: 6 }, end: { line: 2, column: 6 } }
+			});
+		}
+		// a success is the product itself — the wire string, the formatted code — or, for the
+		// object parse, `{ok: true, ast}`
+		if (has_parse) {
+			assert.equal(typeof raw.parse_typescript_json('x;'), 'string');
+			const parsed = raw.parse_typescript('x;');
+			assert.deepEqual(Object.keys(parsed), ['ok', 'ast']);
+			assert.equal(parsed.ast.type, 'Program');
+			assert.equal(raw.parse_internal_typescript('x;'), undefined);
+		}
+		if (has_format) assert.equal(raw.format_typescript('x'), 'x;\n');
 	});
 
-	// a format's refusal of a source that parses: the same point, after an own enumerable
-	// `kind: 'refused'`
+	// a format's refusal of a source that parses: returned too, `kind: 'refused'`, its span
+	// the CR
 	it(
-		'a format refusal: an Error with own enumerable kind, start, line and column',
+		'a format refusal: a returned {ok: false, error}, kind refused',
 		{
 			skip: !has_format
 		},
 		async () => {
 			const raw = await import(`../${pkg_dir}/tsv_wasm.js`);
-			let thrown: any;
-			try {
-				raw.format_svelte(LONE_CR_TAG_COMMENT);
-			} catch (error) {
-				thrown = error;
-			}
-			assert.ok(thrown instanceof Error, String(thrown));
-			const pointed = thrown as Error & Record<'kind' | 'start' | 'line' | 'column', unknown>;
-			assert.deepEqual(Object.keys(pointed), ['kind', 'start', 'line', 'column']);
-			assert.deepEqual(
-				{ kind: pointed.kind, start: pointed.start, line: pointed.line, column: pointed.column },
-				{ kind: 'refused', start: 9, line: 1, column: 9 }
-			);
+			const result = raw.format_svelte(LONE_CR_TAG_COMMENT);
+			assert.equal(result.ok, false);
+			assert.deepEqual(Object.keys(result.error), ERROR_KEYS);
+			const { message, frame: _frame, ...rest } = result.error;
+			assert.equal(message, LONE_CR_REFUSAL);
+			assert.deepEqual(rest, {
+				kind: 'refused',
+				start: 9,
+				end: 10,
+				loc: { start: { line: 1, column: 9 }, end: { line: 1, column: 10 } }
+			});
 		}
 	);
 });

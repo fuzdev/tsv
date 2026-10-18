@@ -245,10 +245,9 @@ export const STRIP_PARSE_ERROR_ROWS: ReadonlyArray<StripParseErrorRow> = [
 	}
 ];
 
-/** The first line of `message`, and the `line:col` header of its second, as a parse error's
- * message prints them. */
-function header_of(message: string): string {
-	return message.split('\n')[1]?.split(' ')[0] ?? '';
+/** The `line:col` header of a frame's first line, as every error's frame prints it. */
+function header_of(frame: string): string {
+	return frame.split('\n')[0]?.split(' ')[0] ?? '';
 }
 
 /**
@@ -291,6 +290,7 @@ export function register_strip_api_suite(
 					'kind',
 					'construct',
 					'message',
+					'frame',
 					'start',
 					'end',
 					'loc'
@@ -299,21 +299,23 @@ export function register_strip_api_suite(
 				const start = locator.position_at(row.start);
 				const end = locator.position_at(row.end);
 				assert.deepStrictEqual(
-					{ ...error, message: undefined },
+					{ ...error, message: undefined, frame: undefined },
 					{
 						kind: 'unsupported',
 						construct: row.construct,
 						message: undefined,
+						frame: undefined,
 						start: row.start,
 						end: row.end,
 						loc: { start, end }
 					}
 				);
+				assert.deepStrictEqual(locator.loc_of(error), error.loc, "loc is the locator's");
 				assert.ok(!(error instanceof Error), 'a plain object, not a thrown-shape Error');
-				const [first] = error.message.split('\n');
-				assert.equal(first, `cannot strip ${STRIP_CONSTRUCT_DESCRIPTIONS[row.construct]}`);
+				assert.equal(error.message, `cannot strip ${STRIP_CONSTRUCT_DESCRIPTIONS[row.construct]}`);
 				// the header names the span's start as `line:column + 1`, as a parse error's does
-				assert.equal(header_of(error.message), `${start.line}:${start.column + 1}`);
+				assert.equal(header_of(error.frame), `${start.line}:${start.column + 1}`);
+				assert.equal(error.frame.split('\n').length, 2, 'the frame is two lines');
 			});
 		}
 
@@ -323,7 +325,14 @@ export function register_strip_api_suite(
 				const result = api.strip_typescript(row.source, row.options);
 				assert.deepStrictEqual(Object.keys(result), ['ok', 'error']);
 				assert.equal(result.ok, false);
-				assert.deepStrictEqual(Object.keys(result.error), ['kind', 'message', 'start', 'loc']);
+				assert.deepStrictEqual(Object.keys(result.error), [
+					'kind',
+					'message',
+					'frame',
+					'start',
+					'end',
+					'loc'
+				]);
 				// the same error, at the same point, that parsing at the reported goal reports
 				const parsed = api.parse_typescript(row.source, {
 					sourceType: row.reported ?? 'module'

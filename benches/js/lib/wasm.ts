@@ -22,7 +22,7 @@ import { createRequire } from 'node:module';
 import { wasm_target } from './runtime.ts';
 import { wasm_bundle_dir } from './tsv_artifacts.ts';
 import { LOCATIONS_PROBE_SOURCES } from './locations_probe.ts';
-import { scope_call, TsvBinding } from './tsv_api.ts';
+import { type EngineFailure, type EngineFn, scope_call, TsvBinding } from './tsv_api.ts';
 import { type InitScope, LANGUAGES } from './types.ts';
 
 /**
@@ -35,18 +35,18 @@ import { type InitScope, LANGUAGES } from './types.ts';
  * `parse_<lang>_json` returns the wire string itself.
  */
 interface WasmModule {
-	parse_svelte: (source: string, source_type?: string) => unknown;
-	parse_svelte_json: (source: string, source_type?: string) => string;
-	parse_internal_svelte: (source: string, source_type?: string) => void;
-	format_svelte: (source: string, source_type?: string) => string;
-	parse_typescript: (source: string, source_type?: string) => unknown;
-	parse_typescript_json: (source: string, source_type?: string) => string;
-	parse_internal_typescript: (source: string, source_type?: string) => void;
-	format_typescript: (source: string, source_type?: string) => string;
-	parse_css: (source: string, source_type?: string) => unknown;
-	parse_css_json: (source: string, source_type?: string) => string;
-	parse_internal_css: (source: string, source_type?: string) => void;
-	format_css: (source: string, source_type?: string) => string;
+	parse_svelte: EngineFn<{ ok: true; ast: unknown } | EngineFailure>;
+	parse_svelte_json: EngineFn<string | EngineFailure>;
+	parse_internal_svelte: EngineFn<EngineFailure | undefined>;
+	format_svelte: EngineFn<string | EngineFailure>;
+	parse_typescript: EngineFn<{ ok: true; ast: unknown } | EngineFailure>;
+	parse_typescript_json: EngineFn<string | EngineFailure>;
+	parse_internal_typescript: EngineFn<EngineFailure | undefined>;
+	format_typescript: EngineFn<string | EngineFailure>;
+	parse_css: EngineFn<{ ok: true; ast: unknown } | EngineFailure>;
+	parse_css_json: EngineFn<string | EngineFailure>;
+	parse_internal_css: EngineFn<EngineFailure | undefined>;
+	format_css: EngineFn<string | EngineFailure>;
 }
 
 export class WasmImplementation extends TsvBinding {
@@ -111,7 +111,7 @@ export class WasmImplementation extends TsvBinding {
 
 		// Fairness guard for the parse rows: the wasm parse fns must return a
 		// js_sys-materialized OBJECT (the engine runs the host's JSON.parse from
-		// Rust). If a glue/build regression ever handed back the raw JSON string
+		// Rust, and returns it as `{ok: true, ast}`). If a glue/build regression ever handed back the raw JSON string
 		// instead, the timed `tsv-wasm` parse rows would silently skip
 		// materialization and read artificially fast vs their native sibling. Probed
 		// here, outside any timed loop, on the raw export (the facade passes through
@@ -121,10 +121,11 @@ export class WasmImplementation extends TsvBinding {
 		const call = scope === undefined ? undefined : scope_call(scope);
 		if (call === undefined || call === 'parse' || call === 'parse_with_locations') {
 			for (const language of scope === undefined ? LANGUAGES : [scope.language]) {
-				const probe = this.engine.parse![language](LOCATIONS_PROBE_SOURCES[language]);
-				if (typeof probe !== 'object' || probe === null) {
+				const result = this.engine.parse![language](LOCATIONS_PROBE_SOURCES[language]);
+				const probe: unknown = result.ok ? result.ast : result;
+				if (!result.ok || typeof probe !== 'object' || probe === null) {
 					throw new Error(
-						`tsv-wasm parse_${language} returned a ${typeof probe} — expected a materialized AST object`
+						`tsv-wasm parse_${language} returned ${result.ok ? `a ${typeof probe} AST` : 'a failure'} — expected a materialized AST object`
 					);
 				}
 			}

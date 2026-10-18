@@ -210,8 +210,10 @@ leading byte-order mark, in any language (the header alone carries the wire's re
 The caret is padded by the display width of what the excerpt prints ahead of it (a tab echoed
 as a tab), so it sits under the error's character even where the header's UTF-16 column and
 the screen column differ. The text comes from `tsv_lang`'s `ParseError` and is the same
-on both bins and in every package — where it is the `message` of the `{kind: 'parse'}` error
-the facade returns, whose `start` and `loc` carry the same point (`crates/tsv_wasm/npm/api.js`).
+on both bins and in every package — where the `{kind: 'parse'}` error the facade returns
+carries it split in two, the summary as `message` and the header, excerpt and caret lines as
+`frame` (so `` `${message}\n${frame}` `` is the text), beside a `start` / `end` / `loc` span
+over the same point (`crates/tsv_wasm/npm/api.js`).
 
 Two errors are not parse errors, and a single input prints them after `Error: ` rather than
 `Parse error: ` (a path-mode `format` names the file either way): a source over the 4 GiB
@@ -226,8 +228,8 @@ the CR is comment text, and the format path's CR fold would end the comment ther
 the rest of its line as markup. (A CR with only whitespace after it, as in a doubled
 `CR CR LF` ending, ends the comment where the fold does, and formats.) The message names the
 CR's `line:col`; `parse` accepts the same bytes. It is a per-file error (exit 2) like any
-other, and in the packages a returned `{kind: 'refused', message, start, loc}` error at the
-CR rather than a `kind: 'parse'` one (`tsv_svelte::parse_folded`). A document whose own
+other, and in the packages a returned `{kind: 'refused', message, frame, start, end, loc}`
+error spanning the CR rather than a `kind: 'parse'` one (`tsv_svelte::parse_folded`). A document whose own
 bytes do not parse reports that parse error first, exactly as `parse` does.
 
 ## Stripping types (`tsv strip`)

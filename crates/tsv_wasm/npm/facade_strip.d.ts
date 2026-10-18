@@ -7,7 +7,7 @@
  * dependency on the parse half's declarations.
  */
 
-import type { TsvParseError } from './facade_error.js';
+import type { TsvError, TsvParseError } from './facade_error.js';
 
 /**
  * Options accepted by `strip_typescript`: the parse goal, read as `format_typescript` reads it.
@@ -81,16 +81,11 @@ export type StripUnsupportedKind =
 	| 'assertion_grouping';
 
 /** The source holds a construct the strip refuses; `start` / `end` / `loc` are its span. */
-export interface StripUnsupportedError {
+export interface StripUnsupportedError extends TsvError {
 	kind: 'unsupported';
 	construct: StripUnsupportedKind;
-	/** `cannot strip <the construct>`, then `line:column + 1` of `start`, the line, a caret. */
-	message: string;
-	/** UTF-16 offsets of the refused span, in the parse wire's coordinates. */
-	start: number;
+	/** The end of the refused construct: the span covers it whole. */
 	end: number;
-	/** The span's line/column, as an acorn node's `loc` (1-based lines, 0-based UTF-16 columns). */
-	loc: { start: { line: number; column: number }; end: { line: number; column: number } };
 }
 
 /**

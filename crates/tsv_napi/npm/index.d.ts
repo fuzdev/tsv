@@ -57,7 +57,7 @@ export type {
 	StripUnsupportedKind,
 	StripUnsupportedError
 } from './facade_strip.js';
-export type { TsvParseError } from './facade_error.js';
+export type { TsvError, TsvParseError } from './facade_error.js';
 export {
 	parse_svelte,
 	parse_svelte_json,

@@ -15,14 +15,17 @@ and Node's `module.stripTypeScriptTypes` share. The implementation is `tsv_ts::s
   borrows the source when nothing is type-only. `StripError::Parse` carries the
   `ParseError`; `StripError::Unsupported { kind, span }` the refused construct
   (`UnsupportedKind::name` is its snake_case wire name) and its byte span.
-  `StripError::message(source)` renders either as the CLI and the packages print it.
+  `StripError::message(source)` renders either as the CLI prints it, and
+  `UnsupportedKind::report(span, source)` splits a refusal — summary, frame, span — as the
+  packages return it (a parse error's is `ParseError::report`).
 - **npm**: `strip_typescript(source, options?)` in `@fuzdev/tsv-wasm` and the native
   `@fuzdev/tsv` — the `strip` cargo feature of `tsv_wasm` and `tsv_napi`, in each crate's
   default set, which the format-only and parse-only wasm packages build without. It
   returns a result instead of throwing for what it finds in the source, as every facade
   export does: `{ok: true, code}` or `{ok: false, error}` with `error.kind` `'parse'` (the
   error `parse_typescript` returns for the goal the error belongs to) or `'unsupported'`
-  (`construct`, and the span as `start` / `end` / `loc: {start, end}`). The bag takes `sourceType` as a format's
+  (`construct`, a one-line `message` and its `frame`, and the span as `start` / `end` /
+  `loc: {start, end}`). The bag takes `sourceType` as a format's
   does. Argument misuse throws a `TypeError`, as on
   every export ([crates/tsv_wasm/CLAUDE.md §The npm Facade](../crates/tsv_wasm/CLAUDE.md#the-npm-facade-options--typed-returns)).
 - **CLI**: `tsv strip <file> | --content <s> | --stdin [--source-type <t>] [--check]`, in the

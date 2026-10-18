@@ -1,15 +1,12 @@
 /**
  * The parse-failure table (`scripts/parse_failure_suite.ts`) over the staged npm packages
- * under BUN, for both engines — the one runtime that disagrees with the contract's
- * premise. Bun gives every `Error` its own non-enumerable numeric `line` and `column`, a
- * plain set writes through them and keeps them non-enumerable, and the facade's
- * `read_pointed_failure` reads only an own ENUMERABLE point into a result's `error` — so each
- * engine deletes the three properties before it sets them (`pointed_error` in
- * `crates/tsv_wasm/src/lib.rs`, `engine_error` in `crates/tsv_napi/src/lib.rs`). Under
- * Node and Deno that delete is a no-op, and every other package suite runs under Node:
- * this is the one place either engine's delete is graded. The type strip's API table
- * (`scripts/strip_suite.ts`) rides along over the two packages that carry the strip, since
- * its refusal crosses the engine boundary on the same own enumerable properties.
+ * under BUN, for both engines — the one supported runtime no other package suite runs. Each
+ * engine BUILDS the failure it returns (`failure_result` in `crates/tsv_wasm/src/lib.rs` and
+ * in `crates/tsv_napi/src/lib.rs`), and the facade hands it back as it is, so what a Bun
+ * caller reads is the object the engine built through JavaScriptCore's own object and
+ * N-API paths: its keys, their order, its span and `loc` are graded here and nowhere else
+ * under Bun. The type strip's API table (`scripts/strip_suite.ts`) rides along over the two
+ * packages that carry the strip, since its refusal is built the same way.
  *
  * Narrow by design. The package suites themselves run under `bun test` nearly whole, but
  * their CLI and resolution rows assert Node's own behavior; this registers the shared
@@ -94,7 +91,7 @@ function launch(args: Array<string>): void {
 		}
 		console.warn(
 			`⚠ bun not found — SKIPPED ${what}; ` +
-				"neither engine's Bun `line` / `column` delete is graded on this machine"
+				"neither engine's returned failure is graded under Bun on this machine"
 		);
 		exit(0);
 	}
@@ -159,8 +156,7 @@ async function register(packages: Array<string>): Promise<void> {
 	}
 	for (const [name, api, p] of apis) {
 		register_parse_failure_suite(`${name} under Bun`, api);
-		// the strip's refusal is read off the engine's own enumerable point properties too,
-		// so Bun's non-enumerable `line` / `column` reach it as they reach a parse failure
+		// the strip's refusal is an engine-built object too, returned through the same path
 		if (STRIP_PACKAGES.has(p)) register_strip_api_suite(`${name} under Bun`, api);
 	}
 }

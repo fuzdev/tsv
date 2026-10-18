@@ -2,7 +2,8 @@
  * The npm packages' facade (`crates/tsv_wasm/npm/api.js` + `api_parse.js`) over a FAKE
  * engine: the options reader every package shares, its refusals word for word, the
  * source-type forwarding, the `{locations: true}` sugar, and the result every export returns
- * (what it reads off an engine's thrown failure, and what it rethrows).
+ * (the failure an engine returns, handed back as it is once checked; what it throws, passed
+ * through).
  *
  * A fake engine rather than a built package on purpose: what this grades is the
  * facade's own logic, which needs no artifact — so it gates in `deno task check`
@@ -47,9 +48,10 @@ function fake_engine(with_object_parse: boolean) {
 			parse_json: family('parse_json', (language, source) => span_wire(roots[language], source)),
 			...(with_object_parse
 				? {
-						parse: family('parse', (language, source) =>
-							JSON.parse(span_wire(roots[language], source))
-						)
+						parse: family('parse', (language, source) => ({
+							ok: true,
+							ast: JSON.parse(span_wire(roots[language], source))
+						}))
 					}
 				: {}),
 			format: family('format', (_language, source) => `formatted:${source}`)
@@ -785,10 +787,11 @@ Deno.test('a source that is not well-formed UTF-16 is refused, naming its offset
 });
 
 /**
- * The whole published surface over an engine whose every call throws `make_thrown()`
- * (a fresh value per call), with or without the engine-side object parse.
+ * The whole published surface over an engine whose every call ends on `make()` (a fresh
+ * value per call): throwing it, or returning it in the product's place — with or without the
+ * engine-side object parse.
  */
-function throwing_api(make_thrown: () => unknown, with_object_parse: boolean) {
+function failing_api(make: () => unknown, mode: 'throw' | 'return', with_object_parse: boolean) {
 	const calls: Array<string> = [];
 	const family = (op: string) =>
 		Object.fromEntries(
@@ -796,7 +799,8 @@ function throwing_api(make_thrown: () => unknown, with_object_parse: boolean) {
 				language,
 				() => {
 					calls.push(`${op}_${language}`);
-					throw make_thrown();
+					if (mode === 'throw') throw make();
+					return make();
 				}
 			])
 		);
@@ -810,6 +814,10 @@ function throwing_api(make_thrown: () => unknown, with_object_parse: boolean) {
 	};
 	return { api, calls };
 }
+
+/** `failing_api` over an engine that throws. */
+const throwing_api = (make_thrown: () => unknown, with_object_parse: boolean) =>
+	failing_api(make_thrown, 'throw', with_object_parse);
 
 /** What `f` throws. */
 const caught = (f: () => unknown): unknown => {
@@ -833,75 +841,137 @@ const PUBLISHED = [
 	'format_css'
 ];
 
-/**
- * An `Error` shaped as Bun builds every one: its own NON-enumerable numeric `line` and
- * `column` (a plain assignment over those keeps them non-enumerable), plus `extra` set as
- * ordinary enumerable properties.
- */
-function bun_shaped_error(extra: Record<string, unknown>): Error {
-	const error = new Error('x');
-	for (const [key, value] of [
-		['line', 7],
-		['column', 3]
-	] as const) {
-		Object.defineProperty(error, key, {
-			value,
-			writable: true,
-			enumerable: false,
-			configurable: true
-		});
+/** A failure as the engines return one, `kind` its error's. */
+const engine_failure = (kind: string) => ({
+	ok: false,
+	error: {
+		kind,
+		message: "Expected ';', found 'y'",
+		frame: '2:3 x y\n      ^ here',
+		start: 9,
+		end: 9,
+		loc: { start: { line: 2, column: 2 }, end: { line: 2, column: 2 } }
 	}
-	return Object.assign(error, extra);
-}
+});
 
-Deno.test("a pointed engine error becomes a result whose error is kind 'parse'", () => {
-	const message = "Expected ';', found 'y'\n2:3 x y\n      ^ here";
-	const pointed = () => Object.assign(new Error(message), { start: 9, line: 2, column: 2 });
+Deno.test("a returned engine failure of kind 'parse' is the result, as it is", () => {
 	for (const with_object_parse of [true, false]) {
-		const { api } = throwing_api(pointed, with_object_parse);
+		let last: unknown;
+		const { api } = failing_api(
+			() => (last = engine_failure('parse')),
+			'return',
+			with_object_parse
+		);
 		for (const name of PUBLISHED) {
-			const result = api[name]('x\nx y') as { ok: false; error: object };
-			deepStrictEqual(Object.keys(result), ['ok', 'error'], name);
-			// a plain object, exactly these keys in this order — nothing else from the engine's
-			deepStrictEqual(
-				result,
-				{
-					ok: false,
-					error: { kind: 'parse', message, start: 9, loc: { line: 2, column: 2 } }
-				},
-				name
-			);
-			deepStrictEqual(Object.keys(result.error), ['kind', 'message', 'start', 'loc'], name);
-			strictEqual(result.error instanceof Error, false, name);
-			deepStrictEqual(structuredClone(result), result, name);
+			// the very object the engine built: nothing copied, nothing added
+			strictEqual(api[name]('x\nx y'), last, name);
 		}
 	}
 });
 
-Deno.test(
-	"a format engine error with kind 'refused' becomes a result whose error is kind 'refused'",
-	() => {
-		const message = 'Lone carriage return\n1:10 <div // c\n              ^ here';
-		const refused = () =>
-			Object.assign(new Error(message), { kind: 'refused', start: 9, line: 1, column: 9 });
+Deno.test("a format's returned refusal is the result; a parse export throws it", () => {
+	for (const with_object_parse of [true, false]) {
+		let last: unknown;
+		const { api } = failing_api(
+			() => (last = engine_failure('refused')),
+			'return',
+			with_object_parse
+		);
+		for (const name of PUBLISHED) {
+			if (name.startsWith('format_')) {
+				strictEqual(api[name]('x'), last, name);
+				continue;
+			}
+			// only a format refuses a source that parses: from a parse export it is an engine bug
+			const error = caught(() => api[name]('x')) as Error;
+			strictEqual(
+				error.message,
+				'internal error: the engine returned neither its product nor a failure',
+				name
+			);
+			strictEqual(error.cause, last, name);
+		}
+	}
+});
+
+Deno.test('a malformed returned failure is thrown as an engine bug, the value its cause', () => {
+	const complete = engine_failure('parse');
+	const without = (key: string) => {
+		const error: Record<string, unknown> = { ...complete.error };
+		delete error[key];
+		return { ok: false, error };
+	};
+	const values: Array<() => unknown> = [
+		// a string is the product, so neither of these is reachable as a failure on a string
+		// export — but an object parse's product must be `{ok: true, ast}`
+		() => ({ ok: false }),
+		() => ({ ok: false, error: null }),
+		() => ({ ok: 'false', error: complete.error }),
+		() => ({ ok: false, error: { ...complete.error, kind: 'enum' } }),
+		() => ({ ok: false, error: { ...complete.error, start: 1.5 } }),
+		() => ({ ok: false, error: { ...complete.error, end: '9' } }),
+		() => ({ ok: false, error: { ...complete.error, loc: null } }),
+		() => ({ ok: false, error: { ...complete.error, loc: {} } }),
+		() => ({
+			ok: false,
+			error: { ...complete.error, loc: { ...complete.error.loc, start: { line: 2 } } }
+		}),
+		() => ({
+			ok: false,
+			error: {
+				...complete.error,
+				loc: { ...complete.error.loc, end: { line: 2, column: 2.5 } }
+			}
+		}),
+		() => ({
+			ok: false,
+			error: {
+				...complete.error,
+				loc: { ...complete.error.loc, start: { line: '2', column: 2 } }
+			}
+		}),
+		() => without('message'),
+		() => without('frame'),
+		() => without('start'),
+		() => without('end'),
+		() => without('loc'),
+		() => 42,
+		() => null,
+		() => undefined
+	];
+	for (const make of values) {
 		for (const with_object_parse of [true, false]) {
-			const { api } = throwing_api(refused, with_object_parse);
-			// only a format refuses a source that parses: a parse export rethrows it (below)
-			for (const name of PUBLISHED.filter((n) => n.startsWith('format_'))) {
-				deepStrictEqual(
-					api[name]('x'),
-					{
-						ok: false,
-						error: { kind: 'refused', message, start: 9, loc: { line: 1, column: 9 } }
-					},
+			let last: unknown;
+			const { api } = failing_api(() => (last = make()), 'return', with_object_parse);
+			for (const name of PUBLISHED) {
+				const error = caught(() => api[name]('x')) as Error;
+				strictEqual(
+					error.message,
+					'internal error: the engine returned neither its product nor a failure',
 					name
 				);
+				strictEqual(error.cause, last, name);
 			}
 		}
 	}
-);
+});
 
-Deno.test('anything else an engine throws passes through as the same object', () => {
+Deno.test("an object parse's `{ok: true}` without an `ast` is thrown as an engine bug", () => {
+	for (const returned of [{ ok: true }, { ok: true, json: '{}' }]) {
+		const api = create_parse_api({
+			parse_json: { typescript: () => '{}' },
+			parse: { typescript: () => returned }
+		});
+		const error = caught(() => api.parse_typescript('x')) as Error;
+		strictEqual(
+			error.message,
+			'internal error: the engine returned neither its product nor a failure'
+		);
+		strictEqual(error.cause, returned);
+	}
+});
+
+Deno.test('anything an engine throws passes through as the same object', () => {
 	class RuntimeError extends Error {}
 	const values: Array<() => unknown> = [
 		// the size cap (or a raw engine's own refusal, reached past the facade): a plain
@@ -910,26 +980,8 @@ Deno.test('anything else an engine throws passes through as the same object', ()
 		// a WASM trap, and V8's stack exhaustion
 		() => new RuntimeError('unreachable'),
 		() => new RangeError('Maximum call stack size exceeded'),
-		// a partial point is no point
-		() => Object.assign(new Error('x'), { start: 1, line: 1 }),
-		() => Object.assign(new Error('x'), { start: '1', line: 1, column: 0 }),
-		// Bun gives every Error its own non-enumerable numeric `line` and `column`, so an
-		// error carrying a numeric `start` alone must not read as a point there
-		() => bun_shaped_error({ start: 4 }),
-		// a member that is not an integer is no point
-		() => Object.assign(new Error('x'), { start: Number.NaN, line: 1, column: 0 }),
-		() => Object.assign(new Error('x'), { start: 0, line: Infinity, column: 0 }),
-		() => Object.assign(new Error('x'), { start: 0, line: 1, column: 1.5 }),
-		// nor is one that is not an own enumerable property
-		() =>
-			Object.defineProperty(Object.assign(new Error('x'), { line: 1, column: 0 }), 'start', {
-				value: 0,
-				enumerable: false
-			}),
-		() => Object.assign(Object.create({ start: 0 }), { line: 1, column: 0 }),
-		// a point under a `kind` no parse or format export throws (a strip refusal's)
-		() => Object.assign(new Error('x'), { kind: 'enum', start: 0, line: 1, column: 0 }),
-		() => Object.assign(new Error('x'), { kind: undefined, start: 0, line: 1, column: 0 }),
+		// a thrown failure-shaped value is still a throw: a failure is returned, never thrown
+		() => engine_failure('parse'),
 		// not an object at all
 		() => 'a string',
 		() => undefined
@@ -946,29 +998,8 @@ Deno.test('anything else an engine throws passes through as the same object', ()
 	}
 });
 
-Deno.test("a parse export rethrows an engine error with kind 'refused' as the same object", () => {
-	for (const with_object_parse of [true, false]) {
-		let last: unknown;
-		const { api } = throwing_api(
-			() =>
-				(last = Object.assign(new Error('x'), { kind: 'refused', start: 0, line: 1, column: 0 })),
-			with_object_parse
-		);
-		for (const name of PUBLISHED.filter((n) => n.startsWith('parse_'))) {
-			strictEqual(
-				caught(() => api[name]('x')),
-				last,
-				name
-			);
-		}
-	}
-});
-
 Deno.test('argument refusals stay TypeErrors and never reach the engine', () => {
-	const { api, calls } = throwing_api(
-		() => Object.assign(new Error('bad'), { start: 0, line: 1, column: 0 }),
-		true
-	);
+	const { api, calls } = failing_api(() => engine_failure('parse'), 'return', true);
 	for (const name of PUBLISHED) {
 		strictEqual(caught(() => api[name](42)) instanceof TypeError, true, name);
 		strictEqual(caught(() => api[name]('x', { nope: true })) instanceof TypeError, true, name);
@@ -992,9 +1023,9 @@ Deno.test("the facade's own JSON.parse failing is a thrown internal Error, not a
 Deno.test(
 	'an options read that throws reaches the caller as itself, before any engine call',
 	() => {
-		// the bag is read ahead of the engine call, so even a throw shaped exactly like an
-		// engine's pointed failure is never converted, and no engine runs
-		const pointed = Object.assign(new Error('from the bag'), { start: 0, line: 1, column: 0 });
+		// the bag is read ahead of the engine call, so its throw reaches the caller as itself
+		// and no engine runs
+		const pointed = new Error('from the bag');
 		const bag = new Proxy(
 			{},
 			{

@@ -7,7 +7,7 @@
 tsv is a Rust toolchain for TypeScript/JS, CSS, and Svelte (and planned HTML/JSON).
 It ships a formatter that closely follows [Prettier](https://prettier.io/) +
 [prettier-plugin-svelte](https://github.com/sveltejs/prettier-plugin-svelte),
-and a drop-in for [Svelte](https://svelte.dev/)'s parser +
+and a parser whose AST is compatible with [Svelte](https://svelte.dev/)'s parser +
 [acorn](https://github.com/acornjs/acorn) +
 [acorn-typescript](https://github.com/sveltejs/acorn-typescript).
 
@@ -68,7 +68,7 @@ tsv implements aspects of:
 
 tsv features:
 
-- [x] parsers for TypeScript/JS, CSS, and Svelte, drop-in for Svelte+acorn+acorn-typescript
+- [x] parsers for TypeScript/JS, CSS, and Svelte, with ASTs compatible with Svelte+acorn+acorn-typescript
 - [x] formatters following Prettier + prettier-plugin-svelte + Svelte's prettier config
       (with intentional divergences and no supported style config)
 - [x] [VS Code formatter extension](https://github.com/fuzdev/vscode-extension-tsv-format) - [`fuzdev.tsv-format`](https://marketplace.visualstudio.com/items?itemName=fuzdev.tsv-format) on the Marketplace and [Open VSX](https://open-vsx.org/extension/fuzdev/tsv-format) (WASM-only, works in desktop VS Code and the browser host)

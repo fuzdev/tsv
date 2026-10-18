@@ -2,7 +2,7 @@
 
 > parser for Svelte, TypeScript, and CSS
 
-Rust-based parser compiled to WASM. Drop-in replacement for **Svelte's parser** + **acorn** + **acorn-typescript**.
+Rust-based parser compiled to WASM, whose AST is compatible with **Svelte's parser** + **acorn** + **acorn-typescript**.
 
 Parsing only — for formatting, see [`@fuzdev/tsv-format-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-format-wasm), or [`@fuzdev/tsv-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-wasm) for both plus the type strip (`strip_typescript`) and a CLI. On Node.js and Bun, [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) is the native build of the same API.
 
@@ -103,18 +103,21 @@ A locator's single lookups throw a `RangeError` for an offset or span the text d
 
 ### Errors and depth limits
 
-A source that doesn't parse returns `{ok: false, error}` with `error` a plain object (no stack; `postMessage`-able) — `{kind: 'parse', message, start, loc}`, typed `TsvParseError` (exported) — in the AST's coordinates ([above](#reconstructing-linecolumn)):
+A source that doesn't parse returns `{ok: false, error}` with `error` a plain object (no stack; `postMessage`-able) — `{kind: 'parse', message, frame, start, end, loc}`, typed `TsvParseError` (exported) — in the AST's coordinates ([above](#reconstructing-linecolumn)):
 
-- `start` is the error's UTF-16 offset and `loc` its `{line, column}` (1-based line, 0-based UTF-16 column), equal to `create_locator(source, {language}).position_at(start)`.
-- The message's second line starts with `loc` as `line:column + 1`.
+- `message` says what went wrong, on one line; `frame` is the excerpt under it — a `line:column` header and the source line, then a caret line — so `` `${message}\n${frame}` `` is the text the CLI prints.
+- `start` and `end` are the error's UTF-16 offsets — a parse error is a point, so `end === start` — and `loc` is their `{start: {line, column}, end: {line, column}}` (1-based line, 0-based UTF-16 column), shaped like a node's: `create_locator(source, {language}).loc_of(result.error)` equals it.
+- The frame's header is `loc.start` as `line:column + 1`.
 
 ```javascript
 import {parse_typescript} from '@fuzdev/tsv-parse-wasm';
 
 const result = parse_typescript('let a;\nconst = ;');
 if (!result.ok) {
-	result.error.kind; // 'parse' — the message ends with the line and a caret
-	[result.error.start, result.error.loc]; // [13, {line: 2, column: 6}]
+	result.error.kind; // 'parse'
+	result.error.message; // "Expected identifier or destructuring pattern, found '='"
+	result.error.frame; // '2:7 const = ;\n          ^ here'
+	[result.error.start, result.error.loc.start]; // [13, {line: 2, column: 6}]
 }
 ```
 

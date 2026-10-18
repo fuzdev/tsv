@@ -351,8 +351,8 @@ macro_rules! parse_ast_for_format {
 /// (`tsv_lang::printing::FoldedSource::parse_with`) and then through `$map_err`, each
 /// binding's own error type (a message string, a located failure, a JS value). A Svelte
 /// refusal (`tsv_lang::ParseError::refusal`) takes the same road; a binding that reports a
-/// point reads the refusal's own (`ParseError::refusal_point`) and marks it a refusal, never
-/// a parse failure.
+/// span reads the refusal's own (`ParseError::report`, `refused` set) and marks it a refusal,
+/// never a parse failure.
 ///
 /// Expands to `Result<String, _>` inside the caller's `with_*_arena` closures, so the
 /// caller's `?`-conversion rules apply; `$lang` resolves in the caller's scope, as in

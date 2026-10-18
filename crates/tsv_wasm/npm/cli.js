@@ -907,8 +907,8 @@ function format_one(path, check) {
 		}
 		return { kind: 'error', message: error_message(error) };
 	}
-	// a parse failure or a refusal: the file's own, reported by its message alone
-	if (!result.ok) return { kind: 'error', message: result.error.message };
+	// a parse failure or a refusal: the file's own, reported by its message and frame alone
+	if (!result.ok) return { kind: 'error', message: failure_text(result.error) };
 	const formatted = result.code;
 	if (formatted === source) return { kind: 'unchanged' };
 	if (!check) {
@@ -948,7 +948,15 @@ function is_engine_failure(error) {
  * (`'unsupported'`).
  */
 function result_failure(error) {
-	return `${error.kind === 'parse' ? 'Parse error' : 'Error'}: ${error.message}`;
+	return `${error.kind === 'parse' ? 'Parse error' : 'Error'}: ${failure_text(error)}`;
+}
+
+/**
+ * A returned failure's text as the native CLI prints it: the one-line `message`, then the
+ * `frame` (the `line:col` header with the excerpt, then the caret line) on the lines below.
+ */
+function failure_text(error) {
+	return `${error.message}\n${error.frame}`;
 }
 
 /**

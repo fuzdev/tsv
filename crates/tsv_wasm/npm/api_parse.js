@@ -11,30 +11,32 @@
  * `locations` (pointing at `parse_<lang>`), since `loc` is a view over objects.
  *
  * Both return a result, as every facade export does (`api.js`'s module doc): `{ok: true, ast}`
- * / `{ok: true, json}`, or `{ok: false, error}` with a `kind: 'parse'` error for a source that
- * does not parse.
+ * / `{ok: true, json}`, or the `{ok: false, error}` the engine returned, a `kind: 'parse'`
+ * error, for a source that does not parse.
  *
  * A separate module from `api.js` so the format-only package, which ships no
  * `locations.js`, never loads one.
  */
 
-import { read_options, read_source, to_failure } from './api.js';
+import { PARSE_KINDS, read_failure, read_options, read_source } from './api.js';
 import { reconstruct_locations } from './locations.js';
 
 /**
  * Build the parse family over one engine, keyed by language — the engine's language
  * names, which are `locations.js`'s too.
  *
- * `engine.parse_json` (`(source, source_type?) => string`) is required;
- * `engine.parse` (`(source, source_type?) => object`) is optional — an engine that
- * parses its wire itself (the WASM bindings run `JSON.parse` engine-side) supplies it,
- * and otherwise the facade `JSON.parse`s the string. A `JSON.parse` failure there is an
- * engine bug, never the caller's source: it throws a plain `Error` (the WASM engine's own
- * text for the same failure, the `SyntaxError` as its `cause`), never a result.
+ * `engine.parse_json` (`(source, source_type?) => string | failure`) is required;
+ * `engine.parse` (`(source, source_type?) => {ok: true, ast} | failure`) is optional — an
+ * engine that parses its wire itself (the WASM bindings run `JSON.parse` engine-side, and
+ * build the whole result there) supplies it, and otherwise the facade `JSON.parse`s the
+ * string. A `JSON.parse` failure there is an engine bug, never the caller's source: it
+ * throws a plain `Error` (the WASM engine's own text for the same failure, the
+ * `SyntaxError` as its `cause`), never a result. A failure is the `{ok: false, error}` the
+ * engine returned (`read_failure`).
  *
  * @param {{
- * 	parse_json: Record<string, (source: string, source_type?: string) => string>,
- * 	parse?: Record<string, (source: string, source_type?: string) => any>
+ * 	parse_json: Record<string, (source: string, source_type?: string) => unknown>,
+ * 	parse?: Record<string, (source: string, source_type?: string) => unknown>
  * }} engine
  * @returns {Record<string, (source: unknown, options?: unknown) => any>}
  * 	`parse_<lang>` and `parse_<lang>_json`.
@@ -49,28 +51,28 @@ export function create_parse_api(engine) {
 			[`parse_${language}`]: (source, options) => {
 				const text = read_source(source, 'parse');
 				const parsed = read_options(options, 'parse', language);
-				let ast;
-				try {
-					ast = engine_parse
-						? engine_parse(text, parsed.source_type)
-						: parse_json(text, parsed.source_type);
-				} catch (thrown) {
-					return to_failure(thrown, false);
+				/** @type {{ok: true, ast: any}} */
+				let result;
+				if (engine_parse) {
+					const returned = /** @type {any} */ (engine_parse(text, parsed.source_type));
+					if (returned?.ok !== true || !('ast' in returned)) {
+						return read_failure(returned, PARSE_KINDS);
+					}
+					result = returned;
+				} else {
+					const json = parse_json(text, parsed.source_type);
+					if (typeof json !== 'string') return read_failure(json, PARSE_KINDS);
+					result = { ok: true, ast: parse_wire(json) };
 				}
-				if (!engine_parse) ast = parse_wire(ast);
-				if (parsed.locations) ast = reconstruct_locations(ast, text, { language });
-				return { ok: true, ast };
+				if (parsed.locations) result.ast = reconstruct_locations(result.ast, text, { language });
+				return result;
 			},
 			[`parse_${language}_json`]: (source, options) => {
 				const text = read_source(source, 'parse');
 				const { source_type } = read_options(options, 'parse_json', language);
-				let json;
-				try {
-					json = parse_json(text, source_type);
-				} catch (thrown) {
-					return to_failure(thrown, false);
-				}
-				return { ok: true, json };
+				const json = parse_json(text, source_type);
+				if (typeof json === 'string') return { ok: true, json };
+				return read_failure(json, PARSE_KINDS);
 			}
 		});
 	}

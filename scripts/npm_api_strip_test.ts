@@ -5,12 +5,11 @@
  *
  * The raw engine contract (both `tsv_wasm` and `tsv_napi`): `strip_typescript(source,
  * source_type?)` — the source type as the bag named it, `undefined` when unset — returns the
- * code, or throws an `Error` whose own ENUMERABLE integer properties carry the
- * failure — `start`, `line`, `column` for a parse failure (the shape every parse export
- * throws), and those plus a string `kind` (the refused construct) and `end`, `end_line`,
- * `end_column` for a refusal. Anything else an engine throws passes through as itself. A
- * fake engine rather than a built package, so this gates in `deno task check` on a bare
- * clone; `scripts/strip_suite.ts` grades the same surface through the real engines.
+ * code, or the `{ok: false, error}` it built for a parse failure (`kind: 'parse'`) or a
+ * refusal (`kind: 'unsupported'`, its `construct`), which the facade checks and hands back as
+ * it is. Anything an engine throws passes through as itself. A fake engine rather than a
+ * built package, so this gates in `deno task check` on a bare clone; `scripts/strip_suite.ts`
+ * grades the same surface through the real engines.
  */
 
 import { deepStrictEqual, strictEqual, throws } from 'node:assert';
@@ -18,7 +17,7 @@ import { deepStrictEqual, strictEqual, throws } from 'node:assert';
 import { create_strip_api } from '../crates/tsv_wasm/npm/api_strip.js';
 
 /** A fake engine that records its calls and answers with `answer`. */
-function fake_strip(answer: (source: string) => string) {
+function fake_strip(answer: (source: string) => unknown) {
 	const calls: Array<Array<unknown>> = [];
 	const api = create_strip_api({
 		typescript: (...args: Array<unknown>) => {
@@ -29,12 +28,28 @@ function fake_strip(answer: (source: string) => string) {
 	return { api, calls };
 }
 
-/** An engine failure as both engines throw one: an `Error` with own enumerable `extra`. */
-const engine_error = (message: string, extra: Record<string, unknown>): Error =>
-	Object.assign(new Error(message), extra);
+/** A failure as both engines return one. */
+const engine_failure = (error: Record<string, unknown>) => ({ ok: false, error });
 
-const PARSE_MESSAGE = "Expected expression, found ';'\n1:7 let = ;\n          ^ here";
-const REFUSAL_MESSAGE = 'cannot strip an enum\n2:1 enum E {}\n    ^ here';
+const PARSE_ERROR = {
+	kind: 'parse',
+	message: "Expected expression, found ';'",
+	frame: '1:7 let = ;\n          ^ here',
+	start: 6,
+	end: 6,
+	loc: { start: { line: 1, column: 6 }, end: { line: 1, column: 6 } }
+};
+
+/** A refusal of `construct`, as both engines return one. */
+const refusal = (construct: string) => ({
+	kind: 'unsupported',
+	construct,
+	message: 'cannot strip an enum',
+	frame: '2:1 enum E {}\n    ^ here',
+	start: 4,
+	end: 13,
+	loc: { start: { line: 2, column: 0 }, end: { line: 2, column: 9 } }
+});
 
 Deno.test('strip: the code, as an ok result', () => {
 	const { api, calls } = fake_strip((source) => source.replace(': T', '   '));
@@ -45,51 +60,16 @@ Deno.test('strip: the code, as an ok result', () => {
 	deepStrictEqual(calls, [['let x: T;', undefined]]);
 });
 
-Deno.test('strip: a pointed engine error is a parse error result, never a throw', () => {
-	const { api } = fake_strip(() => {
-		throw engine_error(PARSE_MESSAGE, { start: 6, line: 1, column: 6 });
-	});
-	const result = api.strip_typescript('let = ;');
-	deepStrictEqual(result, {
-		ok: false,
-		error: { kind: 'parse', message: PARSE_MESSAGE, start: 6, loc: { line: 1, column: 6 } }
-	});
-	deepStrictEqual(Object.keys(result.error), ['kind', 'message', 'start', 'loc']);
-	strictEqual(result.error instanceof Error, false);
+Deno.test('strip: a returned parse failure is the result, as it is', () => {
+	const failure = engine_failure(PARSE_ERROR);
+	const { api } = fake_strip(() => failure);
+	strictEqual(api.strip_typescript('let = ;'), failure);
 });
 
-Deno.test('strip: a refusal is an unsupported result with the construct and its span', () => {
-	const { api } = fake_strip(() => {
-		throw engine_error(REFUSAL_MESSAGE, {
-			kind: 'enum',
-			start: 4,
-			line: 2,
-			column: 0,
-			end: 13,
-			end_line: 2,
-			end_column: 9
-		});
-	});
-	const result = api.strip_typescript('x;\n\nenum E {}');
-	deepStrictEqual(result, {
-		ok: false,
-		error: {
-			kind: 'unsupported',
-			construct: 'enum',
-			message: REFUSAL_MESSAGE,
-			start: 4,
-			end: 13,
-			loc: { start: { line: 2, column: 0 }, end: { line: 2, column: 9 } }
-		}
-	});
-	deepStrictEqual(Object.keys(result.error), [
-		'kind',
-		'construct',
-		'message',
-		'start',
-		'end',
-		'loc'
-	]);
+Deno.test('strip: a returned refusal is the result, as it is', () => {
+	const failure = engine_failure(refusal('enum'));
+	const { api } = fake_strip(() => failure);
+	strictEqual(api.strip_typescript('x;\n\nenum E {}'), failure);
 });
 
 Deno.test('strip: every construct the engines name is passed through by name', () => {
@@ -102,47 +82,44 @@ Deno.test('strip: every construct the engines name is passed through by name', (
 		'type_assertion',
 		'assertion_grouping'
 	]) {
-		const { api } = fake_strip(() => {
-			throw engine_error('m', {
-				kind: construct,
-				start: 0,
-				line: 1,
-				column: 0,
-				end: 1,
-				end_line: 1,
-				end_column: 1
-			});
-		});
+		const { api } = fake_strip(() => engine_failure(refusal(construct)));
 		const result = api.strip_typescript('x');
 		strictEqual(result.ok, false, construct);
 		strictEqual(result.error.construct, construct);
 	}
 });
 
-Deno.test('strip: anything else an engine throws passes through as the same object', () => {
-	class RuntimeError extends Error {}
-	const bun_shaped = new Error('x');
-	// Bun's own non-enumerable numeric `line` / `column` on every `Error`: not a point
-	for (const key of ['line', 'column']) {
-		Object.defineProperty(bun_shaped, key, { value: 1, enumerable: false });
+Deno.test('strip: a malformed returned failure is thrown as an engine bug', () => {
+	const returned = [
+		// a refusal naming a construct the facade does not know
+		engine_failure(refusal('decorator')),
+		// a kind the strip never returns
+		engine_failure({ ...PARSE_ERROR, kind: 'refused' }),
+		// a non-integer offset, a missing frame
+		engine_failure({ ...PARSE_ERROR, start: 0.5 }),
+		engine_failure({ ...PARSE_ERROR, frame: undefined }),
+		{ ok: false },
+		42,
+		undefined
+	];
+	for (const value of returned) {
+		const { api } = fake_strip(() => value);
+		throws(
+			() => api.strip_typescript('x'),
+			(e: unknown) =>
+				e instanceof Error && e.message.startsWith('internal error:') && e.cause === value
+		);
 	}
+});
+
+Deno.test('strip: anything an engine throws passes through as the same object', () => {
+	class RuntimeError extends Error {}
 	const thrown = [
 		new Error('File too large: 5000000000 bytes (maximum: 4294967295 bytes / 4 GiB)'),
 		new RuntimeError('unreachable'),
 		new RangeError('Maximum call stack size exceeded'),
-		Object.assign(bun_shaped, { start: 0 }),
-		// a refusal naming a construct the facade does not know is an engine bug
-		engine_error('m', {
-			kind: 'decorator',
-			start: 0,
-			line: 1,
-			column: 0,
-			end: 1,
-			end_line: 1,
-			end_column: 1
-		}),
-		// a point with a non-integer property is no point
-		engine_error('m', { start: 0.5, line: 1, column: 0 }),
+		// a failure is returned, never thrown: a thrown one is still a throw
+		engine_failure(PARSE_ERROR),
 		'a string'
 	];
 	for (const value of thrown) {

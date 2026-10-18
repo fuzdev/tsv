@@ -42,7 +42,6 @@ locations = ["json"]
 
 [dependencies]
 smallvec.workspace = true
-thiserror.workspace = true
 # Only for the regex-vs-division rule's non-ASCII identifier arm (`source_scan`).
 unicode-ident.workspace = true
 unicode-segmentation.workspace = true

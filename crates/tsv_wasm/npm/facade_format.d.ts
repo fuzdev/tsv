@@ -29,7 +29,7 @@
  * `moduleResolution: node16`/`nodenext` an extensionless one is TS2834 at the consumer.
  */
 
-import type { TsvParseError } from './facade_error.js';
+import type { TsvError, TsvParseError } from './facade_error.js';
 
 /**
  * Options accepted by `format_svelte` / `format_css`. Formatting itself is
@@ -93,19 +93,10 @@ export type FormatError = TsvParseError | FormatRefusedError;
  * normalization would turn into a line break that ends the comment early. Only
  * `format_svelte` refuses.
  */
-export interface FormatRefusedError {
+export interface FormatRefusedError extends TsvError {
 	kind: 'refused';
-	/**
-	 * What is refused (`Lone carriage return inside a '//' comment in a tag: …`), then a line
-	 * `<line>:<column> <excerpt>` whose header is `loc.line:loc.column + 1`, then a caret under
-	 * the refused CR. The excerpt is bounded as `TsvParseError.message`'s is — by ANY line
-	 * terminator, so it ends at the refused CR itself, while the header counts LF lines.
-	 */
-	message: string;
-	/** UTF-16 offset of the refused character, in the parse wire's coordinates. */
-	start: number;
-	/** Line (1-based) and column (0-based, UTF-16 units) of `start`, LF lines. */
-	loc: { line: number; column: number };
+	/** `start + 1`: the span is the refused CR, at which the frame's excerpt ends. */
+	end: number;
 }
 
 /**

@@ -308,7 +308,7 @@ if (wasm_pack_version === null) {
 console.log(`  ${wasm_pack_version}`);
 
 // Step 6 runs the parse-failure table under Bun (`deno task test:bun`), the one leg that
-// grades the engines' deletes of Bun's own `Error` `line` / `column` — asked here so a
+// grades the engines' returned failures under Bun — asked here so a
 // --wetrun without bun fails before the bump. Waived like Step 3b's oracles: a dry run or
 // --no-check warn-skips, re-warned in the final summary.
 let bun_skip_reason: string | null = null;

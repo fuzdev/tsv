@@ -70,39 +70,46 @@ a caller tells "you called it wrong" (a throw) from "the source doesn't parse" (
 hold — [the helper](#linecolumn-reconstruction-helper-npmlocationsjs)).
 
 **The result's error.** A plain object — no stack captured per failure, structured-clone-able
-across a worker. A parse failure (every family) is `{kind: 'parse', message, start, loc}`: the
-error's point in the wire's coordinates (`ParseError::wire_point` — `start` the UTF-16 offset a
-wire node there would carry, `loc` its `{line, column}` under the document's line rule, so `loc`
-is `create_locator(source, {language}).position_at(start)`); the message keeps the Rust
-`ParseError` text, whose `line:col` header prints the same point
-([docs/cli.md §Parse errors](../../docs/cli.md#parse-errors)). A format's refusal of a source that
-parses is `{kind: 'refused', message, start, loc}`, the same shape at the refused character:
-`format_svelte` refuses a lone CR inside an in-tag `//` comment, which the format's CR fold would
-end early (`tsv_svelte::parse_folded`, a `ParseError::refusal` — no syntax error, its point
-`ParseError::refusal_point`). The strip adds its own `'unsupported'` (below). One reader builds
-them: `api.js`'s `read_pointed_failure` reads an engine's thrown point, `to_failure` turns it into
-the parse / format result, and `to_parse_error` is the one `kind: 'parse'` constructor the strip
-half shares.
+across a worker — whose span is shaped like a wire node's. A parse failure (every family) is
+`{kind: 'parse', message, frame, start, end, loc}`: `message` the one-line summary (a line
+terminator it quotes from the source spelled `<U+XXXX>`), `frame` the
+`line:col` header with the excerpted line, then the caret line (`ParseError::report`'s
+`summary` / `frame` — the Rust `ParseError` text is exactly `` `${message}\n${frame}` ``, the
+header printing `loc.start` — [docs/cli.md §Parse errors](../../docs/cli.md#parse-errors));
+`start` / `end` the UTF-16 offsets a wire node would carry (`ParseError::report` — a parse
+error knows a point, not a span, so `end === start`), and `loc` their
+`{start: {line, column}, end: {line, column}}` under the document's line rule, so `loc` is
+`create_locator(source, {language}).loc_of(error)`. A format's refusal of a source that parses
+is `{kind: 'refused', message, frame, start, end, loc}`, the same shape over the refused
+character: `format_svelte` refuses a lone CR inside an in-tag `//` comment, which the format's
+CR fold would end early (`tsv_svelte::parse_folded`, a `ParseError::refusal` — no syntax error,
+its span the CR). The strip adds its own `'unsupported'` (below).
 
-The engines throw a plain `Error` with own ENUMERABLE integer `start`, `line` and `column`
-properties — and for a format refusal an own enumerable `kind: 'refused'` set ahead of them;
-`read_pointed_failure` reads nothing looser, since Bun puts its own non-enumerable numeric
-`line` / `column` on every `Error`. Here it is a hand-declared `#[wasm_bindgen] extern` `Error`
-(`PointedError` in `src/lib.rs`, built by `pointed_error`: a constructor, the setters and
-`Reflect.deleteProperty`, which clears Bun's own `line` / `column` ahead of each set, since the
-format-only build carries no `js-sys`); in `tsv_napi`, an `Error` built on the injected `Env` the
-same way (`engine_error`). The facade wraps the engine call alone, so both engines' results for
+**The engines build it and RETURN it.** A failure the source causes is no exception: each
+engine returns `{ok: false, error}` in its product's place — no `Error` constructed, nothing
+thrown — built by `failure_result` in either crate (here a hand-declared `#[wasm_bindgen]
+extern` `Object` with a constructor and setters, `PlainObject` in `src/lib.rs`, since the
+format-only build carries no `js-sys`; in `tsv_napi`, `Object::new` on the injected `Env`),
+the two setting the keys in one order. The facade tells product from failure by `typeof`: the
+product of `format_*`, `parse_*_json` and `strip_*` is a string and a failure never is; the raw
+`parse_<lang>` (WASM only), whose product is an object, returns the whole result itself,
+`{ok: true, ast}` or the failure, built engine-side in place of the facade's own result object.
+The success path carries nothing extra: a string export's product is returned as a `JsValue`
+string (one decode, as a `String` return costs), the object parse builds the `{ok: true, ast}`
+result engine-side as the one result object of the call, and the facade copies nothing:
+`read_failure` (in `api.js`) checks the failure's shape and hands the engine's object back as
+it is. A malformed failure, or a `kind` the export never returns (a refusal from a parse export,
+`'unsupported'` from a format), is thrown as `Error('internal error: the engine returned neither
+its product nor a failure', {cause})` — an engine bug, never a result. Both engines' results for
 one input are identical (`scripts/parse_failure_suite.ts` holds both package suites to one
 table, the refusal included, and the napi suite compares the two engines directly;
-`deno task test:bun` runs that table under Bun, the one runtime where the delete is not a no-op,
-so it is what fails without it).
+`deno task test:bun` runs that table under Bun).
 
 Anything else an engine throws passes through as itself, THROWN: the raw engines' own
-source-type refusals, a source over the 4 GiB cap (a plain `Error` with no point), a caught
-panic, a WASM trap (`RuntimeError`) or stack exhaustion (`RangeError`) — and a point under a
-`kind` the export never throws, an engine bug. A format parses the CR-folded text through the
-language's `parse_folded` (`FoldedSource::parse_with`), which maps the error back onto the
-caller's source, so it reports the point a parse of that source would. Where the facade
+source-type refusals, a source over the 4 GiB cap (a plain `Error`), a caught panic, a WASM
+trap (`RuntimeError`) or stack exhaustion (`RangeError`). A format parses the CR-folded text
+through the language's `parse_folded` (`FoldedSource::parse_with`), which maps the error back
+onto the caller's source, so it reports the span a parse of that source would. Where the facade
 `JSON.parse`s an engine's wire itself (the native engine), a failure there is thrown as
 `Error('internal error: AST serialized to invalid JSON', {cause})` — the WASM engine's own text
 for that case — never returned as a parse failure.
@@ -111,16 +118,14 @@ for that case — never returned as a parse failure.
 native `@fuzdev/tsv` alone — [docs/strip.md](../../docs/strip.md)). `strip_typescript(source,
 options?)` returns `{ok: true, code}` or `{ok: false, error}`, `error.kind` `'parse'` (the error a
 parse of the source returns at the goal the error belongs to) or `'unsupported'` (`construct`,
-`message`, `start`, `end`, `loc: {start, end}`). Argument misuse is still a `TypeError` (the shared
-`read_source` / `read_options`, whose `'strip'` kind takes `sourceType` as a format's does), and an
-engine failure with no point still throws as itself. The raw export is
-`strip_typescript(source, source_type?)` — the flat shape, its unset source type read as a format
-reads one (`tsv_arena::Family::Strip`) — returning the code or throwing the parse failure's
-pointed `Error`, or for a refusal an `Error` whose own ENUMERABLE `kind` (the construct's
-snake_case name), `start`, `line`, `column`, `end`, `end_line` and `end_column` carry it
-(`PointedError`'s strip-gated setters; `tsv_napi`'s `Failure::Refusal`), each deleted before it is
-set for the Bun reason above. `api_strip.js` imports nothing but `api.js`'s readers, and the
-patcher stages it into the `all` variant alone.
+`message`, `frame`, `start`, `end`, `loc: {start, end}` — `tsv_ts::UnsupportedKind::report`). Argument
+misuse is still a `TypeError` (the shared `read_source` / `read_options`, whose `'strip'` kind
+takes `sourceType` as a format's does), and an engine failure with no point still throws as
+itself. The raw export is `strip_typescript(source, source_type?)` — the flat shape, its unset
+source type read as a format reads one (`tsv_arena::Family::Strip`) — returning the code or the
+`{ok: false, error}` it built, the refusal's `construct` the construct's snake_case name
+(`UnsupportedKind::name`), which `api_strip.js` checks against the set it knows. `api_strip.js`
+imports nothing but `api.js`'s readers, and the patcher stages it into the `all` variant alone.
 
 **Why the reader is JS.** Both package sets need it, and the native one has no WASM to host a
 Rust reader — a Rust reader would need a hand restatement in the napi loader plus a parity test.
@@ -142,8 +147,8 @@ wasm-bindgen's release glue coerces a wrong-typed string argument rather than re
 the `JsValue`, a value that is not a string throws by its kind (`invalid sourceType:
 expected a string ('script' or 'module'), got a number`) — where N-API refuses it at its own
 conversion. `JsValue` is wasm-bindgen's own, so the format-only build still links no
-`js-sys`. The raw `parse_<lang>` returns an object (`js_sys::JSON::parse` over
-the wire), so the bench's fairness probe and `scripts/validate_artifacts.ts`'s deno-bundle
+`js-sys`. The raw `parse_<lang>` returns `{ok: true, ast}`, the object `js_sys::JSON::parse` made
+of the wire, so the bench's fairness probe and `scripts/validate_artifacts.ts`'s deno-bundle
 smoke read the raw module directly.
 
 **The format-only package loads no parse code.** `api.js` imports nothing;
@@ -161,10 +166,13 @@ one shared row (`scripts/facade_surface_suite.ts`, beside the lone-surrogate ref
 node entry's `init` / `init_sync` included (declared there rather than re-exported
 under an alias, since the glue's own are `__wbg_init` / `initSync`).
 
-**Typed returns.** The parse failure is declared once, `TsvParseError` in
-`npm/facade_error.d.ts` (its own file, so every package ships it beside whichever family's
-declarations it carries, each of which imports it), re-exported by name from every entry and from
-the napi `index.d.ts`. The published declarations are the facade's hand-written
+**Typed returns.** The returned error's shape is declared once, `TsvError` in
+`npm/facade_error.d.ts` (`message`, `frame`, `start`, `end`, `loc`, with the field docs), beside
+the parse failure `TsvParseError` that extends it (its own file, so every package ships it beside
+whichever family's declarations it carries, each of which imports it); `FormatRefusedError` and
+`StripUnsupportedError` extend it too, adding only their `kind` (+ `construct`) and what their
+`end` covers. `TsvError` and `TsvParseError` are re-exported by name from every entry and
+from the napi `index.d.ts`. The published declarations are the facade's hand-written
 `npm/facade_format.d.ts` (format and its `FormatResult` / `FormatRefusedError`; in the
 format-capable packages), `npm/facade_parse.d.ts` (parse, `ParseResult<T>` / `ParseJsonResult`)
 and `npm/facade_strip.d.ts`, re-exported **by name** from
@@ -243,7 +251,7 @@ The AST crosses the JS↔WASM boundary as **one compact JSON string** — the sp
 `parse_*` builds it with the lang crate's `convert_ast_json_string` (each
 language's wire-JSON writer emits it directly from the internal AST — no intermediate
 `serde_json::Value` or typed public tree) and calls the engine's native `JSON.parse` from
-Rust via `js_sys::JSON::parse`, so the export returns the object. Building the JS object
+Rust via `js_sys::JSON::parse`, so the export returns the object (as `{ok: true, ast}`). Building the JS object
 graph node-by-node with `serde_wasm_bindgen` is measurably slower. `js-sys` rides the
 `parse` feature alone; the format-only build does not link it.
 

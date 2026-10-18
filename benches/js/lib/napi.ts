@@ -30,7 +30,7 @@
 
 import { stat } from 'node:fs/promises';
 import { napi_library_path } from './tsv_artifacts.ts';
-import { TsvBinding } from './tsv_api.ts';
+import { type EngineFailure, type EngineFn, TsvBinding } from './tsv_api.ts';
 import type { InitScope } from './types.ts';
 
 /**
@@ -42,15 +42,15 @@ import type { InitScope } from './types.ts';
  * ignoring it (`tsv_napi`'s `napi_source_type`), so `TsvBinding` withholds it for them.
  */
 export interface NapiAddon {
-	parse_svelte_json: (source: string, goal?: string) => string;
-	parse_internal_svelte: (source: string, goal?: string) => void;
-	format_svelte: (source: string, goal?: string) => string;
-	parse_typescript_json: (source: string, goal?: string) => string;
-	parse_internal_typescript: (source: string, goal?: string) => void;
-	format_typescript: (source: string, goal?: string) => string;
-	parse_css_json: (source: string, goal?: string) => string;
-	parse_internal_css: (source: string, goal?: string) => void;
-	format_css: (source: string, goal?: string) => string;
+	parse_svelte_json: EngineFn<string | EngineFailure>;
+	parse_internal_svelte: EngineFn<EngineFailure | undefined>;
+	format_svelte: EngineFn<string | EngineFailure>;
+	parse_typescript_json: EngineFn<string | EngineFailure>;
+	parse_internal_typescript: EngineFn<EngineFailure | undefined>;
+	format_typescript: EngineFn<string | EngineFailure>;
+	parse_css_json: EngineFn<string | EngineFailure>;
+	parse_internal_css: EngineFn<EngineFailure | undefined>;
+	format_css: EngineFn<string | EngineFailure>;
 	// test-only panic-contract probe — present only when built with the
 	// `panic_probe` cargo feature (`deno task test:napi`); absent in published
 	// builds, so `test_napi.ts` skips its contract test when undefined

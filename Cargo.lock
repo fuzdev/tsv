@@ -736,7 +736,6 @@ version = "0.6.0"
 dependencies = [
  "serde_json",
  "smallvec",
- "thiserror",
  "unicode-ident",
  "unicode-segmentation",
  "unicode-width",

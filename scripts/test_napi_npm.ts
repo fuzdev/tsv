@@ -362,10 +362,10 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		}
 	);
 
-	// One input, one error: the kind, the message, the `start` and the `loc`, from both
-	// engines alike — the facade builds the published error from the same three engine
-	// properties on both. Gated on the wasm package being current, as the export parity
-	// above is.
+	// One input, one error: the kind, the message, the frame, the span and the `loc`, from
+	// both engines alike — each engine builds the published error itself, so this is what
+	// holds the two builders to one object. Gated on the wasm package being current, as the
+	// export parity above is.
 	it(
 		'returns the same parse failures as @fuzdev/tsv-wasm',
 		{ skip: wasm_parity_skip },

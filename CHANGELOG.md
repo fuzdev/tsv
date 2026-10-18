@@ -15,14 +15,17 @@ Each `## Unreleased` section must be non-empty and carry a
 
 - **breaking** feat: `parse_<lang>`, `parse_<lang>_json` and `format_<lang>` return a result
   instead of throwing, like `strip_typescript` — `{ok: true, ast}`, `{ok: true, json}` and
-  `{ok: true, code}`, or `{ok: false, error}` where a parse failure is the plain object
-  `{kind: 'parse', message, start, loc}` (no stack, structured-clone-able; `SyntaxError` is no
-  longer thrown). `format_svelte`'s refusal of a lone CR inside an in-tag `//` comment is now
-  `{kind: 'refused', message, start, loc}`, pointing at the CR. Argument misuse still throws a
-  `TypeError`, and an engine failure with no position (the size cap, a trap) still throws. The
-  type `TsvSyntaxError` is replaced by `TsvParseError`, with `FormatResult` (its error a
-  `FormatError`: `TsvParseError | FormatRefusedError`), `ParseResult` and `ParseJsonResult`
-  beside `StripResult`
+  `{ok: true, code}`, or `{ok: false, error}`. Every error is a plain object (no stack,
+  structured-clone-able; `SyntaxError` is no longer thrown) shaped like an AST node:
+  `{kind, message, frame, start, end, loc: {start, end}}`, with `message` the one-line summary
+  and `frame` the source excerpt and caret, so
+  `create_locator(source, {language}).loc_of(error)` equals `error.loc`. A parse failure is
+  `kind: 'parse'` (a point, `end === start`); `format_svelte`'s
+  refusal of a lone CR inside an in-tag `//` comment is `kind: 'refused'`, spanning the CR.
+  Argument misuse still throws a `TypeError`, and an engine failure with no position (the size
+  cap, a trap) still throws. The type `TsvSyntaxError` is replaced by `TsvParseError`, every
+  error extending `TsvError`, with `FormatResult`, `ParseResult` and `ParseJsonResult` beside
+  `StripResult`
 - feat: type stripping — `strip_typescript(source, options?)` in `@fuzdev/tsv-wasm` and
   `@fuzdev/tsv`, and `tsv strip` in both CLIs, turn TypeScript into JS by blanking every type
   to whitespace, so every line and column stays where it was. TypeScript that blanking cannot

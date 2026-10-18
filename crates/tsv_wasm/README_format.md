@@ -66,11 +66,12 @@ A set value is exact. With none named and both grammars rejecting the source, th
 
 ### Errors and depth limits
 
-A source that doesn't parse returns `{ok: false, error}` with `error` a plain object (no stack; `postMessage`-able) — `{kind: 'parse', message, start, loc}`, typed `TsvParseError` (exported):
+A source that doesn't parse returns `{ok: false, error}` with `error` a plain object (no stack; `postMessage`-able) — `{kind: 'parse', message, frame, start, end, loc}`, typed `TsvParseError` (exported):
 
-- `start` is the error's UTF-16 offset and `loc` its `{line, column}` (1-based line, 0-based UTF-16 column).
+- `message` says what went wrong, on one line; `frame` is the excerpt under it — a `line:column` header and the source line, then a caret line — so `` `${message}\n${frame}` `` is the text the CLI prints.
+- `start` and `end` are the error's UTF-16 offsets — a parse error is a point, so `end === start` — and `loc` is their `{start: {line, column}, end: {line, column}}` (1-based line, 0-based UTF-16 column), shaped like an AST node's span.
 - TypeScript counts ECMAScript line terminators (LF, CR, CRLF, U+2028, U+2029) and a leading BOM; Svelte (`<script>`, `<style>` and template expressions included) and CSS count LF alone and leave a leading BOM out.
-- The message's second line starts with `loc` as `line:column + 1`.
+- The frame's header is `loc.start` as `line:column + 1`.
 - The position is into your own source, CRLF line endings included — the one [`@fuzdev/tsv-parse-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-parse-wasm) reports, except that with no `sourceType`, `format_typescript` may report its script retry's error instead.
 
 ```javascript
@@ -78,12 +79,14 @@ import {format_typescript} from '@fuzdev/tsv-format-wasm';
 
 const result = format_typescript('let a;\nconst = ;');
 if (!result.ok) {
-	result.error.kind; // 'parse' — the message ends with the line and a caret
-	[result.error.start, result.error.loc]; // [13, {line: 2, column: 6}]
+	result.error.kind; // 'parse'
+	result.error.message; // "Expected identifier or destructuring pattern, found '='"
+	result.error.frame; // '2:7 const = ;\n          ^ here'
+	[result.error.start, result.error.loc.start]; // [13, {line: 2, column: 6}]
 }
 ```
 
-`format_svelte` refuses one source that does parse: a lone CR (not part of a CRLF) with comment text after it inside a `//` comment between a tag's attributes, which Svelte ends at LF alone — the formatter's CR-to-LF fold would end that comment early and turn the rest of its line into markup. The refusal is `{kind: 'refused', message, start, loc}` (typed `FormatRefusedError`), at the CR.
+`format_svelte` refuses one source that does parse: a lone CR (not part of a CRLF) with comment text after it inside a `//` comment between a tag's attributes, which Svelte ends at LF alone — the formatter's CR-to-LF fold would end that comment early and turn the rest of its line into markup. The refusal is `{kind: 'refused', message, frame, start, end, loc}` (typed `FormatRefusedError`), its span the CR.
 
 What still throws is what no result can report: an argument error (a `TypeError`, above), a source over the 4 GiB size cap, and the engine failures below.
 

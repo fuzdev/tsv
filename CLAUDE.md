@@ -328,7 +328,7 @@ Package shape: wasm-pack `web` target, then `scripts/patch_npm_package.ts` adds 
 
 **Conformance gates (Step 3b)** — `deno task conformance:all` (see [Corpus Comparison](#corpus-comparison)); skipped by `--no-check`. Preflights the oracles (`../svelte`, `../acorn-typescript`, `../typescript`, `../test262`, `../prettier`, `../prettier-plugin-svelte`, the `../corpora` snapshot + the `benches/js` `node_modules` sidecar): a **`--wetrun` FAILS** when any is missing (releasing without gates requires the explicit `--no-check`); a dry-run warn-skips, re-warned in the final summary. `deno task doctor` checks the same ahead of time. Only the CSS-WPT harvest stays manual. A `corpus:compare:format` SAFETY hit is self-verified in-run (the native format re-runs and must reproduce byte-identically), so treat it as real; FFI nondeterminism surfaces as a loud `native format nondeterminism` per-file error instead (./benches/js/CLAUDE.md §Known Issues). A caught **panic** hard-fails either corpus tool on every run — a shipped artifact would abort the host, so it must never grade as one more per-file error.
 
-**Bun (Step 6)** — `deno task test:bun format parse all` (the only leg grading the engines' deletes of Bun's own `Error` `line`/`column`) over the three wasm packages. Bun is preflighted in Step 1 like Step 3b's oracles: a **`--wetrun` FAILS** without bun, before the bump (`--no-check` waives); with bun the leg runs `--require-bun`; without, a dry-run (or waived wetrun) warn-skips, re-warned in the summary. `deno task doctor` reports bun. The napi engine under Bun is graded only locally (`test:napi:npm[:run]` on a machine with bun), never by a publish.
+**Bun (Step 6)** — `deno task test:bun format parse all` (the only leg grading the engines' returned failures under Bun) over the three wasm packages. Bun is preflighted in Step 1 like Step 3b's oracles: a **`--wetrun` FAILS** without bun, before the bump (`--no-check` waives); with bun the leg runs `--require-bun`; without, a dry-run (or waived wetrun) warn-skips, re-warned in the summary. `deno task doctor` reports bun. The napi engine under Bun is graded only locally (`test:napi:npm[:run]` on a machine with bun), never by a publish.
 
 ```bash
 deno task publish                        # dry-run: validate everything, no mutation
@@ -850,11 +850,10 @@ Comments live **separately from AST nodes**, in a flat `Comment` array at the ro
 
 ### Rust Crates (minimal deps)
 
-The shipped language/foundation crates' external deps (`tsv_cli` adds only `argh`; dev tooling adds `tokio`, `futures-util`, `serde` with `derive`, `similar` and `tempfile`; `tsv_wasm` adds `wasm-bindgen`/`js-sys`):
+The shipped language/foundation crates' external deps (`tsv_cli` adds only `argh`; dev tooling adds `tokio`, `futures-util`, `serde` with `derive`, `similar`, `tempfile` and `thiserror`; `tsv_wasm` adds `wasm-bindgen`/`js-sys`):
 
 - `serde_json` — wire-JSON emission (exact `f64` formatting; the oracle the hand string escaper is tested against), reached through `tsv_lang`'s `json` feature (and directly by `tsv_ffi`, which serializes its `{"error": …}` payload with it); no shipped crate deserializes. The one reader, `tsv_debug::json` (fixture gate, audits, tests), enables `unbounded_depth` — the default 128-level recursion limit refused wires the parser emits fine. `serde` itself is a dev-tooling dep (`tsv_debug`'s `derive`); the language crates see it only transitively
 - `smallvec` — stack-allocated vectors (printers + `tsv_check`)
-- `thiserror` — error type derivation
 - `phf` — compile-time perfect hash maps (`tsv_html`'s entity table)
 - `unicode-ident` / `unicode-segmentation` / `unicode-width` — XID identifiers, grapheme clustering, display width (CJK, zero-width)
 - `bumpalo` — bump arena for the internal AST (and, via `tsv_arena`, the bindings' per-thread `reset()` reuse; `tsv_check`'s caller-owned arenas follow the same contract)

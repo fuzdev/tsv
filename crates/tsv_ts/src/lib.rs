@@ -30,7 +30,7 @@ use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::is_format_ignore_directive;
 use tsv_lang::printing::{FoldedSource, LineBreaks, LineTable};
 use tsv_lang::{CommentFreeWindow, EmbedContext, Span};
-pub use tsv_lang::{ParseError, Result, WirePoint};
+pub use tsv_lang::{ErrorReport, ParseError, Result, WirePoint};
 
 pub use goal::Goal;
 pub use parser::TopLevelAs;

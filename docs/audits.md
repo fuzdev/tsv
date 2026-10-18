@@ -1165,7 +1165,7 @@ every subpath (the root, `./worker`, `./locations`). What they type:
   each `_json` export, `ParseResult<Root>` / `<Program>` / `<StyleSheetFile>` from the object
   parsers, each narrowing on `ok`) and every option type by name, with a forwarded
   `{sourceType: undefined}` bag on the goalless exports;
-- `TsvParseError`'s `kind`, `start` and `loc` fields, the format error's `kind` union, the
+- `TsvParseError`'s `kind`, `message`, `frame`, `start`, `end` and `loc` fields, the format error's `kind` union, the
   `IgnoreStack` verdict union, the locator's
   `position_at` / `loc_of` / `reconstruct` and `reconstruct_locations`;
 - the WASM lifecycle per condition: under `node`, `init` / `init_sync` / `reinstantiate` and

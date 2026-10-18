@@ -1,8 +1,7 @@
 // Error types for parsing
 
 use std::fmt;
-
-use thiserror::Error;
+use std::fmt::Write as _;
 
 use crate::location::{WireCoordinates, WirePoint};
 
@@ -76,8 +75,12 @@ impl ErrorContext {
         }
     }
 
-    /// Format error context with caret pointer
-    fn format_with_caret(&self, message: &str) -> String {
+    /// The **frame** under a located error's summary: the `{line}:{col}` header and the
+    /// excerpted line, then the caret line beneath — two lines, joined by one `\n`, no
+    /// terminator after. The message a located error renders is its summary, a `\n`, and
+    /// this ([`ErrorContext::format_with_caret`]); a binding reports the two apart
+    /// ([`ErrorReport`]).
+    fn frame(&self) -> String {
         // The pad reproduces what the excerpt PRINTS ahead of the error, not how many
         // characters it holds. Two independent reasons a character count is wrong: a CJK
         // character occupies two columns, and a tab occupies however many the *terminal*
@@ -106,7 +109,13 @@ impl ErrorContext {
                 indent.push(' ');
             }
         }
-        format!("{message}\n{header} {}\n{indent}^ here", self.source_line,)
+        format!("{header} {}\n{indent}^ here", self.source_line)
+    }
+
+    /// `message`, then a `\n`, then the [frame](ErrorContext::frame): the rendered form of a
+    /// located error.
+    fn format_with_caret(&self, message: &str) -> String {
+        format!("{message}\n{}", self.frame())
     }
 }
 
@@ -124,27 +133,23 @@ fn format_error(base_msg: &str, position: usize, context: Option<&ErrorContext>)
 /// so the constructor functions below are the whole API, and keeping the enum private
 /// makes them the only way in (which is what keeps `context` uniformly `None` at
 /// construction, filled later by [`ParseError::with_context`]).
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum ParseErrorKind {
-    #[error("{}", format_error(&format!("Expected {expected}, found {found}"), *position, context.as_ref()))]
     UnexpectedToken {
         expected: String,
         found: String,
         position: usize,
         context: Option<ErrorContext>,
     },
-    #[error("{}", format_error("Unexpected end of file", *position, context.as_ref()))]
     UnexpectedEof {
         position: usize,
         context: Option<ErrorContext>,
     },
-    #[error("{}", format_error(message, *position, context.as_ref()))]
     InvalidSyntax {
         message: String,
         position: usize,
         context: Option<ErrorContext>,
     },
-    #[error("{}", format_error(&format!("Expected expression, found {found}"), *position, context.as_ref()))]
     InvalidExpression {
         found: String,
         position: usize,
@@ -153,15 +158,130 @@ enum ParseErrorKind {
     // Constructed only by `ensure_source_fits`, which every public parse entry point
     // calls before touching the source — that guard is what makes `Token`/`Span`'s
     // `u32` offsets sound (see `tsv_ts/src/lexer/token.rs`).
-    #[error("File too large: {size} bytes (maximum: {max} bytes / 4 GiB)")]
-    FileTooLarge { size: usize, max: usize },
-    // Constructed only by `ParseError::refusal`. Not a located error, though it has a
-    // point: see that constructor.
-    #[error("{rendered}")]
-    Refused {
-        rendered: Box<str>,
-        point: WirePoint,
+    FileTooLarge {
+        size: usize,
+        max: usize,
     },
+    // Constructed only by `ParseError::refusal`. Not a located error, though it has a
+    // span: see that constructor.
+    Refused {
+        message: Box<str>,
+        frame: Box<str>,
+        start: WirePoint,
+        end: WirePoint,
+    },
+}
+
+impl ParseErrorKind {
+    /// What went wrong, without where: the message's first part, ahead of the frame a
+    /// located error renders under it — always ONE line. Every summary every surface prints or
+    /// returns is built here, and several quote source text (a token, a Svelte attribute's
+    /// raw text), so a line terminator in it is spelled out ([`escape_line_terminators`]).
+    fn summary(&self) -> String {
+        escape_line_terminators(self.raw_summary())
+    }
+
+    /// [`ParseErrorKind::summary`] before its line terminators are spelled out.
+    fn raw_summary(&self) -> String {
+        match self {
+            ParseErrorKind::UnexpectedToken {
+                expected, found, ..
+            } => format!("Expected {expected}, found {found}"),
+            ParseErrorKind::UnexpectedEof { .. } => "Unexpected end of file".to_owned(),
+            ParseErrorKind::InvalidSyntax { message, .. } => message.clone(),
+            ParseErrorKind::InvalidExpression { found, .. } => {
+                format!("Expected expression, found {found}")
+            }
+            ParseErrorKind::FileTooLarge { size, max } => {
+                format!("File too large: {size} bytes (maximum: {max} bytes / 4 GiB)")
+            }
+            ParseErrorKind::Refused { message, .. } => message.to_string(),
+        }
+    }
+}
+
+/// The summary, then — for a located error with its context filled, and for a refusal — a
+/// `\n` and the frame; a located error no context has been filled for falls back to
+/// `at position N`.
+impl fmt::Display for ParseErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let summary = self.summary();
+        if let ParseErrorKind::Refused { frame, .. } = self {
+            return write!(f, "{summary}\n{frame}");
+        }
+        match self.located() {
+            Some((position, context)) => {
+                f.write_str(&format_error(&summary, *position, context.as_ref()))
+            }
+            None => f.write_str(&summary),
+        }
+    }
+}
+
+impl ErrorReport {
+    /// A refusal's report — what [`ParseError::refusal`] reports for the same arguments —
+    /// built directly, for a caller whose refusal is no `ParseError` (the type strip's,
+    /// `tsv_ts::UnsupportedKind::report`): `message` as the summary (its line terminators
+    /// spelled out), the frame of `start` in `source` under `coordinates`, and the span
+    /// `start..end`.
+    #[must_use]
+    pub fn refusal(
+        message: &str,
+        source: &str,
+        start: usize,
+        end: usize,
+        coordinates: WireCoordinates,
+    ) -> Self {
+        let context = ErrorContext::from_source(source, start, coordinates);
+        ErrorReport {
+            summary: escape_line_terminators(message.to_owned()),
+            frame: context.frame(),
+            start: context.point,
+            end: coordinates.point(source, end.max(start)),
+            refused: true,
+        }
+    }
+}
+
+/// `summary` with every line terminator — LF, CR, U+2028, U+2029, the characters that end a
+/// line in a terminal or in ECMAScript — spelled `<U+XXXX>` (the `U+` notation the codepoint
+/// errors already use), so a summary quoting source text stays one line and no raw CR
+/// overwrites a terminal line. The frame needs none of this: its excerpt is bounded by the
+/// same terminators ([`ErrorContext::from_source`]).
+fn escape_line_terminators(summary: String) -> String {
+    const TERMINATORS: [char; 4] = ['\n', '\r', '\u{2028}', '\u{2029}'];
+    if !summary.contains(TERMINATORS) {
+        return summary;
+    }
+    let mut escaped = String::with_capacity(summary.len() + 8);
+    for c in summary.chars() {
+        if TERMINATORS.contains(&c) {
+            // infallible: writing to a `String` never fails
+            let _ = write!(escaped, "<U+{:04X}>", u32::from(c));
+        } else {
+            escaped.push(c);
+        }
+    }
+    escaped
+}
+
+/// A pointed error as a binding reports it: the summary and the frame apart, and the span
+/// in the document's wire coordinates ([`ParseError::report`]). The error's own message is
+/// exactly `summary`, a `\n`, then `frame`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ErrorReport {
+    /// What went wrong — the message's first part.
+    pub summary: String,
+    /// The `{line}:{col}` header with the excerpted line, a `\n`, then the caret line —
+    /// what the message prints after the summary and a `\n`.
+    pub frame: String,
+    /// Where the error starts: the point the header prints.
+    pub start: WirePoint,
+    /// Where it ends — `start` itself for a syntax error, which knows a point and no span;
+    /// a refusal's own end ([`ParseError::refusal`]).
+    pub end: WirePoint,
+    /// A [`ParseError::refusal`] of a source that parses, not a syntax error.
+    pub refused: bool,
 }
 
 /// A parse error — **8 bytes**, because the payload lives behind the `Box`.
@@ -320,11 +440,11 @@ impl ParseError {
 
     /// Whether this is a **syntax error** — the source is malformed at a point — rather
     /// than a source over the `u32` cap (positionless) or a [`ParseError::refusal`] of a
-    /// source that parses (pointed, but by [`ParseError::refusal_point`]). The one question
-    /// every surface asks before choosing its channel: the CLI's `Parse error:` prefix, a
-    /// binding's thrown parse failure with its point on it. A whole-document parse entry point
-    /// fills every syntax error's context, so on its errors this is exactly
-    /// `wire_point().is_some()` — what a binding reads when it needs the point itself.
+    /// source that parses (pointed, but by its own span in [`ParseError::report`]). The one question
+    /// every surface asks before choosing its channel: the CLI's `Parse error:` prefix (a
+    /// binding reads the same split from [`ErrorReport::refused`]). A whole-document parse
+    /// entry point fills every syntax error's context, so on its errors this is exactly
+    /// `wire_point().is_some()`.
     pub fn is_syntax_error(&self) -> bool {
         self.0.kind.located().is_some()
     }
@@ -334,14 +454,16 @@ impl ParseError {
         ParseError::new(ParseErrorKind::FileTooLarge { size, max })
     }
 
-    /// A **refusal**: `source` parses, but a format cannot print it without changing what it
-    /// means — the one case is a Svelte in-tag `//` comment holding a lone `<CR>`, which the
-    /// format path's line-terminator fold would end early (`tsv_svelte::parse_folded`).
+    /// A **refusal**: `source` parses, but an operation cannot handle what it holds — a
+    /// format that cannot print it without changing what it means (a Svelte in-tag `//`
+    /// comment holding a lone `<CR>`, which the format path's line-terminator fold would end
+    /// early — `tsv_svelte::parse_folded`), or the type strip refusing TypeScript it cannot
+    /// erase (`tsv_ts::StripError`). It covers the bytes `start..end`.
     ///
-    /// The message is rendered here, with the `line:col` header and excerpt of `position` in
+    /// The message is rendered here, with the `line:col` header and excerpt of `start` in
     /// `source` under `coordinates` that a located error prints, so it reads like every other
-    /// format error, and the point it prints is kept ([`ParseError::refusal_point`]). But it is
-    /// **not a syntax error** — no [`ParseError::position`], no [`ParseError::wire_point`],
+    /// error, and the span is kept ([`ParseError::report`]). But it is **not a syntax error** —
+    /// no [`ParseError::position`], no [`ParseError::wire_point`],
     /// [`ParseError::is_syntax_error`] false: the source is not malformed (`parse` accepts it),
     /// so every surface reports it apart from a parse failure — the CLI's `Error:` prefix, the
     /// npm facade's `kind: 'refused'`.
@@ -350,24 +472,46 @@ impl ParseError {
     pub fn refusal(
         message: &str,
         source: &str,
-        position: usize,
+        start: usize,
+        end: usize,
         coordinates: WireCoordinates,
     ) -> Self {
-        let context = ErrorContext::from_source(source, position, coordinates);
+        let report = ErrorReport::refusal(message, source, start, end, coordinates);
         ParseError::new(ParseErrorKind::Refused {
-            rendered: context.format_with_caret(message).into(),
-            point: context.point,
+            message: report.summary.into(),
+            frame: report.frame.into(),
+            start: report.start,
+            end: report.end,
         })
     }
 
-    /// Where a [`ParseError::refusal`] points, in the wire coordinates it was built in — the
-    /// `line:col` its message header prints. `None` for every other error (a syntax error's
-    /// point is [`ParseError::wire_point`]).
-    pub fn refusal_point(&self) -> Option<WirePoint> {
-        match &self.0.kind {
-            ParseErrorKind::Refused { point, .. } => Some(*point),
-            _ => None,
+    /// The error as a binding reports it — summary, frame and span — for every error with a
+    /// point: a syntax error whose context is filled (its span the point alone:
+    /// `end == start`) and a [`ParseError::refusal`] (its own span, `refused` set). `None`
+    /// for a source over the size cap and for a located error no
+    /// [`ParseError::with_context`] has filled.
+    pub fn report(&self) -> Option<ErrorReport> {
+        if let ParseErrorKind::Refused {
+            frame, start, end, ..
+        } = &self.0.kind
+        {
+            return Some(ErrorReport {
+                summary: self.0.kind.summary(),
+                frame: frame.to_string(),
+                start: *start,
+                end: *end,
+                refused: true,
+            });
         }
+        let (_, context) = self.0.kind.located()?;
+        let context = context.as_ref()?;
+        Some(ErrorReport {
+            summary: self.0.kind.summary(),
+            frame: context.frame(),
+            start: context.point,
+            end: context.point,
+            refused: false,
+        })
     }
 
     /// Reject a source longer than the `u32` span offsets can index (> 4 GiB − 1).
@@ -453,7 +597,7 @@ impl ParseError {
     /// the numbers its message header prints, as `line:column+1`.
     ///
     /// `None` for the kinds that are not syntax errors (a source over the `u32` cap, a
-    /// [`ParseError::refusal`] — whose point is [`ParseError::refusal_point`]) and for an
+    /// [`ParseError::refusal`] — whose span is [`ParseError::report`]'s) and for an
     /// error no [`ParseError::with_context`] has filled — which only the embedded entry points
     /// return, ahead of their host's fill; no whole-document parse entry point does.
     pub fn wire_point(&self) -> Option<WirePoint> {
@@ -812,31 +956,95 @@ mod tests {
         }
     }
 
-    /// A refusal renders the located error's `line:col` header and excerpt and keeps that
-    /// point as its refusal point, but carries no position a binding could report as a syntax
-    /// error's point — and an unfold, which re-takes a located error's context, leaves its
-    /// already-caller-side text alone.
+    /// A refusal renders the located error's `line:col` header and excerpt and reports its
+    /// span, but carries no position a binding could report as a syntax error's point — and
+    /// an unfold, which re-takes a located error's context, leaves its already-caller-side
+    /// text alone.
     #[test]
     fn a_refusal_renders_its_point_but_is_no_syntax_error() {
         let source = "ab\nc\rd";
         // The `<CR>` itself, as `tsv_svelte::parse_folded` points: the header counts `\n`
         // lines, the excerpt stops at the `<CR>`.
-        let refusal = ParseError::refusal("no", source, 4, LF);
+        let refusal = ParseError::refusal("no", source, 4, 5, LF);
         assert_eq!(refusal.to_string(), "no\n2:2 c\n     ^ here");
         assert_eq!(refusal.position(), None);
         assert_eq!(refusal.wire_point(), None);
         assert!(!refusal.is_syntax_error());
-        assert_eq!(refusal.refusal_point(), Some(point(4, 2, 1)));
         assert_eq!(
-            ParseError::invalid_syntax("x".to_string(), 1)
-                .with_context(source, LF)
-                .refusal_point(),
-            None
+            refusal.report(),
+            Some(ErrorReport {
+                summary: "no".to_owned(),
+                frame: "2:2 c\n     ^ here".to_owned(),
+                start: point(4, 2, 1),
+                end: point(5, 2, 2),
+                refused: true,
+            })
         );
         assert_eq!(
             refusal.clone().unfold(source).to_string(),
             refusal.to_string()
         );
+    }
+
+    /// A summary quoting source text never carries a raw line terminator: LF, CR, U+2028 and
+    /// U+2029 are spelled `<U+XXXX>`, in the message and the report alike, for a syntax
+    /// error and a refusal — so the summary stays one line and the message stays
+    /// `summary + "\n" + frame`.
+    #[test]
+    fn a_summary_spells_out_its_line_terminators() {
+        let source = "x\ny";
+        for (raw, spelled) in [
+            ("a\nb", "a<U+000A>b"),
+            ("a\rb", "a<U+000D>b"),
+            ("a\r\nb", "a<U+000D><U+000A>b"),
+            ("a\u{2028}b", "a<U+2028>b"),
+            ("a\u{2029}b", "a<U+2029>b"),
+            ("plain", "plain"),
+        ] {
+            let e =
+                ParseError::invalid_syntax(format!("bad '{raw}'"), 2).with_context(source, ECMA);
+            let report = e.report().expect("a filled syntax error reports");
+            assert_eq!(report.summary, format!("bad '{spelled}'"));
+            assert_eq!(
+                e.to_string(),
+                format!("{}\n{}", report.summary, report.frame)
+            );
+            let e = ParseError::unexpected_token("';'".to_string(), format!("'{raw}'"), 2)
+                .with_context(source, ECMA);
+            assert_eq!(
+                e.report().expect("reports").summary,
+                format!("Expected ';', found '{spelled}'")
+            );
+            let refusal = ParseError::refusal(raw, source, 2, 3, LF);
+            let report = refusal.report().expect("a refusal reports");
+            assert_eq!(report.summary, spelled);
+            assert_eq!(
+                refusal.to_string(),
+                format!("{}\n{}", report.summary, report.frame)
+            );
+        }
+    }
+
+    /// A filled syntax error reports its summary and frame apart — the two its message
+    /// joins with one `\n` — over a one-point span; an unfilled one and the size cap report
+    /// nothing.
+    #[test]
+    fn a_syntax_error_reports_its_summary_frame_and_point() {
+        let source = "let x =\ny";
+        let e = ParseError::unexpected_token("';'".to_string(), "'y'".to_string(), 8);
+        assert_eq!(e.report(), None);
+        let e = e.with_context(source, ECMA);
+        let report = e.report().expect("a filled syntax error reports");
+        assert_eq!(report.summary, "Expected ';', found 'y'");
+        assert_eq!(report.frame, "2:1 y\n    ^ here");
+        assert_eq!(report.start, point(8, 2, 0));
+        assert_eq!(report.end, report.start);
+        assert!(!report.refused);
+        assert_eq!(
+            e.to_string(),
+            format!("{}\n{}", report.summary, report.frame)
+        );
+        assert_eq!(ParseError::file_too_large(5, 4).report(), None);
     }
 
     /// An error raised over the folded text, unfolded, is the error a parse of the original

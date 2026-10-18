@@ -11,7 +11,7 @@ mod test_support;
 mod whitespace;
 
 pub use ast::Root;
-pub use tsv_lang::{ParseError, Result, WirePoint};
+pub use tsv_lang::{ErrorReport, ParseError, Result, WirePoint};
 
 /// The coordinates a Svelte document's positions are reported in — Svelte's: a leading
 /// BOM **elided** (Svelte's `parse` strips it before parsing, so every offset indexes the
@@ -108,7 +108,9 @@ fn refuse_lone_cr_in_tag_line_comment(source: &str, arena: &bumpalo::Bump) -> Re
                 "Lone carriage return inside a '//' comment in a tag: formatting folds it to a \
                  line feed, which would end the comment early",
                 source,
+                // the span is the `<CR>` itself, the one character the refusal is about
                 position,
+                position + 1,
                 WIRE_COORDINATES,
             ));
         }

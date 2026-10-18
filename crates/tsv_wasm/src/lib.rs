@@ -11,14 +11,16 @@
 //!
 //! The AST crosses the JS boundary as a single JSON string — the span-only wire,
 //! the one every binding emits: `parse_*` calls the engine's native `JSON.parse` on
-//! it (via `js_sys`) and returns the object; `parse_*_json` returns the string
-//! itself for consumers that forward the wire format without materializing.
+//! it (via `js_sys`) and returns the object as `{ok: true, ast}`; `parse_*_json` returns
+//! the string itself for consumers that forward the wire format without materializing.
 //! Building the JS object graph node-by-node with `serde_wasm_bindgen` is
 //! measurably slower.
 //!
-//! Every export is flat, `(source, source_type?)`. The published packages wrap them
-//! in a hand-written JS facade (`npm/api.js`, shared with the native `@fuzdev/tsv`)
-//! that owns the options bag, its errors, and the `{locations: true}` sugar.
+//! Every export is flat, `(source, source_type?)`, and RETURNS a failure the source causes
+//! (a parse failure, a refusal) as `{ok: false, error}` in its product's place
+//! ([`failure_result`]) — only an argument refusal or the size cap throws. The published
+//! packages wrap them in a hand-written JS facade (`npm/api.js`, shared with the native
+//! `@fuzdev/tsv`) that owns the options bag, its errors, and the `{locations: true}` sugar.
 
 use wasm_bindgen::prelude::*;
 
@@ -101,93 +103,142 @@ fn err(message: impl ToString) -> JsValue {
     JsError::new(&message.to_string()).into()
 }
 
-// The JS `Error` a parse failure is thrown as, with its point set on it as own properties
-// (a format refusal, with its `kind` beside the point; a strip refusal, with its construct
-// and span). Declared by hand rather than taken
-// from `js_sys::Error`: the format-only build carries no `js-sys`, and a constructor, a
-// few setters and `Reflect.deleteProperty` are all this needs (the `console_error`
-// binding above is the same trade).
+// The plain JS objects a failure is RETURNED as — `{ok: false, error}`, the error
+// `{kind, construct?, message, frame, start, end, loc: {start: {line, column}, end: {…}}}` —
+// and the `{ok: true, ast}` result `parse_<lang>` returns. Declared by hand rather than
+// taken from `js_sys::Object` / `Reflect`: the format-only build carries no `js-sys`, and a
+// constructor and a few setters are all this needs (the `console_error` binding above is
+// the same trade). Each setter writes a plain data property, so the key order is the order
+// the setters run in.
 #[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
 #[wasm_bindgen]
 extern "C" {
-    #[wasm_bindgen(js_name = Error)]
-    type PointedError;
+    #[wasm_bindgen(js_name = Object)]
+    type PlainObject;
 
-    #[wasm_bindgen(constructor, js_class = "Error")]
-    fn new(message: &str) -> PointedError;
-
-    #[wasm_bindgen(method, setter)]
-    fn set_start(this: &PointedError, value: u32);
+    #[wasm_bindgen(constructor, js_class = "Object")]
+    fn new() -> PlainObject;
 
     #[wasm_bindgen(method, setter)]
-    fn set_line(this: &PointedError, value: u32);
+    fn set_ok(this: &PlainObject, value: bool);
+
+    #[cfg(feature = "parse")]
+    #[wasm_bindgen(method, setter)]
+    fn set_ast(this: &PlainObject, value: &JsValue);
 
     #[wasm_bindgen(method, setter)]
-    fn set_column(this: &PointedError, value: u32);
+    fn set_error(this: &PlainObject, value: &PlainObject);
 
     #[wasm_bindgen(method, setter)]
-    fn set_kind(this: &PointedError, value: &str);
+    fn set_kind(this: &PlainObject, value: &str);
 
     #[cfg(feature = "strip")]
     #[wasm_bindgen(method, setter)]
-    fn set_end(this: &PointedError, value: u32);
+    fn set_construct(this: &PlainObject, value: &str);
 
-    #[cfg(feature = "strip")]
     #[wasm_bindgen(method, setter)]
-    fn set_end_line(this: &PointedError, value: u32);
+    fn set_message(this: &PlainObject, value: &str);
 
-    #[cfg(feature = "strip")]
     #[wasm_bindgen(method, setter)]
-    fn set_end_column(this: &PointedError, value: u32);
+    fn set_frame(this: &PlainObject, value: &str);
 
-    #[wasm_bindgen(js_namespace = Reflect, js_name = deleteProperty)]
-    fn delete_property(target: &PointedError, key: &str) -> bool;
+    #[wasm_bindgen(method, setter)]
+    fn set_start(this: &PlainObject, value: u32);
+
+    #[wasm_bindgen(method, setter)]
+    fn set_end(this: &PlainObject, value: u32);
+
+    #[wasm_bindgen(method, setter)]
+    fn set_loc(this: &PlainObject, value: &PlainObject);
+
+    #[wasm_bindgen(method, setter = start)]
+    fn set_start_position(this: &PlainObject, value: &PlainObject);
+
+    #[wasm_bindgen(method, setter = end)]
+    fn set_end_position(this: &PlainObject, value: &PlainObject);
+
+    #[wasm_bindgen(method, setter)]
+    fn set_line(this: &PlainObject, value: u32);
+
+    #[wasm_bindgen(method, setter)]
+    fn set_column(this: &PlainObject, value: u32);
 }
 
-/// A parse failure as the JS `Error` the export throws: its message, plus — for every
-/// located error — own enumerable numeric `start`, `line` and `column` properties, the
-/// error's point in the document's wire coordinates (`ParseError::wire_point`). A format
-/// refusal of a source that parses (`ParseError::refusal`) carries the same three for the
-/// point it refuses at (`ParseError::refusal_point`), after an own enumerable `kind` of
-/// `'refused'`, which says it is no parse failure. The npm facade (`npm/api.js`) reads them
-/// into its result's `error`, so these names are its contract, shared with `tsv_napi`. A
-/// positionless error (a source over the size cap) stays a plain `Error`.
-///
-/// Each property is deleted before it is set, so all three are own ENUMERABLE data
-/// properties — what the facade requires of a point. Bun gives every `Error` its own
-/// non-enumerable `line` and `column` at construction, and a plain set writes through
-/// that property and keeps it non-enumerable; with nothing to delete (Node, Deno, a
-/// browser) the delete is a no-op.
+/// How an export ends that did not produce its product: a failure it RETURNS (the source's
+/// own — a parse failure, a refusal), or an error it THROWS (an argument the raw export
+/// refuses, a source over the size cap).
 #[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
-fn parse_err(e: &ParseError) -> JsValue {
-    let message = e.to_string();
-    if let Some(point) = e.wire_point() {
-        return pointed_error(&message, None, point);
-    }
-    // only a format export refuses a source that parses
-    #[cfg(feature = "format")]
-    if let Some(point) = e.refusal_point() {
-        return pointed_error(&message, Some("refused"), point);
-    }
-    err(message)
+enum Failure {
+    /// The `{ok: false, error}` result ([`failure_result`]).
+    Returned(JsValue),
+    /// A plain JS `Error` ([`err`]).
+    Thrown(JsValue),
 }
 
-/// [`parse_err`]'s thrown value: an `Error` carrying `message`, then `kind` when given, then
-/// the point's `start`, `line` and `column`, each an own enumerable property (deleted first).
 #[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
-fn pointed_error(message: &str, kind: Option<&str>, point: tsv_ts::WirePoint) -> JsValue {
-    let error = PointedError::new(message);
-    if let Some(kind) = kind {
-        delete_property(&error, "kind");
-        error.set_kind(kind);
+impl Failure {
+    /// The export's return value: a returned failure is the `Ok` value beside the product,
+    /// a thrown one the `Err` wasm-bindgen throws.
+    fn into_return(self) -> Result<JsValue, JsValue> {
+        match self {
+            Failure::Returned(result) => Ok(result),
+            Failure::Thrown(error) => Err(error),
+        }
     }
-    for key in ["start", "line", "column"] {
-        delete_property(&error, key);
+}
+
+/// A parse error as the export ends on it: every pointed error RETURNED as
+/// `{ok: false, error}` — `kind` `'parse'` for a syntax error, `'refused'` for a format's
+/// refusal of a source that parses (`ParseError::report`'s `refused`) — and a positionless
+/// one (a source over the size cap) thrown as a plain `Error`.
+#[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
+fn parse_failure(e: &ParseError) -> Failure {
+    match e.report() {
+        Some(report) => Failure::Returned(failure_result(
+            if report.refused { "refused" } else { "parse" },
+            None,
+            &report,
+        )),
+        None => Failure::Thrown(err(e)),
     }
-    error.set_start(point.start);
-    error.set_line(point.line);
-    error.set_column(point.column);
-    error.into()
+}
+
+/// The `{ok: false, error}` result a failure is returned as, its `error` a plain object
+/// with own `kind`, `construct` (a strip refusal's alone), `message` (the summary), `frame`,
+/// `start`, `end` and `loc: {start: {line, column}, end: {line, column}}` — the span in the
+/// document's wire coordinates, shaped as a wire node's. The npm facade (`npm/api.js`)
+/// hands it to the caller as it is, so this shape is its contract, shared with `tsv_napi`.
+#[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
+fn failure_result(kind: &str, construct: Option<&str>, report: &tsv_ts::ErrorReport) -> JsValue {
+    let error = PlainObject::new();
+    error.set_kind(kind);
+    #[cfg(feature = "strip")]
+    if let Some(construct) = construct {
+        error.set_construct(construct);
+    }
+    #[cfg(not(feature = "strip"))]
+    let _ = construct;
+    error.set_message(&report.summary);
+    error.set_frame(&report.frame);
+    error.set_start(report.start.start);
+    error.set_end(report.end.start);
+    let loc = PlainObject::new();
+    loc.set_start_position(&position(report.start));
+    loc.set_end_position(&position(report.end));
+    error.set_loc(&loc);
+    let result = PlainObject::new();
+    result.set_ok(false);
+    result.set_error(&error);
+    result.into()
+}
+
+/// A point's `{line, column}`, the wire's `Position`.
+#[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
+fn position(point: tsv_ts::WirePoint) -> PlainObject {
+    let position = PlainObject::new();
+    position.set_line(point.line);
+    position.set_column(point.column);
+    position
 }
 
 /// Strip the types from TypeScript `source` (`tsv_ts::strip_with_goal`): the JS, every
@@ -195,46 +246,23 @@ fn pointed_error(message: &str, kind: Option<&str>, point: tsv_ts::WirePoint) ->
 /// UTF-16 column. The source type is read as `format_typescript` reads it: omitted, the
 /// module grammar retried as a script; set, exact.
 ///
-/// A source that does not parse throws as every parse export does ([`parse_err`]); a
-/// source holding TypeScript the strip refuses throws an `Error` carrying the refusal's
-/// message (`cannot strip <construct>`, then its `line:col` header, line and caret) and
-/// own ENUMERABLE `kind` (the construct's snake_case name), `start`, `line`, `column`,
-/// `end`, `end_line` and `end_column` (the refused span's two points in the wire's
-/// coordinates). The npm facade (`npm/api_strip.js`) reads both shapes into its result
-/// object, so these names are its contract, shared with `tsv_napi`. Each property is
-/// deleted before it is set, for the reason [`parse_err`] gives.
+/// Returns the JS string, or `{ok: false, error}` ([`failure_result`]): a source that does
+/// not parse as every parse export returns one (`kind` `'parse'`), and TypeScript the strip
+/// refuses as `kind` `'unsupported'` with its `construct` (the construct's snake_case name)
+/// and the refused span. A source over the size cap throws.
 #[cfg(feature = "strip")]
 #[wasm_bindgen]
-pub fn strip_typescript(source: &str, source_type: JsValue) -> Result<String, JsValue> {
+pub fn strip_typescript(source: &str, source_type: JsValue) -> Result<JsValue, JsValue> {
     let goal =
         wasm_source_type(SourceTypeArg::read(&source_type), true, Family::Strip).map_err(err)?;
     tsv_arena::with_ast_arena(|arena| match tsv_ts::strip_with_goal(source, goal, arena) {
-        Ok(stripped) => Ok(stripped.code.into_owned()),
-        Err(tsv_ts::StripError::Parse(e)) => Err(parse_err(&e)),
-        Err(error @ tsv_ts::StripError::Unsupported { kind, span }) => {
-            let start = tsv_ts::WIRE_COORDINATES.point(source, span.start as usize);
-            let end = tsv_ts::WIRE_COORDINATES.point(source, span.end as usize);
-            let thrown = PointedError::new(&error.message(source));
-            for key in [
-                "kind",
-                "start",
-                "line",
-                "column",
-                "end",
-                "end_line",
-                "end_column",
-            ] {
-                delete_property(&thrown, key);
-            }
-            thrown.set_kind(kind.name());
-            thrown.set_start(start.start);
-            thrown.set_line(start.line);
-            thrown.set_column(start.column);
-            thrown.set_end(end.start);
-            thrown.set_end_line(end.line);
-            thrown.set_end_column(end.column);
-            Err(thrown.into())
-        }
+        Ok(stripped) => Ok(JsValue::from_str(&stripped.code)),
+        Err(tsv_ts::StripError::Parse(e)) => parse_failure(&e).into_return(),
+        Err(tsv_ts::StripError::Unsupported { kind, span }) => Ok(failure_result(
+            "unsupported",
+            Some(kind.name()),
+            &kind.report(span, source),
+        )),
     })
 }
 
@@ -552,6 +580,30 @@ fn wasm_source_type(
     )
 }
 
+/// The wire string behind both parse exports (`parse_<lang>` and `parse_<lang>_json`), or
+/// how the parse ended without one: `Result<String, Failure>`.
+#[cfg(feature = "parse")]
+macro_rules! wire_json {
+    ($goalness:ident, $lang:ident, $source:expr, $source_type:expr) => {
+        wasm_source_type(
+            SourceTypeArg::read(&$source_type),
+            goal_allowed!($goalness),
+            Family::Parse,
+        )
+        .map_err(|message| Failure::Thrown(err(message)))
+        .and_then(|goal| {
+            parse_convert!(
+                $goalness,
+                $lang,
+                convert_ast_json_string,
+                $source,
+                goal,
+                |e: ParseError| parse_failure(&e)
+            )
+        })
+    };
+}
+
 /// Generate `parse_<lang>` / `parse_<lang>_json` / `parse_internal_<lang>` /
 /// `format_<lang>` WASM functions for one language module. The parse exports
 /// are gated on `parse` (so the format-only build excludes the convert layer)
@@ -577,63 +629,78 @@ macro_rules! lang_bindings {
         $format_fn:ident,
         $lang:ident $(,)?
     ) => {
-        /// Parse source into the span-only AST object — `JSON.parse` of
-        /// `parse_<lang>_json`'s wire, run engine-side from Rust.
+        /// Parse source into `{ok: true, ast}`, the span-only AST object — `JSON.parse` of
+        /// `parse_<lang>_json`'s wire, run engine-side from Rust — or the
+        /// `{ok: false, error}` a parse failure is returned as.
         #[cfg(feature = "parse")]
         #[wasm_bindgen]
         pub fn $parse_fn(source: &str, source_type: JsValue) -> Result<JsValue, JsValue> {
-            let json = $parse_json_fn(source, source_type)?;
-            js_sys::JSON::parse(&json)
-                .map_err(|_| err("internal error: AST serialized to invalid JSON"))
+            let json = match wire_json!($goalness, $lang, source, source_type) {
+                Ok(json) => json,
+                Err(failure) => return failure.into_return(),
+            };
+            let ast = js_sys::JSON::parse(&json)
+                .map_err(|_| err("internal error: AST serialized to invalid JSON"))?;
+            let result = PlainObject::new();
+            result.set_ok(true);
+            result.set_ast(&ast);
+            Ok(result.into())
         }
 
         /// Parse source into the span-only JSON wire as a compact string —
         /// `start`/`end` offsets, no per-node `loc` (Svelte also no `name_loc`) —
-        /// skipping JS object materialization (for consumers forwarding the wire).
+        /// skipping JS object materialization (for consumers forwarding the wire); or the
+        /// `{ok: false, error}` a parse failure is returned as.
         #[cfg(feature = "parse")]
         #[wasm_bindgen]
-        pub fn $parse_json_fn(source: &str, source_type: JsValue) -> Result<String, JsValue> {
+        pub fn $parse_json_fn(source: &str, source_type: JsValue) -> Result<JsValue, JsValue> {
+            match wire_json!($goalness, $lang, source, source_type) {
+                Ok(json) => Ok(JsValue::from(json)),
+                Err(failure) => failure.into_return(),
+            }
+        }
+
+        /// Parse only, no serialization — the benchmark coverage/throughput probe:
+        /// `undefined`, or the `{ok: false, error}` a parse failure is returned as.
+        #[cfg(feature = "parse")]
+        #[wasm_bindgen]
+        pub fn $parse_internal_fn(source: &str, source_type: JsValue) -> Result<JsValue, JsValue> {
             let goal = wasm_source_type(
                 SourceTypeArg::read(&source_type),
                 goal_allowed!($goalness),
                 Family::Parse,
             )
             .map_err(err)?;
-            parse_convert!(
-                $goalness,
-                $lang,
-                convert_ast_json_string,
-                source,
-                goal,
-                |e| parse_err(&e)
-            )
+            let parsed: Result<(), Failure> =
+                parse_internal!($goalness, $lang, source, goal, |e: ParseError| {
+                    parse_failure(&e)
+                });
+            match parsed {
+                Ok(()) => Ok(JsValue::UNDEFINED),
+                Err(failure) => failure.into_return(),
+            }
         }
 
-        /// Parse only, no serialization — the benchmark coverage/throughput probe.
-        #[cfg(feature = "parse")]
-        #[wasm_bindgen]
-        pub fn $parse_internal_fn(source: &str, source_type: JsValue) -> Result<(), JsValue> {
-            let goal = wasm_source_type(
-                SourceTypeArg::read(&source_type),
-                goal_allowed!($goalness),
-                Family::Parse,
-            )
-            .map_err(err)?;
-            parse_internal!($goalness, $lang, source, goal, |e| parse_err(&e))
-        }
-
-        /// Format source. The source type shapes only the parse the formatter runs;
-        /// omitted, it means none was named — the module grammar, retried as a script.
+        /// Format source: the formatted string, or the `{ok: false, error}` a parse failure
+        /// or a refusal is returned as. The source type shapes only the parse the formatter
+        /// runs; omitted, it means none was named — the module grammar, retried as a script.
         #[cfg(feature = "format")]
         #[wasm_bindgen]
-        pub fn $format_fn(source: &str, source_type: JsValue) -> Result<String, JsValue> {
+        pub fn $format_fn(source: &str, source_type: JsValue) -> Result<JsValue, JsValue> {
             let goal = wasm_source_type(
                 SourceTypeArg::read(&source_type),
                 goal_allowed!($goalness),
                 Family::Format,
             )
             .map_err(err)?;
-            parse_format!($goalness, $lang, source, goal, |e| parse_err(&e))
+            let formatted: Result<String, Failure> =
+                parse_format!($goalness, $lang, source, goal, |e: ParseError| {
+                    parse_failure(&e)
+                });
+            match formatted {
+                Ok(code) => Ok(JsValue::from(code)),
+                Err(failure) => failure.into_return(),
+            }
         }
     };
 }

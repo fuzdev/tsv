@@ -185,6 +185,7 @@ import type {
 	FormatOptions,
 	FormatRefusedError,
 	FormatResult,
+	TsvError,
 	TsvParseError,
 	TypeScriptFormatOptions
 } from '${pkg.name}';
@@ -196,10 +197,13 @@ const returns: [
 	Exact<ReturnType<typeof format_typescript>, FormatResult>,
 	Exact<ReturnType<typeof format_css>, FormatResult>,
 	Exact<TsvParseError['start'], number>,
-	Exact<TsvParseError['loc'], {line: number; column: number}>,
+	Exact<TsvParseError['end'], number>,
+	Exact<TsvParseError['frame'], string>,
+	Exact<TsvParseError['loc'], {start: {line: number; column: number}; end: {line: number; column: number}}>,
+	Exact<FormatRefusedError['loc'], {start: {line: number; column: number}; end: {line: number; column: number}}>,
 	Exact<FormatError['kind'], 'parse' | 'refused'>,
 	Exact<ReturnType<IgnoreStack['classify_dir']>, 'descend' | 'prune' | 'prune_warn'>
-] = [true, true, true, true, true, true, true];
+] = [true, true, true, true, true, true, true, true, true, true];
 
 const result = format_svelte('<p>x</p>');
 // @ts-expect-error the code is there only once \`ok\` says so
@@ -222,9 +226,12 @@ if (!failed.ok) {
 		const refusal: FormatRefusedError = error;
 		void refusal;
 	}
-	const {start, loc}: {start: number; loc: {line: number; column: number}} = error;
+	const {start, end, loc}: {start: number; end: number; loc: {start: {line: number; column: number}; end: {line: number; column: number}}} = error;
 	const message: string = error.message;
-	void [start, loc, message];
+	const frame: string = error.frame;
+	// every kind is a TsvError
+	const base: TsvError = error;
+	void [start, end, loc, message, frame, base];
 }
 
 ${pkg.engine === 'wasm' ? 'using stack = new IgnoreStack();' : 'const stack = new IgnoreStack();'}
@@ -272,7 +279,7 @@ const returns: [
 	Exact<ReturnType<typeof parse_css_json>, ParseJsonResult>,
 	Exact<TsvParseError['kind'], 'parse'>,
 	Exact<TsvParseError['start'], number>,
-	Exact<TsvParseError['loc'], {line: number; column: number}>
+	Exact<TsvParseError['loc'], {start: {line: number; column: number}; end: {line: number; column: number}}>
 ] = [true, true, true, true, true, true, true, true, true];
 const typescript_options: TypeScriptParseOptions = {sourceType: 'script', locations: true};
 const parsed = parse_svelte('<p>x</p>', {locations: true});
@@ -306,8 +313,10 @@ parse_typescript('let a', {locatons: true});
 const failed = parse_css('a {');
 if (!failed.ok) {
 	const error: TsvParseError = failed.error;
-	const {start, loc}: {start: number; loc: {line: number; column: number}} = error;
-	void [start, loc];
+	const {start, loc}: {start: number; loc: {start: {line: number; column: number}; end: {line: number; column: number}}} = error;
+	// the error's span is a node's to the locator
+	const located: SourceLocation | null = create_locator('a {', {language: 'css'}).loc_of(error);
+	void [start, loc, located];
 }
 
 const locator = create_locator('let a', {language: 'typescript'});
@@ -328,7 +337,8 @@ import type {
 	StripOptions,
 	StripResult,
 	StripUnsupportedError,
-	StripUnsupportedKind
+	StripUnsupportedKind,
+	TsvError
 } from '${pkg.name}';
 
 ${EXACT}
@@ -356,12 +366,14 @@ if (result.ok) {
 	void error.construct;
 	if (error.kind === 'unsupported') {
 		const refusal: StripUnsupportedError = error;
+		const base: TsvError = refusal;
+		void base;
 		construct = refusal.construct;
 		const span: [number, number, number] = [refusal.start, refusal.end, refusal.loc.end.column];
 		void span;
 	} else {
-		const point: {line: number; column: number} = error.loc;
-		void [error.start, point];
+		const point: {line: number; column: number} = error.loc.start;
+		void [error.start, error.frame, point];
 	}
 }
 const kinds: Exact<

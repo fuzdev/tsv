@@ -61,7 +61,7 @@ pub use comment::{
     range_too_narrow_for_a_comment,
 };
 pub use config::{EmbedContext, INDENT, LayoutMode, PRINT_WIDTH, TAB_WIDTH};
-pub use error::{ParseError, Result, lex_err};
+pub use error::{ErrorReport, ParseError, Result, lex_err};
 pub use hash::{FxBuildHasher, FxHashMap, FxHashSet, FxHasher};
 #[cfg(feature = "json")]
 pub use json_writer::{JsonWriter, StageRun, StagedDigits, write_array, write_or_null};

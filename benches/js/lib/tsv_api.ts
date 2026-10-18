@@ -23,7 +23,7 @@
  * measure, against `TsvEngine` — which is why a binding keeps its engine reachable.
  */
 
-import { create_format_api } from '../../../crates/tsv_wasm/npm/api.js';
+import { create_format_api, PARSE_KINDS, read_failure } from '../../../crates/tsv_wasm/npm/api.js';
 import { create_parse_api } from '../../../crates/tsv_wasm/npm/api_parse.js';
 import { assert_binding_emits_span_only, type LocationsProbeArtifact } from './locations_probe.ts';
 import { assert_binding_reports_rejection } from './reject_probe.ts';
@@ -45,21 +45,32 @@ import {
 export type EngineFn<T> = (source: string, source_type?: string) => T;
 
 /**
+ * The failure an engine RETURNS in its product's place — a parse failure or a refusal —
+ * as the WASM and N-API engines build it (`crates/tsv_wasm/npm/api.js`'s module doc). The C
+ * FFI's wrapper throws instead (`lib/ffi.ts`), which every caller here reads the same way.
+ */
+export interface EngineFailure {
+	ok: false;
+	error: { kind: string; message: string; frame: string };
+}
+
+/**
  * One binding's flat exports, keyed by language and resolved once, so a timed call
  * allocates no table.
  *
  * `parse_json`, `parse` and `format` are what the facade's two factories take.
  * `parse_json` returns the span-only wire as a string. `parse` is present only for an
  * engine that materializes the wire itself (the WASM bindings run `JSON.parse`
- * engine-side); without it the facade parses `parse_json`'s string, as it does over the
- * N-API addon. `parse_internal` is the bench-only parse that converts nothing: no
- * package publishes it, so it is called as is.
+ * engine-side, returning `{ok: true, ast}`); without it the facade parses `parse_json`'s
+ * string, as it does over the N-API addon. `parse_internal` is the bench-only parse that
+ * converts nothing: no package publishes it, so it is called as is — its success value
+ * `undefined` (or the FFI's empty payload), its failure returned as the others' is.
  */
 export interface TsvEngine {
-	parse_json: Record<Language, EngineFn<string>>;
-	parse?: Record<Language, EngineFn<unknown>>;
-	format: Record<Language, EngineFn<string>>;
-	parse_internal: Record<Language, EngineFn<void>>;
+	parse_json: Record<Language, EngineFn<string | EngineFailure>>;
+	parse?: Record<Language, EngineFn<{ ok: true; ast: unknown } | EngineFailure>>;
+	format: Record<Language, EngineFn<string | EngineFailure>>;
+	parse_internal: Record<Language, EngineFn<unknown>>;
 }
 
 /** A published function: the source, then the options bag. */
@@ -67,7 +78,7 @@ type Published<T> = (source: string, options?: object) => T;
 
 /** What a published function returns: its product under `key`, or the source's failure. */
 type Outcome<K extends string, T> =
-	({ ok: true } & { [key in K]: T }) | { ok: false; error: { message: string } };
+	({ ok: true } & { [key in K]: T }) | { ok: false; error: { message: string; frame: string } };
 
 /** What `bind` leaves: the engine as given, and the facade's functions over it. */
 interface Bound {
@@ -81,7 +92,8 @@ interface Bound {
  * does from every third-party row (`lib/reject_probe.ts`), so a row unwraps the result as a
  * consumer does and throws the failure's message. Only the failure path pays it.
  */
-const rejected = (error: { message: string }): Error => new Error(error.message);
+const rejected = (error: { message: string; frame: string }): Error =>
+	new Error(`${error.message}\n${error.frame}`);
 
 // The bags a call passes, built once: a consumer writes its bag as a literal, but one
 // allocated per timed call here would be the harness's allocation charged to the row
@@ -240,6 +252,10 @@ export abstract class TsvBinding extends BaseImplementation {
 	 * above: every binding refuses a set one there rather than ignoring it).
 	 */
 	parse_internal(source: string, language: Language, goal?: ParseGoal): void {
-		this.bound.engine.parse_internal[language](source, goal_for(language, goal));
+		const outcome = this.bound.engine.parse_internal[language](source, goal_for(language, goal));
+		// a returned failure is the row's rejection, thrown as `rejected` throws a result's
+		if (typeof outcome === 'object' && outcome !== null) {
+			throw rejected(read_failure(outcome, PARSE_KINDS).error as EngineFailure['error']);
+		}
 	}
 }
