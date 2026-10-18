@@ -1,0 +1,2800 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 2817,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A hugged sole destructured parameter breaks BEFORE a breakable return type:",
+			"start": 20,
+			"end": 98
+		},
+		{
+			"type": "Line",
+			"value": " the object pattern prints with no group of its own, so once the signature",
+			"start": 100,
+			"end": 176
+		},
+		{
+			"type": "Line",
+			"value": " overflows its properties expand while the return type stays inline.",
+			"start": 178,
+			"end": 248
+		},
+		{
+			"type": "Line",
+			"value": " Function: 100 chars stays inline, 101 expands the pattern",
+			"start": 251,
+			"end": 311
+		},
+		{
+			"type": "Line",
+			"value": " a generic return type with a nullable union",
+			"start": 522,
+			"end": 568
+		},
+		{
+			"type": "Line",
+			"value": " Bodyless declaration",
+			"start": 679,
+			"end": 702
+		},
+		{
+			"type": "Line",
+			"value": " Arrow",
+			"start": 813,
+			"end": 821
+		},
+		{
+			"type": "Line",
+			"value": " Class method, object method, and interface signature",
+			"start": 933,
+			"end": 988
+		},
+		{
+			"type": "Line",
+			"value": " Function type",
+			"start": 1373,
+			"end": 1389
+		},
+		{
+			"type": "Line",
+			"value": " An untyped pattern",
+			"start": 1500,
+			"end": 1521
+		},
+		{
+			"type": "Line",
+			"value": " A pattern annotated with an object type: both expand",
+			"start": 1644,
+			"end": 1699
+		},
+		{
+			"type": "Line",
+			"value": " A hugged array pattern keeps its own group: the return type breaks",
+			"start": 1814,
+			"end": 1883
+		},
+		{
+			"type": "Line",
+			"value": " A defaulted pattern keeps its own group: the return type breaks",
+			"start": 1989,
+			"end": 2055
+		},
+		{
+			"type": "Line",
+			"value": " Not hugged: two parameters break one per line",
+			"start": 2166,
+			"end": 2214
+		},
+		{
+			"type": "Line",
+			"value": " A return type with no break point: the pattern expands",
+			"start": 2325,
+			"end": 2382
+		},
+		{
+			"type": "Line",
+			"value": " A callback argument: the arguments break out and the pattern stays inline",
+			"start": 2493,
+			"end": 2569
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 2816,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 2807,
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 313,
+					"end": 411,
+					"id": {
+						"type": "Identifier",
+						"start": 322,
+						"end": 327,
+						"name": "fn100"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "ObjectPattern",
+							"start": 328,
+							"end": 387,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 330,
+									"end": 334,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 330,
+										"end": 334,
+										"name": "aaaa"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 330,
+										"end": 334,
+										"name": "aaaa"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 336,
+									"end": 340,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 336,
+										"end": 340,
+										"name": "bbbb"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 336,
+										"end": 340,
+										"name": "bbbb"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 342,
+									"end": 346,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 342,
+										"end": 346,
+										"name": "cccc"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 342,
+										"end": 346,
+										"name": "cccc"
+									},
+									"kind": "init"
+								}
+							],
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 348,
+								"end": 387,
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 350,
+									"end": 387,
+									"typeName": {
+										"type": "Identifier",
+										"start": 350,
+										"end": 387,
+										"name": "Ddddddddddddddddddddddddddddddddddddd"
+									}
+								}
+							}
+						}
+					],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 388,
+						"end": 408,
+						"typeAnnotation": {
+							"type": "TSUnionType",
+							"start": 390,
+							"end": 408,
+							"types": [
+								{
+									"type": "TSStringKeyword",
+									"start": 390,
+									"end": 396
+								},
+								{
+									"type": "TSUndefinedKeyword",
+									"start": 399,
+									"end": 408
+								}
+							]
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 409,
+						"end": 411,
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A hugged sole destructured parameter breaks BEFORE a breakable return type:",
+							"start": 20,
+							"end": 98
+						},
+						{
+							"type": "Line",
+							"value": " the object pattern prints with no group of its own, so once the signature",
+							"start": 100,
+							"end": 176
+						},
+						{
+							"type": "Line",
+							"value": " overflows its properties expand while the return type stays inline.",
+							"start": 178,
+							"end": 248
+						},
+						{
+							"type": "Line",
+							"value": " Function: 100 chars stays inline, 101 expands the pattern",
+							"start": 251,
+							"end": 311
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 413,
+					"end": 519,
+					"id": {
+						"type": "Identifier",
+						"start": 422,
+						"end": 427,
+						"name": "fn101"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "ObjectPattern",
+							"start": 428,
+							"end": 495,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 432,
+									"end": 436,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 432,
+										"end": 436,
+										"name": "aaaa"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 432,
+										"end": 436,
+										"name": "aaaa"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 440,
+									"end": 444,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 440,
+										"end": 444,
+										"name": "bbbb"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 440,
+										"end": 444,
+										"name": "bbbb"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 448,
+									"end": 452,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 448,
+										"end": 452,
+										"name": "cccc"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 448,
+										"end": 452,
+										"name": "cccc"
+									},
+									"kind": "init"
+								}
+							],
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 455,
+								"end": 495,
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 457,
+									"end": 495,
+									"typeName": {
+										"type": "Identifier",
+										"start": 457,
+										"end": 495,
+										"name": "Dddddddddddddddddddddddddddddddddddddd"
+									}
+								}
+							}
+						}
+					],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 496,
+						"end": 516,
+						"typeAnnotation": {
+							"type": "TSUnionType",
+							"start": 498,
+							"end": 516,
+							"types": [
+								{
+									"type": "TSStringKeyword",
+									"start": 498,
+									"end": 504
+								},
+								{
+									"type": "TSUndefinedKeyword",
+									"start": 507,
+									"end": 516
+								}
+							]
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 517,
+						"end": 519,
+						"body": []
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 570,
+					"end": 676,
+					"id": {
+						"type": "Identifier",
+						"start": 579,
+						"end": 581,
+						"name": "fn"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "ObjectPattern",
+							"start": 582,
+							"end": 650,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 586,
+									"end": 590,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 586,
+										"end": 590,
+										"name": "aaaa"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 586,
+										"end": 590,
+										"name": "aaaa"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 594,
+									"end": 598,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 594,
+										"end": 598,
+										"name": "bbbb"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 594,
+										"end": 598,
+										"name": "bbbb"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 602,
+									"end": 606,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 602,
+										"end": 606,
+										"name": "cccc"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 602,
+										"end": 606,
+										"name": "cccc"
+									},
+									"kind": "init"
+								}
+							],
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 609,
+								"end": 650,
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 611,
+									"end": 650,
+									"typeName": {
+										"type": "Identifier",
+										"start": 611,
+										"end": 650,
+										"name": "Ddddddddddddddddddddddddddddddddddddddd"
+									}
+								}
+							}
+						}
+					],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 651,
+						"end": 673,
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 653,
+							"end": 673,
+							"typeName": {
+								"type": "Identifier",
+								"start": 653,
+								"end": 660,
+								"name": "Promise"
+							},
+							"typeArguments": {
+								"type": "TSTypeParameterInstantiation",
+								"start": 660,
+								"end": 673,
+								"params": [
+									{
+										"type": "TSUnionType",
+										"start": 661,
+										"end": 672,
+										"types": [
+											{
+												"type": "TSTypeReference",
+												"start": 661,
+												"end": 665,
+												"typeName": {
+													"type": "Identifier",
+													"start": 661,
+													"end": 665,
+													"name": "Eeee"
+												}
+											},
+											{
+												"type": "TSNullKeyword",
+												"start": 668,
+												"end": 672
+											}
+										]
+									}
+								]
+							}
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 674,
+						"end": 676,
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a generic return type with a nullable union",
+							"start": 522,
+							"end": 568
+						}
+					]
+				},
+				{
+					"type": "TSDeclareFunction",
+					"start": 704,
+					"end": 810,
+					"declare": true,
+					"id": {
+						"type": "Identifier",
+						"start": 721,
+						"end": 725,
+						"name": "decl"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "ObjectPattern",
+							"start": 726,
+							"end": 788,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 730,
+									"end": 734,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 730,
+										"end": 734,
+										"name": "aaaa"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 730,
+										"end": 734,
+										"name": "aaaa"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 738,
+									"end": 742,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 738,
+										"end": 742,
+										"name": "bbbb"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 738,
+										"end": 742,
+										"name": "bbbb"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 746,
+									"end": 750,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 746,
+										"end": 750,
+										"name": "cccc"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 746,
+										"end": 750,
+										"name": "cccc"
+									},
+									"kind": "init"
+								}
+							],
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 753,
+								"end": 788,
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 755,
+									"end": 788,
+									"typeName": {
+										"type": "Identifier",
+										"start": 755,
+										"end": 788,
+										"name": "Ddddddddddddddddddddddddddddddddd"
+									}
+								}
+							}
+						}
+					],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 789,
+						"end": 809,
+						"typeAnnotation": {
+							"type": "TSUnionType",
+							"start": 791,
+							"end": 809,
+							"types": [
+								{
+									"type": "TSStringKeyword",
+									"start": 791,
+									"end": 797
+								},
+								{
+									"type": "TSUndefinedKeyword",
+									"start": 800,
+									"end": 809
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Bodyless declaration",
+							"start": 679,
+							"end": 702
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 823,
+					"end": 930,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 829,
+							"end": 929,
+							"id": {
+								"type": "Identifier",
+								"start": 829,
+								"end": 834,
+								"name": "arrow"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 837,
+								"end": 929,
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 903,
+									"end": 923,
+									"typeAnnotation": {
+										"type": "TSUnionType",
+										"start": 905,
+										"end": 923,
+										"types": [
+											{
+												"type": "TSStringKeyword",
+												"start": 905,
+												"end": 911
+											},
+											{
+												"type": "TSUndefinedKeyword",
+												"start": 914,
+												"end": 923
+											}
+										]
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "ObjectPattern",
+										"start": 838,
+										"end": 902,
+										"properties": [
+											{
+												"type": "Property",
+												"start": 842,
+												"end": 846,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 842,
+													"end": 846,
+													"name": "aaaa"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 842,
+													"end": 846,
+													"name": "aaaa"
+												},
+												"kind": "init"
+											},
+											{
+												"type": "Property",
+												"start": 850,
+												"end": 854,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 850,
+													"end": 854,
+													"name": "bbbb"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 850,
+													"end": 854,
+													"name": "bbbb"
+												},
+												"kind": "init"
+											},
+											{
+												"type": "Property",
+												"start": 858,
+												"end": 862,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 858,
+													"end": 862,
+													"name": "cccc"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 858,
+													"end": 862,
+													"name": "cccc"
+												},
+												"kind": "init"
+											}
+										],
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 865,
+											"end": 902,
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 867,
+												"end": 902,
+												"typeName": {
+													"type": "Identifier",
+													"start": 867,
+													"end": 902,
+													"name": "Ddddddddddddddddddddddddddddddddddd"
+												}
+											}
+										}
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 927,
+									"end": 929,
+									"body": []
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Arrow",
+							"start": 813,
+							"end": 821
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 990,
+					"end": 1113,
+					"id": {
+						"type": "Identifier",
+						"start": 996,
+						"end": 997,
+						"name": "C"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 998,
+						"end": 1113,
+						"body": [
+							{
+								"type": "MethodDefinition",
+								"start": 1002,
+								"end": 1110,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 1002,
+									"end": 1008,
+									"name": "method"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 1008,
+									"end": 1110,
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "ObjectPattern",
+											"start": 1009,
+											"end": 1086,
+											"properties": [
+												{
+													"type": "Property",
+													"start": 1014,
+													"end": 1018,
+													"method": false,
+													"shorthand": true,
+													"computed": false,
+													"key": {
+														"type": "Identifier",
+														"start": 1014,
+														"end": 1018,
+														"name": "aaaa"
+													},
+													"value": {
+														"type": "Identifier",
+														"start": 1014,
+														"end": 1018,
+														"name": "aaaa"
+													},
+													"kind": "init"
+												},
+												{
+													"type": "Property",
+													"start": 1023,
+													"end": 1027,
+													"method": false,
+													"shorthand": true,
+													"computed": false,
+													"key": {
+														"type": "Identifier",
+														"start": 1023,
+														"end": 1027,
+														"name": "bbbb"
+													},
+													"value": {
+														"type": "Identifier",
+														"start": 1023,
+														"end": 1027,
+														"name": "bbbb"
+													},
+													"kind": "init"
+												},
+												{
+													"type": "Property",
+													"start": 1032,
+													"end": 1036,
+													"method": false,
+													"shorthand": true,
+													"computed": false,
+													"key": {
+														"type": "Identifier",
+														"start": 1032,
+														"end": 1036,
+														"name": "cccc"
+													},
+													"value": {
+														"type": "Identifier",
+														"start": 1032,
+														"end": 1036,
+														"name": "cccc"
+													},
+													"kind": "init"
+												}
+											],
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 1040,
+												"end": 1086,
+												"typeAnnotation": {
+													"type": "TSTypeReference",
+													"start": 1042,
+													"end": 1086,
+													"typeName": {
+														"type": "Identifier",
+														"start": 1042,
+														"end": 1086,
+														"name": "Dddddddddddddddddddddddddddddddddddddddddddd"
+													}
+												}
+											}
+										}
+									],
+									"returnType": {
+										"type": "TSTypeAnnotation",
+										"start": 1087,
+										"end": 1107,
+										"typeAnnotation": {
+											"type": "TSUnionType",
+											"start": 1089,
+											"end": 1107,
+											"types": [
+												{
+													"type": "TSStringKeyword",
+													"start": 1089,
+													"end": 1095
+												},
+												{
+													"type": "TSUndefinedKeyword",
+													"start": 1098,
+													"end": 1107
+												}
+											]
+										}
+									},
+									"body": {
+										"type": "BlockStatement",
+										"start": 1108,
+										"end": 1110,
+										"body": []
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Class method, object method, and interface signature",
+							"start": 933,
+							"end": 988
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1115,
+					"end": 1241,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1121,
+							"end": 1240,
+							"id": {
+								"type": "Identifier",
+								"start": 1121,
+								"end": 1122,
+								"name": "o"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 1125,
+								"end": 1240,
+								"properties": [
+									{
+										"type": "Property",
+										"start": 1129,
+										"end": 1237,
+										"method": true,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 1135,
+											"end": 1141,
+											"name": "method"
+										},
+										"value": {
+											"type": "FunctionExpression",
+											"start": 1141,
+											"end": 1237,
+											"id": null,
+											"expression": false,
+											"generator": false,
+											"async": true,
+											"params": [
+												{
+													"type": "ObjectPattern",
+													"start": 1142,
+													"end": 1211,
+													"properties": [
+														{
+															"type": "Property",
+															"start": 1147,
+															"end": 1151,
+															"method": false,
+															"shorthand": true,
+															"computed": false,
+															"key": {
+																"type": "Identifier",
+																"start": 1147,
+																"end": 1151,
+																"name": "aaaa"
+															},
+															"value": {
+																"type": "Identifier",
+																"start": 1147,
+																"end": 1151,
+																"name": "aaaa"
+															},
+															"kind": "init"
+														},
+														{
+															"type": "Property",
+															"start": 1156,
+															"end": 1160,
+															"method": false,
+															"shorthand": true,
+															"computed": false,
+															"key": {
+																"type": "Identifier",
+																"start": 1156,
+																"end": 1160,
+																"name": "bbbb"
+															},
+															"value": {
+																"type": "Identifier",
+																"start": 1156,
+																"end": 1160,
+																"name": "bbbb"
+															},
+															"kind": "init"
+														},
+														{
+															"type": "Property",
+															"start": 1165,
+															"end": 1169,
+															"method": false,
+															"shorthand": true,
+															"computed": false,
+															"key": {
+																"type": "Identifier",
+																"start": 1165,
+																"end": 1169,
+																"name": "cccc"
+															},
+															"value": {
+																"type": "Identifier",
+																"start": 1165,
+																"end": 1169,
+																"name": "cccc"
+															},
+															"kind": "init"
+														}
+													],
+													"typeAnnotation": {
+														"type": "TSTypeAnnotation",
+														"start": 1173,
+														"end": 1211,
+														"typeAnnotation": {
+															"type": "TSTypeReference",
+															"start": 1175,
+															"end": 1211,
+															"typeName": {
+																"type": "Identifier",
+																"start": 1175,
+																"end": 1211,
+																"name": "Dddddddddddddddddddddddddddddddddddd"
+															}
+														}
+													}
+												}
+											],
+											"returnType": {
+												"type": "TSTypeAnnotation",
+												"start": 1212,
+												"end": 1234,
+												"typeAnnotation": {
+													"type": "TSTypeReference",
+													"start": 1214,
+													"end": 1234,
+													"typeName": {
+														"type": "Identifier",
+														"start": 1214,
+														"end": 1221,
+														"name": "Promise"
+													},
+													"typeArguments": {
+														"type": "TSTypeParameterInstantiation",
+														"start": 1221,
+														"end": 1234,
+														"params": [
+															{
+																"type": "TSUnionType",
+																"start": 1222,
+																"end": 1233,
+																"types": [
+																	{
+																		"type": "TSTypeReference",
+																		"start": 1222,
+																		"end": 1226,
+																		"typeName": {
+																			"type": "Identifier",
+																			"start": 1222,
+																			"end": 1226,
+																			"name": "Eeee"
+																		}
+																	},
+																	{
+																		"type": "TSNullKeyword",
+																		"start": 1229,
+																		"end": 1233
+																	}
+																]
+															}
+														]
+													}
+												}
+											},
+											"body": {
+												"type": "BlockStatement",
+												"start": 1235,
+												"end": 1237,
+												"body": []
+											}
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 1243,
+					"end": 1370,
+					"id": {
+						"type": "Identifier",
+						"start": 1253,
+						"end": 1254,
+						"name": "I"
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 1255,
+						"end": 1370,
+						"body": [
+							{
+								"type": "TSMethodSignature",
+								"start": 1259,
+								"end": 1367,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 1259,
+									"end": 1265,
+									"name": "method"
+								},
+								"parameters": [
+									{
+										"type": "ObjectPattern",
+										"start": 1266,
+										"end": 1345,
+										"properties": [
+											{
+												"type": "Property",
+												"start": 1271,
+												"end": 1275,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 1271,
+													"end": 1275,
+													"name": "aaaa"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 1271,
+													"end": 1275,
+													"name": "aaaa"
+												},
+												"kind": "init"
+											},
+											{
+												"type": "Property",
+												"start": 1280,
+												"end": 1284,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 1280,
+													"end": 1284,
+													"name": "bbbb"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 1280,
+													"end": 1284,
+													"name": "bbbb"
+												},
+												"kind": "init"
+											},
+											{
+												"type": "Property",
+												"start": 1289,
+												"end": 1293,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 1289,
+													"end": 1293,
+													"name": "cccc"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 1289,
+													"end": 1293,
+													"name": "cccc"
+												},
+												"kind": "init"
+											}
+										],
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 1297,
+											"end": 1345,
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 1299,
+												"end": 1345,
+												"typeName": {
+													"type": "Identifier",
+													"start": 1299,
+													"end": 1345,
+													"name": "Dddddddddddddddddddddddddddddddddddddddddddddd"
+												}
+											}
+										}
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 1346,
+									"end": 1366,
+									"typeAnnotation": {
+										"type": "TSUnionType",
+										"start": 1348,
+										"end": 1366,
+										"types": [
+											{
+												"type": "TSStringKeyword",
+												"start": 1348,
+												"end": 1354
+											},
+											{
+												"type": "TSUndefinedKeyword",
+												"start": 1357,
+												"end": 1366
+											}
+										]
+									}
+								},
+								"kind": "method"
+							}
+						]
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1391,
+					"end": 1497,
+					"id": {
+						"type": "Identifier",
+						"start": 1396,
+						"end": 1397,
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSFunctionType",
+						"start": 1400,
+						"end": 1496,
+						"parameters": [
+							{
+								"type": "ObjectPattern",
+								"start": 1401,
+								"end": 1473,
+								"properties": [
+									{
+										"type": "Property",
+										"start": 1405,
+										"end": 1409,
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 1405,
+											"end": 1409,
+											"name": "aaaa"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 1405,
+											"end": 1409,
+											"name": "aaaa"
+										},
+										"kind": "init"
+									},
+									{
+										"type": "Property",
+										"start": 1413,
+										"end": 1417,
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 1413,
+											"end": 1417,
+											"name": "bbbb"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 1413,
+											"end": 1417,
+											"name": "bbbb"
+										},
+										"kind": "init"
+									},
+									{
+										"type": "Property",
+										"start": 1421,
+										"end": 1425,
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 1421,
+											"end": 1425,
+											"name": "cccc"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 1421,
+											"end": 1425,
+											"name": "cccc"
+										},
+										"kind": "init"
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 1428,
+									"end": 1473,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 1430,
+										"end": 1473,
+										"typeName": {
+											"type": "Identifier",
+											"start": 1430,
+											"end": 1473,
+											"name": "Ddddddddddddddddddddddddddddddddddddddddddd"
+										}
+									}
+								}
+							}
+						],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 1475,
+							"end": 1496,
+							"typeAnnotation": {
+								"type": "TSUnionType",
+								"start": 1478,
+								"end": 1496,
+								"types": [
+									{
+										"type": "TSStringKeyword",
+										"start": 1478,
+										"end": 1484
+									},
+									{
+										"type": "TSUndefinedKeyword",
+										"start": 1487,
+										"end": 1496
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Function type",
+							"start": 1373,
+							"end": 1389
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 1523,
+					"end": 1641,
+					"id": {
+						"type": "Identifier",
+						"start": 1532,
+						"end": 1539,
+						"name": "untyped"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "ObjectPattern",
+							"start": 1540,
+							"end": 1617,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 1544,
+									"end": 1548,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1544,
+										"end": 1548,
+										"name": "aaaa"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 1544,
+										"end": 1548,
+										"name": "aaaa"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 1552,
+									"end": 1556,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1552,
+										"end": 1556,
+										"name": "bbbb"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 1552,
+										"end": 1556,
+										"name": "bbbb"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 1560,
+									"end": 1564,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1560,
+										"end": 1564,
+										"name": "cccc"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 1560,
+										"end": 1564,
+										"name": "cccc"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 1568,
+									"end": 1572,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1568,
+										"end": 1572,
+										"name": "dddd"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 1568,
+										"end": 1572,
+										"name": "dddd"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 1576,
+									"end": 1580,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1576,
+										"end": 1580,
+										"name": "eeee"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 1576,
+										"end": 1580,
+										"name": "eeee"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 1584,
+									"end": 1588,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1584,
+										"end": 1588,
+										"name": "ffff"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 1584,
+										"end": 1588,
+										"name": "ffff"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 1592,
+									"end": 1596,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1592,
+										"end": 1596,
+										"name": "gggg"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 1592,
+										"end": 1596,
+										"name": "gggg"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 1600,
+									"end": 1604,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1600,
+										"end": 1604,
+										"name": "hhhh"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 1600,
+										"end": 1604,
+										"name": "hhhh"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 1608,
+									"end": 1614,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1608,
+										"end": 1614,
+										"name": "iiiiii"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 1608,
+										"end": 1614,
+										"name": "iiiiii"
+									},
+									"kind": "init"
+								}
+							]
+						}
+					],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 1618,
+						"end": 1638,
+						"typeAnnotation": {
+							"type": "TSUnionType",
+							"start": 1620,
+							"end": 1638,
+							"types": [
+								{
+									"type": "TSStringKeyword",
+									"start": 1620,
+									"end": 1626
+								},
+								{
+									"type": "TSUndefinedKeyword",
+									"start": 1629,
+									"end": 1638
+								}
+							]
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 1639,
+						"end": 1641,
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An untyped pattern",
+							"start": 1500,
+							"end": 1521
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 1701,
+					"end": 1811,
+					"id": {
+						"type": "Identifier",
+						"start": 1710,
+						"end": 1717,
+						"name": "literal"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "ObjectPattern",
+							"start": 1718,
+							"end": 1787,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 1722,
+									"end": 1726,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1722,
+										"end": 1726,
+										"name": "aaaa"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 1722,
+										"end": 1726,
+										"name": "aaaa"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 1730,
+									"end": 1734,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1730,
+										"end": 1734,
+										"name": "bbbb"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 1730,
+										"end": 1734,
+										"name": "bbbb"
+									},
+									"kind": "init"
+								}
+							],
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 1737,
+								"end": 1787,
+								"typeAnnotation": {
+									"type": "TSTypeLiteral",
+									"start": 1739,
+									"end": 1787,
+									"members": [
+										{
+											"type": "TSPropertySignature",
+											"start": 1743,
+											"end": 1773,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 1743,
+												"end": 1747,
+												"name": "aaaa"
+											},
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 1747,
+												"end": 1772,
+												"typeAnnotation": {
+													"type": "TSTypeReference",
+													"start": 1749,
+													"end": 1772,
+													"typeName": {
+														"type": "Identifier",
+														"start": 1749,
+														"end": 1772,
+														"name": "Aaaaaaaaaaaaaaaaaaaaaaa"
+													}
+												}
+											}
+										},
+										{
+											"type": "TSPropertySignature",
+											"start": 1776,
+											"end": 1784,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 1776,
+												"end": 1780,
+												"name": "bbbb"
+											},
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 1780,
+												"end": 1783,
+												"typeAnnotation": {
+													"type": "TSTypeReference",
+													"start": 1782,
+													"end": 1783,
+													"typeName": {
+														"type": "Identifier",
+														"start": 1782,
+														"end": 1783,
+														"name": "B"
+													}
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 1788,
+						"end": 1808,
+						"typeAnnotation": {
+							"type": "TSUnionType",
+							"start": 1790,
+							"end": 1808,
+							"types": [
+								{
+									"type": "TSStringKeyword",
+									"start": 1790,
+									"end": 1796
+								},
+								{
+									"type": "TSUndefinedKeyword",
+									"start": 1799,
+									"end": 1808
+								}
+							]
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 1809,
+						"end": 1811,
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A pattern annotated with an object type: both expand",
+							"start": 1644,
+							"end": 1699
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 1885,
+					"end": 1986,
+					"id": {
+						"type": "Identifier",
+						"start": 1894,
+						"end": 1899,
+						"name": "array"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "ArrayPattern",
+							"start": 1900,
+							"end": 1960,
+							"elements": [
+								{
+									"type": "Identifier",
+									"start": 1901,
+									"end": 1905,
+									"name": "aaaa"
+								},
+								{
+									"type": "Identifier",
+									"start": 1907,
+									"end": 1911,
+									"name": "bbbb"
+								},
+								{
+									"type": "Identifier",
+									"start": 1913,
+									"end": 1917,
+									"name": "cccc"
+								}
+							],
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 1918,
+								"end": 1960,
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 1920,
+									"end": 1960,
+									"typeName": {
+										"type": "Identifier",
+										"start": 1920,
+										"end": 1960,
+										"name": "Dddddddddddddddddddddddddddddddddddddddd"
+									}
+								}
+							}
+						}
+					],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 1961,
+						"end": 1983,
+						"typeAnnotation": {
+							"type": "TSUnionType",
+							"start": 1965,
+							"end": 1983,
+							"types": [
+								{
+									"type": "TSStringKeyword",
+									"start": 1965,
+									"end": 1971
+								},
+								{
+									"type": "TSUndefinedKeyword",
+									"start": 1974,
+									"end": 1983
+								}
+							]
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 1984,
+						"end": 1986,
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A hugged array pattern keeps its own group: the return type breaks",
+							"start": 1814,
+							"end": 1883
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 2057,
+					"end": 2163,
+					"id": {
+						"type": "Identifier",
+						"start": 2066,
+						"end": 2075,
+						"name": "defaulted"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "AssignmentPattern",
+							"start": 2076,
+							"end": 2101,
+							"left": {
+								"type": "ObjectPattern",
+								"start": 2076,
+								"end": 2096,
+								"properties": [
+									{
+										"type": "Property",
+										"start": 2078,
+										"end": 2082,
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 2078,
+											"end": 2082,
+											"name": "aaaa"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 2078,
+											"end": 2082,
+											"name": "aaaa"
+										},
+										"kind": "init"
+									},
+									{
+										"type": "Property",
+										"start": 2084,
+										"end": 2088,
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 2084,
+											"end": 2088,
+											"name": "bbbb"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 2084,
+											"end": 2088,
+											"name": "bbbb"
+										},
+										"kind": "init"
+									},
+									{
+										"type": "Property",
+										"start": 2090,
+										"end": 2094,
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 2090,
+											"end": 2094,
+											"name": "cccc"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 2090,
+											"end": 2094,
+											"name": "cccc"
+										},
+										"kind": "init"
+									}
+								]
+							},
+							"right": {
+								"type": "ObjectExpression",
+								"start": 2099,
+								"end": 2101,
+								"properties": []
+							}
+						}
+					],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 2102,
+						"end": 2160,
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 2104,
+							"end": 2160,
+							"typeName": {
+								"type": "Identifier",
+								"start": 2104,
+								"end": 2111,
+								"name": "Promise"
+							},
+							"typeArguments": {
+								"type": "TSTypeParameterInstantiation",
+								"start": 2111,
+								"end": 2160,
+								"params": [
+									{
+										"type": "TSUnionType",
+										"start": 2115,
+										"end": 2157,
+										"types": [
+											{
+												"type": "TSTypeReference",
+												"start": 2115,
+												"end": 2150,
+												"typeName": {
+													"type": "Identifier",
+													"start": 2115,
+													"end": 2150,
+													"name": "Eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+												}
+											},
+											{
+												"type": "TSTypeReference",
+												"start": 2153,
+												"end": 2157,
+												"typeName": {
+													"type": "Identifier",
+													"start": 2153,
+													"end": 2157,
+													"name": "Ffff"
+												}
+											}
+										]
+									}
+								]
+							}
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 2161,
+						"end": 2163,
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A defaulted pattern keeps its own group: the return type breaks",
+							"start": 1989,
+							"end": 2055
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 2216,
+					"end": 2322,
+					"id": {
+						"type": "Identifier",
+						"start": 2225,
+						"end": 2228,
+						"name": "two"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "ObjectPattern",
+							"start": 2232,
+							"end": 2288,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 2234,
+									"end": 2238,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 2234,
+										"end": 2238,
+										"name": "aaaa"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 2234,
+										"end": 2238,
+										"name": "aaaa"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 2240,
+									"end": 2244,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 2240,
+										"end": 2244,
+										"name": "bbbb"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 2240,
+										"end": 2244,
+										"name": "bbbb"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 2246,
+									"end": 2250,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 2246,
+										"end": 2250,
+										"name": "cccc"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 2246,
+										"end": 2250,
+										"name": "cccc"
+									},
+									"kind": "init"
+								}
+							],
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 2252,
+								"end": 2288,
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 2254,
+									"end": 2288,
+									"typeName": {
+										"type": "Identifier",
+										"start": 2254,
+										"end": 2288,
+										"name": "Dddddddddddddddddddddddddddddddddd"
+									}
+								}
+							}
+						},
+						{
+							"type": "Identifier",
+							"start": 2292,
+							"end": 2296,
+							"name": "e",
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 2293,
+								"end": 2296,
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 2295,
+									"end": 2296,
+									"typeName": {
+										"type": "Identifier",
+										"start": 2295,
+										"end": 2296,
+										"name": "E"
+									}
+								}
+							}
+						}
+					],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 2299,
+						"end": 2319,
+						"typeAnnotation": {
+							"type": "TSUnionType",
+							"start": 2301,
+							"end": 2319,
+							"types": [
+								{
+									"type": "TSStringKeyword",
+									"start": 2301,
+									"end": 2307
+								},
+								{
+									"type": "TSUndefinedKeyword",
+									"start": 2310,
+									"end": 2319
+								}
+							]
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 2320,
+						"end": 2322,
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Not hugged: two parameters break one per line",
+							"start": 2166,
+							"end": 2214
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 2384,
+					"end": 2490,
+					"id": {
+						"type": "Identifier",
+						"start": 2393,
+						"end": 2398,
+						"name": "plain"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "ObjectPattern",
+							"start": 2399,
+							"end": 2478,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 2403,
+									"end": 2407,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 2403,
+										"end": 2407,
+										"name": "aaaa"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 2403,
+										"end": 2407,
+										"name": "aaaa"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 2411,
+									"end": 2415,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 2411,
+										"end": 2415,
+										"name": "bbbb"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 2411,
+										"end": 2415,
+										"name": "bbbb"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 2419,
+									"end": 2423,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 2419,
+										"end": 2423,
+										"name": "cccc"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 2419,
+										"end": 2423,
+										"name": "cccc"
+									},
+									"kind": "init"
+								}
+							],
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 2426,
+								"end": 2478,
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 2428,
+									"end": 2478,
+									"typeName": {
+										"type": "Identifier",
+										"start": 2428,
+										"end": 2478,
+										"name": "Dddddddddddddddddddddddddddddddddddddddddddddddddd"
+									}
+								}
+							}
+						}
+					],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 2479,
+						"end": 2487,
+						"typeAnnotation": {
+							"type": "TSStringKeyword",
+							"start": 2481,
+							"end": 2487
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 2488,
+						"end": 2490,
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A return type with no break point: the pattern expands",
+							"start": 2325,
+							"end": 2382
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2571,
+					"end": 2693,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2571,
+						"end": 2692,
+						"callee": {
+							"type": "Identifier",
+							"start": 2571,
+							"end": 2573,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 2577,
+								"end": 2689,
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 2648,
+									"end": 2668,
+									"typeAnnotation": {
+										"type": "TSUnionType",
+										"start": 2650,
+										"end": 2668,
+										"types": [
+											{
+												"type": "TSStringKeyword",
+												"start": 2650,
+												"end": 2656
+											},
+											{
+												"type": "TSUndefinedKeyword",
+												"start": 2659,
+												"end": 2668
+											}
+										]
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "ObjectPattern",
+										"start": 2578,
+										"end": 2647,
+										"properties": [
+											{
+												"type": "Property",
+												"start": 2580,
+												"end": 2584,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 2580,
+													"end": 2584,
+													"name": "aaaa"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 2580,
+													"end": 2584,
+													"name": "aaaa"
+												},
+												"kind": "init"
+											},
+											{
+												"type": "Property",
+												"start": 2586,
+												"end": 2590,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 2586,
+													"end": 2590,
+													"name": "bbbb"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 2586,
+													"end": 2590,
+													"name": "bbbb"
+												},
+												"kind": "init"
+											},
+											{
+												"type": "Property",
+												"start": 2592,
+												"end": 2596,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 2592,
+													"end": 2596,
+													"name": "cccc"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 2592,
+													"end": 2596,
+													"name": "cccc"
+												},
+												"kind": "init"
+											}
+										],
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 2598,
+											"end": 2647,
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 2600,
+												"end": 2647,
+												"typeName": {
+													"type": "Identifier",
+													"start": 2600,
+													"end": 2647,
+													"name": "Ddddddddddddddddddddddddddddddddddddddddddddddd"
+												}
+											}
+										}
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 2672,
+									"end": 2689,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 2677,
+											"end": 2685,
+											"expression": {
+												"type": "CallExpression",
+												"start": 2677,
+												"end": 2684,
+												"callee": {
+													"type": "Identifier",
+													"start": 2677,
+													"end": 2678,
+													"name": "g"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 2679,
+														"end": 2683,
+														"name": "aaaa"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A callback argument: the arguments break out and the pattern stays inline",
+							"start": 2493,
+							"end": 2569
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2695,
+					"end": 2806,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2695,
+						"end": 2805,
+						"callee": {
+							"type": "Identifier",
+							"start": 2695,
+							"end": 2697,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 2698,
+								"end": 2802,
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 2769,
+									"end": 2789,
+									"typeAnnotation": {
+										"type": "TSUnionType",
+										"start": 2771,
+										"end": 2789,
+										"types": [
+											{
+												"type": "TSStringKeyword",
+												"start": 2771,
+												"end": 2777
+											},
+											{
+												"type": "TSUndefinedKeyword",
+												"start": 2780,
+												"end": 2789
+											}
+										]
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "ObjectPattern",
+										"start": 2699,
+										"end": 2768,
+										"properties": [
+											{
+												"type": "Property",
+												"start": 2701,
+												"end": 2705,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 2701,
+													"end": 2705,
+													"name": "aaaa"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 2701,
+													"end": 2705,
+													"name": "aaaa"
+												},
+												"kind": "init"
+											},
+											{
+												"type": "Property",
+												"start": 2707,
+												"end": 2711,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 2707,
+													"end": 2711,
+													"name": "bbbb"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 2707,
+													"end": 2711,
+													"name": "bbbb"
+												},
+												"kind": "init"
+											},
+											{
+												"type": "Property",
+												"start": 2713,
+												"end": 2717,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 2713,
+													"end": 2717,
+													"name": "cccc"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 2713,
+													"end": 2717,
+													"name": "cccc"
+												},
+												"kind": "init"
+											}
+										],
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 2719,
+											"end": 2768,
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 2721,
+												"end": 2768,
+												"typeName": {
+													"type": "Identifier",
+													"start": 2721,
+													"end": 2768,
+													"name": "Ddddddddddddddddddddddddddddddddddddddddddddddd"
+												}
+											}
+										}
+									}
+								],
+								"body": {
+									"type": "CallExpression",
+									"start": 2795,
+									"end": 2802,
+									"callee": {
+										"type": "Identifier",
+										"start": 2795,
+										"end": 2796,
+										"name": "g"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 2797,
+											"end": 2801,
+											"name": "aaaa"
+										}
+									],
+									"optional": false
+								}
+							}
+						],
+						"optional": false
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

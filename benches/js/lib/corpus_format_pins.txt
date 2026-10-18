@@ -64,7 +64,7 @@ prettier/tests/format/typescript typescript match=690 known=56 partial=7 unknown
 ryanatkn.com svelte match=26 known=5 partial=0 unknown=0 errors=0 expected_errors=0
 ryanatkn.com typescript match=20 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 ryanatkn.com css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0
-storybook typescript match=1332 known=2 partial=0 unknown=14 errors=0 expected_errors=0
+storybook typescript match=1335 known=2 partial=0 unknown=11 errors=0 expected_errors=0
 storybook css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 svelte typescript match=415 known=1 partial=0 unknown=0 errors=0 expected_errors=0
 svelte-docinfo svelte match=12 known=10 partial=0 unknown=0 errors=0 expected_errors=0

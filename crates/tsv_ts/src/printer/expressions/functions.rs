@@ -3503,11 +3503,12 @@ impl<'a> Printer<'a> {
         );
 
         if should_hug_single_pattern {
-            // Hug mode: `(` + param + `)`. An object-literal annotation takes the shared
-            // group-less arm (`build_hugged_literal_param_doc`) so the object breaks before
-            // a breakable return type; every other shape hugs its ordinary doc.
+            // Hug mode: `(` + param + `)`. An object pattern or an object-literal
+            // annotation takes the shared group-less arm
+            // (`build_group_less_hugged_param_doc`) so the object breaks before a breakable
+            // return type; every other shape hugs its ordinary doc.
             let param_doc = self
-                .build_hugged_literal_param_doc(&params[0], comments_present)
+                .build_group_less_hugged_param_doc(&params[0], comments_present)
                 .unwrap_or_else(|| self.build_function_parameter_doc(&params[0]));
             return d.parens(param_doc);
         }

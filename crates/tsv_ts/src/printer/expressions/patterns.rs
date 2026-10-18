@@ -74,6 +74,9 @@ struct PatternTail<'a> {
     body_end: u32,
     optional: bool,
     type_annotation: Option<&'a internal::TSTypeAnnotation<'a>>,
+    /// The pattern is a HUGGED sole parameter ([`Printer::build_hugged_object_pattern_doc`]),
+    /// so an object-type literal annotating it prints without a group of its own too.
+    hugged: bool,
 }
 
 /// Layout role of an assignment-chain segment's right side (`a = b = value`).
@@ -521,6 +524,7 @@ impl<'a> Printer<'a> {
             ),
             optional,
             type_annotation,
+            hugged: false,
         }
     }
 
@@ -550,6 +554,7 @@ impl<'a> Printer<'a> {
             ),
             optional,
             type_annotation,
+            hugged: false,
         }
     }
 
@@ -574,7 +579,21 @@ impl<'a> Printer<'a> {
             tail.body_end
         };
         if let Some(ta) = tail.type_annotation {
-            parts.push(self.build_binding_type_annotation_doc(marker_end, ta, false));
+            // A hugged pattern's object-type annotation is group-less like the pattern
+            // (prettier's `printObject`, the same arm a hugged identifier's literal takes).
+            let literal = if tail.hugged {
+                self.hugged_param_annotation_literal(ta)
+            } else {
+                None
+            };
+            parts.push(match literal {
+                Some(literal) => {
+                    self.build_binding_type_annotation_doc_with(marker_end, ta, || {
+                        self.build_hugged_literal_annotation_doc(ta, literal, true)
+                    })
+                }
+                None => self.build_binding_type_annotation_doc(marker_end, ta, false),
+            });
         }
         (!parts.is_empty()).then(|| d.concat(&parts))
     }
@@ -599,6 +618,40 @@ impl<'a> Printer<'a> {
         obj_span: Span,
         context: PatternContext,
     ) -> DocId {
+        self.build_object_pattern_doc_grouped(obj, obj_span, context, true)
+    }
+
+    /// The object pattern a sole parameter HUGS ([`Printer::hugs_sole_parameter`]): the
+    /// width-decided layout with **no group of its own**. Prettier's `printObject`
+    /// returns bare content for an undecorated `ObjectPattern` whose function hugs its
+    /// only parameter ("so that the object breaks before the return type"): the
+    /// pattern's lines belong to the enclosing signature group, so once the signature
+    /// overflows the properties expand and a breakable return type (`string |
+    /// undefined`, `Promise<B | null>`) stays inline. The object-type literal twin is
+    /// [`Printer::build_hugged_literal_param_doc`]. An empty pattern and a pattern that
+    /// expands on its own (nesting, comments, blank lines) keep their layout.
+    pub(in crate::printer) fn build_hugged_object_pattern_doc(
+        &self,
+        obj: &internal::ObjectPattern<'_>,
+        obj_span: Span,
+    ) -> DocId {
+        self.build_object_pattern_doc_grouped(
+            obj,
+            obj_span,
+            PatternContext::FunctionParameter,
+            false,
+        )
+    }
+
+    /// [`Self::build_object_pattern_doc_with_context`]'s body; `own_group` is `false` only
+    /// for the hugged sole parameter ([`Self::build_hugged_object_pattern_doc`]).
+    fn build_object_pattern_doc_grouped(
+        &self,
+        obj: &internal::ObjectPattern<'_>,
+        obj_span: Span,
+        context: PatternContext,
+        own_group: bool,
+    ) -> DocId {
         let d = self.d();
         if obj.properties.is_empty() {
             self.build_empty_object_pattern_doc(obj, obj_span)
@@ -611,7 +664,10 @@ impl<'a> Printer<'a> {
             // a blank after the `{` is not a reason to expand, and acting on one made
             // the expanded output its own second fixed point (`collection_formatting_hints`).
             let should_expand = object_pattern_should_expand(obj, context);
-            let tail = self.object_pattern_tail(obj, obj_span);
+            let tail = PatternTail {
+                hugged: !own_group,
+                ..self.object_pattern_tail(obj, obj_span)
+            };
             let boundary = tail.body_end;
             let has_comments = self.has_comments_on_page_between(obj_span.start, boundary);
             let (has_line_comments, has_blank_lines) =
@@ -714,7 +770,8 @@ impl<'a> Printer<'a> {
                     group_parts.push(tail);
                 }
 
-                d.group(d.concat(&group_parts))
+                let content = d.concat(&group_parts);
+                if own_group { d.group(content) } else { content }
             }
         }
     }

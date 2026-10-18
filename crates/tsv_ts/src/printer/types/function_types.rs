@@ -169,7 +169,7 @@ impl<'a> Printer<'a> {
     /// The two delimiter gaps around the parameter are the caller's precondition
     /// ([`Self::param_delimiter_gaps_empty`], inside [`Self::hugs_sole_parameter`]) — this
     /// arm emits neither gap and must not grow an emitter for one.
-    pub(in crate::printer) fn build_hugged_literal_param_doc(
+    fn build_hugged_literal_param_doc(
         &self,
         param: &internal::Expression<'_>,
         window_has_comments: bool,
@@ -199,38 +199,100 @@ impl<'a> Printer<'a> {
         let after_modifier = self.push_identifier_head_doc(&mut parts, id);
         parts.push(
             self.build_binding_type_annotation_doc_with(after_modifier, type_ann, || {
-                // The `:`→literal comment window ends at the LITERAL, not at the
-                // annotation's own type: this arm prints the literal, so a redundant paren
-                // shell around it is dropped and its leading gap is part of this one
-                // (`x: (/* c */ { a: T })`). Ending at the shell's `(` instead left that
-                // gap with no emitter and dropped the comment. The shell's TRAILING gap
-                // has no such home and declines this arm outright (above).
-                let colon_end = type_ann.span.start + 1;
-                let type_start = type_literal.span.start;
-                let mut annotation: DocBuf = smallvec![d.text(": ")];
-                if window_has_comments {
-                    // The shared leading emitter, not a kind-keyed space: a block the
-                    // author broke after takes prettier's soft `line`, which the signature
-                    // group — the literal has no group of its own here — collapses while
-                    // it fits and opens for a multi-line block, a forced break, so the
-                    // literal drops below the `*/` exactly as it does at every other
-                    // annotation (`param_annotation_object_broke_after_multiline_block_comment`).
-                    // `AdjacentAnchorLine`: the run's first comment is on the `:` line by
-                    // construction here, so its authored own-line-ness is not read (the
-                    // hardline it would force collapses on the next pass), while an author
-                    // blank after a comment survives as prettier keeps it.
-                    self.push_leading_comment_run(
-                        &mut annotation,
-                        self.comments_to_emit_between(colon_end, type_start),
-                        type_start,
-                        LeadingGlue::AdjacentAnchorLine,
-                    );
-                }
-                annotation.push(self.build_type_literal_doc_for_function_param(type_literal));
-                d.concat(&annotation)
+                self.build_hugged_literal_annotation_doc(
+                    type_ann,
+                    type_literal,
+                    window_has_comments,
+                )
             }),
         );
         Some(d.concat(&parts))
+    }
+
+    /// The object-type literal a hugged sole parameter's annotation prints group-less
+    /// ([`Self::build_hugged_literal_annotation_doc`]): the annotation's type with any
+    /// redundant paren shell stripped, when it is a literal and the shell holds no comment
+    /// after it ([`Self::paren_shell_trailing_gap_empty`]). Asked for a hugged object
+    /// pattern's annotation; the identifier arm reads the same two facts itself.
+    pub(in crate::printer) fn hugged_param_annotation_literal<'t>(
+        &self,
+        type_ann: &'t internal::TSTypeAnnotation<'t>,
+    ) -> Option<&'t internal::TSTypeLiteral<'t>> {
+        match unwrap_parenthesized(type_ann.type_annotation) {
+            TSType::TypeLiteral(t) if self.paren_shell_trailing_gap_empty(type_ann, t.span) => {
+                Some(t)
+            }
+            _ => None,
+        }
+    }
+
+    /// A hugged sole parameter's `: { … }` annotation — the literal with no group of its
+    /// own, behind the `:`→literal comment run.
+    pub(in crate::printer) fn build_hugged_literal_annotation_doc(
+        &self,
+        type_ann: &internal::TSTypeAnnotation<'_>,
+        type_literal: &internal::TSTypeLiteral<'_>,
+        window_has_comments: bool,
+    ) -> DocId {
+        let d = self.d();
+        // The `:`→literal comment window ends at the LITERAL, not at the
+        // annotation's own type: this arm prints the literal, so a redundant paren
+        // shell around it is dropped and its leading gap is part of this one
+        // (`x: (/* c */ { a: T })`). Ending at the shell's `(` instead left that
+        // gap with no emitter and dropped the comment. The shell's TRAILING gap
+        // has no such home: a comment there declines the arm before it gets here
+        // (`paren_shell_trailing_gap_empty`, asked by both callers).
+        let colon_end = type_ann.span.start + 1;
+        let type_start = type_literal.span.start;
+        let mut annotation: DocBuf = smallvec![d.text(": ")];
+        if window_has_comments {
+            // The shared leading emitter, not a kind-keyed space: a block the
+            // author broke after takes prettier's soft `line`, which the signature
+            // group — the literal has no group of its own here — collapses while
+            // it fits and opens for a multi-line block, a forced break, so the
+            // literal drops below the `*/` exactly as it does at every other
+            // annotation (`param_annotation_object_broke_after_multiline_block_comment`).
+            // `AdjacentAnchorLine`: the run's first comment is on the `:` line by
+            // construction here, so its authored own-line-ness is not read (the
+            // hardline it would force collapses on the next pass), while an author
+            // blank after a comment survives as prettier keeps it.
+            self.push_leading_comment_run(
+                &mut annotation,
+                self.comments_to_emit_between(colon_end, type_start),
+                type_start,
+                LeadingGlue::AdjacentAnchorLine,
+            );
+        }
+        annotation.push(self.build_type_literal_doc_for_function_param(type_literal));
+        d.concat(&annotation)
+    }
+
+    /// The hugged sole parameter's GROUP-LESS doc — without its parens — for the two
+    /// shapes prettier's `printObject` prints without a group of their own under a hugging
+    /// function: an identifier annotated with an object-type literal
+    /// ([`Self::build_hugged_literal_param_doc`]) and an undecorated object pattern
+    /// ([`Printer::build_hugged_object_pattern_doc`]). Either way the object breaks before
+    /// a breakable return type. `None` for every other huggable shape (an array pattern, a
+    /// defaulted pattern, a mapped-type annotation), which hugs its ordinary doc. One arm
+    /// for all three parameter builders — value, signature and function/constructor type.
+    pub(in crate::printer) fn build_group_less_hugged_param_doc(
+        &self,
+        param: &internal::Expression<'_>,
+        window_has_comments: bool,
+    ) -> Option<DocId> {
+        if let internal::ExpressionKind::ObjectPattern(obj) = &param.kind {
+            // The shared gate declines a decorated parameter before any hug; this arm has
+            // no decorator emitter, so the ordinary builder takes one if it ever arrives.
+            debug_assert!(
+                obj.decorators.is_none(),
+                "a decorated parameter must not reach the group-less hug arm"
+            );
+            return obj
+                .decorators
+                .is_none()
+                .then(|| self.build_hugged_object_pattern_doc(obj, param.span));
+        }
+        self.build_hugged_literal_param_doc(param, window_has_comments)
     }
 
     //
@@ -1076,7 +1138,7 @@ impl<'a> Printer<'a> {
         param: &internal::Expression<'_>,
         window_has_comments: bool,
     ) -> DocId {
-        self.build_hugged_literal_param_doc(param, window_has_comments)
+        self.build_group_less_hugged_param_doc(param, window_has_comments)
             .unwrap_or_else(|| match &param.kind {
                 internal::ExpressionKind::ObjectPattern(_) => {
                     self.build_function_parameter_doc(param)
