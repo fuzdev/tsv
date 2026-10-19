@@ -317,16 +317,17 @@ pub(super) enum ChainArgKind {
 /// Classify how a single argument should be formatted in chain context.
 ///
 /// Most expressions need soft wrapping so the call can break before the argument.
-/// Only block-like expressions (objects, arrays, functions, classes) hug naturally,
-/// including when wrapped in TS type assertions (`{...} as T`, `[...] satisfies T`).
-/// Arrow functions are classified by their body type.
+/// Only objects, arrays and `function`s hug naturally, including when wrapped in TS type
+/// assertions (`{...} as T`, `[...] satisfies T`); arrow functions are classified by their
+/// body type. A class expression is NOT huggable: prettier's `couldExpandArg` has no class
+/// arm, so a member call breaks a sole class argument onto its own line exactly as a plain
+/// call does (`calls/chain_class_arg_no_hug`).
 pub(super) fn classify_chain_arg(arg: &internal::Expression<'_>) -> ChainArgKind {
     match &arg.kind {
         // Block-like expressions hug the call parens naturally
         internal::ExpressionKind::ObjectExpression(_)
         | internal::ExpressionKind::ArrayExpression(_)
-        | internal::ExpressionKind::FunctionExpression(_)
-        | internal::ExpressionKind::ClassExpression(_) => ChainArgKind::HugsNaturally,
+        | internal::ExpressionKind::FunctionExpression(_) => ChainArgKind::HugsNaturally,
         // TS cast wrappers: classify based on the inner expression
         // e.g., `{...} as any` hugs, `longExpr as T` soft-wraps. Mirrors prettier's
         // couldExpandArg, which looks through `as`/`satisfies`/`<T>` but NOT a
@@ -1597,10 +1598,9 @@ impl ArgOpener {
     ///
     /// ⚠️ **One seam for three printers.** Each of them hand-rolled a bare `callee(arg)` concat
     /// here, and a concat has no state below the hug: an argument with nothing to break inside
-    /// it — `{}`, `[]`, `function () {}`, `class {}` — ran past the print width instead of
-    /// dropping to its own line (`calls/single_arg_function_expression_long`,
-    /// `calls/chain_single_arg_hug_long`). One `printCallArguments` prints all three, so none
-    /// of them may answer this alone.
+    /// it — `{}`, `[]`, `function () {}` — ran past the print width instead of dropping to its
+    /// own line (`calls/single_arg_function_expression_long`, `calls/chain_single_arg_hug_long`).
+    /// One `printCallArguments` prints all three, so none of them may answer this alone.
     #[inline]
     pub(super) fn lone_hug_ladder(
         self,

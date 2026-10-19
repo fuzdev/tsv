@@ -1167,11 +1167,11 @@ fn build_chain_args_single(
                 // Objects, arrays, blocks and `function`s hug — but through prettier's own
                 // ladder, not an unconditional hug. ⚠️ The bare `prefix arg )` concat that
                 // stood here had NO state below the hug, so an argument with nothing to break
-                // inside it — `{}`, `[]`, `function () {}`, `class {}` — ran past the print
-                // width instead of dropping to its own line
-                // (`calls/chain_single_arg_hug_long`). The plain-call and `new` spellings of
-                // this same question are `call_formatting.rs`'s and `new_expression.rs`'s
-                // single-argument arms; one `printCallArguments` prints all three.
+                // inside it — `{}`, `[]`, `function () {}` — ran past the print width
+                // instead of dropping to its own line (`calls/chain_single_arg_hug_long`).
+                // The plain-call and `new` spellings of this same question are
+                // `call_formatting.rs`'s and `new_expression.rs`'s single-argument arms; one
+                // `printCallArguments` prints all three.
                 opener.lone_hug_ladder(d, arg_with_comments, lone_arg_params_render_flat(arg))
             }
         }
