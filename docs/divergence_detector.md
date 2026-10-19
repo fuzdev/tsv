@@ -240,8 +240,9 @@ language/feature pattern claims a hunk before the broad `fill_101_boundary` /
 2. **CSS patterns** — at-rule spacing/wrapping, selectors, comments, SCSS directives, …
    (followed by `format_ignore_preserved` — directive-driven suppression, the most
    specific signal there is, placed ahead of every layout heuristic)
-3. **Feature patterns** — template-literal width, member-expression call,
-   return-type generic union, `block_expression_logical`, …
+3. **Feature patterns** — template-literal width, embedded-language and jest-each
+   template bodies, member-expression call, return-type generic union, the hugged
+   sole-parameter object type, the curried-callee callback, `block_expression_logical`, …
 4. **Svelte element/block patterns** — `inline_content_hug`, `short_expr_100`,
    `comment_preserved`, …
 5. **Semantic preservation patterns** — `instantiation_parens`,
@@ -370,10 +371,10 @@ with it: a hunk straddling a `</style>` boundary takes the CSS regime for all it
 **Every long-line pattern routes through the helper.** `short_expr_100` hand-rolled the
 count arm alone (`{#if}` in prettier's 101–110 band, `added_lines.length >
 removed_lines.length`) and carried the same hole; it takes the shared shape via
-`max_width`. `member_expression_call` still guards on the count alone — it makes no
-prettier-width claim at all, so the width half needs its own rationale rather than being
-folded in silently; today it claims one corpus file, whose only over-width line is an
-unbreakable URL comment identical on both sides and so in no hunk.
+`max_width`. `member_expression_call` still makes no prettier-width claim at all — it
+guards on the count plus a content check blind only to whitespace outside strings (both
+layouts of one call hold the same tokens) — so the width half needs its own rationale rather than being folded in
+silently.
 
 ## Overmatching Audit
 

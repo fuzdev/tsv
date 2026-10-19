@@ -3,7 +3,7 @@
 #
 # <row> <language> match=<n> known=<n> partial=<n> unknown=<n> errors=<n> expected_errors=<n>
 benches/js/.cache/svelte_styles css match=23 known=2 partial=0 unknown=0 errors=0 expected_errors=0
-continue typescript match=940 known=2 partial=0 unknown=9 errors=0 expected_errors=0
+continue typescript match=940 known=11 partial=0 unknown=0 errors=0 expected_errors=0
 cosmicplayground svelte match=83 known=48 partial=0 unknown=0 errors=0 expected_errors=0
 cosmicplayground typescript match=82 known=2 partial=0 unknown=0 errors=0 expected_errors=0
 cosmicplayground css match=1 known=1 partial=0 unknown=0 errors=0 expected_errors=0
@@ -59,12 +59,12 @@ prettier-plugin-svelte/test svelte match=276 known=46 partial=0 unknown=0 errors
 prettier/tests/format/css typescript match=78 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 prettier/tests/format/css css match=87 known=15 partial=8 unknown=14 errors=8 expected_errors=18
 prettier/tests/format/html svelte match=55 known=29 partial=0 unknown=0 errors=39 expected_errors=1
-prettier/tests/format/js typescript match=823 known=63 partial=15 unknown=27 errors=124 expected_errors=54
+prettier/tests/format/js typescript match=823 known=64 partial=16 unknown=25 errors=124 expected_errors=54
 prettier/tests/format/typescript typescript match=691 known=56 partial=7 unknown=24 errors=14 expected_errors=3
 ryanatkn.com svelte match=26 known=5 partial=0 unknown=0 errors=0 expected_errors=0
 ryanatkn.com typescript match=20 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 ryanatkn.com css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0
-storybook typescript match=1340 known=2 partial=0 unknown=6 errors=0 expected_errors=0
+storybook typescript match=1340 known=8 partial=0 unknown=0 errors=0 expected_errors=0
 storybook css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 svelte typescript match=415 known=1 partial=0 unknown=0 errors=0 expected_errors=0
 svelte-docinfo svelte match=12 known=10 partial=0 unknown=0 errors=0 expected_errors=0

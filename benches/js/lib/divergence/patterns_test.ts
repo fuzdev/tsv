@@ -1201,12 +1201,14 @@ Deno.test('css_value_wrap: negative - a top-level COMMA is a seam too', () => {
 
 // ─── member_expression_call ─────────────────────────────────────────────────
 
-Deno.test('member_expression_call: positive - require.resolve in diff', () => {
-	const prettier = 'const p = require.resolve.paths("some/very/long/module/path/that/exceeds");';
-	const ours = 'const p = require.resolve.paths(\n\t"some/very/long/module/path/that/exceeds",\n);';
-	const ctx = make_context(ours, prettier, 'typescript');
-	const match = run_pattern('member_expression_call', ctx);
-	assertNotEquals(match, null);
+Deno.test('member_expression_call: positive - require.resolve.paths (path_calls_long)', () => {
+	// The fixture `path_calls_long_prettier_divergence`'s `require.resolve.paths` site:
+	// prettier breaks at the chain, tsv expands the argument; the tokens are the same.
+	const prettier =
+		"\tconst d = require.resolve\n\t\t.paths('./aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');\n";
+	const ours =
+		"\tconst d = require.resolve.paths(\n\t\t'./aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'\n\t);\n";
+	assert_claims_every_hunk(make_context(ours, prettier, 'typescript'), 'member_expression_call');
 });
 
 Deno.test('member_expression_call: negative - no module pattern in source', () => {
@@ -2626,11 +2628,13 @@ Deno.test('jsdoc_type_cast_parens: negative - reverse direction (ours strips) no
 
 // ─── member_expression_call (additional) ──────────────────────────────────
 
-Deno.test('member_expression_call: positive - import.meta.resolve in diff', () => {
-	const prettier = 'const p = import.meta.resolve("some/very/long/module/path/that/exceeds");';
-	const ours = 'const p = import.meta.resolve(\n\t"some/very/long/module/path/that/exceeds",\n);';
-	const ctx = make_context(ours, prettier, 'typescript');
-	const match = run_pattern('member_expression_call', ctx);
+Deno.test('member_expression_call: positive - import.meta.resolve (path_calls_long)', () => {
+	// The fixture `path_calls_long_prettier_divergence`'s `import.meta.resolve` site.
+	const prettier =
+		"\tconst f = import.meta\n\t\t.resolve('./aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');\n";
+	const ours =
+		"\tconst f = import.meta.resolve(\n\t\t'./aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'\n\t);\n";
+	const match = run_pattern('member_expression_call', make_context(ours, prettier, 'typescript'));
 	assertNotEquals(match, null);
 	assertEquals(match!.pattern, 'member_expression_call');
 });
@@ -3124,3 +3128,821 @@ Deno.test('may_alter_char_frequency: only deliberately-declared patterns may vou
 		'self_closing_nonvoid'
 	]);
 });
+
+// ─── corpus-derived detector gaps ─────────────────────────────────────────
+//
+// Minimal real hunks from the pinned corpus that a cataloged divergence produces but
+// no detector claims, each beside the near miss the widened detector must still
+// refuse. Positives grade the whole classifier, so a hunk left over fails them too.
+
+/** The hunk indices the named pattern claims when the whole classifier runs. */
+function claimed_by(ctx: DetectionContext, pattern_id: string): number[] {
+	const coverage = detect_divergences(ctx);
+	return coverage.matches
+		.filter((m) => m.pattern === pattern_id)
+		.flatMap((m) => m.hunk_indices)
+		.sort((a, b) => a - b);
+}
+
+/** Assert the named pattern claims every hunk and the file classifies `all_explained`. */
+function assert_claims_every_hunk(ctx: DetectionContext, pattern_id: string): void {
+	assertEquals(ctx.hunks.length > 0, true);
+	assertEquals(
+		claimed_by(ctx, pattern_id),
+		ctx.hunks.map((h) => h.index)
+	);
+	assertEquals(detect_divergences(ctx).classification, 'all_explained');
+}
+
+/** Assert no pattern claims anything: the near miss stays `unknown`. */
+function assert_unclaimed(ctx: DetectionContext): void {
+	assertEquals(ctx.hunks.length > 0, true);
+	assertEquals(detect_divergences(ctx).classification, 'none_explained');
+}
+
+// ─── sole_param_object_type_hug ───────────────────────────────────────────
+// conformance_prettier_ts.md §Hugged sole-parameter object type: prettier drops the
+// group of a hugged sole parameter's object type, collapsing the authored expansion
+// to one flat line; tsv keeps it.
+
+Deno.test(
+	'sole_param_object_type_hug: positive - function-type property, authored expansion kept',
+	() => {
+		const prettier =
+			"interface UseModelSelectorProps {\n\tonMessage: (message: { role: string; content: string; messageType: 'system' }) => void;\n\tonModelSwitch?: () => void;\n}\n";
+		const ours =
+			"interface UseModelSelectorProps {\n\tonMessage: (message: {\n\t\trole: string;\n\t\tcontent: string;\n\t\tmessageType: 'system';\n\t}) => void;\n\tonModelSwitch?: () => void;\n}\n";
+		const source =
+			'interface UseModelSelectorProps {\n  onMessage: (message: {\n    role: string;\n    content: string;\n    messageType: "system";\n  }) => void;\n  onModelSwitch?: () => void;\n}\n';
+		assert_claims_every_hunk(
+			make_context(ours, prettier, 'typescript', source),
+			'sole_param_object_type_hug'
+		);
+	}
+);
+
+Deno.test(
+	'sole_param_object_type_hug: positive - annotated object pattern, the break propagates into it',
+	() => {
+		const prettier =
+			'export const ServiceContainerProvider = ({ children }: { children: React.ReactNode }) => {\n\treturn React.createElement(React.Fragment, null, children);\n};\n';
+		const ours =
+			'export const ServiceContainerProvider = ({\n\tchildren\n}: {\n\tchildren: React.ReactNode;\n}) => {\n\treturn React.createElement(React.Fragment, null, children);\n};\n';
+		const source =
+			'export const ServiceContainerProvider = ({\n  children,\n}: {\n  children: React.ReactNode;\n}) => {\n  return React.createElement(React.Fragment, null, children);\n};\n';
+		assert_claims_every_hunk(
+			make_context(ours, prettier, 'typescript', source),
+			'sole_param_object_type_hug'
+		);
+	}
+);
+
+Deno.test(
+	'sole_param_object_type_hug: positive - function type as one parameter of a longer list',
+	() => {
+		// The hug is the function TYPE's sole parameter; the outer list's other
+		// parameters are outside it, and the trailing `,` belongs to the outer list.
+		const prettier =
+			"export function markProcessAsRunning(\n\ttoolCallId: string,\n\tonPartialOutput?: (params: { toolCallId: string; contextItems: any[] }) => void,\n\tcurrentOutput: string = ''\n): void {}\n";
+		const ours =
+			"export function markProcessAsRunning(\n\ttoolCallId: string,\n\tonPartialOutput?: (params: {\n\t\ttoolCallId: string;\n\t\tcontextItems: any[];\n\t}) => void,\n\tcurrentOutput: string = ''\n): void {}\n";
+		const source =
+			'export function markProcessAsRunning(\n  toolCallId: string,\n  onPartialOutput?: (params: {\n    toolCallId: string;\n    contextItems: any[];\n  }) => void,\n  currentOutput: string = "",\n): void {}\n';
+		assert_claims_every_hunk(
+			make_context(ours, prettier, 'typescript', source),
+			'sole_param_object_type_hug'
+		);
+	}
+);
+
+Deno.test('sole_param_object_type_hug: negative - the parameter is not sole', () => {
+	// A second parameter means no hug, so prettier keeps the group and the authored
+	// break — a flat prettier line here is not this divergence.
+	const prettier =
+		'interface P {\n\tonMessage: (message: { role: string; content: string }, id: number) => void;\n}\n';
+	const ours =
+		'interface P {\n\tonMessage: (message: {\n\t\trole: string;\n\t\tcontent: string;\n\t}, id: number) => void;\n}\n';
+	const source =
+		'interface P {\n  onMessage: (message: {\n    role: string;\n    content: string;\n  }, id: number) => void;\n}\n';
+	assert_unclaimed(make_context(ours, prettier, 'typescript', source));
+});
+
+Deno.test(
+	'sole_param_object_type_hug: negative - the source was flat (no authored expansion)',
+	() => {
+		// The divergence keeps an expansion the AUTHOR wrote; tsv expanding a flat
+		// object type that fits is a tsv bug. The unrelated `options: {` object elsewhere
+		// in the file must not stand in for the authored expansion: the source check is
+		// anchored at the site (its first member key), not anywhere in the file.
+		const cfg = 'const cfg = {\n\toptions: {\n\t\ta: 1\n\t}\n};\n';
+		const prettier = `${cfg}interface P {\n\tonMessage: (options: { role: string; content: string; messageType: 'system' }) => void;\n}\n`;
+		const ours = `${cfg}interface P {\n\tonMessage: (options: {\n\t\trole: string;\n\t\tcontent: string;\n\t\tmessageType: 'system';\n\t}) => void;\n}\n`;
+		const source =
+			"const cfg = {\n  options: {\n    a: 1\n  }\n};\ninterface P {\n  onMessage: (options: { role: string; content: string; messageType: 'system' }) => void;\n}\n";
+		assert_unclaimed(make_context(ours, prettier, 'typescript', source));
+	}
+);
+
+Deno.test('sole_param_object_type_hug: negative - ours lost a member', () => {
+	const prettier =
+		"interface P {\n\tonMessage: (message: { role: string; content: string; messageType: 'system' }) => void;\n}\n";
+	const ours =
+		'interface P {\n\tonMessage: (message: {\n\t\trole: string;\n\t\tcontent: string;\n\t}) => void;\n}\n';
+	const source =
+		"interface P {\n  onMessage: (message: {\n    role: string;\n    content: string;\n    messageType: 'system';\n  }) => void;\n}\n";
+	assert_unclaimed(make_context(ours, prettier, 'typescript', source));
+});
+
+// Near misses whose only loss is a separator or string content: SAFETY counts `,` and
+// `;` as formatting characters and whitespace as nothing, so the content proof is the
+// only thing standing between each of these tsv bugs and a `known` verdict.
+
+Deno.test('sole_param_object_type_hug: negative - ours dropped a comma in a member type', () => {
+	const prettier =
+		'interface P {\n\tonX: (opts: { cb: (a: string, b: number) => void; id: string }) => void;\n}\n';
+	const ours =
+		'interface P {\n\tonX: (opts: {\n\t\tcb: (a: string b: number) => void;\n\t\tid: string;\n\t}) => void;\n}\n';
+	const source =
+		'interface P {\n  onX: (opts: {\n    cb: (a: string, b: number) => void;\n    id: string;\n  }) => void;\n}\n';
+	assert_unclaimed(make_context(ours, prettier, 'typescript', source));
+});
+
+Deno.test(
+	'sole_param_object_type_hug: negative - ours dropped a comma between pattern properties',
+	() => {
+		const prettier = 'export const F = ({ a, b }: { a: A; b: B }) => {\n\treturn a;\n};\n';
+		const ours =
+			'export const F = ({\n\ta\n\tb\n}: {\n\ta: A;\n\tb: B;\n}) => {\n\treturn a;\n};\n';
+		const source =
+			'export const F = ({\n  a,\n  b,\n}: {\n  a: A;\n  b: B;\n}) => {\n  return a;\n};\n';
+		assert_unclaimed(make_context(ours, prettier, 'typescript', source));
+	}
+);
+
+Deno.test('sole_param_object_type_hug: negative - ours separates members with `,`', () => {
+	const prettier = 'interface P {\n\tonX: (m: { kind: string; id: string }) => void;\n}\n';
+	const ours =
+		'interface P {\n\tonX: (m: {\n\t\tkind: string,\n\t\tid: string,\n\t}) => void;\n}\n';
+	const source =
+		'interface P {\n  onX: (m: {\n    kind: string;\n    id: string;\n  }) => void;\n}\n';
+	assert_unclaimed(make_context(ours, prettier, 'typescript', source));
+});
+
+Deno.test('sole_param_object_type_hug: negative - ours re-spaced a string literal type', () => {
+	const prettier = "interface P {\n\tonX: (m: { kind: 'system prompt'; id: string }) => void;\n}\n";
+	const ours =
+		"interface P {\n\tonX: (m: {\n\t\tkind: 'systemprompt';\n\t\tid: string;\n\t}) => void;\n}\n";
+	const source =
+		"interface P {\n  onX: (m: {\n    kind: 'system prompt';\n    id: string;\n  }) => void;\n}\n";
+	assert_unclaimed(make_context(ours, prettier, 'typescript', source));
+});
+
+Deno.test(
+	'sole_param_object_type_hug: negative - flat site, same name and first key expanded elsewhere',
+	() => {
+		// An interface field and a function taking it share a name and first key all the
+		// time; the interface's authored `options: {⏎ timeout` must not vouch for tsv
+		// expanding the FLAT parameter type below it.
+		const cfg = 'interface Cfg {\n\toptions: {\n\t\ttimeout: number;\n\t};\n}\n';
+		const prettier = `${cfg}function f(options: { timeout: number; retries: number }) {}\n`;
+		const ours = `${cfg}function f(options: {\n\ttimeout: number;\n\tretries: number;\n}) {}\n`;
+		const source =
+			'interface Cfg {\n  options: {\n    timeout: number;\n  };\n}\nfunction f(options: { timeout: number; retries: number }) {}\n';
+		assert_unclaimed(make_context(ours, prettier, 'typescript', source));
+	}
+);
+
+// ─── member_expression_call (source spells the chain across lines) ────────
+// conformance_prettier_ts.md §Module path calls: prettier breaks `import.meta.resolve(…)`
+// at the `.resolve` chain, tsv expands the call's arguments. The source here is
+// prettier's own chain break, so `import.meta.resolve(` never appears in it whole.
+
+Deno.test('member_expression_call: positive - source breaks the chain before `.resolve(`', () => {
+	const prettier =
+		"\tconst commonOverridePreset = import.meta\n\t\t.resolve('storybook/internal/core-server/presets/common-override-preset');\n\n\tlogger.step('Loading presets');\n";
+	const ours =
+		"\tconst commonOverridePreset = import.meta.resolve(\n\t\t'storybook/internal/core-server/presets/common-override-preset'\n\t);\n\n\tlogger.step('Loading presets');\n";
+	const source =
+		"  const commonOverridePreset = import.meta\n    .resolve('storybook/internal/core-server/presets/common-override-preset');\n\n  logger.step('Loading presets');\n";
+	assert_claims_every_hunk(
+		make_context(ours, prettier, 'typescript', source),
+		'member_expression_call'
+	);
+});
+
+Deno.test(
+	'member_expression_call: negative - chain-broken source, but ours holds no module path call',
+	() => {
+		const prettier = "\tconst p = import.meta\n\t\t.resolve('x');\n";
+		const ours = "\tconst p = import.meta.url.concat(\n\t\t'x'\n\t);\n";
+		const source = "  const p = import.meta\n    .resolve('x');\n";
+		assert_unclaimed(make_context(ours, prettier, 'typescript', source));
+	}
+);
+
+Deno.test('member_expression_call: negative - ours dropped an argument while re-wrapping', () => {
+	// The layout is the cataloged one, but the `parent` argument is gone: the two
+	// layouts of one call must hold the same tokens.
+	const prettier =
+		"\tconst p = import.meta\n\t\t.resolve('storybook/internal/core-server/presets/common-override-preset', parent);\n";
+	const ours =
+		"\tconst p = import.meta.resolve(\n\t\t'storybook/internal/core-server/presets/common-override-preset'\n\t);\n";
+	const source =
+		"  const p = import.meta\n    .resolve('storybook/internal/core-server/presets/common-override-preset', parent);\n";
+	assert_unclaimed(make_context(ours, prettier, 'typescript', source));
+});
+
+Deno.test('member_expression_call: negative - ours re-spaced a string argument', () => {
+	// Whitespace inside a string is content: the two layouts must agree on it.
+	const prettier = "\tconst f = import.meta\n\t\t.resolve('./my file.js', parent);\n";
+	const ours = "\tconst f = import.meta.resolve(\n\t\t'./myfile.js',\n\t\tparent\n\t);\n";
+	assert_unclaimed(make_context(ours, prettier, 'typescript', prettier));
+});
+
+Deno.test('member_expression_call: positive - the string argument kept (control)', () => {
+	const prettier = "\tconst f = import.meta\n\t\t.resolve('./my file.js', parent);\n";
+	const ours = "\tconst f = import.meta.resolve(\n\t\t'./my file.js',\n\t\tparent\n\t);\n";
+	assert_claims_every_hunk(
+		make_context(ours, prettier, 'typescript', prettier),
+		'member_expression_call'
+	);
+});
+
+// ─── template_embedded_verbatim (opener outside the hunk) ─────────────────
+// conformance_prettier_ts.md §Embedded languages kept verbatim: prettier re-indents an
+// embedded `css` body; tsv keeps it as authored. When only the body's indentation
+// moves, the `css`` opener sits in the context above the hunk.
+
+Deno.test(
+	'template_embedded_verbatim: positive - css body re-indented, opener above the hunk',
+	() => {
+		const prettier =
+			'const inlineGlow: SerializedStyles = css`\n\tanimation: ${glow} 1.5s ease-in-out infinite;\n\tcolor: transparent;\n\tcursor: progress;\n`;\n';
+		const ours =
+			'const inlineGlow: SerializedStyles = css`\n  animation: ${glow} 1.5s ease-in-out infinite;\n  color: transparent;\n  cursor: progress;\n`;\n';
+		assert_claims_every_hunk(
+			make_context(ours, prettier, 'typescript', ours),
+			'template_embedded_verbatim'
+		);
+	}
+);
+
+Deno.test(
+	'template_embedded_verbatim: positive - nested css blocks, several hunks under one opener',
+	() => {
+		const prettier =
+			'const hoverable: SerializedStyles = css`\n\ttransition: all 150ms ease-out;\n\ttransform: translate3d(0, 0, 0);\n\n\t&:hover {\n\t\ttransform: translate3d(0, -2px, 0);\n\t}\n\n\t&:active {\n\t\ttransform: translate3d(0, 0, 0);\n\t}\n`;\n';
+		const ours =
+			'const hoverable: SerializedStyles = css`\n  transition: all 150ms ease-out;\n  transform: translate3d(0, 0, 0);\n\n  &:hover {\n    transform: translate3d(0, -2px, 0);\n  }\n\n  &:active {\n    transform: translate3d(0, 0, 0);\n  }\n`;\n';
+		const ctx = make_context(ours, prettier, 'typescript', ours);
+		assertEquals(ctx.hunks.length > 1, true);
+		assert_claims_every_hunk(ctx, 'template_embedded_verbatim');
+	}
+);
+
+Deno.test('template_embedded_verbatim: negative - re-indented body under a non-embed tag', () => {
+	const prettier = 'const q = sql`\n\tSELECT 1\n\tFROM t\n`;\n';
+	const ours = 'const q = sql`\n  SELECT 1\n  FROM t\n`;\n';
+	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
+});
+
+Deno.test('template_embedded_verbatim: negative - the css template closed above the hunk', () => {
+	const prettier = 'const a = css`\n  color: red;\n`;\nconst b = {\n\tx: 1\n};\n';
+	const ours = 'const a = css`\n  color: red;\n`;\nconst b = {\n  x: 1\n};\n';
+	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
+});
+
+Deno.test('template_embedded_verbatim: negative - css body lost a declaration', () => {
+	const prettier =
+		'const inlineGlow = css`\n\tanimation: ${glow} 1.5s ease-in-out infinite;\n\tcolor: transparent;\n\tcursor: progress;\n`;\n';
+	const ours =
+		'const inlineGlow = css`\n  animation: ${glow} 1.5s ease-in-out infinite;\n  color: transparent;\n`;\n';
+	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
+});
+
+Deno.test(
+	'template_embedded_verbatim: negative - ours re-spaced the css body (whitespace only)',
+	() => {
+		// Quasi whitespace is string CONTENT, so a non-whitespace comparison cannot see it.
+		// tsv keeps the body byte for byte, so an ours body line the source does not hold
+		// is a tsv bug even when only spaces moved.
+		const prettier = 'const glow = css`\n\tcolor: red;\n\tcursor: progress;\n`;\n';
+		const ours = 'const glow = css`\n  color:  red;\n  cursor: progress;\n`;\n';
+		const source = 'const glow = css`\n  color: red;\n  cursor: progress;\n`;\n';
+		assert_unclaimed(make_context(ours, prettier, 'typescript', source));
+	}
+);
+
+// Whole-template near misses: a blank or whitespace-only body line is string content too,
+// and every line of it exists somewhere in the source, so only the whole quasi string,
+// compared to a source template's, sees it move. One-line interpolation code is graded
+// byte for byte against prettier's, since the hunk's content check cannot see its spaces.
+
+const css_blank_source = 'const s = css`\n  color: red;\n\n  cursor: progress;\n`;\n';
+const css_blank_prettier = 'const s = css`\n\tcolor: red;\n\n\tcursor: progress;\n`;\n';
+
+Deno.test('template_embedded_verbatim: negative - ours dropped a blank body line', () => {
+	const ours = 'const s = css`\n  color: red;\n  cursor: progress;\n`;\n';
+	assert_unclaimed(make_context(ours, css_blank_prettier, 'typescript', css_blank_source));
+});
+
+Deno.test('template_embedded_verbatim: negative - ours duplicated a blank body line', () => {
+	const ours = 'const s = css`\n  color: red;\n\n\n  cursor: progress;\n`;\n';
+	assert_unclaimed(make_context(ours, css_blank_prettier, 'typescript', css_blank_source));
+});
+
+Deno.test('template_embedded_verbatim: negative - ours emptied a whitespace-only body line', () => {
+	const ours = css_blank_source;
+	const source = 'const s = css`\n  color: red;\n  \n  cursor: progress;\n`;\n';
+	assert_unclaimed(make_context(ours, css_blank_prettier, 'typescript', source));
+});
+
+Deno.test('template_embedded_verbatim: negative - ours re-spaced a one-line interpolation', () => {
+	const prettier = 'const s = css`\n\twidth: ${a + b}px;\n\tcursor: progress;\n`;\n';
+	const ours = 'const s = css`\n  width: ${a+b}px;\n  cursor: progress;\n`;\n';
+	const source = 'const s = css`\n  width: ${a + b}px;\n  cursor: progress;\n`;\n';
+	assert_unclaimed(make_context(ours, prettier, 'typescript', source));
+});
+
+// Interpolations re-laid across lines are graded too: line by line after trimming when
+// both sides span lines, so a re-spaced string or a dropped blank inside the code shows.
+
+const css_arrow_source =
+	"const a = css`\n  color: ${(p) =>\n    p.on ? 'a  b' : 'c'};\n  cursor: progress;\n`;\n";
+const css_arrow_prettier =
+	"const a = css`\n\tcolor: ${(p) =>\n\t\tp.on ? 'a  b' : 'c'};\n\tcursor: progress;\n`;\n";
+
+Deno.test(
+	'template_embedded_verbatim: positive - a multi-line interpolation kept (control)',
+	() => {
+		assert_claims_every_hunk(
+			make_context(css_arrow_source, css_arrow_prettier, 'typescript', css_arrow_source),
+			'template_embedded_verbatim'
+		);
+	}
+);
+
+Deno.test(
+	'template_embedded_verbatim: negative - a string re-spaced in a multi-line interpolation',
+	() => {
+		const ours =
+			"const a = css`\n  color: ${(p) =>\n    p.on ? 'a b' : 'c'};\n  cursor: progress;\n`;\n";
+		assert_unclaimed(make_context(ours, css_arrow_prettier, 'typescript', css_arrow_source));
+	}
+);
+
+Deno.test(
+	'template_embedded_verbatim: negative - a blank dropped in a multi-line interpolation',
+	() => {
+		const source =
+			'const a = css`\n  color: ${(p) => {\n    const x = 1;\n\n    return x;\n  }};\n  cursor: progress;\n`;\n';
+		const prettier =
+			'const a = css`\n\tcolor: ${(p) => {\n\t\tconst x = 1;\n\n\t\treturn x;\n\t}};\n\tcursor: progress;\n`;\n';
+		const ours =
+			'const a = css`\n  color: ${(p) => {\n    const x = 1;\n    return x;\n  }};\n  cursor: progress;\n`;\n';
+		assert_unclaimed(make_context(ours, prettier, 'typescript', source));
+	}
+);
+
+// A template's CLOSER can read like a tag (`` `${name}.css` ``): it must never open a
+// body, or the code below it would be vouched as verbatim quasi text.
+
+Deno.test('template_embedded_verbatim: negative - a closer ending `.css`, code re-indented', () => {
+	const prettier = 'const file = `${name}.css`;\nfunction f() {\n\treturn 1;\n}\nconst t = `x`;\n';
+	const ours = 'const file = `${name}.css`;\nfunction f() {\n  return 1;\n}\nconst t = `x`;\n';
+	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
+});
+
+Deno.test(
+	'template_embedded_verbatim: negative - a closer ending `/index.html`, code re-indented',
+	() => {
+		const prettier = 'const page = `${dir}/index.html`;\nif (a) {\n\tgo(a);\n}\nlog(`done`);\n';
+		const ours = 'const page = `${dir}/index.html`;\nif (a) {\n  go(a);\n}\nlog(`done`);\n';
+		assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
+	}
+);
+
+Deno.test('template_embedded_verbatim: negative - a closer ending `.css`, code re-spaced', () => {
+	const prettier = 'const file = `${name}.css`;\nconst x = a + b;\nconst t = `x`;\n';
+	const ours = 'const file = `${name}.css`;\nconst x = a+b;\nconst t = `x`;\n';
+	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
+});
+
+Deno.test('template_embedded_verbatim: negative - the closer line re-spaced after the `', () => {
+	const prettier = 'const a = css`\n\tcolor: red;\n` + suffix;\n';
+	const ours = 'const a = css`\n  color: red;\n`+ suffix;\n';
+	const source = 'const a = css`\n  color: red;\n` + suffix;\n';
+	assert_unclaimed(make_context(ours, prettier, 'typescript', source));
+});
+
+// The source template that vouches for ours' must be ITS OWN (same ordinal, same tag),
+// never a sibling whose quasi text happens to equal ours'.
+
+Deno.test(
+	'template_embedded_verbatim: partial - a same-tag sibling cannot vouch a dropped blank',
+	() => {
+		const source =
+			'const a = css`\n  color: red;\n\n  cursor: progress;\n`;\nconst b = css`\n  color: red;\n  cursor: progress;\n`;\n';
+		const prettier =
+			'const a = css`\n\tcolor: red;\n\n\tcursor: progress;\n`;\nconst b = css`\n\tcolor: red;\n\tcursor: progress;\n`;\n';
+		const ours =
+			'const a = css`\n  color: red;\n  cursor: progress;\n`;\nconst b = css`\n  color: red;\n  cursor: progress;\n`;\n';
+		const ctx = make_context(ours, prettier, 'typescript', source);
+		assertEquals(ctx.hunks.length, 2);
+		assertEquals(claimed_by(ctx, 'template_embedded_verbatim'), [1]);
+		assertEquals(detect_divergences(ctx).classification, 'partial');
+	}
+);
+
+Deno.test(
+	'template_embedded_verbatim: partial - an html sibling cannot vouch a css template',
+	() => {
+		const source = 'const a = css`\n  x\n\n  y\n`;\nconst b = html`\n  x\n  y\n`;\n';
+		const prettier = 'const a = css`\n\tx\n\n\ty\n`;\nconst b = html`\n\tx\n\ty\n`;\n';
+		const ours = 'const a = css`\n  x\n  y\n`;\nconst b = html`\n  x\n  y\n`;\n';
+		const ctx = make_context(ours, prettier, 'typescript', source);
+		assertEquals(ctx.hunks.length, 2);
+		assertEquals(claimed_by(ctx, 'template_embedded_verbatim'), [1]);
+		assertEquals(detect_divergences(ctx).classification, 'partial');
+	}
+);
+
+// ─── template_literal_width (glued `}` in a template literal type) ────────
+// conformance_prettier_ts.md §Template-literal types: tsv breaks after `${` with `}` on its
+// own line. For a union the author wrote with a line break inside it (here a leading
+// `|`), prettier breaks after `${` too and glues `}` to the last member, so only the `}`
+// line differs.
+
+Deno.test(
+	'template_literal_width: positive - type interpolation closes on its own line, prettier glues `}`',
+	() => {
+		const head =
+			"\tname: `${string} ${`v${number}` | 'Latest' | 'Prerelease'} (${'Webpack' | 'Vite' | 'RsBuild'} | ${";
+		const prettier = `type BaseTemplates = Template & {\n${head}\n\t\t'JavaScript' | 'TypeScript'})\`;\n};\n`;
+		const ours = `type BaseTemplates = Template & {\n${head}\n\t\t'JavaScript' | 'TypeScript'\n\t})\`;\n};\n`;
+		const source =
+			"type BaseTemplates = Template & {\n  name: `${string} ${`v${number}` | 'Latest' | 'Prerelease'} (${'Webpack' | 'Vite' | 'RsBuild'} | ${\n    | 'JavaScript'\n    | 'TypeScript'})`;\n};\n";
+		assert_claims_every_hunk(
+			make_context(ours, prettier, 'typescript', source),
+			'template_literal_width'
+		);
+	}
+);
+
+Deno.test(
+	'template_literal_width: negative - the same `}` shape in a VALUE template (not a type)',
+	() => {
+		// A value-position interpolation that is not a member/identifier/binary keeps
+		// `${`…`}` hugged in both formatters; tsv dropping `}` to its own line there
+		// is a bug, not the template-literal-type divergence.
+		const head =
+			"\tname: `${string} ${`v${number}` | 'Latest' | 'Prerelease'} (${'Webpack' | 'Vite' | 'RsBuild'} | ${";
+		const prettier = `const baseTemplates = {\n${head}\n\t\tlabel('JavaScript', 'TypeScript')})\`\n};\n`;
+		const ours = `const baseTemplates = {\n${head}\n\t\tlabel('JavaScript', 'TypeScript')\n\t})\`\n};\n`;
+		assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
+	}
+);
+
+Deno.test('template_literal_width: negative - the flat interpolation would fit', () => {
+	// `${'JavaScript' | 'TypeScript'})` fits after this short head, so there is no width
+	// reason for tsv's break — a short-line `}` relocation is a bug.
+	const prettier = "type T = {\n\tname: `(${\n\t\t'JavaScript' | 'TypeScript'})`;\n};\n";
+	const ours = "type T = {\n\tname: `(${\n\t\t'JavaScript' | 'TypeScript'\n\t})`;\n};\n";
+	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
+});
+
+Deno.test('template_literal_width: negative - the relocated `}` line lost a member', () => {
+	const head =
+		"\tname: `${string} ${`v${number}` | 'Latest' | 'Prerelease'} (${'Webpack' | 'Vite' | 'RsBuild'} | ${";
+	const prettier = `type BaseTemplates = Template & {\n${head}\n\t\t'JavaScript' | 'TypeScript'})\`;\n};\n`;
+	const ours = `type BaseTemplates = Template & {\n${head}\n\t\t'JavaScript'\n\t})\`;\n};\n`;
+	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
+});
+
+Deno.test(
+	'template_literal_width: negative - a `}` then text then a backtick is not a template break',
+	() => {
+		// The glued-`}` case reads its own wider `}…\`` marker; the shared Case 1 marker
+		// stays `}\`` exactly. Widened, Case 1 would claim this ordinary over-break of a
+		// line that fits (a prettier line over 80, ours `}), \`…` on its own line).
+		const prettier =
+			'\tassert.equal(compute({ alpha: 1, beta: 2 }), `the computed value ${name} should match`);\n';
+		const ours =
+			'\tassert.equal(compute({\n\t\talpha: 1,\n\t\tbeta: 2\n\t}), `the computed value ${name} should match`);\n';
+		assertEquals(visual_width(prettier.trimEnd()) > 80, true);
+		assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
+	}
+);
+
+// ─── jest_each_table ──────────────────────────────────────────────────────
+// conformance_prettier_ts.md §jest-each tables: prettier re-aligns (and re-indents) a
+// `describe`/`it`/`test` `.each` table; tsv keeps the quasi text as authored.
+
+Deno.test('jest_each_table: positive - table re-indented, tag above the hunk', () => {
+	const prettier =
+		"\tit.each`\n\t\tlanguage        | exists          | expected\n\t\t${'javascript'} | ${['js', 'ts']} | ${'/js'}\n\t\t${'typescript'} | ${[]}           | ${''}\n\t`(\n\t\t`should copy $expected`,\n\t\tasync ({ language, exists, expected }) => {}\n\t);\n";
+	const ours =
+		"\tit.each`\n    language        | exists          | expected\n    ${'javascript'} | ${['js', 'ts']} | ${'/js'}\n    ${'typescript'} | ${[]}           | ${''}\n  `(\n\t\t`should copy $expected`,\n\t\tasync ({ language, exists, expected }) => {}\n\t);\n";
+	assert_claims_every_hunk(make_context(ours, prettier, 'typescript', ours), 'jest_each_table');
+});
+
+Deno.test('jest_each_table: positive - table cells re-padded to their column', () => {
+	const prettier =
+		"test.each`\n\ta      | b      | expected\n\t${1}   | ${2}   | ${3}\n\t${100} | ${200} | ${300}\n`('adds $a + $b', ({ a, b, expected }) => {\n\texpect(a + b).toBe(expected);\n});\n";
+	const ours =
+		"test.each`\n\ta | b | expected\n\t${1} | ${2} | ${3}\n\t${100} | ${200} | ${300}\n`('adds $a + $b', ({ a, b, expected }) => {\n\texpect(a + b).toBe(expected);\n});\n";
+	assert_claims_every_hunk(make_context(ours, prettier, 'typescript', ours), 'jest_each_table');
+});
+
+Deno.test('jest_each_table: negative - an `.each` tag prettier does not treat as jest', () => {
+	const prettier = 'table.each`\n\ta    | b\n\t${1} | ${2}\n`(run);\n';
+	const ours = 'table.each`\n\ta | b\n\t${1} | ${2}\n`(run);\n';
+	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
+});
+
+Deno.test('jest_each_table: negative - a cell changed, not a re-alignment', () => {
+	const prettier =
+		"test.each`\n\ta      | b      | expected\n\t${1}   | ${2}   | ${3}\n\t${100} | ${200} | ${300}\n`('adds', fn);\n";
+	const ours =
+		"test.each`\n\ta | b | expected\n\t${1} | ${2} | ${3}\n\t${100} | ${200} | ${30}\n`('adds', fn);\n";
+	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
+});
+
+Deno.test('jest_each_table: negative - re-indent in the callback after the table closed', () => {
+	const prettier =
+		"describe.each`\n\ta    | b\n\t${1} | ${2}\n`('$a', ({ a, b }) => {\n\texpect(a).toBe(b);\n});\n";
+	const ours =
+		"describe.each`\n\ta    | b\n\t${1} | ${2}\n`('$a', ({ a, b }) => {\n  expect(a).toBe(b);\n});\n";
+	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
+});
+
+Deno.test('jest_each_table: negative - a member `.describe.each` is not a jest table', () => {
+	// Prettier's `isJestEachTemplateLiteral` wants an Identifier object (`describe`, or
+	// `describe.only`), so `foo.describe.each` is an ordinary tagged template to it.
+	const prettier = 'foo.describe.each`\n\ta    | b\n\t${1} | ${2}\n`(run);\n';
+	const ours = 'foo.describe.each`\n\ta | b\n\t${1} | ${2}\n`(run);\n';
+	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
+});
+
+Deno.test('jest_each_table: negative - ours re-spaced the table (whitespace only)', () => {
+	// The quasi is verbatim in tsv, so an ours table line the source does not hold is a
+	// tsv bug, even when prettier's re-alignment leaves the non-whitespace text equal.
+	const prettier = "describe.each`\n\ta    | b\n\t${1} | ${2}\n`('$a', fn);\n";
+	const ours = "describe.each`\n\ta | b\n\t${1}  |  ${2}\n`('$a', fn);\n";
+	const source = "describe.each`\n\ta | b\n\t${1} | ${2}\n`('$a', fn);\n";
+	assert_unclaimed(make_context(ours, prettier, 'typescript', source));
+});
+
+const jest_blank_source =
+	"describe('x', () => {\n  it.each`\n    a    | b\n    ${1} | ${2}\n\n    ${3} | ${4}\n  `('t', () => {});\n});\n";
+const jest_blank_prettier =
+	"describe('x', () => {\n\tit.each`\n\t\ta    | b\n\t\t${1} | ${2}\n\n\t\t${3} | ${4}\n\t`('t', () => {});\n});\n";
+
+Deno.test('jest_each_table: negative - ours dropped a blank table line', () => {
+	const ours =
+		"describe('x', () => {\n\tit.each`\n    a    | b\n    ${1} | ${2}\n    ${3} | ${4}\n  `('t', () => {});\n});\n";
+	assert_unclaimed(make_context(ours, jest_blank_prettier, 'typescript', jest_blank_source));
+});
+
+Deno.test('jest_each_table: negative - ours re-spaced a cell interpolation', () => {
+	const ours =
+		"describe('x', () => {\n\tit.each`\n    a    | b\n    ${ 1 } | ${2}\n\n    ${3} | ${4}\n  `('t', () => {});\n});\n";
+	assert_unclaimed(make_context(ours, jest_blank_prettier, 'typescript', jest_blank_source));
+});
+
+Deno.test('jest_each_table: positive - the blank-line table kept verbatim (control)', () => {
+	// The near misses above, without the bug: the table as authored is claimed.
+	const ours =
+		"describe('x', () => {\n\tit.each`\n    a    | b\n    ${1} | ${2}\n\n    ${3} | ${4}\n  `('t', () => {});\n});\n";
+	assert_claims_every_hunk(
+		make_context(ours, jest_blank_prettier, 'typescript', jest_blank_source),
+		'jest_each_table'
+	);
+});
+
+Deno.test(
+	'jest_each_table: positive - the opener line itself changed (prettier suite jest-each.js)',
+	() => {
+		// The table starts on the tag's line; prettier moves it to the next line, so the
+		// opener is in the hunk on both sides. The second table's interpolation breaks
+		// across lines, which only the interpolation's own continuation lines may do.
+		const prettier =
+			'describe.each`\n\ta    | b    | expected\n\t${1} | ${1} | ${2}\n\t${1} | ${2} | ${3}\n\t${2} | ${1} | ${3}\n`;\n\n// an example to demo multiline quasi\ndescribe.each`\n\ta    | b    | expected\n\t${11111111111} | ${a()\n\t\t.b((x) => x)\n\t\t.c()\n\t\t.d()} | ${2}\n\t${1} | ${2} | ${3}\n\t${2} | ${1} | ${3}\n`;\n';
+		const ours =
+			'describe.each`a    | b    | expected\n${1} | ${1} | ${2}\n${1} | ${2} | ${3}\n${2} | ${1} | ${3}`;\n\n// an example to demo multiline quasi\ndescribe.each`a    | b    | expected\n${11111111111} | ${a()\n\t.b((x) => x)\n\t.c()\n\t.d()} | ${2}\n${1} | ${2} | ${3}\n${2} | ${1} | ${3}`;\n';
+		const source =
+			'describe.each`a    | b    | expected\n${1} | ${1} | ${2}\n${1} | ${2} | ${3}\n${2} | ${1} | ${3}`\n\n// an example to demo multiline quasi\ndescribe.each`a    | b    | expected\n${11111111111} | ${a().b(x => x).c().d()} | ${2}\n${1} | ${2} | ${3}\n${2} | ${1} | ${3}`\n';
+		assert_claims_every_hunk(make_context(ours, prettier, 'typescript', source), 'jest_each_table');
+	}
+);
+
+Deno.test('jest_each_table: negative - a closer ending `test.each`, code re-indented', () => {
+	const prettier = 'const s = `run test.each`;\nfunction f() {\n\treturn 1;\n}\nconst t = `x`;\n';
+	const ours = 'const s = `run test.each`;\nfunction f() {\n  return 1;\n}\nconst t = `x`;\n';
+	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
+});
+
+// ─── curried_callee_callback_hug ──────────────────────────────────────────
+// conformance_prettier_ts.md §Curried-callee callback signature: prettier keeps a sole
+// block-bodied arrow hugged to a curried callee's `(` and breaks its parameters; tsv
+// breaks the argument out, the signature on one line, the body one level deeper.
+
+Deno.test(
+	'curried_callee_callback_hug: positive - typed signature, re-indented body (Storybook tree.ts)',
+	() => {
+		const prettier = [
+			'export const getDescendantIds = memoize(1000)((',
+			'\tdata: IndexHash,',
+			'\tid: string,',
+			'\tskipLeafs: boolean',
+			'): string[] => {',
+			'\tconst entry = data[id];',
+			"\tif (!entry || !('children' in entry) || !entry.children) {",
+			'\t\treturn [];',
+			'\t}',
+			'\treturn entry.children.reduce((acc, childId) => {',
+			'\t\tconst child = data[childId];',
+			'',
+			"\t\tif (!child || (skipLeafs && (child.type === 'story' || child.type === 'docs'))) {",
+			'\t\t\treturn acc;',
+			'\t\t}',
+			'\t\tacc.push(childId, ...getDescendantIds(data, childId, skipLeafs));',
+			'\t\treturn acc;',
+			'\t}, [] as string[]);',
+			'});',
+			'',
+			'export function getPath(item: Item): string[] {}',
+			''
+		].join('\n');
+		const ours = [
+			'export const getDescendantIds = memoize(1000)(',
+			'\t(data: IndexHash, id: string, skipLeafs: boolean): string[] => {',
+			'\t\tconst entry = data[id];',
+			"\t\tif (!entry || !('children' in entry) || !entry.children) {",
+			'\t\t\treturn [];',
+			'\t\t}',
+			'\t\treturn entry.children.reduce((acc, childId) => {',
+			'\t\t\tconst child = data[childId];',
+			'',
+			"\t\t\tif (!child || (skipLeafs && (child.type === 'story' || child.type === 'docs'))) {",
+			'\t\t\t\treturn acc;',
+			'\t\t\t}',
+			'\t\t\tacc.push(childId, ...getDescendantIds(data, childId, skipLeafs));',
+			'\t\t\treturn acc;',
+			'\t\t}, [] as string[]);',
+			'\t}',
+			');',
+			'',
+			'export function getPath(item: Item): string[] {}',
+			''
+		].join('\n');
+		const ctx = make_context(ours, prettier, 'typescript', prettier.replaceAll('\t', '  '));
+		assertEquals(ctx.hunks.length > 1, true);
+		assert_claims_every_hunk(ctx, 'curried_callee_callback_hug');
+	}
+);
+
+Deno.test(
+	'curried_callee_callback_hug: positive - two callbacks, untyped and typed (Storybook router/utils.ts)',
+	() => {
+		const prettier = [
+			'export const parsePath: (path: string | undefined) => StoryData = memoize(1000)((',
+			'\tpath: string | undefined | null',
+			') => {',
+			'\tconst result: StoryData = {',
+			'\t\tviewMode: undefined',
+			'\t};',
+			'',
+			'\tif (path) {',
+			"\t\tresult.viewMode = 'review';",
+			'\t}',
+			'\treturn result;',
+			'});',
+			'',
+			'type Match = { path: string };',
+			'',
+			'export const getMatch = memoize(1000)((',
+			'\tcurrent: string,',
+			'\ttarget: string | RegExp,',
+			'\tstartsWith = true',
+			'): Match | null => {',
+			'\tif (startsWith) {',
+			"\t\tif (typeof target !== 'string') {",
+			"\t\t\tthrow new Error('startsWith only works with string targets');",
+			'\t\t}',
+			'\t\tconst startsWithTarget = current && current.startsWith(target);',
+			'\t\tif (startsWithTarget) {',
+			'\t\t\treturn { path: current };',
+			'\t\t}',
+			'',
+			'\t\treturn null;',
+			'\t}',
+			'',
+			"\tconst currentIsTarget = typeof target === 'string' && current === target;",
+			'\tconst matchTarget = current && target && current.match(target);',
+			'',
+			'\tif (currentIsTarget || matchTarget) {',
+			'\t\treturn { path: current };',
+			'\t}',
+			'',
+			'\treturn null;',
+			'});',
+			''
+		].join('\n');
+		const ours = [
+			'export const parsePath: (path: string | undefined) => StoryData = memoize(1000)(',
+			'\t(path: string | undefined | null) => {',
+			'\t\tconst result: StoryData = {',
+			'\t\t\tviewMode: undefined',
+			'\t\t};',
+			'',
+			'\t\tif (path) {',
+			"\t\t\tresult.viewMode = 'review';",
+			'\t\t}',
+			'\t\treturn result;',
+			'\t}',
+			');',
+			'',
+			'type Match = { path: string };',
+			'',
+			'export const getMatch = memoize(1000)(',
+			'\t(current: string, target: string | RegExp, startsWith = true): Match | null => {',
+			'\t\tif (startsWith) {',
+			"\t\t\tif (typeof target !== 'string') {",
+			"\t\t\t\tthrow new Error('startsWith only works with string targets');",
+			'\t\t\t}',
+			'\t\t\tconst startsWithTarget = current && current.startsWith(target);',
+			'\t\t\tif (startsWithTarget) {',
+			'\t\t\t\treturn { path: current };',
+			'\t\t\t}',
+			'',
+			'\t\t\treturn null;',
+			'\t\t}',
+			'',
+			"\t\tconst currentIsTarget = typeof target === 'string' && current === target;",
+			'\t\tconst matchTarget = current && target && current.match(target);',
+			'',
+			'\t\tif (currentIsTarget || matchTarget) {',
+			'\t\t\treturn { path: current };',
+			'\t\t}',
+			'',
+			'\t\treturn null;',
+			'\t}',
+			');',
+			''
+		].join('\n');
+		const ctx = make_context(ours, prettier, 'typescript', prettier.replaceAll('\t', '  '));
+		assertEquals(ctx.hunks.length > 2, true);
+		assert_claims_every_hunk(ctx, 'curried_callee_callback_hug');
+	}
+);
+
+Deno.test('curried_callee_callback_hug: negative - a plain (non-curried) callee', () => {
+	// Prettier's exemption is for a curried callee alone; under a plain callee it breaks
+	// every argument out like tsv, so this pair is not the divergence.
+	const prettier = [
+		'export const getDescendantIdentifiers = memoizeEverything((',
+		'\tdata: IndexHash,',
+		'\tidentifier: string',
+		'): string[] => {',
+		'\treturn [identifier];',
+		'});',
+		''
+	].join('\n');
+	const ours = [
+		'export const getDescendantIdentifiers = memoizeEverything(',
+		'\t(data: IndexHash, identifier: string): string[] => {',
+		'\t\treturn [identifier];',
+		'\t}',
+		');',
+		''
+	].join('\n');
+	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
+});
+
+Deno.test(
+	'curried_callee_callback_hug: negative - a curried call whose body also lost a statement',
+	() => {
+		// The header and signature have the divergence's shape, but the body is not the
+		// prettier body one level deeper — a tsv change inside it must not ride along.
+		const prettier = [
+			'export const getDescendantIdentifiers = memoize(1000)((',
+			'\tdata: IndexHash,',
+			'\tidentifier: string',
+			'): string[] => {',
+			'\tconst entry = data[identifier];',
+			'\treturn [identifier];',
+			'});',
+			''
+		].join('\n');
+		const ours = [
+			'export const getDescendantIdentifiers = memoize(1000)(',
+			'\t(data: IndexHash, identifier: string): string[] => {',
+			'\t\treturn [identifier];',
+			'\t}',
+			');',
+			''
+		].join('\n');
+		assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
+	}
+);

@@ -1914,7 +1914,50 @@ const template_literal_width: DivergencePattern = {
 		// does not match the end-of-line `${` / `}`` break markers Case 1/2 key on.
 		const nested_template_interpolation = /\$\{[^`}]*`/;
 
+		// Case 4's own closer: `}`, then anything but a backtick or `$`, then the backtick
+		// (`})\`;`). Deliberately NOT `closing_brace_backtick` widened — Cases 1/2 read that
+		// one, and widened it would let Case 1 claim any `}, \`…\`` line beside a wide
+		// prettier line.
+		const glued_close_brace_backtick = /^\t+\}[^`$]*`/;
+		// A template literal TYPE's head: a `type` alias or an `interface`.
+		const type_declaration_head =
+			/^\s*(?:export\s+)?(?:declare\s+)?(?:type\s+[\w$]+(?:\s*<[^=]*>)?\s*=|interface\s+[\w$])/;
+
 		const prettier_lines = ctx.prettier_lines!;
+		const ours_lines = ctx.ours_lines!;
+
+		// Case 4 (§Template-literal types, the authored-union form): the interpolation
+		// already breaks after `${` on both sides — prettier breaks a union the author wrote
+		// with a line break inside it and glues `}` to its last member, tsv puts `}` on its
+		// own line.
+		// One prettier line becomes two ours lines and nothing else moves: the line
+		// above (the `${` line, context on both sides) plus the flat closer would overrun
+		// the width, ours holds it, and the template is a TYPE — the same `}` in a value
+		// template is no divergence.
+		const glued_type_close = (hunk: DiffHunk): boolean => {
+			if (!hunk.ours_range || !hunk.prettier_range) return false;
+			if (hunk.removed_lines.length !== 1 || hunk.added_lines.length !== 2) return false;
+			const [first, closer] = hunk.added_lines;
+			const removed = hunk.removed_lines[0];
+			if (!glued_close_brace_backtick.test(closer)) return false;
+			if (first.trim() + closer.trim() !== removed.trim()) return false;
+			if (!ours_holds_print_width(hunk)) return false;
+			const head_at = hunk.ours_range.start - 1;
+			const head = ours_lines[head_at];
+			if (head === undefined || head !== prettier_lines[hunk.prettier_range.start - 1])
+				return false;
+			if (!break_after_dollar_brace.test(head)) return false;
+			if (leading_ws(closer) !== leading_ws(head)) return false;
+			if (visual_width(head.trimEnd() + removed.trim()) <= PRINT_WIDTH) return false;
+			if (type_declaration_head.test(head)) return true;
+			const indent = leading_ws(head).length;
+			for (let l = head_at - 1; l >= 0; l--) {
+				const line = ours_lines[l];
+				if (line.trim() === '' || leading_ws(line).length >= indent) continue;
+				return type_declaration_head.test(line);
+			}
+			return false;
+		};
 
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
 			const added_has_break = hunk.added_lines.some(
@@ -1979,7 +2022,7 @@ const template_literal_width: DivergencePattern = {
 				return true;
 			}
 
-			return false;
+			return glued_type_close(hunk);
 		});
 
 		if (hunk_indices.length > 0 && ctx.source.includes('${')) {
@@ -2038,8 +2081,9 @@ const member_expression_call: DivergencePattern = {
 	detect(ctx) {
 		const module_patterns = /(?:require\.resolve(?:\.paths)?|import\.meta\.resolve)\(/;
 
-		if (!module_patterns.test(ctx.source)) return null;
-
+		// The hunk alone is the gate, never `ctx.source`: a source that already spells
+		// prettier's chain break (`import.meta⏎.resolve(`) never holds the call whole.
+		//
 		// Ours-side evidence guard. The documented divergence is: ours expands the
 		// call args (extra lines) while prettier breaks at the member chain. Bare
 		// substring presence is NOT enough — a real bug on a line that merely
@@ -2049,10 +2093,17 @@ const member_expression_call: DivergencePattern = {
 		//   2. Ours genuinely re-wrapped (more added than removed lines). A hunk
 		//      where ours collapsed onto fewer lines, or where the pattern only
 		//      shows up on prettier's removed side, is not this divergence.
+		//   3. The hunk moved only whitespace outside strings: the two layouts of one
+		//      call hold the same tokens, so a dropped argument or comma, or a re-spaced
+		//      string argument, is never this divergence.
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
 			const ours_has_module_break = hunk.added_lines.some((l) => module_patterns.test(l));
 			if (!ours_has_module_break) return false;
-			return hunk.added_lines.length > hunk.removed_lines.length;
+			if (hunk.added_lines.length <= hunk.removed_lines.length) return false;
+			return (
+				strip_ws_outside_strings(hunk.removed_lines.join('\n')) ===
+				strip_ws_outside_strings(hunk.added_lines.join('\n'))
+			);
 		});
 
 		if (hunk_indices.length > 0) {
@@ -4008,6 +4059,266 @@ const jsdoc_type_cast_parens: DivergencePattern = {
 	}
 };
 
+/**
+ * One run of quasi text on one output line — the part of a template literal's body that
+ * is string content, never formatted — with the delimiters on either side of it.
+ *
+ * `line` on a side means the run reaches that end of the line; otherwise the run is
+ * bounded by the template's own `` ` `` or by an interpolation's `${` / `}`.
+ */
+interface QuasiRun {
+	text: string;
+	left: 'line' | '`' | '}';
+	right: 'line' | '`' | '${';
+}
+
+/** What [`scan_template_body`] learned about a template literal's lines. */
+interface TemplateBodyScan {
+	/** The line holding the closing `` ` ``. */
+	close_line: number;
+	/** The closing `` ` ``'s column on `close_line`. */
+	close_col: number;
+	/** The quasi runs of each line from the opener's to the closer's, keyed by line index. */
+	runs: Map<number, QuasiRun[]>;
+	/** Each interpolation's code between `${` and `}`, byte for byte, line breaks as `\n`. */
+	codes: string[];
+}
+
+/**
+ * Walk a template literal from the opening `` ` `` at `lines[line][col]` to its closing
+ * one, splitting each line into the quasi text runs that hold verbatim source and
+ * collecting each interpolation's code.
+ *
+ * Fails closed (null) on anything it cannot read with certainty: a nested template, a
+ * comment or a string left open across a line inside an interpolation, or no closer.
+ * Callers treat null as "not this divergence", so an unread shape is never claimed.
+ */
+function scan_template_body(lines: string[], line: number, col: number): TemplateBodyScan | null {
+	const runs = new Map<number, QuasiRun[]>();
+	const codes: string[] = [];
+	let code = '';
+	let in_quasi = true;
+	let depth = 0;
+	let left: QuasiRun['left'] = '`';
+	for (let l = line; l < lines.length; l++) {
+		const text = lines[l];
+		const line_runs: QuasiRun[] = [];
+		runs.set(l, line_runs);
+		let start = l === line ? col + 1 : 0;
+		if (l !== line && in_quasi) left = 'line';
+		let quote: string | null = null;
+		for (let i = start; i < text.length; i++) {
+			const c = text[i];
+			if (in_quasi) {
+				if (c === '\\') {
+					i++;
+				} else if (c === '`') {
+					line_runs.push({ text: text.slice(start, i), left, right: '`' });
+					return { close_line: l, close_col: i, runs, codes };
+				} else if (c === '$' && text[i + 1] === '{') {
+					line_runs.push({ text: text.slice(start, i), left, right: '${' });
+					in_quasi = false;
+					depth = 1;
+					i++;
+					start = i + 1;
+					code = '';
+				}
+			} else if (quote !== null) {
+				if (c === '\\') i++;
+				else if (c === quote) quote = null;
+			} else if (c === "'" || c === '"') {
+				quote = c;
+			} else if (c === '`' || (c === '/' && (text[i + 1] === '/' || text[i + 1] === '*'))) {
+				return null;
+			} else if (c === '{') {
+				depth++;
+			} else if (c === '}' && --depth === 0) {
+				codes.push(code + text.slice(start, i));
+				in_quasi = true;
+				left = '}';
+				start = i + 1;
+			}
+		}
+		if (quote !== null) return null;
+		if (in_quasi) line_runs.push({ text: text.slice(start), left, right: 'line' });
+		else code += text.slice(start) + '\n';
+	}
+	return null;
+}
+
+/** A scanned template's quasi strings in order, each whole, its line breaks included. */
+function quasis_of(scan: TemplateBodyScan): string[] {
+	const out: string[] = [];
+	let current = '';
+	for (const l of [...scan.runs.keys()].sort((a, b) => a - b)) {
+		for (const run of scan.runs.get(l)!) {
+			current = run.left === 'line' ? current + '\n' + run.text : run.text;
+			if (run.right !== 'line') out.push(current);
+		}
+	}
+	return out;
+}
+
+/** A template opener: the backtick at `lines[line][col]`, its matched tag (backtick included). */
+interface TemplateOpener {
+	line: number;
+	col: number;
+	tag: string;
+}
+
+/**
+ * Whether the backtick at `line[col]` can open a template: an even count of unescaped
+ * backticks ahead of it on its line. An odd count makes it a closer, like the one ending
+ * `` `${name}.css` `` — whose text before the backtick reads like a `css` tag.
+ */
+function is_opener_backtick(line: string, col: number): boolean {
+	let count = 0;
+	for (let i = 0; i < col; i++) {
+		if (line[i] === '\\') i++;
+		else if (line[i] === '`') count++;
+	}
+	return count % 2 === 0;
+}
+
+/** Every backtick in `lines` that opens a template `tag` names, in document order. */
+function template_openers(lines: string[], tag: RegExp): TemplateOpener[] {
+	const out: TemplateOpener[] = [];
+	for (let l = 0; l < lines.length; l++) {
+		const line = lines[l];
+		for (let c = line.indexOf('`'); c !== -1; c = line.indexOf('`', c + 1)) {
+			if (!is_opener_backtick(line, c)) continue;
+			const m = tag.exec(line.slice(0, c + 1));
+			if (m) out.push({ line: l, col: c, tag: m[0] });
+		}
+	}
+	return out;
+}
+
+/** A template's identity for the source match: its tag and its whole quasi strings. */
+function template_key(tag: string, scan: TemplateBodyScan): string {
+	return JSON.stringify([tag, quasis_of(scan)]);
+}
+
+/**
+ * The `template_key` of every template in `source_lines` whose opener `tag` matches, in
+ * document order (`null` for one the scan cannot read) — the template at the same
+ * ordinal in ours, kept verbatim, must equal it exactly. Formatting never adds or drops
+ * a template, so the ordinal pairs each ours template with its own source.
+ */
+function source_template_keys(source_lines: string[], tag: RegExp): Array<string | null> {
+	return template_openers(source_lines, tag).map((o) => {
+		const scan = scan_template_body(source_lines, o.line, o.col);
+		return scan && template_key(o.tag, scan);
+	});
+}
+
+/**
+ * The template literal enclosing (or opening on) line `from`: walk up to the first line
+ * holding a backtick, and accept it only when its LAST backtick is an opener (by
+ * `is_opener_backtick`) that `tag` matches (`tag` is anchored at the backtick, `` …` $``).
+ * Anything else there — a closer, a nested template — means the hunk is not inside a
+ * recognized template.
+ */
+function enclosing_template_opener(
+	lines: string[],
+	from: number,
+	tag: RegExp
+): TemplateOpener | null {
+	for (let l = from; l >= 0; l--) {
+		const col = lines[l].lastIndexOf('`');
+		if (col === -1) continue;
+		if (!is_opener_backtick(lines[l], col)) return null;
+		const m = tag.exec(lines[l].slice(0, col + 1));
+		return m ? { line: l, col, tag: m[0] } : null;
+	}
+	return null;
+}
+
+/**
+ * Whether interpolation code `ours` is prettier's `prettier` up to layout. One line on
+ * both sides: byte for byte. Multi-line on both: line by line after trimming, so only
+ * indentation moves (a blank line or a re-spaced string stays visible). One line against
+ * several: equal outside strings with whitespace stripped.
+ */
+function interpolation_code_matches(ours: string, prettier: string): boolean {
+	const ours_multi = ours.includes('\n');
+	const prettier_multi = prettier.includes('\n');
+	if (!ours_multi && !prettier_multi) return ours === prettier;
+	if (ours_multi && prettier_multi) {
+		const ours_rows = ours.split('\n');
+		const prettier_rows = prettier.split('\n');
+		return (
+			ours_rows.length === prettier_rows.length &&
+			ours_rows.every((row, i) => row.trim() === prettier_rows[i].trim())
+		);
+	}
+	return strip_ws_outside_strings(ours) === strip_ws_outside_strings(prettier);
+}
+
+/**
+ * Whether `hunk` lies wholly inside one recognized tagged template on BOTH sides and
+ * moves nothing but whitespace — the shape of a divergence where prettier re-lays a
+ * template body tsv keeps verbatim.
+ *
+ * The opener may be above the hunk or on its first line (prettier may move the body
+ * off the tag's line); the closer may be inside it. The non-whitespace text must be
+ * equal (prettier only moved whitespace), and — because that comparison cannot see
+ * whitespace that is string content or code spacing — three byte-for-byte checks
+ * make a tsv bug inside the template unclaimable:
+ *   1. the opener line up to its backtick and the closer line from its backtick are
+ *      prettier's (code ahead of the tag and after the template);
+ *   2. every interpolation is prettier's code up to layout (`interpolation_code_matches`
+ *      — tsv formats that code as prettier does);
+ *   3. the template's tag and whole quasi strings, line breaks included, are those of
+ *      the source template at the same ordinal (`source_keys`) — so no blank line,
+ *      quasi space or table row moves, and no sibling template can vouch for it.
+ */
+function template_body_reflowed(
+	hunk: DiffHunk,
+	ctx: DetectionContext,
+	tag: RegExp,
+	source_keys: () => Array<string | null>
+): boolean {
+	if (!hunk.ours_range || !hunk.prettier_range) return false;
+	const ours_lines = ctx.ours_lines!;
+	const prettier_lines = ctx.prettier_lines!;
+
+	const ours_open = enclosing_template_opener(ours_lines, hunk.ours_range.start, tag);
+	const prettier_open = enclosing_template_opener(prettier_lines, hunk.prettier_range.start, tag);
+	if (!ours_open || !prettier_open || ours_open.tag !== prettier_open.tag) return false;
+	const ours_scan = scan_template_body(ours_lines, ours_open.line, ours_open.col);
+	const prettier_scan = scan_template_body(prettier_lines, prettier_open.line, prettier_open.col);
+	if (!ours_scan || !prettier_scan) return false;
+	if (hunk.ours_range.end > ours_scan.close_line) return false;
+	if (hunk.prettier_range.end > prettier_scan.close_line) return false;
+
+	const removed = strip_all_ws(hunk.removed_lines.join(''));
+	if (removed === '' || removed !== strip_all_ws(hunk.added_lines.join(''))) return false;
+
+	const ours_head = ours_lines[ours_open.line].slice(0, ours_open.col + 1);
+	if (ours_head !== prettier_lines[prettier_open.line].slice(0, prettier_open.col + 1)) {
+		return false;
+	}
+	const ours_tail = ours_lines[ours_scan.close_line].slice(ours_scan.close_col);
+	if (ours_tail !== prettier_lines[prettier_scan.close_line].slice(prettier_scan.close_col)) {
+		return false;
+	}
+	const ours_codes = ours_scan.codes;
+	const prettier_codes = prettier_scan.codes;
+	if (ours_codes.length !== prettier_codes.length) return false;
+	if (!ours_codes.every((o, i) => interpolation_code_matches(o, prettier_codes[i]))) return false;
+
+	const ordinal = template_openers(ours_lines, tag).findIndex(
+		(o) => o.line === ours_open.line && o.col === ours_open.col
+	);
+	return ordinal !== -1 && source_keys()[ordinal] === template_key(ours_open.tag, ours_scan);
+}
+
+/** The source's lines, split on every line terminator tsv's format folds to `\n`. */
+function source_lines_of(ctx: DetectionContext): string[] {
+	return ctx.source.split(/\r\n|\r|\n/);
+}
+
 const template_embedded_verbatim: DivergencePattern = {
 	id: 'template_embedded_verbatim',
 	description:
@@ -4027,13 +4338,25 @@ const template_embedded_verbatim: DivergencePattern = {
 		// nothing): prettier reflowed a recognized-tag template, and ours kept a one-line
 		// `tag`…`` form prettier did not reproduce.
 		const embedded_tag_template = /\b(?:html|css|graphql|gql)`/;
+		// The same tag set, anchored at the opener's backtick for the enclosing-opener arm.
+		// `(?<![\w$.])` like the jest tag, not `\b`: prettier wants an Identifier tag, and a
+		// closer such as `` `${dir}/index.html` `` must not read as one.
+		const embedded_tag_opener = /(?<![\w$.])(?:html|css|graphql|gql)`$/;
+		let keys: Array<string | null> | null = null;
+		const source_keys = () =>
+			(keys ??= source_template_keys(source_lines_of(ctx), embedded_tag_opener));
 
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
 			const prettier_reflowed = hunk.removed_lines.some((l) => embedded_tag_template.test(l));
 			const ours_verbatim = hunk.added_lines.some(
 				(l) => embedded_tag_template.test(l) && !hunk.removed_lines.includes(l)
 			);
-			return prettier_reflowed && ours_verbatim;
+			if (prettier_reflowed && ours_verbatim) return true;
+
+			// Enclosing-opener arm: prettier re-indented (or re-spaced) the body of a
+			// recognized-tag template whose opener sits above the hunk, so only body
+			// whitespace moved and the tag is in the context.
+			return template_body_reflowed(hunk, ctx, embedded_tag_opener, source_keys);
 		});
 
 		if (hunk_indices.length > 0) {
@@ -4043,6 +4366,42 @@ const template_embedded_verbatim: DivergencePattern = {
 				hunk_indices,
 				reason:
 					'Tagged-template body kept verbatim (prettier reformats the embedded html/css/graphql language; tsv does no embedded formatting)'
+			};
+		}
+		return null;
+	}
+};
+
+const jest_each_table: DivergencePattern = {
+	id: 'jest_each_table',
+	description:
+		'jest-each table body kept verbatim; prettier re-aligns (and re-indents) the `|` table',
+	languages: ['typescript', 'svelte'],
+	conformance_sections: ['TypeScript: Template Literals'],
+	fixtures: ['typescript/expressions/literals/template/jest_each_table_prettier_divergence'],
+	detect(ctx) {
+		// conformance_prettier_ts.md §jest-each tables: prettier's `isJestEachTemplateLiteral`
+		// re-aligns a `describe`/`it`/`test` `.each` table; tsv keeps every tagged template's
+		// quasi as authored. The tag mirrors prettier's test exactly — an Identifier object
+		// (`[fx]?(describe|it|test)`, optionally `.only`/`.skip`), so `(?<![\w$.])` and not
+		// `\b`: `foo.describe.each` is an ordinary tagged template to prettier.
+		const jest_each_opener = /(?<![\w$.])[fx]?(?:describe|it|test)(?:\.(?:only|skip))?\.each`$/;
+		if (!ctx.ours.includes('.each`')) return null;
+		let keys: Array<string | null> | null = null;
+		const source_keys = () =>
+			(keys ??= source_template_keys(source_lines_of(ctx), jest_each_opener));
+
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) =>
+			template_body_reflowed(hunk, ctx, jest_each_opener, source_keys)
+		);
+
+		if (hunk_indices.length > 0) {
+			return {
+				pattern: 'jest_each_table',
+				confidence: 'certain',
+				hunk_indices,
+				reason:
+					'jest-each table kept verbatim (prettier re-aligns describe/it/test .each tables; tsv keeps tagged-template quasi text as authored)'
 			};
 		}
 		return null;
@@ -4196,6 +4555,316 @@ const union_paren_member_inline: DivergencePattern = {
 				hunk_indices,
 				reason:
 					'tsv keeps a parenthesized union member inline (union-fit); prettier explodes it one member per line'
+			};
+		}
+		return null;
+	}
+};
+
+/**
+ * The index of the `}` closing the `{` at `line[open]`, or -1 — string contents skipped,
+ * so a brace inside a string literal type does not count.
+ */
+function matching_brace(line: string, open: number): number {
+	let depth = 0;
+	let quote: string | null = null;
+	for (let i = open; i < line.length; i++) {
+		const c = line[i];
+		if (quote !== null) {
+			if (c === '\\') i++;
+			else if (c === quote) quote = null;
+		} else if (c === "'" || c === '"' || c === '`') {
+			quote = c;
+		} else if (c === '{') {
+			depth++;
+		} else if (c === '}' && --depth === 0) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+/** The index of the first non-space character at or after `from`. */
+function skip_spaces(line: string, from: number): number {
+	let i = from;
+	while (line[i] === ' ' || line[i] === '\t') i++;
+	return i;
+}
+
+/**
+ * Every whitespace character outside a string literal removed — `strip_all_ws` that
+ * keeps the spaces inside `'…'`, `"…"` and `` `…` `` (string CONTENT, which no layout
+ * moves). A quote left open at the end reads to the end, which only keeps more.
+ */
+function strip_ws_outside_strings(s: string): string {
+	let out = '';
+	let quote: string | null = null;
+	for (let i = 0; i < s.length; i++) {
+		const c = s[i];
+		if (quote !== null) {
+			out += c;
+			if (c === '\\' && i + 1 < s.length) out += s[++i];
+			else if (c === quote) quote = null;
+		} else if (c === "'" || c === '"' || c === '`') {
+			quote = c;
+			out += c;
+		} else if (!/\s/.test(c)) {
+			out += c;
+		}
+	}
+	return out;
+}
+
+/** A member list's content as `strip_ws_outside_strings` reads it, a `;` before `}` aside. */
+function strip_member_list(s: string): string {
+	return strip_ws_outside_strings(s).replace(/;(?=\})/g, '');
+}
+
+/** A hugged sole parameter's name and annotation opener, as ours ends the site's first line. */
+const SOLE_PARAM_TYPE_OPENER = /\(([\w$]+)\??\s*:\s*\{$/;
+/** A hugged sole object-pattern parameter's opener, as ours ends the site's first line. */
+const SOLE_PARAM_PATTERN_OPENER = /\(\{$/;
+
+/**
+ * Whether the flat prettier line `removed` holds, at the place ours' `opener` line ends,
+ * a parenthesized list with exactly ONE parameter: `(name?: { … })`, or for an object
+ * pattern `({ … }: { … })`. Read by brace matching from the `{` ours opened — the `(`
+ * before it opens the list, the `)` after the annotation closes it, so a second
+ * parameter (`(a: { … }, b)`) is never a hug.
+ */
+function flat_sole_param_at(removed: string, opener: string, is_pattern: boolean): boolean {
+	const head = opener.trimEnd();
+	if (!removed.startsWith(head)) return false;
+	let close = matching_brace(removed, head.length - 1);
+	if (close === -1) return false;
+	if (is_pattern) {
+		let i = skip_spaces(removed, close + 1);
+		if (removed[i] !== ':') return false;
+		i = skip_spaces(removed, i + 1);
+		if (removed[i] !== '{') return false;
+		close = matching_brace(removed, i);
+		if (close === -1) return false;
+	}
+	return removed[skip_spaces(removed, close + 1)] === ')';
+}
+
+/** The first member key of an object-type member line (`role: string;` → `role`). */
+function member_key(line: string): string | null {
+	return /^\s*([^\s:?(;,<]+)/.exec(line)?.[1] ?? null;
+}
+
+const sole_param_object_type_hug: DivergencePattern = {
+	id: 'sole_param_object_type_hug',
+	description:
+		"Hugged sole parameter's object type keeps the author's expansion; prettier collapses it flat",
+	languages: ['typescript', 'svelte'],
+	conformance_sections: ['TypeScript'],
+	fixtures: [
+		'typescript/declarations/function/sole_param_hug_authored_expansion_prettier_divergence',
+		'typescript/expressions/calls/callback_sole_param_block_body_hug_prettier_divergence'
+	],
+	detect(ctx) {
+		// conformance_prettier_ts.md §Hugged sole-parameter object type (◆design_choice):
+		// prettier's `printObject` returns a hugged sole parameter's object type without its
+		// group, losing the author's `shouldBreak`, so an authored `(a: {⏎…⏎})` collapses to
+		// one flat line; tsv keeps the break. Each prettier (removed) line is one site,
+		// re-laid by a run of our (added) lines:
+		//   1. the run's first line ends `(name: {` (or `({` for an annotated object
+		//      pattern) and the prettier line holds that list flat with ONE parameter;
+		//   2. the run is the prettier line's content, whitespace outside string literals
+		//      and the `;` ours adds before each `}` aside — the content-preservation proof
+		//      (no member, comma or separator lost, swapped or invented; no string re-spaced);
+		//   3. the SOURCE spells this site expanded: `name: {⏎` (`}: {⏎` for the pattern)
+		//      followed by the first member's key, at least as often as ours does. Counted,
+		//      because an interface field and a parameter share a name and first key all the
+		//      time — tsv expanding a FLAT type would be a tsv bug.
+		// Blank lines carry nothing; their counts must merely balance.
+		const sites_rewrapped = (hunk: DiffHunk): boolean => {
+			const removed = hunk.removed_lines.filter((l) => l.trim() !== '');
+			const added = hunk.added_lines.filter((l) => l.trim() !== '');
+			if (removed.length === 0) return false;
+			if (hunk.removed_lines.length - removed.length !== hunk.added_lines.length - added.length) {
+				return false;
+			}
+			let at = 0;
+			for (const flat of removed) {
+				const opener = added[at];
+				if (opener === undefined) return false;
+				const named = SOLE_PARAM_TYPE_OPENER.exec(opener.trimEnd());
+				const is_pattern = !named && SOLE_PARAM_PATTERN_OPENER.test(opener.trimEnd());
+				if (!named && !is_pattern) return false;
+				if (!flat_sole_param_at(flat, opener, is_pattern)) return false;
+
+				const target = strip_ws_outside_strings(flat);
+				let run = '';
+				let end = at;
+				while (end < added.length && strip_member_list(run).length < target.length) {
+					run += strip_ws_outside_strings(added[end]);
+					end++;
+				}
+				if (strip_member_list(run) !== target) return false;
+
+				const run_lines = added.slice(at, end);
+				let site: RegExp;
+				if (named) {
+					const key = member_key(run_lines[1] ?? '');
+					if (key === null) return false;
+					site = new RegExp(
+						`(?<![\\w$])${escape_regex(named[1])}\\??\\s*:\\s*\\{[ \\t]*\\r?\\n\\s*${escape_regex(key)}`
+					);
+				} else {
+					const annotation = run_lines.findIndex((l) => l.trim() === '}: {');
+					const key = annotation === -1 ? null : member_key(run_lines[annotation + 1] ?? '');
+					if (key === null) return false;
+					site = new RegExp(`\\}\\s*:\\s*\\{[ \\t]*\\r?\\n\\s*${escape_regex(key)}`);
+				}
+				// a tsv-invented expansion makes ours spell the site once more than the source
+				const sites_in = (text: string) => text.match(new RegExp(site.source, 'g'))?.length ?? 0;
+				if (sites_in(ctx.source) < sites_in(ctx.ours)) return false;
+				at = end;
+			}
+			return at === added.length;
+		};
+
+		const hunk_indices = find_matching_hunks(ctx.hunks, sites_rewrapped);
+		if (hunk_indices.length > 0) {
+			return {
+				pattern: 'sole_param_object_type_hug',
+				confidence: 'certain',
+				hunk_indices,
+				reason:
+					"Hugged sole parameter's object type keeps the authored expansion (prettier drops its group and collapses it)"
+			};
+		}
+		return null;
+	}
+};
+
+/** The prettier and ours line spans one curried-callee callback occupies. */
+interface CurriedRegion {
+	prettier: { start: number; end: number };
+	ours: { start: number; end: number };
+}
+
+/**
+ * Prove a curried-callee callback region line for line, from the call's head line —
+ * `p0` in prettier's output, `o0` in ours — or return null.
+ *
+ * Prettier: `head((`, the parameters one per line a level in, `): T => {`, the body at
+ * the head's level plus one, then `})` + the statement's tail. Ours: `head(`, the whole
+ * signature on ONE line a level in, the body one level deeper than prettier's line for
+ * line, then `}` and `)` + the same tail. The signature is the same text whitespace
+ * aside; ours holds the width on it; and flat on the head's line it would not fit —
+ * the overflow that makes prettier break the parameters at all.
+ */
+function curried_region(
+	p_lines: string[],
+	o_lines: string[],
+	p0: number,
+	o0: number
+): CurriedRegion | null {
+	const head = p_lines[p0];
+	if (!head.endsWith(')((') || o_lines[o0] !== head.slice(0, -1)) return null;
+	const indent = leading_ws(head);
+	const inner = indent + '\t';
+
+	let sig_end = p0 + 1;
+	while (sig_end < p_lines.length && p_lines[sig_end].startsWith(inner)) sig_end++;
+	const p_sig = p_lines[sig_end];
+	if (sig_end === p0 + 1 || p_sig === undefined) return null;
+	if (!p_sig.startsWith(indent + ')') || !/=>\s*\{$/.test(p_sig)) return null;
+
+	const o_sig = o_lines[o0 + 1];
+	if (o_sig === undefined || leading_ws(o_sig) !== inner || o_sig[inner.length] !== '(')
+		return null;
+	if (!/=>\s*\{$/.test(o_sig) || visual_width(o_sig) > PRINT_WIDTH) return null;
+	if (visual_width(o_lines[o0] + o_sig.trimStart()) <= PRINT_WIDTH) return null;
+	if (strip_all_ws(p_lines.slice(p0, sig_end + 1).join('')) !== strip_all_ws(o_lines[o0] + o_sig)) {
+		return null;
+	}
+
+	let p = sig_end + 1;
+	let o = o0 + 2;
+	for (;;) {
+		const line = p_lines[p];
+		if (line === undefined) return null;
+		if (line.startsWith(indent + '})')) break;
+		if (o_lines[o] !== (line === '' ? '' : '\t' + line)) return null;
+		p++;
+		o++;
+	}
+	const tail = p_lines[p].slice(indent.length + 2);
+	if (o_lines[o] !== inner + '}' || o_lines[o + 1] !== indent + ')' + tail) return null;
+	return { prettier: { start: p0, end: p }, ours: { start: o0, end: o + 1 } };
+}
+
+const curried_callee_callback_hug: DivergencePattern = {
+	id: 'curried_callee_callback_hug',
+	description:
+		'Callback of a curried callee: tsv breaks the argument out with a one-line signature; prettier keeps it hugged and breaks its parameters',
+	languages: ['typescript', 'svelte'],
+	conformance_sections: ['TypeScript'],
+	fixtures: ['typescript/expressions/calls/curried_callback_signature_long_prettier_divergence'],
+	detect(ctx) {
+		// conformance_prettier_ts.md §Curried-callee callback signature (◆design_choice):
+		// prettier's `isDecoratedFunction` exemption keeps `memoize(1000)((` hugged and
+		// breaks the parameters; tsv takes the layout any other callee gets. The whole
+		// region is proved line for line ([`curried_region`]) — the body one level deeper
+		// and otherwise byte-identical — so the diff's many re-indent hunks inside it are
+		// claimed together, and a hunk reaching outside it, or a body that changed, is not.
+		const p_lines = ctx.prettier_lines!;
+		const o_lines = ctx.ours_lines!;
+		const regions: CurriedRegion[] = [];
+		for (const hunk of ctx.hunks) {
+			if (!hunk.prettier_range || !hunk.ours_range) continue;
+			const region = curried_region(
+				p_lines,
+				o_lines,
+				hunk.prettier_range.start,
+				hunk.ours_range.start
+			);
+			if (region) regions.push(region);
+		}
+		if (regions.length === 0) return null;
+
+		// A hunk is the region's when every non-blank line it changes lies inside it.
+		// The diff pairs identical blank lines freely, so a blank may be counted just
+		// outside; across a region's hunks the blanks must still balance, so no blank
+		// line is gained or lost beside it.
+		const inside = (span: { start: number; end: number }, at: number): boolean =>
+			at >= span.start && at <= span.end;
+		const hunk_indices: number[] = [];
+		for (const region of regions) {
+			const claimed: DiffHunk[] = [];
+			for (const hunk of ctx.hunks) {
+				let in_region = false;
+				let outside = false;
+				hunk.removed_lines.forEach((line, i) => {
+					if (line.trim() === '') return;
+					if (inside(region.prettier, hunk.prettier_range!.start + i)) in_region = true;
+					else outside = true;
+				});
+				hunk.added_lines.forEach((line, i) => {
+					if (line.trim() === '') return;
+					if (inside(region.ours, hunk.ours_range!.start + i)) in_region = true;
+					else outside = true;
+				});
+				if (in_region && !outside) claimed.push(hunk);
+			}
+			const blanks = (lines: string[]): number => lines.filter((l) => l.trim() === '').length;
+			const removed_blanks = claimed.reduce((n, h) => n + blanks(h.removed_lines), 0);
+			const added_blanks = claimed.reduce((n, h) => n + blanks(h.added_lines), 0);
+			if (removed_blanks !== added_blanks) continue;
+			for (const hunk of claimed) hunk_indices.push(hunk.index);
+		}
+
+		if (hunk_indices.length > 0) {
+			return {
+				pattern: 'curried_callee_callback_hug',
+				confidence: 'certain',
+				hunk_indices: [...new Set(hunk_indices)].sort((a, b) => a - b),
+				reason:
+					"Curried callee's callback breaks out with a one-line signature (prettier hugs it and breaks the parameters)"
 			};
 		}
 		return null;
@@ -4390,6 +5059,7 @@ export const PATTERNS: DivergencePattern[] = [
 	// 3. Feature-specific patterns
 	template_literal_width,
 	template_embedded_verbatim,
+	jest_each_table,
 	field_key_quoted,
 	block_expression_logical,
 	member_expression_call,
@@ -4397,6 +5067,8 @@ export const PATTERNS: DivergencePattern[] = [
 	nullable_union_type_argument,
 	non_null_paren_base,
 	union_paren_member_inline,
+	sole_param_object_type_hug,
+	curried_callee_callback_hug,
 	forced_continuation_indent,
 
 	// 4. Svelte-specific patterns
