@@ -3,6 +3,7 @@
 //! printer's style decides inside the region the two bound.
 
 use super::Printer;
+use super::expressions::functions::has_leftmost_arrow_body_parens;
 use crate::ast::internal::{
     ArrowFunctionBody, ArrowFunctionExpression, BinaryExpression, BinaryOperator, Decorator,
     Expression, ExpressionKind, ObjectPatternProperty, ObjectProperty, UnaryExpression,
@@ -525,10 +526,13 @@ impl Printer<'_> {
 
     /// Whether an arrow function's expression body `body` takes the conditional's pair the
     /// arrow prints around it while it stays on the `=>` line (prettier's
-    /// `shouldAddParensIfNotBreak`) — every conditional body but one a region leaves bare.
+    /// `shouldAddParensIfNotBreak`) — every conditional body but one whose leftmost token takes
+    /// its own pair ([`has_leftmost_arrow_body_parens`]: `({}).x ? a : b` prints bare, the pair
+    /// around the object alone) and one a region leaves bare.
     #[inline]
     pub(in crate::printer) fn arrow_body_takes_ternary_pair(&self, body: &Expression<'_>) -> bool {
         matches!(body.kind, ExpressionKind::ConditionalExpression(_))
+            && !has_leftmost_arrow_body_parens(body)
             && !self.region_withholds_pair(body)
     }
 

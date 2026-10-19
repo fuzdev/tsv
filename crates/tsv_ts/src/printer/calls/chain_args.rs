@@ -607,7 +607,7 @@ fn build_chain_args_force_expand(
         if (arrow_body_is_call_through_non_null(body_expr) || is_ternary_arrow_body(body_expr))
             && !arrow_hug_refused_by_comments(printer, arrow, arrow_span, body_expr)
         {
-            let body_doc = printer.build_expression_doc(body_expr);
+            let body_doc = printer.build_arrow_arg_body_doc_unclaimed(body_expr);
             let body_doc =
                 prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
             let sig_doc = build_arrow_sig_doc(printer, arrow, arrow_span);
@@ -871,7 +871,7 @@ fn build_chain_args_single(
     {
         let arrow_doc = printer.build_arg_expression_doc(arg);
         let arrow_doc = prepend_leading(d, leading_comment_doc, arrow_doc);
-        let body_doc = printer.build_expression_doc(body_expr);
+        let body_doc = printer.build_arrow_arg_body_doc_unclaimed(body_expr);
         let body_doc =
             prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
         let sig_doc = build_hugged_arrow_sig_doc(printer, arrow, arg.span)
@@ -1320,8 +1320,10 @@ fn build_chain_args_multi(
 
         let sig_doc = build_hugged_arrow_sig_doc(printer, arrow, *arrow_span);
         // Reuse the pre-built call body (see above); conditional bodies build fresh.
-        let body_doc =
-            body_reuse.map_or_else(|| printer.build_expression_doc(body_expr), |(_, doc)| doc);
+        let body_doc = body_reuse.map_or_else(
+            || printer.build_arrow_arg_body_doc_unclaimed(body_expr),
+            |(_, doc)| doc,
+        );
         let body_doc =
             prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
 

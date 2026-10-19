@@ -2,8 +2,8 @@
 
 use crate::ast::internal::{self, Expression, ExpressionKind, TSType};
 use crate::printer::Printer;
-use crate::printer::expressions::functions::arrow_token_end;
-use crate::printer::needs_parens::{leftmost_no_lookahead, strip_non_null_wrappers};
+use crate::printer::expressions::functions::{arrow_token_end, has_leftmost_arrow_body_parens};
+use crate::printer::needs_parens::strip_non_null_wrappers;
 use crate::printer::types::helpers::{is_simple_type, unwrap_parenthesized};
 use tsv_lang::source_scan::has_newline_after_position;
 
@@ -321,9 +321,10 @@ pub(super) fn is_ternary_arrow_body(body: &Expression<'_>) -> bool {
 
 /// Whether an arrow's expression body breaks after `=>` with the space before it that a
 /// `fits` measurement counts ([`super::arg_wrapping`]'s break-body state): prettier's
-/// `shouldAddParensIfNotBreak` — a ternary whose leftmost token is not an object literal,
-/// printed `" ", group([ifBreak("", "("), indent([softline, body]), …])` — and only while the
-/// body stays on the `=>` line, which a comment ending its line refuses
+/// `shouldAddParensIfNotBreak` — a ternary that does not take its own pair
+/// ([`has_leftmost_arrow_body_parens`]), printed
+/// `" ", group([ifBreak("", "("), indent([softline, body]), …])` — and only while the body
+/// stays on the `=>` line, which a comment ending its line refuses
 /// ([`arrow_body_has_leading_own_line_comment`]).
 pub(super) fn arrow_body_breaks_after_space(
     printer: &Printer<'_>,
@@ -331,10 +332,7 @@ pub(super) fn arrow_body_breaks_after_space(
     body: &Expression<'_>,
 ) -> bool {
     is_ternary_arrow_body(body)
-        && !matches!(
-            leftmost_no_lookahead(body).kind,
-            ExpressionKind::ObjectExpression(_)
-        )
+        && !has_leftmost_arrow_body_parens(body)
         && !arrow_body_has_leading_own_line_comment(printer, arrow, body)
 }
 

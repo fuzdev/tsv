@@ -222,6 +222,12 @@ pub(in crate::printer) fn has_leftmost_arrow_body_parens(expr: &internal::Expres
     leftmost_arrow_body_parens_span(expr).is_some()
 }
 
+/// Whether the node at an arrow body's leftmost position that takes a pair is the body
+/// itself (a bare object, a bare decorated class) rather than a node inside it.
+fn arrow_body_is_its_own_leftmost_pair(expr: &internal::Expression<'_>) -> bool {
+    leftmost_arrow_body_parens_span(expr) == Some(expr.span())
+}
+
 /// Check if an expression is a huggable pattern for function parameters.
 ///
 /// Prettier's `shouldHugTheOnlyFunctionParameter` hugs a single object/array pattern,
@@ -1487,8 +1493,7 @@ impl<'a> Printer<'a> {
                 })
             });
             parts.push(d.indent_hardline(body_doc));
-        } else if self.arrow_body_takes_ternary_pair(expr) && !has_leftmost_arrow_body_parens(expr)
-        {
+        } else if self.arrow_body_takes_ternary_pair(expr) {
             // Prettier's shouldAddParensIfNotBreak: ternary body gets conditional
             // parens when inline, no parens when on its own line.
             // Excludes ternaries whose test starts with ObjectExpression (matches
@@ -2379,10 +2384,7 @@ impl<'a> Printer<'a> {
                         hoisted_run,
                         glued_run,
                     )
-                } else if self.arrow_body_takes_ternary_pair(expr)
-                    && !has_leftmost_arrow_body_parens(expr)
-                    && !should_break_chain
-                {
+                } else if self.arrow_body_takes_ternary_pair(expr) && !should_break_chain {
                     // Ternary body: parens when inline, none when broken
                     // (prettier's shouldAddParensIfNotBreak). ⚠️ Prettier gates this
                     // disjunct of `shouldPutBodyOnSameLine` on `!shouldBreakChain`, and
@@ -2987,6 +2989,41 @@ impl<'a> Printer<'a> {
             && !self.left_spine_shell_has_own_line_comment(expr)
     }
 
+    /// An arrow's expression body whose leftmost token takes its own pair — an object's `{`
+    /// (read as a block) or a decorated class's `@`, which `ConciseBody` rejects
+    /// ([`leftmost_arrow_body_parens_span`]) — built with that pair; `None` for any other body.
+    ///
+    /// The one seam for it: the whole arrow's body build asks it first, and so does every
+    /// call-argument state that reassembles an arrow from its signature and a body it builds
+    /// itself ([`Printer::build_arrow_arg_body_doc`]) — a body built past it prints
+    /// `(a) =>⏎\t{}.x ? b : c`, which does not reparse.
+    pub(in crate::printer) fn build_leftmost_parens_arrow_body_doc(
+        &self,
+        expr: &internal::Expression<'_>,
+    ) -> Option<DocId> {
+        let leftmost_span = leftmost_arrow_body_parens_span(expr)?;
+        let prev = self
+            .arrow_body_leftmost_parens_target
+            .replace(Some(leftmost_span));
+        let doc = self.build_flat_chain_expression_doc(expr);
+        self.arrow_body_leftmost_parens_target.set(prev);
+        Some(doc)
+    }
+
+    /// [`Self::build_leftmost_parens_arrow_body_doc`] for a body whose leftmost pair sits
+    /// INSIDE it (`({}).x ? b : c`, `({}) as T`): `None` as well when the body itself is the
+    /// node that takes the pair (a bare object, a bare decorated class) — the call-argument
+    /// states print those through their own hug, which adds the pair around the whole body.
+    pub(in crate::printer) fn build_inner_leftmost_parens_arrow_body_doc(
+        &self,
+        expr: &internal::Expression<'_>,
+    ) -> Option<DocId> {
+        if arrow_body_is_its_own_leftmost_pair(expr) {
+            return None;
+        }
+        self.build_leftmost_parens_arrow_body_doc(expr)
+    }
+
     fn build_arrow_body_doc(&self, expr: &internal::Expression<'_>) -> DocId {
         self.build_arrow_body_doc_with_leading(expr, None)
     }
@@ -3032,12 +3069,7 @@ impl<'a> Printer<'a> {
         // when reached. Keyed by span (not a bool) so it survives a chain base being
         // rebuilt across conditional-group variants, and never matches a same-shaped node
         // nested deeper (e.g. a call argument). Saved/restored for nested arrows.
-        if let Some(leftmost_span) = leftmost_arrow_body_parens_span(expr) {
-            let prev = self
-                .arrow_body_leftmost_parens_target
-                .replace(Some(leftmost_span));
-            let doc = self.build_flat_chain_expression_doc(expr);
-            self.arrow_body_leftmost_parens_target.set(prev);
+        if let Some(doc) = self.build_leftmost_parens_arrow_body_doc(expr) {
             return prepend(doc);
         }
 

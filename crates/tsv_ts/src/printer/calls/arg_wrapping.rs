@@ -21,7 +21,7 @@ use super::arg_predicates::{
 use crate::ast::internal;
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, arrow_signature_refuses_hug, arrow_token_end,
-    has_leftmost_arrow_body_parens, prepend_leading,
+    prepend_leading,
 };
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
@@ -460,8 +460,23 @@ impl Printer<'_> {
     /// claimed route on the next pass — so the state wobbled. (The chain's force-expanded and
     /// multi-argument states build their body plainly: no authoring reaches either as the
     /// printed state of a ternary body, so a claim there could not be pinned.)
+    ///
+    /// A body whose leftmost token takes its own pair INSIDE it is built through that seam
+    /// ([`Printer::build_inner_leftmost_parens_arrow_body_doc`]), as the whole arrow builds it.
     pub(super) fn build_arrow_arg_body_doc(&self, body_expr: &internal::Expression<'_>) -> DocId {
-        self.build_expression_doc_claiming_outermost(body_expr)
+        self.build_inner_leftmost_parens_arrow_body_doc(body_expr)
+            .unwrap_or_else(|| self.build_expression_doc_claiming_outermost(body_expr))
+    }
+
+    /// [`Self::build_arrow_arg_body_doc`] for the states that build their body unclaimed (the
+    /// member chain's force-expanded and multi-argument states, a lone call body): the
+    /// leftmost pair, else the plain expression doc.
+    pub(super) fn build_arrow_arg_body_doc_unclaimed(
+        &self,
+        body_expr: &internal::Expression<'_>,
+    ) -> DocId {
+        self.build_inner_leftmost_parens_arrow_body_doc(body_expr)
+            .unwrap_or_else(|| self.build_expression_doc(body_expr))
     }
 }
 
@@ -474,9 +489,9 @@ impl Printer<'_> {
 /// **conditional** (ternary). The caller injects it via `Printer::inject_arrow_body` before
 /// `build_args_split_last`; the whole arrow reuses it (a call body via `build_arrow_body_doc`,
 /// a conditional body via the conditional arm of `build_arrow_expression_body`), and the
-/// break-body state reuses the same DocId. Leftmost-object conditionals are excluded — the
-/// whole arrow routes those through `build_arrow_body_doc`'s object-parens arm, not the
-/// conditional arm, so the injected raw wouldn't match. Returns `None` (unchanged behavior)
+/// break-body state reuses the same DocId. A body whose leftmost token takes its own pair is
+/// built through the seam the whole arrow's body build asks first
+/// ([`Printer::build_arrow_arg_body_doc`]), so it matches too. Returns `None` (unchanged behavior)
 /// when the last arg isn't such an arrow.
 ///
 /// A commented call is injected too: one comment in the innermost body puts every enclosing
@@ -496,10 +511,10 @@ pub(super) fn prebuild_expand_last_break_body(
     }) = last_arg
         && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
         && (arrow_body_is_call_through_non_null(body_expr)
-            || (matches!(
+            || matches!(
                 body_expr.kind,
                 internal::ExpressionKind::ConditionalExpression(_)
-            ) && !has_leftmost_arrow_body_parens(body_expr)))
+            ))
     {
         let body_doc = build_arrow_body_like_arrow(printer, body_expr);
         return Some((body_expr.span().start, body_doc));
@@ -1149,10 +1164,10 @@ pub(super) fn build_arrow_gap_break_multi_arg_doc(
 /// gap sends **every** expression body through `build_arrow_body_doc_with_leading`, which
 /// consults the injection above any body-kind branch. So the terminal is claimed by whichever
 /// prebuild reproduces that branch — the object/array one adds the grammar's parens, the
-/// block one is the block builder itself — and the two bodies whose branch does something
-/// else is declined: a **leftmost-object** expression (an object behind a cast, a member
-/// access, …) has a paren target threaded into its build, so a bare doc would print a body
-/// missing the parens the grammar requires. A **ternary** needs no exclusion on this route
+/// block one is the block builder itself, and a **leftmost-object** expression (an object
+/// behind a cast, a member access, …) is built through the same leftmost-pair seam
+/// ([`Printer::build_arrow_arg_body_doc`]) the body's own builder asks first. A **ternary**
+/// needs no exclusion on this route
 /// even though it takes `if_break` layout parens elsewhere — the own-line run that selects
 /// this whole state is a forced break, and `build_arrow_body_doc_with_leading`'s conditional
 /// arm answers a breaking body with the NO-parens form, which is exactly the bare doc.
@@ -1177,15 +1192,10 @@ fn prebuild_arrow_gap_break_body(
         internal::ArrowFunctionBody::BlockStatement(block) => {
             Some((block.span.start, printer.arrow_block_body_doc(block)))
         }
-        internal::ArrowFunctionBody::Expression(body) => {
-            if has_leftmost_arrow_body_parens(body) {
-                return None;
-            }
-            Some((
-                body.span().start,
-                build_arrow_body_like_arrow(printer, body),
-            ))
-        }
+        internal::ArrowFunctionBody::Expression(body) => Some((
+            body.span().start,
+            build_arrow_body_like_arrow(printer, body),
+        )),
     }
 }
 
@@ -2064,9 +2074,9 @@ pub(super) fn build_break_body_ladder(
 /// flat with the grammar-clarifying parens (`map((x) => (x ? y : z))`), the body broken after
 /// `=>` with the parens dropped, then the argument on its own line — whole when it fits there
 /// (`map(⏎\t(x) => (x ? y : z)⏎)`), its body broken after `=>` too when it does not. The break
-/// state's `=>` line is measured with the space a ternary body leaves
-/// ([`arrow_before_broken_body`]), so a `map((x) =>` line of exactly the print width breaks
-/// the argument out as prettier does.
+/// state's `=>` line is measured with the space a ternary body leaves where prettier leaves
+/// one (`flat_pair`, below; [`arrow_before_broken_body`]), so a `map((x) =>` line of exactly
+/// the print width breaks the argument out as prettier does.
 ///
 /// The third parallel copy of this sat one per printer. What a caller owns is its `opener`
 /// and its signature and body docs. A forced break in the BODY collapses the ladder to the
@@ -2082,11 +2092,14 @@ pub(super) fn build_break_body_ladder(
 /// ([`build_arrow_sig_doc`]), which the flat state prints on its own line as prettier's hug
 /// does (`fn((⏎\t// c⏎) => (a ? b : c))`).
 ///
-/// `flat_pair` is whether the flat state takes those parens: a body a comma-list region
-/// leaves bare ([`Printer::arrow_body_takes_ternary_pair`]) keeps the ladder's layout and
-/// prints flat as written. The break state's `=>` line counts no space when a comment in the
-/// `=>`→body gap ends its line ([`arrow_body_has_leading_own_line_comment`]): prettier then
-/// breaks the body below `=>` with none.
+/// `flat_pair` is whether the flat state takes those parens — and whether the break state's
+/// `=>` line counts the space prettier leaves before them: not for a body whose leftmost token
+/// takes its own pair (`({}).x ? b : c`,
+/// [`has_leftmost_arrow_body_parens`](crate::printer::expressions::functions::has_leftmost_arrow_body_parens))
+/// or one a comma-list region leaves bare ([`Printer::arrow_body_takes_ternary_pair`]). Nor
+/// is the space counted when a comment in the `=>`→body gap ends its line
+/// ([`arrow_body_has_leading_own_line_comment`]): prettier then breaks the body below `=>`
+/// with none.
 pub(super) fn build_ternary_arrow_hug_ladder(
     printer: &Printer<'_>,
     opener: ArgOpener,
@@ -2106,9 +2119,9 @@ pub(super) fn build_ternary_arrow_hug_ladder(
     let body_doc = prepend_hugged_arrow_body_comments(printer, arrow, body_start, body_doc);
     // The arrow with its body broken after `=>`, whose measured `=>` line keeps the space a
     // ternary body's break leaves ([`arrow_before_broken_body`]).
-    let arrow_before = arrow_before_broken_body(!arrow_body_has_leading_own_line_comment(
-        printer, arrow, body_expr,
-    ));
+    let arrow_before = arrow_before_broken_body(
+        flat_pair && !arrow_body_has_leading_own_line_comment(printer, arrow, body_expr),
+    );
     let arrow_broken = d.concat(&[sig_doc, d.text(arrow_before), d.indent_hardline(body_below)]);
     // Break: the first hardline breaks after `=>`, the second drops `)` to its own line.
     // No trailing comma (trailingComma: 'none').
@@ -2181,8 +2194,10 @@ pub(super) fn build_arrow_call_body_states(
     let d = printer.d();
     let body_reuse = prebuild_expand_last_break_body(printer, Some(arg));
     let arrow_doc = printer.with_arrow_body_inject(body_reuse, printed);
-    let body_doc =
-        body_reuse.map_or_else(|| printer.build_expression_doc(body_expr), |(_, doc)| doc);
+    let body_doc = body_reuse.map_or_else(
+        || printer.build_arrow_arg_body_doc_unclaimed(body_expr),
+        |(_, doc)| doc,
+    );
     let body_doc = prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
     let sig_doc = build_hugged_arrow_sig_doc(printer, arrow, arg.span);
     build_break_body_ladder(
