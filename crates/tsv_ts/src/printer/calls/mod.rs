@@ -651,7 +651,11 @@ impl<'a> Printer<'a> {
             // on the last argument must still disable the expand-last hug, exactly as an
             // ordinary leading comment does — prettier's `shouldExpandLastArg` sees it.
             let call_has_comments = self.has_comments_on_page_between(paren_open, span.end);
-            if call.arguments.len() >= 2
+            // The route rebuilds the call from its callee and arguments alone, so a call with
+            // type arguments or a `?.` takes the general path, which prints them.
+            if call.type_arguments.is_none()
+                && !call.optional
+                && call.arguments.len() >= 2
                 && call
                     .arguments
                     .last()
