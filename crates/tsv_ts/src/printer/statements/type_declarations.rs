@@ -1449,9 +1449,16 @@ impl<'a> Printer<'a> {
         // Member id (identifier or string literal)
         let id_doc = match &member.id {
             internal::TSEnumMemberId::Identifier(id) => self.identifier_name_doc(id),
+            // A string member name takes the as-needed key rule every other key follows:
+            // `'b'` prints `b`, while `'d-2'` and an escape-bearing `'\x62'` keep their quotes.
             internal::TSEnumMemberId::String(lit) => {
-                // String literal member name: `"hello"` in `enum { "hello" = 1 }`
-                self.build_literal_doc(lit)
+                if let internal::LiteralValue::String(cooked) = &lit.value {
+                    let content = cooked.resolve(lit.span, self.source);
+                    self.build_string_literal_key_doc(lit, content)
+                } else {
+                    // The parser builds this arm from a string token alone.
+                    self.build_literal_doc(lit)
+                }
             }
         };
 

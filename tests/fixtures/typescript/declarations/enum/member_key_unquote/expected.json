@@ -1,0 +1,588 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 664,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Identifier-valid string keys unquote, keywords included",
+			"start": 20,
+			"end": 78
+		},
+		{
+			"type": "Line",
+			"value": " Keys that keep their quotes: an escape, a non-identifier, a numeric name",
+			"start": 145,
+			"end": 220
+		},
+		{
+			"type": "Line",
+			"value": " A later initializer referencing an unquoted member",
+			"start": 273,
+			"end": 326
+		},
+		{
+			"type": "Line",
+			"value": " A comment beside a key stays where it was written",
+			"start": 355,
+			"end": 407
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 422,
+			"end": 429
+		},
+		{
+			"type": "Block",
+			"value": " d ",
+			"start": 437,
+			"end": 444
+		},
+		{
+			"type": "Line",
+			"value": " Every enum declaration form",
+			"start": 456,
+			"end": 486
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 663,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 654,
+			"body": [
+				{
+					"type": "TSEnumDeclaration",
+					"start": 80,
+					"end": 142,
+					"id": {
+						"type": "Identifier",
+						"start": 85,
+						"end": 86,
+						"name": "A"
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 91,
+							"end": 98,
+							"id": {
+								"type": "Identifier",
+								"start": 91,
+								"end": 92,
+								"name": "b"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 95,
+								"end": 98,
+								"value": "b",
+								"raw": "'b'"
+							}
+						},
+						{
+							"type": "TSEnumMember",
+							"start": 102,
+							"end": 111,
+							"id": {
+								"type": "Identifier",
+								"start": 102,
+								"end": 107,
+								"name": "class"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 110,
+								"end": 111,
+								"value": 1,
+								"raw": "1"
+							}
+						},
+						{
+							"type": "TSEnumMember",
+							"start": 115,
+							"end": 130,
+							"id": {
+								"type": "Identifier",
+								"start": 115,
+								"end": 126,
+								"name": "constructor"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 129,
+								"end": 130,
+								"value": 2,
+								"raw": "2"
+							}
+						},
+						{
+							"type": "TSEnumMember",
+							"start": 134,
+							"end": 139,
+							"id": {
+								"type": "Identifier",
+								"start": 134,
+								"end": 135,
+								"name": "c"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 138,
+								"end": 139,
+								"value": 3,
+								"raw": "3"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Identifier-valid string keys unquote, keywords included",
+							"start": 20,
+							"end": 78
+						}
+					]
+				},
+				{
+					"type": "TSEnumDeclaration",
+					"start": 222,
+					"end": 270,
+					"id": {
+						"type": "Identifier",
+						"start": 227,
+						"end": 228,
+						"name": "B"
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 233,
+							"end": 243,
+							"id": {
+								"type": "Literal",
+								"start": 233,
+								"end": 239,
+								"value": "b",
+								"raw": "'\\x62'"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 242,
+								"end": 243,
+								"value": 1,
+								"raw": "1"
+							}
+						},
+						{
+							"type": "TSEnumMember",
+							"start": 247,
+							"end": 256,
+							"id": {
+								"type": "Literal",
+								"start": 247,
+								"end": 252,
+								"value": "d-2",
+								"raw": "'d-2'"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 255,
+								"end": 256,
+								"value": 2,
+								"raw": "2"
+							}
+						},
+						{
+							"type": "TSEnumMember",
+							"start": 260,
+							"end": 267,
+							"id": {
+								"type": "Literal",
+								"start": 260,
+								"end": 263,
+								"value": "1",
+								"raw": "'1'"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 266,
+								"end": 267,
+								"value": 3,
+								"raw": "3"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Keys that keep their quotes: an escape, a non-identifier, a numeric name",
+							"start": 145,
+							"end": 220
+						}
+					]
+				},
+				{
+					"type": "TSEnumDeclaration",
+					"start": 328,
+					"end": 352,
+					"id": {
+						"type": "Identifier",
+						"start": 333,
+						"end": 334,
+						"name": "C"
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 339,
+							"end": 340,
+							"id": {
+								"type": "Identifier",
+								"start": 339,
+								"end": 340,
+								"name": "a"
+							}
+						},
+						{
+							"type": "TSEnumMember",
+							"start": 344,
+							"end": 349,
+							"id": {
+								"type": "Identifier",
+								"start": 344,
+								"end": 345,
+								"name": "b"
+							},
+							"initializer": {
+								"type": "Identifier",
+								"start": 348,
+								"end": 349,
+								"name": "a"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A later initializer referencing an unquoted member",
+							"start": 273,
+							"end": 326
+						}
+					]
+				},
+				{
+					"type": "TSEnumDeclaration",
+					"start": 409,
+					"end": 453,
+					"id": {
+						"type": "Identifier",
+						"start": 414,
+						"end": 415,
+						"name": "I"
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 420,
+							"end": 433,
+							"id": {
+								"type": "Identifier",
+								"start": 420,
+								"end": 421,
+								"name": "b",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 422,
+										"end": 429
+									}
+								]
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 432,
+								"end": 433,
+								"value": 1,
+								"raw": "1"
+							}
+						},
+						{
+							"type": "TSEnumMember",
+							"start": 445,
+							"end": 450,
+							"id": {
+								"type": "Identifier",
+								"start": 445,
+								"end": 446,
+								"name": "e"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 449,
+								"end": 450,
+								"value": 2,
+								"raw": "2"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " d ",
+									"start": 437,
+									"end": 444
+								}
+							]
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment beside a key stays where it was written",
+							"start": 355,
+							"end": 407
+						}
+					]
+				},
+				{
+					"type": "TSEnumDeclaration",
+					"start": 488,
+					"end": 513,
+					"const": true,
+					"id": {
+						"type": "Identifier",
+						"start": 499,
+						"end": 500,
+						"name": "D"
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 505,
+							"end": 510,
+							"id": {
+								"type": "Identifier",
+								"start": 505,
+								"end": 506,
+								"name": "a"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 509,
+								"end": 510,
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Every enum declaration form",
+							"start": 456,
+							"end": 486
+						}
+					]
+				},
+				{
+					"type": "TSEnumDeclaration",
+					"start": 515,
+					"end": 542,
+					"declare": true,
+					"id": {
+						"type": "Identifier",
+						"start": 528,
+						"end": 529,
+						"name": "E"
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 534,
+							"end": 539,
+							"id": {
+								"type": "Identifier",
+								"start": 534,
+								"end": 535,
+								"name": "a"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 538,
+								"end": 539,
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 544,
+					"end": 570,
+					"exportKind": "value",
+					"declaration": {
+						"type": "TSEnumDeclaration",
+						"start": 551,
+						"end": 570,
+						"id": {
+							"type": "Identifier",
+							"start": 556,
+							"end": 557,
+							"name": "F"
+						},
+						"members": [
+							{
+								"type": "TSEnumMember",
+								"start": 562,
+								"end": 567,
+								"id": {
+									"type": "Identifier",
+									"start": 562,
+									"end": 563,
+									"name": "a"
+								},
+								"initializer": {
+									"type": "Literal",
+									"start": 566,
+									"end": 567,
+									"value": 1,
+									"raw": "1"
+								}
+							}
+						]
+					},
+					"specifiers": [],
+					"source": null
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 572,
+					"end": 604,
+					"exportKind": "value",
+					"declaration": {
+						"type": "TSEnumDeclaration",
+						"start": 579,
+						"end": 604,
+						"const": true,
+						"id": {
+							"type": "Identifier",
+							"start": 590,
+							"end": 591,
+							"name": "G"
+						},
+						"members": [
+							{
+								"type": "TSEnumMember",
+								"start": 596,
+								"end": 601,
+								"id": {
+									"type": "Identifier",
+									"start": 596,
+									"end": 597,
+									"name": "a"
+								},
+								"initializer": {
+									"type": "Literal",
+									"start": 600,
+									"end": 601,
+									"value": 1,
+									"raw": "1"
+								}
+							}
+						]
+					},
+					"specifiers": [],
+					"source": null
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 606,
+					"end": 653,
+					"id": {
+						"type": "Identifier",
+						"start": 616,
+						"end": 617,
+						"name": "N"
+					},
+					"body": {
+						"type": "TSModuleBlock",
+						"start": 618,
+						"end": 653,
+						"body": [
+							{
+								"type": "ExportNamedDeclaration",
+								"start": 622,
+								"end": 650,
+								"exportKind": "value",
+								"declaration": {
+									"type": "TSEnumDeclaration",
+									"start": 629,
+									"end": 650,
+									"id": {
+										"type": "Identifier",
+										"start": 634,
+										"end": 635,
+										"name": "H"
+									},
+									"members": [
+										{
+											"type": "TSEnumMember",
+											"start": 641,
+											"end": 646,
+											"id": {
+												"type": "Identifier",
+												"start": 641,
+												"end": 642,
+												"name": "a"
+											},
+											"initializer": {
+												"type": "Literal",
+												"start": 645,
+												"end": 646,
+												"value": 1,
+												"raw": "1"
+											}
+										}
+									]
+								},
+								"specifiers": [],
+								"source": null
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

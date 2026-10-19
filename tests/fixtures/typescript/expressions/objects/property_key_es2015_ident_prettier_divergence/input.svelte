@@ -11,6 +11,10 @@
 	class C {
 		𐊧() {}
 	}
+	// An enum member name unquotes the same way.
+	enum E {
+		𐊧 = 1
+	}
 	// A key that is not a valid identifier stays quoted.
 	const digit = { '0a': 2 };
 </script>

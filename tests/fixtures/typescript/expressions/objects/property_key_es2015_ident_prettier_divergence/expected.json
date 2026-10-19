@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 420,
+	"end": 489,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -36,20 +36,26 @@
 		},
 		{
 			"type": "Line",
-			"value": " A key that is not a valid identifier stays quoted.",
+			"value": " An enum member name unquotes the same way.",
 			"start": 328,
-			"end": 381
+			"end": 373
+		},
+		{
+			"type": "Line",
+			"value": " A key that is not a valid identifier stays quoted.",
+			"start": 397,
+			"end": 450
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 419,
+		"end": 488,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 410,
+			"end": 479,
 			"body": [
 				{
 					"type": "VariableDeclaration",
@@ -261,43 +267,82 @@
 					]
 				},
 				{
+					"type": "TSEnumDeclaration",
+					"start": 375,
+					"end": 395,
+					"id": {
+						"type": "Identifier",
+						"start": 380,
+						"end": 381,
+						"name": "E"
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 386,
+							"end": 392,
+							"id": {
+								"type": "Identifier",
+								"start": 386,
+								"end": 388,
+								"name": "𐊧"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 391,
+								"end": 392,
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An enum member name unquotes the same way.",
+							"start": 328,
+							"end": 373
+						}
+					]
+				},
+				{
 					"type": "VariableDeclaration",
-					"start": 383,
-					"end": 409,
+					"start": 452,
+					"end": 478,
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 389,
-							"end": 408,
+							"start": 458,
+							"end": 477,
 							"id": {
 								"type": "Identifier",
-								"start": 389,
-								"end": 394,
+								"start": 458,
+								"end": 463,
 								"name": "digit"
 							},
 							"init": {
 								"type": "ObjectExpression",
-								"start": 397,
-								"end": 408,
+								"start": 466,
+								"end": 477,
 								"properties": [
 									{
 										"type": "Property",
-										"start": 399,
-										"end": 406,
+										"start": 468,
+										"end": 475,
 										"method": false,
 										"shorthand": false,
 										"computed": false,
 										"key": {
 											"type": "Literal",
-											"start": 399,
-											"end": 403,
+											"start": 468,
+											"end": 472,
 											"value": "0a",
 											"raw": "'0a'"
 										},
 										"value": {
 											"type": "Literal",
-											"start": 405,
-											"end": 406,
+											"start": 474,
+											"end": 475,
 											"value": 2,
 											"raw": "2"
 										},
@@ -312,8 +357,8 @@
 						{
 							"type": "Line",
 							"value": " A key that is not a valid identifier stays quoted.",
-							"start": 328,
-							"end": 381
+							"start": 397,
+							"end": 450
 						}
 					]
 				}

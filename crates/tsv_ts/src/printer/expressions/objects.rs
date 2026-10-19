@@ -961,7 +961,7 @@ impl<'a> Printer<'a> {
     /// else keep them and normalize the quote style. Keeping quotes covers
     /// non-identifier keys (`'kebab-case'`) and escape-bearing keys (`'b'`) whose
     /// escapes must be preserved (see [`Self::string_key_unquotes`]). Shared by
-    /// object property keys and import-attribute keys.
+    /// object property keys, import-attribute keys and enum member names.
     pub(in crate::printer) fn build_string_literal_key_doc(
         &self,
         lit: &Literal<'_>,

@@ -19,8 +19,9 @@ The rule is position-scoped, and a quote that carries meaning stays:
   both formatters, since a bare `new` before `(` or `<` starts a construct signature (see
   [method_signature_new_key_quoted](../../../types/method_signature_new_key_quoted/)).
 - A class method or `get` / `set` accessor key unquotes the same way (`'𐊧'() {}` →
-  `𐊧() {}`). A class **field** key is outside the rule: a quoted field key keeps its quotes
-  whatever it spells (see [field_key_quoted](../../../declarations/class/field_key_quoted/)).
+  `𐊧() {}`), as does an enum member name (`'𐊧' = 1` → `𐊧 = 1`). A class **field** key
+  is outside the rule: a quoted field key keeps its quotes whatever it spells (see
+  [field_key_quoted](../../../declarations/class/field_key_quoted/)).
 - A key that is not a valid identifier (`'0a'`) stays quoted in both.
 
 ## Reason

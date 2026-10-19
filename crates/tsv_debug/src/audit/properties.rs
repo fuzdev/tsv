@@ -496,7 +496,7 @@ pub(crate) fn leaf_conservation_diff(input: &Value, output: &Value) -> Option<St
 /// | `Fragment` | **erase** | a container, one per owner; an `{#await}` branch's fragment appears and vanishes with the branch's authored form (`{:then value}` with an empty body is dropped, `{:catch}` folds to the `catch` shorthand) — its NODES still count |
 /// | `EmptyStatement` | **erase** | a stray `;` the formatter drops by design |
 /// | `TSParenthesizedType` / `ParenthesizedExpression` / `TSUnionType` / `TSIntersectionType` / `TSInstantiationExpression` / `ChainExpression` | **erase** | wrapper shells the formatter strips or flattens by design (a redundant type paren, a redundant grouping pair the `{#snippet}`-parameter wire keeps as a node, a single-member `\| A`, a nested `A \| (B \| C)`, a redundant `(a?.b)?.c` chain shell); acorn-typescript reads `Base<T>` in a class heritage as an instantiation expression or not by the SPELLING of what follows, so tsv's drop-in parse does too. The shell's operands still count |
-/// | a string `Literal` or an `Identifier` reached through `key` | **conflate** as `n:key` | the quote-props rewrite (`{"a": 1}` ↔ `{a: 1}`) flips the node type of a property key; the leaf check conserves the text across it |
+/// | a string `Literal` or an `Identifier` reached through `key`, or through a `TSEnumMember`'s `id` | **conflate** as `n:key` | the quote-props rewrite (`{"a": 1}` ↔ `{a: 1}`, `enum E { "a" }` ↔ `enum E { a }`) flips the node type of a property key or an enum member name; the leaf check conserves the text across it |
 /// | a `*Directive`'s `value` / `expression` | **skip the subtree** | shorthand normalization (`style:color={color}` → `style:color`, `let:x={x}` → `let:x`) drops the expression node; the directive and its name still count |
 /// | an `AwaitBlock`'s `value` / `error` | **skip the subtree** | the binding rides the branch's authored form (above) |
 /// | `comments` / `leadingComments` / `trailingComments` / `comment` | **skip the subtree** | comments have their own gates (ledger, census), and the nestled-JSDoc merge legitimately prints two parsed blocks as one; the singular `comment` is a Svelte `<style>`'s `content.comment`, a COPY of the template comment preceding the tag (which the fragment already counts once) |
@@ -667,6 +667,17 @@ fn census_entry<'a>(
     }
 }
 
+/// The key a child reached through `field` of a node of type `ty` is censused under: the field
+/// itself, except an enum member's `id`, which is a key position like a property's `key` (the
+/// quote-props rewrite flips it between a string `Literal` and an `Identifier`).
+fn census_child_key<'k>(field: &'k str, ty: Option<&str>) -> &'k str {
+    if field == "id" && ty == Some("TSEnumMember") {
+        "key"
+    } else {
+        field
+    }
+}
+
 /// Whether the census skips the subtree at `key` inside a node of type `ty` — the table's
 /// skip rules (metadata and positions, comments, a directive's shorthand-normalized value, an
 /// await block's binding).
@@ -678,16 +689,17 @@ fn census_skips_key(key: &str, ty: Option<&str>) -> bool {
         || (ty == Some("AwaitBlock") && matches!(key, "value" | "error"))
 }
 
-/// Whether a node of this type steers how its OWN children are censused — the three the rules
+/// Whether a node of this type steers how its OWN children are censused — the ones the rules
 /// above read a parent's `type` for: a directive (whose shorthand-normalized value is skipped),
-/// an await block (whose binding is), and an element (which may open a raw island). Every other
-/// type is read only for the node's own entry, which is settled once the object closes.
+/// an await block (whose binding is), an element (which may open a raw island), and an enum
+/// member (whose `id` is censused as a key). Every other type is read only for the node's own
+/// entry, which is settled once the object closes.
 ///
-/// [`streamed_node_census`] is the caller: taking children as they arrive, it needs these three
-/// to have been spelled BEFORE them, and this is the predicate that says which wire fields it
+/// [`streamed_node_census`] is the caller: taking children as they arrive, it needs these to
+/// have been spelled BEFORE them, and this is the predicate that says which wire fields it
 /// actually waits on. (Svelte's `Root` spells its `type` fifth, and steers nothing.)
 fn census_type_steers_children(ty: &str) -> bool {
-    ty.ends_with("Directive") || matches!(ty, "AwaitBlock" | "RegularElement")
+    ty.ends_with("Directive") || matches!(ty, "AwaitBlock" | "RegularElement" | "TSEnumMember")
 }
 
 /// Whether this node opens a raw `<script>` / `<style>` island — a text inside one is code the
@@ -742,6 +754,7 @@ fn collect_conserved_nodes<'a>(
                 if census_skips_key(k, ty) {
                     continue;
                 }
+                let k = census_child_key(k, ty);
                 collect_conserved_nodes(child, Some(k), raw_island, names, None, out);
             }
         }
@@ -979,7 +992,7 @@ where
             let child_island = raw_island || census_opens_raw_island(ty, name);
             let value = map.next_value_seed(CensusSeed {
                 state,
-                key: Some(field),
+                key: Some(census_child_key(field, ty)),
                 raw_island: child_island,
                 words: None,
             })?;
@@ -1363,6 +1376,25 @@ mod node_census_tests {
         let quoted = prop(json!({"type": "Literal", "value": "a"}));
         let bare = prop(json!({"type": "Identifier", "name": "a"}));
         assert!(node_conservation_diff(&quoted, &bare).is_none());
+        // An enum member's name is a key position too.
+        let member = |id: Value| json!({"type": "TSEnumMember", "id": id});
+        assert!(
+            node_conservation_diff(
+                &member(json!({"type": "Literal", "value": "a"})),
+                &member(json!({"type": "Identifier", "name": "a"}))
+            )
+            .is_none()
+        );
+        // Only an enum member's `id` is a key: a module name's flip (`declare module 'm'` ↔
+        // `declare module m`) changes what the declaration means.
+        let module = |id: Value| json!({"type": "TSModuleDeclaration", "id": id});
+        assert!(
+            node_conservation_diff(
+                &module(json!({"type": "Literal", "value": "m"})),
+                &module(json!({"type": "Identifier", "name": "m"}))
+            )
+            .is_some()
+        );
         // A value-position flip is not the quote-props rewrite.
         let v = |x: Value| json!({"type": "ExpressionStatement", "expression": x});
         assert!(
