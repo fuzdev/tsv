@@ -9,7 +9,7 @@
 // ## Architecture
 //
 // Doc-first (like `values.rs`): every selector is built as ONE `group`/`indent`/
-// `line`/`softline` doc tree and rendered once via `write_arena_doc_with_suffix`. The
+// `line`/`softline` doc tree and rendered once via `write_arena_doc_reserving`. The
 // renderer makes the wrapping decisions, so width measurement and emission share a
 // single representation — there is no separate measurement pass to drift from
 // emission. The list level (the "2+ selectors always break" rule and the
@@ -43,12 +43,6 @@ use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::printing::format_string_literal;
 use tsv_lang::source_scan;
 
-/// Trailing punctuation that follows a selector on its last line (`) {` / `,`),
-/// reserved so a selector that would overflow once the brace is appended breaks
-/// instead. Two columns reproduces the imperative printer's `+2`/`+4` overheads
-/// exactly (the pseudo-args group already counts its own `()`).
-const SELECTOR_SUFFIX_WIDTH: usize = 2;
-
 impl<'a> Printer<'a> {
     /// The leading combinator string for the first compound in a complex selector
     /// (e.g. the `>` in `:has(> img)`). A descendant combinator has no leading
@@ -72,22 +66,29 @@ impl<'a> Printer<'a> {
     ///
     /// Prettier's rule: a top-level list of 2+ selectors ALWAYS breaks (one per
     /// line); a single selector wraps only on width. A comment at a comma boundary
-    /// keeps the whole list **inline** (matching prettier — a comment-bearing list is
-    /// not subject to the always-break rule), with the comments interleaved at their
-    /// boundaries and the surrounding whitespace normalized (the cataloged spacing
+    /// keeps the whole list **inline** at its commas (matching prettier — a comment-bearing
+    /// list is not subject to the always-break rule), with the comments interleaved at
+    /// their boundaries and the surrounding whitespace normalized (the cataloged spacing
     /// divergence — prettier preserves the source whitespace; see
-    /// conformance_prettier_css.md §CSS: Comments).
+    /// conformance_prettier_css.md §CSS: Comments). Its items still wrap at the print
+    /// width, where prettier leaves a comment-bearing selector as written (the cataloged
+    /// print-width divergence, conformance_prettier_css.md §CSS: Selectors).
     pub(super) fn print_selector_list(&mut self, list: &internal::SelectorList<'_>) {
         if list.selectors.is_empty() {
             return;
         }
+        // What the rule writes after its selector on the last line: the block's ` {`.
+        let block_open = " {".len();
         if self.has_comments_to_emit_between(list.span.start, list.span.end) {
+            // The inline form: its last line is the list's, the ` {` behind it.
             let doc = self.build_comma_list_doc(list.selectors, false);
-            self.write_arena_doc_with_suffix(doc, SELECTOR_SUFFIX_WIDTH);
+            self.write_arena_doc_reserving(doc, block_open);
             return;
         }
         if list.selectors.len() >= 2 {
-            // Top-level list: each selector on its own line.
+            // Top-level list: each selector on its own line, a non-last one's last line
+            // ending in the `,` this loop writes, the last one's in the ` {`.
+            let last = list.selectors.len() - 1;
             for (i, complex) in list.selectors.iter().enumerate() {
                 if i > 0 {
                     // The comment-free twin of `build_comma_list_doc`'s pre-comma
@@ -101,10 +102,11 @@ impl<'a> Printer<'a> {
                     self.write(",\n");
                     self.write_indent();
                 }
-                self.print_complex_selector(complex);
+                let suffix = if i == last { block_open } else { ",".len() };
+                self.print_complex_selector(complex, suffix);
             }
         } else {
-            self.print_complex_selector(&list.selectors[0]);
+            self.print_complex_selector(&list.selectors[0], block_open);
         }
     }
 
@@ -197,7 +199,8 @@ impl<'a> Printer<'a> {
     /// lead the next). `breakable` selects the separator after the comma: a `line`
     /// (the nested/forgiving form, where the enclosing group decides whether to break
     /// one-per-line) or a literal space (the top-level inline-with-comments form, which
-    /// matches prettier by never breaking a comment-bearing list). Leading/trailing
+    /// matches prettier by never breaking a comment-bearing list at its commas; its items
+    /// still wrap at the print width). Leading/trailing
     /// comments (inside `:is()` parens) are added by the caller — `build_pseudo_args_doc`
     /// via `comment_blocks_in_range` + `wrap_inner_with_comments` — since they sit
     /// outside the list span.
@@ -270,11 +273,14 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Render a single complex selector by building its doc and printing it,
-    /// reserving the trailing `) {`/`,` so an over-width selector breaks.
-    fn print_complex_selector(&mut self, complex: &internal::ComplexSelector<'_>) {
+    /// Render a single complex selector by building its doc and printing it, charging
+    /// the `suffix` columns written after it (` {` or `,`) to its last line alone, so a
+    /// selector that would overflow once the punctuation lands breaks, while a line a
+    /// later break ends (the head before a broken pseudo's argument list) is measured
+    /// without it.
+    fn print_complex_selector(&mut self, complex: &internal::ComplexSelector<'_>, suffix: usize) {
         let doc = self.build_complex_selector_doc(complex);
-        self.write_arena_doc_with_suffix(doc, SELECTOR_SUFFIX_WIDTH);
+        self.write_arena_doc_reserving(doc, suffix);
     }
 
     //

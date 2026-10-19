@@ -677,26 +677,6 @@ impl<'a> Printer<'a> {
         self.write_declaration_end(decl);
     }
 
-    /// Render a value doc, reserving `reserve` columns of trailing punctuation
-    /// (the declaration's `;`) for the **outermost** group's fit decision only.
-    ///
-    /// Unlike `write_arena_doc_with_suffix` — whose `EmbedContext::suffix_width`
-    /// every group's fit check subtracts — this appends a measurement-only trailing
-    /// node (it renders nothing) after the doc. The outermost group's flat line
-    /// reaches that node and counts it, but a nested group (a nested `calc`, a paren
-    /// group) is separated from it by the outermost group's softline break, so its
-    /// lookahead stops there and it never reserves the column. That keeps prettier's
-    /// exact-width-boundary layout for nested groups, which a global suffix would
-    /// wrongly break (e.g. a 100-column nested paren group).
-    fn write_arena_doc_reserving(&mut self, doc: DocId, reserve: usize) {
-        let reserved = {
-            let d = self.d();
-            let marker = d.with_context(d.empty(), DocContext::reserving(reserve));
-            d.concat(&[doc, marker])
-        };
-        self.write_arena_doc(reserved);
-    }
-
     /// Print a function-valued declaration whose value contains comments.
     ///
     /// CSS value comments aren't stored in the AST, so the value is reconstructed

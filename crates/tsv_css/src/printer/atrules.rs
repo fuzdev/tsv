@@ -8,8 +8,8 @@
 //
 // Doc-first (like `selectors.rs`/`values.rs`): each prelude is built as one doc tree
 // and rendered through the renderer via the shared `write_arena_doc_with_suffix` (the
-// same writer selectors.rs uses), so the wrap decision and emission share a single
-// representation — no measurement pass to drift from emission. `@supports`/`@container`
+// writer the `@scope` clause's selector list uses too), so the wrap decision and emission
+// share a single representation — no measurement pass to drift from emission. `@supports`/`@container`
 // conditions and the `@media`/`@import` single-query `and`/`or` wrap are `fill`s; the
 // `@media` comma list is a `group`. The one holdout is the `@import` comma-separated
 // query *list* (`print_import_media_query_fill`), whose two-level greedy fill keeps the

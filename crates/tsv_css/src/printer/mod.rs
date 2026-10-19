@@ -36,7 +36,7 @@ use crate::lexer::{Lexer, TokenKind};
 use tsv_lang::{
     CommentFreeWindow, EmbedContext, INDENT, OutputBuffer, Span, TAB_WIDTH, comments_to_emit_from,
     doc::{
-        self,
+        self, DocContext,
         arena::{DocArena, DocId},
     },
     has_comments_to_emit_from, is_format_ignore_directive,
@@ -442,7 +442,7 @@ impl<'a> Printer<'a> {
     ///
     /// Only one thing can leave a space there: a selector (or at-rule prelude) ending
     /// in a CSS **escape's payload** — `.a\ ` is a class named `a `, and that space is
-    /// content, so it survives the render (see `write_arena_doc_with_suffix`). It also
+    /// content, so it survives the render (see `write_arena_doc`). It also
     /// already separates the prelude from the brace, so adding a second space would
     /// emit `.a\  {` where every other formatter emits `.a\ {`. Absorbing the separator
     /// is the fix; trimming the payload instead is not — that strands the backslash
@@ -548,28 +548,45 @@ impl<'a> Printer<'a> {
     ///
     /// Interior lines are still trimmed inline by `render_line_break`; only the final-line
     /// trim is skipped, and an ordinary value's rendered piece never ends in whitespace, so
-    /// this is a no-op everywhere else. [`Self::write_arena_doc_with_suffix`] — selectors and
-    /// at-rule preludes — does the same, for the same reason.
+    /// this is a no-op everywhere else — except a selector, which can end in an escaped
+    /// space too (`.a\ `, a class named `a `), with the `,` / ` {` its caller appends landing
+    /// right after it: trim the payload and the stranded backslash escapes that punctuation
+    /// instead (`.a\ , .b` → `.a\,`, one class named `a,` — the selector list is gone).
+    /// [`Self::write_arena_doc_with_suffix`] — at-rule preludes and the `@scope` clause's
+    /// selector list — does the same, for the same reason.
     pub(crate) fn write_arena_doc(&mut self, d: DocId) {
+        let embed = self.embed;
+        if !self.try_write_arena_doc_flat(d, &embed) {
+            self.render_arena_doc(d, &embed);
+        }
+    }
+
+    /// The flat write-out every writer here tries first: `true` when the doc fit the rest
+    /// of its line under `embed` and was appended, `false` (buffer untouched) when it is
+    /// left to [`Self::render_arena_doc`].
+    fn try_write_arena_doc_flat(&mut self, d: DocId, embed: &EmbedContext) -> bool {
         let current_col = self.current_column();
-        if doc::arena_try_print_flat_into(
+        doc::arena_try_print_flat_into(
             self.arena,
             d,
-            &self.embed,
+            embed,
             current_col,
             self.indent_level,
             self.source,
             self.buffer.as_append_target(),
-        ) {
-            return;
-        }
+        )
+    }
+
+    /// Render a doc under `embed` through the preserve-whitespace entry point and write it.
+    fn render_arena_doc(&mut self, d: DocId, embed: &EmbedContext) {
+        let current_col = self.current_column();
         // Render into the arena-parked scratch: one warm buffer across the
         // file's rules instead of an alloc/free per rule.
         let mut output = self.arena.take_render_scratch();
         doc::arena_print_doc_with_indent_resolved_preserve_whitespace_into(
             self.arena,
             d,
-            &self.embed,
+            embed,
             current_col,
             self.indent_level,
             self.source,
@@ -579,49 +596,60 @@ impl<'a> Printer<'a> {
         self.arena.park_render_scratch(output);
     }
 
+    /// Render a doc, charging `reserve` columns of trailing punctuation the caller
+    /// writes after it (a declaration's `;`, a selector's `,` or ` {`) to the doc's
+    /// **last line** only.
+    ///
+    /// Unlike [`Self::write_arena_doc_with_suffix`] — whose `EmbedContext::suffix_width`
+    /// every group's fit check subtracts, on every line — this appends a
+    /// measurement-only trailing node (it renders nothing) after the doc. A group whose
+    /// flat line runs to the doc's end reaches that node and counts it, but a group a
+    /// later break separates from it (a nested `calc`, a pseudo's argument list
+    /// followed by another one, a `:global(…)` argument's inner line) stops its
+    /// look-ahead at that break and never reserves the columns — prettier's rule, where
+    /// the punctuation is printed after the doc and only the line it lands on carries
+    /// it. A global suffix would break such a line at exactly the print width.
+    ///
+    /// The flat write-out is tried first with the reserve as a suffix instead, so the
+    /// doc that fits — nearly every one — builds no marker: a doc written flat is one
+    /// line, its last, and the flat walk charges a suffix and a trailing reserve alike
+    /// (`print_width − suffix − column` against the doc's width), so the two accept the
+    /// same docs.
+    pub(super) fn write_arena_doc_reserving(&mut self, doc: DocId, reserve: usize) {
+        let mut flat_embed = self.embed;
+        flat_embed.suffix_width += reserve;
+        if self.try_write_arena_doc_flat(doc, &flat_embed) {
+            return;
+        }
+        let reserved = {
+            let d = self.d();
+            let marker = d.with_context(d.empty(), DocContext::reserving(reserve));
+            d.concat(&[doc, marker])
+        };
+        let embed = self.embed;
+        self.render_arena_doc(reserved, &embed);
+    }
+
     /// Like `write_arena_doc`, but reserving `suffix_width` columns for the
     /// punctuation the caller appends after the doc (` {`/`;` after an at-rule
-    /// prelude, `) {`/`,` after a selector). The reservation rides
+    /// prelude, the `)` after an `@scope` clause's selector list). The reservation rides
     /// `EmbedContext::suffix_width` (read by every group's fit check); fill-based docs
     /// additionally carry it as the fill's `trailing_reserve` (fills don't read
-    /// `suffix_width`). Shared by the selector and at-rule-prelude writers.
+    /// `suffix_width`). Shared by the at-rule-prelude writers.
     ///
     /// Preserves the rendered piece's trailing whitespace for the same reason
     /// [`Self::write_arena_doc`] does — and the suffix is *precisely* the punctuation
-    /// that makes it matter. A selector can end in an escaped space (`.a\ `, a class
-    /// named `a `), and the `,` / ` {` the caller appends lands right after it: trim
-    /// the payload and the stranded backslash escapes that punctuation instead
-    /// (`.a\ , .b` → `.a\,`, one class named `a,` — the selector list is gone).
+    /// that makes it matter: an `@scope` clause's selector can end in an escaped space
+    /// (`.a\ `), and the `)` the caller appends lands right after it.
     ///
     /// Tries the flat write-out first, as [`Self::write_arena_doc`] does; the suffix
     /// width is reserved there too.
     pub(crate) fn write_arena_doc_with_suffix(&mut self, d: DocId, suffix_width: usize) {
-        let current_col = self.current_column();
         let mut embed = self.embed;
         embed.suffix_width = suffix_width;
-        if doc::arena_try_print_flat_into(
-            self.arena,
-            d,
-            &embed,
-            current_col,
-            self.indent_level,
-            self.source,
-            self.buffer.as_append_target(),
-        ) {
-            return;
+        if !self.try_write_arena_doc_flat(d, &embed) {
+            self.render_arena_doc(d, &embed);
         }
-        let mut output = self.arena.take_render_scratch();
-        doc::arena_print_doc_with_indent_resolved_preserve_whitespace_into(
-            self.arena,
-            d,
-            &embed,
-            current_col,
-            self.indent_level,
-            self.source,
-            &mut output,
-        );
-        self.write(&output);
-        self.arena.park_render_scratch(output);
     }
 
     /// Get the formatted output
