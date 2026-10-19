@@ -639,6 +639,28 @@ fn linearize_call_callee<'a>(
     }
 }
 
+/// The chain node for `member`'s own lookup — `.prop`, `.#prop` or `[index]`, optional or
+/// not — positioned for its object→property gap, for the member printer that prints one
+/// lookup after an operand it does not linearize ([`super::build_lookup_after_operand_doc`]).
+///
+/// Built by the linearizer's own step, over an empty run: the stripped-paren gap it would
+/// record names an earlier member node, and there is none.
+pub(super) fn member_lookup_node<'a>(
+    member: &'a internal::MemberExpression<'_>,
+    member_span: Span,
+    source: &str,
+) -> ChainNode<'a> {
+    let mut nodes = ChainNodeVec::new();
+    let mut paren_gaps = Vec::new();
+    linearize_member_node(member, member_span, source, &mut nodes, &mut paren_gaps);
+    debug_assert!(paren_gaps.is_empty() && nodes.len() == 1);
+    #[expect(clippy::unreachable)] // `linearize_member_node` always pushes the member's node
+    let Some(node) = nodes.pop() else {
+        unreachable!("a member linearizes to its own lookup node");
+    };
+    node
+}
+
 /// Process a MemberExpression node: handle paren gaps and push the appropriate ChainNode.
 ///
 /// Extracted from `linearize_recursive` so it can be shared with

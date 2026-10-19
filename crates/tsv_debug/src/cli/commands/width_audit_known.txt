@@ -39,7 +39,7 @@
 # FAILS (a fix landed, or the fixture that carried it moved — re-pin).
 #
 # Regenerate with `deno task width:audit:update`.
-# shapes: 42
+# shapes: 43
 svelte	'	-	'
 svelte	'	-	*/
 svelte	)	-	;
@@ -70,6 +70,7 @@ svelte	IDENT	-	{
 svelte	IDENT	-->	WORD
 svelte	[	-	'
 svelte	`	-	;
+svelte	`	-	=
 svelte	class	-	}
 svelte	const	-	;
 svelte	const	-	WORD

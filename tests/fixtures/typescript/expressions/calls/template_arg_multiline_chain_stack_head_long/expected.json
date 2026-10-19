@@ -1,0 +1,315 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 542,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A two-link stack ending in a call keeps its links glued below a long head too. The first",
+			"start": 20,
+			"end": 111
+		},
+		{
+			"type": "Line",
+			"value": " link is a lookup on the head's call: at 100 columns the head fills its line and that",
+			"start": 113,
+			"end": 200
+		},
+		{
+			"type": "Line",
+			"value": " lookup moves to the next one, and at 101 the head's own arguments break instead",
+			"start": 202,
+			"end": 284
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 541,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 532,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 286,
+					"end": 406,
+					"expression": {
+						"type": "CallExpression",
+						"start": 286,
+						"end": 405,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 286,
+							"end": 398,
+							"object": {
+								"type": "CallExpression",
+								"start": 286,
+								"end": 396,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 286,
+									"end": 389,
+									"object": {
+										"type": "CallExpression",
+										"start": 286,
+										"end": 384,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 286,
+											"end": 353,
+											"object": {
+												"type": "Identifier",
+												"start": 286,
+												"end": 325,
+												"name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 326,
+												"end": 353,
+												"name": "mmmmmmmmmmmmmmmmmmmmmmmmmmm"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 354,
+												"end": 383,
+												"name": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 388,
+										"end": 389,
+										"name": "o"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 390,
+										"end": 395,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 391,
+												"end": 394,
+												"value": {
+													"raw": "\na\n",
+													"cooked": "\na\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 397,
+								"end": 398,
+								"name": "o"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "TemplateLiteral",
+								"start": 399,
+								"end": 404,
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 400,
+										"end": 403,
+										"value": {
+											"raw": "\nb\n",
+											"cooked": "\nb\n"
+										},
+										"tail": true
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A two-link stack ending in a call keeps its links glued below a long head too. The first",
+							"start": 20,
+							"end": 111
+						},
+						{
+							"type": "Line",
+							"value": " link is a lookup on the head's call: at 100 columns the head fills its line and that",
+							"start": 113,
+							"end": 200
+						},
+						{
+							"type": "Line",
+							"value": " lookup moves to the next one, and at 101 the head's own arguments break instead",
+							"start": 202,
+							"end": 284
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 408,
+					"end": 531,
+					"expression": {
+						"type": "CallExpression",
+						"start": 408,
+						"end": 530,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 408,
+							"end": 523,
+							"object": {
+								"type": "CallExpression",
+								"start": 408,
+								"end": 521,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 408,
+									"end": 514,
+									"object": {
+										"type": "CallExpression",
+										"start": 408,
+										"end": 512,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 408,
+											"end": 476,
+											"object": {
+												"type": "Identifier",
+												"start": 408,
+												"end": 448,
+												"name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 449,
+												"end": 476,
+												"name": "mmmmmmmmmmmmmmmmmmmmmmmmmmm"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 480,
+												"end": 509,
+												"name": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 513,
+										"end": 514,
+										"name": "o"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 515,
+										"end": 520,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 516,
+												"end": 519,
+												"value": {
+													"raw": "\na\n",
+													"cooked": "\na\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 522,
+								"end": 523,
+								"name": "o"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "TemplateLiteral",
+								"start": 524,
+								"end": 529,
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 525,
+										"end": 528,
+										"value": {
+											"raw": "\nb\n",
+											"cooked": "\nb\n"
+										},
+										"tail": true
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

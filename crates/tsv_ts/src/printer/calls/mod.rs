@@ -608,6 +608,130 @@ pub(in crate::printer) fn is_memberish(expr: &internal::Expression<'_>) -> bool 
 }
 
 impl<'a> Printer<'a> {
+    /// Whether `call` takes the member-chain bypass for a sole multiline template on the
+    /// `(` line — prettier's `isTemplateOnItsOwnLine` arm of `printCallExpression`, which
+    /// returns `[callee, "(", template, ")"]` before the `printMemberChain` redirect is
+    /// reached ([`arg_wrapping::multiline_template_hug_applies`] is the argument half).
+    ///
+    /// Declines on a LINE comment anywhere in the callee: a `//` in a chain gap defers as a
+    /// `line_suffix`, and with the heads flat there is no break of its own left to flush
+    /// at (see the bypass in [`Self::build_call_doc`]).
+    ///
+    /// The one definition, asked where a call is printed ([`Self::build_call_doc`]) and
+    /// where a member or a `!` is printed over such a call
+    /// ([`Self::build_template_bypass_operand_doc`]).
+    pub(in crate::printer) fn call_takes_template_bypass(
+        &self,
+        call: &internal::CallExpression<'_>,
+        span: Span,
+    ) -> bool {
+        // The shape test comes first: it reads the argument list alone, where the rest
+        // needs the callee gap resolved to know where the `(` follows.
+        is_sole_multiline_template_arg(call.arguments) && {
+            let paren_open = call_paren_open(self, call, span);
+            multiline_template_hug_applies(self, call.arguments, paren_open)
+                && !self.has_line_comments_between(span.start, paren_open)
+        }
+    }
+
+    /// Whether the first call down `expr`'s object spine — through member objects and
+    /// `!` operands — takes the template bypass ([`Self::call_takes_template_bypass`]).
+    ///
+    /// Prettier prints a member through `printMemberExpression` (`[print(object),
+    /// lookup]`) and a `!` as `[print(expression), "!"]`; only a CALL reaches
+    /// `printMemberChain`, which flattens its callee spine without printing the links. So
+    /// a stack of bypassed calls (`` v.m(r).o(`⏎a⏎`).o(`⏎b⏎`) ``) prints each link
+    /// through its own call printer — each glued to the template that closes the link
+    /// below — and a member or `!` ending such a stack (`` …o(`⏎b⏎`).p ``) prints over it
+    /// the same way. tsv's member and `!` printers linearize instead, so they ask this
+    /// first. A call whose callee spine merely CONTAINS a bypassed call still linearizes
+    /// it — `printMemberChain` absorbs the templates once a non-bypassed call opens the
+    /// chain (`` …o(`⏎b⏎`).p(x) ``).
+    fn spine_takes_template_bypass(&self, expr: &internal::Expression<'_>) -> bool {
+        let mut expr = expr;
+        loop {
+            expr = match &expr.kind {
+                internal::ExpressionKind::MemberExpression(member) => member.object,
+                internal::ExpressionKind::TSNonNullExpression(non_null) => non_null.expression,
+                internal::ExpressionKind::CallExpression(call) => {
+                    return self.call_takes_template_bypass(call, expr.span);
+                }
+                _ => return false,
+            };
+        }
+    }
+
+    /// The doc of `operand` printed whole, when the member or `!` spanning `span` over it
+    /// prints as prettier's member and non-null printers do — the operand's spine reaches a
+    /// call the template bypass takes ([`Self::spine_takes_template_bypass`]) — and `None`
+    /// when the caller linearizes as usual. `parent_optional` is the member's own `?.`
+    /// (`false` for a `!`).
+    ///
+    /// An operand that is a parenthesized optional chain the parent's access seals
+    /// (`` (v?.o(`⏎a⏎`)).p `` — [`chain::child_stops_optional_chain`]) keeps its pair:
+    /// without it the access would join the chain, moving its short-circuit boundary. So
+    /// does a shell a comparison region keeps ([`Self::region_keeps_shell`]), as the
+    /// linearizer keeps both at a member object. The assignment-target / `new`-callee mark
+    /// follows every other operand down to the call
+    /// ([`Self::build_with_inline_every_lookup_forwarded`]).
+    ///
+    /// Declines for any comment on the page in `span`, block comments included — this route
+    /// does not place them where they belong: one in the lookup's own gap prints inside the
+    /// lookup's break group, after its softline, where prettier prints it ahead of the
+    /// group (an own-line one stays inline, one after the `.` moves before it), and one
+    /// inside the pair kept around a sealed operand is dropped, the pair being printed
+    /// around the bare operand with no emitter for the gap it strips. A `//` the operand
+    /// defers would be owed prettier's `lineSuffixBoundary` between the two halves, which
+    /// this route does not print. The linearized chain places all of them.
+    pub(in crate::printer) fn build_template_bypass_operand_doc(
+        &self,
+        operand: &internal::Expression<'_>,
+        span: Span,
+        parent_optional: bool,
+    ) -> Option<DocId> {
+        if !self.spine_takes_template_bypass(operand)
+            || self.has_comments_on_page_between(span.start, span.end)
+        {
+            return None;
+        }
+        // No expression-statement mark to clear: the spine ends at a call that takes the
+        // bypass, whose own route clears it ([`Self::build_call_doc`]).
+        Some(
+            if chain::child_stops_optional_chain(span.start, parent_optional, operand)
+                || self.region_keeps_shell(operand)
+            {
+                // A sealed chain is the `ChainExpression` prettier's ancestor walks stop
+                // at, so the mark stays behind with this lookup; a region's shell, tsv's
+                // own pair, is given the same answer.
+                self.d().parens(self.build_expression_doc(operand))
+            } else {
+                self.build_with_inline_every_lookup_forwarded(span, operand, || {
+                    self.build_expression_doc(operand)
+                })
+            },
+        )
+    }
+
+    /// A member whose object is a call the template bypass takes, printed as prettier's
+    /// `printMemberExpression` prints it — the object whole, then this lookup — rather than
+    /// linearizing the object's links into a chain ([`Self::spine_takes_template_bypass`]);
+    /// `None` for every other member.
+    ///
+    /// Out of line: [`Self::build_member_doc`] is inlined into the expression dispatch, the
+    /// expression recursion itself, and this rare shape must add nothing to its frames.
+    #[inline(never)]
+    fn build_template_bypass_member_doc(
+        &self,
+        member: &internal::MemberExpression<'_>,
+        span: Span,
+    ) -> Option<DocId> {
+        let object_doc =
+            self.build_template_bypass_operand_doc(member.object, span, member.optional)?;
+        Some(chain::build_lookup_after_operand_doc(
+            member, span, object_doc, self,
+        ))
+    }
+
     /// Build a Doc for a call expression with argument wrapping (not chain-aware)
     pub(super) fn build_call_doc_with_wrapping(
         &self,
@@ -733,16 +857,12 @@ impl<'a> Printer<'a> {
             if test_patterns::test_call_flat_layout_applies(call, span, self) {
                 return self.build_call_doc_with_wrapping(call, span);
             }
-            // The template rule's shape test comes first: it reads the argument list
-            // alone, where the rest needs the callee gap resolved to know where the `(`
-            // follows.
-            if is_sole_multiline_template_arg(call.arguments) {
-                let paren_open = call_paren_open(self, call, span);
-                if multiline_template_hug_applies(self, call.arguments, paren_open)
-                    && !self.has_line_comments_between(span.start, paren_open)
-                {
-                    return self.build_call_doc_with_wrapping(call, span);
-                }
+            if self.call_takes_template_bypass(call, span) {
+                // The callee is printed for this call, not as the statement's chain: a
+                // chain inside it takes no short-head merge (prettier's `shouldMerge` reads
+                // `isExpressionStatement(parent)`, and its parent is the callee's member).
+                self.is_expression_statement.set(false);
+                return self.build_call_doc_with_wrapping(call, span);
             }
 
             // Use chain wrapping for chains (nested calls) or memberish callees
@@ -773,6 +893,19 @@ impl<'a> Printer<'a> {
         // prettier's `hasPrettierIgnore` → verbatim-print behavior.
         if self.member_gap_frozen(member.object.span().end, member.property.span().start) {
             return self.build_frozen_opaque_node_doc(span);
+        }
+
+        // Asked only of an object that is itself a link — a call, a member or a `!`; the
+        // object of `a.b` or `this.b` reaches no call — so the common member pays one kind
+        // test and no call.
+        if matches!(
+            member.object.kind,
+            internal::ExpressionKind::CallExpression(_)
+                | internal::ExpressionKind::MemberExpression(_)
+                | internal::ExpressionKind::TSNonNullExpression(_)
+        ) && let Some(doc) = self.build_template_bypass_member_doc(member, span)
+        {
+            return doc;
         }
 
         // Use chain-based implementation

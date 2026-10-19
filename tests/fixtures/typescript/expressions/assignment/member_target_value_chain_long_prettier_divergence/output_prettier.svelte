@@ -13,6 +13,18 @@
 	zz.yy =
 		aaaaaaaaaaaa.bbbbbbbbbbbb.cccccccccccc.dddddddddddd.eeeeeeeeeeee.ffffffffffff.gggggggggggg.hhhhh;
 
+	// A value chain holding a computed lookup (here under a template-taking call) — at 100
+	// both formatters keep it whole; at 101 tsv breaks at the last lookup, and prettier,
+	// with every lookup inlined, breaks inside the computed lookup's brackets
+	x.y = v.m(r).o(`
+a
+`).p[k].qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq;
+	x.y = v.m(r).o(`
+a
+`).p[
+		k
+	].qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq;
+
 	// Control: an identifier target keeps prettier's walk out of it, so both formatters
 	// break the same 101-char value chain
 	zzyy =

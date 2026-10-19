@@ -404,6 +404,16 @@ fn the_prefix_shell_keeps_every_spelling_of_its_operand() {
             "fn(a < b, typeof (c)().d.e().f > (f, g));",
             "fn(a < b, typeof (c)().d.e().f > (f, g));",
         ),
+        // A head ending in a call whose sole argument is a multiline template, the stack of
+        // such links prettier prints whole ahead of the member.
+        (
+            "fn(a < b, typeof (c.d(`\nx\n`)).e > (f, g));",
+            "fn(\n\ta < b,\n\ttypeof (c.d(`\nx\n`)).e > (f, g)\n);",
+        ),
+        (
+            "fn(a < b, typeof (c.d(`\nx\n`).d(`\ny\n`)).e > (f, g));",
+            "fn(\n\ta < b,\n\ttypeof (c.d(`\nx\n`).d(`\ny\n`)).e > (f, g)\n);",
+        ),
         ("fn(a < b, -(c)() > (f, g));", "fn(a < b, -(c)() > (f, g));"),
         (
             "fn(a < b, -(c.d).e > (f, g));",

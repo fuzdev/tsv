@@ -1,0 +1,5661 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 2736,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 2638,
+				"end": 2640,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 2640,
+				"end": 2675,
+				"expression": {
+					"type": "CallExpression",
+					"start": 2641,
+					"end": 2674,
+					"callee": {
+						"type": "MemberExpression",
+						"start": 2641,
+						"end": 2667,
+						"object": {
+							"type": "CallExpression",
+							"start": 2641,
+							"end": 2665,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 2641,
+								"end": 2658,
+								"object": {
+									"type": "CallExpression",
+									"start": 2641,
+									"end": 2656,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 2641,
+										"end": 2649,
+										"object": {
+											"type": "CallExpression",
+											"start": 2641,
+											"end": 2647,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 2641,
+												"end": 2644,
+												"object": {
+													"type": "Identifier",
+													"start": 2641,
+													"end": 2642,
+													"name": "v"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 2643,
+													"end": 2644,
+													"name": "m"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 2645,
+													"end": 2646,
+													"name": "r"
+												}
+											],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 2648,
+											"end": 2649,
+											"name": "o"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "TemplateLiteral",
+											"start": 2650,
+											"end": 2655,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 2651,
+													"end": 2654,
+													"value": {
+														"raw": "\na\n",
+														"cooked": "\na\n"
+													},
+													"tail": true
+												}
+											]
+										}
+									],
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 2657,
+									"end": 2658,
+									"name": "o"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "TemplateLiteral",
+									"start": 2659,
+									"end": 2664,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 2660,
+											"end": 2663,
+											"value": {
+												"raw": "\nb\n",
+												"cooked": "\nb\n"
+											},
+											"tail": true
+										}
+									]
+								}
+							],
+							"optional": false
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 2666,
+							"end": 2667,
+							"name": "o"
+						},
+						"computed": false,
+						"optional": false
+					},
+					"arguments": [
+						{
+							"type": "TemplateLiteral",
+							"start": 2668,
+							"end": 2673,
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 2669,
+									"end": 2672,
+									"value": {
+										"raw": "\nc\n",
+										"cooked": "\nc\n"
+									},
+									"tail": true
+								}
+							]
+						}
+					],
+					"optional": false
+				}
+			},
+			{
+				"type": "Text",
+				"start": 2675,
+				"end": 2676,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 2676,
+				"end": 2735,
+				"name": "div",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 2682,
+						"end": 2727,
+						"name": "data-attr",
+						"value": {
+							"type": "ExpressionTag",
+							"start": 2692,
+							"end": 2727,
+							"expression": {
+								"type": "CallExpression",
+								"start": 2693,
+								"end": 2726,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 2693,
+									"end": 2719,
+									"object": {
+										"type": "CallExpression",
+										"start": 2693,
+										"end": 2717,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 2693,
+											"end": 2710,
+											"object": {
+												"type": "CallExpression",
+												"start": 2693,
+												"end": 2708,
+												"callee": {
+													"type": "MemberExpression",
+													"start": 2693,
+													"end": 2701,
+													"object": {
+														"type": "CallExpression",
+														"start": 2693,
+														"end": 2699,
+														"callee": {
+															"type": "MemberExpression",
+															"start": 2693,
+															"end": 2696,
+															"object": {
+																"type": "Identifier",
+																"start": 2693,
+																"end": 2694,
+																"name": "v"
+															},
+															"property": {
+																"type": "Identifier",
+																"start": 2695,
+																"end": 2696,
+																"name": "m"
+															},
+															"computed": false,
+															"optional": false
+														},
+														"arguments": [
+															{
+																"type": "Identifier",
+																"start": 2697,
+																"end": 2698,
+																"name": "r"
+															}
+														],
+														"optional": false
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 2700,
+														"end": 2701,
+														"name": "o"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [
+													{
+														"type": "TemplateLiteral",
+														"start": 2702,
+														"end": 2707,
+														"expressions": [],
+														"quasis": [
+															{
+																"type": "TemplateElement",
+																"start": 2703,
+																"end": 2706,
+																"value": {
+																	"raw": "\na\n",
+																	"cooked": "\na\n"
+																},
+																"tail": true
+															}
+														]
+													}
+												],
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 2709,
+												"end": 2710,
+												"name": "o"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "TemplateLiteral",
+												"start": 2711,
+												"end": 2716,
+												"expressions": [],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 2712,
+														"end": 2715,
+														"value": {
+															"raw": "\nb\n",
+															"cooked": "\nb\n"
+														},
+														"tail": true
+													}
+												]
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 2718,
+										"end": 2719,
+										"name": "o"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 2720,
+										"end": 2725,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 2721,
+												"end": 2724,
+												"value": {
+													"raw": "\nc\n",
+													"cooked": "\nc\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A call whose sole argument is a multiline template on the `(` line prints flat, above",
+			"start": 20,
+			"end": 108
+		},
+		{
+			"type": "Line",
+			"value": " the member-chain layout, and so does each such call reached as the object of the",
+			"start": 110,
+			"end": 193
+		},
+		{
+			"type": "Line",
+			"value": " next link: a stack of them stays glued however many links it has.",
+			"start": 195,
+			"end": 263
+		},
+		{
+			"type": "Line",
+			"value": " Two, three and four links below a short head",
+			"start": 266,
+			"end": 313
+		},
+		{
+			"type": "Line",
+			"value": " Ending in a member, a non-null or a computed access instead of a call",
+			"start": 424,
+			"end": 496
+		},
+		{
+			"type": "Line",
+			"value": " A member over a member: every lookup prints after the stack, none on a chain line",
+			"start": 624,
+			"end": 708
+		},
+		{
+			"type": "Line",
+			"value": " A parenthesized optional chain the access seals keeps its parens — under a member, a",
+			"start": 742,
+			"end": 829
+		},
+		{
+			"type": "Line",
+			"value": " non-null, a declaration, an assignment target and a `new` callee, and as the head of a",
+			"start": 831,
+			"end": 920
+		},
+		{
+			"type": "Line",
+			"value": " further link. An optional access needs no parens, so they go",
+			"start": 922,
+			"end": 985
+		},
+		{
+			"type": "Line",
+			"value": " Links reached through `?.`, `!` and a computed callee, a tagged template, and a",
+			"start": 1173,
+			"end": 1255
+		},
+		{
+			"type": "Line",
+			"value": " template whose interpolation sits between its lines",
+			"start": 1257,
+			"end": 1311
+		},
+		{
+			"type": "Line",
+			"value": " A plain link between template links: the chain below it is laid out on its own",
+			"start": 1522,
+			"end": 1603
+		},
+		{
+			"type": "Line",
+			"value": " A test call at the bottom of the stack",
+			"start": 1654,
+			"end": 1695
+		},
+		{
+			"type": "Line",
+			"value": " Positions: an assignment, a declaration, `return`, `await`, an arrow body, a nested",
+			"start": 1760,
+			"end": 1846
+		},
+		{
+			"type": "Line",
+			"value": " argument, an object property",
+			"start": 1848,
+			"end": 1879
+		},
+		{
+			"type": "Line",
+			"value": " Controls: a call ending the chain takes every link onto a chain line; a short head;",
+			"start": 2254,
+			"end": 2340
+		},
+		{
+			"type": "Line",
+			"value": " templates on their own lines; one-line templates",
+			"start": 2342,
+			"end": 2393
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 2638,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 2629,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 315,
+					"end": 340,
+					"expression": {
+						"type": "CallExpression",
+						"start": 315,
+						"end": 339,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 315,
+							"end": 332,
+							"object": {
+								"type": "CallExpression",
+								"start": 315,
+								"end": 330,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 315,
+									"end": 323,
+									"object": {
+										"type": "CallExpression",
+										"start": 315,
+										"end": 321,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 315,
+											"end": 318,
+											"object": {
+												"type": "Identifier",
+												"start": 315,
+												"end": 316,
+												"name": "v"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 317,
+												"end": 318,
+												"name": "m"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 319,
+												"end": 320,
+												"name": "r"
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 322,
+										"end": 323,
+										"name": "o"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 324,
+										"end": 329,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 325,
+												"end": 328,
+												"value": {
+													"raw": "\na\n",
+													"cooked": "\na\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 331,
+								"end": 332,
+								"name": "o"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "TemplateLiteral",
+								"start": 333,
+								"end": 338,
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 334,
+										"end": 337,
+										"value": {
+											"raw": "\nb\n",
+											"cooked": "\nb\n"
+										},
+										"tail": true
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A call whose sole argument is a multiline template on the `(` line prints flat, above",
+							"start": 20,
+							"end": 108
+						},
+						{
+							"type": "Line",
+							"value": " the member-chain layout, and so does each such call reached as the object of the",
+							"start": 110,
+							"end": 193
+						},
+						{
+							"type": "Line",
+							"value": " next link: a stack of them stays glued however many links it has.",
+							"start": 195,
+							"end": 263
+						},
+						{
+							"type": "Line",
+							"value": " Two, three and four links below a short head",
+							"start": 266,
+							"end": 313
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 342,
+					"end": 376,
+					"expression": {
+						"type": "CallExpression",
+						"start": 342,
+						"end": 375,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 342,
+							"end": 368,
+							"object": {
+								"type": "CallExpression",
+								"start": 342,
+								"end": 366,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 342,
+									"end": 359,
+									"object": {
+										"type": "CallExpression",
+										"start": 342,
+										"end": 357,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 342,
+											"end": 350,
+											"object": {
+												"type": "CallExpression",
+												"start": 342,
+												"end": 348,
+												"callee": {
+													"type": "MemberExpression",
+													"start": 342,
+													"end": 345,
+													"object": {
+														"type": "Identifier",
+														"start": 342,
+														"end": 343,
+														"name": "v"
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 344,
+														"end": 345,
+														"name": "m"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 346,
+														"end": 347,
+														"name": "r"
+													}
+												],
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 349,
+												"end": 350,
+												"name": "o"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "TemplateLiteral",
+												"start": 351,
+												"end": 356,
+												"expressions": [],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 352,
+														"end": 355,
+														"value": {
+															"raw": "\na\n",
+															"cooked": "\na\n"
+														},
+														"tail": true
+													}
+												]
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 358,
+										"end": 359,
+										"name": "o"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 360,
+										"end": 365,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 361,
+												"end": 364,
+												"value": {
+													"raw": "\nb\n",
+													"cooked": "\nb\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 367,
+								"end": 368,
+								"name": "o"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "TemplateLiteral",
+								"start": 369,
+								"end": 374,
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 370,
+										"end": 373,
+										"value": {
+											"raw": "\nc\n",
+											"cooked": "\nc\n"
+										},
+										"tail": true
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 378,
+					"end": 421,
+					"expression": {
+						"type": "CallExpression",
+						"start": 378,
+						"end": 420,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 378,
+							"end": 413,
+							"object": {
+								"type": "CallExpression",
+								"start": 378,
+								"end": 411,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 378,
+									"end": 404,
+									"object": {
+										"type": "CallExpression",
+										"start": 378,
+										"end": 402,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 378,
+											"end": 395,
+											"object": {
+												"type": "CallExpression",
+												"start": 378,
+												"end": 393,
+												"callee": {
+													"type": "MemberExpression",
+													"start": 378,
+													"end": 386,
+													"object": {
+														"type": "CallExpression",
+														"start": 378,
+														"end": 384,
+														"callee": {
+															"type": "MemberExpression",
+															"start": 378,
+															"end": 381,
+															"object": {
+																"type": "Identifier",
+																"start": 378,
+																"end": 379,
+																"name": "v"
+															},
+															"property": {
+																"type": "Identifier",
+																"start": 380,
+																"end": 381,
+																"name": "m"
+															},
+															"computed": false,
+															"optional": false
+														},
+														"arguments": [
+															{
+																"type": "Identifier",
+																"start": 382,
+																"end": 383,
+																"name": "r"
+															}
+														],
+														"optional": false
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 385,
+														"end": 386,
+														"name": "o"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [
+													{
+														"type": "TemplateLiteral",
+														"start": 387,
+														"end": 392,
+														"expressions": [],
+														"quasis": [
+															{
+																"type": "TemplateElement",
+																"start": 388,
+																"end": 391,
+																"value": {
+																	"raw": "\na\n",
+																	"cooked": "\na\n"
+																},
+																"tail": true
+															}
+														]
+													}
+												],
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 394,
+												"end": 395,
+												"name": "o"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "TemplateLiteral",
+												"start": 396,
+												"end": 401,
+												"expressions": [],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 397,
+														"end": 400,
+														"value": {
+															"raw": "\nb\n",
+															"cooked": "\nb\n"
+														},
+														"tail": true
+													}
+												]
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 403,
+										"end": 404,
+										"name": "o"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 405,
+										"end": 410,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 406,
+												"end": 409,
+												"value": {
+													"raw": "\nc\n",
+													"cooked": "\nc\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 412,
+								"end": 413,
+								"name": "o"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "TemplateLiteral",
+								"start": 414,
+								"end": 419,
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 415,
+										"end": 418,
+										"value": {
+											"raw": "\nd\n",
+											"cooked": "\nd\n"
+										},
+										"tail": true
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 498,
+					"end": 525,
+					"expression": {
+						"type": "MemberExpression",
+						"start": 498,
+						"end": 524,
+						"object": {
+							"type": "CallExpression",
+							"start": 498,
+							"end": 522,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 498,
+								"end": 515,
+								"object": {
+									"type": "CallExpression",
+									"start": 498,
+									"end": 513,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 498,
+										"end": 506,
+										"object": {
+											"type": "CallExpression",
+											"start": 498,
+											"end": 504,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 498,
+												"end": 501,
+												"object": {
+													"type": "Identifier",
+													"start": 498,
+													"end": 499,
+													"name": "v"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 500,
+													"end": 501,
+													"name": "m"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 502,
+													"end": 503,
+													"name": "r"
+												}
+											],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 505,
+											"end": 506,
+											"name": "o"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "TemplateLiteral",
+											"start": 507,
+											"end": 512,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 508,
+													"end": 511,
+													"value": {
+														"raw": "\na\n",
+														"cooked": "\na\n"
+													},
+													"tail": true
+												}
+											]
+										}
+									],
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 514,
+									"end": 515,
+									"name": "o"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "TemplateLiteral",
+									"start": 516,
+									"end": 521,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 517,
+											"end": 520,
+											"value": {
+												"raw": "\nb\n",
+												"cooked": "\nb\n"
+											},
+											"tail": true
+										}
+									]
+								}
+							],
+							"optional": false
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 523,
+							"end": 524,
+							"name": "p"
+						},
+						"computed": false,
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Ending in a member, a non-null or a computed access instead of a call",
+							"start": 424,
+							"end": 496
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 527,
+					"end": 563,
+					"expression": {
+						"type": "MemberExpression",
+						"start": 527,
+						"end": 562,
+						"object": {
+							"type": "CallExpression",
+							"start": 527,
+							"end": 560,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 527,
+								"end": 553,
+								"object": {
+									"type": "CallExpression",
+									"start": 527,
+									"end": 551,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 527,
+										"end": 544,
+										"object": {
+											"type": "CallExpression",
+											"start": 527,
+											"end": 542,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 527,
+												"end": 535,
+												"object": {
+													"type": "CallExpression",
+													"start": 527,
+													"end": 533,
+													"callee": {
+														"type": "MemberExpression",
+														"start": 527,
+														"end": 530,
+														"object": {
+															"type": "Identifier",
+															"start": 527,
+															"end": 528,
+															"name": "v"
+														},
+														"property": {
+															"type": "Identifier",
+															"start": 529,
+															"end": 530,
+															"name": "m"
+														},
+														"computed": false,
+														"optional": false
+													},
+													"arguments": [
+														{
+															"type": "Identifier",
+															"start": 531,
+															"end": 532,
+															"name": "r"
+														}
+													],
+													"optional": false
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 534,
+													"end": 535,
+													"name": "o"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [
+												{
+													"type": "TemplateLiteral",
+													"start": 536,
+													"end": 541,
+													"expressions": [],
+													"quasis": [
+														{
+															"type": "TemplateElement",
+															"start": 537,
+															"end": 540,
+															"value": {
+																"raw": "\na\n",
+																"cooked": "\na\n"
+															},
+															"tail": true
+														}
+													]
+												}
+											],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 543,
+											"end": 544,
+											"name": "o"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "TemplateLiteral",
+											"start": 545,
+											"end": 550,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 546,
+													"end": 549,
+													"value": {
+														"raw": "\nb\n",
+														"cooked": "\nb\n"
+													},
+													"tail": true
+												}
+											]
+										}
+									],
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 552,
+									"end": 553,
+									"name": "o"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "TemplateLiteral",
+									"start": 554,
+									"end": 559,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 555,
+											"end": 558,
+											"value": {
+												"raw": "\nc\n",
+												"cooked": "\nc\n"
+											},
+											"tail": true
+										}
+									]
+								}
+							],
+							"optional": false
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 561,
+							"end": 562,
+							"name": "p"
+						},
+						"computed": false,
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 565,
+					"end": 591,
+					"expression": {
+						"type": "TSNonNullExpression",
+						"start": 565,
+						"end": 590,
+						"expression": {
+							"type": "CallExpression",
+							"start": 565,
+							"end": 589,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 565,
+								"end": 582,
+								"object": {
+									"type": "CallExpression",
+									"start": 565,
+									"end": 580,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 565,
+										"end": 573,
+										"object": {
+											"type": "CallExpression",
+											"start": 565,
+											"end": 571,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 565,
+												"end": 568,
+												"object": {
+													"type": "Identifier",
+													"start": 565,
+													"end": 566,
+													"name": "v"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 567,
+													"end": 568,
+													"name": "m"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 569,
+													"end": 570,
+													"name": "r"
+												}
+											],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 572,
+											"end": 573,
+											"name": "o"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "TemplateLiteral",
+											"start": 574,
+											"end": 579,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 575,
+													"end": 578,
+													"value": {
+														"raw": "\na\n",
+														"cooked": "\na\n"
+													},
+													"tail": true
+												}
+											]
+										}
+									],
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 581,
+									"end": 582,
+									"name": "o"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "TemplateLiteral",
+									"start": 583,
+									"end": 588,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 584,
+											"end": 587,
+											"value": {
+												"raw": "\nb\n",
+												"cooked": "\nb\n"
+											},
+											"tail": true
+										}
+									]
+								}
+							],
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 593,
+					"end": 621,
+					"expression": {
+						"type": "MemberExpression",
+						"start": 593,
+						"end": 620,
+						"object": {
+							"type": "CallExpression",
+							"start": 593,
+							"end": 617,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 593,
+								"end": 610,
+								"object": {
+									"type": "CallExpression",
+									"start": 593,
+									"end": 608,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 593,
+										"end": 601,
+										"object": {
+											"type": "CallExpression",
+											"start": 593,
+											"end": 599,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 593,
+												"end": 596,
+												"object": {
+													"type": "Identifier",
+													"start": 593,
+													"end": 594,
+													"name": "v"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 595,
+													"end": 596,
+													"name": "m"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 597,
+													"end": 598,
+													"name": "r"
+												}
+											],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 600,
+											"end": 601,
+											"name": "o"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "TemplateLiteral",
+											"start": 602,
+											"end": 607,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 603,
+													"end": 606,
+													"value": {
+														"raw": "\na\n",
+														"cooked": "\na\n"
+													},
+													"tail": true
+												}
+											]
+										}
+									],
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 609,
+									"end": 610,
+									"name": "o"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "TemplateLiteral",
+									"start": 611,
+									"end": 616,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 612,
+											"end": 615,
+											"value": {
+												"raw": "\nb\n",
+												"cooked": "\nb\n"
+											},
+											"tail": true
+										}
+									]
+								}
+							],
+							"optional": false
+						},
+						"property": {
+							"type": "Literal",
+							"start": 618,
+							"end": 619,
+							"value": 0,
+							"raw": "0"
+						},
+						"computed": true,
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 710,
+					"end": 739,
+					"expression": {
+						"type": "MemberExpression",
+						"start": 710,
+						"end": 738,
+						"object": {
+							"type": "MemberExpression",
+							"start": 710,
+							"end": 736,
+							"object": {
+								"type": "CallExpression",
+								"start": 710,
+								"end": 734,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 710,
+									"end": 727,
+									"object": {
+										"type": "CallExpression",
+										"start": 710,
+										"end": 725,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 710,
+											"end": 718,
+											"object": {
+												"type": "CallExpression",
+												"start": 710,
+												"end": 716,
+												"callee": {
+													"type": "MemberExpression",
+													"start": 710,
+													"end": 713,
+													"object": {
+														"type": "Identifier",
+														"start": 710,
+														"end": 711,
+														"name": "v"
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 712,
+														"end": 713,
+														"name": "m"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 714,
+														"end": 715,
+														"name": "r"
+													}
+												],
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 717,
+												"end": 718,
+												"name": "o"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "TemplateLiteral",
+												"start": 719,
+												"end": 724,
+												"expressions": [],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 720,
+														"end": 723,
+														"value": {
+															"raw": "\na\n",
+															"cooked": "\na\n"
+														},
+														"tail": true
+													}
+												]
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 726,
+										"end": 727,
+										"name": "o"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 728,
+										"end": 733,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 729,
+												"end": 732,
+												"value": {
+													"raw": "\nb\n",
+													"cooked": "\nb\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 735,
+								"end": 736,
+								"name": "p"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 737,
+							"end": 738,
+							"name": "q"
+						},
+						"computed": false,
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A member over a member: every lookup prints after the stack, none on a chain line",
+							"start": 624,
+							"end": 708
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 987,
+					"end": 1008,
+					"expression": {
+						"type": "MemberExpression",
+						"start": 987,
+						"end": 1007,
+						"object": {
+							"type": "ChainExpression",
+							"start": 988,
+							"end": 1004,
+							"expression": {
+								"type": "CallExpression",
+								"start": 988,
+								"end": 1004,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 988,
+									"end": 997,
+									"object": {
+										"type": "CallExpression",
+										"start": 988,
+										"end": 995,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 988,
+											"end": 992,
+											"object": {
+												"type": "Identifier",
+												"start": 988,
+												"end": 989,
+												"name": "v"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 991,
+												"end": 992,
+												"name": "m"
+											},
+											"computed": false,
+											"optional": true
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 993,
+												"end": 994,
+												"name": "r"
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 996,
+										"end": 997,
+										"name": "o"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 998,
+										"end": 1003,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 999,
+												"end": 1002,
+												"value": {
+													"raw": "\na\n",
+													"cooked": "\na\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							}
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 1006,
+							"end": 1007,
+							"name": "p"
+						},
+						"computed": false,
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A parenthesized optional chain the access seals keeps its parens — under a member, a",
+							"start": 742,
+							"end": 829
+						},
+						{
+							"type": "Line",
+							"value": " non-null, a declaration, an assignment target and a `new` callee, and as the head of a",
+							"start": 831,
+							"end": 920
+						},
+						{
+							"type": "Line",
+							"value": " further link. An optional access needs no parens, so they go",
+							"start": 922,
+							"end": 985
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1010,
+					"end": 1032,
+					"expression": {
+						"type": "MemberExpression",
+						"start": 1010,
+						"end": 1031,
+						"object": {
+							"type": "TSNonNullExpression",
+							"start": 1010,
+							"end": 1029,
+							"expression": {
+								"type": "ChainExpression",
+								"start": 1011,
+								"end": 1027,
+								"expression": {
+									"type": "CallExpression",
+									"start": 1011,
+									"end": 1027,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 1011,
+										"end": 1020,
+										"object": {
+											"type": "CallExpression",
+											"start": 1011,
+											"end": 1018,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 1011,
+												"end": 1015,
+												"object": {
+													"type": "Identifier",
+													"start": 1011,
+													"end": 1012,
+													"name": "v"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 1014,
+													"end": 1015,
+													"name": "m"
+												},
+												"computed": false,
+												"optional": true
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 1016,
+													"end": 1017,
+													"name": "r"
+												}
+											],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 1019,
+											"end": 1020,
+											"name": "o"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "TemplateLiteral",
+											"start": 1021,
+											"end": 1026,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 1022,
+													"end": 1025,
+													"value": {
+														"raw": "\na\n",
+														"cooked": "\na\n"
+													},
+													"tail": true
+												}
+											]
+										}
+									],
+									"optional": false
+								}
+							}
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 1030,
+							"end": 1031,
+							"name": "p"
+						},
+						"computed": false,
+						"optional": false
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1034,
+					"end": 1065,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1040,
+							"end": 1064,
+							"id": {
+								"type": "Identifier",
+								"start": 1040,
+								"end": 1041,
+								"name": "z"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 1044,
+								"end": 1064,
+								"object": {
+									"type": "ChainExpression",
+									"start": 1045,
+									"end": 1061,
+									"expression": {
+										"type": "CallExpression",
+										"start": 1045,
+										"end": 1061,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 1045,
+											"end": 1054,
+											"object": {
+												"type": "CallExpression",
+												"start": 1045,
+												"end": 1052,
+												"callee": {
+													"type": "MemberExpression",
+													"start": 1045,
+													"end": 1049,
+													"object": {
+														"type": "Identifier",
+														"start": 1045,
+														"end": 1046,
+														"name": "v"
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 1048,
+														"end": 1049,
+														"name": "m"
+													},
+													"computed": false,
+													"optional": true
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 1050,
+														"end": 1051,
+														"name": "r"
+													}
+												],
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 1053,
+												"end": 1054,
+												"name": "o"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "TemplateLiteral",
+												"start": 1055,
+												"end": 1060,
+												"expressions": [],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 1056,
+														"end": 1059,
+														"value": {
+															"raw": "\na\n",
+															"cooked": "\na\n"
+														},
+														"tail": true
+													}
+												]
+											}
+										],
+										"optional": false
+									}
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 1063,
+									"end": 1064,
+									"name": "p"
+								},
+								"computed": false,
+								"optional": false
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1067,
+					"end": 1092,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1067,
+						"end": 1091,
+						"operator": "=",
+						"left": {
+							"type": "MemberExpression",
+							"start": 1067,
+							"end": 1087,
+							"object": {
+								"type": "ChainExpression",
+								"start": 1068,
+								"end": 1084,
+								"expression": {
+									"type": "CallExpression",
+									"start": 1068,
+									"end": 1084,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 1068,
+										"end": 1077,
+										"object": {
+											"type": "CallExpression",
+											"start": 1068,
+											"end": 1075,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 1068,
+												"end": 1072,
+												"object": {
+													"type": "Identifier",
+													"start": 1068,
+													"end": 1069,
+													"name": "v"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 1071,
+													"end": 1072,
+													"name": "m"
+												},
+												"computed": false,
+												"optional": true
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 1073,
+													"end": 1074,
+													"name": "r"
+												}
+											],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 1076,
+											"end": 1077,
+											"name": "o"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "TemplateLiteral",
+											"start": 1078,
+											"end": 1083,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 1079,
+													"end": 1082,
+													"value": {
+														"raw": "\na\n",
+														"cooked": "\na\n"
+													},
+													"tail": true
+												}
+											]
+										}
+									],
+									"optional": false
+								}
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 1086,
+								"end": 1087,
+								"name": "p"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"right": {
+							"type": "Literal",
+							"start": 1090,
+							"end": 1091,
+							"value": 1,
+							"raw": "1"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1094,
+					"end": 1121,
+					"expression": {
+						"type": "NewExpression",
+						"start": 1094,
+						"end": 1120,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 1098,
+							"end": 1118,
+							"object": {
+								"type": "ChainExpression",
+								"start": 1099,
+								"end": 1115,
+								"expression": {
+									"type": "CallExpression",
+									"start": 1099,
+									"end": 1115,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 1099,
+										"end": 1108,
+										"object": {
+											"type": "CallExpression",
+											"start": 1099,
+											"end": 1106,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 1099,
+												"end": 1103,
+												"object": {
+													"type": "Identifier",
+													"start": 1099,
+													"end": 1100,
+													"name": "v"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 1102,
+													"end": 1103,
+													"name": "m"
+												},
+												"computed": false,
+												"optional": true
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 1104,
+													"end": 1105,
+													"name": "r"
+												}
+											],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 1107,
+											"end": 1108,
+											"name": "o"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "TemplateLiteral",
+											"start": 1109,
+											"end": 1114,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 1110,
+													"end": 1113,
+													"value": {
+														"raw": "\na\n",
+														"cooked": "\na\n"
+													},
+													"tail": true
+												}
+											]
+										}
+									],
+									"optional": false
+								}
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 1117,
+								"end": 1118,
+								"name": "p"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": []
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1123,
+					"end": 1148,
+					"expression": {
+						"type": "MemberExpression",
+						"start": 1123,
+						"end": 1147,
+						"object": {
+							"type": "CallExpression",
+							"start": 1123,
+							"end": 1145,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 1123,
+								"end": 1138,
+								"object": {
+									"type": "ChainExpression",
+									"start": 1124,
+									"end": 1135,
+									"expression": {
+										"type": "CallExpression",
+										"start": 1124,
+										"end": 1135,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 1124,
+											"end": 1128,
+											"object": {
+												"type": "Identifier",
+												"start": 1124,
+												"end": 1125,
+												"name": "v"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 1127,
+												"end": 1128,
+												"name": "o"
+											},
+											"computed": false,
+											"optional": true
+										},
+										"arguments": [
+											{
+												"type": "TemplateLiteral",
+												"start": 1129,
+												"end": 1134,
+												"expressions": [],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 1130,
+														"end": 1133,
+														"value": {
+															"raw": "\na\n",
+															"cooked": "\na\n"
+														},
+														"tail": true
+													}
+												]
+											}
+										],
+										"optional": false
+									}
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 1137,
+									"end": 1138,
+									"name": "o"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "TemplateLiteral",
+									"start": 1139,
+									"end": 1144,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 1140,
+											"end": 1143,
+											"value": {
+												"raw": "\nb\n",
+												"cooked": "\nb\n"
+											},
+											"tail": true
+										}
+									]
+								}
+							],
+							"optional": false
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 1146,
+							"end": 1147,
+							"name": "p"
+						},
+						"computed": false,
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1150,
+					"end": 1170,
+					"expression": {
+						"type": "ChainExpression",
+						"start": 1150,
+						"end": 1169,
+						"expression": {
+							"type": "MemberExpression",
+							"start": 1150,
+							"end": 1169,
+							"object": {
+								"type": "CallExpression",
+								"start": 1150,
+								"end": 1166,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 1150,
+									"end": 1159,
+									"object": {
+										"type": "CallExpression",
+										"start": 1150,
+										"end": 1157,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 1150,
+											"end": 1154,
+											"object": {
+												"type": "Identifier",
+												"start": 1150,
+												"end": 1151,
+												"name": "v"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 1153,
+												"end": 1154,
+												"name": "m"
+											},
+											"computed": false,
+											"optional": true
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 1155,
+												"end": 1156,
+												"name": "r"
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1158,
+										"end": 1159,
+										"name": "o"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 1160,
+										"end": 1165,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 1161,
+												"end": 1164,
+												"value": {
+													"raw": "\na\n",
+													"cooked": "\na\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 1168,
+								"end": 1169,
+								"name": "p"
+							},
+							"computed": false,
+							"optional": true
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1313,
+					"end": 1351,
+					"expression": {
+						"type": "ChainExpression",
+						"start": 1313,
+						"end": 1350,
+						"expression": {
+							"type": "CallExpression",
+							"start": 1313,
+							"end": 1350,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 1313,
+								"end": 1343,
+								"object": {
+									"type": "CallExpression",
+									"start": 1313,
+									"end": 1340,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 1313,
+										"end": 1333,
+										"object": {
+											"type": "CallExpression",
+											"start": 1313,
+											"end": 1330,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 1313,
+												"end": 1323,
+												"object": {
+													"type": "CallExpression",
+													"start": 1313,
+													"end": 1320,
+													"callee": {
+														"type": "MemberExpression",
+														"start": 1313,
+														"end": 1317,
+														"object": {
+															"type": "Identifier",
+															"start": 1313,
+															"end": 1314,
+															"name": "v"
+														},
+														"property": {
+															"type": "Identifier",
+															"start": 1316,
+															"end": 1317,
+															"name": "m"
+														},
+														"computed": false,
+														"optional": true
+													},
+													"arguments": [
+														{
+															"type": "Identifier",
+															"start": 1318,
+															"end": 1319,
+															"name": "r"
+														}
+													],
+													"optional": false
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 1322,
+													"end": 1323,
+													"name": "o"
+												},
+												"computed": false,
+												"optional": true
+											},
+											"arguments": [
+												{
+													"type": "TemplateLiteral",
+													"start": 1324,
+													"end": 1329,
+													"expressions": [],
+													"quasis": [
+														{
+															"type": "TemplateElement",
+															"start": 1325,
+															"end": 1328,
+															"value": {
+																"raw": "\na\n",
+																"cooked": "\na\n"
+															},
+															"tail": true
+														}
+													]
+												}
+											],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 1332,
+											"end": 1333,
+											"name": "o"
+										},
+										"computed": false,
+										"optional": true
+									},
+									"arguments": [
+										{
+											"type": "TemplateLiteral",
+											"start": 1334,
+											"end": 1339,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 1335,
+													"end": 1338,
+													"value": {
+														"raw": "\nb\n",
+														"cooked": "\nb\n"
+													},
+													"tail": true
+												}
+											]
+										}
+									],
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 1342,
+									"end": 1343,
+									"name": "o"
+								},
+								"computed": false,
+								"optional": true
+							},
+							"arguments": [
+								{
+									"type": "TemplateLiteral",
+									"start": 1344,
+									"end": 1349,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 1345,
+											"end": 1348,
+											"value": {
+												"raw": "\nc\n",
+												"cooked": "\nc\n"
+											},
+											"tail": true
+										}
+									]
+								}
+							],
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Links reached through `?.`, `!` and a computed callee, a tagged template, and a",
+							"start": 1173,
+							"end": 1255
+						},
+						{
+							"type": "Line",
+							"value": " template whose interpolation sits between its lines",
+							"start": 1257,
+							"end": 1311
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1353,
+					"end": 1390,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1353,
+						"end": 1389,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 1353,
+							"end": 1382,
+							"object": {
+								"type": "TSNonNullExpression",
+								"start": 1353,
+								"end": 1380,
+								"expression": {
+									"type": "CallExpression",
+									"start": 1353,
+									"end": 1379,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 1353,
+										"end": 1372,
+										"object": {
+											"type": "TSNonNullExpression",
+											"start": 1353,
+											"end": 1370,
+											"expression": {
+												"type": "CallExpression",
+												"start": 1353,
+												"end": 1369,
+												"callee": {
+													"type": "MemberExpression",
+													"start": 1353,
+													"end": 1362,
+													"object": {
+														"type": "TSNonNullExpression",
+														"start": 1353,
+														"end": 1360,
+														"expression": {
+															"type": "CallExpression",
+															"start": 1353,
+															"end": 1359,
+															"callee": {
+																"type": "MemberExpression",
+																"start": 1353,
+																"end": 1356,
+																"object": {
+																	"type": "Identifier",
+																	"start": 1353,
+																	"end": 1354,
+																	"name": "v"
+																},
+																"property": {
+																	"type": "Identifier",
+																	"start": 1355,
+																	"end": 1356,
+																	"name": "m"
+																},
+																"computed": false,
+																"optional": false
+															},
+															"arguments": [
+																{
+																	"type": "Identifier",
+																	"start": 1357,
+																	"end": 1358,
+																	"name": "r"
+																}
+															],
+															"optional": false
+														}
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 1361,
+														"end": 1362,
+														"name": "o"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [
+													{
+														"type": "TemplateLiteral",
+														"start": 1363,
+														"end": 1368,
+														"expressions": [],
+														"quasis": [
+															{
+																"type": "TemplateElement",
+																"start": 1364,
+																"end": 1367,
+																"value": {
+																	"raw": "\na\n",
+																	"cooked": "\na\n"
+																},
+																"tail": true
+															}
+														]
+													}
+												],
+												"optional": false
+											}
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 1371,
+											"end": 1372,
+											"name": "o"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "TemplateLiteral",
+											"start": 1373,
+											"end": 1378,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 1374,
+													"end": 1377,
+													"value": {
+														"raw": "\nb\n",
+														"cooked": "\nb\n"
+													},
+													"tail": true
+												}
+											]
+										}
+									],
+									"optional": false
+								}
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 1381,
+								"end": 1382,
+								"name": "o"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "TemplateLiteral",
+								"start": 1383,
+								"end": 1388,
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 1384,
+										"end": 1387,
+										"value": {
+											"raw": "\nc\n",
+											"cooked": "\nc\n"
+										},
+										"tail": true
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1392,
+					"end": 1429,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1392,
+						"end": 1428,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 1392,
+							"end": 1421,
+							"object": {
+								"type": "CallExpression",
+								"start": 1392,
+								"end": 1418,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 1392,
+									"end": 1411,
+									"object": {
+										"type": "CallExpression",
+										"start": 1392,
+										"end": 1408,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 1392,
+											"end": 1401,
+											"object": {
+												"type": "CallExpression",
+												"start": 1392,
+												"end": 1398,
+												"callee": {
+													"type": "MemberExpression",
+													"start": 1392,
+													"end": 1395,
+													"object": {
+														"type": "Identifier",
+														"start": 1392,
+														"end": 1393,
+														"name": "v"
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 1394,
+														"end": 1395,
+														"name": "m"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 1396,
+														"end": 1397,
+														"name": "r"
+													}
+												],
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 1399,
+												"end": 1400,
+												"name": "k"
+											},
+											"computed": true,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "TemplateLiteral",
+												"start": 1402,
+												"end": 1407,
+												"expressions": [],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 1403,
+														"end": 1406,
+														"value": {
+															"raw": "\na\n",
+															"cooked": "\na\n"
+														},
+														"tail": true
+													}
+												]
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1409,
+										"end": 1410,
+										"name": "k"
+									},
+									"computed": true,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 1412,
+										"end": 1417,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 1413,
+												"end": 1416,
+												"value": {
+													"raw": "\nb\n",
+													"cooked": "\nb\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 1419,
+								"end": 1420,
+								"name": "k"
+							},
+							"computed": true,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "TemplateLiteral",
+								"start": 1422,
+								"end": 1427,
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 1423,
+										"end": 1426,
+										"value": {
+											"raw": "\nc\n",
+											"cooked": "\nc\n"
+										},
+										"tail": true
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1431,
+					"end": 1468,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1431,
+						"end": 1467,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 1431,
+							"end": 1459,
+							"object": {
+								"type": "CallExpression",
+								"start": 1431,
+								"end": 1457,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 1431,
+									"end": 1449,
+									"object": {
+										"type": "CallExpression",
+										"start": 1431,
+										"end": 1447,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 1431,
+											"end": 1439,
+											"object": {
+												"type": "CallExpression",
+												"start": 1431,
+												"end": 1437,
+												"callee": {
+													"type": "MemberExpression",
+													"start": 1431,
+													"end": 1434,
+													"object": {
+														"type": "Identifier",
+														"start": 1431,
+														"end": 1432,
+														"name": "v"
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 1433,
+														"end": 1434,
+														"name": "m"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 1435,
+														"end": 1436,
+														"name": "r"
+													}
+												],
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 1438,
+												"end": 1439,
+												"name": "o"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "TaggedTemplateExpression",
+												"start": 1440,
+												"end": 1446,
+												"tag": {
+													"type": "Identifier",
+													"start": 1440,
+													"end": 1441,
+													"name": "t"
+												},
+												"quasi": {
+													"type": "TemplateLiteral",
+													"start": 1441,
+													"end": 1446,
+													"expressions": [],
+													"quasis": [
+														{
+															"type": "TemplateElement",
+															"start": 1442,
+															"end": 1445,
+															"value": {
+																"raw": "\na\n",
+																"cooked": "\na\n"
+															},
+															"tail": true
+														}
+													]
+												}
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1448,
+										"end": 1449,
+										"name": "o"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "TaggedTemplateExpression",
+										"start": 1450,
+										"end": 1456,
+										"tag": {
+											"type": "Identifier",
+											"start": 1450,
+											"end": 1451,
+											"name": "t"
+										},
+										"quasi": {
+											"type": "TemplateLiteral",
+											"start": 1451,
+											"end": 1456,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 1452,
+													"end": 1455,
+													"value": {
+														"raw": "\nb\n",
+														"cooked": "\nb\n"
+													},
+													"tail": true
+												}
+											]
+										}
+									}
+								],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 1458,
+								"end": 1459,
+								"name": "o"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "TaggedTemplateExpression",
+								"start": 1460,
+								"end": 1466,
+								"tag": {
+									"type": "Identifier",
+									"start": 1460,
+									"end": 1461,
+									"name": "t"
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 1461,
+									"end": 1466,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 1462,
+											"end": 1465,
+											"value": {
+												"raw": "\nc\n",
+												"cooked": "\nc\n"
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1470,
+					"end": 1519,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1470,
+						"end": 1518,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 1470,
+							"end": 1506,
+							"object": {
+								"type": "CallExpression",
+								"start": 1470,
+								"end": 1504,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 1470,
+									"end": 1492,
+									"object": {
+										"type": "CallExpression",
+										"start": 1470,
+										"end": 1490,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 1470,
+											"end": 1478,
+											"object": {
+												"type": "CallExpression",
+												"start": 1470,
+												"end": 1476,
+												"callee": {
+													"type": "MemberExpression",
+													"start": 1470,
+													"end": 1473,
+													"object": {
+														"type": "Identifier",
+														"start": 1470,
+														"end": 1471,
+														"name": "v"
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 1472,
+														"end": 1473,
+														"name": "m"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 1474,
+														"end": 1475,
+														"name": "r"
+													}
+												],
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 1477,
+												"end": 1478,
+												"name": "o"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "TemplateLiteral",
+												"start": 1479,
+												"end": 1489,
+												"expressions": [
+													{
+														"type": "Identifier",
+														"start": 1485,
+														"end": 1486,
+														"name": "b"
+													}
+												],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 1480,
+														"end": 1483,
+														"value": {
+															"raw": "\na ",
+															"cooked": "\na "
+														},
+														"tail": false
+													},
+													{
+														"type": "TemplateElement",
+														"start": 1487,
+														"end": 1488,
+														"value": {
+															"raw": "\n",
+															"cooked": "\n"
+														},
+														"tail": true
+													}
+												]
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1491,
+										"end": 1492,
+										"name": "o"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 1493,
+										"end": 1503,
+										"expressions": [
+											{
+												"type": "Identifier",
+												"start": 1499,
+												"end": 1500,
+												"name": "d"
+											}
+										],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 1494,
+												"end": 1497,
+												"value": {
+													"raw": "\nc ",
+													"cooked": "\nc "
+												},
+												"tail": false
+											},
+											{
+												"type": "TemplateElement",
+												"start": 1501,
+												"end": 1502,
+												"value": {
+													"raw": "\n",
+													"cooked": "\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 1505,
+								"end": 1506,
+								"name": "o"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "TemplateLiteral",
+								"start": 1507,
+								"end": 1517,
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 1513,
+										"end": 1514,
+										"name": "f"
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 1508,
+										"end": 1511,
+										"value": {
+											"raw": "\ne ",
+											"cooked": "\ne "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 1515,
+										"end": 1516,
+										"value": {
+											"raw": "\n",
+											"cooked": "\n"
+										},
+										"tail": true
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1605,
+					"end": 1651,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1605,
+						"end": 1650,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 1605,
+							"end": 1643,
+							"object": {
+								"type": "CallExpression",
+								"start": 1605,
+								"end": 1641,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 1605,
+									"end": 1638,
+									"object": {
+										"type": "CallExpression",
+										"start": 1605,
+										"end": 1633,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 1605,
+											"end": 1619,
+											"object": {
+												"type": "CallExpression",
+												"start": 1605,
+												"end": 1614,
+												"callee": {
+													"type": "MemberExpression",
+													"start": 1605,
+													"end": 1611,
+													"object": {
+														"type": "Identifier",
+														"start": 1605,
+														"end": 1606,
+														"name": "v"
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 1610,
+														"end": 1611,
+														"name": "m"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 1612,
+														"end": 1613,
+														"name": "r"
+													}
+												],
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 1618,
+												"end": 1619,
+												"name": "o"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "TemplateLiteral",
+												"start": 1624,
+												"end": 1629,
+												"expressions": [],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 1625,
+														"end": 1628,
+														"value": {
+															"raw": "\na\n",
+															"cooked": "\na\n"
+														},
+														"tail": true
+													}
+												]
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1637,
+										"end": 1638,
+										"name": "q"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 1639,
+										"end": 1640,
+										"name": "x"
+									}
+								],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 1642,
+								"end": 1643,
+								"name": "o"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "TemplateLiteral",
+								"start": 1644,
+								"end": 1649,
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 1645,
+										"end": 1648,
+										"value": {
+											"raw": "\nc\n",
+											"cooked": "\nc\n"
+										},
+										"tail": true
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A plain link between template links: the chain below it is laid out on its own",
+							"start": 1522,
+							"end": 1603
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1697,
+					"end": 1757,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1697,
+						"end": 1756,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 1697,
+							"end": 1749,
+							"object": {
+								"type": "CallExpression",
+								"start": 1697,
+								"end": 1747,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 1697,
+									"end": 1740,
+									"object": {
+										"type": "CallExpression",
+										"start": 1697,
+										"end": 1738,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 1697,
+											"end": 1731,
+											"object": {
+												"type": "CallExpression",
+												"start": 1697,
+												"end": 1729,
+												"callee": {
+													"type": "Identifier",
+													"start": 1697,
+													"end": 1699,
+													"name": "it"
+												},
+												"arguments": [
+													{
+														"type": "Literal",
+														"start": 1700,
+														"end": 1703,
+														"value": "a",
+														"raw": "'a'"
+													},
+													{
+														"type": "ArrowFunctionExpression",
+														"start": 1705,
+														"end": 1728,
+														"id": null,
+														"expression": false,
+														"generator": false,
+														"async": true,
+														"params": [],
+														"body": {
+															"type": "BlockStatement",
+															"start": 1717,
+															"end": 1728,
+															"body": [
+																{
+																	"type": "ExpressionStatement",
+																	"start": 1721,
+																	"end": 1725,
+																	"expression": {
+																		"type": "CallExpression",
+																		"start": 1721,
+																		"end": 1724,
+																		"callee": {
+																			"type": "Identifier",
+																			"start": 1721,
+																			"end": 1722,
+																			"name": "b"
+																		},
+																		"arguments": [],
+																		"optional": false
+																	}
+																}
+															]
+														}
+													}
+												],
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 1730,
+												"end": 1731,
+												"name": "o"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "TemplateLiteral",
+												"start": 1732,
+												"end": 1737,
+												"expressions": [],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 1733,
+														"end": 1736,
+														"value": {
+															"raw": "\na\n",
+															"cooked": "\na\n"
+														},
+														"tail": true
+													}
+												]
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1739,
+										"end": 1740,
+										"name": "o"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 1741,
+										"end": 1746,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 1742,
+												"end": 1745,
+												"value": {
+													"raw": "\nb\n",
+													"cooked": "\nb\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 1748,
+								"end": 1749,
+								"name": "o"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "TemplateLiteral",
+								"start": 1750,
+								"end": 1755,
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 1751,
+										"end": 1754,
+										"value": {
+											"raw": "\nc\n",
+											"cooked": "\nc\n"
+										},
+										"tail": true
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A test call at the bottom of the stack",
+							"start": 1654,
+							"end": 1695
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1881,
+					"end": 1919,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1881,
+						"end": 1918,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1881,
+							"end": 1882,
+							"name": "x"
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 1885,
+							"end": 1918,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 1885,
+								"end": 1911,
+								"object": {
+									"type": "CallExpression",
+									"start": 1885,
+									"end": 1909,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 1885,
+										"end": 1902,
+										"object": {
+											"type": "CallExpression",
+											"start": 1885,
+											"end": 1900,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 1885,
+												"end": 1893,
+												"object": {
+													"type": "CallExpression",
+													"start": 1885,
+													"end": 1891,
+													"callee": {
+														"type": "MemberExpression",
+														"start": 1885,
+														"end": 1888,
+														"object": {
+															"type": "Identifier",
+															"start": 1885,
+															"end": 1886,
+															"name": "v"
+														},
+														"property": {
+															"type": "Identifier",
+															"start": 1887,
+															"end": 1888,
+															"name": "m"
+														},
+														"computed": false,
+														"optional": false
+													},
+													"arguments": [
+														{
+															"type": "Identifier",
+															"start": 1889,
+															"end": 1890,
+															"name": "r"
+														}
+													],
+													"optional": false
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 1892,
+													"end": 1893,
+													"name": "o"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [
+												{
+													"type": "TemplateLiteral",
+													"start": 1894,
+													"end": 1899,
+													"expressions": [],
+													"quasis": [
+														{
+															"type": "TemplateElement",
+															"start": 1895,
+															"end": 1898,
+															"value": {
+																"raw": "\na\n",
+																"cooked": "\na\n"
+															},
+															"tail": true
+														}
+													]
+												}
+											],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 1901,
+											"end": 1902,
+											"name": "o"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "TemplateLiteral",
+											"start": 1903,
+											"end": 1908,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 1904,
+													"end": 1907,
+													"value": {
+														"raw": "\nb\n",
+														"cooked": "\nb\n"
+													},
+													"tail": true
+												}
+											]
+										}
+									],
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 1910,
+									"end": 1911,
+									"name": "o"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "TemplateLiteral",
+									"start": 1912,
+									"end": 1917,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 1913,
+											"end": 1916,
+											"value": {
+												"raw": "\nc\n",
+												"cooked": "\nc\n"
+											},
+											"tail": true
+										}
+									]
+								}
+							],
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Positions: an assignment, a declaration, `return`, `await`, an arrow body, a nested",
+							"start": 1760,
+							"end": 1846
+						},
+						{
+							"type": "Line",
+							"value": " argument, an object property",
+							"start": 1848,
+							"end": 1879
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1921,
+					"end": 1965,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1927,
+							"end": 1964,
+							"id": {
+								"type": "Identifier",
+								"start": 1927,
+								"end": 1928,
+								"name": "y"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1931,
+								"end": 1964,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 1931,
+									"end": 1957,
+									"object": {
+										"type": "CallExpression",
+										"start": 1931,
+										"end": 1955,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 1931,
+											"end": 1948,
+											"object": {
+												"type": "CallExpression",
+												"start": 1931,
+												"end": 1946,
+												"callee": {
+													"type": "MemberExpression",
+													"start": 1931,
+													"end": 1939,
+													"object": {
+														"type": "CallExpression",
+														"start": 1931,
+														"end": 1937,
+														"callee": {
+															"type": "MemberExpression",
+															"start": 1931,
+															"end": 1934,
+															"object": {
+																"type": "Identifier",
+																"start": 1931,
+																"end": 1932,
+																"name": "v"
+															},
+															"property": {
+																"type": "Identifier",
+																"start": 1933,
+																"end": 1934,
+																"name": "m"
+															},
+															"computed": false,
+															"optional": false
+														},
+														"arguments": [
+															{
+																"type": "Identifier",
+																"start": 1935,
+																"end": 1936,
+																"name": "r"
+															}
+														],
+														"optional": false
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 1938,
+														"end": 1939,
+														"name": "o"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [
+													{
+														"type": "TemplateLiteral",
+														"start": 1940,
+														"end": 1945,
+														"expressions": [],
+														"quasis": [
+															{
+																"type": "TemplateElement",
+																"start": 1941,
+																"end": 1944,
+																"value": {
+																	"raw": "\na\n",
+																	"cooked": "\na\n"
+																},
+																"tail": true
+															}
+														]
+													}
+												],
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 1947,
+												"end": 1948,
+												"name": "o"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "TemplateLiteral",
+												"start": 1949,
+												"end": 1954,
+												"expressions": [],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 1950,
+														"end": 1953,
+														"value": {
+															"raw": "\nb\n",
+															"cooked": "\nb\n"
+														},
+														"tail": true
+													}
+												]
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1956,
+										"end": 1957,
+										"name": "o"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 1958,
+										"end": 1963,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 1959,
+												"end": 1962,
+												"value": {
+													"raw": "\nc\n",
+													"cooked": "\nc\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 1967,
+					"end": 2028,
+					"id": {
+						"type": "Identifier",
+						"start": 1976,
+						"end": 1977,
+						"name": "f"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 1980,
+						"end": 2028,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 1984,
+								"end": 2025,
+								"argument": {
+									"type": "CallExpression",
+									"start": 1991,
+									"end": 2024,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 1991,
+										"end": 2017,
+										"object": {
+											"type": "CallExpression",
+											"start": 1991,
+											"end": 2015,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 1991,
+												"end": 2008,
+												"object": {
+													"type": "CallExpression",
+													"start": 1991,
+													"end": 2006,
+													"callee": {
+														"type": "MemberExpression",
+														"start": 1991,
+														"end": 1999,
+														"object": {
+															"type": "CallExpression",
+															"start": 1991,
+															"end": 1997,
+															"callee": {
+																"type": "MemberExpression",
+																"start": 1991,
+																"end": 1994,
+																"object": {
+																	"type": "Identifier",
+																	"start": 1991,
+																	"end": 1992,
+																	"name": "v"
+																},
+																"property": {
+																	"type": "Identifier",
+																	"start": 1993,
+																	"end": 1994,
+																	"name": "m"
+																},
+																"computed": false,
+																"optional": false
+															},
+															"arguments": [
+																{
+																	"type": "Identifier",
+																	"start": 1995,
+																	"end": 1996,
+																	"name": "r"
+																}
+															],
+															"optional": false
+														},
+														"property": {
+															"type": "Identifier",
+															"start": 1998,
+															"end": 1999,
+															"name": "o"
+														},
+														"computed": false,
+														"optional": false
+													},
+													"arguments": [
+														{
+															"type": "TemplateLiteral",
+															"start": 2000,
+															"end": 2005,
+															"expressions": [],
+															"quasis": [
+																{
+																	"type": "TemplateElement",
+																	"start": 2001,
+																	"end": 2004,
+																	"value": {
+																		"raw": "\na\n",
+																		"cooked": "\na\n"
+																	},
+																	"tail": true
+																}
+															]
+														}
+													],
+													"optional": false
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 2007,
+													"end": 2008,
+													"name": "o"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [
+												{
+													"type": "TemplateLiteral",
+													"start": 2009,
+													"end": 2014,
+													"expressions": [],
+													"quasis": [
+														{
+															"type": "TemplateElement",
+															"start": 2010,
+															"end": 2013,
+															"value": {
+																"raw": "\nb\n",
+																"cooked": "\nb\n"
+															},
+															"tail": true
+														}
+													]
+												}
+											],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 2016,
+											"end": 2017,
+											"name": "o"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "TemplateLiteral",
+											"start": 2018,
+											"end": 2023,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 2019,
+													"end": 2022,
+													"value": {
+														"raw": "\nc\n",
+														"cooked": "\nc\n"
+													},
+													"tail": true
+												}
+											]
+										}
+									],
+									"optional": false
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 2030,
+					"end": 2096,
+					"id": {
+						"type": "Identifier",
+						"start": 2045,
+						"end": 2046,
+						"name": "g"
+					},
+					"expression": false,
+					"generator": false,
+					"async": true,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 2049,
+						"end": 2096,
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 2053,
+								"end": 2093,
+								"expression": {
+									"type": "AwaitExpression",
+									"start": 2053,
+									"end": 2092,
+									"argument": {
+										"type": "CallExpression",
+										"start": 2059,
+										"end": 2092,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 2059,
+											"end": 2085,
+											"object": {
+												"type": "CallExpression",
+												"start": 2059,
+												"end": 2083,
+												"callee": {
+													"type": "MemberExpression",
+													"start": 2059,
+													"end": 2076,
+													"object": {
+														"type": "CallExpression",
+														"start": 2059,
+														"end": 2074,
+														"callee": {
+															"type": "MemberExpression",
+															"start": 2059,
+															"end": 2067,
+															"object": {
+																"type": "CallExpression",
+																"start": 2059,
+																"end": 2065,
+																"callee": {
+																	"type": "MemberExpression",
+																	"start": 2059,
+																	"end": 2062,
+																	"object": {
+																		"type": "Identifier",
+																		"start": 2059,
+																		"end": 2060,
+																		"name": "v"
+																	},
+																	"property": {
+																		"type": "Identifier",
+																		"start": 2061,
+																		"end": 2062,
+																		"name": "m"
+																	},
+																	"computed": false,
+																	"optional": false
+																},
+																"arguments": [
+																	{
+																		"type": "Identifier",
+																		"start": 2063,
+																		"end": 2064,
+																		"name": "r"
+																	}
+																],
+																"optional": false
+															},
+															"property": {
+																"type": "Identifier",
+																"start": 2066,
+																"end": 2067,
+																"name": "o"
+															},
+															"computed": false,
+															"optional": false
+														},
+														"arguments": [
+															{
+																"type": "TemplateLiteral",
+																"start": 2068,
+																"end": 2073,
+																"expressions": [],
+																"quasis": [
+																	{
+																		"type": "TemplateElement",
+																		"start": 2069,
+																		"end": 2072,
+																		"value": {
+																			"raw": "\na\n",
+																			"cooked": "\na\n"
+																		},
+																		"tail": true
+																	}
+																]
+															}
+														],
+														"optional": false
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 2075,
+														"end": 2076,
+														"name": "o"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [
+													{
+														"type": "TemplateLiteral",
+														"start": 2077,
+														"end": 2082,
+														"expressions": [],
+														"quasis": [
+															{
+																"type": "TemplateElement",
+																"start": 2078,
+																"end": 2081,
+																"value": {
+																	"raw": "\nb\n",
+																	"cooked": "\nb\n"
+																},
+																"tail": true
+															}
+														]
+													}
+												],
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 2084,
+												"end": 2085,
+												"name": "o"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "TemplateLiteral",
+												"start": 2086,
+												"end": 2091,
+												"expressions": [],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 2087,
+														"end": 2090,
+														"value": {
+															"raw": "\nc\n",
+															"cooked": "\nc\n"
+														},
+														"tail": true
+													}
+												]
+											}
+										],
+										"optional": false
+									}
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 2098,
+					"end": 2150,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 2104,
+							"end": 2149,
+							"id": {
+								"type": "Identifier",
+								"start": 2104,
+								"end": 2105,
+								"name": "h"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 2108,
+								"end": 2149,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "CallExpression",
+									"start": 2116,
+									"end": 2149,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 2116,
+										"end": 2142,
+										"object": {
+											"type": "CallExpression",
+											"start": 2116,
+											"end": 2140,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 2116,
+												"end": 2133,
+												"object": {
+													"type": "CallExpression",
+													"start": 2116,
+													"end": 2131,
+													"callee": {
+														"type": "MemberExpression",
+														"start": 2116,
+														"end": 2124,
+														"object": {
+															"type": "CallExpression",
+															"start": 2116,
+															"end": 2122,
+															"callee": {
+																"type": "MemberExpression",
+																"start": 2116,
+																"end": 2119,
+																"object": {
+																	"type": "Identifier",
+																	"start": 2116,
+																	"end": 2117,
+																	"name": "v"
+																},
+																"property": {
+																	"type": "Identifier",
+																	"start": 2118,
+																	"end": 2119,
+																	"name": "m"
+																},
+																"computed": false,
+																"optional": false
+															},
+															"arguments": [
+																{
+																	"type": "Identifier",
+																	"start": 2120,
+																	"end": 2121,
+																	"name": "r"
+																}
+															],
+															"optional": false
+														},
+														"property": {
+															"type": "Identifier",
+															"start": 2123,
+															"end": 2124,
+															"name": "o"
+														},
+														"computed": false,
+														"optional": false
+													},
+													"arguments": [
+														{
+															"type": "TemplateLiteral",
+															"start": 2125,
+															"end": 2130,
+															"expressions": [],
+															"quasis": [
+																{
+																	"type": "TemplateElement",
+																	"start": 2126,
+																	"end": 2129,
+																	"value": {
+																		"raw": "\na\n",
+																		"cooked": "\na\n"
+																	},
+																	"tail": true
+																}
+															]
+														}
+													],
+													"optional": false
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 2132,
+													"end": 2133,
+													"name": "o"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [
+												{
+													"type": "TemplateLiteral",
+													"start": 2134,
+													"end": 2139,
+													"expressions": [],
+													"quasis": [
+														{
+															"type": "TemplateElement",
+															"start": 2135,
+															"end": 2138,
+															"value": {
+																"raw": "\nb\n",
+																"cooked": "\nb\n"
+															},
+															"tail": true
+														}
+													]
+												}
+											],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 2141,
+											"end": 2142,
+											"name": "o"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "TemplateLiteral",
+											"start": 2143,
+											"end": 2148,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 2144,
+													"end": 2147,
+													"value": {
+														"raw": "\nc\n",
+														"cooked": "\nc\n"
+													},
+													"tail": true
+												}
+											]
+										}
+									],
+									"optional": false
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2152,
+					"end": 2195,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2152,
+						"end": 2194,
+						"callee": {
+							"type": "Identifier",
+							"start": 2152,
+							"end": 2154,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "CallExpression",
+								"start": 2158,
+								"end": 2191,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 2158,
+									"end": 2184,
+									"object": {
+										"type": "CallExpression",
+										"start": 2158,
+										"end": 2182,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 2158,
+											"end": 2175,
+											"object": {
+												"type": "CallExpression",
+												"start": 2158,
+												"end": 2173,
+												"callee": {
+													"type": "MemberExpression",
+													"start": 2158,
+													"end": 2166,
+													"object": {
+														"type": "CallExpression",
+														"start": 2158,
+														"end": 2164,
+														"callee": {
+															"type": "MemberExpression",
+															"start": 2158,
+															"end": 2161,
+															"object": {
+																"type": "Identifier",
+																"start": 2158,
+																"end": 2159,
+																"name": "v"
+															},
+															"property": {
+																"type": "Identifier",
+																"start": 2160,
+																"end": 2161,
+																"name": "m"
+															},
+															"computed": false,
+															"optional": false
+														},
+														"arguments": [
+															{
+																"type": "Identifier",
+																"start": 2162,
+																"end": 2163,
+																"name": "r"
+															}
+														],
+														"optional": false
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 2165,
+														"end": 2166,
+														"name": "o"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [
+													{
+														"type": "TemplateLiteral",
+														"start": 2167,
+														"end": 2172,
+														"expressions": [],
+														"quasis": [
+															{
+																"type": "TemplateElement",
+																"start": 2168,
+																"end": 2171,
+																"value": {
+																	"raw": "\na\n",
+																	"cooked": "\na\n"
+																},
+																"tail": true
+															}
+														]
+													}
+												],
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 2174,
+												"end": 2175,
+												"name": "o"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "TemplateLiteral",
+												"start": 2176,
+												"end": 2181,
+												"expressions": [],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 2177,
+														"end": 2180,
+														"value": {
+															"raw": "\nb\n",
+															"cooked": "\nb\n"
+														},
+														"tail": true
+													}
+												]
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 2183,
+										"end": 2184,
+										"name": "o"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 2185,
+										"end": 2190,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 2186,
+												"end": 2189,
+												"value": {
+													"raw": "\nc\n",
+													"cooked": "\nc\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 2197,
+					"end": 2251,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 2203,
+							"end": 2250,
+							"id": {
+								"type": "Identifier",
+								"start": 2203,
+								"end": 2204,
+								"name": "o"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 2207,
+								"end": 2250,
+								"properties": [
+									{
+										"type": "Property",
+										"start": 2211,
+										"end": 2247,
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 2211,
+											"end": 2212,
+											"name": "p"
+										},
+										"value": {
+											"type": "CallExpression",
+											"start": 2214,
+											"end": 2247,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 2214,
+												"end": 2240,
+												"object": {
+													"type": "CallExpression",
+													"start": 2214,
+													"end": 2238,
+													"callee": {
+														"type": "MemberExpression",
+														"start": 2214,
+														"end": 2231,
+														"object": {
+															"type": "CallExpression",
+															"start": 2214,
+															"end": 2229,
+															"callee": {
+																"type": "MemberExpression",
+																"start": 2214,
+																"end": 2222,
+																"object": {
+																	"type": "CallExpression",
+																	"start": 2214,
+																	"end": 2220,
+																	"callee": {
+																		"type": "MemberExpression",
+																		"start": 2214,
+																		"end": 2217,
+																		"object": {
+																			"type": "Identifier",
+																			"start": 2214,
+																			"end": 2215,
+																			"name": "v"
+																		},
+																		"property": {
+																			"type": "Identifier",
+																			"start": 2216,
+																			"end": 2217,
+																			"name": "m"
+																		},
+																		"computed": false,
+																		"optional": false
+																	},
+																	"arguments": [
+																		{
+																			"type": "Identifier",
+																			"start": 2218,
+																			"end": 2219,
+																			"name": "r"
+																		}
+																	],
+																	"optional": false
+																},
+																"property": {
+																	"type": "Identifier",
+																	"start": 2221,
+																	"end": 2222,
+																	"name": "o"
+																},
+																"computed": false,
+																"optional": false
+															},
+															"arguments": [
+																{
+																	"type": "TemplateLiteral",
+																	"start": 2223,
+																	"end": 2228,
+																	"expressions": [],
+																	"quasis": [
+																		{
+																			"type": "TemplateElement",
+																			"start": 2224,
+																			"end": 2227,
+																			"value": {
+																				"raw": "\na\n",
+																				"cooked": "\na\n"
+																			},
+																			"tail": true
+																		}
+																	]
+																}
+															],
+															"optional": false
+														},
+														"property": {
+															"type": "Identifier",
+															"start": 2230,
+															"end": 2231,
+															"name": "o"
+														},
+														"computed": false,
+														"optional": false
+													},
+													"arguments": [
+														{
+															"type": "TemplateLiteral",
+															"start": 2232,
+															"end": 2237,
+															"expressions": [],
+															"quasis": [
+																{
+																	"type": "TemplateElement",
+																	"start": 2233,
+																	"end": 2236,
+																	"value": {
+																		"raw": "\nb\n",
+																		"cooked": "\nb\n"
+																	},
+																	"tail": true
+																}
+															]
+														}
+													],
+													"optional": false
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 2239,
+													"end": 2240,
+													"name": "o"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [
+												{
+													"type": "TemplateLiteral",
+													"start": 2241,
+													"end": 2246,
+													"expressions": [],
+													"quasis": [
+														{
+															"type": "TemplateElement",
+															"start": 2242,
+															"end": 2245,
+															"value": {
+																"raw": "\nc\n",
+																"cooked": "\nc\n"
+															},
+															"tail": true
+														}
+													]
+												}
+											],
+											"optional": false
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2395,
+					"end": 2467,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2395,
+						"end": 2466,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 2395,
+							"end": 2463,
+							"object": {
+								"type": "CallExpression",
+								"start": 2395,
+								"end": 2458,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 2395,
+									"end": 2444,
+									"object": {
+										"type": "CallExpression",
+										"start": 2395,
+										"end": 2439,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 2395,
+											"end": 2425,
+											"object": {
+												"type": "CallExpression",
+												"start": 2395,
+												"end": 2420,
+												"callee": {
+													"type": "MemberExpression",
+													"start": 2395,
+													"end": 2406,
+													"object": {
+														"type": "CallExpression",
+														"start": 2395,
+														"end": 2401,
+														"callee": {
+															"type": "MemberExpression",
+															"start": 2395,
+															"end": 2398,
+															"object": {
+																"type": "Identifier",
+																"start": 2395,
+																"end": 2396,
+																"name": "v"
+															},
+															"property": {
+																"type": "Identifier",
+																"start": 2397,
+																"end": 2398,
+																"name": "m"
+															},
+															"computed": false,
+															"optional": false
+														},
+														"arguments": [
+															{
+																"type": "Identifier",
+																"start": 2399,
+																"end": 2400,
+																"name": "r"
+															}
+														],
+														"optional": false
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 2405,
+														"end": 2406,
+														"name": "o"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [
+													{
+														"type": "TemplateLiteral",
+														"start": 2411,
+														"end": 2416,
+														"expressions": [],
+														"quasis": [
+															{
+																"type": "TemplateElement",
+																"start": 2412,
+																"end": 2415,
+																"value": {
+																	"raw": "\na\n",
+																	"cooked": "\na\n"
+																},
+																"tail": true
+															}
+														]
+													}
+												],
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 2424,
+												"end": 2425,
+												"name": "o"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "TemplateLiteral",
+												"start": 2430,
+												"end": 2435,
+												"expressions": [],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 2431,
+														"end": 2434,
+														"value": {
+															"raw": "\nb\n",
+															"cooked": "\nb\n"
+														},
+														"tail": true
+													}
+												]
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 2443,
+										"end": 2444,
+										"name": "o"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 2449,
+										"end": 2454,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 2450,
+												"end": 2453,
+												"value": {
+													"raw": "\nc\n",
+													"cooked": "\nc\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 2462,
+								"end": 2463,
+								"name": "p"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 2464,
+								"end": 2465,
+								"name": "x"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Controls: a call ending the chain takes every link onto a chain line; a short head;",
+							"start": 2254,
+							"end": 2340
+						},
+						{
+							"type": "Line",
+							"value": " templates on their own lines; one-line templates",
+							"start": 2342,
+							"end": 2393
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2469,
+					"end": 2498,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2469,
+						"end": 2497,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 2469,
+							"end": 2490,
+							"object": {
+								"type": "CallExpression",
+								"start": 2469,
+								"end": 2488,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 2469,
+									"end": 2481,
+									"object": {
+										"type": "CallExpression",
+										"start": 2469,
+										"end": 2479,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 2469,
+											"end": 2472,
+											"object": {
+												"type": "Identifier",
+												"start": 2469,
+												"end": 2470,
+												"name": "v"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 2471,
+												"end": 2472,
+												"name": "o"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "TemplateLiteral",
+												"start": 2473,
+												"end": 2478,
+												"expressions": [],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 2474,
+														"end": 2477,
+														"value": {
+															"raw": "\na\n",
+															"cooked": "\na\n"
+														},
+														"tail": true
+													}
+												]
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 2480,
+										"end": 2481,
+										"name": "o"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 2482,
+										"end": 2487,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 2483,
+												"end": 2486,
+												"value": {
+													"raw": "\nb\n",
+													"cooked": "\nb\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 2489,
+								"end": 2490,
+								"name": "o"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "TemplateLiteral",
+								"start": 2491,
+								"end": 2496,
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 2492,
+										"end": 2495,
+										"value": {
+											"raw": "\nc\n",
+											"cooked": "\nc\n"
+										},
+										"tail": true
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2500,
+					"end": 2532,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2500,
+						"end": 2531,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 2500,
+							"end": 2524,
+							"object": {
+								"type": "CallExpression",
+								"start": 2500,
+								"end": 2522,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 2500,
+									"end": 2515,
+									"object": {
+										"type": "CallExpression",
+										"start": 2500,
+										"end": 2513,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 2500,
+											"end": 2506,
+											"object": {
+												"type": "ThisExpression",
+												"start": 2500,
+												"end": 2504
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 2505,
+												"end": 2506,
+												"name": "o"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "TemplateLiteral",
+												"start": 2507,
+												"end": 2512,
+												"expressions": [],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 2508,
+														"end": 2511,
+														"value": {
+															"raw": "\na\n",
+															"cooked": "\na\n"
+														},
+														"tail": true
+													}
+												]
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 2514,
+										"end": 2515,
+										"name": "o"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 2516,
+										"end": 2521,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 2517,
+												"end": 2520,
+												"value": {
+													"raw": "\nb\n",
+													"cooked": "\nb\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 2523,
+								"end": 2524,
+								"name": "o"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "TemplateLiteral",
+								"start": 2525,
+								"end": 2530,
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 2526,
+										"end": 2529,
+										"value": {
+											"raw": "\nc\n",
+											"cooked": "\nc\n"
+										},
+										"tail": true
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2534,
+					"end": 2598,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2534,
+						"end": 2597,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 2534,
+							"end": 2583,
+							"object": {
+								"type": "CallExpression",
+								"start": 2534,
+								"end": 2578,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 2534,
+									"end": 2564,
+									"object": {
+										"type": "CallExpression",
+										"start": 2534,
+										"end": 2559,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 2534,
+											"end": 2545,
+											"object": {
+												"type": "CallExpression",
+												"start": 2534,
+												"end": 2540,
+												"callee": {
+													"type": "MemberExpression",
+													"start": 2534,
+													"end": 2537,
+													"object": {
+														"type": "Identifier",
+														"start": 2534,
+														"end": 2535,
+														"name": "v"
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 2536,
+														"end": 2537,
+														"name": "m"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 2538,
+														"end": 2539,
+														"name": "r"
+													}
+												],
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 2544,
+												"end": 2545,
+												"name": "o"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "TemplateLiteral",
+												"start": 2550,
+												"end": 2555,
+												"expressions": [],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 2551,
+														"end": 2554,
+														"value": {
+															"raw": "\na\n",
+															"cooked": "\na\n"
+														},
+														"tail": true
+													}
+												]
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 2563,
+										"end": 2564,
+										"name": "o"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 2569,
+										"end": 2574,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 2570,
+												"end": 2573,
+												"value": {
+													"raw": "\nb\n",
+													"cooked": "\nb\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 2582,
+								"end": 2583,
+								"name": "o"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "TemplateLiteral",
+								"start": 2588,
+								"end": 2593,
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 2589,
+										"end": 2592,
+										"value": {
+											"raw": "\nc\n",
+											"cooked": "\nc\n"
+										},
+										"tail": true
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2600,
+					"end": 2628,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2600,
+						"end": 2627,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 2600,
+							"end": 2622,
+							"object": {
+								"type": "CallExpression",
+								"start": 2600,
+								"end": 2620,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 2600,
+									"end": 2615,
+									"object": {
+										"type": "CallExpression",
+										"start": 2600,
+										"end": 2613,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 2600,
+											"end": 2608,
+											"object": {
+												"type": "CallExpression",
+												"start": 2600,
+												"end": 2606,
+												"callee": {
+													"type": "MemberExpression",
+													"start": 2600,
+													"end": 2603,
+													"object": {
+														"type": "Identifier",
+														"start": 2600,
+														"end": 2601,
+														"name": "v"
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 2602,
+														"end": 2603,
+														"name": "m"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 2604,
+														"end": 2605,
+														"name": "r"
+													}
+												],
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 2607,
+												"end": 2608,
+												"name": "o"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "TemplateLiteral",
+												"start": 2609,
+												"end": 2612,
+												"expressions": [],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 2610,
+														"end": 2611,
+														"value": {
+															"raw": "a",
+															"cooked": "a"
+														},
+														"tail": true
+													}
+												]
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 2614,
+										"end": 2615,
+										"name": "o"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 2616,
+										"end": 2619,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 2617,
+												"end": 2618,
+												"value": {
+													"raw": "b",
+													"cooked": "b"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 2621,
+								"end": 2622,
+								"name": "o"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "TemplateLiteral",
+								"start": 2623,
+								"end": 2626,
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 2624,
+										"end": 2625,
+										"value": {
+											"raw": "c",
+											"cooked": "c"
+										},
+										"tail": true
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

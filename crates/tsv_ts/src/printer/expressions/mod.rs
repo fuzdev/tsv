@@ -1642,6 +1642,16 @@ impl<'a> Printer<'a> {
             self.append_trailing_paren_comments(&mut parts, argument_end, span.end);
             parts.push(d.text("!"));
             d.concat(&parts)
+        } else if let Some(operand_doc) = self.build_with_inline_member_call_tail_forwarded(
+            span,
+            non_null_expr.expression,
+            || self.build_template_bypass_operand_doc(non_null_expr.expression, span, false),
+        ) {
+            // Over a call the template bypass takes, prettier's `[print(expression), "!"]`
+            // rather than a linearized chain (`Printer::spine_takes_template_bypass`). The
+            // declaration / assignment mark on this `!` belongs to the member under it
+            // (`Printer::build_with_inline_member_call_tail_forwarded`).
+            d.concat(&[operand_doc, d.text("!")])
         } else if Self::is_chain_expression(non_null_expr.expression) {
             // When inner expression is a chain (member or call), use chain architecture
             // to properly handle breaking. This ensures the outer `!` is included

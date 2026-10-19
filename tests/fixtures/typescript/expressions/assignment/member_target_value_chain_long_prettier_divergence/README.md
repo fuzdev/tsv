@@ -4,12 +4,15 @@ An assignment whose **target** is a member chain, and whose **value** is a membe
 for its own line.
 
 tsv: breaks the value's chain at its last lookup, holding print width
-Prettier: prints the value's chain intact and overflows
+Prettier: prints the value's chain intact and overflows — or, when the chain holds a computed lookup,
+breaks inside its brackets instead
 
 | Case                                | tsv           | Prettier      |
 | ----------------------------------- | ------------- | ------------- |
 | `zz.yy = <value chain>` at 100      | intact        | intact        |
 | `zz.yy = <value chain>` at 101      | breaks at the last lookup | intact, overflows |
+| `` x.y = v.m(r).o(`⏎a⏎`).p[k].q… `` at 100 | intact     | intact        |
+| `` x.y = v.m(r).o(`⏎a⏎`).p[k].q… `` at 101 | breaks at the last lookup | breaks inside `[k]` |
 | `zzyy = <value chain>` at 101       | breaks at the last lookup | breaks at the last lookup |
 
 ## Reason
@@ -30,8 +33,8 @@ character of target-shape away, so the overflow buys nothing and costs the print
 What is declined is this clause's walk, not the value position: `shouldInline`'s **call-object**
 clause names an assignment's value (and a declarator's initializer) outright and identity-checks
 the parent, and tsv implements it — so a value chain whose last lookup hangs off a call *with
-arguments* does lose that break point. The chains here are call-free, which is why they stay
-breakable.
+arguments* does lose that break point. The chains here end in a lookup hanging off a member, not off
+a call with arguments, which is why they stay breakable.
 
 ## Related
 
