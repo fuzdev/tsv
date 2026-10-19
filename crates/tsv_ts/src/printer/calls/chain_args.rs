@@ -927,7 +927,21 @@ fn build_chain_args_single(
         return with_chain_head(
             d,
             head,
-            build_ternary_arrow_hug_ladder(printer, opener, arrow, body_expr, sig_doc, body_doc),
+            build_ternary_arrow_hug_ladder(
+                printer,
+                opener,
+                arrow,
+                body_expr,
+                sig_doc,
+                body_doc,
+                || {
+                    prepend_leading(
+                        d,
+                        leading_comment_doc,
+                        printer.build_arg_expression_doc(arg),
+                    )
+                },
+            ),
         );
     }
 

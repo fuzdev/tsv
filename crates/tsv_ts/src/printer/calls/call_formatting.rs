@@ -902,7 +902,7 @@ fn try_single_arg_hug(
                     && !arrow_signature_refuses_hug(printer, arrow, arg.span)
                 {
                     return Some(build_ternary_arrow_hug_states(
-                        printer, callee, arrow, arg.span, body_expr,
+                        printer, callee, arg, arrow, body_expr,
                     ));
                 }
             }
@@ -1009,12 +1009,12 @@ fn build_block_arrow_hug_states(
 fn build_ternary_arrow_hug_states(
     printer: &Printer<'_>,
     callee: DocId,
+    arg: &internal::Expression<'_>,
     arrow: &internal::ArrowFunctionExpression<'_>,
-    span: Span,
     body_expr: &internal::Expression<'_>,
 ) -> DocId {
     let d = printer.d();
-    let sig_doc = build_arrow_sig_doc(printer, arrow, span);
+    let sig_doc = build_arrow_sig_doc(printer, arrow, arg.span);
 
     // The body expression; the ladder prepends the comments between `=>` and the body
     let body_doc = printer.build_arrow_arg_body_doc(body_expr);
@@ -1026,6 +1026,7 @@ fn build_ternary_arrow_hug_states(
         body_expr,
         sig_doc,
         body_doc,
+        || printer.build_expression_doc(arg),
     )
 }
 

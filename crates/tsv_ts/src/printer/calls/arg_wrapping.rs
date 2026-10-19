@@ -2072,16 +2072,17 @@ pub(super) fn build_break_body_ladder(
 
 /// The three-state ladder a **lone** arrow argument with a TERNARY body selects among:
 /// flat with the grammar-clarifying parens (`map((x) => (x ? y : z))`), the body broken after
-/// `=>` with the parens dropped, then the argument on its own line — whole when it fits there
-/// (`map(⏎\t(x) => (x ? y : z)⏎)`), its body broken after `=>` too when it does not. The break
+/// `=>` with the parens dropped, then the argument on its own line, printed whole as
+/// prettier's broken-out argument prints it (`map(⏎\t(x) => (x ? y : z)⏎)`, the parameters
+/// breaking first when the `=>` line overflows: `(⏎\t\tx…⏎\t) => (x ? y : z)`). The break
 /// state's `=>` line is measured with the space a ternary body leaves where prettier leaves
 /// one (`flat_pair`, below; [`arrow_before_broken_body`]), so a `map((x) =>` line of exactly
 /// the print width breaks the argument out as prettier does.
 ///
-/// The third parallel copy of this sat one per printer. What a caller owns is its `opener`
-/// and its signature and body docs. A forced break in the BODY collapses the ladder to the
-/// break state alone: `fits()` would otherwise pick the flat state on a truncated measurement
-/// and then print the parens around an already-broken body.
+/// The third parallel copy of this sat one per printer. What a caller owns is its `opener`,
+/// its signature and body docs, and `printed`, the whole argument as its argument builder
+/// prints it. A forced break in the BODY drops the flat state: `fits()` would otherwise pick
+/// it on a truncated measurement and then print the parens around an already-broken body.
 ///
 /// The question is asked of the body, never the whole arrow: a break the signature carries is
 /// not one the break state answers. Read off the whole arrow it selected the break state on a
@@ -2107,11 +2108,28 @@ pub(super) fn build_ternary_arrow_hug_ladder(
     body_expr: &internal::Expression<'_>,
     sig_doc: DocId,
     body_doc: DocId,
+    printed: impl FnOnce() -> DocId,
 ) -> DocId {
     let d = printer.d();
     let flat_pair = printer.arrow_body_takes_ternary_pair(body_expr);
     let prefix = opener.open;
     let body_start = body_expr.span().start;
+    // All broken: the argument drops to its own line, printed WHOLE as prettier's
+    // broken-out argument prints it (`printedArguments`) — its own printer decides whether
+    // the parameters break, whether the body stays on the `=>` line in its parens or breaks
+    // below it, and where a comment run in the `=>`→body gap goes. The state an enclosing
+    // break mode falls through to. The body is the one already built for the states above,
+    // INJECTED into the whole-arrow build rather than built again
+    // ([`Printer::with_arrow_body_inject`], as [`build_arrow_call_body_states`] does): a
+    // ternary branch holding another lone ternary-body arrow argument would otherwise build
+    // its body twice per level, O(2^depth).
+    let whole = printer.with_arrow_body_inject(Some((body_start, body_doc)), printed);
+    let state_all_broken = d.concat(&[
+        prefix,
+        d.indent(d.concat(&[d.hardline(), whole])),
+        d.hardline(),
+        d.text(")"),
+    ]);
     // The `=>`→body gap's comments, composed per state: glued where the body stays on the
     // `=>` line, a run the author broke after keeping its line where the body sits below
     // ([`prepend_arrow_body_comments`]).
@@ -2127,7 +2145,10 @@ pub(super) fn build_ternary_arrow_hug_ladder(
     // No trailing comma (trailingComma: 'none').
     let state_break = d.concat(&[prefix, arrow_broken, d.hardline(), d.text(")")]);
     if d.will_break(body_doc) {
-        return opener.after_callee(d, state_break);
+        // No flat state, but the break state still falls through to the argument on its own
+        // line: a `callee((sig) =>` line too wide to hug breaks the argument out, as prettier's
+        // `conditionalGroup` does past its hugged state.
+        return opener.ladder(d, &[state_break, state_all_broken]);
     }
     // The arrow on one line: the parens the grammar wants around a ternary body.
     let arrow_flat = if flat_pair {
@@ -2137,30 +2158,6 @@ pub(super) fn build_ternary_arrow_hug_ladder(
     };
     // Flat: the arrow, then the call's own `)`.
     let state_flat = d.concat(&[prefix, arrow_flat, d.text(")")]);
-    // All broken: the argument drops to its own line, where it is printed as prettier's
-    // broken-out argument prints it — whole when it fits there, its body broken after `=>`
-    // only when it does not. The state an enclosing break mode falls through to. Its broken
-    // arrow keeps the gap's comments glued: a run the author broke after, given its line
-    // here, converges only in two passes — the next pass reads it as an own-line comment and
-    // takes the arrow's gap-break route, which breaks a signature this state printed flat and
-    // over width (`fn(⏎\t(a…) =>⏎\t\t/* c */⏎\t\ta ? b : c⏎)`), and is stable from there.
-    // Glued is not prettier's form either, and not only past width: with a long callee the
-    // `callee((sig) =>` line overflows while `\t(sig) =>` fits, so this state prints
-    // `/* c */ a ? b : c` on a line well within width where prettier keeps the comment's
-    // own line.
-    // TODO: make the whole arrow (`build_expression_doc`, as prettier's broken-out argument
-    // prints it) this state's broken member in place of `arrow_broken_out` — the signature
-    // then breaks where it must, and the run keeps its line at every width.
-    let arrow_broken_out = d.concat(&[sig_doc, d.text(arrow_before), d.indent_hardline(body_doc)]);
-    let state_all_broken = d.concat(&[
-        prefix,
-        d.indent(d.concat(&[
-            d.hardline(),
-            d.conditional_group(&[arrow_flat, arrow_broken_out]),
-        ])),
-        d.hardline(),
-        d.text(")"),
-    ]);
     opener.ladder(d, &[state_flat, state_break, state_all_broken])
 }
 

@@ -497,6 +497,29 @@ fn gen_ts_nested_arrow_cond_single(depth: usize) -> String {
     format!("const v = {expr};\n")
 }
 
+/// [`gen_ts_nested_arrow_cond_single`] with a forced break in the ternary's other branch (a
+/// multi-line template) — the lone ternary ladder's will-break branch, whose broken-out state
+/// prints the whole argument with the already-built body injected
+/// (`build_ternary_arrow_hug_ladder`).
+fn gen_ts_nested_arrow_cond_single_forced(depth: usize) -> String {
+    let mut expr = String::from("done");
+    for i in 0..depth {
+        expr = format!("call{i}(p{i} => (c{i} ? {expr} : `x\ny`))");
+    }
+    format!("const v = {expr};\n")
+}
+
+/// A lone `new` arrow argument whose ternary body follows an own-line comment — the broken
+/// `=>`→body gap route, asked above `new`'s single-argument body-kind match
+/// (`build_arrow_gap_break_single_arg_doc`).
+fn gen_ts_nested_arrow_cond_single_new_comment(depth: usize) -> String {
+    let mut expr = String::from("done");
+    for i in 0..depth {
+        expr = format!("new C{i}((p{i}) =>\n/* c */\nc{i} ? {expr} : z{i})");
+    }
+    format!("const v = {expr};\n")
+}
+
 /// MULTI-arg last-arg FUNCTION expression (block body) that recurses in its `return`
 /// (`f(lead, function (x) {{ return f(lead, function (y) {{ … }}); }})`) — the block-body
 /// last-arg path (`ArgOpener::inline_or_expand_all`).
@@ -834,6 +857,18 @@ const CONSTRUCTS: &[Construct] = &[
         name: "ts_nested_arrow_cond_single",
         parser: ParserType::TypeScript,
         generate: gen_ts_nested_arrow_cond_single,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_arrow_cond_single_forced",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_arrow_cond_single_forced,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_arrow_cond_single_new_comment",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_arrow_cond_single_new_comment,
         depths: &[4, 8, 12],
     },
     Construct {

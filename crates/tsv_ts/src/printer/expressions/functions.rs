@@ -183,6 +183,18 @@ fn ternary_body_parens_group(d: &DocArena, body: DocId) -> DocId {
     ]))
 }
 
+/// [`ternary_body_parens_group`] with the space after `=>` inside its flat half (` (`): the
+/// plain arrow body's form when a comment run the author broke after leads the body, whose
+/// broken layout puts nothing past `=>` on its line (prettier's own-line arm). Measured from
+/// the signature, the group in break mode then adds no column past `=>`.
+fn ternary_body_parens_group_spaced(d: &DocArena, body: DocId) -> DocId {
+    d.group(d.concat(&[
+        d.if_break(d.empty(), d.text(" (")),
+        d.indent(d.concat(&[d.softline(), body])),
+        d.if_break(d.empty(), d.text(")")),
+    ]))
+}
+
 /// Walk a curried arrow chain's heads from `head` inwards, calling `visit` with each head
 /// and the **previous** head's `=>` end (`None` at the chain's own head, whose leading gap
 /// belongs to the enclosing site), and returning the terminal non-arrow body.
@@ -1545,6 +1557,10 @@ impl<'a> Printer<'a> {
             {
                 parts.push(self.break_after_operator_run_doc(run, body_start, body_doc));
             } else {
+                // Prettier's `hasLeadingOwnLineComment` is a newline after ANY comment in the
+                // gap, so a run the author broke after takes its own-line arm: no space after
+                // `=>` and no paren pair to measure, the signature's `fits()` ending at `=>`.
+                let broke_after = soft_run.is_some();
                 let with_leading = if let Some(run) = soft_run {
                     let mut run_parts = DocBuf::new();
                     self.push_leading_run_with_soft_line(&mut run_parts, &run);
@@ -1553,13 +1569,28 @@ impl<'a> Printer<'a> {
                 } else {
                     prepend_leading(d, gap_run(), body_doc)
                 };
-                if d.will_break(body_doc) {
-                    // Body has hardlines (multiline template in ternary, etc.)
-                    // Use normal break layout — no parens needed
-                    parts.push(hang_after_operator(d, with_leading));
+                if broke_after {
+                    // The run's own line is the BROKEN layout, so the space rides the flat
+                    // half with the `(` — a `(sig) =>` line of exactly the print width keeps
+                    // its parameters flat with the run below `=>`
+                    // (`calls/arrow_ternary_body_lone_arg_comment_long`), while a signature
+                    // that must break still joins the run into the parens on `) =>` when it fits.
+                    // The body cannot break here: one that will takes the forced emitter above
+                    // (`broke_after_run_break_is_forced`).
+                    parts.push(ternary_body_parens_group_spaced(d, with_leading));
                 } else {
+                    // Prettier's `" "` before the parens group, whatever that group decides: the
+                    // renderer trims it at a break, but the signature's `fits()` counts it, so a
+                    // `(sig) =>` line one short of the print width breaks the parameters
+                    // (`calls/arrow_ternary_body_lone_arg_long`).
                     parts.push(d.text(" "));
-                    parts.push(ternary_body_parens_group(d, with_leading));
+                    parts.push(if d.will_break(body_doc) {
+                        // Body has hardlines (multiline template in ternary, etc.)
+                        // Use normal break layout — no parens needed
+                        hang_after_operator(d, with_leading)
+                    } else {
+                        ternary_body_parens_group(d, with_leading)
+                    });
                 }
             }
         } else {

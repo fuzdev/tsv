@@ -477,6 +477,7 @@ impl<'a> Printer<'a> {
                                 body_expr,
                                 sig_doc,
                                 body_doc,
+                                || self.build_expression_doc(new_expr.arguments[0]),
                             );
                         }
 
