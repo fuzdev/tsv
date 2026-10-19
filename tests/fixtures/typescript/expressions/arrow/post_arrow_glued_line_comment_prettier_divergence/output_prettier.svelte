@@ -38,6 +38,12 @@
 		({ b: 1 })
 	);
 
+	// a lone `new` argument answers the same way
+	new Fn((x) =>
+		// c
+		x ? a : b
+	);
+
 	// a curried chain's head gap answers the same way
 	const h =
 		(x) =>

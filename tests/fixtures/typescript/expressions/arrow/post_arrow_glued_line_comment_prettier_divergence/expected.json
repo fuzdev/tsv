@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 942,
+	"end": 1026,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -84,62 +84,74 @@
 		},
 		{
 			"type": "Line",
-			"value": " a curried chain's head gap answers the same way",
+			"value": " a lone `new` argument answers the same way",
 			"start": 570,
-			"end": 620
+			"end": 615
 		},
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 641,
-			"end": 645
+			"start": 631,
+			"end": 635
+		},
+		{
+			"type": "Line",
+			"value": " a curried chain's head gap answers the same way",
+			"start": 654,
+			"end": 704
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 725,
+			"end": 729
 		},
 		{
 			"type": "Line",
 			"value": " a run the author wrote together stays together on the `=>` line",
-			"start": 663,
-			"end": 729
+			"start": 747,
+			"end": 813
 		},
 		{
 			"type": "Block",
 			"value": " lead1 ",
-			"start": 747,
-			"end": 758
+			"start": 831,
+			"end": 842
 		},
 		{
 			"type": "Line",
 			"value": " lead2",
-			"start": 759,
-			"end": 767
-		},
-		{
-			"type": "Line",
-			"value": " control: an own-line authoring keeps its own line — the two positions are",
-			"start": 775,
+			"start": 843,
 			"end": 851
 		},
 		{
 			"type": "Line",
+			"value": " control: an own-line authoring keeps its own line — the two positions are",
+			"start": 859,
+			"end": 935
+		},
+		{
+			"type": "Line",
 			"value": " both stable, and the author picks between them",
-			"start": 853,
-			"end": 902
+			"start": 937,
+			"end": 986
 		},
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 922,
-			"end": 926
+			"start": 1006,
+			"end": 1010
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 941,
+		"end": 1025,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 932,
+			"end": 1016,
 			"body": [
 				{
 					"type": "VariableDeclaration",
@@ -634,24 +646,24 @@
 					}
 				},
 				{
-					"type": "VariableDeclaration",
-					"start": 622,
-					"end": 660,
-					"declarations": [
-						{
-							"type": "VariableDeclarator",
-							"start": 628,
-							"end": 659,
-							"id": {
-								"type": "Identifier",
-								"start": 628,
-								"end": 629,
-								"name": "h"
-							},
-							"init": {
+					"type": "ExpressionStatement",
+					"start": 617,
+					"end": 651,
+					"expression": {
+						"type": "NewExpression",
+						"start": 617,
+						"end": 650,
+						"callee": {
+							"type": "Identifier",
+							"start": 621,
+							"end": 623,
+							"name": "Fn"
+						},
+						"arguments": [
+							{
 								"type": "ArrowFunctionExpression",
-								"start": 634,
-								"end": 659,
+								"start": 624,
+								"end": 647,
 								"id": null,
 								"expression": true,
 								"generator": false,
@@ -659,15 +671,89 @@
 								"params": [
 									{
 										"type": "Identifier",
-										"start": 635,
-										"end": 636,
+										"start": 625,
+										"end": 626,
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "ConditionalExpression",
+									"start": 638,
+									"end": 647,
+									"test": {
+										"type": "Identifier",
+										"start": 638,
+										"end": 639,
+										"name": "x"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 642,
+										"end": 643,
+										"name": "a"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 646,
+										"end": 647,
+										"name": "b"
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 631,
+											"end": 635
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a lone `new` argument answers the same way",
+							"start": 570,
+							"end": 615
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 706,
+					"end": 744,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 712,
+							"end": 743,
+							"id": {
+								"type": "Identifier",
+								"start": 712,
+								"end": 713,
+								"name": "h"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 718,
+								"end": 743,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 719,
+										"end": 720,
 										"name": "x"
 									}
 								],
 								"body": {
 									"type": "ArrowFunctionExpression",
-									"start": 648,
-									"end": 659,
+									"start": 732,
+									"end": 743,
 									"id": null,
 									"expression": true,
 									"generator": false,
@@ -675,23 +761,23 @@
 									"params": [
 										{
 											"type": "Identifier",
-											"start": 649,
-											"end": 650,
+											"start": 733,
+											"end": 734,
 											"name": "y"
 										}
 									],
 									"body": {
 										"type": "Identifier",
-										"start": 658,
-										"end": 659,
+										"start": 742,
+										"end": 743,
 										"name": "z"
 									},
 									"leadingComments": [
 										{
 											"type": "Line",
 											"value": " c",
-											"start": 641,
-											"end": 645
+											"start": 725,
+											"end": 729
 										}
 									]
 								}
@@ -703,30 +789,30 @@
 						{
 							"type": "Line",
 							"value": " a curried chain's head gap answers the same way",
-							"start": 570,
-							"end": 620
+							"start": 654,
+							"end": 704
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 731,
-					"end": 772,
+					"start": 815,
+					"end": 856,
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 737,
-							"end": 771,
+							"start": 821,
+							"end": 855,
 							"id": {
 								"type": "Identifier",
-								"start": 737,
-								"end": 738,
+								"start": 821,
+								"end": 822,
 								"name": "m"
 							},
 							"init": {
 								"type": "ArrowFunctionExpression",
-								"start": 741,
-								"end": 771,
+								"start": 825,
+								"end": 855,
 								"id": null,
 								"expression": true,
 								"generator": false,
@@ -734,21 +820,21 @@
 								"params": [],
 								"body": {
 									"type": "Identifier",
-									"start": 770,
-									"end": 771,
+									"start": 854,
+									"end": 855,
 									"name": "x",
 									"leadingComments": [
 										{
 											"type": "Block",
 											"value": " lead1 ",
-											"start": 747,
-											"end": 758
+											"start": 831,
+											"end": 842
 										},
 										{
 											"type": "Line",
 											"value": " lead2",
-											"start": 759,
-											"end": 767
+											"start": 843,
+											"end": 851
 										}
 									]
 								}
@@ -760,30 +846,30 @@
 						{
 							"type": "Line",
 							"value": " a run the author wrote together stays together on the `=>` line",
-							"start": 663,
-							"end": 729
+							"start": 747,
+							"end": 813
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 904,
-					"end": 931,
+					"start": 988,
+					"end": 1015,
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 910,
-							"end": 930,
+							"start": 994,
+							"end": 1014,
 							"id": {
 								"type": "Identifier",
-								"start": 910,
-								"end": 911,
+								"start": 994,
+								"end": 995,
 								"name": "n"
 							},
 							"init": {
 								"type": "ArrowFunctionExpression",
-								"start": 914,
-								"end": 930,
+								"start": 998,
+								"end": 1014,
 								"id": null,
 								"expression": true,
 								"generator": false,
@@ -791,15 +877,15 @@
 								"params": [],
 								"body": {
 									"type": "Identifier",
-									"start": 929,
-									"end": 930,
+									"start": 1013,
+									"end": 1014,
 									"name": "x",
 									"leadingComments": [
 										{
 											"type": "Line",
 											"value": " c",
-											"start": 922,
-											"end": 926
+											"start": 1006,
+											"end": 1010
 										}
 									]
 								}
@@ -811,14 +897,14 @@
 						{
 							"type": "Line",
 							"value": " control: an own-line authoring keeps its own line — the two positions are",
-							"start": 775,
-							"end": 851
+							"start": 859,
+							"end": 935
 						},
 						{
 							"type": "Line",
 							"value": " both stable, and the author picks between them",
-							"start": 853,
-							"end": 902
+							"start": 937,
+							"end": 986
 						}
 					]
 				}

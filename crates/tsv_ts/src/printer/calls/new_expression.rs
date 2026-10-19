@@ -323,6 +323,34 @@ impl<'a> Printer<'a> {
             && !single_arg_has_trailing_comment
             && !single_arg_leading_emit_comment
         {
+            // A broken `=>`→body gap keeps the arrow start on the `new A(` line and breaks the
+            // closing paren onto its own — **above the match**, the plain call's order
+            // (`try_single_arg_hug` in `call_formatting.rs` gives the full argument): the rule
+            // is the gap's and not the arms' body-kind split, and the one body question it does
+            // owe, prettier's `couldExpandArg`, the helper applies itself
+            // ([`last_arg_arrow_gap_break`]). Asked inside the block-arrow arm alone, it left a
+            // ternary body to the reassembling ladder, whose broken-out state printed the
+            // signature flat past the print width (`calls/new_arrow_body_own_line_comment_long`).
+            // It asks the leading gap **on page**, as the block-arrow arm's refusal below does:
+            // an OWNED comment before the arrow (glued `/* l */`, a JSDoc) is not to emit, so
+            // the guard above passes it, yet it still breaks the argument out — the plain
+            // call's leading-comment branch returns before its hoist for the same reason.
+            let arg0 = new_expr.arguments[0];
+            if new_has_comments
+                && !single_arg_leading_on_page_comment
+                && let internal::ExpressionKind::ArrowFunctionExpression(_) = &arg0.kind
+                && let Some(gap_break) = last_arg_arrow_gap_break(self, arg0)
+            {
+                return build_arrow_gap_break_single_arg_doc(
+                    self,
+                    ArgOpener::callee(d, callee_with_types),
+                    arg0,
+                    &gap_break,
+                    None,
+                    || self.build_expression_doc(arg0),
+                );
+            }
+
             match &new_expr.arguments[0] {
                 // Object / array container argument, cast or not: the shared hug, which also
                 // owns the truly-empty softline case ([`build_single_container_arg_doc`]). An
@@ -393,23 +421,6 @@ impl<'a> Printer<'a> {
                             d.softline(),
                             d.text(")"),
                         ]);
-                    }
-
-                    // A broken `=>`→body gap forces the closing paren onto its own line — the
-                    // rule is the gap's and not the arms' body-kind split; the one body
-                    // question it does owe, prettier's `couldExpandArg`, the helper applies
-                    // itself, see [`last_arg_arrow_gap_break`].
-                    if new_has_comments
-                        && let Some(gap_break) = last_arg_arrow_gap_break(self, arg0)
-                    {
-                        return build_arrow_gap_break_single_arg_doc(
-                            self,
-                            ArgOpener::callee(d, callee_with_types),
-                            arg0,
-                            &gap_break,
-                            glued,
-                            build,
-                        );
                     }
 
                     // The same two printings and state ladder the plain call's and the member
