@@ -190,32 +190,30 @@ export const run_bench_child = async <TResult>(
 	let reported_at: number | null = null;
 	const exited = await new Promise<
 		{ error: Error } | { code: number | null; signal: NodeJS.Signals | null }
-	>(
-		(resolve) => {
-			const poll = setInterval(() => {
-				const now = Date.now();
-				if (reported_at === null && existsSync(spec.result_path)) reported_at = now;
-				if (reported_at !== null && now - reported_at > EXIT_GRACE_MS) {
-					exit_hung = true;
-				} else if (now - started > deadline_ms) {
-					timed_out = true;
-				} else {
-					return;
-				}
-				// once: the `exit` event below ends the wait
-				clearInterval(poll);
-				child.kill('SIGKILL');
-			}, POLL_MS);
-			child.once('error', (error) => {
-				clearInterval(poll);
-				resolve({ error });
-			});
-			child.once('exit', (code, signal) => {
-				clearInterval(poll);
-				resolve({ code, signal });
-			});
-		}
-	);
+	>((resolve) => {
+		const poll = setInterval(() => {
+			const now = Date.now();
+			if (reported_at === null && existsSync(spec.result_path)) reported_at = now;
+			if (reported_at !== null && now - reported_at > EXIT_GRACE_MS) {
+				exit_hung = true;
+			} else if (now - started > deadline_ms) {
+				timed_out = true;
+			} else {
+				return;
+			}
+			// once: the `exit` event below ends the wait
+			clearInterval(poll);
+			child.kill('SIGKILL');
+		}, POLL_MS);
+		child.once('error', (error) => {
+			clearInterval(poll);
+			resolve({ error });
+		});
+		child.once('exit', (code, signal) => {
+			clearInterval(poll);
+			resolve({ code, signal });
+		});
+	});
 	running = null;
 	if ('error' in exited) throw fail(`${label} could not be started: ${exited.error.message}`);
 	if (timed_out) {

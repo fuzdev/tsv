@@ -18,9 +18,8 @@ use super::arg_wrapping::{
     build_call_args_expanded, build_call_args_with_blank_lines, build_empty_args_doc,
     build_expand_first_arg_doc, build_printed_argument_doc, build_single_arrow_hug_doc,
     build_single_container_arg_doc, build_ternary_arrow_hug_ladder, could_expand_arrow_chain,
-    first_arg_signature_refuses_expand_first, last_arg_arrow_gap_break,
-    prepend_arrow_body_comments, should_expand_first_arg, try_hook_deps_args_doc,
-    try_hug_multiline_template_arg, wrap_call_with_hard_breaks_paren_line,
+    first_arg_signature_refuses_expand_first, last_arg_arrow_gap_break, should_expand_first_arg,
+    try_hook_deps_args_doc, try_hug_multiline_template_arg, wrap_call_with_hard_breaks_paren_line,
     wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
 };
 use super::expand_last::{ArgOwner, try_expand_last_arg};
@@ -343,7 +342,8 @@ impl<'a> Printer<'a> {
                     ..
                 } if !single_arg_leading_on_page_comment => {
                     let arg_doc = self.build_expression_doc(new_expr.arguments[0]);
-                    return ArgOpener::Callee(callee_with_types).lone_hug_ladder(d, arg_doc, false);
+                    return ArgOpener::callee(d, callee_with_types)
+                        .lone_hug_ladder(d, arg_doc, false);
                 }
                 // Block arrow (or expandable arrow chain): use conditional_group to let Doc decide hug vs wrap
                 internal::Expression {
@@ -404,7 +404,7 @@ impl<'a> Printer<'a> {
                     {
                         return build_arrow_gap_break_single_arg_doc(
                             self,
-                            ArgOpener::Callee(callee_with_types),
+                            ArgOpener::callee(d, callee_with_types),
                             arg0,
                             &gap_break,
                             glued,
@@ -420,7 +420,7 @@ impl<'a> Printer<'a> {
                     // argument out where prettier hugs.
                     return build_single_arrow_hug_doc(
                         self,
-                        ArgOpener::Callee(callee_with_types),
+                        ArgOpener::callee(d, callee_with_types),
                         arg0,
                         arrow,
                         glued,
@@ -456,21 +456,16 @@ impl<'a> Printer<'a> {
                             let sig_doc =
                                 build_arrow_sig_doc(self, arrow, new_expr.arguments[0].span);
                             let body_doc = self.build_arrow_arg_body_doc(body_expr);
-                            let body_doc = prepend_arrow_body_comments(
-                                self,
-                                arrow,
-                                body_expr.span().start,
-                                body_doc,
-                            );
 
                             // The ladder, shared with the plain call's
                             // `build_ternary_arrow_hug_states` and the member chain's arm.
                             return build_ternary_arrow_hug_ladder(
-                                d,
-                                ArgOpener::Callee(callee_with_types),
+                                self,
+                                ArgOpener::callee(d, callee_with_types),
+                                arrow,
+                                body_expr,
                                 sig_doc,
                                 body_doc,
-                                self.arrow_body_takes_ternary_pair(body_expr),
                             );
                         }
 
@@ -487,7 +482,7 @@ impl<'a> Printer<'a> {
                             let arg0 = new_expr.arguments[0];
                             return build_arrow_call_body_states(
                                 self,
-                                ArgOpener::Callee(callee_with_types),
+                                ArgOpener::callee(d, callee_with_types),
                                 arg0,
                                 arrow,
                                 body_expr,
@@ -530,7 +525,7 @@ impl<'a> Printer<'a> {
         {
             return build_call_args_expanded(
                 self,
-                ArgOpener::Callee(callee_with_types),
+                ArgOpener::callee(d, callee_with_types),
                 new_expr.arguments,
                 paren_open,
                 new_expr_span.end,
@@ -562,7 +557,7 @@ impl<'a> Printer<'a> {
         {
             return build_expand_first_arg_doc(
                 self,
-                ArgOpener::Callee(callee_with_types),
+                ArgOpener::callee(d, callee_with_types),
                 new_expr.arguments,
                 paren_open,
                 new_expr_span.end,

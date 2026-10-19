@@ -23,8 +23,8 @@ use super::arg_wrapping::{
     build_expand_first_arg_doc, build_joined_argument_doc, build_printed_argument_doc,
     build_single_arrow_hug_doc, build_single_container_arg_doc, build_ternary_arrow_hug_ladder,
     could_expand_arrow_chain, first_arg_signature_refuses_expand_first, last_arg_arrow_gap_break,
-    prepend_arrow_body_comments, should_expand_first_arg, try_hook_deps_args_doc,
-    try_hug_multiline_template_arg, wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
+    should_expand_first_arg, try_hook_deps_args_doc, try_hug_multiline_template_arg,
+    wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
 };
 use super::expand_last::{ArgOwner, try_expand_last_arg};
 use super::module_paths::{get_module_path_chain_break, is_module_path_no_break};
@@ -536,7 +536,7 @@ fn build_call_args_doc(
     if is_function_composition_args(call.arguments) && !arg_trailing_line_comment {
         return build_call_args_expanded(
             printer,
-            ArgOpener::Callee(callee),
+            ArgOpener::callee(d, callee),
             call.arguments,
             paren_open,
             span.end,
@@ -558,7 +558,7 @@ fn build_call_args_doc(
     {
         return build_expand_first_arg_doc(
             printer,
-            ArgOpener::Callee(callee),
+            ArgOpener::callee(d, callee),
             call.arguments,
             paren_open,
             span.end,
@@ -817,7 +817,7 @@ fn try_single_arg_hug(
     {
         return Some(build_arrow_gap_break_single_arg_doc(
             printer,
-            ArgOpener::Callee(callee),
+            ArgOpener::callee(d, callee),
             arg,
             &gap_break,
             None,
@@ -848,7 +848,7 @@ fn try_single_arg_hug(
         // callee and the signature's head on one line, which the break makes impossible.
         internal::ExpressionKind::FunctionExpression(_) => {
             let arg_doc = printer.build_expression_doc(arg);
-            let opener = ArgOpener::Callee(callee);
+            let opener = ArgOpener::callee(d, callee);
             if callback_signature_refuses_hug(printer, arg, 1) {
                 return Some(opener.break_out(d, arg_doc));
             }
@@ -931,7 +931,7 @@ fn try_single_arg_hug(
                 // The body is built once and shared by every state (see the ladder's doc).
                 return Some(build_arrow_call_body_states(
                     printer,
-                    ArgOpener::Callee(callee),
+                    ArgOpener::callee(d, callee),
                     arg,
                     arrow,
                     body_expr,
@@ -990,7 +990,14 @@ fn build_block_arrow_hug_states(
     // The two printings and the state ladder they feed, shared with the `new` and
     // member-chain single-argument arms — an object/array terminal gets the middle state that
     // expands it internally while the arrow stays hugged.
-    build_single_arrow_hug_doc(printer, ArgOpener::Callee(callee), arg, arrow, None, build)
+    build_single_arrow_hug_doc(
+        printer,
+        ArgOpener::callee(d, callee),
+        arg,
+        arrow,
+        None,
+        build,
+    )
 }
 
 /// Build the 3-state expand-last layout for a single expression arrow with a
@@ -1009,16 +1016,16 @@ fn build_ternary_arrow_hug_states(
     let d = printer.d();
     let sig_doc = build_arrow_sig_doc(printer, arrow, span);
 
-    // Build body expression with comments between `=>` and body
+    // The body expression; the ladder prepends the comments between `=>` and the body
     let body_doc = printer.build_arrow_arg_body_doc(body_expr);
-    let body_doc = prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
 
     build_ternary_arrow_hug_ladder(
-        d,
-        ArgOpener::Callee(callee),
+        printer,
+        ArgOpener::callee(d, callee),
+        arrow,
+        body_expr,
         sig_doc,
         body_doc,
-        printer.arrow_body_takes_ternary_pair(body_expr),
     )
 }
 

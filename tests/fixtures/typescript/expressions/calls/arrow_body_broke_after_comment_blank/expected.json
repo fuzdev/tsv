@@ -1,0 +1,464 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 486,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A block comment glued to `=>` that the author broke after, then a blank line, before a",
+			"start": 20,
+			"end": 109
+		},
+		{
+			"type": "Line",
+			"value": " body with a hard break of its own: the break is forced, so the comment takes its own",
+			"start": 111,
+			"end": 198
+		},
+		{
+			"type": "Line",
+			"value": " line under `=>` and the blank survives with it — in every call that hugs the arrow.",
+			"start": 200,
+			"end": 286
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 305,
+			"end": 312
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 354,
+			"end": 361
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 410,
+			"end": 417
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 450,
+			"end": 457
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 485,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 476,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 288,
+					"end": 330,
+					"expression": {
+						"type": "CallExpression",
+						"start": 288,
+						"end": 329,
+						"callee": {
+							"type": "Identifier",
+							"start": 288,
+							"end": 290,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 291,
+								"end": 294,
+								"value": "x",
+								"raw": "'x'"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 296,
+								"end": 326,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 297,
+										"end": 298,
+										"name": "a"
+									}
+								],
+								"body": {
+									"type": "CallExpression",
+									"start": 316,
+									"end": 326,
+									"callee": {
+										"type": "Identifier",
+										"start": 316,
+										"end": 319,
+										"name": "fn1"
+									},
+									"arguments": [
+										{
+											"type": "TemplateLiteral",
+											"start": 320,
+											"end": 325,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 321,
+													"end": 324,
+													"value": {
+														"raw": "a\nb",
+														"cooked": "a\nb"
+													},
+													"tail": true
+												}
+											]
+										}
+									],
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 305,
+											"end": 312
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block comment glued to `=>` that the author broke after, then a blank line, before a",
+							"start": 20,
+							"end": 109
+						},
+						{
+							"type": "Line",
+							"value": " body with a hard break of its own: the break is forced, so the comment takes its own",
+							"start": 111,
+							"end": 198
+						},
+						{
+							"type": "Line",
+							"value": " line under `=>` and the blank survives with it — in every call that hugs the arrow.",
+							"start": 200,
+							"end": 286
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 333,
+					"end": 379,
+					"expression": {
+						"type": "NewExpression",
+						"start": 333,
+						"end": 378,
+						"callee": {
+							"type": "Identifier",
+							"start": 337,
+							"end": 339,
+							"name": "Fn"
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 340,
+								"end": 343,
+								"value": "x",
+								"raw": "'x'"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 345,
+								"end": 375,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 346,
+										"end": 347,
+										"name": "a"
+									}
+								],
+								"body": {
+									"type": "CallExpression",
+									"start": 365,
+									"end": 375,
+									"callee": {
+										"type": "Identifier",
+										"start": 365,
+										"end": 368,
+										"name": "fn1"
+									},
+									"arguments": [
+										{
+											"type": "TemplateLiteral",
+											"start": 369,
+											"end": 374,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 370,
+													"end": 373,
+													"value": {
+														"raw": "a\nb",
+														"cooked": "a\nb"
+													},
+													"tail": true
+												}
+											]
+										}
+									],
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 354,
+											"end": 361
+										}
+									]
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 382,
+					"end": 435,
+					"expression": {
+						"type": "CallExpression",
+						"start": 382,
+						"end": 434,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 382,
+							"end": 395,
+							"object": {
+								"type": "CallExpression",
+								"start": 382,
+								"end": 391,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 382,
+									"end": 389,
+									"object": {
+										"type": "Identifier",
+										"start": 382,
+										"end": 385,
+										"name": "obj"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 386,
+										"end": 389,
+										"name": "fn1"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 392,
+								"end": 395,
+								"name": "fn2"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 396,
+								"end": 399,
+								"value": "x",
+								"raw": "'x'"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 401,
+								"end": 431,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 402,
+										"end": 403,
+										"name": "a"
+									}
+								],
+								"body": {
+									"type": "CallExpression",
+									"start": 421,
+									"end": 431,
+									"callee": {
+										"type": "Identifier",
+										"start": 421,
+										"end": 424,
+										"name": "fn1"
+									},
+									"arguments": [
+										{
+											"type": "TemplateLiteral",
+											"start": 425,
+											"end": 430,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 426,
+													"end": 429,
+													"value": {
+														"raw": "a\nb",
+														"cooked": "a\nb"
+													},
+													"tail": true
+												}
+											]
+										}
+									],
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 410,
+											"end": 417
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 438,
+					"end": 475,
+					"expression": {
+						"type": "CallExpression",
+						"start": 438,
+						"end": 474,
+						"callee": {
+							"type": "Identifier",
+							"start": 438,
+							"end": 440,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 441,
+								"end": 471,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 442,
+										"end": 443,
+										"name": "a"
+									}
+								],
+								"body": {
+									"type": "CallExpression",
+									"start": 461,
+									"end": 471,
+									"callee": {
+										"type": "Identifier",
+										"start": 461,
+										"end": 464,
+										"name": "fn1"
+									},
+									"arguments": [
+										{
+											"type": "TemplateLiteral",
+											"start": 465,
+											"end": 470,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 466,
+													"end": 469,
+													"value": {
+														"raw": "a\nb",
+														"cooked": "a\nb"
+													},
+													"tail": true
+												}
+											]
+										}
+									],
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 450,
+											"end": 457
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

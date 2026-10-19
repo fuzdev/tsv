@@ -18,9 +18,9 @@ use super::arg_comments::{
     has_inter_argument_comments, has_trailing_comments_on_args, last_arg_has_comments,
 };
 use super::arg_predicates::{
-    arrow_body_is_call_through_non_null, is_block_function, is_function_composition_args,
-    is_ternary_arrow_body, last_arg_is_array_or_object, lone_arg_params_render_flat,
-    mark_boolean_coercion_argument,
+    arrow_body_breaks_after_space, arrow_body_is_call_through_non_null, is_block_function,
+    is_function_composition_args, is_ternary_arrow_body, last_arg_is_array_or_object,
+    lone_arg_params_render_flat, mark_boolean_coercion_argument,
 };
 use super::arg_wrapping::{
     ArgOpener, ChainArgKind, arrow_body_expands_internally, arrow_body_tail_has_comments,
@@ -814,7 +814,7 @@ fn build_chain_args_single(
     // The chain's spelling of what a call-argument state opens with — its own `(` / `?.(`,
     // the callee being a separate group the chain printer places. Every ladder below is the
     // plain-call / `new` one read through it.
-    let opener = ArgOpener::ChainPrefix(prefix);
+    let opener = ArgOpener::chain(prefix);
 
     let arg = &call.arguments[0];
 
@@ -885,7 +885,16 @@ fn build_chain_args_single(
         return with_chain_head(
             d,
             head,
-            build_break_body_ladder(d, opener, &[], sig_doc, body_doc, arrow_doc, arrow_doc),
+            build_break_body_ladder(
+                d,
+                opener,
+                &[],
+                sig_doc,
+                body_doc,
+                false,
+                arrow_doc,
+                arrow_doc,
+            ),
         );
     }
 
@@ -910,8 +919,6 @@ fn build_chain_args_single(
         && !arrow_signature_refuses_hug(printer, arrow, arg.span)
     {
         let body_doc = printer.build_arrow_arg_body_doc(body_expr);
-        let body_doc =
-            prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
         let sig_doc = build_arrow_sig_doc(printer, arrow, arg.span);
         let sig_doc = prepend_leading(d, leading_comment_doc, sig_doc);
 
@@ -920,13 +927,7 @@ fn build_chain_args_single(
         return with_chain_head(
             d,
             head,
-            build_ternary_arrow_hug_ladder(
-                d,
-                opener,
-                sig_doc,
-                body_doc,
-                printer.arrow_body_takes_ternary_pair(body_expr),
-            ),
+            build_ternary_arrow_hug_ladder(printer, opener, arrow, body_expr, sig_doc, body_doc),
         );
     }
 
@@ -1200,7 +1201,7 @@ fn build_chain_args_multi(
     } = ctx;
     // See [`build_chain_args_single`] — the chain's opener, through which every ladder below
     // is the plain-call / `new` one.
-    let opener = ArgOpener::ChainPrefix(prefix);
+    let opener = ArgOpener::chain(prefix);
 
     // A broken `=>`→body gap on the last argument forces the closing
     // paren onto its own line. Above every body-kind arm below, because the rule is the
@@ -1335,6 +1336,7 @@ fn build_chain_args_multi(
                 &head_parts,
                 sig_doc,
                 body_doc,
+                arrow_body_breaks_after_space(printer, arrow, body_expr),
                 last_arg_doc,
                 all_args_broken,
             ),

@@ -678,22 +678,14 @@ impl<'a> Printer<'a> {
                 let (head_parts, last_arg_doc, all_args_broken) =
                     build_args_split_last(call.arguments, self, paren_open, call_has_comments);
 
-                let state_inline = d.concat(&[
-                    callee_doc,
-                    d.text("("),
-                    d.concat(&head_parts),
+                // The two-state ladder every expand-last printer shares, so the curried
+                // callee stays outside its states like any other callee.
+                return arg_wrapping::ArgOpener::callee(d, callee_doc).inline_or_expand_all(
+                    d,
+                    &head_parts,
                     last_arg_doc,
-                    d.text(")"),
-                ]);
-                let state_expand_all = d.concat(&[
-                    callee_doc,
-                    d.text("("),
-                    d.indent(d.concat(&[d.line(), all_args_broken])),
-                    d.line(),
-                    d.text(")"),
-                ]);
-
-                return d.conditional_group(&[state_inline, state_expand_all]);
+                    all_args_broken,
+                );
             }
         }
 

@@ -1,0 +1,3806 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 4478,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 4323,
+				"end": 4325,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 4325,
+				"end": 4477,
+				"expression": {
+					"type": "CallExpression",
+					"start": 4326,
+					"end": 4476,
+					"callee": {
+						"type": "TaggedTemplateExpression",
+						"start": 4326,
+						"end": 4351,
+						"tag": {
+							"type": "Identifier",
+							"start": 4326,
+							"end": 4328,
+							"name": "fn"
+						},
+						"quasi": {
+							"type": "TemplateLiteral",
+							"start": 4328,
+							"end": 4351,
+							"expressions": [
+								{
+									"type": "Literal",
+									"start": 4340,
+									"end": 4341,
+									"value": 1,
+									"raw": "1"
+								},
+								{
+									"type": "Literal",
+									"start": 4347,
+									"end": 4348,
+									"value": 2,
+									"raw": "2"
+								}
+							],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 4329,
+									"end": 4338,
+									"value": {
+										"raw": "\n\ta | b\n\t",
+										"cooked": "\n\ta | b\n\t"
+									},
+									"tail": false
+								},
+								{
+									"type": "TemplateElement",
+									"start": 4342,
+									"end": 4345,
+									"value": {
+										"raw": " | ",
+										"cooked": " | "
+									},
+									"tail": false
+								},
+								{
+									"type": "TemplateElement",
+									"start": 4349,
+									"end": 4350,
+									"value": {
+										"raw": "\n",
+										"cooked": "\n"
+									},
+									"tail": true
+								}
+							]
+						}
+					},
+					"arguments": [
+						{
+							"type": "Literal",
+							"start": 4354,
+							"end": 4440,
+							"value": "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+							"raw": "'abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
+						},
+						{
+							"type": "ArrowFunctionExpression",
+							"start": 4443,
+							"end": 4474,
+							"id": null,
+							"expression": false,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "ObjectPattern",
+									"start": 4444,
+									"end": 4452,
+									"properties": [
+										{
+											"type": "Property",
+											"start": 4446,
+											"end": 4447,
+											"method": false,
+											"shorthand": true,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 4446,
+												"end": 4447,
+												"name": "a"
+											},
+											"value": {
+												"type": "Identifier",
+												"start": 4446,
+												"end": 4447,
+												"name": "a"
+											},
+											"kind": "init"
+										},
+										{
+											"type": "Property",
+											"start": 4449,
+											"end": 4450,
+											"method": false,
+											"shorthand": true,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 4449,
+												"end": 4450,
+												"name": "b"
+											},
+											"value": {
+												"type": "Identifier",
+												"start": 4449,
+												"end": 4450,
+												"name": "b"
+											},
+											"kind": "init"
+										}
+									]
+								}
+							],
+							"body": {
+								"type": "BlockStatement",
+								"start": 4457,
+								"end": 4474,
+								"body": [
+									{
+										"type": "ExpressionStatement",
+										"start": 4461,
+										"end": 4471,
+										"expression": {
+											"type": "CallExpression",
+											"start": 4461,
+											"end": 4470,
+											"callee": {
+												"type": "Identifier",
+												"start": 4461,
+												"end": 4464,
+												"name": "fn1"
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 4465,
+													"end": 4466,
+													"name": "a"
+												},
+												{
+													"type": "Identifier",
+													"start": 4468,
+													"end": 4469,
+													"name": "b"
+												}
+											],
+											"optional": false
+										}
+									}
+								]
+							}
+						}
+					],
+					"optional": false
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a multiline tagged-template callee: the arguments are measured from the closing line",
+			"start": 20,
+			"end": 107
+		},
+		{
+			"type": "Line",
+			"value": " the hugged head at 100 chars",
+			"start": 109,
+			"end": 140
+		},
+		{
+			"type": "Line",
+			"value": " the hugged head at 101 chars",
+			"start": 286,
+			"end": 317
+		},
+		{
+			"type": "Line",
+			"value": " `new`, an async arrow",
+			"start": 763,
+			"end": 787
+		},
+		{
+			"type": "Line",
+			"value": " positions",
+			"start": 952,
+			"end": 964
+		},
+		{
+			"type": "Line",
+			"value": " a test table",
+			"start": 2046,
+			"end": 2061
+		},
+		{
+			"type": "Line",
+			"value": " a curried call whose callee call breaks: the arguments are measured from its closing line",
+			"start": 2241,
+			"end": 2333
+		},
+		{
+			"type": "Line",
+			"value": " the callee's arguments broken by width, the hugged head at 100 chars",
+			"start": 2335,
+			"end": 2406
+		},
+		{
+			"type": "Line",
+			"value": " the callee's arguments broken by width, the hugged head at 101 chars",
+			"start": 2638,
+			"end": 2709
+		},
+		{
+			"type": "Line",
+			"value": " a function argument, the hugged head at 100 chars",
+			"start": 2951,
+			"end": 3003
+		},
+		{
+			"type": "Line",
+			"value": " a function argument, the hugged head at 101 chars",
+			"start": 3149,
+			"end": 3201
+		},
+		{
+			"type": "Line",
+			"value": " a multiline template argument, the hugged head at 100 chars",
+			"start": 3357,
+			"end": 3419
+		},
+		{
+			"type": "Line",
+			"value": " a multiline template argument, the hugged head at 101 chars",
+			"start": 3549,
+			"end": 3611
+		},
+		{
+			"type": "Line",
+			"value": " controls: a head that fits, an object, a one-line template, a broken non-template callee",
+			"start": 3752,
+			"end": 3843
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 4323,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 4314,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 142,
+					"end": 284,
+					"expression": {
+						"type": "CallExpression",
+						"start": 142,
+						"end": 283,
+						"callee": {
+							"type": "TaggedTemplateExpression",
+							"start": 142,
+							"end": 167,
+							"tag": {
+								"type": "Identifier",
+								"start": 142,
+								"end": 144,
+								"name": "fn"
+							},
+							"quasi": {
+								"type": "TemplateLiteral",
+								"start": 144,
+								"end": 167,
+								"expressions": [
+									{
+										"type": "Literal",
+										"start": 156,
+										"end": 157,
+										"value": 1,
+										"raw": "1"
+									},
+									{
+										"type": "Literal",
+										"start": 163,
+										"end": 164,
+										"value": 2,
+										"raw": "2"
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 145,
+										"end": 154,
+										"value": {
+											"raw": "\n\ta | b\n\t",
+											"cooked": "\n\ta | b\n\t"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 158,
+										"end": 161,
+										"value": {
+											"raw": " | ",
+											"cooked": " | "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 165,
+										"end": 166,
+										"value": {
+											"raw": "\n",
+											"cooked": "\n"
+										},
+										"tail": true
+									}
+								]
+							}
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 168,
+								"end": 249,
+								"value": "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+								"raw": "'abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 251,
+								"end": 282,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "ObjectPattern",
+										"start": 252,
+										"end": 260,
+										"properties": [
+											{
+												"type": "Property",
+												"start": 254,
+												"end": 255,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 254,
+													"end": 255,
+													"name": "a"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 254,
+													"end": 255,
+													"name": "a"
+												},
+												"kind": "init"
+											},
+											{
+												"type": "Property",
+												"start": 257,
+												"end": 258,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 257,
+													"end": 258,
+													"name": "b"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 257,
+													"end": 258,
+													"name": "b"
+												},
+												"kind": "init"
+											}
+										]
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 265,
+									"end": 282,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 269,
+											"end": 279,
+											"expression": {
+												"type": "CallExpression",
+												"start": 269,
+												"end": 278,
+												"callee": {
+													"type": "Identifier",
+													"start": 269,
+													"end": 272,
+													"name": "fn1"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 273,
+														"end": 274,
+														"name": "a"
+													},
+													{
+														"type": "Identifier",
+														"start": 276,
+														"end": 277,
+														"name": "b"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a multiline tagged-template callee: the arguments are measured from the closing line",
+							"start": 20,
+							"end": 107
+						},
+						{
+							"type": "Line",
+							"value": " the hugged head at 100 chars",
+							"start": 109,
+							"end": 140
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 319,
+					"end": 471,
+					"expression": {
+						"type": "CallExpression",
+						"start": 319,
+						"end": 470,
+						"callee": {
+							"type": "TaggedTemplateExpression",
+							"start": 319,
+							"end": 344,
+							"tag": {
+								"type": "Identifier",
+								"start": 319,
+								"end": 321,
+								"name": "fn"
+							},
+							"quasi": {
+								"type": "TemplateLiteral",
+								"start": 321,
+								"end": 344,
+								"expressions": [
+									{
+										"type": "Literal",
+										"start": 333,
+										"end": 334,
+										"value": 1,
+										"raw": "1"
+									},
+									{
+										"type": "Literal",
+										"start": 340,
+										"end": 341,
+										"value": 2,
+										"raw": "2"
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 322,
+										"end": 331,
+										"value": {
+											"raw": "\n\ta | b\n\t",
+											"cooked": "\n\ta | b\n\t"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 335,
+										"end": 338,
+										"value": {
+											"raw": " | ",
+											"cooked": " | "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 342,
+										"end": 343,
+										"value": {
+											"raw": "\n",
+											"cooked": "\n"
+										},
+										"tail": true
+									}
+								]
+							}
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 348,
+								"end": 430,
+								"value": "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+								"raw": "'abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 434,
+								"end": 467,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "ObjectPattern",
+										"start": 435,
+										"end": 443,
+										"properties": [
+											{
+												"type": "Property",
+												"start": 437,
+												"end": 438,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 437,
+													"end": 438,
+													"name": "a"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 437,
+													"end": 438,
+													"name": "a"
+												},
+												"kind": "init"
+											},
+											{
+												"type": "Property",
+												"start": 440,
+												"end": 441,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 440,
+													"end": 441,
+													"name": "b"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 440,
+													"end": 441,
+													"name": "b"
+												},
+												"kind": "init"
+											}
+										]
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 448,
+									"end": 467,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 453,
+											"end": 463,
+											"expression": {
+												"type": "CallExpression",
+												"start": 453,
+												"end": 462,
+												"callee": {
+													"type": "Identifier",
+													"start": 453,
+													"end": 456,
+													"name": "fn1"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 457,
+														"end": 458,
+														"name": "a"
+													},
+													{
+														"type": "Identifier",
+														"start": 460,
+														"end": 461,
+														"name": "b"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the hugged head at 101 chars",
+							"start": 286,
+							"end": 317
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 473,
+					"end": 611,
+					"expression": {
+						"type": "CallExpression",
+						"start": 473,
+						"end": 610,
+						"callee": {
+							"type": "TaggedTemplateExpression",
+							"start": 473,
+							"end": 498,
+							"tag": {
+								"type": "Identifier",
+								"start": 473,
+								"end": 475,
+								"name": "fn"
+							},
+							"quasi": {
+								"type": "TemplateLiteral",
+								"start": 475,
+								"end": 498,
+								"expressions": [
+									{
+										"type": "Literal",
+										"start": 487,
+										"end": 488,
+										"value": 1,
+										"raw": "1"
+									},
+									{
+										"type": "Literal",
+										"start": 494,
+										"end": 495,
+										"value": 2,
+										"raw": "2"
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 476,
+										"end": 485,
+										"value": {
+											"raw": "\n\ta | b\n\t",
+											"cooked": "\n\ta | b\n\t"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 489,
+										"end": 492,
+										"value": {
+											"raw": " | ",
+											"cooked": " | "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 496,
+										"end": 497,
+										"value": {
+											"raw": "\n",
+											"cooked": "\n"
+										},
+										"tail": true
+									}
+								]
+							}
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 499,
+								"end": 582,
+								"value": "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+								"raw": "'abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
+							},
+							{
+								"type": "FunctionExpression",
+								"start": 584,
+								"end": 609,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 596,
+									"end": 609,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 600,
+											"end": 606,
+											"expression": {
+												"type": "CallExpression",
+												"start": 600,
+												"end": 605,
+												"callee": {
+													"type": "Identifier",
+													"start": 600,
+													"end": 603,
+													"name": "fn1"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 613,
+					"end": 761,
+					"expression": {
+						"type": "CallExpression",
+						"start": 613,
+						"end": 760,
+						"callee": {
+							"type": "TaggedTemplateExpression",
+							"start": 613,
+							"end": 638,
+							"tag": {
+								"type": "Identifier",
+								"start": 613,
+								"end": 615,
+								"name": "fn"
+							},
+							"quasi": {
+								"type": "TemplateLiteral",
+								"start": 615,
+								"end": 638,
+								"expressions": [
+									{
+										"type": "Literal",
+										"start": 627,
+										"end": 628,
+										"value": 1,
+										"raw": "1"
+									},
+									{
+										"type": "Literal",
+										"start": 634,
+										"end": 635,
+										"value": 2,
+										"raw": "2"
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 616,
+										"end": 625,
+										"value": {
+											"raw": "\n\ta | b\n\t",
+											"cooked": "\n\ta | b\n\t"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 629,
+										"end": 632,
+										"value": {
+											"raw": " | ",
+											"cooked": " | "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 636,
+										"end": 637,
+										"value": {
+											"raw": "\n",
+											"cooked": "\n"
+										},
+										"tail": true
+									}
+								]
+							}
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 642,
+								"end": 726,
+								"value": "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+								"raw": "'abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
+							},
+							{
+								"type": "FunctionExpression",
+								"start": 730,
+								"end": 757,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 742,
+									"end": 757,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 747,
+											"end": 753,
+											"expression": {
+												"type": "CallExpression",
+												"start": 747,
+												"end": 752,
+												"callee": {
+													"type": "Identifier",
+													"start": 747,
+													"end": 750,
+													"name": "fn1"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 789,
+					"end": 949,
+					"expression": {
+						"type": "NewExpression",
+						"start": 789,
+						"end": 948,
+						"callee": {
+							"type": "TaggedTemplateExpression",
+							"start": 793,
+							"end": 818,
+							"tag": {
+								"type": "Identifier",
+								"start": 793,
+								"end": 795,
+								"name": "Fn"
+							},
+							"quasi": {
+								"type": "TemplateLiteral",
+								"start": 795,
+								"end": 818,
+								"expressions": [
+									{
+										"type": "Literal",
+										"start": 807,
+										"end": 808,
+										"value": 1,
+										"raw": "1"
+									},
+									{
+										"type": "Literal",
+										"start": 814,
+										"end": 815,
+										"value": 2,
+										"raw": "2"
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 796,
+										"end": 805,
+										"value": {
+											"raw": "\n\ta | b\n\t",
+											"cooked": "\n\ta | b\n\t"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 809,
+										"end": 812,
+										"value": {
+											"raw": " | ",
+											"cooked": " | "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 816,
+										"end": 817,
+										"value": {
+											"raw": "\n",
+											"cooked": "\n"
+										},
+										"tail": true
+									}
+								]
+							}
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 822,
+								"end": 902,
+								"value": "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+								"raw": "'abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 906,
+								"end": 945,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": true,
+								"params": [
+									{
+										"type": "ObjectPattern",
+										"start": 913,
+										"end": 921,
+										"properties": [
+											{
+												"type": "Property",
+												"start": 915,
+												"end": 916,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 915,
+													"end": 916,
+													"name": "a"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 915,
+													"end": 916,
+													"name": "a"
+												},
+												"kind": "init"
+											},
+											{
+												"type": "Property",
+												"start": 918,
+												"end": 919,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 918,
+													"end": 919,
+													"name": "b"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 918,
+													"end": 919,
+													"name": "b"
+												},
+												"kind": "init"
+											}
+										]
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 926,
+									"end": 945,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 931,
+											"end": 941,
+											"expression": {
+												"type": "CallExpression",
+												"start": 931,
+												"end": 940,
+												"callee": {
+													"type": "Identifier",
+													"start": 931,
+													"end": 934,
+													"name": "fn1"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 935,
+														"end": 936,
+														"name": "a"
+													},
+													{
+														"type": "Identifier",
+														"start": 938,
+														"end": 939,
+														"name": "b"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `new`, an async arrow",
+							"start": 763,
+							"end": 787
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 966,
+					"end": 1134,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 972,
+							"end": 1133,
+							"id": {
+								"type": "Identifier",
+								"start": 972,
+								"end": 975,
+								"name": "a01"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 978,
+								"end": 1133,
+								"callee": {
+									"type": "TaggedTemplateExpression",
+									"start": 978,
+									"end": 1003,
+									"tag": {
+										"type": "Identifier",
+										"start": 978,
+										"end": 980,
+										"name": "fn"
+									},
+									"quasi": {
+										"type": "TemplateLiteral",
+										"start": 980,
+										"end": 1003,
+										"expressions": [
+											{
+												"type": "Literal",
+												"start": 992,
+												"end": 993,
+												"value": 1,
+												"raw": "1"
+											},
+											{
+												"type": "Literal",
+												"start": 999,
+												"end": 1000,
+												"value": 2,
+												"raw": "2"
+											}
+										],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 981,
+												"end": 990,
+												"value": {
+													"raw": "\n\ta | b\n\t",
+													"cooked": "\n\ta | b\n\t"
+												},
+												"tail": false
+											},
+											{
+												"type": "TemplateElement",
+												"start": 994,
+												"end": 997,
+												"value": {
+													"raw": " | ",
+													"cooked": " | "
+												},
+												"tail": false
+											},
+											{
+												"type": "TemplateElement",
+												"start": 1001,
+												"end": 1002,
+												"value": {
+													"raw": "\n",
+													"cooked": "\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								},
+								"arguments": [
+									{
+										"type": "Literal",
+										"start": 1007,
+										"end": 1093,
+										"value": "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+										"raw": "'abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
+									},
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 1097,
+										"end": 1130,
+										"id": null,
+										"expression": false,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "ObjectPattern",
+												"start": 1098,
+												"end": 1106,
+												"properties": [
+													{
+														"type": "Property",
+														"start": 1100,
+														"end": 1101,
+														"method": false,
+														"shorthand": true,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 1100,
+															"end": 1101,
+															"name": "a"
+														},
+														"value": {
+															"type": "Identifier",
+															"start": 1100,
+															"end": 1101,
+															"name": "a"
+														},
+														"kind": "init"
+													},
+													{
+														"type": "Property",
+														"start": 1103,
+														"end": 1104,
+														"method": false,
+														"shorthand": true,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 1103,
+															"end": 1104,
+															"name": "b"
+														},
+														"value": {
+															"type": "Identifier",
+															"start": 1103,
+															"end": 1104,
+															"name": "b"
+														},
+														"kind": "init"
+													}
+												]
+											}
+										],
+										"body": {
+											"type": "BlockStatement",
+											"start": 1111,
+											"end": 1130,
+											"body": [
+												{
+													"type": "ExpressionStatement",
+													"start": 1116,
+													"end": 1126,
+													"expression": {
+														"type": "CallExpression",
+														"start": 1116,
+														"end": 1125,
+														"callee": {
+															"type": "Identifier",
+															"start": 1116,
+															"end": 1119,
+															"name": "fn1"
+														},
+														"arguments": [
+															{
+																"type": "Identifier",
+																"start": 1120,
+																"end": 1121,
+																"name": "a"
+															},
+															{
+																"type": "Identifier",
+																"start": 1123,
+																"end": 1124,
+																"name": "b"
+															}
+														],
+														"optional": false
+													}
+												}
+											]
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " positions",
+							"start": 952,
+							"end": 964
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 1136,
+					"end": 1502,
+					"id": {
+						"type": "Identifier",
+						"start": 1151,
+						"end": 1154,
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": false,
+					"async": true,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 1157,
+						"end": 1502,
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 1161,
+								"end": 1328,
+								"expression": {
+									"type": "AwaitExpression",
+									"start": 1161,
+									"end": 1327,
+									"argument": {
+										"type": "CallExpression",
+										"start": 1167,
+										"end": 1327,
+										"callee": {
+											"type": "TaggedTemplateExpression",
+											"start": 1167,
+											"end": 1192,
+											"tag": {
+												"type": "Identifier",
+												"start": 1167,
+												"end": 1169,
+												"name": "fn"
+											},
+											"quasi": {
+												"type": "TemplateLiteral",
+												"start": 1169,
+												"end": 1192,
+												"expressions": [
+													{
+														"type": "Literal",
+														"start": 1181,
+														"end": 1182,
+														"value": 1,
+														"raw": "1"
+													},
+													{
+														"type": "Literal",
+														"start": 1188,
+														"end": 1189,
+														"value": 2,
+														"raw": "2"
+													}
+												],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 1170,
+														"end": 1179,
+														"value": {
+															"raw": "\n\ta | b\n\t",
+															"cooked": "\n\ta | b\n\t"
+														},
+														"tail": false
+													},
+													{
+														"type": "TemplateElement",
+														"start": 1183,
+														"end": 1186,
+														"value": {
+															"raw": " | ",
+															"cooked": " | "
+														},
+														"tail": false
+													},
+													{
+														"type": "TemplateElement",
+														"start": 1190,
+														"end": 1191,
+														"value": {
+															"raw": "\n",
+															"cooked": "\n"
+														},
+														"tail": true
+													}
+												]
+											}
+										},
+										"arguments": [
+											{
+												"type": "Literal",
+												"start": 1197,
+												"end": 1283,
+												"value": "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+												"raw": "'abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
+											},
+											{
+												"type": "ArrowFunctionExpression",
+												"start": 1288,
+												"end": 1323,
+												"id": null,
+												"expression": false,
+												"generator": false,
+												"async": false,
+												"params": [
+													{
+														"type": "ObjectPattern",
+														"start": 1289,
+														"end": 1297,
+														"properties": [
+															{
+																"type": "Property",
+																"start": 1291,
+																"end": 1292,
+																"method": false,
+																"shorthand": true,
+																"computed": false,
+																"key": {
+																	"type": "Identifier",
+																	"start": 1291,
+																	"end": 1292,
+																	"name": "a"
+																},
+																"value": {
+																	"type": "Identifier",
+																	"start": 1291,
+																	"end": 1292,
+																	"name": "a"
+																},
+																"kind": "init"
+															},
+															{
+																"type": "Property",
+																"start": 1294,
+																"end": 1295,
+																"method": false,
+																"shorthand": true,
+																"computed": false,
+																"key": {
+																	"type": "Identifier",
+																	"start": 1294,
+																	"end": 1295,
+																	"name": "b"
+																},
+																"value": {
+																	"type": "Identifier",
+																	"start": 1294,
+																	"end": 1295,
+																	"name": "b"
+																},
+																"kind": "init"
+															}
+														]
+													}
+												],
+												"body": {
+													"type": "BlockStatement",
+													"start": 1302,
+													"end": 1323,
+													"body": [
+														{
+															"type": "ExpressionStatement",
+															"start": 1308,
+															"end": 1318,
+															"expression": {
+																"type": "CallExpression",
+																"start": 1308,
+																"end": 1317,
+																"callee": {
+																	"type": "Identifier",
+																	"start": 1308,
+																	"end": 1311,
+																	"name": "fn1"
+																},
+																"arguments": [
+																	{
+																		"type": "Identifier",
+																		"start": 1312,
+																		"end": 1313,
+																		"name": "a"
+																	},
+																	{
+																		"type": "Identifier",
+																		"start": 1315,
+																		"end": 1316,
+																		"name": "b"
+																	}
+																],
+																"optional": false
+															}
+														}
+													]
+												}
+											}
+										],
+										"optional": false
+									}
+								}
+							},
+							{
+								"type": "ReturnStatement",
+								"start": 1331,
+								"end": 1499,
+								"argument": {
+									"type": "CallExpression",
+									"start": 1338,
+									"end": 1498,
+									"callee": {
+										"type": "TaggedTemplateExpression",
+										"start": 1338,
+										"end": 1363,
+										"tag": {
+											"type": "Identifier",
+											"start": 1338,
+											"end": 1340,
+											"name": "fn"
+										},
+										"quasi": {
+											"type": "TemplateLiteral",
+											"start": 1340,
+											"end": 1363,
+											"expressions": [
+												{
+													"type": "Literal",
+													"start": 1352,
+													"end": 1353,
+													"value": 1,
+													"raw": "1"
+												},
+												{
+													"type": "Literal",
+													"start": 1359,
+													"end": 1360,
+													"value": 2,
+													"raw": "2"
+												}
+											],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 1341,
+													"end": 1350,
+													"value": {
+														"raw": "\n\ta | b\n\t",
+														"cooked": "\n\ta | b\n\t"
+													},
+													"tail": false
+												},
+												{
+													"type": "TemplateElement",
+													"start": 1354,
+													"end": 1357,
+													"value": {
+														"raw": " | ",
+														"cooked": " | "
+													},
+													"tail": false
+												},
+												{
+													"type": "TemplateElement",
+													"start": 1361,
+													"end": 1362,
+													"value": {
+														"raw": "\n",
+														"cooked": "\n"
+													},
+													"tail": true
+												}
+											]
+										}
+									},
+									"arguments": [
+										{
+											"type": "Literal",
+											"start": 1368,
+											"end": 1454,
+											"value": "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+											"raw": "'abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
+										},
+										{
+											"type": "ArrowFunctionExpression",
+											"start": 1459,
+											"end": 1494,
+											"id": null,
+											"expression": false,
+											"generator": false,
+											"async": false,
+											"params": [
+												{
+													"type": "ObjectPattern",
+													"start": 1460,
+													"end": 1468,
+													"properties": [
+														{
+															"type": "Property",
+															"start": 1462,
+															"end": 1463,
+															"method": false,
+															"shorthand": true,
+															"computed": false,
+															"key": {
+																"type": "Identifier",
+																"start": 1462,
+																"end": 1463,
+																"name": "a"
+															},
+															"value": {
+																"type": "Identifier",
+																"start": 1462,
+																"end": 1463,
+																"name": "a"
+															},
+															"kind": "init"
+														},
+														{
+															"type": "Property",
+															"start": 1465,
+															"end": 1466,
+															"method": false,
+															"shorthand": true,
+															"computed": false,
+															"key": {
+																"type": "Identifier",
+																"start": 1465,
+																"end": 1466,
+																"name": "b"
+															},
+															"value": {
+																"type": "Identifier",
+																"start": 1465,
+																"end": 1466,
+																"name": "b"
+															},
+															"kind": "init"
+														}
+													]
+												}
+											],
+											"body": {
+												"type": "BlockStatement",
+												"start": 1473,
+												"end": 1494,
+												"body": [
+													{
+														"type": "ExpressionStatement",
+														"start": 1479,
+														"end": 1489,
+														"expression": {
+															"type": "CallExpression",
+															"start": 1479,
+															"end": 1488,
+															"callee": {
+																"type": "Identifier",
+																"start": 1479,
+																"end": 1482,
+																"name": "fn1"
+															},
+															"arguments": [
+																{
+																	"type": "Identifier",
+																	"start": 1483,
+																	"end": 1484,
+																	"name": "a"
+																},
+																{
+																	"type": "Identifier",
+																	"start": 1486,
+																	"end": 1487,
+																	"name": "b"
+																}
+															],
+															"optional": false
+														}
+													}
+												]
+											}
+										}
+									],
+									"optional": false
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1504,
+					"end": 1675,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1504,
+						"end": 1674,
+						"callee": {
+							"type": "Identifier",
+							"start": 1504,
+							"end": 1507,
+							"name": "fn3"
+						},
+						"arguments": [
+							{
+								"type": "CallExpression",
+								"start": 1511,
+								"end": 1671,
+								"callee": {
+									"type": "TaggedTemplateExpression",
+									"start": 1511,
+									"end": 1536,
+									"tag": {
+										"type": "Identifier",
+										"start": 1511,
+										"end": 1513,
+										"name": "fn"
+									},
+									"quasi": {
+										"type": "TemplateLiteral",
+										"start": 1513,
+										"end": 1536,
+										"expressions": [
+											{
+												"type": "Literal",
+												"start": 1525,
+												"end": 1526,
+												"value": 1,
+												"raw": "1"
+											},
+											{
+												"type": "Literal",
+												"start": 1532,
+												"end": 1533,
+												"value": 2,
+												"raw": "2"
+											}
+										],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 1514,
+												"end": 1523,
+												"value": {
+													"raw": "\n\ta | b\n\t",
+													"cooked": "\n\ta | b\n\t"
+												},
+												"tail": false
+											},
+											{
+												"type": "TemplateElement",
+												"start": 1527,
+												"end": 1530,
+												"value": {
+													"raw": " | ",
+													"cooked": " | "
+												},
+												"tail": false
+											},
+											{
+												"type": "TemplateElement",
+												"start": 1534,
+												"end": 1535,
+												"value": {
+													"raw": "\n",
+													"cooked": "\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								},
+								"arguments": [
+									{
+										"type": "Literal",
+										"start": 1541,
+										"end": 1627,
+										"value": "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+										"raw": "'abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
+									},
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 1632,
+										"end": 1667,
+										"id": null,
+										"expression": false,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "ObjectPattern",
+												"start": 1633,
+												"end": 1641,
+												"properties": [
+													{
+														"type": "Property",
+														"start": 1635,
+														"end": 1636,
+														"method": false,
+														"shorthand": true,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 1635,
+															"end": 1636,
+															"name": "a"
+														},
+														"value": {
+															"type": "Identifier",
+															"start": 1635,
+															"end": 1636,
+															"name": "a"
+														},
+														"kind": "init"
+													},
+													{
+														"type": "Property",
+														"start": 1638,
+														"end": 1639,
+														"method": false,
+														"shorthand": true,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 1638,
+															"end": 1639,
+															"name": "b"
+														},
+														"value": {
+															"type": "Identifier",
+															"start": 1638,
+															"end": 1639,
+															"name": "b"
+														},
+														"kind": "init"
+													}
+												]
+											}
+										],
+										"body": {
+											"type": "BlockStatement",
+											"start": 1646,
+											"end": 1667,
+											"body": [
+												{
+													"type": "ExpressionStatement",
+													"start": 1652,
+													"end": 1662,
+													"expression": {
+														"type": "CallExpression",
+														"start": 1652,
+														"end": 1661,
+														"callee": {
+															"type": "Identifier",
+															"start": 1652,
+															"end": 1655,
+															"name": "fn1"
+														},
+														"arguments": [
+															{
+																"type": "Identifier",
+																"start": 1656,
+																"end": 1657,
+																"name": "a"
+															},
+															{
+																"type": "Identifier",
+																"start": 1659,
+																"end": 1660,
+																"name": "b"
+															}
+														],
+														"optional": false
+													}
+												}
+											]
+										}
+									}
+								],
+								"optional": false
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1677,
+					"end": 1858,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1683,
+							"end": 1857,
+							"id": {
+								"type": "Identifier",
+								"start": 1683,
+								"end": 1686,
+								"name": "a02"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 1689,
+								"end": 1857,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "CallExpression",
+									"start": 1697,
+									"end": 1857,
+									"callee": {
+										"type": "TaggedTemplateExpression",
+										"start": 1697,
+										"end": 1722,
+										"tag": {
+											"type": "Identifier",
+											"start": 1697,
+											"end": 1699,
+											"name": "fn"
+										},
+										"quasi": {
+											"type": "TemplateLiteral",
+											"start": 1699,
+											"end": 1722,
+											"expressions": [
+												{
+													"type": "Literal",
+													"start": 1711,
+													"end": 1712,
+													"value": 1,
+													"raw": "1"
+												},
+												{
+													"type": "Literal",
+													"start": 1718,
+													"end": 1719,
+													"value": 2,
+													"raw": "2"
+												}
+											],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 1700,
+													"end": 1709,
+													"value": {
+														"raw": "\n\ta | b\n\t",
+														"cooked": "\n\ta | b\n\t"
+													},
+													"tail": false
+												},
+												{
+													"type": "TemplateElement",
+													"start": 1713,
+													"end": 1716,
+													"value": {
+														"raw": " | ",
+														"cooked": " | "
+													},
+													"tail": false
+												},
+												{
+													"type": "TemplateElement",
+													"start": 1720,
+													"end": 1721,
+													"value": {
+														"raw": "\n",
+														"cooked": "\n"
+													},
+													"tail": true
+												}
+											]
+										}
+									},
+									"arguments": [
+										{
+											"type": "Literal",
+											"start": 1727,
+											"end": 1813,
+											"value": "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+											"raw": "'abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
+										},
+										{
+											"type": "ArrowFunctionExpression",
+											"start": 1818,
+											"end": 1853,
+											"id": null,
+											"expression": false,
+											"generator": false,
+											"async": false,
+											"params": [
+												{
+													"type": "ObjectPattern",
+													"start": 1819,
+													"end": 1827,
+													"properties": [
+														{
+															"type": "Property",
+															"start": 1821,
+															"end": 1822,
+															"method": false,
+															"shorthand": true,
+															"computed": false,
+															"key": {
+																"type": "Identifier",
+																"start": 1821,
+																"end": 1822,
+																"name": "a"
+															},
+															"value": {
+																"type": "Identifier",
+																"start": 1821,
+																"end": 1822,
+																"name": "a"
+															},
+															"kind": "init"
+														},
+														{
+															"type": "Property",
+															"start": 1824,
+															"end": 1825,
+															"method": false,
+															"shorthand": true,
+															"computed": false,
+															"key": {
+																"type": "Identifier",
+																"start": 1824,
+																"end": 1825,
+																"name": "b"
+															},
+															"value": {
+																"type": "Identifier",
+																"start": 1824,
+																"end": 1825,
+																"name": "b"
+															},
+															"kind": "init"
+														}
+													]
+												}
+											],
+											"body": {
+												"type": "BlockStatement",
+												"start": 1832,
+												"end": 1853,
+												"body": [
+													{
+														"type": "ExpressionStatement",
+														"start": 1838,
+														"end": 1848,
+														"expression": {
+															"type": "CallExpression",
+															"start": 1838,
+															"end": 1847,
+															"callee": {
+																"type": "Identifier",
+																"start": 1838,
+																"end": 1841,
+																"name": "fn1"
+															},
+															"arguments": [
+																{
+																	"type": "Identifier",
+																	"start": 1842,
+																	"end": 1843,
+																	"name": "a"
+																},
+																{
+																	"type": "Identifier",
+																	"start": 1845,
+																	"end": 1846,
+																	"name": "b"
+																}
+															],
+															"optional": false
+														}
+													}
+												]
+											}
+										}
+									],
+									"optional": false
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1860,
+					"end": 2043,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1866,
+							"end": 2042,
+							"id": {
+								"type": "Identifier",
+								"start": 1866,
+								"end": 1869,
+								"name": "a03"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 1872,
+								"end": 2042,
+								"properties": [
+									{
+										"type": "Property",
+										"start": 1876,
+										"end": 2039,
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 1876,
+											"end": 1877,
+											"name": "c"
+										},
+										"value": {
+											"type": "CallExpression",
+											"start": 1879,
+											"end": 2039,
+											"callee": {
+												"type": "TaggedTemplateExpression",
+												"start": 1879,
+												"end": 1904,
+												"tag": {
+													"type": "Identifier",
+													"start": 1879,
+													"end": 1881,
+													"name": "fn"
+												},
+												"quasi": {
+													"type": "TemplateLiteral",
+													"start": 1881,
+													"end": 1904,
+													"expressions": [
+														{
+															"type": "Literal",
+															"start": 1893,
+															"end": 1894,
+															"value": 1,
+															"raw": "1"
+														},
+														{
+															"type": "Literal",
+															"start": 1900,
+															"end": 1901,
+															"value": 2,
+															"raw": "2"
+														}
+													],
+													"quasis": [
+														{
+															"type": "TemplateElement",
+															"start": 1882,
+															"end": 1891,
+															"value": {
+																"raw": "\n\ta | b\n\t",
+																"cooked": "\n\ta | b\n\t"
+															},
+															"tail": false
+														},
+														{
+															"type": "TemplateElement",
+															"start": 1895,
+															"end": 1898,
+															"value": {
+																"raw": " | ",
+																"cooked": " | "
+															},
+															"tail": false
+														},
+														{
+															"type": "TemplateElement",
+															"start": 1902,
+															"end": 1903,
+															"value": {
+																"raw": "\n",
+																"cooked": "\n"
+															},
+															"tail": true
+														}
+													]
+												}
+											},
+											"arguments": [
+												{
+													"type": "Literal",
+													"start": 1909,
+													"end": 1995,
+													"value": "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+													"raw": "'abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
+												},
+												{
+													"type": "ArrowFunctionExpression",
+													"start": 2000,
+													"end": 2035,
+													"id": null,
+													"expression": false,
+													"generator": false,
+													"async": false,
+													"params": [
+														{
+															"type": "ObjectPattern",
+															"start": 2001,
+															"end": 2009,
+															"properties": [
+																{
+																	"type": "Property",
+																	"start": 2003,
+																	"end": 2004,
+																	"method": false,
+																	"shorthand": true,
+																	"computed": false,
+																	"key": {
+																		"type": "Identifier",
+																		"start": 2003,
+																		"end": 2004,
+																		"name": "a"
+																	},
+																	"value": {
+																		"type": "Identifier",
+																		"start": 2003,
+																		"end": 2004,
+																		"name": "a"
+																	},
+																	"kind": "init"
+																},
+																{
+																	"type": "Property",
+																	"start": 2006,
+																	"end": 2007,
+																	"method": false,
+																	"shorthand": true,
+																	"computed": false,
+																	"key": {
+																		"type": "Identifier",
+																		"start": 2006,
+																		"end": 2007,
+																		"name": "b"
+																	},
+																	"value": {
+																		"type": "Identifier",
+																		"start": 2006,
+																		"end": 2007,
+																		"name": "b"
+																	},
+																	"kind": "init"
+																}
+															]
+														}
+													],
+													"body": {
+														"type": "BlockStatement",
+														"start": 2014,
+														"end": 2035,
+														"body": [
+															{
+																"type": "ExpressionStatement",
+																"start": 2020,
+																"end": 2030,
+																"expression": {
+																	"type": "CallExpression",
+																	"start": 2020,
+																	"end": 2029,
+																	"callee": {
+																		"type": "Identifier",
+																		"start": 2020,
+																		"end": 2023,
+																		"name": "fn1"
+																	},
+																	"arguments": [
+																		{
+																			"type": "Identifier",
+																			"start": 2024,
+																			"end": 2025,
+																			"name": "a"
+																		},
+																		{
+																			"type": "Identifier",
+																			"start": 2027,
+																			"end": 2028,
+																			"name": "b"
+																		}
+																	],
+																	"optional": false
+																}
+															}
+														]
+													}
+												}
+											],
+											"optional": false
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2063,
+					"end": 2238,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2063,
+						"end": 2237,
+						"callee": {
+							"type": "TaggedTemplateExpression",
+							"start": 2063,
+							"end": 2099,
+							"tag": {
+								"type": "MemberExpression",
+								"start": 2063,
+								"end": 2070,
+								"object": {
+									"type": "Identifier",
+									"start": 2063,
+									"end": 2065,
+									"name": "it"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 2066,
+									"end": 2070,
+									"name": "each"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"quasi": {
+								"type": "TemplateLiteral",
+								"start": 2070,
+								"end": 2099,
+								"expressions": [
+									{
+										"type": "Literal",
+										"start": 2087,
+										"end": 2088,
+										"value": 1,
+										"raw": "1"
+									},
+									{
+										"type": "Literal",
+										"start": 2094,
+										"end": 2095,
+										"value": 2,
+										"raw": "2"
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 2071,
+										"end": 2085,
+										"value": {
+											"raw": "\n\t\ta    | b\n\t\t",
+											"cooked": "\n\t\ta    | b\n\t\t"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 2089,
+										"end": 2092,
+										"value": {
+											"raw": " | ",
+											"cooked": " | "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 2096,
+										"end": 2098,
+										"value": {
+											"raw": "\n\t",
+											"cooked": "\n\t"
+										},
+										"tail": true
+									}
+								]
+							}
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 2103,
+								"end": 2185,
+								"value": "returns $b when the value is $a and the other options are left at their defaults",
+								"raw": "'returns $b when the value is $a and the other options are left at their defaults'"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 2189,
+								"end": 2234,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "ObjectPattern",
+										"start": 2190,
+										"end": 2198,
+										"properties": [
+											{
+												"type": "Property",
+												"start": 2192,
+												"end": 2193,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 2192,
+													"end": 2193,
+													"name": "a"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 2192,
+													"end": 2193,
+													"name": "a"
+												},
+												"kind": "init"
+											},
+											{
+												"type": "Property",
+												"start": 2195,
+												"end": 2196,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 2195,
+													"end": 2196,
+													"name": "b"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 2195,
+													"end": 2196,
+													"name": "b"
+												},
+												"kind": "init"
+											}
+										]
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 2203,
+									"end": 2234,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 2208,
+											"end": 2230,
+											"expression": {
+												"type": "CallExpression",
+												"start": 2208,
+												"end": 2229,
+												"callee": {
+													"type": "MemberExpression",
+													"start": 2208,
+													"end": 2226,
+													"object": {
+														"type": "CallExpression",
+														"start": 2208,
+														"end": 2221,
+														"callee": {
+															"type": "Identifier",
+															"start": 2208,
+															"end": 2214,
+															"name": "expect"
+														},
+														"arguments": [
+															{
+																"type": "CallExpression",
+																"start": 2215,
+																"end": 2220,
+																"callee": {
+																	"type": "Identifier",
+																	"start": 2215,
+																	"end": 2217,
+																	"name": "fn"
+																},
+																"arguments": [
+																	{
+																		"type": "Identifier",
+																		"start": 2218,
+																		"end": 2219,
+																		"name": "a"
+																	}
+																],
+																"optional": false
+															}
+														],
+														"optional": false
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 2222,
+														"end": 2226,
+														"name": "toBe"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 2227,
+														"end": 2228,
+														"name": "b"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a test table",
+							"start": 2046,
+							"end": 2061
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2408,
+					"end": 2636,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2408,
+						"end": 2635,
+						"callee": {
+							"type": "CallExpression",
+							"start": 2408,
+							"end": 2525,
+							"callee": {
+								"type": "Identifier",
+								"start": 2408,
+								"end": 2409,
+								"name": "f"
+							},
+							"arguments": [
+								{
+									"type": "Literal",
+									"start": 2413,
+									"end": 2461,
+									"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+									"raw": "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'"
+								},
+								{
+									"type": "Literal",
+									"start": 2465,
+									"end": 2522,
+									"value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+									"raw": "'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
+								}
+							],
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 2526,
+								"end": 2613,
+								"value": "ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+								"raw": "'ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt'"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 2615,
+								"end": 2634,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 2621,
+									"end": 2634,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 2625,
+											"end": 2631,
+											"expression": {
+												"type": "CallExpression",
+												"start": 2625,
+												"end": 2630,
+												"callee": {
+													"type": "Identifier",
+													"start": 2625,
+													"end": 2628,
+													"name": "fn1"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a curried call whose callee call breaks: the arguments are measured from its closing line",
+							"start": 2241,
+							"end": 2333
+						},
+						{
+							"type": "Line",
+							"value": " the callee's arguments broken by width, the hugged head at 100 chars",
+							"start": 2335,
+							"end": 2406
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2711,
+					"end": 2949,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2711,
+						"end": 2948,
+						"callee": {
+							"type": "CallExpression",
+							"start": 2711,
+							"end": 2828,
+							"callee": {
+								"type": "Identifier",
+								"start": 2711,
+								"end": 2712,
+								"name": "f"
+							},
+							"arguments": [
+								{
+									"type": "Literal",
+									"start": 2716,
+									"end": 2764,
+									"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+									"raw": "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'"
+								},
+								{
+									"type": "Literal",
+									"start": 2768,
+									"end": 2825,
+									"value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+									"raw": "'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
+								}
+							],
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 2832,
+								"end": 2920,
+								"value": "tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+								"raw": "'tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt'"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 2924,
+								"end": 2945,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 2930,
+									"end": 2945,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 2935,
+											"end": 2941,
+											"expression": {
+												"type": "CallExpression",
+												"start": 2935,
+												"end": 2940,
+												"callee": {
+													"type": "Identifier",
+													"start": 2935,
+													"end": 2938,
+													"name": "fn1"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the callee's arguments broken by width, the hugged head at 101 chars",
+							"start": 2638,
+							"end": 2709
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 3005,
+					"end": 3147,
+					"expression": {
+						"type": "CallExpression",
+						"start": 3005,
+						"end": 3146,
+						"callee": {
+							"type": "CallExpression",
+							"start": 3005,
+							"end": 3037,
+							"callee": {
+								"type": "Identifier",
+								"start": 3005,
+								"end": 3007,
+								"name": "fn"
+							},
+							"arguments": [
+								{
+									"type": "FunctionExpression",
+									"start": 3008,
+									"end": 3036,
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 3020,
+										"end": 3036,
+										"body": [
+											{
+												"type": "ReturnStatement",
+												"start": 3024,
+												"end": 3033,
+												"argument": {
+													"type": "Literal",
+													"start": 3031,
+													"end": 3032,
+													"value": 2,
+													"raw": "2"
+												}
+											}
+										]
+									}
+								}
+							],
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 3038,
+								"end": 3124,
+								"value": "tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+								"raw": "'tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt'"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 3126,
+								"end": 3145,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 3132,
+									"end": 3145,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 3136,
+											"end": 3142,
+											"expression": {
+												"type": "CallExpression",
+												"start": 3136,
+												"end": 3141,
+												"callee": {
+													"type": "Identifier",
+													"start": 3136,
+													"end": 3139,
+													"name": "fn1"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a function argument, the hugged head at 100 chars",
+							"start": 2951,
+							"end": 3003
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 3203,
+					"end": 3355,
+					"expression": {
+						"type": "CallExpression",
+						"start": 3203,
+						"end": 3354,
+						"callee": {
+							"type": "CallExpression",
+							"start": 3203,
+							"end": 3235,
+							"callee": {
+								"type": "Identifier",
+								"start": 3203,
+								"end": 3205,
+								"name": "fn"
+							},
+							"arguments": [
+								{
+									"type": "FunctionExpression",
+									"start": 3206,
+									"end": 3234,
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 3218,
+										"end": 3234,
+										"body": [
+											{
+												"type": "ReturnStatement",
+												"start": 3222,
+												"end": 3231,
+												"argument": {
+													"type": "Literal",
+													"start": 3229,
+													"end": 3230,
+													"value": 2,
+													"raw": "2"
+												}
+											}
+										]
+									}
+								}
+							],
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 3239,
+								"end": 3326,
+								"value": "ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+								"raw": "'ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt'"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 3330,
+								"end": 3351,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 3336,
+									"end": 3351,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 3341,
+											"end": 3347,
+											"expression": {
+												"type": "CallExpression",
+												"start": 3341,
+												"end": 3346,
+												"callee": {
+													"type": "Identifier",
+													"start": 3341,
+													"end": 3344,
+													"name": "fn1"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a function argument, the hugged head at 101 chars",
+							"start": 3149,
+							"end": 3201
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 3421,
+					"end": 3547,
+					"expression": {
+						"type": "CallExpression",
+						"start": 3421,
+						"end": 3546,
+						"callee": {
+							"type": "CallExpression",
+							"start": 3421,
+							"end": 3435,
+							"callee": {
+								"type": "Identifier",
+								"start": 3421,
+								"end": 3423,
+								"name": "fn"
+							},
+							"arguments": [
+								{
+									"type": "TemplateLiteral",
+									"start": 3424,
+									"end": 3434,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 3425,
+											"end": 3433,
+											"value": {
+												"raw": "\n\ta | b\n",
+												"cooked": "\n\ta | b\n"
+											},
+											"tail": true
+										}
+									]
+								}
+							],
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 3436,
+								"end": 3524,
+								"value": "tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+								"raw": "'tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt'"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 3526,
+								"end": 3545,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 3532,
+									"end": 3545,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 3536,
+											"end": 3542,
+											"expression": {
+												"type": "CallExpression",
+												"start": 3536,
+												"end": 3541,
+												"callee": {
+													"type": "Identifier",
+													"start": 3536,
+													"end": 3539,
+													"name": "fn1"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a multiline template argument, the hugged head at 100 chars",
+							"start": 3357,
+							"end": 3419
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 3613,
+					"end": 3749,
+					"expression": {
+						"type": "CallExpression",
+						"start": 3613,
+						"end": 3748,
+						"callee": {
+							"type": "CallExpression",
+							"start": 3613,
+							"end": 3627,
+							"callee": {
+								"type": "Identifier",
+								"start": 3613,
+								"end": 3615,
+								"name": "fn"
+							},
+							"arguments": [
+								{
+									"type": "TemplateLiteral",
+									"start": 3616,
+									"end": 3626,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 3617,
+											"end": 3625,
+											"value": {
+												"raw": "\n\ta | b\n",
+												"cooked": "\n\ta | b\n"
+											},
+											"tail": true
+										}
+									]
+								}
+							],
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 3631,
+								"end": 3720,
+								"value": "ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+								"raw": "'ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt'"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 3724,
+								"end": 3745,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 3730,
+									"end": 3745,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 3735,
+											"end": 3741,
+											"expression": {
+												"type": "CallExpression",
+												"start": 3735,
+												"end": 3740,
+												"callee": {
+													"type": "Identifier",
+													"start": 3735,
+													"end": 3738,
+													"name": "fn1"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a multiline template argument, the hugged head at 101 chars",
+							"start": 3549,
+							"end": 3611
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 3845,
+					"end": 3912,
+					"expression": {
+						"type": "CallExpression",
+						"start": 3845,
+						"end": 3911,
+						"callee": {
+							"type": "TaggedTemplateExpression",
+							"start": 3845,
+							"end": 3870,
+							"tag": {
+								"type": "Identifier",
+								"start": 3845,
+								"end": 3847,
+								"name": "fn"
+							},
+							"quasi": {
+								"type": "TemplateLiteral",
+								"start": 3847,
+								"end": 3870,
+								"expressions": [
+									{
+										"type": "Literal",
+										"start": 3859,
+										"end": 3860,
+										"value": 1,
+										"raw": "1"
+									},
+									{
+										"type": "Literal",
+										"start": 3866,
+										"end": 3867,
+										"value": 2,
+										"raw": "2"
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 3848,
+										"end": 3857,
+										"value": {
+											"raw": "\n\ta | b\n\t",
+											"cooked": "\n\ta | b\n\t"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 3861,
+										"end": 3864,
+										"value": {
+											"raw": " | ",
+											"cooked": " | "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 3868,
+										"end": 3869,
+										"value": {
+											"raw": "\n",
+											"cooked": "\n"
+										},
+										"tail": true
+									}
+								]
+							}
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 3871,
+								"end": 3877,
+								"value": "text",
+								"raw": "'text'"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 3879,
+								"end": 3910,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "ObjectPattern",
+										"start": 3880,
+										"end": 3888,
+										"properties": [
+											{
+												"type": "Property",
+												"start": 3882,
+												"end": 3883,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 3882,
+													"end": 3883,
+													"name": "a"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 3882,
+													"end": 3883,
+													"name": "a"
+												},
+												"kind": "init"
+											},
+											{
+												"type": "Property",
+												"start": 3885,
+												"end": 3886,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 3885,
+													"end": 3886,
+													"name": "b"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 3885,
+													"end": 3886,
+													"name": "b"
+												},
+												"kind": "init"
+											}
+										]
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 3893,
+									"end": 3910,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 3897,
+											"end": 3907,
+											"expression": {
+												"type": "CallExpression",
+												"start": 3897,
+												"end": 3906,
+												"callee": {
+													"type": "Identifier",
+													"start": 3897,
+													"end": 3900,
+													"name": "fn1"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 3901,
+														"end": 3902,
+														"name": "a"
+													},
+													{
+														"type": "Identifier",
+														"start": 3904,
+														"end": 3905,
+														"name": "b"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " controls: a head that fits, an object, a one-line template, a broken non-template callee",
+							"start": 3752,
+							"end": 3843
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 3914,
+					"end": 4060,
+					"expression": {
+						"type": "CallExpression",
+						"start": 3914,
+						"end": 4059,
+						"callee": {
+							"type": "TaggedTemplateExpression",
+							"start": 3914,
+							"end": 3939,
+							"tag": {
+								"type": "Identifier",
+								"start": 3914,
+								"end": 3916,
+								"name": "fn"
+							},
+							"quasi": {
+								"type": "TemplateLiteral",
+								"start": 3916,
+								"end": 3939,
+								"expressions": [
+									{
+										"type": "Literal",
+										"start": 3928,
+										"end": 3929,
+										"value": 1,
+										"raw": "1"
+									},
+									{
+										"type": "Literal",
+										"start": 3935,
+										"end": 3936,
+										"value": 2,
+										"raw": "2"
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 3917,
+										"end": 3926,
+										"value": {
+											"raw": "\n\ta | b\n\t",
+											"cooked": "\n\ta | b\n\t"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 3930,
+										"end": 3933,
+										"value": {
+											"raw": " | ",
+											"cooked": " | "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 3937,
+										"end": 3938,
+										"value": {
+											"raw": "\n",
+											"cooked": "\n"
+										},
+										"tail": true
+									}
+								]
+							}
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 3940,
+								"end": 4025,
+								"value": "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+								"raw": "'abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
+							},
+							{
+								"type": "ObjectExpression",
+								"start": 4027,
+								"end": 4058,
+								"properties": [
+									{
+										"type": "Property",
+										"start": 4031,
+										"end": 4041,
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 4031,
+											"end": 4041,
+											"name": "aaaaaaaaaa"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 4031,
+											"end": 4041,
+											"name": "aaaaaaaaaa"
+										},
+										"kind": "init"
+									},
+									{
+										"type": "Property",
+										"start": 4045,
+										"end": 4055,
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 4045,
+											"end": 4055,
+											"name": "bbbbbbbbbb"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 4045,
+											"end": 4055,
+											"name": "bbbbbbbbbb"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 4062,
+					"end": 4188,
+					"expression": {
+						"type": "CallExpression",
+						"start": 4062,
+						"end": 4187,
+						"callee": {
+							"type": "TaggedTemplateExpression",
+							"start": 4062,
+							"end": 4071,
+							"tag": {
+								"type": "Identifier",
+								"start": 4062,
+								"end": 4064,
+								"name": "fn"
+							},
+							"quasi": {
+								"type": "TemplateLiteral",
+								"start": 4064,
+								"end": 4071,
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 4065,
+										"end": 4070,
+										"value": {
+											"raw": "a | b",
+											"cooked": "a | b"
+										},
+										"tail": true
+									}
+								]
+							}
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 4075,
+								"end": 4147,
+								"value": "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+								"raw": "'abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 4151,
+								"end": 4184,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "ObjectPattern",
+										"start": 4152,
+										"end": 4160,
+										"properties": [
+											{
+												"type": "Property",
+												"start": 4154,
+												"end": 4155,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 4154,
+													"end": 4155,
+													"name": "a"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 4154,
+													"end": 4155,
+													"name": "a"
+												},
+												"kind": "init"
+											},
+											{
+												"type": "Property",
+												"start": 4157,
+												"end": 4158,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 4157,
+													"end": 4158,
+													"name": "b"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 4157,
+													"end": 4158,
+													"name": "b"
+												},
+												"kind": "init"
+											}
+										]
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 4165,
+									"end": 4184,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 4170,
+											"end": 4180,
+											"expression": {
+												"type": "CallExpression",
+												"start": 4170,
+												"end": 4179,
+												"callee": {
+													"type": "Identifier",
+													"start": 4170,
+													"end": 4173,
+													"name": "fn1"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 4174,
+														"end": 4175,
+														"name": "a"
+													},
+													{
+														"type": "Identifier",
+														"start": 4177,
+														"end": 4178,
+														"name": "b"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 4190,
+					"end": 4313,
+					"expression": {
+						"type": "CallExpression",
+						"start": 4190,
+						"end": 4312,
+						"callee": {
+							"type": "CallExpression",
+							"start": 4190,
+							"end": 4205,
+							"callee": {
+								"type": "Identifier",
+								"start": 4190,
+								"end": 4192,
+								"name": "fn"
+							},
+							"arguments": [
+								{
+									"type": "ObjectExpression",
+									"start": 4193,
+									"end": 4204,
+									"properties": [
+										{
+											"type": "Property",
+											"start": 4197,
+											"end": 4201,
+											"method": false,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 4197,
+												"end": 4198,
+												"name": "a"
+											},
+											"value": {
+												"type": "Literal",
+												"start": 4200,
+												"end": 4201,
+												"value": 1,
+												"raw": "1"
+											},
+											"kind": "init"
+										}
+									]
+								}
+							],
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 4206,
+								"end": 4278,
+								"value": "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+								"raw": "'abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 4280,
+								"end": 4311,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "ObjectPattern",
+										"start": 4281,
+										"end": 4289,
+										"properties": [
+											{
+												"type": "Property",
+												"start": 4283,
+												"end": 4284,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 4283,
+													"end": 4284,
+													"name": "a"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 4283,
+													"end": 4284,
+													"name": "a"
+												},
+												"kind": "init"
+											},
+											{
+												"type": "Property",
+												"start": 4286,
+												"end": 4287,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 4286,
+													"end": 4287,
+													"name": "b"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 4286,
+													"end": 4287,
+													"name": "b"
+												},
+												"kind": "init"
+											}
+										]
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 4294,
+									"end": 4311,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 4298,
+											"end": 4308,
+											"expression": {
+												"type": "CallExpression",
+												"start": 4298,
+												"end": 4307,
+												"callee": {
+													"type": "Identifier",
+													"start": 4298,
+													"end": 4301,
+													"name": "fn1"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 4302,
+														"end": 4303,
+														"name": "a"
+													},
+													{
+														"type": "Identifier",
+														"start": 4305,
+														"end": 4306,
+														"name": "b"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

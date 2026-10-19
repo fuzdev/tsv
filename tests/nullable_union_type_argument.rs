@@ -10,11 +10,12 @@
 //! unbreakable form; an arrow-function variable's annotation, which prettier opts out of the
 //! rule; a line already over print width before the `<`; a value wrapped around the call; the
 //! after-`=` break taken on the line up to the call's `(`, at its print width boundary; a value
-//! whose layout is chosen between forms from the unbroken `<>` (a longer member chain, a
-//! hugging last argument); a breakable binding or type-parameter list ahead of the `=`,
-//! which stays whole while its line fits up to the `=`; and either layout nested in an
-//! enclosing group (an `if` body, a call argument, an arrow body, an object property, a
-//! type position), which leaves that group on one line while it fits.
+//! whose layout is chosen between forms from the unbroken `<>` (a longer member chain); a
+//! hugging last argument, whose forms leave the `<>` outside the choice; a breakable binding
+//! or type-parameter list ahead of the `=`, which stays whole while its line fits up to the
+//! `=`; and either layout nested in an enclosing group (an `if` body, a call argument, an
+//! arrow body, an object property, a type position), which leaves that group on one line
+//! while it fits.
 //! The over-width rows are tsv's own fixed point, not a prettier claim (prettier leaves the
 //! line over print width there); the rows saying "prettier's form" are prettier's fixed point.
 
@@ -167,10 +168,24 @@ const CASES: &[(&str, &str)] = &[
         "const x = fn<Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb | null>(null).then(y).catch(z).finally(w);\n",
         "const x =\n\tfn<\n\t\tBbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb | null\n\t>(null)\n\t\t.then(y)\n\t\t.catch(z)\n\t\t.finally(w);\n",
     ),
-    // ... as does a call whose last argument hugs (prettier's form, but for the `<>`)
+    // a call whose last argument hugs keeps the `=` line as a call with any other argument does,
+    // the `<>` broken inside and the hug taken after the broken `>` as after any broken
+    // type-argument list (prettier breaks after the `=` and leaves the `<>` line over width)
     (
         "const x = useState<Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb | null>({ aaaaaaaaaaaa: 1, bbbbbbbbbbbbbbbbbbbbb: 2, cccccccccccccccccccccc: 3, dddddddddddddddddd: 4, eeeeeeeeeeeeee: 5 });\n",
-        "const x =\n\tuseState<\n\t\tBbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb | null\n\t>(\n\t\t{\n\t\t\taaaaaaaaaaaa: 1,\n\t\t\tbbbbbbbbbbbbbbbbbbbbb: 2,\n\t\t\tcccccccccccccccccccccc: 3,\n\t\t\tdddddddddddddddddd: 4,\n\t\t\teeeeeeeeeeeeee: 5\n\t\t}\n\t);\n",
+        "const x = useState<\n\tBbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb | null\n>({\n\taaaaaaaaaaaa: 1,\n\tbbbbbbbbbbbbbbbbbbbbb: 2,\n\tcccccccccccccccccccccc: 3,\n\tdddddddddddddddddd: 4,\n\teeeeeeeeeeeeee: 5\n});\n",
+    ),
+    // a lone nullable union past print width breaks inside the `<>` and the last argument hugs
+    // after the `>`: at statement position (prettier leaves the `<>` line over width and breaks
+    // the argument out) ...
+    (
+        "fn<AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA | null>({ a: 1 });\n",
+        "fn<\n\tAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA | null\n>({ a: 1 });\n",
+    ),
+    // ... and after the `=`, which stays on the `=` line as the hugging call above does
+    (
+        "const a = fn<AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA | null>({ a: 1 });\n",
+        "const a = fn<\n\tAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA | null\n>({ a: 1 });\n",
     ),
     // the member access past a call keeps the `=` line, as the call alone does ...
     (

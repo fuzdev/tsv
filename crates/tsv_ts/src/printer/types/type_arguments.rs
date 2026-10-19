@@ -271,8 +271,8 @@ impl<'a> Printer<'a> {
     /// after-operator layout's fallback states, whose fit test must see the `<…>`
     /// open. `None` when no build of that list is found in `value_doc`, or
     /// when one cannot be swapped (`replace_subdoc` declines a path through a keyed
-    /// group, and through a conditional group — a member chain's or a hugging last
-    /// argument's layouts, chosen from the unbroken `<…>`).
+    /// group, and through a conditional group — a member chain's layouts, chosen from the
+    /// unbroken `<…>`; a call's argument ladders sit after the callee, outside that path).
     pub(in crate::printer) fn value_with_nullable_union_broken(
         &self,
         value_doc: DocId,

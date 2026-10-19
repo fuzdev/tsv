@@ -570,6 +570,7 @@ Standalone head wrap + dangle + body-expand:
 - `{#await}` — [await_long](../tests/fixtures/svelte/blocks/await/long_prettier_divergence/)
 - `{#key}` — [key_long](../tests/fixtures/svelte/blocks/key/long_prettier_divergence/)
 - `{#if}` (binary / member chain / call / `{:else if}`) — [if_long](../tests/fixtures/svelte/blocks/if/long_prettier_divergence/)
+- `{#if}` call with wrapped type arguments (the last argument hugs after the `>`) — [if_type_args_long](../tests/fixtures/svelte/blocks/if/type_args_long_prettier_divergence/)
 - `{#if}` last block quirk — [last_block](../tests/fixtures/svelte/blocks/if/last_block_prettier_divergence/)
 
 The shape is keyed on **that the head broke, not on why**: tsv's block head hugs its first

@@ -8,7 +8,8 @@
 
 use super::arg_comments::{any_comment_forces_expansion_slice, last_arg_has_comments};
 use super::arg_predicates::{
-    arrow_body_is_call_through_non_null, is_array_or_object_unwrapped, is_ternary_arrow_body,
+    arrow_body_breaks_after_space, arrow_body_is_call_through_non_null,
+    is_array_or_object_unwrapped, is_ternary_arrow_body,
 };
 use super::arg_wrapping::{
     ArgOpener, arrow_body_expands_internally, arrow_hug_refused_by_comments, build_args_split_last,
@@ -99,7 +100,7 @@ pub(super) fn try_expand_last_arg(
     if arguments.len() < 2 {
         return None;
     }
-    let opener = ArgOpener::Callee(callee);
+    let opener = ArgOpener::callee(d, callee);
 
     let last_arg = arguments.last().copied();
     let last_is_function = matches!(
@@ -278,6 +279,7 @@ pub(super) fn try_expand_last_arg(
                 &head_parts,
                 sig_doc,
                 body_doc,
+                arrow_body_breaks_after_space(printer, arrow, body_expr),
                 last_arg_doc,
                 all_args_broken,
             ));

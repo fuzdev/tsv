@@ -23,6 +23,20 @@
 			? aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 			: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb;
 
+	// call argument: same rule under `=>`, every argument broken out
+	fn(
+		'x',
+		(a) =>
+			/* c1 */
+			aaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb + cccccccccccccccccccccccccc
+	);
+
+	// call argument hugged on the call's line, its body below `=>`
+	fn('tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt', (a) =>
+		/* c1 */
+		gg(a, b)
+	);
+
 	// a glued run the author broke after: the run holds the line
 	const s =
 		/* c1 */ /* c2 */

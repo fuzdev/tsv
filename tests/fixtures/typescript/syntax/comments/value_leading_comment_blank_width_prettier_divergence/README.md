@@ -23,7 +23,10 @@ const u =
 
 `unformatted_comment_on_head.svelte` is the single-newline authoring, which both formatters
 normalize to input; `unformatted_ours_blank.svelte` adds the blank, which only tsv normalizes
-to input. The type-alias union is the same rule at a seam whose union arm already reached it.
+to input. The type-alias union is the same rule at a seam whose union arm already reached it, and
+the two call-argument cases (`fn('x', (a) => /* c1 */⏎⏎body)`, every argument broken out or the
+arrow hugged on the call's line) are the arrow-body rule where the arrow is an argument: the
+body already sits below `=>`, so the comment keeps its own line and the blank yields.
 
 The blank may also sit **between** two comments, the last glued to the value
 (`= /* c1 */⏎⏎/* c2 */ v`): the break is then the first comment's, and it yields the same way —

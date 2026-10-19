@@ -1,0 +1,400 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 727,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 27,
+				"end": 29,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 29,
+				"end": 726,
+				"name": "div",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 34,
+							"end": 36,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 36,
+							"end": 133,
+							"data": " call whose type arguments wrap: the last argument hugs after the >, then )} (divergence) "
+						},
+						{
+							"type": "Text",
+							"start": 133,
+							"end": 135,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "IfBlock",
+							"elseif": false,
+							"start": 135,
+							"end": 271,
+							"test": {
+								"type": "CallExpression",
+								"start": 140,
+								"end": 259,
+								"callee": {
+									"type": "Identifier",
+									"start": 140,
+									"end": 142,
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "ObjectExpression",
+										"start": 250,
+										"end": 258,
+										"properties": [
+											{
+												"type": "Property",
+												"start": 252,
+												"end": 256,
+												"method": false,
+												"shorthand": false,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 252,
+													"end": 253,
+													"name": "a"
+												},
+												"value": {
+													"type": "Literal",
+													"start": 255,
+													"end": 256,
+													"value": 1,
+													"raw": "1"
+												},
+												"kind": "init"
+											}
+										]
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 142,
+									"end": 249,
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 146,
+											"end": 213,
+											"typeName": {
+												"type": "Identifier",
+												"start": 146,
+												"end": 213,
+												"name": "Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 217,
+											"end": 246,
+											"typeName": {
+												"type": "Identifier",
+												"start": 217,
+												"end": 246,
+												"name": "Bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+											}
+										}
+									]
+								}
+							},
+							"consequent": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 260,
+										"end": 266,
+										"raw": "\n\t\tz\n\t",
+										"data": "\n\t\tz\n\t"
+									}
+								]
+							},
+							"alternate": null
+						},
+						{
+							"type": "Text",
+							"start": 271,
+							"end": 273,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 273,
+							"end": 365,
+							"data": " >( ends at column 100: the type arguments fit, the arguments break out (divergence) "
+						},
+						{
+							"type": "Text",
+							"start": 365,
+							"end": 367,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "IfBlock",
+							"elseif": false,
+							"start": 367,
+							"end": 491,
+							"test": {
+								"type": "CallExpression",
+								"start": 372,
+								"end": 479,
+								"callee": {
+									"type": "Identifier",
+									"start": 372,
+									"end": 374,
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "ObjectExpression",
+										"start": 468,
+										"end": 476,
+										"properties": [
+											{
+												"type": "Property",
+												"start": 470,
+												"end": 474,
+												"method": false,
+												"shorthand": false,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 470,
+													"end": 471,
+													"name": "a"
+												},
+												"value": {
+													"type": "Literal",
+													"start": 473,
+													"end": 474,
+													"value": 1,
+													"raw": "1"
+												},
+												"kind": "init"
+											}
+										]
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 374,
+									"end": 464,
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 375,
+											"end": 432,
+											"typeName": {
+												"type": "Identifier",
+												"start": 375,
+												"end": 432,
+												"name": "Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 434,
+											"end": 463,
+											"typeName": {
+												"type": "Identifier",
+												"start": 434,
+												"end": 463,
+												"name": "Bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+											}
+										}
+									]
+								}
+							},
+							"consequent": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 480,
+										"end": 486,
+										"raw": "\n\t\tz\n\t",
+										"data": "\n\t\tz\n\t"
+									}
+								]
+							},
+							"alternate": null
+						},
+						{
+							"type": "Text",
+							"start": 491,
+							"end": 493,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 493,
+							"end": 590,
+							"data": " >( would end at column 101: the type arguments wrap, the last argument hugs (divergence) "
+						},
+						{
+							"type": "Text",
+							"start": 590,
+							"end": 592,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "IfBlock",
+							"elseif": false,
+							"start": 592,
+							"end": 719,
+							"test": {
+								"type": "CallExpression",
+								"start": 597,
+								"end": 707,
+								"callee": {
+									"type": "Identifier",
+									"start": 597,
+									"end": 599,
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "ObjectExpression",
+										"start": 698,
+										"end": 706,
+										"properties": [
+											{
+												"type": "Property",
+												"start": 700,
+												"end": 704,
+												"method": false,
+												"shorthand": false,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 700,
+													"end": 701,
+													"name": "a"
+												},
+												"value": {
+													"type": "Literal",
+													"start": 703,
+													"end": 704,
+													"value": 1,
+													"raw": "1"
+												},
+												"kind": "init"
+											}
+										]
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 599,
+									"end": 697,
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 603,
+											"end": 661,
+											"typeName": {
+												"type": "Identifier",
+												"start": 603,
+												"end": 661,
+												"name": "Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 665,
+											"end": 694,
+											"typeName": {
+												"type": "Identifier",
+												"start": 665,
+												"end": 694,
+												"name": "Bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+											}
+										}
+									]
+								}
+							},
+							"consequent": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 708,
+										"end": 714,
+										"raw": "\n\t\tz\n\t",
+										"data": "\n\t\tz\n\t"
+									}
+								]
+							},
+							"alternate": null
+						},
+						{
+							"type": "Text",
+							"start": 719,
+							"end": 720,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 27,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 18,
+			"body": [],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

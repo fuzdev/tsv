@@ -2,8 +2,10 @@
 
 use crate::ast::internal::{self, Expression, ExpressionKind, TSType};
 use crate::printer::Printer;
-use crate::printer::needs_parens::strip_non_null_wrappers;
+use crate::printer::expressions::functions::arrow_token_end;
+use crate::printer::needs_parens::{leftmost_no_lookahead, strip_non_null_wrappers};
 use crate::printer::types::helpers::{is_simple_type, unwrap_parenthesized};
+use tsv_lang::source_scan::has_newline_after_position;
 
 /// Prettier's `isBooleanTypeCoercion` (`utilities/is-boolean-type-coercion.js`): a plain
 /// `Boolean(x)` call — the `!!x` coercion spelled as a call.
@@ -315,6 +317,40 @@ pub(super) fn arrow_body_is_call_through_non_null(body: &Expression<'_>) -> bool
 /// Call expressions, objects, and arrays are handled by other code paths.
 pub(super) fn is_ternary_arrow_body(body: &Expression<'_>) -> bool {
     matches!(body.kind, ExpressionKind::ConditionalExpression(_))
+}
+
+/// Whether an arrow's expression body breaks after `=>` with the space before it that a
+/// `fits` measurement counts ([`super::arg_wrapping`]'s break-body state): prettier's
+/// `shouldAddParensIfNotBreak` — a ternary whose leftmost token is not an object literal,
+/// printed `" ", group([ifBreak("", "("), indent([softline, body]), …])` — and only while the
+/// body stays on the `=>` line, which a comment ending its line refuses
+/// ([`arrow_body_has_leading_own_line_comment`]).
+pub(super) fn arrow_body_breaks_after_space(
+    printer: &Printer<'_>,
+    arrow: &internal::ArrowFunctionExpression<'_>,
+    body: &Expression<'_>,
+) -> bool {
+    is_ternary_arrow_body(body)
+        && !matches!(
+            leftmost_no_lookahead(body).kind,
+            ExpressionKind::ObjectExpression(_)
+        )
+        && !arrow_body_has_leading_own_line_comment(printer, arrow, body)
+}
+
+/// Whether a comment in an arrow's `=>`→body gap ends its line — prettier's
+/// `hasLeadingOwnLineComment(text, body)` (a leading comment with a newline after it), the
+/// conjunct of `shouldPutBodyOnSameLine` that sends the body to `indent([line, body])`, with
+/// no space after `=>` (`(a) => /* c */⏎a ? b : c`). The break-body states measure their
+/// `=>` line by it ([`arrow_body_breaks_after_space`] and the lone ternary ladder).
+pub(super) fn arrow_body_has_leading_own_line_comment(
+    printer: &Printer<'_>,
+    arrow: &internal::ArrowFunctionExpression<'_>,
+    body: &Expression<'_>,
+) -> bool {
+    printer
+        .comments_in_source_between(arrow_token_end(arrow), body.span().start)
+        .any(|c| has_newline_after_position(printer.source, c.span.end))
 }
 
 /// Whether an expression is an object literal with properties — the narrow

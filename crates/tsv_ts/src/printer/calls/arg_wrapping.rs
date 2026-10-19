@@ -14,8 +14,9 @@ use super::arg_comments::{
     emit_first_arg_leading_comments, emit_last_arg_trailing_comments,
 };
 use super::arg_predicates::{
-    arrow_body_is_call_through_non_null, is_block_function, is_react_hook_call_with_deps_array,
-    is_short_second_arg_for_expand_first, is_ternary_arrow_body,
+    arrow_body_has_leading_own_line_comment, arrow_body_is_call_through_non_null,
+    is_block_function, is_react_hook_call_with_deps_array, is_short_second_arg_for_expand_first,
+    is_ternary_arrow_body,
 };
 use crate::ast::internal;
 use crate::printer::expressions::functions::{
@@ -163,8 +164,7 @@ pub(super) fn build_hugged_arrow_sig_doc(
 }
 
 /// Prepend any comments between arrow `=>` and body expression to `body_doc`, for a state
-/// that puts the body BELOW `=>` (`(sig =>\n  body,\n)`) or collapses to such a state on the
-/// doc's forced break.
+/// that puts the body BELOW `=>` (`(sig =>\n  body,\n)`).
 ///
 /// When call argument paths build `sig_doc` and `body_doc` separately, comments between
 /// `=>` and the body are not part of either doc. This finds them and prepends to
@@ -178,14 +178,34 @@ pub(super) fn prepend_arrow_body_comments(
 ) -> DocId {
     let arrow_end = arrow_token_end(arrow);
 
-    // A run the author broke AFTER keeps its breaks before a body that breaks — by a hard
-    // break of its own, or by a multi-line comment in the run — exactly as the arrow's own
-    // arms answer it (`Printer::break_or_hang_after_operator_run_doc`). The body sits below
-    // `=>` in every state this doc reaches, so the forced emitter is the rendering the run
-    // needs; glued, it welded the run onto the body (`/* x */ /* y */ fn(`).
-    if let Some(run) = printer.broke_after_value_leading_run(arrow_end, body_start)
-        && printer.broke_after_run_break_is_forced(&run, body_doc)
+    // A run the author broke AFTER keeps that break. The body sits below `=>` in every state
+    // this doc reaches, and there prettier's leading comment that ends its line
+    // (`hasLeadingOwnLineComment`) prints the `line` after it in the group the `=>` break
+    // broke, so it breaks too (`(a) =>⏎\t/* c */⏎\ta ? b : c`) — whatever the body does,
+    // where the arrow's own arms ask whether the break is forced
+    // (`Printer::break_or_hang_after_operator_run_doc`) because their body may stay on the
+    // `=>` line. Glued, the run welded onto the body (`/* c */ a ? b : c`), a form the next
+    // pass reads as a comment that does not end its line — and measures the `=>` line
+    // differently ([`arrow_body_has_leading_own_line_comment`]).
+    //
+    // The author blank after the run answers as at every other arrow host (the default
+    // layout's dispatch, `Printer::build_arrow_expression_body`'s non-hug arms): a run no
+    // comment of which owns its line ([`Printer::value_gap_soft_broke_after_run`]) whose
+    // break is not forced ([`Printer::broke_after_run_break_is_forced`]) takes the soft
+    // half ([`Printer::push_leading_run_with_soft_line`]), whose `line` yields the blank.
+    // Here that `line` always renders broken — its group is pre-broken, since this state
+    // already put the body below `=>` — so the comment keeps its own line and the blank
+    // goes, as `const v = (a) => /* c */⏎⏎body` does. A forced break, or a comment that
+    // owns its line, takes the forced emitter, which keeps the blank.
+    if let Some(run) = printer.value_gap_soft_broke_after_run(arrow_end, body_start)
+        && !printer.broke_after_run_break_is_forced(&run, body_doc)
     {
+        let d = printer.d();
+        let mut parts = DocBuf::new();
+        printer.push_leading_run_with_soft_line(&mut parts, &run);
+        return d.concat(&[d.group_break(d.concat(&parts)), body_doc]);
+    }
+    if let Some(run) = printer.broke_after_value_leading_run(arrow_end, body_start) {
         return printer.leading_run_before_breaking_value_doc(&run, body_start, body_doc);
     }
     prepend_hugged_arrow_body_comments(printer, arrow, body_start, body_doc)
@@ -221,7 +241,7 @@ pub(super) fn prepend_hugged_arrow_body_comments(
 /// plain-call and `new` printers hold a bare callee doc rather than an opener.
 #[inline]
 pub(super) fn wrap_call_with_soft_breaks(d: &DocArena, callee: DocId, args: DocId) -> DocId {
-    ArgOpener::Callee(callee).wrap_soft(d, args)
+    ArgOpener::callee(d, callee).wrap_soft(d, args)
 }
 
 /// The callee spelling of [`ArgOpener::wrap_hard_broken`], kept as a free function for the
@@ -237,7 +257,7 @@ pub(super) fn wrap_call_with_hard_breaks_paren_line(
     paren_line: &[DocId],
     args: DocId,
 ) -> DocId {
-    ArgOpener::Callee(callee).wrap_hard_broken(d, paren_line, args)
+    ArgOpener::callee(d, callee).wrap_hard_broken(d, paren_line, args)
 }
 
 /// Wrap arguments with a `will_break` guard: if any arg contains hardlines
@@ -971,16 +991,13 @@ fn build_arrow_gap_break_state(
     head_parts: &[DocId],
     last_arg_doc: DocId,
 ) -> DocId {
-    opener.after_callee(
-        d,
-        d.group_break(d.concat(&[
-            opener.open_text(d),
-            d.concat(head_parts),
-            d.group_break(last_arg_doc),
-            d.softline(),
-            d.text(")"),
-        ])),
-    )
+    d.group_break(d.concat(&[
+        opener.open,
+        d.concat(head_parts),
+        d.group_break(last_arg_doc),
+        d.softline(),
+        d.text(")"),
+    ]))
 }
 
 /// The own-line-post-arrow **ladder**: that state, then `allArgsBrokenOut()`.
@@ -1011,10 +1028,13 @@ fn build_arrow_gap_break_ladder(
     expanded_last_arg_doc: DocId,
     all_args_broken: DocId,
 ) -> DocId {
-    d.conditional_group(&[
-        build_arrow_gap_break_state(d, opener, head_parts, expanded_last_arg_doc),
-        opener.expand_all(d, all_args_broken),
-    ])
+    opener.ladder(
+        d,
+        &[
+            build_arrow_gap_break_state(d, opener, head_parts, expanded_last_arg_doc),
+            opener.expand_all_state(d, all_args_broken),
+        ],
+    )
 }
 
 /// The two printings [`build_arrow_gap_break_ladder`]'s states read, for the two
@@ -1197,7 +1217,7 @@ pub(super) fn build_single_container_arg_doc(
 ) -> DocId {
     let d = printer.d();
     let arg_doc = printer.build_expression_doc(arg);
-    ArgOpener::Callee(callee).lone_hug_ladder(d, arg_doc, false)
+    ArgOpener::callee(d, callee).lone_hug_ladder(d, arg_doc, false)
 }
 
 /// Prettier's `lastArg` — the hugged argument printed with `expandLastArg: true`, the
@@ -1421,96 +1441,127 @@ fn build_single_arrow_arg_states(
     body_expands_internally: bool,
 ) -> DocId {
     if !body_expands_internally {
-        return d.conditional_group(&[
-            opener.inline(d, &[], docs.expanded),
-            opener.break_out(d, docs.printed),
-        ]);
+        return opener.ladder(
+            d,
+            &[
+                opener.inline(d, &[], docs.expanded),
+                opener.break_out_state(d, docs.printed),
+            ],
+        );
     }
     opener.inline_hug_or_expand_all(d, &[], docs.expanded, docs.printed)
 }
 
-/// What an argument-state doc opens with, in the two spellings the printers genuinely
-/// disagree on — and the ONLY thing they disagree on, which is why every ladder below takes
-/// one of these rather than being written twice.
+/// What an argument layout opens with, and the callee it follows.
 ///
-/// The plain-call and `new` printers return a doc that carries the callee, so each state adds
-/// the `(` itself. The member chain's callee is a separate group the chain printer places, so
-/// its argument doc starts at the paren and the `?.(` optional spelling rides in the same
-/// string.
+/// The printers disagree on exactly one thing here: whether the argument doc carries the
+/// callee. The plain-call and `new` printers return a doc that does ([`Self::callee`]); the
+/// member chain's callee is a separate group the chain printer places, so its argument doc
+/// starts at the paren and the `?.(` optional spelling rides in the opening text
+/// ([`Self::chain`]). Every ladder below takes one of these rather than being written twice.
+///
+/// ⚠️ **The callee is outside every state.** Prettier prints a call as
+/// `[callee, typeArgs, printCallArguments()]`, and the `conditionalGroup` its argument
+/// ladders build covers the arguments alone — so a state is measured from the `(`, wherever
+/// the callee left the line. Each layout here builds its states from [`Self::open`] and
+/// places the callee once, in front of the whole layout ([`Self::after_callee`]). A callee
+/// written into each state instead was measured as part of it: the fits walk then stopped
+/// at the callee's first break — a width-broken type-argument list
+/// (`calls/type_args_broken_last_arg_hug_long`), a multiline tagged template
+/// (`calls/tagged_template_callee_multiline_last_arg_long`) — and judged the state on a line
+/// the arguments never print on.
 #[derive(Clone, Copy)]
-pub(super) enum ArgOpener {
+pub(super) struct ArgOpener {
     /// The whole head the `(` follows — for `new` that includes the keyword and type
-    /// arguments.
-    Callee(DocId),
-    /// The chain's own `(` / `?.(`, as the doc the chain built where its spelling is a
-    /// literal.
-    ChainPrefix(DocId),
+    /// arguments. `None` for the member chain, and for a layout built to sit inside another
+    /// layout's states ([`Self::args_only`]).
+    callee: Option<DocId>,
+    /// The opening delimiter: `(`, or the chain's own `(` / `?.(` as the doc the chain built.
+    open: DocId,
 }
 
 impl ArgOpener {
-    /// The opening delimiter's own text — `(` for a callee spelling, the chain's `(` / `?.(`.
+    /// The plain-call and `new` spelling: `callee(`.
     #[inline]
-    fn open_text(self, d: &DocArena) -> DocId {
-        match self {
-            Self::Callee(_) => d.text("("),
-            Self::ChainPrefix(prefix) => prefix,
+    pub(super) fn callee(d: &DocArena, callee: DocId) -> Self {
+        Self {
+            callee: Some(callee),
+            open: d.text("("),
         }
     }
 
-    /// Everything an argument state opens with, callee included — the head a reassembling
-    /// state (a signature, a hugged body) is written straight after.
-    ///
-    /// [`Self::after_callee`] over [`Self::open_text`], for the states that build a flat run
-    /// rather than wrapping a group: there is nothing here for the callee to stay outside
-    /// of. Only the once-per-construct reassembling states take it — [`Self::flat`], which
-    /// is measured on every call-argument list in the document, spells the two arms out
-    /// instead, because a wrapper node there is paid every time.
+    /// The member chain's spelling: its `(` / `?.(`, with no callee in the doc.
     #[inline]
-    fn open_prefix(self, d: &DocArena) -> DocId {
-        self.after_callee(d, self.open_text(d))
-    }
-
-    /// Place `doc` after the callee this spelling carries, if any. The callee stays **outside**
-    /// whatever group `doc` is — its own groups measure themselves, and a hardline in the
-    /// callee must not force the argument list open.
-    #[inline]
-    fn after_callee(self, d: &DocArena, doc: DocId) -> DocId {
-        match self {
-            Self::Callee(callee) => d.concat(&[callee, doc]),
-            Self::ChainPrefix(_) => doc,
+    pub(super) fn chain(prefix: DocId) -> Self {
+        Self {
+            callee: None,
+            open: prefix,
         }
     }
 
-    /// `opener(before after)` — a whole argument list on one line, as two already-built
-    /// halves.
+    /// The same opener without its callee — for an argument layout one of the ladders below
+    /// takes as a STATE, which must not carry the callee the ladder places outside it.
+    #[inline]
+    pub(super) fn args_only(self) -> Self {
+        Self {
+            callee: None,
+            open: self.open,
+        }
+    }
+
+    /// Place `layout` after the callee this opener carries, if any. The callee stays
+    /// **outside** whatever `layout` is — its own groups measure themselves, a hardline in
+    /// the callee must not force the argument list open, and a state of the layout is
+    /// measured from the `(` (see the type's doc).
+    #[inline]
+    pub(super) fn after_callee(self, d: &DocArena, layout: DocId) -> DocId {
+        match self.callee {
+            Some(callee) => d.concat(&[callee, layout]),
+            None => layout,
+        }
+    }
+
+    /// A ladder: the states, measured from the `(`, behind the callee.
+    #[inline]
+    fn ladder(self, d: &DocArena, states: &[DocId]) -> DocId {
+        self.after_callee(d, d.conditional_group(states))
+    }
+
+    /// `(before after)` — a whole argument list on one line, as two already-built halves.
     ///
     /// The one flat-run spelling, which both ladders' first states are: the expand-LAST
     /// family passes its head arguments and the last one ([`Self::inline`]), the
     /// expand-FIRST family the first argument and its tail
-    /// ([`Self::expand_first_state`]) — the same run, pivoting at opposite ends.
-    ///
-    /// The two arms are spelled out here rather than composed from [`Self::open_prefix`]:
-    /// this is built for every call-argument list in the document, so the run stays FLAT
-    /// and allocates no buffer.
+    /// ([`Self::expand_first_state`]) — the same run, pivoting at opposite ends. Built for
+    /// every call-argument list in the document, so the run stays flat and allocates no
+    /// buffer.
     #[inline]
     fn flat(self, d: &DocArena, before: DocId, after: DocId) -> DocId {
-        match self {
-            Self::Callee(callee) => d.concat(&[callee, d.text("("), before, after, d.text(")")]),
-            Self::ChainPrefix(prefix) => d.concat(&[prefix, before, after, d.text(")")]),
-        }
+        d.concat(&[self.open, before, after, d.text(")")])
     }
 
-    /// `opener(head_parts last_arg)` — the expand-LAST families' flat state.
+    /// `(head_parts last_arg)` — the expand-LAST families' flat state.
     #[inline]
     fn inline(self, d: &DocArena, head_parts: &[DocId], last_arg_doc: DocId) -> DocId {
         self.flat(d, d.concat(head_parts), last_arg_doc)
     }
 
-    /// The hug: head arguments inline, the last one broken open
+    /// The hug state: head arguments inline, the last one broken open
     /// (prettier's `group(lastArg, { shouldBreak: true })`).
     #[inline]
     fn hug(self, d: &DocArena, head_parts: &[DocId], last_arg_doc: DocId) -> DocId {
         self.inline(d, head_parts, d.group_break(last_arg_doc))
+    }
+
+    /// The LONE argument on its own line, as a state ([`Self::break_out`]).
+    #[inline]
+    fn break_out_state(self, d: &DocArena, printed: DocId) -> DocId {
+        d.concat(&[
+            self.open,
+            d.indent(d.concat(&[d.softline(), printed])),
+            d.softline(),
+            d.text(")"),
+        ])
     }
 
     /// The LONE argument on its own line, with SOFT lines rather than [`Self::expand_all`]'s
@@ -1521,12 +1572,7 @@ impl ArgOpener {
     /// callback's parameter list multiline).
     #[inline]
     pub(super) fn break_out(self, d: &DocArena, printed: DocId) -> DocId {
-        d.concat(&[
-            self.open_prefix(d),
-            d.indent(d.concat(&[d.softline(), printed])),
-            d.softline(),
-            d.text(")"),
-        ])
+        self.after_callee(d, self.break_out_state(d, printed))
     }
 
     /// The ladder for a LONE huggable argument, in prettier's own shape: flat, hugged with the
@@ -1559,23 +1605,26 @@ impl ArgOpener {
         }
     }
 
-    /// Prettier's `allArgsBrokenOut()` — every argument on its own line.
+    /// Prettier's `allArgsBrokenOut()` as a state.
     ///
     /// Wrapped in `group_break` to force break mode, matching prettier's
     /// `group(contents, { shouldBreak: true })`. Without the group the `line`s would inherit
     /// the enclosing mode and render as spaces wherever that mode is Flat — which a short
     /// chain measured inside assignment layout's `fits()` really is.
     #[inline]
+    fn expand_all_state(self, d: &DocArena, all_args_broken: DocId) -> DocId {
+        d.group_break(d.concat(&[
+            self.open,
+            d.indent(d.concat(&[d.line(), all_args_broken])),
+            d.line(),
+            d.text(")"),
+        ]))
+    }
+
+    /// Prettier's `allArgsBrokenOut()` — every argument on its own line — as the whole layout.
+    #[inline]
     pub(super) fn expand_all(self, d: &DocArena, all_args_broken: DocId) -> DocId {
-        self.after_callee(
-            d,
-            d.group_break(d.concat(&[
-                self.open_text(d),
-                d.indent(d.concat(&[d.line(), all_args_broken])),
-                d.line(),
-                d.text(")"),
-            ])),
-        )
+        self.after_callee(d, self.expand_all_state(d, all_args_broken))
     }
 
     /// Prettier's `if (headArgs.some(willBreak)) return allArgsBrokenOut()`, the one guard
@@ -1598,14 +1647,14 @@ impl ArgOpener {
             .then(|| self.expand_all(d, all_args_broken))
     }
 
-    /// Soft-break wrapping: `opener(args)` collapses to one line when it fits and breaks its
+    /// Soft-break wrapping: `callee(args)` collapses to one line when it fits and breaks its
     /// own parens when it does not. The default argument-list layout in every printer.
     #[inline]
     pub(super) fn wrap_soft(self, d: &DocArena, args: DocId) -> DocId {
         self.after_callee(
             d,
             d.group(d.concat(&[
-                self.open_text(d),
+                self.open,
                 d.indent_softline(args),
                 d.softline(),
                 d.text(")"),
@@ -1622,7 +1671,7 @@ impl ArgOpener {
     pub(super) fn hug_arg(self, d: &DocArena, arg: DocId) -> DocId {
         self.after_callee(
             d,
-            d.group(d.concat(&[self.open_text(d), arg, d.softline(), d.text(")")])),
+            d.group(d.concat(&[self.open, arg, d.softline(), d.text(")")])),
         )
     }
 
@@ -1639,10 +1688,13 @@ impl ArgOpener {
         last_arg_doc: DocId,
         all_args_broken: DocId,
     ) -> DocId {
-        d.conditional_group(&[
-            self.inline(d, head_parts, last_arg_doc),
-            self.expand_all(d, all_args_broken),
-        ])
+        self.ladder(
+            d,
+            &[
+                self.inline(d, head_parts, last_arg_doc),
+                self.expand_all_state(d, all_args_broken),
+            ],
+        )
     }
 
     /// The three-state ladder for a **different-type** expand-last argument:
@@ -1679,21 +1731,27 @@ impl ArgOpener {
         all_args_broken: DocId,
     ) -> DocId {
         if d.will_break(last_arg_doc) {
-            return d.conditional_group(&[
-                self.hug(d, head_parts, last_arg_doc),
-                self.expand_all(d, all_args_broken),
-            ]);
+            return self.ladder(
+                d,
+                &[
+                    self.hug(d, head_parts, last_arg_doc),
+                    self.expand_all_state(d, all_args_broken),
+                ],
+            );
         }
-        d.conditional_group(&[
-            self.inline(d, head_parts, last_arg_doc),
-            self.hug(d, head_parts, last_arg_doc),
-            self.expand_all(d, all_args_broken),
-        ])
+        self.ladder(
+            d,
+            &[
+                self.inline(d, head_parts, last_arg_doc),
+                self.hug(d, head_parts, last_arg_doc),
+                self.expand_all_state(d, all_args_broken),
+            ],
+        )
     }
 
-    /// One expand-FIRST state: `opener(first_arg tail)` — [`Self::flat`] pivoted at the
-    /// other end, with the argument that may open in the FIRST position and the rest of
-    /// the list riding flat behind it.
+    /// One expand-FIRST state: `(first_arg tail)` — [`Self::flat`] pivoted at the other end,
+    /// with the argument that may open in the FIRST position and the rest of the list riding
+    /// flat behind it.
     #[inline]
     fn expand_first_state(self, d: &DocArena, first_arg_doc: DocId, tail: DocId) -> DocId {
         self.flat(d, first_arg_doc, tail)
@@ -1711,7 +1769,8 @@ impl ArgOpener {
     /// argument list, and a two-state ladder would take the last state there instead.
     /// State 2 is not optional either — without it a first argument with nothing of its
     /// own to break (`() => {}`) holds an over-width line forever, which is the shape this
-    /// ladder replaced.
+    /// ladder replaced. `all_args_broken` is that state whole, built through
+    /// [`Self::args_only`] so it carries no callee of its own.
     ///
     /// A first argument that already carries a forced break (the usual block body) simply
     /// falls out of state 0 onto state 1, so no pre-check screens for one, and prettier's
@@ -1728,14 +1787,17 @@ impl ArgOpener {
         tail: DocId,
         all_args_broken: DocId,
     ) -> DocId {
-        d.conditional_group(&[
-            self.expand_first_state(d, first_arg_doc, tail),
-            self.expand_first_state(d, d.group_break(first_arg_doc), tail),
-            all_args_broken,
-        ])
+        self.ladder(
+            d,
+            &[
+                self.expand_first_state(d, first_arg_doc, tail),
+                self.expand_first_state(d, d.group_break(first_arg_doc), tail),
+                all_args_broken,
+            ],
+        )
     }
 
-    /// The always-multiline argument layout: `opener(⏎\targs⏎)`, with the
+    /// The always-multiline argument layout: `callee(⏎\targs⏎)`, with the
     /// `(`→first-argument gap's same-line comment run injected on the `(` line when there
     /// is one (`fn( // c⏎\targs⏎)`).
     ///
@@ -1744,21 +1806,21 @@ impl ArgOpener {
     /// following break to flush against, and any argument printed onto that line would be
     /// swallowed by the comment.
     ///
-    /// Nothing here wraps the callee, so a hardline inside it (a multiline array, say)
-    /// cannot force the arguments open — the args make their own flat/break decision. The
-    /// soft counterpart is [`Self::wrap_soft`]. No trailing comma is emitted
+    /// The callee stays outside, so a hardline inside it (a multiline array, say) cannot
+    /// force the arguments open — the args make their own flat/break decision. The soft
+    /// counterpart is [`Self::wrap_soft`]. No trailing comma is emitted
     /// (`trailingComma: 'none'`).
     #[inline]
     fn wrap_hard_broken(self, d: &DocArena, paren_line: &[DocId], args: DocId) -> DocId {
         // One flat concat rather than a nest of them: the run is short and fixed, and this
         // layout is reached once per forced-expansion construct.
         let mut parts: DocBuf = DocBuf::new();
-        parts.push(self.open_prefix(d));
+        parts.push(self.open);
         parts.extend(paren_line.iter().copied());
         parts.push(d.indent_hardline(args));
         parts.push(d.hardline());
         parts.push(d.text(")"));
-        d.concat(&parts)
+        self.after_callee(d, d.concat(&parts))
     }
 }
 
@@ -1876,10 +1938,8 @@ pub(super) fn build_expand_first_arg_doc(
         );
     }
 
-    let all_args_broken =
-        || build_call_args_expanded(printer, opener, arguments, paren_open, call_end);
     if tail_parts.iter().any(|&id| d.will_break(id)) {
-        return all_args_broken();
+        return build_call_args_expanded(printer, opener, arguments, paren_open, call_end);
     }
 
     // The first argument can expand internally; the tail stays on its closing line — and
@@ -1888,7 +1948,7 @@ pub(super) fn build_expand_first_arg_doc(
         d,
         first_arg_doc,
         d.concat(&tail_parts),
-        all_args_broken(),
+        build_call_args_expanded(printer, opener.args_only(), arguments, paren_open, call_end),
     )
 }
 
@@ -1906,6 +1966,13 @@ pub(super) fn last_two_args_same_type(args: &[&internal::Expression<'_>]) -> boo
 ///
 /// Layout: `opener + head_parts + sig => \n  body\n)` — the head arguments stay inline and
 /// only the last argument's body breaks after its `=>`.
+///
+/// `conditional_body` keeps the space after `=>` that a ternary body's break leaves at the
+/// line end, which the renderer trims but a `fits` measurement counts: prettier prints such a
+/// body as `" ", group([ifBreak("", "("), indent([softline, body]), …])`
+/// (`printArrowFunctionBody`'s `shouldAddParensIfNotBreak` arm), so a `…, (a) =>` line of
+/// exactly the print width does not fit there. Every other body breaks with no space
+/// (`indent([line, body])`).
 #[inline]
 fn build_break_body_state(
     d: &DocArena,
@@ -1913,16 +1980,25 @@ fn build_break_body_state(
     head_parts: &[DocId],
     sig_doc: DocId,
     body_doc: DocId,
+    conditional_body: bool,
 ) -> DocId {
     d.concat(&[
-        opener.open_prefix(d),
+        opener.open,
         d.concat(head_parts),
         sig_doc,
-        d.text(" =>"),
+        d.text(arrow_before_broken_body(conditional_body)),
         d.indent_hardline(body_doc),
         d.hardline(),
         d.text(")"),
     ])
+}
+
+/// The `=>` an arrow argument prints ahead of a body that breaks onto the next line: with the
+/// trailing space for a ternary body ([`build_break_body_state`]), which the renderer trims at
+/// the break but a `fits` measurement of the `=>` line counts.
+#[inline]
+const fn arrow_before_broken_body(conditional_body: bool) -> &'static str {
+    if conditional_body { " => " } else { " =>" }
 }
 
 /// The expand-last ladder for a last argument that is an expression arrow whose body BREAKS
@@ -1940,19 +2016,25 @@ fn build_break_body_state(
 ///
 /// `sig_doc` is [`build_hugged_arrow_sig_doc`]'s: `None` for a signature that refuses the
 /// hug, which leaves only the all-broken-out state, prettier's `ArgExpansionBailout`.
+/// `conditional_body` is whether the body is a ternary ([`build_break_body_state`]).
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the ladder's pieces are each the caller's own; a struct would only rename them"
+)]
 pub(super) fn build_break_body_ladder(
     d: &DocArena,
     opener: ArgOpener,
     head_parts: &[DocId],
     sig_doc: Option<DocId>,
     body_doc: DocId,
+    conditional_body: bool,
     last_arg_doc: DocId,
     all_args_broken: DocId,
 ) -> DocId {
-    let state_expand_all = opener.expand_all(d, all_args_broken);
     let Some(sig_doc) = sig_doc else {
-        return state_expand_all;
+        return opener.expand_all(d, all_args_broken);
     };
+    let state_expand_all = opener.expand_all_state(d, all_args_broken);
     if d.will_break(last_arg_doc) {
         // A break the body does not carry is the signature's own — a comment in an empty
         // parameter list, the one forced break a hugged signature keeps
@@ -1960,23 +2042,31 @@ pub(super) fn build_break_body_ladder(
         // (`group(lastArg, { shouldBreak: true })`), so the comment keeps its line and the
         // body decides its own break below it; the break-body state would force one.
         let state_hug = if d.will_break(body_doc) {
-            build_break_body_state(d, opener, head_parts, sig_doc, body_doc)
+            build_break_body_state(d, opener, head_parts, sig_doc, body_doc, conditional_body)
         } else {
             opener.hug(d, head_parts, last_arg_doc)
         };
-        return d.conditional_group(&[state_hug, state_expand_all]);
+        return opener.ladder(d, &[state_hug, state_expand_all]);
     }
-    let state_break_body = build_break_body_state(d, opener, head_parts, sig_doc, body_doc);
-    d.conditional_group(&[
-        opener.inline(d, head_parts, last_arg_doc),
-        state_break_body,
-        state_expand_all,
-    ])
+    let state_break_body =
+        build_break_body_state(d, opener, head_parts, sig_doc, body_doc, conditional_body);
+    opener.ladder(
+        d,
+        &[
+            opener.inline(d, head_parts, last_arg_doc),
+            state_break_body,
+            state_expand_all,
+        ],
+    )
 }
 
 /// The three-state ladder a **lone** arrow argument with a TERNARY body selects among:
 /// flat with the grammar-clarifying parens (`map((x) => (x ? y : z))`), the body broken after
-/// `=>` with the parens dropped, then the whole signature indented onto its own line.
+/// `=>` with the parens dropped, then the argument on its own line — whole when it fits there
+/// (`map(⏎\t(x) => (x ? y : z)⏎)`), its body broken after `=>` too when it does not. The break
+/// state's `=>` line is measured with the space a ternary body leaves
+/// ([`arrow_before_broken_body`]), so a `map((x) =>` line of exactly the print width breaks
+/// the argument out as prettier does.
 ///
 /// The third parallel copy of this sat one per printer. What a caller owns is its `opener`
 /// and its signature and body docs. A forced break in the BODY collapses the ladder to the
@@ -1994,48 +2084,71 @@ pub(super) fn build_break_body_ladder(
 ///
 /// `flat_pair` is whether the flat state takes those parens: a body a comma-list region
 /// leaves bare ([`Printer::arrow_body_takes_ternary_pair`]) keeps the ladder's layout and
-/// prints flat as written.
+/// prints flat as written. The break state's `=>` line counts no space when a comment in the
+/// `=>`→body gap ends its line ([`arrow_body_has_leading_own_line_comment`]): prettier then
+/// breaks the body below `=>` with none.
 pub(super) fn build_ternary_arrow_hug_ladder(
-    d: &DocArena,
+    printer: &Printer<'_>,
     opener: ArgOpener,
+    arrow: &internal::ArrowFunctionExpression<'_>,
+    body_expr: &internal::Expression<'_>,
     sig_doc: DocId,
     body_doc: DocId,
-    flat_pair: bool,
 ) -> DocId {
-    let prefix = opener.open_prefix(d);
+    let d = printer.d();
+    let flat_pair = printer.arrow_body_takes_ternary_pair(body_expr);
+    let prefix = opener.open;
+    let body_start = body_expr.span().start;
+    // The `=>`→body gap's comments, composed per state: glued where the body stays on the
+    // `=>` line, a run the author broke after keeping its line where the body sits below
+    // ([`prepend_arrow_body_comments`]).
+    let body_below = prepend_arrow_body_comments(printer, arrow, body_start, body_doc);
+    let body_doc = prepend_hugged_arrow_body_comments(printer, arrow, body_start, body_doc);
+    // The arrow with its body broken after `=>`, whose measured `=>` line keeps the space a
+    // ternary body's break leaves ([`arrow_before_broken_body`]).
+    let arrow_before = arrow_before_broken_body(!arrow_body_has_leading_own_line_comment(
+        printer, arrow, body_expr,
+    ));
+    let arrow_broken = d.concat(&[sig_doc, d.text(arrow_before), d.indent_hardline(body_below)]);
     // Break: the first hardline breaks after `=>`, the second drops `)` to its own line.
     // No trailing comma (trailingComma: 'none').
-    let state_break = d.concat(&[
-        prefix,
-        sig_doc,
-        d.text(" =>"),
-        d.indent_hardline(body_doc),
-        d.hardline(),
-        d.text(")"),
-    ]);
+    let state_break = d.concat(&[prefix, arrow_broken, d.hardline(), d.text(")")]);
     if d.will_break(body_doc) {
-        return state_break;
+        return opener.after_callee(d, state_break);
     }
-    // Flat: the parens the grammar wants around a ternary body, then the call's own `)`.
-    let state_flat = if flat_pair {
-        d.concat(&[prefix, sig_doc, d.text(" => ("), body_doc, d.text("))")])
+    // The arrow on one line: the parens the grammar wants around a ternary body.
+    let arrow_flat = if flat_pair {
+        d.concat(&[sig_doc, d.text(" => ("), body_doc, d.text(")")])
     } else {
-        d.concat(&[prefix, sig_doc, d.text(" => "), body_doc, d.text(")")])
+        d.concat(&[sig_doc, d.text(" => "), body_doc])
     };
-    // All broken: the signature drops to its own line too — the state an enclosing break
-    // mode falls through to.
+    // Flat: the arrow, then the call's own `)`.
+    let state_flat = d.concat(&[prefix, arrow_flat, d.text(")")]);
+    // All broken: the argument drops to its own line, where it is printed as prettier's
+    // broken-out argument prints it — whole when it fits there, its body broken after `=>`
+    // only when it does not. The state an enclosing break mode falls through to. Its broken
+    // arrow keeps the gap's comments glued: a run the author broke after, given its line
+    // here, converges only in two passes — the next pass reads it as an own-line comment and
+    // takes the arrow's gap-break route, which breaks a signature this state printed flat and
+    // over width (`fn(⏎\t(a…) =>⏎\t\t/* c */⏎\t\ta ? b : c⏎)`), and is stable from there.
+    // Glued is not prettier's form either, and not only past width: with a long callee the
+    // `callee((sig) =>` line overflows while `\t(sig) =>` fits, so this state prints
+    // `/* c */ a ? b : c` on a line well within width where prettier keeps the comment's
+    // own line.
+    // TODO: make the whole arrow (`build_expression_doc`, as prettier's broken-out argument
+    // prints it) this state's broken member in place of `arrow_broken_out` — the signature
+    // then breaks where it must, and the run keeps its line at every width.
+    let arrow_broken_out = d.concat(&[sig_doc, d.text(arrow_before), d.indent_hardline(body_doc)]);
     let state_all_broken = d.concat(&[
         prefix,
         d.indent(d.concat(&[
             d.hardline(),
-            sig_doc,
-            d.text(" =>"),
-            d.indent_hardline(body_doc),
+            d.conditional_group(&[arrow_flat, arrow_broken_out]),
         ])),
         d.hardline(),
         d.text(")"),
     ]);
-    d.conditional_group(&[state_flat, state_break, state_all_broken])
+    opener.ladder(d, &[state_flat, state_break, state_all_broken])
 }
 
 /// The ladder for a **lone** arrow argument whose expression body is a call (through a
@@ -2072,7 +2185,16 @@ pub(super) fn build_arrow_call_body_states(
         body_reuse.map_or_else(|| printer.build_expression_doc(body_expr), |(_, doc)| doc);
     let body_doc = prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
     let sig_doc = build_hugged_arrow_sig_doc(printer, arrow, arg.span);
-    build_break_body_ladder(d, opener, &[], sig_doc, body_doc, arrow_doc, arrow_doc)
+    build_break_body_ladder(
+        d,
+        opener,
+        &[],
+        sig_doc,
+        body_doc,
+        false,
+        arrow_doc,
+        arrow_doc,
+    )
 }
 
 /// Build argument docs joined with breaks, preserving inter-argument comments.
