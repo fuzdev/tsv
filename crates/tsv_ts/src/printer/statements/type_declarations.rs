@@ -640,11 +640,9 @@ impl<'a> Printer<'a> {
             // `TSTypeAliasDeclaration` through `printAssignment` (`type-alias.js`), so it
             // hangs the value at EVERY value kind and at a complex type-parameter head
             // alike — which is why this is asked ahead of every value-shaped arm below,
-            // and why the union arm's own hug question (`union_hugs_equals`) reads it too.
-            // The arm the author's
-            // own break owns (`broke_after_value_leading_run`) still comes first: it
-            // reproduces that break rather than reflowing the value onto the comment's
-            // closing line.
+            // the union arm's hug included. The arm the author's own break owns
+            // (`broke_after_value_leading_run`) still comes first: it reproduces that
+            // break rather than reflowing the value onto the comment's closing line.
             let indentable_leads_value = self.indentable_block_leads_value(eq_pos + 1, type_start);
             // A block run the author broke AFTER (`type A = /* c */⏎<value>`) takes
             // prettier's break-after-operator for EVERY value kind — `chooseLayout`'s
@@ -702,51 +700,16 @@ impl<'a> Printer<'a> {
                 // the layout `build_union_type_doc` just chose. A comment can make it
                 // decline the hug and expand — a member/gap comment, or the run handed
                 // in above, which prettier binds to the first member — and then the `=`
-                // has to break like any other non-hugging union.
-                // Whether the union HUGS the `=` — two shapes, and the fourth disjunct
-                // overrides BOTH, stated once here rather than as a conjunct on each so a
-                // third hug shape cannot be added without it: a hug is a layout arm like
-                // any other, and prettier hangs `{ … } | null` — and a single-member
-                // union — under an indentable leading block exactly as it hangs every
-                // other value.
-                let union_hugs_equals = !indentable_leads_value
-                    && (
-                        // Hugged unions (e.g. `{ ... } | null`): the object type handles
-                        // its own expansion, so keep `= {` together like other
-                        // internally-breaking types.
-                        hugged
-                        // A single-member union prints transparently as its member
-                        // (prettier drops the node in postprocess), so a member that owns
-                        // its comment break hugs the `=` exactly as it would bare —
-                        // `= | (A // c)` collapses to the retained shell, whose parens own
-                        // the break. The hang below would split the `=` for a break the
-                        // reparse (seeing the bare shell) reproduces at the shell, not the
-                        // `=` (F1).
-                        //
-                        // A member that collapses to an INTERSECTION keeps the `=` for
-                        // the same reason, read off the doc the collapse just built: the
-                        // bare authoring goes to the intersection arm below, whose `fluid`
-                        // keeps a value that breaks on its own on the `=` line while its
-                        // first break fits, so hanging here split the `=` for a break the
-                        // reparse — which no longer sees a union at all — reproduces inside
-                        // the intersection (`= | ((// c⏎A | B) & C)`).
-                        //
-                        // TODO: no input reaches this disjunct — the sole-member peel
-                        // (`unwrap_redundant_parens`) hands every unfrozen one-member union to
-                        // the dispatch as its member, and a directive that would freeze it
-                        // takes the force-break branch first — so it is dead as far as every
-                        // probe shows; prove it and drop it.
-                        // The kind is asked because the break must be the MEMBER's: a
-                        // member collapsing to a union breaks from the union's own
-                        // leading-`|` layout, which is what the hang indents.
-                        || (u.types.len() == 1
-                            && (self.value_owns_its_comment_break(u.types[0])
-                                || (matches!(
-                                    unwrap_parenthesized(u.types[0]),
-                                    TSType::Intersection(_)
-                                ) && d.will_break(type_doc))))
-                    );
-                if union_hugs_equals {
+                // has to break like any other non-hugging union. A hugged union (e.g.
+                // `{ ... } | null`) keeps `= {` together like other internally-breaking
+                // types: the object type handles its own expansion.
+                //
+                // A single-member union never reaches this arm: the sole-member peel
+                // (`unwrap_redundant_parens`, above) hands every unfrozen one to the
+                // dispatch as its member, and a directive that would freeze it takes the
+                // `force_break` branch first. An indentable leading block took its own arm
+                // above, for every value kind.
+                if hugged {
                     parts.push(d.text(" "));
                     parts.push(make_rhs(type_doc));
                 } else {
