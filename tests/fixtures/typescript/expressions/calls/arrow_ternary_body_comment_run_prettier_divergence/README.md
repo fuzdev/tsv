@@ -1,0 +1,3 @@
+# arrow_ternary_body_comment_run_prettier_divergence
+
+An own-line block-comment run between `=>` and a ternary body, in a hugged call argument (lone and last), at the two widths where prettier is not idempotent: its first pass flattens the arrow onto the `=>` line (`output_prettier.svelte`), its second glues the run to the body (`variant_glued.svelte`, which tsv also keeps). tsv keeps the run on its own line, as prettier does one column wider. See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation) and [conformance_prettier.md §Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy).

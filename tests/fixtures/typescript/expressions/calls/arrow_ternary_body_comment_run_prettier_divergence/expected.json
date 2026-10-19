@@ -1,0 +1,425 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 619,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a block-comment run below `=>`, in a last and a lone ternary-body arrow argument, at the",
+			"start": 20,
+			"end": 111
+		},
+		{
+			"type": "Line",
+			"value": " two widths where the run plus the body would just fit on the `=>` line",
+			"start": 113,
+			"end": 186
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 258,
+			"end": 265
+		},
+		{
+			"type": "Block",
+			"value": " d ",
+			"start": 266,
+			"end": 273
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 364,
+			"end": 371
+		},
+		{
+			"type": "Block",
+			"value": " d ",
+			"start": 372,
+			"end": 379
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 469,
+			"end": 476
+		},
+		{
+			"type": "Block",
+			"value": " d ",
+			"start": 477,
+			"end": 484
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 575,
+			"end": 582
+		},
+		{
+			"type": "Block",
+			"value": " d ",
+			"start": 583,
+			"end": 590
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 618,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 609,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 188,
+					"end": 291,
+					"expression": {
+						"type": "CallExpression",
+						"start": 188,
+						"end": 290,
+						"callee": {
+							"type": "Identifier",
+							"start": 188,
+							"end": 190,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 191,
+								"end": 247,
+								"value": "tttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+								"raw": "'tttttttttttttttttttttttttttttttttttttttttttttttttttttt'"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 249,
+								"end": 287,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 250,
+										"end": 251,
+										"name": "a"
+									}
+								],
+								"body": {
+									"type": "ConditionalExpression",
+									"start": 276,
+									"end": 287,
+									"test": {
+										"type": "Identifier",
+										"start": 276,
+										"end": 277,
+										"name": "a"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 280,
+										"end": 282,
+										"name": "bb"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 285,
+										"end": 287,
+										"name": "cc"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 258,
+											"end": 265
+										},
+										{
+											"type": "Block",
+											"value": " d ",
+											"start": 266,
+											"end": 273
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block-comment run below `=>`, in a last and a lone ternary-body arrow argument, at the",
+							"start": 20,
+							"end": 111
+						},
+						{
+							"type": "Line",
+							"value": " two widths where the run plus the body would just fit on the `=>` line",
+							"start": 113,
+							"end": 186
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 293,
+					"end": 397,
+					"expression": {
+						"type": "CallExpression",
+						"start": 293,
+						"end": 396,
+						"callee": {
+							"type": "Identifier",
+							"start": 293,
+							"end": 295,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 296,
+								"end": 353,
+								"value": "ttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+								"raw": "'ttttttttttttttttttttttttttttttttttttttttttttttttttttttt'"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 355,
+								"end": 393,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 356,
+										"end": 357,
+										"name": "a"
+									}
+								],
+								"body": {
+									"type": "ConditionalExpression",
+									"start": 382,
+									"end": 393,
+									"test": {
+										"type": "Identifier",
+										"start": 382,
+										"end": 383,
+										"name": "a"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 386,
+										"end": 388,
+										"name": "bb"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 391,
+										"end": 393,
+										"name": "cc"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 364,
+											"end": 371
+										},
+										{
+											"type": "Block",
+											"value": " d ",
+											"start": 372,
+											"end": 379
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 399,
+					"end": 502,
+					"expression": {
+						"type": "CallExpression",
+						"start": 399,
+						"end": 501,
+						"callee": {
+							"type": "Identifier",
+							"start": 399,
+							"end": 401,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 402,
+								"end": 498,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 403,
+										"end": 462,
+										"name": "atttttttttttttttttttttttttttttttttttttttttttttttttttttttttt"
+									}
+								],
+								"body": {
+									"type": "ConditionalExpression",
+									"start": 487,
+									"end": 498,
+									"test": {
+										"type": "Identifier",
+										"start": 487,
+										"end": 488,
+										"name": "a"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 491,
+										"end": 493,
+										"name": "bb"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 496,
+										"end": 498,
+										"name": "cc"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 469,
+											"end": 476
+										},
+										{
+											"type": "Block",
+											"value": " d ",
+											"start": 477,
+											"end": 484
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 504,
+					"end": 608,
+					"expression": {
+						"type": "CallExpression",
+						"start": 504,
+						"end": 607,
+						"callee": {
+							"type": "Identifier",
+							"start": 504,
+							"end": 506,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 507,
+								"end": 604,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 508,
+										"end": 568,
+										"name": "attttttttttttttttttttttttttttttttttttttttttttttttttttttttttt"
+									}
+								],
+								"body": {
+									"type": "ConditionalExpression",
+									"start": 593,
+									"end": 604,
+									"test": {
+										"type": "Identifier",
+										"start": 593,
+										"end": 594,
+										"name": "a"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 597,
+										"end": 599,
+										"name": "bb"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 602,
+										"end": 604,
+										"name": "cc"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 575,
+											"end": 582
+										},
+										{
+											"type": "Block",
+											"value": " d ",
+											"start": 583,
+											"end": 590
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
