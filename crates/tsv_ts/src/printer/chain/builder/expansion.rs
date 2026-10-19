@@ -4,11 +4,8 @@
 // - Blank line detection between methods
 // - Comment-forced expansion
 // - Complex argument detection
-// - Callback analysis
 
-use crate::ast::internal::{ArrowFunctionBody, BlockStatement, ExpressionKind};
 use crate::printer::calls::arg_predicates::is_simple_call_argument;
-use crate::printer::is_effectively_empty_body;
 
 use super::super::printing::{chain_gap_any, node_comment_gap};
 use super::super::types::{ChainGroup, ChainNode};
@@ -202,82 +199,6 @@ pub(super) fn call_has_complex_args<'a>(node: &ChainNode<'a>) -> bool {
     call.arguments
         .iter()
         .any(|arg| !is_simple_call_argument(arg, 2))
-}
-
-/// Status of callback arguments in a call node
-#[derive(Default)]
-pub(super) struct CallbackStatus {
-    /// Whether the call has any callback argument (arrow/function)
-    pub has_callback: bool,
-    /// Whether any callback prints with a forced break
-    pub will_break: bool,
-}
-
-/// Analyze callback status for a call node in a single pass
-pub(super) fn call_callback_status<'a>(
-    node: &ChainNode<'a>,
-    printer: &Printer<'_>,
-) -> CallbackStatus {
-    let Some(call) = node.as_call_expression() else {
-        return CallbackStatus::default();
-    };
-
-    let mut has_callback = false;
-    let mut will_break = false;
-
-    for arg in call.arguments {
-        match &arg.kind {
-            ExpressionKind::ArrowFunctionExpression(arrow) => {
-                has_callback = true;
-                if !will_break {
-                    will_break = match &arrow.body {
-                        ArrowFunctionBody::BlockStatement(block) => {
-                            block_body_will_break(block, printer)
-                        }
-                        // An expression body breaks only where what prints carries a forced
-                        // break (a preserved object, template text, a comment's line), never
-                        // because the source spans lines: prettier's `willBreak` over the
-                        // printed argument. Asked of the WHOLE arrow, so a forced break in
-                        // its parameters or return type counts too, and through the
-                        // argument builder the chain itself calls, so the build is shared.
-                        ArrowFunctionBody::Expression(_) => printer
-                            .arena()
-                            .will_break(printer.build_arg_expression_doc(arg)),
-                    };
-                }
-            }
-            ExpressionKind::FunctionExpression(func) => {
-                has_callback = true;
-                if !will_break {
-                    will_break = block_body_will_break(&func.body, printer);
-                }
-            }
-            _ => {}
-        }
-        // Early exit if we've found everything
-        if has_callback && will_break {
-            break;
-        }
-    }
-
-    CallbackStatus {
-        has_callback,
-        will_break,
-    }
-}
-
-/// Whether a callback's block body prints broken: it holds a statement that prints (a
-/// bare `;` prints nothing), or a comment occupies the page inside its braces (a
-/// comment-only block prints on its own lines).
-///
-/// Decides from what prints, never from a source newline or the raw statement list: an
-/// empty body authored `{⏎}` or `{ ; }` prints `{}`, so reading either as broken would
-/// expand the chain on one pass and the reparse of that output would join it on the next.
-/// The comment clause is prettier's `willBreak` over the printed body; the comment's own
-/// hardline would break the chain anyway, but the decision is stated here, not inherited.
-fn block_body_will_break(block: &BlockStatement<'_>, printer: &Printer<'_>) -> bool {
-    !is_effectively_empty_body(block.body)
-        || printer.has_comments_on_page_between(block.span.start, block.span.end)
 }
 
 /// Check if chain ends with member access (not a call)

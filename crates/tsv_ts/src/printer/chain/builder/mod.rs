@@ -17,7 +17,7 @@ mod member_only;
 use std::iter;
 
 use expansion::{
-    call_callback_status, call_has_complex_args, ends_with_member, has_blank_lines_between_methods,
+    call_has_complex_args, ends_with_member, has_blank_lines_between_methods,
     has_comments_forcing_expansion,
 };
 use helpers::{build_expanded_doc, build_first_groups_doc, gap_has_break_forcing_comments};
@@ -258,8 +258,8 @@ fn build_chain_doc_impl<'a>(
 
     // Short chains: use group-based breaking
     // Prettier (`printMemberChain`, `print/member-chain.js`) only checks nodeHasComment for short chains.
-    // Force expand conditions like "2+ callbacks with breaking body" and "3+ calls
-    // with complex args" only apply to long chains (`printMemberChain`).
+    // Force expand conditions like "3+ calls with complex args" only apply to long
+    // chains (`printMemberChain`).
     // Comments between chain segments DO block the short chain path (matching
     // Prettier's nodeHasComment check).
     if groups.len() <= cutoff
@@ -308,21 +308,7 @@ fn should_force_chain_expand<'a>(
     // Prettier's chain expansion rules (`printMemberChain`, `print/member-chain.js`):
     // 1. Blank lines BETWEEN methods (not just before first) force expansion
     // 2. 3+ calls with complex args force expansion
-    // 3. 2+ calls with callbacks, where any callback prints with a forced break, force expansion
     let has_blank_lines_between = has_blank_lines_between_methods(groups, printer);
-
-    // Single pass: count calls and callbacks, and check if any callback breaks
-    let (call_count, calls_with_callbacks, any_callback_breaks) = call_nodes().fold(
-        (0usize, 0usize, false),
-        |(calls, count, any_breaks), node| {
-            let status = call_callback_status(node, printer);
-            (
-                calls + 1,
-                count + usize::from(status.has_callback),
-                any_breaks || status.will_break,
-            )
-        },
-    );
 
     // Comments between chain segments force expansion, EXCEPT for comments before
     // trailing members (which are handled specially by add_group_no_break)
@@ -331,8 +317,7 @@ fn should_force_chain_expand<'a>(
 
     has_blank_lines_between
         || has_forcing_comments
-        || (call_count > 2 && call_nodes().any(call_has_complex_args))
-        || (calls_with_callbacks >= 2 && any_callback_breaks)
+        || (call_nodes().count() > 2 && call_nodes().any(call_has_complex_args))
 }
 
 /// Build doc for short chains (groups.len() <= cutoff)

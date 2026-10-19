@@ -3,4 +3,14 @@
 		(x) => x
 	) // after filter
 	.length;
+	someLongName(() => 1).bbbbb(() => {
+		f();
+	}) // c
+	.ccccc;
+	someLongName(() => {
+		g();
+	}).bbbbb(
+		() => 2
+	) // c
+	.ccccc;
 </script>
