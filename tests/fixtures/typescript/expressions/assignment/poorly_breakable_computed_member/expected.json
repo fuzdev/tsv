@@ -1,0 +1,1781 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1586,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Prettier's `isPoorlyBreakableMemberOrCallChain` descends a member's OBJECT only and never",
+			"start": 10,
+			"end": 102
+		},
+		{
+			"type": "Line",
+			"value": " reads a computed member's index, so an index that forces a break leaves the chain poorly",
+			"start": 104,
+			"end": 195
+		},
+		{
+			"type": "Line",
+			"value": " breakable: the value breaks after the operator and the index expands inside it",
+			"start": 197,
+			"end": 278
+		},
+		{
+			"type": "Line",
+			"value": " a multiline template call in the computed member's index, at every assignment operator",
+			"start": 281,
+			"end": 370
+		},
+		{
+			"type": "Line",
+			"value": " a class property, and an object property: a short key keeps the value on its line, a longer",
+			"start": 494,
+			"end": 588
+		},
+		{
+			"type": "Line",
+			"value": " key breaks after the colon",
+			"start": 590,
+			"end": 619
+		},
+		{
+			"type": "Line",
+			"value": " a declarator takes the same layout",
+			"start": 742,
+			"end": 779
+		},
+		{
+			"type": "Line",
+			"value": " a bare or tagged multiline template as the index, at any depth",
+			"start": 817,
+			"end": 882
+		},
+		{
+			"type": "Line",
+			"value": " the operand of a wrapper, or a chain rooted at `this` or reached through `?.`",
+			"start": 967,
+			"end": 1047
+		},
+		{
+			"type": "Line",
+			"value": " the chain continuing past the bracket",
+			"start": 1173,
+			"end": 1213
+		},
+		{
+			"type": "Line",
+			"value": " other indexes that force a break: a block body, an authored-expanded object",
+			"start": 1307,
+			"end": 1385
+		},
+		{
+			"type": "Line",
+			"value": " control: the template as a call argument instead keeps the chain on the operator line",
+			"start": 1462,
+			"end": 1550
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1585,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 1576,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 372,
+					"end": 399,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 372,
+						"end": 398,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 372,
+							"end": 373,
+							"name": "z"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 378,
+							"end": 398,
+							"object": {
+								"type": "MemberExpression",
+								"start": 378,
+								"end": 381,
+								"object": {
+									"type": "Identifier",
+									"start": 378,
+									"end": 379,
+									"name": "w"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 380,
+									"end": 381,
+									"name": "x"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"property": {
+								"type": "CallExpression",
+								"start": 386,
+								"end": 394,
+								"callee": {
+									"type": "Identifier",
+									"start": 386,
+									"end": 387,
+									"name": "o"
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 388,
+										"end": 393,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 389,
+												"end": 392,
+												"value": {
+													"raw": "\na\n",
+													"cooked": "\na\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							},
+							"computed": true,
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Prettier's `isPoorlyBreakableMemberOrCallChain` descends a member's OBJECT only and never",
+							"start": 10,
+							"end": 102
+						},
+						{
+							"type": "Line",
+							"value": " reads a computed member's index, so an index that forces a break leaves the chain poorly",
+							"start": 104,
+							"end": 195
+						},
+						{
+							"type": "Line",
+							"value": " breakable: the value breaks after the operator and the index expands inside it",
+							"start": 197,
+							"end": 278
+						},
+						{
+							"type": "Line",
+							"value": " a multiline template call in the computed member's index, at every assignment operator",
+							"start": 281,
+							"end": 370
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 401,
+					"end": 429,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 401,
+						"end": 428,
+						"operator": "+=",
+						"left": {
+							"type": "Identifier",
+							"start": 401,
+							"end": 402,
+							"name": "z"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 408,
+							"end": 428,
+							"object": {
+								"type": "MemberExpression",
+								"start": 408,
+								"end": 411,
+								"object": {
+									"type": "Identifier",
+									"start": 408,
+									"end": 409,
+									"name": "w"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 410,
+									"end": 411,
+									"name": "x"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"property": {
+								"type": "CallExpression",
+								"start": 416,
+								"end": 424,
+								"callee": {
+									"type": "Identifier",
+									"start": 416,
+									"end": 417,
+									"name": "o"
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 418,
+										"end": 423,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 419,
+												"end": 422,
+												"value": {
+													"raw": "\na\n",
+													"cooked": "\na\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							},
+							"computed": true,
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 431,
+					"end": 460,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 431,
+						"end": 459,
+						"operator": "??=",
+						"left": {
+							"type": "Identifier",
+							"start": 431,
+							"end": 432,
+							"name": "z"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 439,
+							"end": 459,
+							"object": {
+								"type": "MemberExpression",
+								"start": 439,
+								"end": 442,
+								"object": {
+									"type": "Identifier",
+									"start": 439,
+									"end": 440,
+									"name": "w"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 441,
+									"end": 442,
+									"name": "x"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"property": {
+								"type": "CallExpression",
+								"start": 447,
+								"end": 455,
+								"callee": {
+									"type": "Identifier",
+									"start": 447,
+									"end": 448,
+									"name": "o"
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 449,
+										"end": 454,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 450,
+												"end": 453,
+												"value": {
+													"raw": "\na\n",
+													"cooked": "\na\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							},
+							"computed": true,
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 462,
+					"end": 491,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 462,
+						"end": 490,
+						"operator": "=",
+						"left": {
+							"type": "MemberExpression",
+							"start": 462,
+							"end": 465,
+							"object": {
+								"type": "Identifier",
+								"start": 462,
+								"end": 463,
+								"name": "a"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 464,
+								"end": 465,
+								"name": "b"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 470,
+							"end": 490,
+							"object": {
+								"type": "MemberExpression",
+								"start": 470,
+								"end": 473,
+								"object": {
+									"type": "Identifier",
+									"start": 470,
+									"end": 471,
+									"name": "w"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 472,
+									"end": 473,
+									"name": "x"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"property": {
+								"type": "CallExpression",
+								"start": 478,
+								"end": 486,
+								"callee": {
+									"type": "Identifier",
+									"start": 478,
+									"end": 479,
+									"name": "o"
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 480,
+										"end": 485,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 481,
+												"end": 484,
+												"value": {
+													"raw": "\na\n",
+													"cooked": "\na\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							},
+							"computed": true,
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 621,
+					"end": 666,
+					"id": {
+						"type": "Identifier",
+						"start": 627,
+						"end": 628,
+						"name": "C"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 629,
+						"end": 666,
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 633,
+								"end": 663,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 633,
+									"end": 634,
+									"name": "p"
+								},
+								"value": {
+									"type": "MemberExpression",
+									"start": 640,
+									"end": 662,
+									"object": {
+										"type": "MemberExpression",
+										"start": 640,
+										"end": 643,
+										"object": {
+											"type": "Identifier",
+											"start": 640,
+											"end": 641,
+											"name": "w"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 642,
+											"end": 643,
+											"name": "x"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"property": {
+										"type": "CallExpression",
+										"start": 649,
+										"end": 657,
+										"callee": {
+											"type": "Identifier",
+											"start": 649,
+											"end": 650,
+											"name": "o"
+										},
+										"arguments": [
+											{
+												"type": "TemplateLiteral",
+												"start": 651,
+												"end": 656,
+												"expressions": [],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 652,
+														"end": 655,
+														"value": {
+															"raw": "\na\n",
+															"cooked": "\na\n"
+														},
+														"tail": true
+													}
+												]
+											}
+										],
+										"optional": false
+									},
+									"computed": true,
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a class property, and an object property: a short key keeps the value on its line, a longer",
+							"start": 494,
+							"end": 588
+						},
+						{
+							"type": "Line",
+							"value": " key breaks after the colon",
+							"start": 590,
+							"end": 619
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 668,
+					"end": 739,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 668,
+						"end": 738,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 668,
+							"end": 669,
+							"name": "q"
+						},
+						"right": {
+							"type": "ObjectExpression",
+							"start": 672,
+							"end": 738,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 676,
+									"end": 699,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 676,
+										"end": 677,
+										"name": "k"
+									},
+									"value": {
+										"type": "MemberExpression",
+										"start": 679,
+										"end": 699,
+										"object": {
+											"type": "MemberExpression",
+											"start": 679,
+											"end": 682,
+											"object": {
+												"type": "Identifier",
+												"start": 679,
+												"end": 680,
+												"name": "w"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 681,
+												"end": 682,
+												"name": "x"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"property": {
+											"type": "CallExpression",
+											"start": 687,
+											"end": 695,
+											"callee": {
+												"type": "Identifier",
+												"start": 687,
+												"end": 688,
+												"name": "o"
+											},
+											"arguments": [
+												{
+													"type": "TemplateLiteral",
+													"start": 689,
+													"end": 694,
+													"expressions": [],
+													"quasis": [
+														{
+															"type": "TemplateElement",
+															"start": 690,
+															"end": 693,
+															"value": {
+																"raw": "\na\n",
+																"cooked": "\na\n"
+															},
+															"tail": true
+														}
+													]
+												}
+											],
+											"optional": false
+										},
+										"computed": true,
+										"optional": false
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 703,
+									"end": 735,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 703,
+										"end": 708,
+										"name": "kkkkk"
+									},
+									"value": {
+										"type": "MemberExpression",
+										"start": 713,
+										"end": 735,
+										"object": {
+											"type": "MemberExpression",
+											"start": 713,
+											"end": 716,
+											"object": {
+												"type": "Identifier",
+												"start": 713,
+												"end": 714,
+												"name": "w"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 715,
+												"end": 716,
+												"name": "x"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"property": {
+											"type": "CallExpression",
+											"start": 722,
+											"end": 730,
+											"callee": {
+												"type": "Identifier",
+												"start": 722,
+												"end": 723,
+												"name": "o"
+											},
+											"arguments": [
+												{
+													"type": "TemplateLiteral",
+													"start": 724,
+													"end": 729,
+													"expressions": [],
+													"quasis": [
+														{
+															"type": "TemplateElement",
+															"start": 725,
+															"end": 728,
+															"value": {
+																"raw": "\na\n",
+																"cooked": "\na\n"
+															},
+															"tail": true
+														}
+													]
+												}
+											],
+											"optional": false
+										},
+										"computed": true,
+										"optional": false
+									},
+									"kind": "init"
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 781,
+					"end": 814,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 787,
+							"end": 813,
+							"id": {
+								"type": "Identifier",
+								"start": 787,
+								"end": 788,
+								"name": "y"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 793,
+								"end": 813,
+								"object": {
+									"type": "MemberExpression",
+									"start": 793,
+									"end": 796,
+									"object": {
+										"type": "Identifier",
+										"start": 793,
+										"end": 794,
+										"name": "w"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 795,
+										"end": 796,
+										"name": "x"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"property": {
+									"type": "CallExpression",
+									"start": 801,
+									"end": 809,
+									"callee": {
+										"type": "Identifier",
+										"start": 801,
+										"end": 802,
+										"name": "o"
+									},
+									"arguments": [
+										{
+											"type": "TemplateLiteral",
+											"start": 803,
+											"end": 808,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 804,
+													"end": 807,
+													"value": {
+														"raw": "\na\n",
+														"cooked": "\na\n"
+													},
+													"tail": true
+												}
+											]
+										}
+									],
+									"optional": false
+								},
+								"computed": true,
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a declarator takes the same layout",
+							"start": 742,
+							"end": 779
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 884,
+					"end": 906,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 884,
+						"end": 905,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 884,
+							"end": 885,
+							"name": "z"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 890,
+							"end": 905,
+							"object": {
+								"type": "Identifier",
+								"start": 890,
+								"end": 891,
+								"name": "w"
+							},
+							"property": {
+								"type": "TemplateLiteral",
+								"start": 896,
+								"end": 901,
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 897,
+										"end": 900,
+										"value": {
+											"raw": "\na\n",
+											"cooked": "\na\n"
+										},
+										"tail": true
+									}
+								]
+							},
+							"computed": true,
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a bare or tagged multiline template as the index, at any depth",
+							"start": 817,
+							"end": 882
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 908,
+					"end": 933,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 908,
+						"end": 932,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 908,
+							"end": 909,
+							"name": "z"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 914,
+							"end": 932,
+							"object": {
+								"type": "MemberExpression",
+								"start": 914,
+								"end": 917,
+								"object": {
+									"type": "Identifier",
+									"start": 914,
+									"end": 915,
+									"name": "w"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 916,
+									"end": 917,
+									"name": "x"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"property": {
+								"type": "TaggedTemplateExpression",
+								"start": 922,
+								"end": 928,
+								"tag": {
+									"type": "Identifier",
+									"start": 922,
+									"end": 923,
+									"name": "t"
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 923,
+									"end": 928,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 924,
+											"end": 927,
+											"value": {
+												"raw": "\na\n",
+												"cooked": "\na\n"
+											},
+											"tail": true
+										}
+									]
+								}
+							},
+							"computed": true,
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 935,
+					"end": 964,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 935,
+						"end": 963,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 935,
+							"end": 936,
+							"name": "z"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 941,
+							"end": 963,
+							"object": {
+								"type": "MemberExpression",
+								"start": 941,
+								"end": 946,
+								"object": {
+									"type": "MemberExpression",
+									"start": 941,
+									"end": 944,
+									"object": {
+										"type": "Identifier",
+										"start": 941,
+										"end": 942,
+										"name": "w"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 943,
+										"end": 944,
+										"name": "x"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 945,
+									"end": 946,
+									"name": "y"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"property": {
+								"type": "CallExpression",
+								"start": 951,
+								"end": 959,
+								"callee": {
+									"type": "Identifier",
+									"start": 951,
+									"end": 952,
+									"name": "o"
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 953,
+										"end": 958,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 954,
+												"end": 957,
+												"value": {
+													"raw": "\na\n",
+													"cooked": "\na\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							},
+							"computed": true,
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1049,
+					"end": 1082,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1049,
+						"end": 1081,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1049,
+							"end": 1050,
+							"name": "z"
+						},
+						"right": {
+							"type": "AwaitExpression",
+							"start": 1055,
+							"end": 1081,
+							"argument": {
+								"type": "MemberExpression",
+								"start": 1061,
+								"end": 1081,
+								"object": {
+									"type": "MemberExpression",
+									"start": 1061,
+									"end": 1064,
+									"object": {
+										"type": "Identifier",
+										"start": 1061,
+										"end": 1062,
+										"name": "w"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1063,
+										"end": 1064,
+										"name": "x"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"property": {
+									"type": "CallExpression",
+									"start": 1069,
+									"end": 1077,
+									"callee": {
+										"type": "Identifier",
+										"start": 1069,
+										"end": 1070,
+										"name": "o"
+									},
+									"arguments": [
+										{
+											"type": "TemplateLiteral",
+											"start": 1071,
+											"end": 1076,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 1072,
+													"end": 1075,
+													"value": {
+														"raw": "\na\n",
+														"cooked": "\na\n"
+													},
+													"tail": true
+												}
+											]
+										}
+									],
+									"optional": false
+								},
+								"computed": true,
+								"optional": false
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the operand of a wrapper, or a chain rooted at `this` or reached through `?.`",
+							"start": 967,
+							"end": 1047
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1084,
+					"end": 1107,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1084,
+						"end": 1106,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1084,
+							"end": 1085,
+							"name": "z"
+						},
+						"right": {
+							"type": "UnaryExpression",
+							"start": 1090,
+							"end": 1106,
+							"operator": "!",
+							"prefix": true,
+							"argument": {
+								"type": "MemberExpression",
+								"start": 1091,
+								"end": 1106,
+								"object": {
+									"type": "Identifier",
+									"start": 1091,
+									"end": 1092,
+									"name": "w"
+								},
+								"property": {
+									"type": "TemplateLiteral",
+									"start": 1097,
+									"end": 1102,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 1098,
+											"end": 1101,
+											"value": {
+												"raw": "\na\n",
+												"cooked": "\na\n"
+											},
+											"tail": true
+										}
+									]
+								},
+								"computed": true,
+								"optional": false
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1109,
+					"end": 1139,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1109,
+						"end": 1138,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1109,
+							"end": 1110,
+							"name": "z"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 1115,
+							"end": 1138,
+							"object": {
+								"type": "MemberExpression",
+								"start": 1115,
+								"end": 1121,
+								"object": {
+									"type": "ThisExpression",
+									"start": 1115,
+									"end": 1119
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 1120,
+									"end": 1121,
+									"name": "x"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"property": {
+								"type": "CallExpression",
+								"start": 1126,
+								"end": 1134,
+								"callee": {
+									"type": "Identifier",
+									"start": 1126,
+									"end": 1127,
+									"name": "o"
+								},
+								"arguments": [
+									{
+										"type": "TemplateLiteral",
+										"start": 1128,
+										"end": 1133,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 1129,
+												"end": 1132,
+												"value": {
+													"raw": "\na\n",
+													"cooked": "\na\n"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"optional": false
+							},
+							"computed": true,
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1141,
+					"end": 1170,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1141,
+						"end": 1169,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1141,
+							"end": 1142,
+							"name": "z"
+						},
+						"right": {
+							"type": "ChainExpression",
+							"start": 1147,
+							"end": 1169,
+							"expression": {
+								"type": "MemberExpression",
+								"start": 1147,
+								"end": 1169,
+								"object": {
+									"type": "MemberExpression",
+									"start": 1147,
+									"end": 1150,
+									"object": {
+										"type": "Identifier",
+										"start": 1147,
+										"end": 1148,
+										"name": "w"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1149,
+										"end": 1150,
+										"name": "x"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"property": {
+									"type": "CallExpression",
+									"start": 1157,
+									"end": 1165,
+									"callee": {
+										"type": "Identifier",
+										"start": 1157,
+										"end": 1158,
+										"name": "o"
+									},
+									"arguments": [
+										{
+											"type": "TemplateLiteral",
+											"start": 1159,
+											"end": 1164,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 1160,
+													"end": 1163,
+													"value": {
+														"raw": "\na\n",
+														"cooked": "\na\n"
+													},
+													"tail": true
+												}
+											]
+										}
+									],
+									"optional": false
+								},
+								"computed": true,
+								"optional": true
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1215,
+					"end": 1244,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1215,
+						"end": 1243,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1215,
+							"end": 1216,
+							"name": "z"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 1221,
+							"end": 1243,
+							"object": {
+								"type": "MemberExpression",
+								"start": 1221,
+								"end": 1241,
+								"object": {
+									"type": "MemberExpression",
+									"start": 1221,
+									"end": 1224,
+									"object": {
+										"type": "Identifier",
+										"start": 1221,
+										"end": 1222,
+										"name": "w"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1223,
+										"end": 1224,
+										"name": "x"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"property": {
+									"type": "CallExpression",
+									"start": 1229,
+									"end": 1237,
+									"callee": {
+										"type": "Identifier",
+										"start": 1229,
+										"end": 1230,
+										"name": "o"
+									},
+									"arguments": [
+										{
+											"type": "TemplateLiteral",
+											"start": 1231,
+											"end": 1236,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 1232,
+													"end": 1235,
+													"value": {
+														"raw": "\na\n",
+														"cooked": "\na\n"
+													},
+													"tail": true
+												}
+											]
+										}
+									],
+									"optional": false
+								},
+								"computed": true,
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 1242,
+								"end": 1243,
+								"name": "y"
+							},
+							"computed": false,
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the chain continuing past the bracket",
+							"start": 1173,
+							"end": 1213
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1246,
+					"end": 1275,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1246,
+						"end": 1274,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1246,
+							"end": 1247,
+							"name": "z"
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 1252,
+							"end": 1274,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 1252,
+								"end": 1272,
+								"object": {
+									"type": "MemberExpression",
+									"start": 1252,
+									"end": 1255,
+									"object": {
+										"type": "Identifier",
+										"start": 1252,
+										"end": 1253,
+										"name": "w"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1254,
+										"end": 1255,
+										"name": "x"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"property": {
+									"type": "CallExpression",
+									"start": 1260,
+									"end": 1268,
+									"callee": {
+										"type": "Identifier",
+										"start": 1260,
+										"end": 1261,
+										"name": "o"
+									},
+									"arguments": [
+										{
+											"type": "TemplateLiteral",
+											"start": 1262,
+											"end": 1267,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 1263,
+													"end": 1266,
+													"value": {
+														"raw": "\na\n",
+														"cooked": "\na\n"
+													},
+													"tail": true
+												}
+											]
+										}
+									],
+									"optional": false
+								},
+								"computed": true,
+								"optional": false
+							},
+							"arguments": [],
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1277,
+					"end": 1304,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1277,
+						"end": 1303,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1277,
+							"end": 1278,
+							"name": "z"
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 1283,
+							"end": 1303,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 1283,
+								"end": 1300,
+								"object": {
+									"type": "MemberExpression",
+									"start": 1283,
+									"end": 1298,
+									"object": {
+										"type": "Identifier",
+										"start": 1283,
+										"end": 1284,
+										"name": "w"
+									},
+									"property": {
+										"type": "TemplateLiteral",
+										"start": 1289,
+										"end": 1294,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 1290,
+												"end": 1293,
+												"value": {
+													"raw": "\na\n",
+													"cooked": "\na\n"
+												},
+												"tail": true
+											}
+										]
+									},
+									"computed": true,
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 1299,
+									"end": 1300,
+									"name": "f"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "Identifier",
+									"start": 1301,
+									"end": 1302,
+									"name": "x"
+								}
+							],
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1387,
+					"end": 1425,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1387,
+						"end": 1424,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1387,
+							"end": 1388,
+							"name": "z"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 1393,
+							"end": 1424,
+							"object": {
+								"type": "Identifier",
+								"start": 1393,
+								"end": 1394,
+								"name": "w"
+							},
+							"property": {
+								"type": "ArrowFunctionExpression",
+								"start": 1399,
+								"end": 1420,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 1405,
+									"end": 1420,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 1411,
+											"end": 1415,
+											"expression": {
+												"type": "CallExpression",
+												"start": 1411,
+												"end": 1414,
+												"callee": {
+													"type": "Identifier",
+													"start": 1411,
+													"end": 1412,
+													"name": "f"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									]
+								}
+							},
+							"computed": true,
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " other indexes that force a break: a block body, an authored-expanded object",
+							"start": 1307,
+							"end": 1385
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1427,
+					"end": 1459,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1427,
+						"end": 1458,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1427,
+							"end": 1428,
+							"name": "z"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 1433,
+							"end": 1458,
+							"object": {
+								"type": "Identifier",
+								"start": 1433,
+								"end": 1434,
+								"name": "w"
+							},
+							"property": {
+								"type": "ObjectExpression",
+								"start": 1439,
+								"end": 1454,
+								"properties": [
+									{
+										"type": "Property",
+										"start": 1445,
+										"end": 1449,
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 1445,
+											"end": 1446,
+											"name": "a"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 1448,
+											"end": 1449,
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init"
+									}
+								]
+							},
+							"computed": true,
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1552,
+					"end": 1575,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1552,
+						"end": 1574,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1552,
+							"end": 1553,
+							"name": "z"
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 1556,
+							"end": 1574,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 1556,
+								"end": 1559,
+								"object": {
+									"type": "Identifier",
+									"start": 1556,
+									"end": 1557,
+									"name": "w"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 1558,
+									"end": 1559,
+									"name": "x"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "CallExpression",
+									"start": 1563,
+									"end": 1571,
+									"callee": {
+										"type": "Identifier",
+										"start": 1563,
+										"end": 1564,
+										"name": "o"
+									},
+									"arguments": [
+										{
+											"type": "TemplateLiteral",
+											"start": 1565,
+											"end": 1570,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 1566,
+													"end": 1569,
+													"value": {
+														"raw": "\na\n",
+														"cooked": "\na\n"
+													},
+													"tail": true
+												}
+											]
+										}
+									],
+									"optional": false
+								}
+							],
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " control: the template as a call argument instead keeps the chain on the operator line",
+							"start": 1462,
+							"end": 1550
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

@@ -1173,12 +1173,28 @@ impl<'a> Printer<'a> {
                 self.build_led_curried_chain_doc(run, (gap_start, value_start), build)
             }
         };
+        // Cleared around the value's build and folded back after it, so the assert below
+        // reads only this value's computed indexes while an enclosing assignment still
+        // sees them as part of its own value (`Printer::computed_index_breaks`).
+        #[cfg(debug_assertions)]
+        let outer_index_breaks = self.computed_index_breaks.replace(false);
         let (hoisted_run, right_doc) = match rhs_info.gap {
             Some(gap) => {
                 self.hoist_owned_value_gap_run(gap.start, right_expr, seam_prints_pair, build_right)
             }
             None => (None, build_right(None)),
         };
+        #[cfg(debug_assertions)]
+        let index_breaks = {
+            let index_breaks = self.computed_index_breaks.get();
+            self.computed_index_breaks
+                .set(outer_index_breaks || index_breaks);
+            index_breaks
+        };
+        // The assert's operand is still type-checked in a release build, where nothing tracks
+        // the witness.
+        #[cfg(not(debug_assertions))]
+        let index_breaks = false;
         // Parenthesize an `in` RHS inside a for-header init (`for (a = (b in c);…)`);
         // a no-op elsewhere. The assignment builder is the RHS's only build site and
         // never routes it through `needs_parens`, so the for-init rule is applied here.
@@ -1197,7 +1213,7 @@ impl<'a> Printer<'a> {
         // our static AST analysis missed a break-emitting node — the chain actually
         // has internal break points and may need a different layout.
         //
-        // Two exemptions, both cases where the doc force-breaks for a reason that is NOT a
+        // Three exemptions, each a case where the doc force-breaks for a reason that is NOT a
         // chain break point the static analysis missed:
         //
         // - A COMMENT in the RHS. The classifier deliberately models comment-free geometry
@@ -1241,6 +1257,15 @@ impl<'a> Printer<'a> {
         //   agrees the chain is poorly breakable here (a line-continuation string is a lone
         //   short argument) and breaks after the operator, so the classification is sound.
         //   (`chain_has_multiline_string_arg`).
+        // - A break forced INSIDE A COMPUTED MEMBER'S BRACKETS (a multiline template or a
+        //   block-bodied arrow as the index, `z = w.x[o(…)]`). The classifier never reads a
+        //   computed member's index, as prettier's `isPoorlyBreakableMemberOrCallChain`
+        //   descends a member's object alone, so the chain stays poorly breakable, the value
+        //   breaks after the operator, and the index expands inside its own brackets — the
+        //   break is the index's, not a chain break point. Witnessed by the index doc itself
+        //   (`index_breaks`, set where the lookup is built), never by the chain holding a
+        //   computed member: an index that does not break exempts nothing, so a
+        //   misclassified `a[i]` chain still trips.
         debug_assert!(
             {
                 let core_expr = unwrap_expression(right_expr);
@@ -1253,6 +1278,7 @@ impl<'a> Printer<'a> {
                     || self.has_comments_on_page_between(rhs_span.start, rhs_span.end)
                     || shell_gap_forces_break
                     || chain_has_multiline_string_arg(core_expr, self.source)
+                    || index_breaks
                     || !is_poorly_breakable_chain(core_expr, self)
                     || !d.will_break(right_doc)
             },

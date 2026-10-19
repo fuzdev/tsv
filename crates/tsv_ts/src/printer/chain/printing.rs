@@ -322,6 +322,13 @@ pub(crate) fn print_node_inner<'a>(
                 raw_inner
             };
 
+            // Debug-only witness for the `is_poorly_breakable_chain` assert: a break the
+            // index forces is the index's own (see `Printer::computed_index_breaks`).
+            #[cfg(debug_assertions)]
+            if d.will_break(inner) {
+                printer.computed_index_breaks.set(true);
+            }
+
             let open = if *optional { "?.[" } else { "[" };
             // A numeric index keeps its brackets flat (prettier's `isNumericLiteral`
             // carve-out); every other index gets a breakable group.

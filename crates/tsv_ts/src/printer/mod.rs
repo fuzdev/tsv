@@ -644,6 +644,19 @@ pub struct Printer<'a> {
     /// only cause more work, never a dropped comment. Defaults `true` (do the full
     /// classify) so any member print reached without a preceding set is fail-safe.
     pub(crate) chain_has_comments: Cell<bool>,
+    /// Whether a computed member's index doc built since the assignment builder last cleared
+    /// this will break — a break that originates inside the `[…]`. Debug-only: the one
+    /// reader is the `is_poorly_breakable_chain` assert in `expressions/assignment.rs`,
+    /// which clears it around the value's build (save/restore, so a nested assignment's
+    /// value folds into the enclosing one's answer) and exempts a forced break only when
+    /// it is set. The classifier never reads a computed property — prettier's
+    /// `isPoorlyBreakableMemberOrCallChain` descends a member's object alone — so a break
+    /// the index forces is the index's own, not a chain break point the static walk
+    /// missed. Set by the chain printer's computed-member arm (`chain/printing.rs`), the
+    /// one builder of a computed lookup's brackets. The witness is value-wide: once any
+    /// index in the value breaks, it exempts every other forced break in that value too.
+    #[cfg(debug_assertions)]
+    pub(crate) computed_index_breaks: Cell<bool>,
     /// Spans of the bare negative literals an array type's element run of indexed accesses
     /// leads (`-1[K][]`), which the indexed-access object rule prints with a pair
     /// (`(-1)[K][]`; `array_run_negative_literal`). Recorded by the array
@@ -787,6 +800,8 @@ impl<'a> Printer<'a> {
             chain_arg_share_active: Cell::new(false),
             arrow_body_inject: Cell::new(None),
             chain_has_comments: Cell::new(true),
+            #[cfg(debug_assertions)]
+            computed_index_breaks: Cell::new(false),
             negative_literal_pair_targets: SpanMarks::default(),
             dividend_tail_targets: SpanMarks::default(),
             withheld_clarity_pair_targets: SpanMarks::default(),
