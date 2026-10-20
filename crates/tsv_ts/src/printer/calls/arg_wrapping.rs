@@ -1661,15 +1661,26 @@ impl ArgOpener {
     /// own parens when it does not. The default argument-list layout in every printer.
     #[inline]
     pub(super) fn wrap_soft(self, d: &DocArena, args: DocId) -> DocId {
-        self.after_callee(
-            d,
-            d.group(d.concat(&[
-                self.open,
-                d.indent_softline(args),
-                d.softline(),
-                d.text(")"),
-            ])),
-        )
+        self.after_callee(d, d.group(self.soft_list_contents(d, args)))
+    }
+
+    /// [`Self::wrap_soft`] without its group — prettier's default tail for a long-curried
+    /// call (`isLongCurriedCallExpression`), whose list then breaks with the nearest group
+    /// around it, ahead of the outer call's own list.
+    #[inline]
+    pub(super) fn soft_list(self, d: &DocArena, args: DocId) -> DocId {
+        self.after_callee(d, self.soft_list_contents(d, args))
+    }
+
+    /// `(`, the arguments behind a soft break, a soft break, `)` — the default tail's contents.
+    #[inline]
+    fn soft_list_contents(self, d: &DocArena, args: DocId) -> DocId {
+        d.concat(&[
+            self.open,
+            d.indent_softline(args),
+            d.softline(),
+            d.text(")"),
+        ])
     }
 
     /// A single huggable argument: hugs the opening delimiter and drops the `)` to its own

@@ -536,11 +536,18 @@ fn print_group_inner<'a>(
     skip_first_comments: bool,
 ) -> DocId {
     let d = printer.arena();
-    let doc = d.concat_iter(group.nodes.iter().enumerate().map(|(i, n)| {
-        // Skip comments only for the first member node
-        let skip_comments = skip_first_comments && i == 0 && n.is_member();
-        print_node_inner(n, printer, expanded, skip_comments)
-    }));
+    let doc =
+        if printer.chain_ungroups_args.get() && group.nodes.iter().any(ChainNode::ungroups_args) {
+            print_curried_group(group, printer, expanded, skip_first_comments)
+        } else {
+            d.concat_iter(
+                group
+                    .nodes
+                    .iter()
+                    .enumerate()
+                    .map(|(i, n)| print_group_node(n, i, printer, expanded, skip_first_comments)),
+            )
+        };
     // A call whose argument list breaks for a run an argument deferred — at the argument
     // or in a list nested inside it ([`Printer::span_holds_forced_list_break`]) — is a
     // group that breaks, as it is on the
@@ -553,6 +560,59 @@ fn print_group_inner<'a>(
         return d.group_break(doc);
     }
     doc
+}
+
+/// One node of a group, `i` its position there — the comment skip applies to the first
+/// member node alone.
+#[inline]
+fn print_group_node(
+    node: &ChainNode<'_>,
+    i: usize,
+    printer: &Printer<'_>,
+    expanded: bool,
+    skip_first_comments: bool,
+) -> DocId {
+    let skip_comments = skip_first_comments && i == 0 && node.is_member();
+    print_node_inner(node, printer, expanded, skip_comments)
+}
+
+/// A group holding a long-curried call ([`ChainNode::ungroups_args`]), each call on a call
+/// closing a group over the group's nodes before it — prettier's `group(contents)` for a
+/// call whose callee is a call (`printCallExpression`); in a curried run on a plain callee,
+/// the chain's one group, that is everything before the call. A bare argument list breaks
+/// with the nearest group around it, so in `f(a, b, c)(d, e)(g)` the inner two lists break
+/// together only when the prefix through `(d, e)` does not fit, and the last list breaks
+/// alone when it does.
+///
+/// A call some enclosing `printMemberChain` swallowed (not
+/// [`ChainCall::own_call_layout`](super::types::ChainCall::own_call_layout)) closes no
+/// group: its `rec` prints the arguments straight after the callee.
+///
+/// Out of line: the group printer is on the expression recursion cycle, and this rare shape
+/// must add nothing to its frame.
+#[inline(never)]
+fn print_curried_group(
+    group: &ChainGroup<'_>,
+    printer: &Printer<'_>,
+    expanded: bool,
+    skip_first_comments: bool,
+) -> DocId {
+    let d = printer.arena();
+    let mut parts = DocBuf::new();
+    for (i, node) in group.nodes.iter().enumerate() {
+        let doc = print_group_node(node, i, printer, expanded, skip_first_comments);
+        let closes_group = i > 0
+            && group.nodes[i - 1].is_call()
+            && matches!(node, ChainNode::Call { facts, .. } if facts.own_call_layout);
+        if closes_group {
+            let prefix = d.concat(&parts);
+            parts.clear();
+            parts.push(d.group(d.concat(&[prefix, doc])));
+        } else {
+            parts.push(doc);
+        }
+    }
+    d.concat(&parts)
 }
 
 /// Whether a call in `group` has an argument holding a list element that breaks its list

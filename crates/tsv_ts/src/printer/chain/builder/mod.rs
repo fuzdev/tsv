@@ -37,6 +37,7 @@ use super::printing::{
 use super::types::{ChainGroup, ChainNode, ChainNodeVec};
 use crate::ast::internal::{ArrowFunctionBody, CallExpression, Expression, ExpressionKind};
 use crate::printer::Printer;
+use crate::printer::calls::is_memberish;
 
 use smallvec::SmallVec;
 use smallvec::smallvec;
@@ -700,9 +701,80 @@ pub fn call_prints_as_member_chain(
     printer: &Printer<'_>,
 ) -> bool {
     let mut nodes = ChainNodeVec::new();
-    linearize_chain_from_call_into(call, span, printer.linearize_input(), &mut nodes);
+    let _ = linearize_chain_from_call_into(call, span, printer.linearize_input(), &mut nodes);
     let groups = group_chain_nodes(&nodes, printer);
     groups_exceed_cutoff(&groups, false, printer)
+}
+
+/// Decide every call's [`ChainCall::ungroup_args`](super::types::ChainCall::ungroup_args) —
+/// prettier's `isLongCurriedCallExpression`, asked of each call that is the callee of the
+/// call after it: the outer call takes at least one argument and fewer than this one
+/// (`connect(a, b, c)(Component)`). Such a list prints without its own group, so it breaks
+/// with the nearest group around it — before the outer list, which keeps its own.
+///
+/// A call whose callee is memberish and which prettier prints through `printCallExpression`
+/// (`own_call_layout`) is the ROOT of a member chain of its own, and there the bare list
+/// survives only on `printMemberChain`'s short path, which returns `oneLine` without a
+/// group: the chain ending at this call holds no more groups than the cutoff (three when
+/// its first two merge, two otherwise), no comment and no blank line between its links.
+/// The merge is asked as prettier asks it there, off the expression-statement position —
+/// the chain's parent is the outer call — so `z.a().f(x, y)(z)` keeps its list grouped
+/// where `this.a().f(x, y)(z)` breaks it. A longer chain keeps the list grouped too:
+/// prettier's `conditionalGroup([oneLine, expanded])` measures `oneLine` flat, and tsv
+/// linearizes the outer call into the chain, so neither of its states can say what
+/// prettier's does about a bare list inside it.
+///
+/// Every other such call is ungrouped: a call on a plain callee or on another call, and a
+/// call some enclosing `printMemberChain` swallowed, whose `rec` prints its arguments
+/// through `printCallArguments` all the same. The list prints bare only where
+/// `printCallArguments` reaches its default tail — a hook, a function composition, a blank
+/// line or an expand-first / expand-last argument returns before it (`chain_args.rs`).
+///
+/// Returns whether any call followed by another call of this chain prints its list bare —
+/// the only shape the group printer closes a group for.
+pub fn mark_long_curried_calls(nodes: &mut [ChainNode<'_>], printer: &Printer<'_>) -> bool {
+    let mut any = false;
+    for i in 1..nodes.len() {
+        let ungroup = match (&nodes[i - 1], &nodes[i]) {
+            (
+                ChainNode::Call {
+                    call, span, facts, ..
+                },
+                ChainNode::Call { call: outer, .. },
+            ) if !outer.arguments.is_empty() && call.arguments.len() > outer.arguments.len() => {
+                !(facts.own_call_layout && is_memberish(call.callee))
+                    || curried_callee_chain_is_short(&nodes[..i], span.end, printer)
+            }
+            _ => continue,
+        };
+        if let ChainNode::Call { facts, .. } = &mut nodes[i - 1] {
+            facts.ungroup_args = ungroup;
+        }
+        any |= ungroup;
+    }
+    any
+}
+
+/// Whether the member chain ending at a long-curried call takes `printMemberChain`'s short
+/// path — see [`mark_long_curried_calls`]. `chain` is that chain's nodes, `chain_end` the
+/// call's end.
+///
+/// A comment anywhere in the chain keeps the list grouped. Prettier's own question
+/// (`nodeHasComment`) is narrower, but a commented chain is printed by tsv's comment-aware
+/// paths, which this does not reach into.
+fn curried_callee_chain_is_short(
+    chain: &[ChainNode<'_>],
+    chain_end: u32,
+    printer: &Printer<'_>,
+) -> bool {
+    let groups = group_chain_nodes(chain, printer);
+    let chain_start = match groups.first().and_then(|g| g.nodes.first()) {
+        Some(ChainNode::Base { expr, .. }) => expr.span().start,
+        _ => return false,
+    };
+    !groups_exceed_cutoff(&groups, false, printer)
+        && !printer.has_comments_on_page_between(chain_start, chain_end)
+        && !has_blank_lines_between_methods(&groups, printer)
 }
 
 /// Build the doc for a peeled chain: the prefix (everything through the last

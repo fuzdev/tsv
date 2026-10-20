@@ -4755,7 +4755,9 @@ interface CurriedRegion {
  * signature on ONE line a level in, the body one level deeper than prettier's line for
  * line, then `}` and `)` + the same tail. The signature is the same text whitespace
  * aside; ours holds the width on it; and flat on the head's line it would not fit —
- * the overflow that makes prettier break the parameters at all.
+ * the overflow that makes prettier break the parameters at all. A signature too wide for
+ * a line of its own breaks in ours too ([`broken_signature_end`]), each of its lines then
+ * prettier's one level deeper.
  */
 function curried_region(
 	p_lines: string[],
@@ -4774,17 +4776,24 @@ function curried_region(
 	if (sig_end === p0 + 1 || p_sig === undefined) return null;
 	if (!p_sig.startsWith(indent + ')') || !/=>\s*\{$/.test(p_sig)) return null;
 
-	const o_sig = o_lines[o0 + 1];
-	if (o_sig === undefined || leading_ws(o_sig) !== inner || o_sig[inner.length] !== '(')
-		return null;
-	if (!/=>\s*\{$/.test(o_sig) || visual_width(o_sig) > PRINT_WIDTH) return null;
-	if (visual_width(o_lines[o0] + o_sig.trimStart()) <= PRINT_WIDTH) return null;
-	if (strip_all_ws(p_lines.slice(p0, sig_end + 1).join('')) !== strip_all_ws(o_lines[o0] + o_sig)) {
+	let o_sig_end = broken_signature_end(p_lines, o_lines, p0, sig_end, o0, inner);
+	if (o_sig_end === null) {
+		const o_sig = o_lines[o0 + 1];
+		if (o_sig === undefined || leading_ws(o_sig) !== inner || o_sig[inner.length] !== '(')
+			return null;
+		if (!/=>\s*\{$/.test(o_sig) || visual_width(o_sig) > PRINT_WIDTH) return null;
+		if (visual_width(o_lines[o0] + o_sig.trimStart()) <= PRINT_WIDTH) return null;
+		o_sig_end = o0 + 1;
+	}
+	if (
+		strip_all_ws(p_lines.slice(p0, sig_end + 1).join('')) !==
+		strip_all_ws(o_lines.slice(o0, o_sig_end + 1).join(''))
+	) {
 		return null;
 	}
 
 	let p = sig_end + 1;
-	let o = o0 + 2;
+	let o = o_sig_end + 1;
 	for (;;) {
 		const line = p_lines[p];
 		if (line === undefined) return null;
@@ -4796,6 +4805,31 @@ function curried_region(
 	const tail = p_lines[p].slice(indent.length + 2);
 	if (o_lines[o] !== inner + '}' || o_lines[o + 1] !== indent + ')' + tail) return null;
 	return { prettier: { start: p0, end: p }, ours: { start: o0, end: o + 1 } };
+}
+
+/**
+ * The ours line ending a curried-callee callback's signature that ours breaks too, or null:
+ * `(` alone a level in, prettier's parameter lines and its `): T => {` line each one level
+ * deeper, and the signature flat on its own line over the width — the only reason ours
+ * breaks it.
+ */
+function broken_signature_end(
+	p_lines: string[],
+	o_lines: string[],
+	p0: number,
+	sig_end: number,
+	o0: number,
+	inner: string
+): number | null {
+	if (o_lines[o0 + 1] !== inner + '(') return null;
+	let o = o0 + 2;
+	for (let p = p0 + 1; p <= sig_end; p++, o++) {
+		if (o_lines[o] !== '\t' + p_lines[p]) return null;
+	}
+	const params = p_lines.slice(p0 + 1, sig_end).map((l) => l.trim());
+	const flat = inner + '(' + params.join(' ') + p_lines[sig_end].trim();
+	if (visual_width(flat) <= PRINT_WIDTH) return null;
+	return o - 1;
 }
 
 const curried_callee_callback_hug: DivergencePattern = {

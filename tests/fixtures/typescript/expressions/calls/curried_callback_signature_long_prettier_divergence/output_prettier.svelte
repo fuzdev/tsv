@@ -71,4 +71,17 @@
 	) => {
 		return [path];
 	});
+
+	// When the inner call takes more arguments than the outer one, the inner list breaks first;
+	// a signature too long for its own line then breaks its parameters.
+	const aaaaaaaa = memoize(
+		1000,
+		a
+	)((
+		bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: B,
+		ccccccccccccccccccccccccc: string,
+		d: boolean
+	): string[] => {
+		return [c];
+	});
 </script>

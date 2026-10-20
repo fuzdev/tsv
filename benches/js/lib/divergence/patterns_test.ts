@@ -3897,6 +3897,82 @@ Deno.test(
 	}
 );
 
+Deno.test(
+	'curried_callee_callback_hug: positive - a signature too wide for its own line, under a broken inner list',
+	() => {
+		// The inner call takes more arguments than the outer one, so both formatters break the
+		// inner list first; ours then breaks the signature on a line of its own, each line
+		// prettier's one level deeper.
+		const prettier = [
+			'const aaaaaaaa = memoize(',
+			'\t1000,',
+			'\ta',
+			')((',
+			'\tbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: B,',
+			'\tccccccccccccccccccccccccc: string,',
+			'\td: boolean',
+			'): string[] => {',
+			'\treturn [c];',
+			'});',
+			''
+		].join('\n');
+		const ours = [
+			'const aaaaaaaa = memoize(',
+			'\t1000,',
+			'\ta',
+			')(',
+			'\t(',
+			'\t\tbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: B,',
+			'\t\tccccccccccccccccccccccccc: string,',
+			'\t\td: boolean',
+			'\t): string[] => {',
+			'\t\treturn [c];',
+			'\t}',
+			');',
+			''
+		].join('\n');
+		assert_claims_every_hunk(
+			make_context(ours, prettier, 'typescript', prettier),
+			'curried_callee_callback_hug'
+		);
+	}
+);
+
+Deno.test(
+	'curried_callee_callback_hug: negative - a broken signature that fits on a line of its own',
+	() => {
+		// Ours breaks a signature only when it overflows its own line; one that fits there
+		// broken anyway is not this divergence.
+		const prettier = [
+			'const aaaaaaaa = memoize(',
+			'\t1000,',
+			'\ta',
+			')((',
+			'\tb: B,',
+			'\tc: string',
+			'): string[] => {',
+			'\treturn [c];',
+			'});',
+			''
+		].join('\n');
+		const ours = [
+			'const aaaaaaaa = memoize(',
+			'\t1000,',
+			'\ta',
+			')(',
+			'\t(',
+			'\t\tb: B,',
+			'\t\tc: string',
+			'\t): string[] => {',
+			'\t\treturn [c];',
+			'\t}',
+			');',
+			''
+		].join('\n');
+		assert_unclaimed(make_context(ours, prettier, 'typescript', prettier));
+	}
+);
+
 Deno.test('curried_callee_callback_hug: negative - a plain (non-curried) callee', () => {
 	// Prettier's exemption is for a curried callee alone; under a plain callee it breaks
 	// every argument out like tsv, so this pair is not the divergence.

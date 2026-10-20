@@ -607,6 +607,33 @@ pub(in crate::printer) fn is_memberish(expr: &internal::Expression<'_>) -> bool 
     )
 }
 
+/// Whether `call`'s callee is a call taking more arguments than `call` does, and `call` takes
+/// at least one — prettier's `isLongCurriedCallExpression`, asked from the outer call. The
+/// chain decides the same question per link ([`chain::ChainCall::ungroup_args`]); this is
+/// the routing half, for the two routes in [`Printer::build_call_doc`] that print the
+/// callee whole and so could not leave its list ungrouped.
+fn callee_is_long_curried(call: &internal::CallExpression<'_>) -> bool {
+    matches!(
+        &call.callee.kind,
+        internal::ExpressionKind::CallExpression(inner)
+            if !call.arguments.is_empty() && inner.arguments.len() > call.arguments.len()
+    )
+}
+
+/// Whether `callee`, the call a curried call is made on, roots in a member chain: down its
+/// callees through any number of further curried calls, the innermost call has a memberish
+/// callee (`a.b().c(x)` of `a.b().c(x)(y)`, `a.c(x)(y)` of `a.c(x)(y)(z)`).
+///
+/// Such a run keeps the template bypass in [`Printer::build_call_doc`], which prints that
+/// chain on one line as prettier does; the chain path would expand it.
+fn curried_run_roots_in_member_chain(callee: &internal::CallExpression<'_>) -> bool {
+    let mut call = callee;
+    while let internal::ExpressionKind::CallExpression(inner) = &call.callee.kind {
+        call = inner;
+    }
+    is_memberish(call.callee)
+}
+
 impl<'a> Printer<'a> {
     /// Whether `call` takes the member-chain bypass for a sole multiline template on the
     /// `(` line — prettier's `isTemplateOnItsOwnLine` arm of `printCallExpression`, which
@@ -791,6 +818,9 @@ impl<'a> Printer<'a> {
                 && !(call_has_comments
                     && last_arg_has_comments(call.arguments, self, span.end, paren_open))
                 && !inner_has_multiline_arg
+                // A long-curried callee prints its list without a group, which this route —
+                // printing the callee whole — cannot express. The chain path prints it.
+                && !callee_is_long_curried(call)
                 // The hug renders the callback's signature head on this line, so a
                 // signature that will break refuses it here as at every expand-last site;
                 // the fall-through breaks every argument out.
@@ -857,7 +887,19 @@ impl<'a> Printer<'a> {
             if test_patterns::test_call_flat_layout_applies(call, span, self) {
                 return self.build_call_doc_with_wrapping(call, span);
             }
-            if self.call_takes_template_bypass(call, span) {
+            // A long-curried callee is the exception (`fn(a, b)` under a sole template): the
+            // bypass prints it whole, where prettier leaves its list without a group, and the
+            // template's forced break then breaks that list ([`chain::ChainCall::ungroup_args`]).
+            // The chain path prints both — this call keeps its own layout there, hug included.
+            // A curried run rooted in a member chain keeps the bypass, which holds that chain
+            // on one line where the chain path would expand it.
+            if self.call_takes_template_bypass(call, span)
+                && !matches!(
+                    &call.callee.kind,
+                    internal::ExpressionKind::CallExpression(inner)
+                        if callee_is_long_curried(call) && !curried_run_roots_in_member_chain(inner)
+                )
+            {
                 // The callee is printed for this call, not as the statement's chain: a
                 // chain inside it takes no short-head merge (prettier's `shouldMerge` reads
                 // `isExpressionStatement(parent)`, and its parent is the callee's member).
@@ -867,8 +909,20 @@ impl<'a> Printer<'a> {
 
             // Use chain wrapping for chains (nested calls) or memberish callees
             let mut nodes = chain::ChainNodeVec::new();
-            chain::linearize_chain_from_call_into(call, span, self.linearize_input(), &mut nodes);
-            chain::build_linearized_chain_doc(&nodes, call.callee, span.start, span, self)
+            let long_curried = chain::linearize_chain_from_call_into(
+                call,
+                span,
+                self.linearize_input(),
+                &mut nodes,
+            );
+            chain::build_linearized_chain_doc(
+                &mut nodes,
+                long_curried,
+                call.callee,
+                span.start,
+                span,
+                self,
+            )
         } else {
             // Simple call (non-memberish callee) - wrap args directly
             self.build_call_doc_with_wrapping(call, span)
@@ -910,8 +964,20 @@ impl<'a> Printer<'a> {
 
         // Use chain-based implementation
         let mut nodes = chain::ChainNodeVec::new();
-        chain::linearize_chain_from_member_into(member, span, self.linearize_input(), &mut nodes);
-        chain::build_linearized_chain_doc(&nodes, member.object, span.start, span, self)
+        let long_curried = chain::linearize_chain_from_member_into(
+            member,
+            span,
+            self.linearize_input(),
+            &mut nodes,
+        );
+        chain::build_linearized_chain_doc(
+            &mut nodes,
+            long_curried,
+            member.object,
+            span.start,
+            span,
+            self,
+        )
     }
 
     /// Build a Doc for a dynamic import expression: `import('module')` or `import('module', options)`

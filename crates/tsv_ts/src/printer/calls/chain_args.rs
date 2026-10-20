@@ -228,6 +228,10 @@ struct ChainArgsContext {
     /// link at all. Threaded here rather than re-derived, because it is a fact about the
     /// link's POSITION in the chain and no branch builder can see one.
     own_call_layout: bool,
+    /// [`ChainCall::ungroup_args`] — the default tail prints the list without its own group.
+    /// Threaded here for the reason `own_call_layout` is: whether the call is the callee of a
+    /// call taking fewer arguments is a fact about its position in the chain.
+    ungroup_args: bool,
     /// **to emit**: a non-owned leading comment before the first argument (emitted here).
     has_leading_comments: bool,
     /// **on page**: any leading comment before the first argument, **owned or not** — an
@@ -264,7 +268,10 @@ fn build_call_args_doc_for_chain_impl(
     facts: ChainCall,
     force_expand: bool,
 ) -> DocId {
-    let ChainCall { own_call_layout } = facts;
+    let ChainCall {
+        own_call_layout,
+        ungroup_args,
+    } = facts;
     // Build type arguments if present: `<T, U>`
     let type_args = get_call_type_arguments(call);
     let type_args_doc = type_args.map(|ta| printer.build_type_parameter_instantiation_doc(ta));
@@ -399,6 +406,7 @@ fn build_call_args_doc_for_chain_impl(
         paren_open,
         prefix,
         own_call_layout,
+        ungroup_args,
         has_leading_comments,
         has_leading_comment_on_page,
         has_any_comments,
@@ -1211,6 +1219,7 @@ fn build_chain_args_multi(
         has_any_comment_text,
         last_arg_commented,
         comments_force_expansion,
+        ungroup_args,
         ..
     } = ctx;
     // See [`build_chain_args_single`] — the chain's opener, through which every ladder below
@@ -1533,5 +1542,13 @@ fn build_chain_args_multi(
             }
         }
     }
-    with_chain_head(d, head, opener.wrap_soft(d, d.concat(&arg_parts)))
+    // Prettier's default tail: the list in its own group, except for a long-curried call,
+    // whose list breaks with the group around it ([`ChainCall::ungroup_args`]).
+    let args = d.concat(&arg_parts);
+    let list = if ungroup_args {
+        opener.soft_list(d, args)
+    } else {
+        opener.wrap_soft(d, args)
+    };
+    with_chain_head(d, head, list)
 }

@@ -5,7 +5,7 @@
 // - Grouping: Group nodes by natural break points
 // - Merge decisions: Determine if first groups should be merged
 
-use super::builder::build_chain_doc;
+use super::builder::{build_chain_doc, mark_long_curried_calls};
 use super::printing::chain_gap_any;
 use super::types::{ChainGroup, ChainGroupVec, ChainNode, ChainNodeVec};
 use crate::ast::internal::{self, Expression, ExpressionKind, IdentName};
@@ -62,7 +62,7 @@ fn linearize_chain<'a>(expr: &'a Expression<'_>, input: LinearizeInput<'_>) -> C
     let mut nodes = ChainNodeVec::new();
     let mut paren_gaps = Vec::new();
     linearize_recursive(expr, input, &mut nodes, &mut paren_gaps);
-    finalize_chain_nodes(&mut nodes, &paren_gaps, input);
+    let _ = finalize_chain_nodes(&mut nodes, &paren_gaps, input);
     nodes
 }
 
@@ -101,12 +101,14 @@ fn linearize_chain<'a>(expr: &'a Expression<'_>, input: LinearizeInput<'_>) -> C
 // correction; the magnitude behind it did not.
 
 /// Linearize starting from a CallExpression (avoids cloning to wrap in Expression)
+///
+/// Returns whether the chain holds a long-curried pair ([`finalize_chain_nodes`]).
 pub fn linearize_chain_from_call_into<'a>(
     call: &'a internal::CallExpression<'_>,
     span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
-) {
+) -> bool {
     debug_assert!(
         nodes.is_empty(),
         "the linearizer fills its buffer, never appends"
@@ -114,16 +116,18 @@ pub fn linearize_chain_from_call_into<'a>(
     let mut paren_gaps = Vec::new();
     linearize_call_callee(call, span, input, nodes, &mut paren_gaps);
     nodes.push(ChainNode::call(call, span));
-    finalize_chain_nodes(nodes, &paren_gaps, input);
+    finalize_chain_nodes(nodes, &paren_gaps, input)
 }
 
 /// Linearize starting from a MemberExpression (avoids cloning to wrap in Expression)
+///
+/// Returns whether the chain holds a long-curried pair ([`finalize_chain_nodes`]).
 pub fn linearize_chain_from_member_into<'a>(
     member: &'a internal::MemberExpression<'_>,
     span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
-) {
+) -> bool {
     debug_assert!(
         nodes.is_empty(),
         "the linearizer fills its buffer, never appends"
@@ -131,10 +135,12 @@ pub fn linearize_chain_from_member_into<'a>(
     let mut paren_gaps = Vec::new();
     linearize_member_object(member, span, input, nodes, &mut paren_gaps);
     linearize_member_node(member, span, input.source, nodes, &mut paren_gaps);
-    finalize_chain_nodes(nodes, &paren_gaps, input);
+    finalize_chain_nodes(nodes, &paren_gaps, input)
 }
 
 /// Linearize starting from a TSNonNullExpression (avoids cloning to wrap in Expression)
+///
+/// Returns whether the chain holds a long-curried pair ([`finalize_chain_nodes`]).
 ///
 /// The terminal `NonNull` push takes no comment gate: the OUTERMOST operand→`!`
 /// gap's comments are handled by `build_ts_non_null_doc` before this entry is
@@ -146,7 +152,7 @@ pub fn linearize_chain_from_non_null_into<'a>(
     span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
-) {
+) -> bool {
     debug_assert!(
         nodes.is_empty(),
         "the linearizer fills its buffer, never appends"
@@ -154,7 +160,7 @@ pub fn linearize_chain_from_non_null_into<'a>(
     let mut paren_gaps = Vec::new();
     linearize_recursive(non_null.expression, input, nodes, &mut paren_gaps);
     nodes.push(ChainNode::non_null(non_null, span));
-    finalize_chain_nodes(nodes, &paren_gaps, input);
+    finalize_chain_nodes(nodes, &paren_gaps, input)
 }
 
 /// Apply deferred paren gap extensions to member nodes.
@@ -204,16 +210,20 @@ type ParenGap = (usize, u32, u32);
 /// extensions, then re-evaluate the base node's parens for the callee case.
 /// Shared by every linearization entry point so the two post-passes never
 /// drift apart.
+///
+/// Returns whether the chain holds a long-curried pair ([`mark_own_call_layout`]), which
+/// every entry point hands back for [`build_linearized_chain_doc`].
 fn finalize_chain_nodes(
     nodes: &mut [ChainNode<'_>],
     paren_gaps: &[ParenGap],
     input: LinearizeInput<'_>,
-) {
+) -> bool {
     apply_paren_gaps(nodes, paren_gaps);
     fix_callee_base_parens(nodes, input);
-    mark_own_call_layout(nodes, input.source);
+    let long_curried = mark_own_call_layout(nodes, input.source);
     #[cfg(feature = "buffer_stats")]
     crate::printer::buffer_stats::record_chain_nodes(nodes.len());
+    long_curried
 }
 
 /// Decide, per call node, whether prettier would print it through `printCallExpression` —
@@ -240,12 +250,23 @@ fn finalize_chain_nodes(
 /// identifier path (`describe.only`), and `require`/`define`/`import()` are a bare
 /// identifier or their own node — none of which can have a call beneath them, so none can
 /// ever be the ancestor that swallows one.
-fn mark_own_call_layout(nodes: &mut [ChainNode<'_>], source: &str) {
+///
+/// Returns whether the walk met a long-curried pair: a call directly followed by a call that
+/// takes at least one argument and fewer than it — exactly the pairs
+/// [`mark_long_curried_calls`] decides, so a chain without one skips that pass.
+fn mark_own_call_layout(nodes: &mut [ChainNode<'_>], source: &str) -> bool {
     let mut entered = false;
+    let mut long_curried = false;
+    // The argument count of the node after this one when that node is a call.
+    let mut next_call_args = None;
     for node in nodes.iter_mut().rev() {
         let ChainNode::Call { call, facts, .. } = node else {
+            next_call_args = None;
             continue;
         };
+        long_curried |=
+            next_call_args.is_some_and(|outer| outer > 0 && call.arguments.len() > outer);
+        next_call_args = Some(call.arguments.len());
         if entered {
             // `rec` swallows a memberish-or-call callee and stops at anything else, printing
             // that one with `print()` — a fresh `printCallExpression` context for everything
@@ -259,6 +280,7 @@ fn mark_own_call_layout(nodes: &mut [ChainNode<'_>], source: &str) {
             entered = is_memberish(call.callee) && !template_preempts_chain_redirect(call, source);
         }
     }
+    long_curried
 }
 
 /// Prettier's `isTemplateLiteralSingleArg` — a sole multiline template the author did NOT put
@@ -1028,8 +1050,9 @@ fn is_factory_name(name: IdentName<'_>, name_start: u32, printer: &Printer<'_>) 
 ///
 /// **Every chain entry point goes through here**, and there are three: a call, a member,
 /// and a `!` that seals a chain. Each differs only in which linearizer it ran and what it
-/// hands over; the four steps after that — the head window, the grouping, the doc, and the
-/// prepend — are one answer, so they are written once. Reassembling them at a call site is
+/// hands over; the steps after that — the head window, the long-curried marks
+/// ([`mark_long_curried_calls`]), the grouping, the doc, and the prepend — are one answer, so
+/// they are written once. Reassembling them at a call site is
 /// how the non-null door came to omit the prepend and drop every comment in its base's
 /// stripped parens.
 ///
@@ -1038,8 +1061,11 @@ fn is_factory_name(name: IdentName<'_>, name_start: u32, printer: &Printer<'_>) 
 /// region outside the operand is that builder's own leading claim and the two windows must
 /// partition the head rather than both taking it (`docs/comments.md` hazard 3). `span` is
 /// the printed node's own span, which the chain doc needs for its source lookups.
+/// `long_curried` is what the linearizer returned: whether the chain holds a long-curried
+/// pair at all, without which the marks have nothing to decide.
 pub fn build_linearized_chain_doc(
-    nodes: &[ChainNode<'_>],
+    nodes: &mut [ChainNode<'_>],
+    long_curried: bool,
     head_expr: &Expression<'_>,
     chain_start: u32,
     span: Span,
@@ -1067,9 +1093,13 @@ pub fn build_linearized_chain_doc(
         }
         _ => None,
     };
+    let outer_ungroups = printer
+        .chain_ungroups_args
+        .replace(long_curried && mark_long_curried_calls(nodes, printer));
     let groups = group_chain_nodes(nodes, printer);
     let chain_doc =
         printer.with_frozen_chain_base(frozen_base, || build_chain_doc(&groups, span, printer));
+    printer.chain_ungroups_args.set(outer_ungroups);
     printer.prepend_removed_paren_comments(head_start, head_end, chain_doc)
 }
 

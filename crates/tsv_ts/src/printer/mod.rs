@@ -644,6 +644,14 @@ pub struct Printer<'a> {
     /// only cause more work, never a dropped comment. Defaults `true` (do the full
     /// classify) so any member print reached without a preceding set is fail-safe.
     pub(crate) chain_has_comments: Cell<bool>,
+    /// Whether the member chain currently being built holds a call that prints its argument
+    /// list without a group (`chain::ChainCall::ungroup_args`) and is followed by another
+    /// call of the chain. Set once per `chain::build_linearized_chain_doc` (save/restore,
+    /// like [`Self::chain_has_comments`]) and read by the group printer, which then scans the
+    /// group for the calls that close a group around a curried prefix — a scan every other
+    /// chain skips. Defaults `true` for the same fail-safe reason: a group printed without a
+    /// preceding set only scans.
+    pub(crate) chain_ungroups_args: Cell<bool>,
     /// Whether a computed member's index doc built since the assignment builder last cleared
     /// this will break — a break that originates inside the `[…]`. Debug-only: the one
     /// reader is the `is_poorly_breakable_chain` assert in `expressions/assignment.rs`,
@@ -800,6 +808,7 @@ impl<'a> Printer<'a> {
             chain_arg_share_active: Cell::new(false),
             arrow_body_inject: Cell::new(None),
             chain_has_comments: Cell::new(true),
+            chain_ungroups_args: Cell::new(true),
             #[cfg(debug_assertions)]
             computed_index_breaks: Cell::new(false),
             negative_literal_pair_targets: SpanMarks::default(),

@@ -432,6 +432,31 @@ fn gen_ts_nested_curried_arrow_chain(depth: usize) -> String {
     format!("const v = {expr};\n")
 }
 
+/// LONG-CURRIED calls (`f(a, b)(c)`, an inner list longer than the outer one) nested through
+/// the OUTER call's argument — the chain link whose list prints without its own group
+/// (`ChainCall::ungroup_args`). The pass that marks it groups the chain ending at the inner
+/// call a second time, so a mark that re-entered the argument's own chain per level would
+/// show here.
+fn gen_ts_long_curried_arg(depth: usize) -> String {
+    let mut expr = String::from("done");
+    for i in 0..depth {
+        expr = format!("f{i}(a{i}, b{i})({expr})");
+    }
+    format!("const v = {expr};\n")
+}
+
+/// The CALLEE twin of `gen_ts_long_curried_arg` — one curried run `f(a, b)(c)(a, b)(c)…`, where
+/// every other link is long-curried and every call on a call closes a group over everything
+/// before it (`print_curried_group`). Each group must wrap the prefix built so far, not
+/// rebuild it.
+fn gen_ts_long_curried_callee(depth: usize) -> String {
+    let mut expr = String::from("f");
+    for i in 0..depth {
+        expr = format!("{expr}(a{i}, b{i})(c{i})");
+    }
+    format!("const v = {expr};\n")
+}
+
 /// Nested assignment RHS (`a = (b = (c = …))`) — the assignment-layout
 /// `conditional_group`/fluid-layout candidate site.
 fn gen_ts_assignment_nested(depth: usize) -> String {
@@ -761,6 +786,18 @@ const CONSTRUCTS: &[Construct] = &[
         name: "ts_nested_curried_arrow_chain",
         parser: ParserType::TypeScript,
         generate: gen_ts_nested_curried_arrow_chain,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_long_curried_arg",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_long_curried_arg,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_long_curried_callee",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_long_curried_callee,
         depths: &[4, 8, 12],
     },
     Construct {

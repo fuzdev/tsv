@@ -31,7 +31,7 @@ pub type ChainGroupVec<'a> = SmallVec<[ChainGroup<'a>; 4]>;
 pub type ChainNodeRefVec<'n, 'a> = SmallVec<[&'n ChainNode<'a>; 8]>;
 
 /// The facts about one call LINK that only the chain can supply — the link's own printer
-/// has no parent pointer and cannot see either of them.
+/// has no parent pointer and cannot see any of them.
 ///
 /// `own_call_layout` is the one prettier states as a routing decision: `printCallExpression`
 /// answers the call-level layout rules (the sole-multiline-template hug, the test-call flat
@@ -50,13 +50,21 @@ pub struct ChainCall {
     /// member-chain redirect swallowed. Set by `mark_own_call_layout` after linearization;
     /// `new` seeds it `true`, the value for a chain nothing entered.
     pub own_call_layout: bool,
+    /// This call's argument list prints WITHOUT its own group at prettier's default tail —
+    /// `printCallArguments`' `isLongCurriedCallExpression` arm: the call is the callee of the
+    /// next call, which takes at least one argument and fewer than this one
+    /// (`connect(a, b)(Component)`). The list then breaks with the nearest enclosing group,
+    /// so it breaks before the outer call's list does. Set by `mark_long_curried_calls`;
+    /// `new` seeds it `false`.
+    pub ungroup_args: bool,
 }
 
 impl ChainCall {
-    /// A link's facts before the chain-wide pass decides `own_call_layout`.
+    /// A link's facts before the chain-wide passes decide them.
     pub fn new() -> Self {
         Self {
             own_call_layout: true,
+            ungroup_args: false,
         }
     }
 }
@@ -312,6 +320,12 @@ impl<'a> ChainNode<'a> {
     /// Check if this is a call node
     pub const fn is_call(&self) -> bool {
         matches!(self, Self::Call { .. })
+    }
+
+    /// Whether this is a call whose argument list prints without its own group
+    /// ([`ChainCall::ungroup_args`]).
+    pub const fn ungroups_args(&self) -> bool {
+        matches!(self, Self::Call { facts, .. } if facts.ungroup_args)
     }
 
     /// Check if this is a member node (including computed)

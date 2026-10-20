@@ -59,7 +59,7 @@ prettier-plugin-svelte/test svelte match=276 known=46 partial=0 unknown=0 errors
 prettier/tests/format/css typescript match=78 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 prettier/tests/format/css css match=87 known=15 partial=8 unknown=14 errors=8 expected_errors=18
 prettier/tests/format/html svelte match=55 known=29 partial=0 unknown=0 errors=39 expected_errors=1
-prettier/tests/format/js typescript match=823 known=64 partial=16 unknown=25 errors=124 expected_errors=54
+prettier/tests/format/js typescript match=824 known=64 partial=16 unknown=24 errors=124 expected_errors=54
 prettier/tests/format/typescript typescript match=691 known=56 partial=7 unknown=24 errors=14 expected_errors=3
 ryanatkn.com svelte match=26 known=5 partial=0 unknown=0 errors=0 expected_errors=0
 ryanatkn.com typescript match=20 known=0 partial=0 unknown=0 errors=0 expected_errors=0

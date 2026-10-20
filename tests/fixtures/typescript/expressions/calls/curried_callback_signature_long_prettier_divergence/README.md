@@ -12,8 +12,12 @@ breaks every argument out, as tsv does everywhere.
 - **tsv**: `memoize(1000)(⏎\t(data: Data, id: string, skip: boolean): string[] => {⏎…⏎\t}⏎);`
 - **Prettier** (`const`): `memoize(1000)((⏎\tdata: Data,⏎\tid: string,⏎\tskip: boolean⏎): string[] => {⏎…⏎});`
 
+When the inner call takes more arguments than the outer one (`memoize(1000, a)((…) => {…})`),
+both formatters first break the inner list (prettier's long-curried rule); the divergence is
+then on the `)(` line, where a signature too long for its own line also breaks its parameters.
+
 At 100 the hug holds in both formatters. `unformatted_ours_hugged` is the hugged authoring of
-every 101 cell.
+every 101 cell and of the cell whose inner call takes more arguments.
 
 See [conformance_prettier_ts.md](../../../../../../docs/conformance_prettier_ts.md)
 §Curried-callee callback signature.

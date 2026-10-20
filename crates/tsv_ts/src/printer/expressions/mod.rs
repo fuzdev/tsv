@@ -1657,7 +1657,7 @@ impl<'a> Printer<'a> {
             // to properly handle breaking. This ensures the outer `!` is included
             // in the linearized chain for proper segment grouping.
             let mut nodes = chain::ChainNodeVec::new();
-            chain::linearize_chain_from_non_null_into(
+            let long_curried = chain::linearize_chain_from_non_null_into(
                 non_null_expr,
                 span,
                 self.linearize_input(),
@@ -1675,7 +1675,8 @@ impl<'a> Printer<'a> {
             // so the two claims partition the head rather than both taking it
             // (`docs/comments.md` hazard 3).
             chain::build_linearized_chain_doc(
-                &nodes,
+                &mut nodes,
+                long_curried,
                 non_null_expr.expression,
                 argument_start,
                 span,

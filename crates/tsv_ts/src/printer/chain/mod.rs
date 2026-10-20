@@ -46,8 +46,8 @@ mod types;
 
 // Re-export public API
 // `group_chain_nodes` and `build_chain_doc` are deliberately NOT re-exported: they are two
-// of the four steps `build_linearized_chain_doc` performs, and handing them out separately
-// is what let a caller assemble three of the four and drop the head claim.
+// of the steps `build_linearized_chain_doc` performs, and handing them out separately is
+// what let a caller assemble some of them and drop the head claim.
 pub use analysis::{
     LinearizeInput, build_linearized_chain_doc, chain_paren_leading_gap,
     linearize_chain_from_call_into, linearize_chain_from_member_into,
