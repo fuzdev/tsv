@@ -8,6 +8,7 @@
 
 use crate::ast::internal;
 use crate::printer::ArrowChainContext;
+use crate::printer::AssumedBreak;
 use crate::printer::LeadingGlue;
 use crate::printer::class_common::ClassHeaderOptions;
 use crate::printer::class_common::ClassTypeParamsGap;
@@ -18,7 +19,7 @@ use crate::printer::expressions::assignment::{
 use crate::printer::expressions::operators::SeqLayout;
 use crate::printer::needs_parens::leftmost_no_lookahead;
 use crate::printer::statements::function::FunctionHeadModifier;
-use crate::printer::types::helpers::is_huggable_type;
+use crate::printer::types::helpers::{is_huggable_type, type_literal_members_hold_brace_type};
 use crate::printer::{
     CommentFilter, CommentSpacing, CommentVec, ParenContext, Printer,
     is_multiline_template_expression, unwrap_parenthesized,
@@ -495,6 +496,16 @@ fn sole_param_object_type_start(
     open: Option<u32>,
     close: Option<u32>,
 ) -> Option<u32> {
+    sole_param_object_type(printer, params, open, close).map(|literal| literal.span.start)
+}
+
+/// The literal [`sole_param_object_type_start`] names, as the node.
+fn sole_param_object_type<'a>(
+    printer: &Printer<'_>,
+    params: &'a [internal::Expression<'a>],
+    open: Option<u32>,
+    close: Option<u32>,
+) -> Option<&'a internal::TSTypeLiteral<'a>> {
     if !printer.hugs_sole_parameter(params, open, close, true) {
         return None;
     }
@@ -505,9 +516,116 @@ fn sole_param_object_type_start(
         _ => None,
     }?;
     match unwrap_parenthesized(annotation.type_annotation) {
-        internal::TSType::TypeLiteral(literal) => Some(literal.span.start),
+        internal::TSType::TypeLiteral(literal) => Some(literal),
         _ => None,
     }
+}
+
+/// A block-bodied callback argument whose hugged sole parameter's object type
+/// ([`sole_param_object_type_start`]) the author wrote FLAT — the one shape whose print-width
+/// break of that literal tsv reads back as authored.
+///
+/// The hug keeps an authored expansion of that literal for a block body (the cataloged
+/// divergence), so a literal that breaks only for width on the broken-out argument line
+/// would read back as the hug: prettier's form there is not a tsv fixed point. The hug
+/// ladders admit the hug with the literal assumed expanded instead, through a state gated on
+/// that very line ([`AssumedBreak::TypeLiteral`]); this names its eligibility, so every
+/// ladder asks one question.
+///
+/// Comment-free signatures only: a comment there decides the hug through
+/// [`callback_signature_refuses_hug`] alone, and keeps the source's reading. A literal whose
+/// members hold a blank line is out too: read expanded, it refuses the hug. So is one whose
+/// members hold a nested non-empty brace type ([`type_literal_members_hold_brace_type`]): the
+/// hug would break that type for width, and its break reads back as authored.
+pub(in crate::printer) struct FlatSoleParamLiteral<'a> {
+    /// The literal's span start — the [`AssumedBreak::TypeLiteral`] position.
+    pub(in crate::printer) literal: u32,
+    /// The callback's block body, which every printing of the callback shares.
+    pub(in crate::printer) body: &'a internal::BlockStatement<'a>,
+    /// Whether the callback is an arrow (its body builds through
+    /// `Printer::arrow_block_body_doc`) rather than a `function`.
+    pub(in crate::printer) is_arrow: bool,
+    /// The break that ends the broken-out argument's line before the body does: a `function`
+    /// whose sole parameter groups on its own ([`should_group_function_parameters`]) with an
+    /// object return type, which breaks after that type's `{` ([`function_return_type_break`]).
+    ///
+    /// [`should_group_function_parameters`]: crate::printer::types::function_types::should_group_function_parameters
+    pub(in crate::printer) return_break: Option<AssumedBreak>,
+}
+
+/// The break prettier's params group measures a `function`'s flat parameters up to, when that
+/// group is its own: prettier's `shouldGroupFunctionParameters` (one parameter, type
+/// parameters that allow grouping, an object return type) wraps the parameters in a group of
+/// their own, and its `fits` reads the rest commands in break mode, so the return type's `{`
+/// ends the measured line (`function (a: { … }): {`).
+///
+/// `None` for any other return type: one that will break already ends the measured line at
+/// its own forced break, and one that does not group the parameters leaves the line to the body's.
+fn function_return_type_break(func: &internal::FunctionExpression<'_>) -> Option<AssumedBreak> {
+    let return_type = func.return_type.as_ref()?;
+    if !crate::printer::types::function_types::type_params_allow_grouping(
+        func.type_parameters.as_ref(),
+    ) {
+        return None;
+    }
+    match unwrap_parenthesized(return_type.type_annotation) {
+        internal::TSType::TypeLiteral(literal) => {
+            Some(AssumedBreak::TypeLiteral(literal.span.start))
+        }
+        internal::TSType::Mapped(mapped) => Some(AssumedBreak::MappedType(mapped.span.start)),
+        _ => None,
+    }
+}
+
+/// [`FlatSoleParamLiteral`] for `arg`, or `None`.
+pub(in crate::printer) fn flat_sole_param_literal<'a>(
+    printer: &Printer<'_>,
+    arg: &'a internal::Expression<'a>,
+) -> Option<FlatSoleParamLiteral<'a>> {
+    if printer.canonical {
+        return None;
+    }
+    let (literal, body, is_arrow, return_break) = match &arg.kind {
+        internal::ExpressionKind::ArrowFunctionExpression(arrow) => {
+            let internal::ArrowFunctionBody::BlockStatement(body) = &arrow.body else {
+                return None;
+            };
+            let literal = sole_param_object_type(
+                printer,
+                arrow.params,
+                arrow.params_start,
+                printer.arrow_params_end(arrow),
+            )?;
+            (literal, body, true, None)
+        }
+        internal::ExpressionKind::FunctionExpression(func) => {
+            let close = printer
+                .find_closing_paren(func.params_start, func.body.span.start)
+                .map(|after_paren| after_paren - 1);
+            let literal =
+                sole_param_object_type(printer, func.params, Some(func.params_start), close)?;
+            (literal, &func.body, false, function_return_type_break(func))
+        }
+        _ => return None,
+    };
+    // A blank line between the literal's members refuses the hug once the literal is read
+    // expanded (`type_literal_force_multiline`), so for it the width break reads back as the
+    // broken-out form, not the hug — no state of this kind applies. A nested brace type is
+    // out for the same reason: its own width break in the hug reads back as authored, which
+    // the hug keeps refusing, as prettier does.
+    if printer.literal_authored_expanded(literal)
+        || type_literal_members_hold_brace_type(literal)
+        || printer.type_literal_members_hold_blank_line(literal)
+        || printer.has_comments_on_page_between(arg.span.start, body.span.start)
+    {
+        return None;
+    }
+    Some(FlatSoleParamLiteral {
+        literal: literal.span.start,
+        body,
+        is_arrow,
+        return_break,
+    })
 }
 
 /// Whether `arrow`'s signature refuses a hug that renders its head on the callee's line —

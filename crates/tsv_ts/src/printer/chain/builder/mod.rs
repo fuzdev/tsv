@@ -37,7 +37,8 @@ use super::printing::{
 use super::types::{ChainGroup, ChainNode, ChainNodeVec};
 use crate::ast::internal::{ArrowFunctionBody, CallExpression, Expression, ExpressionKind};
 use crate::printer::Printer;
-use crate::printer::calls::is_memberish;
+use crate::printer::calls::{AssumedParamHug, is_memberish};
+use crate::printer::expressions::functions::flat_sole_param_literal;
 
 use smallvec::SmallVec;
 use smallvec::smallvec;
@@ -971,10 +972,15 @@ fn build_long_chain_doc<'a>(
     //   that withdraws it wherever the broken chain is the shared fixed point.
     //
     // With neither, the chain is the plain two-state group.
-    let middle_state =
-        build_breaking_object_chain_doc(first_groups, rest_groups, printer).or_else(|| {
+    //
+    // A third builder covers a disjoint shape — a block-bodied callback, never object-rooted:
+    // its hug is the settled form from prettier's second pass when the callback's sole
+    // parameter's object type, written flat, breaks for width ([`build_assumed_param_hug_state`]).
+    let middle_state = build_breaking_object_chain_doc(first_groups, rest_groups, printer)
+        .or_else(|| {
             build_flat_object_hug_state(first_groups, rest_groups, *on_line.last()?, printer)
-        });
+        })
+        .or_else(|| build_assumed_param_hug_state(first_groups, rest_groups, printer));
 
     match middle_state {
         Some(state) => d.conditional_group(&[on_line_doc, state, expanded]),
@@ -1161,6 +1167,81 @@ fn build_flat_object_hug_state<'a>(
     }
     let contents = build_prefix_flat_last_expanded_doc(first_groups, rest_groups, printer);
     Some(d.gated_state(probe, contents))
+}
+
+/// Build the gated hug state for a block-bodied callback whose hugged sole parameter's object
+/// type is written flat but cannot fit flat on the expanded chain's broken-out argument line —
+/// the chain spelling of the call printers' width-broken sole-parameter literal state
+/// (`calls::AssumedParamHug`; `docs/conformance_prettier_ts.md` §Hugged sole-parameter object
+/// type).
+///
+/// Prettier's pass 1 expands the chain, breaks the last call's arguments out and the literal
+/// for width on that line; pass 2 reads the literal as authored, and the chain's one-line
+/// measurement — truncated at the literal's forced break — collapses the chain onto the hug.
+/// This state is that settled form: the chain prefix flat and the last call printing its
+/// assumed-expanded hug outright, admitted while the argument cannot fit flat on its own line
+/// in the expanded chain — two levels below the chain (the call's line, then the argument's),
+/// which is why the probe is a [`tsv_lang::doc::arena::DocArena::line_probe`] one level past
+/// the gate's own.
+///
+/// The callback is the last call's last argument, or the first of two — the argument the
+/// lone, expand-last or expand-first hug opens.
+///
+/// The argument printer decides whether the hug state exists (every refusal it asks), so
+/// this builder only asks for it: it rebuilds the last group with the request set and keeps
+/// the state only when the printer consumed it. The rebuild is cheap — every argument doc
+/// in it is a chain-share hit.
+fn build_assumed_param_hug_state<'a>(
+    first_groups: &[ChainGroup<'a>],
+    rest_groups: &[ChainGroup<'a>],
+    printer: &Printer<'_>,
+) -> Option<DocId> {
+    let d = printer.arena();
+    // The callback the last call's hug would open: its last argument (the lone and
+    // expand-last hugs), or the first of two (the expand-first hug).
+    let call = rest_groups
+        .last()?
+        .nodes
+        .iter()
+        .rev()
+        .find_map(ChainNode::as_call_expression)?;
+    let callback = |arg: &&Expression<'_>| flat_sole_param_literal(printer, arg).is_some();
+    let (arg, separator) = match call.arguments {
+        [.., last] if callback(last) => (*last, None),
+        [first, _] if callback(first) => (*first, Some(d.text(","))),
+        _ => return None,
+    };
+    let (last, prefix) = rest_groups.split_last()?;
+    let outer = printer
+        .force_assumed_param_hug
+        .replace(Some(arg.span.start));
+    let last_doc = print_group(last, printer);
+    let taken = printer.force_assumed_param_hug.replace(outer).is_none();
+    if !taken {
+        return None;
+    }
+    let mut parts = build_groups_flat_docs(first_groups, printer);
+    parts.extend(prefix.iter().map(|g| print_group(g, printer)));
+    parts.push(d.group_break(last_doc));
+    // The argument's line as the call printer's own state measures it: a `function` the hug
+    // flattens (the last of several arguments) whose return type ends that line is measured
+    // to its `{`. The body is a chain-share hit.
+    let flattens_params = separator.is_none() && call.arguments.len() > 1;
+    let ends_at_return_type = flattens_params
+        && flat_sole_param_literal(printer, arg).is_some_and(|flat| flat.return_break.is_some());
+    let printed = match ends_at_return_type
+        .then(|| AssumedParamHug::new(printer, arg))
+        .flatten()
+    {
+        Some(hug) => hug.gate_line(printer, true, || printer.build_arg_expression_doc(arg)),
+        None => printer.build_arg_expression_doc(arg),
+    };
+    let line = match separator {
+        Some(separator) => d.concat(&[printed, separator]),
+        None => printed,
+    };
+    let probe = d.line_probe(1, line);
+    Some(d.gated_state(probe, d.concat(&parts)))
 }
 
 /// The SOLE argument of the chain's last call — the one whose kind decides which

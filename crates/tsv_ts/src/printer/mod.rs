@@ -114,6 +114,15 @@ pub(crate) enum ShareTag {
     /// `calls::prebuild_expand_last_obj_array_body` — an arrow's object/array terminal body,
     /// parens included, as the arrow's own body build would produce it.
     ExpandLastBody = 0b0000_1000,
+    /// `calls::AssumedParamHug::new` — a block-bodied callback argument's body, built once
+    /// for both of the callback's printings.
+    AssumedHugBody = 0b0001_0000,
+    /// `calls::AssumedParamHug::build` — the callback argument printed with its sole
+    /// parameter's object type assumed expanded.
+    AssumedHugArg = 0b0010_0000,
+    /// `calls::AssumedParamHug::build` — a `function` callback argument printed with its
+    /// return type's `{` assumed broken, the line its hug state's gate measures.
+    AssumedHugProbe = 0b0100_0000,
 }
 
 impl ShareTag {
@@ -130,7 +139,45 @@ impl ShareTag {
 // different `expandLastArg` state, which is a hit that is NOT byte-identical to a rebuild.
 const _: () = assert!(ShareTag::ArgExpression as u8 & ShareTag::STATE_BITS == 0);
 const _: () = assert!(ShareTag::ExpandLastBody as u8 & ShareTag::STATE_BITS == 0);
+const _: () = assert!(ShareTag::AssumedHugBody as u8 & ShareTag::STATE_BITS == 0);
+const _: () = assert!(ShareTag::AssumedHugArg as u8 & ShareTag::STATE_BITS == 0);
 const _: () = assert!(ShareTag::ArgExpression as u8 != ShareTag::ExpandLastBody as u8);
+const _: () = assert!(ShareTag::AssumedHugBody as u8 != ShareTag::ArgExpression as u8);
+const _: () = assert!(ShareTag::AssumedHugBody as u8 != ShareTag::ExpandLastBody as u8);
+const _: () = assert!(ShareTag::AssumedHugArg as u8 != ShareTag::ArgExpression as u8);
+const _: () = assert!(ShareTag::AssumedHugArg as u8 != ShareTag::ExpandLastBody as u8);
+const _: () = assert!(ShareTag::AssumedHugArg as u8 != ShareTag::AssumedHugBody as u8);
+const _: () = assert!(ShareTag::AssumedHugProbe as u8 & ShareTag::STATE_BITS == 0);
+const _: () = assert!(ShareTag::AssumedHugProbe as u8 != ShareTag::ArgExpression as u8);
+const _: () = assert!(ShareTag::AssumedHugProbe as u8 != ShareTag::ExpandLastBody as u8);
+const _: () = assert!(ShareTag::AssumedHugProbe as u8 != ShareTag::AssumedHugBody as u8);
+const _: () = assert!(ShareTag::AssumedHugProbe as u8 != ShareTag::AssumedHugArg as u8);
+
+/// One break a doc build reads as AUTHORED although the source does not hold it — the state
+/// [`Printer::assumed_break`] carries while a convergence state is built.
+///
+/// Prettier reaches some fixed points only on its second pass, which reads a break its first
+/// pass printed for WIDTH as one the author wrote. tsv prints that settled form in one pass by
+/// building it with the break assumed: each variant names one source position and the one
+/// reader that answers for it, so no reader can match a position another kind recorded.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum AssumedBreak {
+    /// The object-type literal starting here breaks after its `{`
+    /// (`type_literal_force_multiline`).
+    TypeLiteral(u32),
+    /// The mapped type starting here breaks after its `{` (`build_mapped_type_doc`).
+    MappedType(u32),
+}
+
+impl AssumedBreak {
+    /// The source position the assumed break belongs to — inside every node whose doc the
+    /// assumption can change, and inside no other.
+    pub(crate) fn position(self) -> u32 {
+        match self {
+            Self::TypeLiteral(start) | Self::MappedType(start) => start,
+        }
+    }
+}
 
 /// A set of spans marked during one document's print and never consumed — what a printer
 /// cell keyed by span needs when one decision records a node for a reader that builds it
@@ -348,6 +395,19 @@ pub struct Printer<'a> {
     /// by the literal's own position, so a nested literal built under the question keeps
     /// its authored expansion — and refuses the hug, as prettier's does.
     pub(crate) unforced_param_type_literal: Cell<Option<u32>>,
+    /// The one break the doc being built reads as authored ([`AssumedBreak`]), or `None`.
+    ///
+    /// Set only around the build of a convergence state's contents
+    /// ([`Self::with_assumed_break`]) and read by the one predicate each variant names, so a
+    /// build outside that scope never sees it. A doc that depends on it is a doc of a node
+    /// whose span holds the assumed position, which is what keeps the chain share sound under
+    /// it ([`Self::chain_share_key`]).
+    pub(crate) assumed_break: Cell<Option<AssumedBreak>>,
+    /// The callback argument (by span start) whose member-chain call must print its
+    /// `calls::AssumedParamHug` hug state outright — set by the chain printer while it
+    /// builds the chain's own convergence state, and CONSUMED (cleared) by the argument
+    /// printer that takes it, which is how the chain learns the state exists.
+    pub(crate) force_assumed_param_hug: Cell<Option<u32>>,
     /// How many trailing runs [`Self::append_trailing_paren_comments`] has DEFERRED out of a
     /// grouping pair the printer strips (`x + (y * z // c⏎)`): a `line_suffix` that no
     /// break inside the operand ends, so it rides to wherever the enclosing line ends.
@@ -640,7 +700,9 @@ pub struct Printer<'a> {
     /// injected DocId is exactly what the arrow's own body build would produce for a
     /// call body — `build_arrow_body_doc` returns `build_expression_doc` there).
     /// Keyed by span (unique per source position); nested expand-last calls
-    /// save/restore, so only the node currently being reused ever matches.
+    /// save/restore, so only the node currently being reused ever matches. A
+    /// `function` callback's block body is injected through the same slot
+    /// (`append_body_with_sig_comments`).
     pub(crate) arrow_body_inject: Cell<Option<(u32, DocId)>>,
     /// Whether the member chain currently being built has any comment anywhere in its
     /// span. Set once per `build_chain_doc` (save/restore, so a nested chain in a call
@@ -794,6 +856,8 @@ impl<'a> Printer<'a> {
             expand_last_arg_flat_params: Cell::new(false),
             test_call_flat_params: Cell::new(false),
             unforced_param_type_literal: Cell::new(None),
+            assumed_break: Cell::new(None),
+            force_assumed_param_hug: Cell::new(None),
             deferred_paren_runs: Cell::new(0),
             forced_list_elements: RefCell::new(Vec::new()),
             nullable_union_type_args: RefCell::new(Vec::new()),
@@ -908,6 +972,19 @@ impl<'a> Printer<'a> {
         let prev = self.inject_arrow_body(span, doc);
         let out = build();
         self.restore_arrow_body_inject(prev);
+        out
+    }
+
+    /// Run `build` with `assumed` as the [assumed break](Self::assumed_break), restoring the
+    /// previous one after — the scope a convergence state's contents is built in.
+    pub(crate) fn with_assumed_break<R>(
+        &self,
+        assumed: AssumedBreak,
+        build: impl FnOnce() -> R,
+    ) -> R {
+        let prev = self.assumed_break.replace(Some(assumed));
+        let out = build();
+        self.assumed_break.set(prev);
         out
     }
 
@@ -1467,9 +1544,25 @@ impl<'a> Printer<'a> {
     /// Printer state a chain's flat and expanded candidates reach a given node under
     /// differently — so a hit is byte-identical to a rebuild by construction rather than
     /// by the caller having checked. See the `chain_arg_share_active` field doc.
-    pub(crate) fn chain_share_key<T>(&self, node: &T, builder: ShareTag) -> Option<ShareKey> {
+    ///
+    /// An [assumed break](Self::assumed_break) is the one other state, and it changes the doc
+    /// of exactly the nodes whose span holds its position: those are built fresh (`None`),
+    /// every other node keeps its key, so the subtrees a convergence state rebuilds beside the
+    /// assumption still share. A tag bit could not stand in for it — two assumptions at two
+    /// positions would read each other's entries.
+    pub(crate) fn chain_share_key(
+        &self,
+        node: &internal::Expression<'_>,
+        builder: ShareTag,
+    ) -> Option<ShareKey> {
         if !self.chain_arg_share_active.get() {
             return None;
+        }
+        if let Some(assumed) = self.assumed_break.get() {
+            let span = node.span();
+            if (span.start..span.end).contains(&assumed.position()) {
+                return None;
+            }
         }
         let mut tag = builder as u8;
         if self.skip_arrow_chain.get() {

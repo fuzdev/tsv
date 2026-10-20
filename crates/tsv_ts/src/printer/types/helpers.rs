@@ -664,3 +664,142 @@ pub(super) fn type_needs_parens_in_union_or_intersection(
         other => is_constrained_infer(other),
     }
 }
+
+//
+// Nested brace types
+//
+
+/// Whether one of `literal`'s members holds a non-empty **brace-delimited** type
+/// (`TypeLiteral` / `Mapped`; an empty `{}` has nothing to break) anywhere in its types, a
+/// function type's parameter annotations and return type included — a nested `{` whose own
+/// print-width break the next pass reads as authored, since a brace type keeps an authored
+/// expansion ([`Printer::literal_authored_expanded`]).
+///
+/// Asked of the AST, never the source: a `{` inside a string-literal type, a template
+/// type's text or a comment opens nothing that breaks.
+pub(in crate::printer) fn type_literal_members_hold_brace_type(
+    literal: &internal::TSTypeLiteral<'_>,
+) -> bool {
+    literal.members.iter().any(type_element_holds_brace_type)
+}
+
+/// [`type_literal_members_hold_brace_type`] for one member.
+fn type_element_holds_brace_type(member: &internal::TSTypeElement<'_>) -> bool {
+    use internal::TSTypeElement;
+    match member {
+        TSTypeElement::PropertySignature(p) => {
+            annotation_holds_brace_type(p.type_annotation.as_ref())
+        }
+        TSTypeElement::MethodSignature(m) => {
+            signature_holds_brace_type(m.type_parameters.as_ref(), m.params, m.return_type.as_ref())
+        }
+        TSTypeElement::CallSignature(c) => {
+            signature_holds_brace_type(c.type_parameters.as_ref(), c.params, c.return_type.as_ref())
+        }
+        TSTypeElement::ConstructSignature(c) => {
+            signature_holds_brace_type(c.type_parameters.as_ref(), c.params, c.return_type.as_ref())
+        }
+        TSTypeElement::IndexSignature(i) => {
+            annotation_holds_brace_type(i.type_annotation.as_ref())
+                || i.parameters
+                    .iter()
+                    .any(|param| annotation_holds_brace_type(param.type_annotation()))
+        }
+    }
+}
+
+fn annotation_holds_brace_type(annotation: Option<&internal::TSTypeAnnotation<'_>>) -> bool {
+    annotation.is_some_and(|a| type_holds_brace_type(a.type_annotation))
+}
+
+fn signature_holds_brace_type(
+    type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
+    params: &[internal::Expression<'_>],
+    return_type: Option<&internal::TSTypeAnnotation<'_>>,
+) -> bool {
+    type_parameters.is_some_and(type_parameters_hold_brace_type)
+        || params.iter().any(param_holds_brace_type)
+        || annotation_holds_brace_type(return_type)
+}
+
+fn type_parameters_hold_brace_type(decl: &internal::TSTypeParameterDeclaration<'_>) -> bool {
+    decl.params.iter().any(type_parameter_holds_brace_type)
+}
+
+fn type_parameter_holds_brace_type(param: &internal::TSTypeParameter<'_>) -> bool {
+    param.constraint.is_some_and(type_holds_brace_type)
+        || param.default.is_some_and(type_holds_brace_type)
+}
+
+fn type_arguments_hold_brace_type(
+    args: Option<&internal::TSTypeParameterInstantiation<'_>>,
+) -> bool {
+    args.is_some_and(|args| args.params.iter().any(|ty| type_holds_brace_type(ty)))
+}
+
+/// A signature parameter's annotation. A destructuring pattern itself is not a brace type:
+/// its width break does not read back as authored, so only its annotation is walked.
+fn param_holds_brace_type(param: &internal::Expression<'_>) -> bool {
+    use internal::ExpressionKind;
+    match &param.kind {
+        ExpressionKind::Identifier(id) => annotation_holds_brace_type(id.type_annotation()),
+        ExpressionKind::ObjectPattern(p) => annotation_holds_brace_type(p.type_annotation.as_ref()),
+        ExpressionKind::ArrayPattern(p) => annotation_holds_brace_type(p.type_annotation.as_ref()),
+        ExpressionKind::RestElement(r) => {
+            param_holds_brace_type(r.argument)
+                || annotation_holds_brace_type(r.type_annotation.as_ref())
+        }
+        ExpressionKind::AssignmentPattern(p) => param_holds_brace_type(p.left),
+        _ => false,
+    }
+}
+
+/// [`type_literal_members_hold_brace_type`] for one type, the type itself included.
+fn type_holds_brace_type(ty: &TSType<'_>) -> bool {
+    match ty {
+        // An empty literal has nothing to break.
+        TSType::TypeLiteral(l) => !l.members.is_empty(),
+        TSType::Mapped(_) => true,
+        TSType::Keyword(_) | TSType::ThisType(_) => false,
+        TSType::Literal(TSLiteralType::TemplateLiteral(t)) => {
+            t.types.iter().any(|ty| type_holds_brace_type(ty))
+        }
+        TSType::Literal(_) => false,
+        TSType::Array(a) => type_holds_brace_type(a.element_type),
+        TSType::Union(TSUnionType { types, .. })
+        | TSType::Intersection(TSIntersectionType { types, .. }) => {
+            types.iter().any(|ty| type_holds_brace_type(ty))
+        }
+        TSType::Tuple(t) => t.element_types.iter().any(|ty| type_holds_brace_type(ty)),
+        TSType::TypeReference(r) => type_arguments_hold_brace_type(r.type_arguments.as_ref()),
+        TSType::Function(f) => {
+            signature_holds_brace_type(f.type_parameters.as_ref(), f.params, Some(&f.return_type))
+        }
+        TSType::Constructor(c) => {
+            signature_holds_brace_type(c.type_parameters.as_ref(), c.params, Some(&c.return_type))
+        }
+        TSType::Parenthesized(TSParenthesizedType {
+            type_annotation, ..
+        }) => type_holds_brace_type(type_annotation),
+        TSType::TypePredicate(p) => p.type_annotation.is_some_and(type_holds_brace_type),
+        TSType::Conditional(c) => [c.check_type, c.extends_type, c.true_type, c.false_type]
+            .into_iter()
+            .any(type_holds_brace_type),
+        TSType::TypeOperator(o) => type_holds_brace_type(o.type_annotation),
+        // An import type's options object (`import('m', { with: … })`) is an expression,
+        // not a type; only its type arguments are walked.
+        TSType::Import(i) => type_arguments_hold_brace_type(i.type_arguments.as_ref()),
+        TSType::TypeQuery(q) => {
+            type_arguments_hold_brace_type(q.type_arguments.as_ref())
+                || matches!(&q.expr_name, internal::TSTypeQueryExprName::Import(i)
+                    if type_arguments_hold_brace_type(i.type_arguments.as_ref()))
+        }
+        TSType::IndexedAccess(i) => {
+            type_holds_brace_type(i.object_type) || type_holds_brace_type(i.index_type)
+        }
+        TSType::Rest(r) => type_holds_brace_type(r.type_annotation),
+        TSType::Optional(o) => type_holds_brace_type(o.type_annotation),
+        TSType::NamedTupleMember(n) => type_holds_brace_type(n.element_type),
+        TSType::Infer(i) => type_parameter_holds_brace_type(&i.type_parameter),
+    }
+}

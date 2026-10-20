@@ -342,9 +342,11 @@ pub enum DocNode {
     ///
     /// An admitted state's `contents` is measured and rendered like any other
     /// state. Everywhere else — fits walks, `will_break`, rebuilds — the node is
-    /// transparent to `contents`; `probe` is measured only, never rendered (its
-    /// nodes are shared with the group's other states, so nothing exists only
-    /// inside it).
+    /// transparent to `contents`; `probe` is measured only, never rendered. Its
+    /// nodes are mostly shared with the group's other states, but a probe may
+    /// hold docs built for it alone (a [`DocArena::line_probe`]'s padding and
+    /// hard line, a prefix of the state's line), which no walk but the admission
+    /// measure visits; a rebuild carries them along unchanged.
     GatedState {
         probe: DocId,
         contents: DocId,
@@ -2958,6 +2960,31 @@ impl DocArena {
     /// conditional group — see [`DocNode::GatedState`].
     pub fn gated_state(&self, probe: DocId, contents: DocId) -> DocId {
         self.gated_state_admitting(probe, contents, GateAdmit::ProbeOverflows)
+    }
+
+    /// A [`DocNode::GatedState`] probe standing for the line `doc` heads
+    /// `extra_indents` levels deeper than the state's own fresh line, and ending
+    /// where `doc`'s first line does.
+    ///
+    /// The gate measures its probe one indent level deeper than the group,
+    /// completed by the group's rest commands. Two things a state's real line
+    /// can differ in from that: it sits deeper (a member chain's broken-out
+    /// argument is two levels below the chain), and it ENDS where the rest
+    /// commands would continue it (a broken-out argument's line stops before
+    /// the `)` and `;` the rest supply). The prefix is `TAB_WIDTH` columns per
+    /// level — exactly a tab's width, which is all an indent level is — and the
+    /// trailing hard line ends the fits walk there, fitting, so no rest command
+    /// is charged. Measured only: no walk but the gate's admission reads a
+    /// probe, so neither the padding nor the hard line ever renders.
+    pub fn line_probe(&self, extra_indents: usize, doc: DocId) -> DocId {
+        const PAD: &str = "        ";
+        let width = TAB_WIDTH * extra_indents;
+        assert!(
+            width <= PAD.len(),
+            "line_probe: {extra_indents} extra indents"
+        );
+        let line = [self.text(&PAD[..width]), doc, self.hardline()];
+        self.concat(if width == 0 { &line[1..] } else { &line })
     }
 
     /// Create a conditional-group state admitted only while `probe` FITS flat on a

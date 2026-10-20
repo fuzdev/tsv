@@ -23,14 +23,14 @@ use super::arg_predicates::{
     lone_arg_params_render_flat, mark_boolean_coercion_argument,
 };
 use super::arg_wrapping::{
-    ArgOpener, ChainArgKind, arrow_body_expands_internally, arrow_body_tail_has_comments,
-    arrow_hug_refused_by_comments, build_args_split_last, build_arrow_gap_break_multi_arg_doc,
-    build_arrow_gap_break_single_arg_doc, build_arrow_sig_doc, build_break_body_ladder,
-    build_expand_first_arg_doc, build_expand_last_obj_array_doc, build_flat_params_arg_doc,
-    build_hugged_arrow_sig_doc, build_joined_argument_doc, build_printed_argument_doc,
-    build_single_arrow_hug_doc, build_ternary_arrow_hug_ladder, classify_chain_arg,
-    first_arg_signature_refuses_expand_first, last_arg_arrow_gap_break, last_two_args_same_type,
-    prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
+    ArgOpener, AssumedParamHug, ChainArgKind, arrow_body_expands_internally,
+    arrow_body_tail_has_comments, arrow_hug_refused_by_comments, build_args_split_last,
+    build_arrow_gap_break_multi_arg_doc, build_arrow_gap_break_single_arg_doc, build_arrow_sig_doc,
+    build_break_body_ladder, build_expand_first_arg_doc, build_expand_last_obj_array_doc,
+    build_flat_params_arg_doc, build_hugged_arrow_sig_doc, build_joined_argument_doc,
+    build_printed_argument_doc, build_single_arrow_hug_doc, build_ternary_arrow_hug_ladder,
+    classify_chain_arg, first_arg_signature_refuses_expand_first, last_arg_arrow_gap_break,
+    last_two_args_same_type, prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
     prepend_arrow_body_comments, prepend_hugged_arrow_body_comments, should_expand_first_arg,
     try_hook_deps_args_doc,
 };
@@ -991,8 +991,21 @@ fn build_chain_args_single(
     // Build arg doc in argument context. This is prettier's `printedArguments` — printed
     // with no `expandLastArg`, so a curried chain takes the progressive layout
     // (`build_printed_argument_doc`); the expand-last hug states above build their own.
-    let arg_doc =
-        build_printed_argument_doc(printer, arg, || printer.build_arg_expression_doc(arg));
+    //
+    // A block-bodied arrow the block-arrow arm below may hug takes its body built once, for
+    // the convergence state that arm admits ([`AssumedParamHug`]).
+    let assumed = match &arg.kind {
+        ExpressionKind::ArrowFunctionExpression(arrow)
+            if matches!(arrow.body, internal::ArrowFunctionBody::BlockStatement(_))
+                && !(has_leading_comment_on_page || last_arg_commented) =>
+        {
+            AssumedParamHug::new(printer, arg)
+        }
+        _ => None,
+    };
+    let arg_doc = AssumedParamHug::sharing(assumed.as_ref(), printer, || {
+        build_printed_argument_doc(printer, arg, || printer.build_arg_expression_doc(arg))
+    });
     let arg_start = arg.span().start;
     let arg_end = arg.span().end;
 
@@ -1121,7 +1134,38 @@ fn build_chain_args_single(
         } else {
             // No leading comments — try hug first, then expand
             let state_hug = d.concat(&[prefix, arg_with_comments, d.text(")")]);
-            d.conditional_group(&[state_hug, state_expand])
+            match assumed {
+                Some(hug) => {
+                    let build_arg = || {
+                        build_printed_argument_doc(printer, arg, || {
+                            printer.build_arg_expression_doc(arg)
+                        })
+                    };
+                    let with_trailing = |assumed_arg| match trailing_comments_doc {
+                        Some(trailing) => d.concat(&[assumed_arg, trailing]),
+                        None => assumed_arg,
+                    };
+                    // The chain's own convergence state asks for this state alone
+                    // (`chain::builder`'s assumed-hug middle state).
+                    if hug.take_forced(printer) {
+                        let assumed_arg = with_trailing(hug.contents(printer, build_arg));
+                        return with_chain_head(
+                            d,
+                            head,
+                            d.concat(&[prefix, assumed_arg, d.text(")")]),
+                        );
+                    }
+                    let assumed = hug.build(printer, false, build_arg);
+                    let state_assumed =
+                        d.concat(&[prefix, with_trailing(assumed.doc), d.text(")")]);
+                    d.conditional_group(&[
+                        state_hug,
+                        assumed.state(d, arg_with_comments, state_assumed),
+                        state_expand,
+                    ])
+                }
+                None => d.conditional_group(&[state_hug, state_expand]),
+            }
         };
         return with_chain_head(d, head, doc);
     }
@@ -1275,8 +1319,14 @@ fn build_chain_args_multi(
         // itself (a bundler annotation) — prettier's `shouldExpandLastArg` sees it too.
         && !last_arg_commented
     {
+        let assumed = call
+            .arguments
+            .last()
+            .and_then(|last| AssumedParamHug::new(printer, last));
         let (head_parts, last_arg_doc, all_args_broken) =
-            build_args_split_last(call.arguments, printer, paren_open, has_any_comments);
+            AssumedParamHug::sharing(assumed.as_ref(), printer, || {
+                build_args_split_last(call.arguments, printer, paren_open, has_any_comments)
+            });
 
         // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
         if let Some(bail) = opener.expand_all_if_head_breaks(d, &head_parts, all_args_broken) {
@@ -1295,10 +1345,29 @@ fn build_chain_args_multi(
             return with_chain_head(d, head, opener.expand_all(d, all_args_broken));
         }
 
+        let last_index = call.arguments.len() - 1;
+        // The chain's own convergence state asks for the hug state alone
+        // (`chain::builder`'s assumed-hug middle state).
+        let build_last =
+            || build_joined_argument_doc(printer, paren_open, call.arguments, last_index);
+        if let Some(hug) = &assumed
+            && hug.take_forced(printer)
+        {
+            let contents = hug.contents(printer, build_last);
+            return with_chain_head(d, head, opener.inline(d, &head_parts, contents));
+        }
+        // A plain call's last of several arguments: its hug flattens a `function`'s parameters.
+        let assumed = assumed.map(|hug| hug.build(printer, true, build_last));
         return with_chain_head(
             d,
             head,
-            opener.inline_or_expand_all(d, &head_parts, last_arg_doc, all_args_broken),
+            opener.inline_assumed_or_expand_all(
+                d,
+                &head_parts,
+                last_arg_doc,
+                assumed,
+                all_args_broken,
+            ),
         );
     }
 

@@ -1476,6 +1476,42 @@ mod arena_tests {
     }
 
     #[test]
+    fn test_line_probe_measures_its_own_line_at_its_depth() {
+        // A two-state group whose middle state is gated on a line two levels
+        // below the group (one past the gate's own fresh line): `ab(cccc)` at +2
+        // needs 2·2 + 8 = 12 columns, and the line ENDS there — the rest command
+        // (`;`) is never charged to it. So at width 12 the probe fits (the
+        // fallback is the settled form), and at 11 it overflows (the gated state
+        // is admitted).
+        fn build(a: &DocArena) -> DocId {
+            let line = a.text("ab(cccc)");
+            let gated = a.text("G");
+            let fallback = a.text("FALLBACK-TOO-WIDE-TO-FIT");
+            let group = a.conditional_group(&[
+                a.text("FIRST-STATE-TOO-WIDE-TO-FIT"),
+                a.gated_state(a.line_probe(1, line), gated),
+                fallback,
+            ]);
+            a.concat(&[group, a.text(";")])
+        }
+        let a = DocArena::new();
+        let doc = build(&a);
+        assert_eq!(render_pw_tab(&a, doc, 12), "FALLBACK-TOO-WIDE-TO-FIT;");
+        assert_eq!(render_pw_tab(&a, doc, 11), "G;");
+        // With no extra level the same line is measured at +1: 2 + 8 = 10.
+        let a = DocArena::new();
+        let line = a.text("ab(cccc)");
+        let group = a.conditional_group(&[
+            a.text("FIRST-STATE-TOO-WIDE-TO-FIT"),
+            a.gated_state(a.line_probe(0, line), a.text("G")),
+            a.text("FALLBACK-TOO-WIDE-TO-FIT"),
+        ]);
+        let doc = a.concat(&[group, a.text(";")]);
+        assert_eq!(render_pw_tab(&a, doc, 10), "FALLBACK-TOO-WIDE-TO-FIT;");
+        assert_eq!(render_pw_tab(&a, doc, 9), "G;");
+    }
+
+    #[test]
     #[should_panic(expected = "conditional_group requires at least one state")]
     fn test_conditional_group_empty_panics() {
         let a = DocArena::new();

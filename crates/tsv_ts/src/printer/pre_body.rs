@@ -183,6 +183,12 @@ impl<'a> Printer<'a> {
         parts.push(pre_body);
         if let Some(frozen) = frozen {
             parts.push(self.build_frozen_span_doc(frozen));
+        } else if let Some((span, doc)) = self.arrow_body_inject.get()
+            && span == body.span.start
+        {
+            // A callback argument's body built once for both of its printings (the
+            // `function` spelling of the arrow-body injection, `Printer::arrow_body_inject`).
+            parts.push(doc);
         } else {
             parts.push(self.build_block_statement_doc(body));
         }

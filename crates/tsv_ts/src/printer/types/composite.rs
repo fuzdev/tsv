@@ -20,10 +20,10 @@ use super::{
 use crate::ast::internal::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
-use crate::printer::LeadingGlue;
 use crate::printer::comments::{ConditionalBranchPlacement, OwnLineBlock, TrailingBlank};
 use crate::printer::ignore::RoutedScope;
 use crate::printer::layout::bracketed_list_body;
+use crate::printer::{AssumedBreak, LeadingGlue};
 use crate::printer::{CommentVec, ShellLeadingRun, ShellPair};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Comment;
@@ -1422,7 +1422,11 @@ impl<'a> Printer<'a> {
         // canonical mode keeps (a comment inside the mapped type), which the doc carries
         // and the classifier reads. Erasing it needs a `canonicalize:audit` cell showing the
         // inline and multi-line authorings converge, and `format_canonical`'s docs updated.
-        let source_is_multiline = super::super::is_brace_block_multiline(self.source, m.span);
+        //
+        // A convergence state's build reads it as broken after its `{` whatever the source
+        // holds (`Printer::assumed_break`), exactly as an authored break.
+        let source_is_multiline = super::super::is_brace_block_multiline(self.source, m.span)
+            || self.assumed_break.get() == Some(AssumedBreak::MappedType(m.span.start));
         // The shell's own question — the source test above, OR a trailing run that deferred
         // and so has to land inside the braces (`TrailingRun::deferred`, at the value
         // branch's emission below). Only that branch can raise it.

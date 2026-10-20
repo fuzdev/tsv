@@ -649,6 +649,79 @@ fn measure(c: &Construct) -> ConstructResult {
     }
 }
 
+/// The object type a level of the flat-sole-parameter-literal constructs annotates its
+/// callback's sole parameter with: written flat and too wide for any line at any depth, so
+/// every level takes the width-broken literal's convergence state.
+const FLAT_WIDE_PARAM_LITERAL: &str =
+    "{ b: C; d: DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD }";
+
+/// A block-bodied callback LAST argument whose sole parameter's object type is written flat
+/// and too wide (`f(lead, (a: { … }) => { f(lead, (b: { … }) => { … }); })`) — the
+/// width-broken literal's hug state (`calls::AssumedParamHug`), whose second printing of the
+/// callback must share the body rather than rebuild it.
+fn gen_ts_nested_flat_param_literal_multiarg(depth: usize) -> String {
+    let mut body = String::from("done();");
+    for i in 0..depth {
+        body = format!("call{i}(lead{i}, (a{i}: {FLAT_WIDE_PARAM_LITERAL}) => {{ {body} }});");
+    }
+    format!("{body}\n")
+}
+
+/// The same callback as a LONE argument of a two-call member chain's last call — the chain's
+/// own convergence state, which rebuilds the last group per candidate.
+fn gen_ts_nested_flat_param_literal_chain(depth: usize) -> String {
+    let mut body = String::from("done();");
+    for i in 0..depth {
+        body = format!("obj{i}.a().fn((a{i}: {FLAT_WIDE_PARAM_LITERAL}) => {{ {body} }});");
+    }
+    format!("{body}\n")
+}
+
+/// The same callback as a `function` expression after a lead argument — the body shared
+/// through the `function` spelling of the body injection.
+fn gen_ts_nested_flat_param_literal_function(depth: usize) -> String {
+    let mut body = String::from("done();");
+    for i in 0..depth {
+        body =
+            format!("call{i}(lead{i}, function (a{i}: {FLAT_WIDE_PARAM_LITERAL}) {{ {body} }});");
+    }
+    format!("{body}\n")
+}
+
+/// The same `function` callback with an object return type, which ends the broken-out
+/// line at that type's `{` — the third printing of the callback the state's gate measures.
+fn gen_ts_nested_flat_param_literal_function_return(depth: usize) -> String {
+    let mut body = String::from("done();");
+    for i in 0..depth {
+        body = format!(
+            "call{i}(lead{i}, function (a{i}: {FLAT_WIDE_PARAM_LITERAL}): {{ x: X }} {{ {body} }});"
+        );
+    }
+    format!("{body}\n")
+}
+
+/// That callback after a lead argument of a two-call member chain's last call, in a value
+/// position — the chain's own convergence state, which measures its own printing of that line.
+fn gen_ts_nested_flat_param_literal_chain_return(depth: usize) -> String {
+    let mut body = String::from("done();");
+    for i in 0..depth {
+        body = format!(
+            "const v{i} = obj{i}.a().fn(lead{i}, function (a{i}: {FLAT_WIDE_PARAM_LITERAL}): {{ x: X }} {{ {body} }});"
+        );
+    }
+    format!("{body}\n")
+}
+
+/// The same callback as the FIRST of two arguments (`reduce((a: { … }) => { … }, '')`) —
+/// the expand-first hug's spelling of the state.
+fn gen_ts_nested_flat_param_literal_first(depth: usize) -> String {
+    let mut body = String::from("done();");
+    for i in 0..depth {
+        body = format!("call{i}((a{i}: {FLAT_WIDE_PARAM_LITERAL}) => {{ {body} }}, '');");
+    }
+    format!("{body}\n")
+}
+
 /// Every construct the audit measures, with the depths it grows each one to.
 const CONSTRUCTS: &[Construct] = &[
     Construct {
@@ -931,6 +1004,42 @@ const CONSTRUCTS: &[Construct] = &[
         name: "ts_nested_fn_expr_multiarg",
         parser: ParserType::TypeScript,
         generate: gen_ts_nested_fn_expr_multiarg,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_flat_param_literal_multiarg",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_flat_param_literal_multiarg,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_flat_param_literal_chain",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_flat_param_literal_chain,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_flat_param_literal_function",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_flat_param_literal_function,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_flat_param_literal_first",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_flat_param_literal_first,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_flat_param_literal_function_return",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_flat_param_literal_function_return,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_flat_param_literal_chain_return",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_flat_param_literal_chain_return,
         depths: &[4, 8, 12],
     },
 ];

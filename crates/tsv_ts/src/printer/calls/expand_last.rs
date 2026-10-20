@@ -12,10 +12,11 @@ use super::arg_predicates::{
     is_array_or_object_unwrapped, is_ternary_arrow_body,
 };
 use super::arg_wrapping::{
-    ArgOpener, arrow_body_expands_internally, arrow_hug_refused_by_comments, build_args_split_last,
-    build_arrow_gap_break_multi_arg_doc, build_break_body_ladder, build_expand_last_obj_array_doc,
-    build_hugged_arrow_sig_doc, could_expand_arrow_chain, last_arg_arrow_gap_break,
-    last_two_args_same_type, prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
+    ArgOpener, AssumedParamHug, arrow_body_expands_internally, arrow_hug_refused_by_comments,
+    build_args_split_last, build_arrow_gap_break_multi_arg_doc, build_break_body_ladder,
+    build_expand_last_obj_array_doc, build_hugged_arrow_sig_doc, build_joined_argument_doc,
+    could_expand_arrow_chain, last_arg_arrow_gap_break, last_two_args_same_type,
+    prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
     prepend_arrow_body_comments,
 };
 use crate::ast::internal;
@@ -220,9 +221,20 @@ pub(super) fn try_expand_last_arg(
         };
         (call_body, obj_body)
     };
+    // A block-bodied callback whose sole parameter's object type is written flat shares its
+    // body the same way, for the convergence state it may take ([`AssumedParamHug`]). Disjoint
+    // from both prebuilds above (an expression body) and from the gap-break state (a comment
+    // in the signature, which the state's own gate refuses).
+    let assumed = if arrow_gap_break.is_none() && body_reuse.is_none() && obj_reuse.is_none() {
+        last_arg.and_then(|last| AssumedParamHug::new(printer, last))
+    } else {
+        None
+    };
     let inject = match &arrow_gap_break {
         Some(gap_break) => gap_break.inject,
-        None => body_reuse.or(obj_reuse),
+        None => body_reuse
+            .or(obj_reuse)
+            .or_else(|| assumed.as_ref().map(AssumedParamHug::body_inject)),
     };
 
     let (head_parts, last_arg_doc, all_args_broken) = printer
@@ -318,7 +330,20 @@ pub(super) fn try_expand_last_arg(
         {
             return Some(opener.expand_all(d, all_args_broken));
         }
-        return Some(opener.inline_or_expand_all(d, &head_parts, last_arg_doc, all_args_broken));
+        let assumed = assumed.map(|hug| {
+            // Prettier's `shouldExpandParameters`: a plain call's last of several arguments.
+            let flattens_params = owner == ArgOwner::Call && arguments.len() > 1;
+            hug.build(printer, flattens_params, || {
+                build_joined_argument_doc(printer, paren_open, arguments, arguments.len() - 1)
+            })
+        });
+        return Some(opener.inline_assumed_or_expand_all(
+            d,
+            &head_parts,
+            last_arg_doc,
+            assumed,
+            all_args_broken,
+        ));
     }
 
     // Array / object last argument. Prettier disables the hug state when the last two arguments

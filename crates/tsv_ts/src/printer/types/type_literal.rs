@@ -14,7 +14,8 @@ use crate::ast::internal::{
     TSIntersectionType, TSParenthesizedType, TSType, TSTypeElement, TSTypeLiteral, TSUnionType,
 };
 use crate::printer::{
-    LeadingGlue, MemberBlankScan, MemberBody, MemberFreeze, MemberSeam, ShellLeadingRun, ShellPair,
+    AssumedBreak, LeadingGlue, MemberBlankScan, MemberBody, MemberFreeze, MemberSeam,
+    ShellLeadingRun, ShellPair,
 };
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
@@ -1059,11 +1060,14 @@ impl<'a> Printer<'a> {
         // *immediately* after `{`, so a block comment on the brace line
         // (`{ /* c */\n a: T }`) defeats it — detect the newline before the first
         // member directly here.
+        //
+        // A convergence state's build reads one literal as expanded whatever the source holds
+        // (`Printer::assumed_break`) — OR-ed into the source read, never answered ahead of
+        // it, so the hug policy's question above treats the assumed expansion exactly as it
+        // treats an authored one.
         let expanded = !self.canonical
-            && (super::super::is_brace_block_multiline(self.source, obj.span)
-                || obj.members.first().is_some_and(|m| {
-                    self.source[obj.span.start as usize..m.span().start as usize].contains('\n')
-                }));
+            && (self.literal_authored_expanded(obj)
+                || self.assumed_break.get() == Some(AssumedBreak::TypeLiteral(obj.span.start)));
         if unforced {
             // The hug policy's question drops the authored expansion alone. A blank line
             // between the expanded literal's own members prints as a `hardline` in both
@@ -1097,10 +1101,23 @@ impl<'a> Printer<'a> {
             })
     }
 
+    /// Whether the author broke `obj` after its `{`: a newline right after the brace, or
+    /// before the first member (a block comment on the brace line hides the first from
+    /// `is_brace_block_multiline`).
+    pub(in crate::printer) fn literal_authored_expanded(&self, obj: &TSTypeLiteral<'_>) -> bool {
+        super::super::is_brace_block_multiline(self.source, obj.span)
+            || obj.members.first().is_some_and(|m| {
+                self.source[obj.span.start as usize..m.span().start as usize].contains('\n')
+            })
+    }
+
     /// Whether a blank line separates two of `obj`'s members — measured past the gap's
     /// comments, as the member walk measures the blank it keeps
     /// ([`MemberBlankScan::PastComments`]).
-    fn type_literal_members_hold_blank_line(&self, obj: &TSTypeLiteral<'_>) -> bool {
+    pub(in crate::printer) fn type_literal_members_hold_blank_line(
+        &self,
+        obj: &TSTypeLiteral<'_>,
+    ) -> bool {
         obj.members.windows(2).any(|pair| {
             let next_start = pair[1].span().start;
             self.has_blank_line_between(

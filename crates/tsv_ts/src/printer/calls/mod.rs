@@ -39,6 +39,7 @@ mod test_patterns;
 pub(crate) use arg_comments::{
     PartitionedComments, has_stripped_paren_gap, skip_stripped_open_paren,
 };
+pub(in crate::printer) use arg_wrapping::AssumedParamHug;
 pub(in crate::printer) use import_expr::{ImportOptionsArg, build_import_args_comment_layout};
 
 use super::chain::{self, ChainCall, call_callee_paren_leading_start};
@@ -861,17 +862,38 @@ impl<'a> Printer<'a> {
 
                 // Build args split into head (with commas) and last
                 // Leading comments before first arg are handled inside build_args_split_last
+                let assumed = call
+                    .arguments
+                    .last()
+                    .and_then(|last| AssumedParamHug::new(self, last));
                 let (head_parts, last_arg_doc, all_args_broken) =
-                    build_args_split_last(call.arguments, self, paren_open, call_has_comments);
+                    AssumedParamHug::sharing(assumed.as_ref(), self, || {
+                        build_args_split_last(call.arguments, self, paren_open, call_has_comments)
+                    });
+                let last_index = call.arguments.len() - 1;
+                let assumed = assumed.map(|hug| {
+                    // Prettier's `shouldExpandParameters`: a plain call's last of several
+                    // arguments flattens a `function`'s parameters in the hug.
+                    hug.build(self, call.arguments.len() > 1, || {
+                        arg_wrapping::build_joined_argument_doc(
+                            self,
+                            paren_open,
+                            call.arguments,
+                            last_index,
+                        )
+                    })
+                });
 
                 // The two-state ladder every expand-last printer shares, so the curried
                 // callee stays outside its states like any other callee.
-                return arg_wrapping::ArgOpener::callee(d, callee_doc).inline_or_expand_all(
-                    d,
-                    &head_parts,
-                    last_arg_doc,
-                    all_args_broken,
-                );
+                return arg_wrapping::ArgOpener::callee(d, callee_doc)
+                    .inline_assumed_or_expand_all(
+                        d,
+                        &head_parts,
+                        last_arg_doc,
+                        assumed,
+                        all_args_broken,
+                    );
             }
         }
 
