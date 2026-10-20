@@ -1,0 +1,1583 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1400,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 1362,
+				"end": 1364,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 1364,
+				"end": 1399,
+				"expression": {
+					"type": "NewExpression",
+					"start": 1365,
+					"end": 1398,
+					"callee": {
+						"type": "Identifier",
+						"start": 1369,
+						"end": 1371,
+						"name": "Fn"
+					},
+					"arguments": [
+						{
+							"type": "ArrowFunctionExpression",
+							"start": 1380,
+							"end": 1397,
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 1381,
+									"end": 1382,
+									"name": "x"
+								}
+							],
+							"body": {
+								"type": "ObjectExpression",
+								"start": 1388,
+								"end": 1396,
+								"properties": [
+									{
+										"type": "Property",
+										"start": 1390,
+										"end": 1394,
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 1390,
+											"end": 1391,
+											"name": "k"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 1393,
+											"end": 1394,
+											"name": "a"
+										},
+										"kind": "init"
+									}
+								]
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " l ",
+									"start": 1372,
+									"end": 1379
+								}
+							]
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A lone arrow argument led by a block comment stays on the `new` line when it fits —",
+			"start": 20,
+			"end": 106
+		},
+		{
+			"type": "Line",
+			"value": " object, array and object-terminal arrow-chain bodies, at every statement position",
+			"start": 108,
+			"end": 192
+		},
+		{
+			"type": "Line",
+			"value": " Statement, object body",
+			"start": 195,
+			"end": 220
+		},
+		{
+			"type": "Block",
+			"value": " l ",
+			"start": 229,
+			"end": 236
+		},
+		{
+			"type": "Line",
+			"value": " Array body",
+			"start": 259,
+			"end": 272
+		},
+		{
+			"type": "Block",
+			"value": " l ",
+			"start": 281,
+			"end": 288
+		},
+		{
+			"type": "Line",
+			"value": " Arrow chain with an object terminal",
+			"start": 304,
+			"end": 342
+		},
+		{
+			"type": "Block",
+			"value": " l ",
+			"start": 351,
+			"end": 358
+		},
+		{
+			"type": "Line",
+			"value": " Type arguments",
+			"start": 388,
+			"end": 405
+		},
+		{
+			"type": "Block",
+			"value": " l ",
+			"start": 417,
+			"end": 424
+		},
+		{
+			"type": "Line",
+			"value": " Member callee",
+			"start": 447,
+			"end": 463
+		},
+		{
+			"type": "Block",
+			"value": " l ",
+			"start": 474,
+			"end": 481
+		},
+		{
+			"type": "Line",
+			"value": " JSDoc lead",
+			"start": 504,
+			"end": 517
+		},
+		{
+			"type": "Block",
+			"value": "* l ",
+			"start": 526,
+			"end": 534
+		},
+		{
+			"type": "Line",
+			"value": " `return` and `throw`",
+			"start": 557,
+			"end": 580
+		},
+		{
+			"type": "Block",
+			"value": " l ",
+			"start": 615,
+			"end": 622
+		},
+		{
+			"type": "Block",
+			"value": " l ",
+			"start": 679,
+			"end": 686
+		},
+		{
+			"type": "Line",
+			"value": " `export default`",
+			"start": 712,
+			"end": 731
+		},
+		{
+			"type": "Block",
+			"value": " l ",
+			"start": 755,
+			"end": 762
+		},
+		{
+			"type": "Line",
+			"value": " A declarator value: the same flat form",
+			"start": 785,
+			"end": 826
+		},
+		{
+			"type": "Block",
+			"value": " l ",
+			"start": 845,
+			"end": 852
+		},
+		{
+			"type": "Line",
+			"value": " Block body: the argument breaks out",
+			"start": 875,
+			"end": 913
+		},
+		{
+			"type": "Block",
+			"value": " l ",
+			"start": 925,
+			"end": 932
+		},
+		{
+			"type": "Line",
+			"value": " Ternary body",
+			"start": 965,
+			"end": 980
+		},
+		{
+			"type": "Block",
+			"value": " l ",
+			"start": 989,
+			"end": 996
+		},
+		{
+			"type": "Line",
+			"value": " A plain call",
+			"start": 1020,
+			"end": 1035
+		},
+		{
+			"type": "Block",
+			"value": " l ",
+			"start": 1040,
+			"end": 1047
+		},
+		{
+			"type": "Line",
+			"value": " Exactly 100 columns: stays flat",
+			"start": 1070,
+			"end": 1104
+		},
+		{
+			"type": "Block",
+			"value": " l ",
+			"start": 1113,
+			"end": 1120
+		},
+		{
+			"type": "Line",
+			"value": " 101 columns: the argument breaks out",
+			"start": 1207,
+			"end": 1246
+		},
+		{
+			"type": "Block",
+			"value": " l ",
+			"start": 1258,
+			"end": 1265
+		},
+		{
+			"type": "Block",
+			"value": " l ",
+			"start": 1372,
+			"end": 1379
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1362,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1353,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 222,
+					"end": 256,
+					"expression": {
+						"type": "NewExpression",
+						"start": 222,
+						"end": 255,
+						"callee": {
+							"type": "Identifier",
+							"start": 226,
+							"end": 228,
+							"name": "Fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 237,
+								"end": 254,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 238,
+										"end": 239,
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "ObjectExpression",
+									"start": 245,
+									"end": 253,
+									"properties": [
+										{
+											"type": "Property",
+											"start": 247,
+											"end": 251,
+											"method": false,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 247,
+												"end": 248,
+												"name": "k"
+											},
+											"value": {
+												"type": "Identifier",
+												"start": 250,
+												"end": 251,
+												"name": "a"
+											},
+											"kind": "init"
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " l ",
+										"start": 229,
+										"end": 236
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A lone arrow argument led by a block comment stays on the `new` line when it fits —",
+							"start": 20,
+							"end": 106
+						},
+						{
+							"type": "Line",
+							"value": " object, array and object-terminal arrow-chain bodies, at every statement position",
+							"start": 108,
+							"end": 192
+						},
+						{
+							"type": "Line",
+							"value": " Statement, object body",
+							"start": 195,
+							"end": 220
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 274,
+					"end": 301,
+					"expression": {
+						"type": "NewExpression",
+						"start": 274,
+						"end": 300,
+						"callee": {
+							"type": "Identifier",
+							"start": 278,
+							"end": 280,
+							"name": "Fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 289,
+								"end": 299,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 290,
+										"end": 291,
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "ArrayExpression",
+									"start": 296,
+									"end": 299,
+									"elements": [
+										{
+											"type": "Identifier",
+											"start": 297,
+											"end": 298,
+											"name": "a"
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " l ",
+										"start": 281,
+										"end": 288
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Array body",
+							"start": 259,
+							"end": 272
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 344,
+					"end": 385,
+					"expression": {
+						"type": "NewExpression",
+						"start": 344,
+						"end": 384,
+						"callee": {
+							"type": "Identifier",
+							"start": 348,
+							"end": 350,
+							"name": "Fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 359,
+								"end": 383,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 360,
+										"end": 361,
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "ArrowFunctionExpression",
+									"start": 366,
+									"end": 383,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 367,
+											"end": 368,
+											"name": "y"
+										}
+									],
+									"body": {
+										"type": "ObjectExpression",
+										"start": 374,
+										"end": 382,
+										"properties": [
+											{
+												"type": "Property",
+												"start": 376,
+												"end": 380,
+												"method": false,
+												"shorthand": false,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 376,
+													"end": 377,
+													"name": "k"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 379,
+													"end": 380,
+													"name": "a"
+												},
+												"kind": "init"
+											}
+										]
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " l ",
+										"start": 351,
+										"end": 358
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Arrow chain with an object terminal",
+							"start": 304,
+							"end": 342
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 407,
+					"end": 444,
+					"expression": {
+						"type": "NewExpression",
+						"start": 407,
+						"end": 443,
+						"callee": {
+							"type": "Identifier",
+							"start": 411,
+							"end": 413,
+							"name": "Fn"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 413,
+							"end": 416,
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 414,
+									"end": 415,
+									"typeName": {
+										"type": "Identifier",
+										"start": 414,
+										"end": 415,
+										"name": "T"
+									}
+								}
+							]
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 425,
+								"end": 442,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 426,
+										"end": 427,
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "ObjectExpression",
+									"start": 433,
+									"end": 441,
+									"properties": [
+										{
+											"type": "Property",
+											"start": 435,
+											"end": 439,
+											"method": false,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 435,
+												"end": 436,
+												"name": "k"
+											},
+											"value": {
+												"type": "Identifier",
+												"start": 438,
+												"end": 439,
+												"name": "a"
+											},
+											"kind": "init"
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " l ",
+										"start": 417,
+										"end": 424
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Type arguments",
+							"start": 388,
+							"end": 405
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 465,
+					"end": 501,
+					"expression": {
+						"type": "NewExpression",
+						"start": 465,
+						"end": 500,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 469,
+							"end": 473,
+							"object": {
+								"type": "Identifier",
+								"start": 469,
+								"end": 470,
+								"name": "a"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 471,
+								"end": 473,
+								"name": "Fn"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 482,
+								"end": 499,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 483,
+										"end": 484,
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "ObjectExpression",
+									"start": 490,
+									"end": 498,
+									"properties": [
+										{
+											"type": "Property",
+											"start": 492,
+											"end": 496,
+											"method": false,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 492,
+												"end": 493,
+												"name": "k"
+											},
+											"value": {
+												"type": "Identifier",
+												"start": 495,
+												"end": 496,
+												"name": "a"
+											},
+											"kind": "init"
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " l ",
+										"start": 474,
+										"end": 481
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Member callee",
+							"start": 447,
+							"end": 463
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 519,
+					"end": 554,
+					"expression": {
+						"type": "NewExpression",
+						"start": 519,
+						"end": 553,
+						"callee": {
+							"type": "Identifier",
+							"start": 523,
+							"end": 525,
+							"name": "Fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 535,
+								"end": 552,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 536,
+										"end": 537,
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "ObjectExpression",
+									"start": 543,
+									"end": 551,
+									"properties": [
+										{
+											"type": "Property",
+											"start": 545,
+											"end": 549,
+											"method": false,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 545,
+												"end": 546,
+												"name": "k"
+											},
+											"value": {
+												"type": "Identifier",
+												"start": 548,
+												"end": 549,
+												"name": "a"
+											},
+											"kind": "init"
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* l ",
+										"start": 526,
+										"end": 534
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " JSDoc lead",
+							"start": 504,
+							"end": 517
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 582,
+					"end": 645,
+					"id": {
+						"type": "Identifier",
+						"start": 591,
+						"end": 594,
+						"name": "fn1"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 597,
+						"end": 645,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 601,
+								"end": 642,
+								"argument": {
+									"type": "NewExpression",
+									"start": 608,
+									"end": 641,
+									"callee": {
+										"type": "Identifier",
+										"start": 612,
+										"end": 614,
+										"name": "Fn"
+									},
+									"arguments": [
+										{
+											"type": "ArrowFunctionExpression",
+											"start": 623,
+											"end": 640,
+											"id": null,
+											"expression": true,
+											"generator": false,
+											"async": false,
+											"params": [
+												{
+													"type": "Identifier",
+													"start": 624,
+													"end": 625,
+													"name": "x"
+												}
+											],
+											"body": {
+												"type": "ObjectExpression",
+												"start": 631,
+												"end": 639,
+												"properties": [
+													{
+														"type": "Property",
+														"start": 633,
+														"end": 637,
+														"method": false,
+														"shorthand": false,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 633,
+															"end": 634,
+															"name": "k"
+														},
+														"value": {
+															"type": "Identifier",
+															"start": 636,
+															"end": 637,
+															"name": "a"
+														},
+														"kind": "init"
+													}
+												]
+											},
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " l ",
+													"start": 615,
+													"end": 622
+												}
+											]
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `return` and `throw`",
+							"start": 557,
+							"end": 580
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 647,
+					"end": 709,
+					"id": {
+						"type": "Identifier",
+						"start": 656,
+						"end": 659,
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 662,
+						"end": 709,
+						"body": [
+							{
+								"type": "ThrowStatement",
+								"start": 666,
+								"end": 706,
+								"argument": {
+									"type": "NewExpression",
+									"start": 672,
+									"end": 705,
+									"callee": {
+										"type": "Identifier",
+										"start": 676,
+										"end": 678,
+										"name": "Fn"
+									},
+									"arguments": [
+										{
+											"type": "ArrowFunctionExpression",
+											"start": 687,
+											"end": 704,
+											"id": null,
+											"expression": true,
+											"generator": false,
+											"async": false,
+											"params": [
+												{
+													"type": "Identifier",
+													"start": 688,
+													"end": 689,
+													"name": "x"
+												}
+											],
+											"body": {
+												"type": "ObjectExpression",
+												"start": 695,
+												"end": 703,
+												"properties": [
+													{
+														"type": "Property",
+														"start": 697,
+														"end": 701,
+														"method": false,
+														"shorthand": false,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 697,
+															"end": 698,
+															"name": "k"
+														},
+														"value": {
+															"type": "Identifier",
+															"start": 700,
+															"end": 701,
+															"name": "a"
+														},
+														"kind": "init"
+													}
+												]
+											},
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " l ",
+													"start": 679,
+													"end": 686
+												}
+											]
+										}
+									]
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 733,
+					"end": 782,
+					"exportKind": "value",
+					"declaration": {
+						"type": "NewExpression",
+						"start": 748,
+						"end": 781,
+						"callee": {
+							"type": "Identifier",
+							"start": 752,
+							"end": 754,
+							"name": "Fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 763,
+								"end": 780,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 764,
+										"end": 765,
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "ObjectExpression",
+									"start": 771,
+									"end": 779,
+									"properties": [
+										{
+											"type": "Property",
+											"start": 773,
+											"end": 777,
+											"method": false,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 773,
+												"end": 774,
+												"name": "k"
+											},
+											"value": {
+												"type": "Identifier",
+												"start": 776,
+												"end": 777,
+												"name": "a"
+											},
+											"kind": "init"
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " l ",
+										"start": 755,
+										"end": 762
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `export default`",
+							"start": 712,
+							"end": 731
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 828,
+					"end": 872,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 834,
+							"end": 871,
+							"id": {
+								"type": "Identifier",
+								"start": 834,
+								"end": 835,
+								"name": "b"
+							},
+							"init": {
+								"type": "NewExpression",
+								"start": 838,
+								"end": 871,
+								"callee": {
+									"type": "Identifier",
+									"start": 842,
+									"end": 844,
+									"name": "Fn"
+								},
+								"arguments": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 853,
+										"end": 870,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 854,
+												"end": 855,
+												"name": "x"
+											}
+										],
+										"body": {
+											"type": "ObjectExpression",
+											"start": 861,
+											"end": 869,
+											"properties": [
+												{
+													"type": "Property",
+													"start": 863,
+													"end": 867,
+													"method": false,
+													"shorthand": false,
+													"computed": false,
+													"key": {
+														"type": "Identifier",
+														"start": 863,
+														"end": 864,
+														"name": "k"
+													},
+													"value": {
+														"type": "Identifier",
+														"start": 866,
+														"end": 867,
+														"name": "a"
+													},
+													"kind": "init"
+												}
+											]
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " l ",
+												"start": 845,
+												"end": 852
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A declarator value: the same flat form",
+							"start": 785,
+							"end": 826
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 915,
+					"end": 962,
+					"expression": {
+						"type": "NewExpression",
+						"start": 915,
+						"end": 961,
+						"callee": {
+							"type": "Identifier",
+							"start": 919,
+							"end": 921,
+							"name": "Fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 933,
+								"end": 958,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 934,
+										"end": 935,
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 940,
+									"end": 958,
+									"body": [
+										{
+											"type": "ReturnStatement",
+											"start": 945,
+											"end": 954,
+											"argument": {
+												"type": "Identifier",
+												"start": 952,
+												"end": 953,
+												"name": "a"
+											}
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " l ",
+										"start": 925,
+										"end": 932
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Block body: the argument breaks out",
+							"start": 875,
+							"end": 913
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 982,
+					"end": 1017,
+					"expression": {
+						"type": "NewExpression",
+						"start": 982,
+						"end": 1016,
+						"callee": {
+							"type": "Identifier",
+							"start": 986,
+							"end": 988,
+							"name": "Fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 997,
+								"end": 1015,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 998,
+										"end": 999,
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "ConditionalExpression",
+									"start": 1005,
+									"end": 1014,
+									"test": {
+										"type": "Identifier",
+										"start": 1005,
+										"end": 1006,
+										"name": "c"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 1009,
+										"end": 1010,
+										"name": "a"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 1013,
+										"end": 1014,
+										"name": "b"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " l ",
+										"start": 989,
+										"end": 996
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Ternary body",
+							"start": 965,
+							"end": 980
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1037,
+					"end": 1067,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1037,
+						"end": 1066,
+						"callee": {
+							"type": "Identifier",
+							"start": 1037,
+							"end": 1039,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 1048,
+								"end": 1065,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 1049,
+										"end": 1050,
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "ObjectExpression",
+									"start": 1056,
+									"end": 1064,
+									"properties": [
+										{
+											"type": "Property",
+											"start": 1058,
+											"end": 1062,
+											"method": false,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 1058,
+												"end": 1059,
+												"name": "k"
+											},
+											"value": {
+												"type": "Identifier",
+												"start": 1061,
+												"end": 1062,
+												"name": "a"
+											},
+											"kind": "init"
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " l ",
+										"start": 1040,
+										"end": 1047
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A plain call",
+							"start": 1020,
+							"end": 1035
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1106,
+					"end": 1204,
+					"expression": {
+						"type": "NewExpression",
+						"start": 1106,
+						"end": 1203,
+						"callee": {
+							"type": "Identifier",
+							"start": 1110,
+							"end": 1112,
+							"name": "Fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 1121,
+								"end": 1202,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 1122,
+										"end": 1123,
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "ObjectExpression",
+									"start": 1129,
+									"end": 1201,
+									"properties": [
+										{
+											"type": "Property",
+											"start": 1131,
+											"end": 1199,
+											"method": false,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 1131,
+												"end": 1132,
+												"name": "k"
+											},
+											"value": {
+												"type": "Identifier",
+												"start": 1134,
+												"end": 1199,
+												"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+											},
+											"kind": "init"
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " l ",
+										"start": 1113,
+										"end": 1120
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Exactly 100 columns: stays flat",
+							"start": 1070,
+							"end": 1104
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1248,
+					"end": 1352,
+					"expression": {
+						"type": "NewExpression",
+						"start": 1248,
+						"end": 1351,
+						"callee": {
+							"type": "Identifier",
+							"start": 1252,
+							"end": 1254,
+							"name": "Fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 1266,
+								"end": 1348,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 1267,
+										"end": 1268,
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "ObjectExpression",
+									"start": 1274,
+									"end": 1347,
+									"properties": [
+										{
+											"type": "Property",
+											"start": 1276,
+											"end": 1345,
+											"method": false,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 1276,
+												"end": 1277,
+												"name": "k"
+											},
+											"value": {
+												"type": "Identifier",
+												"start": 1279,
+												"end": 1345,
+												"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab"
+											},
+											"kind": "init"
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " l ",
+										"start": 1258,
+										"end": 1265
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 columns: the argument breaks out",
+							"start": 1207,
+							"end": 1246
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

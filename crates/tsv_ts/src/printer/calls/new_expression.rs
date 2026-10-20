@@ -408,19 +408,20 @@ impl<'a> Printer<'a> {
                     // ⚠️ Both refusals are asked BEFORE the printing pair below and read only
                     // the `printedArguments` one — the pair is a second build of the argument
                     // ([`build_arrow_hug_printed_doc`]).
+                    //
+                    // The refused form is prettier's `allArgsBrokenOut` fallback,
+                    // `group(contents, {shouldBreak: printedArguments.some(willBreak)})`: the
+                    // argument breaks out only when its doc will break, and otherwise stays
+                    // on the `new` line while it fits. A bare concat has no group of its own,
+                    // so its softlines would take whatever mode the enclosing group renders in —
+                    // broken at a statement root, whatever the argument's width.
                     if signature_refuses || has_leading_comment {
                         let printed = prepend_leading(
                             d,
                             glued,
                             build_arrow_hug_printed_doc(self, arg0, arrow, build),
                         );
-                        return d.concat(&[
-                            callee_with_types,
-                            d.text("("),
-                            d.indent(d.concat(&[d.softline(), printed])),
-                            d.softline(),
-                            d.text(")"),
-                        ]);
+                        return wrap_call_with_will_break_guard(d, callee_with_types, printed);
                     }
 
                     // The same two printings and state ladder the plain call's and the member
