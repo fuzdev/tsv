@@ -27,9 +27,6 @@ fuz_css css compared=2 tsv_errors=0 canonical_errors=0 both_errors=0
 fuz_docs svelte compared=46 tsv_errors=0 canonical_errors=0 both_errors=0
 fuz_docs typescript compared=19 tsv_errors=0 canonical_errors=0 both_errors=0
 fuz_docs css compared=1 tsv_errors=0 canonical_errors=0 both_errors=0
-fuz_mastodon svelte compared=15 tsv_errors=0 canonical_errors=0 both_errors=0
-fuz_mastodon typescript compared=9 tsv_errors=0 canonical_errors=0 both_errors=0
-fuz_mastodon css compared=1 tsv_errors=0 canonical_errors=0 both_errors=0
 fuz_repos svelte compared=28 tsv_errors=0 canonical_errors=0 both_errors=0
 fuz_repos typescript compared=70 tsv_errors=0 canonical_errors=0 both_errors=0
 fuz_repos css compared=1 tsv_errors=0 canonical_errors=0 both_errors=0

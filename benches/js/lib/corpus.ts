@@ -563,7 +563,6 @@ const COLLECTIONS: Record<string, CollectionPlacement> = {
 	fuz_css: { perf: true },
 	fuz_docs: { perf: true },
 	fuz_repos: { perf: true },
-	fuz_mastodon: { perf: true },
 	fuz_template: { perf: true },
 	fuz_ui: { perf: true },
 	fuz_util: { perf: true },
