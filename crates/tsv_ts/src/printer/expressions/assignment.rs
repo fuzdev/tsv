@@ -420,34 +420,31 @@ fn unwrap_expression<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
 ///
 /// Returns `true` (has complex type args) when:
 /// - More than 1 type argument, or
-/// - A comment inside the `<…>` forces it open (see the comment leg below) — the one
-///   clause that fires whatever the argument's shape, or
-/// - The single type argument is an object/type literal, union, or intersection
-///   (always), or a mapped type that force-breaks (see below). Asked of the argument
-///   with its redundant paren shell unwrapped.
+/// - A comment inside the `<…>` forces it open (see the comment leg below), or
+/// - The single type argument is an object/type literal, union, or intersection.
+///   Asked of the argument with its redundant paren shell unwrapped, or
+/// - The printed `<…>` will break on its own (the doc leg below).
 ///
 /// These cases are NOT poorly breakable — the type arguments themselves can break,
 /// so we should not break at the assignment operator.
 ///
 /// Matches Prettier's `isCallExpressionWithComplexTypeArguments` (`print/assignment.js`),
 /// which lists object/union/intersection unconditionally, then falls back to
-/// `willBreak(print("typeArguments"))`. tsv covers the unconditional list directly;
-/// for a single mapped type-arg — which prettier treats as complex only via that
-/// `willBreak` fallback (mapped is absent from its explicit list) — it approximates
-/// the fallback with a sound static check: the mapped's source span contains a
-/// newline. A newline-free single-line mapped type-arg cannot force-break (its only
-/// breaks are width-driven `line`s), so it is poorly-breakable and the assignment
-/// breaks after `=` like prettier; every force-break — object-style `shouldBreak`
-/// from an authored newline, a forcing comment, or a nested forced break — leaves a
-/// newline in the span, so a newline is a sound stand-in for the printed doc's
-/// `willBreak` (and keeps the `is_poorly_breakable_chain` debug_assert sound: a
-/// force-breaking mapped type-arg is never classified poorly-breakable).
+/// `willBreak(print("typeArguments"))`. tsv covers the unconditional list directly and
+/// asks the fallback of the doc itself: the call path's own type-arguments doc
+/// (`build_type_parameter_instantiation_doc`), built only when the `<…>` source span holds
+/// a newline. A newline is necessary for a forced break but not sufficient — a type
+/// argument the author merely wrapped (`f<A<⏎B>>()`) forces nothing, while one nested
+/// below the argument's own shape (an expanded object type inside a reference, a
+/// `keyof`, an array element type, a string literal type with a line continuation)
+/// forces the `<…>` open with no node of the unconditional list in sight. The cheap gate
+/// keeps the doc build off every single-line `<…>`, which can break only for width.
 ///
-/// The mapped-type source-newline read below is one half of a pair with
-/// `build_mapped_type_doc` (printer/types/composite.rs), which reads the same source
-/// newline to decide the force-break. Both are deliberately left un-erased by the
-/// canonical reprint (`crate::format_canonical`) — gating either one alone, or both,
-/// is unsound. See `build_mapped_type_doc` for the full reasoning before touching this.
+/// A single mapped type-arg — which prettier treats as complex only via that `willBreak`
+/// fallback (mapped is absent from its explicit list) — is answered by the doc leg too.
+///
+/// The function answers `true` for every call whose `<…>` doc force-breaks, which keeps
+/// the `is_poorly_breakable_chain` debug_assert sound.
 fn is_call_with_complex_type_arguments(
     call: &internal::CallExpression<'_>,
     printer: &Printer<'_>,
@@ -480,11 +477,18 @@ fn is_call_with_complex_type_arguments(
     // unconditional list sees the union directly. Reading the shell instead classified
     // `f<(A | B)>()` as simple where the bare `f<A | B>()` was complex — one authoring of
     // one type reaching two layouts.
-    match type_args.params.first().copied().map(unwrap_parenthesized) {
-        Some(TSType::TypeLiteral(_) | TSType::Union(_) | TSType::Intersection(_)) => true,
-        Some(TSType::Mapped(m)) => m.span.extract(printer.source).contains('\n'),
-        _ => false,
-    }
+    let listed = matches!(
+        type_args.params.first().copied().map(unwrap_parenthesized),
+        Some(TSType::TypeLiteral(_) | TSType::Union(_) | TSType::Intersection(_))
+    );
+    // The `willBreak` fallback for everything else, read off the call path's own doc. No
+    // comment reaches this build: a `<…>` with a comment on page and a newline returned
+    // through the comment leg above, and one with no newline stops at the cheap gate.
+    listed
+        || (type_args.span.extract(printer.source).contains('\n')
+            && printer
+                .d()
+                .will_break(printer.build_type_parameter_instantiation_doc(type_args)))
 }
 
 /// A chain is poorly breakable if it doesn't have good internal break points:
@@ -570,9 +574,9 @@ fn is_poorly_breakable_chain_recursive(
                 return false;
             }
 
-            // Calls with complex type arguments (object/mapped/union/intersection types,
-            // or multiple type args) are NOT poorly breakable - they have internal break
-            // points via the type arguments.
+            // Calls with complex type arguments (object/union/intersection types,
+            // multiple type args, or a `<…>` whose doc will break) are NOT poorly
+            // breakable - they have internal break points via the type arguments.
             // Matches Prettier's `isCallExpressionWithComplexTypeArguments` (`print/assignment.js`)
             if is_call_with_complex_type_arguments(call, printer) {
                 return false;

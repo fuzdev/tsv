@@ -261,7 +261,7 @@ fn validate_output_js(js: &str) -> Result<(), CompileError> {
 /// forms is a genuine code difference.
 ///
 /// One caveat on that last claim, for callers outside this crate: `format_canonical`
-/// does **not** erase a mapped type's source multi-line-ness (a deliberate residual —
+/// does **not** erase a mapped type's source multi-line-ness (an un-erased residual —
 /// see its docs), so two sources differing only in how a mapped type was authored do
 /// canonicalize differently. It cannot bite the compiler-parity use this exists for —
 /// compiled JS carries no TypeScript types — but it does mean "canonical form" is not
