@@ -457,6 +457,19 @@ fn gen_ts_long_curried_callee(depth: usize) -> String {
     format!("const v = {expr};\n")
 }
 
+/// A curried call on a MEMBER CHAIN (`obj.a().b().f(x, y)(z)`), nested through the outer
+/// argument — the call printed `group([callee, args])` with the chain built whole as its
+/// callee (`build_curried_member_chain_call_doc`). The callee chain's last list is long-curried
+/// here, so the chain is built under the outer call's mark; a mark that rebuilt it per state
+/// would show here.
+fn gen_ts_curried_member_chain_tail(depth: usize) -> String {
+    let mut expr = String::from("done");
+    for i in 0..depth {
+        expr = format!("obj{i}.a().b().f(x{i}, y{i})({expr})");
+    }
+    format!("const v = {expr};\n")
+}
+
 /// Nested assignment RHS (`a = (b = (c = …))`) — the assignment-layout
 /// `conditional_group`/fluid-layout candidate site.
 fn gen_ts_assignment_nested(depth: usize) -> String {
@@ -798,6 +811,12 @@ const CONSTRUCTS: &[Construct] = &[
         name: "ts_long_curried_callee",
         parser: ParserType::TypeScript,
         generate: gen_ts_long_curried_callee,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_curried_member_chain_tail",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_curried_member_chain_tail,
         depths: &[4, 8, 12],
     },
     Construct {

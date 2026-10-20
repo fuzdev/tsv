@@ -733,8 +733,8 @@ the doc-node count grows faster than ~depth^3:
   the body (own-line before an object, block or call body; glued and broken after before an
   object), and curried, the last in untyped / typed / `new` / chain / object-TERMINAL spellings,
   the object-terminal one again in single-argument, multi-argument and chain forms; and
-  long-curried calls (`f(a, b)(c)`), nested through the outer call's argument and along one
-  curried run.
+  long-curried calls (`f(a, b)(c)`), nested through the outer call's argument, along one curried
+  run, and as a member chain's curried tail.
 
 An axis earns its place by REACHING a builder no other axis does; the curried axes came from
 real 2^depth regressions that the family as it then stood could not see. Deterministic, pure

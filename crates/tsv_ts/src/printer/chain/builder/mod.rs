@@ -268,12 +268,20 @@ fn build_chain_doc_impl<'a>(
             && chain_has_comments
             && has_comments_forcing_expansion(groups, chain_end, printer))
     {
+        // A chain that is the callee of a call taking fewer arguments marks its last link
+        // (`Printer::build_call_doc`), and prettier's short path then returns `oneLine`
+        // without a group, so that link's bare list breaks with the outer call's group.
+        let long_curried = groups
+            .last()
+            .and_then(|g| g.nodes.last())
+            .is_some_and(ChainNode::ungroups_args);
         return build_short_chain_doc(
             rest_groups,
             first_doc,
             first_has_parens,
             has_calls,
             inline.every,
+            long_curried,
             printer,
         );
     }
@@ -328,11 +336,14 @@ fn build_short_chain_doc<'a>(
     first_has_parens: bool,
     has_calls: bool,
     inline_every_lookup: bool,
+    long_curried: bool,
     printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
+    // `long_curried`: prettier's `isLongCurriedCallExpression` return of `oneLine` itself.
+    let group = |doc| if long_curried { doc } else { d.group(doc) };
     if rest_groups.is_empty() {
-        return d.group(first_doc);
+        return group(first_doc);
     }
 
     // For short chains, prettier just concatenates groups directly WITHOUT softlines.
@@ -394,7 +405,7 @@ fn build_short_chain_doc<'a>(
     // ladder's first state — broke a sole `function` argument out of `vi.spyOn(a,
     // 'b').mockImplementation(…)` where prettier hugs it and breaks its parameters
     // (`calls/chained/function_arg_params_break_long`).
-    d.group(on_line)
+    group(on_line)
 }
 
 /// The trailing member tail as the two contiguous runs it spans: what the last
@@ -713,16 +724,18 @@ pub fn call_prints_as_member_chain(
 /// with the nearest group around it — before the outer list, which keeps its own.
 ///
 /// A call whose callee is memberish and which prettier prints through `printCallExpression`
-/// (`own_call_layout`) is the ROOT of a member chain of its own, and there the bare list
-/// survives only on `printMemberChain`'s short path, which returns `oneLine` without a
-/// group: the chain ending at this call holds no more groups than the cutoff (three when
-/// its first two merge, two otherwise), no comment and no blank line between its links.
-/// The merge is asked as prettier asks it there, off the expression-statement position —
-/// the chain's parent is the outer call — so `z.a().f(x, y)(z)` keeps its list grouped
-/// where `this.a().f(x, y)(z)` breaks it. A longer chain keeps the list grouped too:
-/// prettier's `conditionalGroup([oneLine, expanded])` measures `oneLine` flat, and tsv
-/// linearizes the outer call into the chain, so neither of its states can say what
-/// prettier's does about a bare list inside it.
+/// (`own_call_layout`) is the ROOT of a member chain of its own. A call printed on its own
+/// keeps such a chain out of its own (`Printer::build_call_doc`, which marks the chain's
+/// last link itself), so the root meets the outer call in one chain only behind a member or
+/// a `!` above that call, which still linearizes it. There the bare list survives only on
+/// `printMemberChain`'s short path, which returns `oneLine` without a group: the chain
+/// ending at this call holds no more groups than the cutoff (three when its first two
+/// merge, two otherwise), no comment and no blank line between its links. The merge is
+/// asked as prettier asks it there, off the expression-statement position — the chain's
+/// parent is the outer call — so `z.a().f(x, y)(z).p` keeps its list grouped where
+/// `this.a().f(x, y)(z).p` breaks it. A longer chain keeps the list grouped too: prettier's
+/// `conditionalGroup([oneLine, expanded])` measures `oneLine` flat, and the linearized
+/// chain's states cannot say what prettier's does about a bare list inside it.
 ///
 /// Every other such call is ungrouped: a call on a plain callee or on another call, and a
 /// call some enclosing `printMemberChain` swallowed, whose `rec` prints its arguments
@@ -731,7 +744,8 @@ pub fn call_prints_as_member_chain(
 /// line or an expand-first / expand-last argument returns before it (`chain_args.rs`).
 ///
 /// Returns whether any call followed by another call of this chain prints its list bare —
-/// the only shape the group printer closes a group for.
+/// the only shape the group printer closes a group for. The chain's last link, which the
+/// call printing the chain as its callee marks itself, is followed by none.
 pub fn mark_long_curried_calls(nodes: &mut [ChainNode<'_>], printer: &Printer<'_>) -> bool {
     let mut any = false;
     for i in 1..nodes.len() {

@@ -425,6 +425,14 @@ pub struct Printer<'a> {
     /// position list are on [`Printer::build_flat_chain_expression_doc`]. Keyed by span and
     /// not consumed, like the targets above.
     pub(crate) flat_chain_target: Cell<Option<Span>>,
+    /// Span of a call printed as the CALLEE of a call taking fewer arguments (at least one) —
+    /// prettier's `isLongCurriedCallExpression`, which leaves that callee's argument list
+    /// without a group. Set by the outer call's head around its callee build alone
+    /// (`calls::call_formatting::build_call_head`), the one printer that builds a call's
+    /// callee whole; the callee reads it on entry — the member chain for its last link
+    /// ([`Printer::build_call_doc`]), the plain call for its own default tail. Keyed by span
+    /// and restored after the build, like the targets above.
+    pub(crate) long_curried_target: Cell<Option<Span>>,
     /// Span of a JSDoc cast sitting directly in a **value gap**, whose comment→`(`
     /// separator therefore reflows to a space instead of taking the soft `line`
     /// ([`Printer::build_jsdoc_cast_lead_doc`]).
@@ -795,6 +803,7 @@ impl<'a> Printer<'a> {
             ternary_hang_target: Cell::new(None),
             assignment_value_target: Cell::new(None),
             flat_chain_target: Cell::new(None),
+            long_curried_target: Cell::new(None),
             jsdoc_cast_value_gap_target: Cell::new(None),
             jsdoc_cast_cannot_hang_target: Cell::new(None),
             inline_every_member_lookup: Cell::new(None),

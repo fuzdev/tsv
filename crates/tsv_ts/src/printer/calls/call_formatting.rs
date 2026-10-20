@@ -95,6 +95,9 @@ struct CallHead {
     test_call_flat: bool,
     /// The argument list opens with `?.(` because the `?.` fused into it.
     fuse_optional: bool,
+    /// This call is the callee of a call taking fewer arguments, so its default tail prints
+    /// the list without a group ([`Printer::long_curried_target`]).
+    ungroup_args: bool,
 }
 
 fn build_call_head(
@@ -103,6 +106,9 @@ fn build_call_head(
     span: Span,
 ) -> CallHead {
     let d = printer.d();
+
+    // Read before the callee is built, which re-arms the target for the callee's own span.
+    let ungroup_args = printer.long_curried_target.get() == Some(span);
 
     // Test function calls (`it`, `test.only`, `describe`, …) stay on one line even past
     // the print width — unless an argument gap holds a comment the flat layout has no
@@ -163,6 +169,13 @@ fn build_call_head(
     // level out still honors the directive: it leads the whole statement, and the statement
     // freeze keeps the author's pair inside its slice.
     let callee_freezes = callee_parens.is_none() && !owned_pair;
+    // A callee that is a call taking more arguments than this one prints its list without a
+    // group (prettier's `isLongCurriedCallExpression`): armed for the callee build alone.
+    let outer_target = super::callee_is_long_curried(call).then(|| {
+        printer
+            .long_curried_target
+            .replace(Some(call.callee.span()))
+    });
     let callee_doc = printer.build_left_spine_operand_doc_if(
         callee_freezes,
         span.start,
@@ -188,6 +201,9 @@ fn build_call_head(
                 })
         },
     );
+    if let Some(outer) = outer_target {
+        printer.long_curried_target.set(outer);
+    }
 
     let callee = if owned_pair {
         printer.build_owned_required_pair_doc(
@@ -238,6 +254,7 @@ fn build_call_head(
         gap,
         test_call_flat,
         fuse_optional,
+        ungroup_args,
     }
 }
 
@@ -262,6 +279,7 @@ fn build_call_args_doc(
         gap,
         test_call_flat,
         fuse_optional,
+        ungroup_args,
         ..
     } = head;
     let callee_gap_start = gap.start;
@@ -635,6 +653,12 @@ fn build_call_args_doc(
     // without the old has_block_function_before_last check, which was too aggressive — it
     // forced hardlines for empty block bodies like `async () => {}`, preventing calls like
     // `fn([], 3, async () => {}, aaa)` from staying on one line.
+    //
+    // A long-curried call's list takes no group at all: prettier returns the bare contents,
+    // so the list breaks with the group around it — the outer call's.
+    if ungroup_args {
+        return ArgOpener::callee(d, callee).soft_list(d, arg_parts);
+    }
     wrap_call_with_will_break_guard(d, callee, arg_parts)
 }
 

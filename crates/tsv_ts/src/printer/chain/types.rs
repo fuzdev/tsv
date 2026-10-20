@@ -54,8 +54,9 @@ pub struct ChainCall {
     /// `printCallArguments`' `isLongCurriedCallExpression` arm: the call is the callee of the
     /// next call, which takes at least one argument and fewer than this one
     /// (`connect(a, b)(Component)`). The list then breaks with the nearest enclosing group,
-    /// so it breaks before the outer call's list does. Set by `mark_long_curried_calls`;
-    /// `new` seeds it `false`.
+    /// so it breaks before the outer call's list does. Set by `mark_long_curried_calls`, and
+    /// on a chain's last link by the call printing that chain as its callee
+    /// (`Printer::build_call_doc`); `new` seeds it `false`.
     pub ungroup_args: bool,
 }
 
