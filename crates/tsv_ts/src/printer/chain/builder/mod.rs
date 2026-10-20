@@ -36,9 +36,9 @@ use super::printing::{
 };
 use super::types::{ChainGroup, ChainNode, ChainNodeVec};
 use crate::ast::internal::{ArrowFunctionBody, CallExpression, Expression, ExpressionKind};
-use crate::printer::Printer;
-use crate::printer::calls::{AssumedParamHug, is_memberish};
+use crate::printer::calls::{AssumedParamHug, arrow_body_hugs_call_parens, is_memberish};
 use crate::printer::expressions::functions::flat_sole_param_literal;
+use crate::printer::{AssumedBreak, Printer};
 
 use smallvec::SmallVec;
 use smallvec::smallvec;
@@ -973,14 +973,17 @@ fn build_long_chain_doc<'a>(
     //
     // With neither, the chain is the plain two-state group.
     //
-    // A third builder covers a disjoint shape — a block-bodied callback, never object-rooted:
-    // its hug is the settled form from prettier's second pass when the callback's sole
-    // parameter's object type, written flat, breaks for width ([`build_assumed_param_hug_state`]).
+    // Two more builders cover disjoint shapes, never object-rooted: a block-bodied callback,
+    // whose hug is the settled form from prettier's second pass when the callback's sole
+    // parameter's object type, written flat, breaks for width ([`build_assumed_param_hug_state`]);
+    // and an expression-bodied arrow whose `=>` holds a glued comment the line ends after,
+    // which prettier's second pass reads as own-line ([`build_arrow_comment_line_state`]).
     let middle_state = build_breaking_object_chain_doc(first_groups, rest_groups, printer)
         .or_else(|| {
             build_flat_object_hug_state(first_groups, rest_groups, *on_line.last()?, printer)
         })
-        .or_else(|| build_assumed_param_hug_state(first_groups, rest_groups, printer));
+        .or_else(|| build_assumed_param_hug_state(first_groups, rest_groups, printer))
+        .or_else(|| build_arrow_comment_line_state(first_groups, rest_groups, &on_line, printer));
 
     match middle_state {
         Some(state) => d.conditional_group(&[on_line_doc, state, expanded]),
@@ -1241,6 +1244,87 @@ fn build_assumed_param_hug_state<'a>(
         None => printed,
     };
     let probe = d.line_probe(1, line);
+    Some(d.gated_state(probe, d.concat(&parts)))
+}
+
+/// Build the gated state for a last-argument arrow whose `=>` holds one single-line block
+/// comment glued to it with a newline after (`(p) => /* c */⏎body`) — the member-chain
+/// arrow-comment convergence window (`docs/conformance_prettier_ts.md` §Member-chain
+/// arrow-comment convergence).
+///
+/// Prettier separates that comment from the body by a soft line on its first pass, so the
+/// arrow carries no forced break: the chain's one-line measurement reads the whole flat
+/// content, overflows, and the chain expands, the comment breaking onto its own line inside
+/// it wherever the arrow cannot fit flat on the expanded chain's line. Pass 2 reads the
+/// comment's new leading newline as a hard break, truncates the one-line measurement there,
+/// and collapses the chain back to flat with the comment on its own line under `=>`. This
+/// state IS that settled form: the flat chain with the last group printed under the comment
+/// assumed own-line ([`AssumedBreak::OwnLineComment`]), admitted while the arrow cannot
+/// fit flat on the line of the expanded chain that carries it — the last call's line for a
+/// body that hugs the call's parentheses (a conditional, a call — `could_expand_arrow_arg`'s
+/// body kinds; the probe is the last group flat, measured as the precedent's), the arrow's
+/// own broken-out argument line for any other, two levels below the chain
+/// ([`tsv_lang::doc::arena::DocArena::line_probe`]).
+///
+/// Outside it: a second comment anywhere in the last call's arguments keeps the expanded
+/// chain in both formatters, a forced break already in the last group re-reads as it is,
+/// and an earlier call taking a function argument has prettier's pass 2 force-expand the chain
+/// (`lastGroupWillBreakAndOtherCallsHaveFunctionArguments`), which leaves pass 1 its fixed
+/// point. A body that is itself an object, an array or an arrow keeps the glued comment by
+/// other rules and never reaches here.
+fn build_arrow_comment_line_state<'a>(
+    first_groups: &[ChainGroup<'a>],
+    rest_groups: &[ChainGroup<'a>],
+    on_line: &[DocId],
+    printer: &Printer<'_>,
+) -> Option<DocId> {
+    let d = printer.arena();
+    let (&last_flat, prefix_flat) = on_line.split_last()?;
+    if d.will_break(last_flat) {
+        return None;
+    }
+    let (last, _) = rest_groups.split_last()?;
+    let (call, call_span) = last.nodes.iter().rev().find_map(|node| match node {
+        ChainNode::Call { call, span, .. } => Some((*call, *span)),
+        _ => None,
+    })?;
+    let arg = *call.arguments.last()?;
+    let ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind else {
+        return None;
+    };
+    let ArrowFunctionBody::Expression(body) = &arrow.body else {
+        return None;
+    };
+    if matches!(
+        body.kind,
+        ExpressionKind::ObjectExpression(_)
+            | ExpressionKind::ArrayExpression(_)
+            | ExpressionKind::ArrowFunctionExpression(_)
+    ) {
+        return None;
+    }
+    let comment = printer.arrow_gap_glued_block_comment(arrow, body)?;
+    // The gap's comment is the only one the last call's arguments hold — from its callee's
+    // end to its `)`, so a comment ahead of the first argument or trailing the body counts
+    // too — and no other comment rule decides the layout beside it.
+    if printer
+        .comments_on_page_between(call.callee.span().end, call_span.end)
+        .nth(1)
+        .is_some()
+        || other_calls_have_function_arguments(first_groups, rest_groups)
+    {
+        return None;
+    }
+    let last_assumed = printer.with_assumed_break(AssumedBreak::OwnLineComment(comment), || {
+        print_group(last, printer)
+    });
+    let mut parts: DocBuf = prefix_flat.iter().copied().collect();
+    parts.push(last_assumed);
+    let probe = if arrow_body_hugs_call_parens(body) {
+        last_flat
+    } else {
+        d.line_probe(1, printer.build_arg_expression_doc(arg))
+    };
     Some(d.gated_state(probe, d.concat(&parts)))
 }
 

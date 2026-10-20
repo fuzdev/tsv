@@ -3393,6 +3393,28 @@ impl<'a> Printer<'a> {
         self.comment_hangs_value_after_operator(sig_end, body_start)
     }
 
+    /// The start of the one comment in `arrow`'s `=>`→`body` gap when it is a single-line
+    /// block glued to `=>` with a newline after it — `=> /* c */⏎body`, the comment
+    /// prettier separates from the body by a soft line on its first pass and by a hard one
+    /// on its second (`printLeadingComment` gives a hard line only with a newline before the
+    /// comment too). `None` for any other gap.
+    pub(in crate::printer) fn arrow_gap_glued_block_comment(
+        &self,
+        arrow: &internal::ArrowFunctionExpression<'_>,
+        body: &internal::Expression<'_>,
+    ) -> Option<u32> {
+        let gap_start = arrow_token_end(arrow);
+        let body_start = body.span().start;
+        let mut comments = self.comments_in_source_between(gap_start, body_start);
+        let comment = comments.next()?;
+        (comments.next().is_none()
+            && comment.is_block
+            && !comment.multiline
+            && !self.has_newline_between(gap_start, comment.span.start)
+            && self.has_newline_between(comment.span.end, body_start))
+        .then_some(comment.span.start)
+    }
+
     /// The hug arm's half of "does the `=>`→body gap break": `Some(run)` when a block run
     /// glued to `=>` that the author broke AFTER precedes a hug-eligible body — the geometry
     /// [`Self::breaking_value_leading_run`] asks in [`Self::build_arrow_expression_body`]'s

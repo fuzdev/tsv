@@ -167,6 +167,10 @@ pub(crate) enum AssumedBreak {
     TypeLiteral(u32),
     /// The mapped type starting here breaks after its `{` (`build_mapped_type_doc`).
     MappedType(u32),
+    /// The block comment starting here reads as written on a line of its own
+    /// (`is_own_line_comment`) — prettier's newline BEFORE a comment, which decides both
+    /// the hard separator after it and the break ahead of it.
+    OwnLineComment(u32),
 }
 
 impl AssumedBreak {
@@ -174,7 +178,9 @@ impl AssumedBreak {
     /// assumption can change, and inside no other.
     pub(crate) fn position(self) -> u32 {
         match self {
-            Self::TypeLiteral(start) | Self::MappedType(start) => start,
+            Self::TypeLiteral(start) | Self::MappedType(start) | Self::OwnLineComment(start) => {
+                start
+            }
         }
     }
 }
@@ -2424,8 +2430,13 @@ impl<'a> Printer<'a> {
     /// not the predicate a comment-position seam wants: asked of a line comment it says
     /// "own line" whatever the author wrote before it on that line. A seam deciding
     /// which element a `//` trails must ask the physical question directly.
+    ///
+    /// A convergence state's build reads one block comment as own-line whatever the
+    /// source holds ([`AssumedBreak::OwnLineComment`]).
     pub(crate) fn is_own_line_comment(&self, comment: &internal::Comment) -> bool {
-        !comment.is_block || !self.comment_follows_content_on_its_line(comment)
+        !comment.is_block
+            || !self.comment_follows_content_on_its_line(comment)
+            || self.assumed_break.get() == Some(AssumedBreak::OwnLineComment(comment.span.start))
     }
 
     /// Whether a multi-line block comment **prints as indented lines**

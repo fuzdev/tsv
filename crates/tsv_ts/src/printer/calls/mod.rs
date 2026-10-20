@@ -595,6 +595,14 @@ impl<'a> CalleeParens<'a> {
     }
 }
 
+/// Whether an arrow's expression `body` is one of the two kinds prettier's `couldExpandArg`
+/// hugs to the call's parentheses directly (a call — through a trailing `!` too — or a
+/// conditional), rather than breaking the call's arguments out around the arrow.
+pub(in crate::printer) fn arrow_body_hugs_call_parens(body: &internal::Expression<'_>) -> bool {
+    arg_predicates::arrow_body_is_call_through_non_null(body)
+        || arg_predicates::is_ternary_arrow_body(body)
+}
+
 /// Check if callee is a member expression (used for chain detection)
 ///
 /// Prettier's `isMemberish`, and the gate on BOTH of its chain decisions: the

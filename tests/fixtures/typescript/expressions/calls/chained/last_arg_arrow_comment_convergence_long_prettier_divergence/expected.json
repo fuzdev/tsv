@@ -1,0 +1,2560 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 3901,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 3735,
+				"end": 3737,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 3737,
+				"end": 3765,
+				"data": " Template expression "
+			},
+			{
+				"type": "Text",
+				"start": 3765,
+				"end": 3766,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 3766,
+				"end": 3900,
+				"name": "p",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 3769,
+							"end": 3771,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 3771,
+							"end": 3895,
+							"expression": {
+								"type": "CallExpression",
+								"start": 3772,
+								"end": 3894,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 3772,
+									"end": 3784,
+									"object": {
+										"type": "CallExpression",
+										"start": 3772,
+										"end": 3777,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 3772,
+											"end": 3775,
+											"object": {
+												"type": "Identifier",
+												"start": 3772,
+												"end": 3773,
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 3774,
+												"end": 3775,
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 3778,
+										"end": 3784,
+										"name": "fnName"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 3785,
+										"end": 3891,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 3786,
+												"end": 3787,
+												"name": "p"
+											}
+										],
+										"body": {
+											"type": "ConditionalExpression",
+											"start": 3804,
+											"end": 3891,
+											"test": {
+												"type": "Identifier",
+												"start": 3804,
+												"end": 3814,
+												"name": "aaaaaaaaaa"
+											},
+											"consequent": {
+												"type": "Identifier",
+												"start": 3817,
+												"end": 3843,
+												"name": "bbbbbbbbbbbbbbbbbbbbbbbbbb"
+											},
+											"alternate": {
+												"type": "Identifier",
+												"start": 3846,
+												"end": 3891,
+												"name": "ccccccccccccccccccccccccccccccccccccccccccccc"
+											},
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 3794,
+													"end": 3801
+												}
+											]
+										}
+									}
+								],
+								"optional": false
+							}
+						},
+						{
+							"type": "Text",
+							"start": 3895,
+							"end": 3896,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Declarator: the comment glued to `=>` ends its line, so it prints on its own line under",
+			"start": 10,
+			"end": 100
+		},
+		{
+			"type": "Line",
+			"value": " `=>` and the chain stays flat, the ternary body hugging",
+			"start": 102,
+			"end": 160
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 195,
+			"end": 202
+		},
+		{
+			"type": "Line",
+			"value": " Assignment, a call body",
+			"start": 299,
+			"end": 325
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 354,
+			"end": 361
+		},
+		{
+			"type": "Line",
+			"value": " Return",
+			"start": 458,
+			"end": 467
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 516,
+			"end": 523
+		},
+		{
+			"type": "Line",
+			"value": " Property value, a binary body: the arguments break out",
+			"start": 625,
+			"end": 682
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 729,
+			"end": 736
+		},
+		{
+			"type": "Line",
+			"value": " Call argument, an identifier body",
+			"start": 838,
+			"end": 874
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 913,
+			"end": 920
+		},
+		{
+			"type": "Line",
+			"value": " A statement whose head does not merge",
+			"start": 1022,
+			"end": 1062
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 1091,
+			"end": 1098
+		},
+		{
+			"type": "Line",
+			"value": " At 100 the arrow fits flat on the broken-out argument line, so the chain breaks and the",
+			"start": 1195,
+			"end": 1285
+		},
+		{
+			"type": "Line",
+			"value": " comment stays inline",
+			"start": 1287,
+			"end": 1310
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 1353,
+			"end": 1360
+		},
+		{
+			"type": "Line",
+			"value": " At 101 the arrow fits on no line: the chain stays flat and the comment prints on its own line",
+			"start": 1448,
+			"end": 1544
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 1583,
+			"end": 1590
+		},
+		{
+			"type": "Line",
+			"value": " At 100 a call body fits flat on the expanded chain's last line, so the chain breaks and the",
+			"start": 1681,
+			"end": 1775
+		},
+		{
+			"type": "Line",
+			"value": " comment stays inline",
+			"start": 1777,
+			"end": 1800
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 1839,
+			"end": 1846
+		},
+		{
+			"type": "Line",
+			"value": " At 101 the call body fits on no line: the chain stays flat and the comment prints on its",
+			"start": 1923,
+			"end": 2014
+		},
+		{
+			"type": "Line",
+			"value": " own line",
+			"start": 2016,
+			"end": 2027
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 2062,
+			"end": 2069
+		},
+		{
+			"type": "Line",
+			"value": " A sequence body breaks the arguments out",
+			"start": 2151,
+			"end": 2194
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 2233,
+			"end": 2240
+		},
+		{
+			"type": "Line",
+			"value": " A blank line after the comment is kept",
+			"start": 2331,
+			"end": 2372
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 2408,
+			"end": 2415
+		},
+		{
+			"type": "Line",
+			"value": " Control: a short-head statement merges its head, so the chain never reaches the two-state",
+			"start": 2499,
+			"end": 2591
+		},
+		{
+			"type": "Line",
+			"value": " group and the comment prints on its own line in both formatters",
+			"start": 2593,
+			"end": 2659
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 2683,
+			"end": 2690
+		},
+		{
+			"type": "Line",
+			"value": " Control: a two-comment run keeps the chain broken in both formatters",
+			"start": 2787,
+			"end": 2858
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 2900,
+			"end": 2907
+		},
+		{
+			"type": "Block",
+			"value": " d ",
+			"start": 2908,
+			"end": 2915
+		},
+		{
+			"type": "Line",
+			"value": " Control: a second comment trailing the body keeps the chain broken in both formatters",
+			"start": 3014,
+			"end": 3102
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 3146,
+			"end": 3153
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 3220,
+			"end": 3227
+		},
+		{
+			"type": "Line",
+			"value": " Control: a second comment ahead of the first argument keeps the chain broken in both",
+			"start": 3235,
+			"end": 3322
+		},
+		{
+			"type": "Line",
+			"value": " formatters",
+			"start": 3324,
+			"end": 3337
+		},
+		{
+			"type": "Block",
+			"value": " l ",
+			"start": 3374,
+			"end": 3381
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 3389,
+			"end": 3396
+		},
+		{
+			"type": "Line",
+			"value": " Control: an earlier call takes a function argument, so the chain stays broken in both",
+			"start": 3470,
+			"end": 3558
+		},
+		{
+			"type": "Line",
+			"value": " formatters",
+			"start": 3560,
+			"end": 3573
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 3622,
+			"end": 3629
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 3794,
+			"end": 3801
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 3735,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 3726,
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 162,
+					"end": 296,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 168,
+							"end": 295,
+							"id": {
+								"type": "Identifier",
+								"start": 168,
+								"end": 170,
+								"name": "v1"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 173,
+								"end": 295,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 173,
+									"end": 185,
+									"object": {
+										"type": "CallExpression",
+										"start": 173,
+										"end": 178,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 173,
+											"end": 176,
+											"object": {
+												"type": "Identifier",
+												"start": 173,
+												"end": 174,
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 175,
+												"end": 176,
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 179,
+										"end": 185,
+										"name": "fnName"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 186,
+										"end": 292,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 187,
+												"end": 188,
+												"name": "p"
+											}
+										],
+										"body": {
+											"type": "ConditionalExpression",
+											"start": 205,
+											"end": 292,
+											"test": {
+												"type": "Identifier",
+												"start": 205,
+												"end": 215,
+												"name": "aaaaaaaaaa"
+											},
+											"consequent": {
+												"type": "Identifier",
+												"start": 218,
+												"end": 244,
+												"name": "bbbbbbbbbbbbbbbbbbbbbbbbbb"
+											},
+											"alternate": {
+												"type": "Identifier",
+												"start": 247,
+												"end": 292,
+												"name": "ccccccccccccccccccccccccccccccccccccccccccccc"
+											},
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 195,
+													"end": 202
+												}
+											]
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Declarator: the comment glued to `=>` ends its line, so it prints on its own line under",
+							"start": 10,
+							"end": 100
+						},
+						{
+							"type": "Line",
+							"value": " `=>` and the chain stays flat, the ternary body hugging",
+							"start": 102,
+							"end": 160
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 327,
+					"end": 455,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 327,
+						"end": 454,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 327,
+							"end": 329,
+							"name": "v2"
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 332,
+							"end": 454,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 332,
+								"end": 344,
+								"object": {
+									"type": "CallExpression",
+									"start": 332,
+									"end": 337,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 332,
+										"end": 335,
+										"object": {
+											"type": "Identifier",
+											"start": 332,
+											"end": 333,
+											"name": "a"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 334,
+											"end": 335,
+											"name": "b"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 338,
+									"end": 344,
+									"name": "fnName"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 345,
+									"end": 451,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 346,
+											"end": 347,
+											"name": "p"
+										}
+									],
+									"body": {
+										"type": "CallExpression",
+										"start": 364,
+										"end": 451,
+										"callee": {
+											"type": "Identifier",
+											"start": 364,
+											"end": 370,
+											"name": "gggggg"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 371,
+												"end": 401,
+												"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+											},
+											{
+												"type": "Identifier",
+												"start": 403,
+												"end": 450,
+												"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+											}
+										],
+										"optional": false,
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 354,
+												"end": 361
+											}
+										]
+									}
+								}
+							],
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Assignment, a call body",
+							"start": 299,
+							"end": 325
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 469,
+					"end": 622,
+					"id": {
+						"type": "Identifier",
+						"start": 478,
+						"end": 479,
+						"name": "q"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 482,
+						"end": 622,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 486,
+								"end": 619,
+								"argument": {
+									"type": "CallExpression",
+									"start": 493,
+									"end": 618,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 493,
+										"end": 505,
+										"object": {
+											"type": "CallExpression",
+											"start": 493,
+											"end": 498,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 493,
+												"end": 496,
+												"object": {
+													"type": "Identifier",
+													"start": 493,
+													"end": 494,
+													"name": "a"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 495,
+													"end": 496,
+													"name": "b"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 499,
+											"end": 505,
+											"name": "fnName"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "ArrowFunctionExpression",
+											"start": 506,
+											"end": 614,
+											"id": null,
+											"expression": true,
+											"generator": false,
+											"async": false,
+											"params": [
+												{
+													"type": "Identifier",
+													"start": 507,
+													"end": 508,
+													"name": "p"
+												}
+											],
+											"body": {
+												"type": "ConditionalExpression",
+												"start": 527,
+												"end": 614,
+												"test": {
+													"type": "Identifier",
+													"start": 527,
+													"end": 537,
+													"name": "aaaaaaaaaa"
+												},
+												"consequent": {
+													"type": "Identifier",
+													"start": 540,
+													"end": 566,
+													"name": "bbbbbbbbbbbbbbbbbbbbbbbbbb"
+												},
+												"alternate": {
+													"type": "Identifier",
+													"start": 569,
+													"end": 614,
+													"name": "ccccccccccccccccccccccccccccccccccccccccccccc"
+												},
+												"leadingComments": [
+													{
+														"type": "Block",
+														"value": " c ",
+														"start": 516,
+														"end": 523
+													}
+												]
+											}
+										}
+									],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Return",
+							"start": 458,
+							"end": 467
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 684,
+					"end": 835,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 690,
+							"end": 834,
+							"id": {
+								"type": "Identifier",
+								"start": 690,
+								"end": 691,
+								"name": "o"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 694,
+								"end": 834,
+								"properties": [
+									{
+										"type": "Property",
+										"start": 698,
+										"end": 831,
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 698,
+											"end": 699,
+											"name": "k"
+										},
+										"value": {
+											"type": "CallExpression",
+											"start": 701,
+											"end": 831,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 701,
+												"end": 713,
+												"object": {
+													"type": "CallExpression",
+													"start": 701,
+													"end": 706,
+													"callee": {
+														"type": "MemberExpression",
+														"start": 701,
+														"end": 704,
+														"object": {
+															"type": "Identifier",
+															"start": 701,
+															"end": 702,
+															"name": "a"
+														},
+														"property": {
+															"type": "Identifier",
+															"start": 703,
+															"end": 704,
+															"name": "b"
+														},
+														"computed": false,
+														"optional": false
+													},
+													"arguments": [],
+													"optional": false
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 707,
+													"end": 713,
+													"name": "fnName"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [
+												{
+													"type": "ArrowFunctionExpression",
+													"start": 718,
+													"end": 827,
+													"id": null,
+													"expression": true,
+													"generator": false,
+													"async": false,
+													"params": [
+														{
+															"type": "Identifier",
+															"start": 719,
+															"end": 720,
+															"name": "p"
+														}
+													],
+													"body": {
+														"type": "BinaryExpression",
+														"start": 741,
+														"end": 827,
+														"left": {
+															"type": "Identifier",
+															"start": 741,
+															"end": 771,
+															"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+														},
+														"operator": "+",
+														"right": {
+															"type": "Identifier",
+															"start": 774,
+															"end": 827,
+															"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+														},
+														"leadingComments": [
+															{
+																"type": "Block",
+																"value": " c ",
+																"start": 729,
+																"end": 736
+															}
+														]
+													}
+												}
+											],
+											"optional": false
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Property value, a binary body: the arguments break out",
+							"start": 625,
+							"end": 682
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 876,
+					"end": 1019,
+					"expression": {
+						"type": "CallExpression",
+						"start": 876,
+						"end": 1018,
+						"callee": {
+							"type": "Identifier",
+							"start": 876,
+							"end": 881,
+							"name": "outer"
+						},
+						"arguments": [
+							{
+								"type": "CallExpression",
+								"start": 885,
+								"end": 1015,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 885,
+									"end": 897,
+									"object": {
+										"type": "CallExpression",
+										"start": 885,
+										"end": 890,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 885,
+											"end": 888,
+											"object": {
+												"type": "Identifier",
+												"start": 885,
+												"end": 886,
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 887,
+												"end": 888,
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 891,
+										"end": 897,
+										"name": "fnName"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 902,
+										"end": 1011,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 903,
+												"end": 904,
+												"name": "p"
+											}
+										],
+										"body": {
+											"type": "Identifier",
+											"start": 925,
+											"end": 1011,
+											"name": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 913,
+													"end": 920
+												}
+											]
+										}
+									}
+								],
+								"optional": false
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Call argument, an identifier body",
+							"start": 838,
+							"end": 874
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1064,
+					"end": 1192,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1064,
+						"end": 1191,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 1064,
+							"end": 1081,
+							"object": {
+								"type": "CallExpression",
+								"start": 1064,
+								"end": 1074,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 1064,
+									"end": 1072,
+									"object": {
+										"type": "Identifier",
+										"start": 1064,
+										"end": 1070,
+										"name": "abcdef"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1071,
+										"end": 1072,
+										"name": "b"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 1075,
+								"end": 1081,
+								"name": "fnName"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 1082,
+								"end": 1188,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 1083,
+										"end": 1084,
+										"name": "p"
+									}
+								],
+								"body": {
+									"type": "ConditionalExpression",
+									"start": 1101,
+									"end": 1188,
+									"test": {
+										"type": "Identifier",
+										"start": 1101,
+										"end": 1111,
+										"name": "aaaaaaaaaa"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 1114,
+										"end": 1140,
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbb"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 1143,
+										"end": 1188,
+										"name": "ccccccccccccccccccccccccccccccccccccccccccccc"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 1091,
+											"end": 1098
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A statement whose head does not merge",
+							"start": 1022,
+							"end": 1062
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1312,
+					"end": 1445,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1318,
+							"end": 1444,
+							"id": {
+								"type": "Identifier",
+								"start": 1318,
+								"end": 1320,
+								"name": "v3"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1323,
+								"end": 1444,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 1323,
+									"end": 1341,
+									"object": {
+										"type": "CallExpression",
+										"start": 1323,
+										"end": 1331,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 1323,
+											"end": 1329,
+											"object": {
+												"type": "Identifier",
+												"start": 1323,
+												"end": 1324,
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 1328,
+												"end": 1329,
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1335,
+										"end": 1341,
+										"name": "fnName"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 1346,
+										"end": 1440,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 1347,
+												"end": 1348,
+												"name": "p"
+											}
+										],
+										"body": {
+											"type": "Identifier",
+											"start": 1361,
+											"end": 1440,
+											"name": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 1353,
+													"end": 1360
+												}
+											]
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At 100 the arrow fits flat on the broken-out argument line, so the chain breaks and the",
+							"start": 1195,
+							"end": 1285
+						},
+						{
+							"type": "Line",
+							"value": " comment stays inline",
+							"start": 1287,
+							"end": 1310
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1546,
+					"end": 1678,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1552,
+							"end": 1677,
+							"id": {
+								"type": "Identifier",
+								"start": 1552,
+								"end": 1554,
+								"name": "v4"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1557,
+								"end": 1677,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 1557,
+									"end": 1569,
+									"object": {
+										"type": "CallExpression",
+										"start": 1557,
+										"end": 1562,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 1557,
+											"end": 1560,
+											"object": {
+												"type": "Identifier",
+												"start": 1557,
+												"end": 1558,
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 1559,
+												"end": 1560,
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1563,
+										"end": 1569,
+										"name": "fnName"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 1573,
+										"end": 1674,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 1574,
+												"end": 1575,
+												"name": "p"
+											}
+										],
+										"body": {
+											"type": "Identifier",
+											"start": 1594,
+											"end": 1674,
+											"name": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 1583,
+													"end": 1590
+												}
+											]
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At 101 the arrow fits on no line: the chain stays flat and the comment prints on its own line",
+							"start": 1448,
+							"end": 1544
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1802,
+					"end": 1920,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1808,
+							"end": 1919,
+							"id": {
+								"type": "Identifier",
+								"start": 1808,
+								"end": 1810,
+								"name": "v6"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1813,
+								"end": 1919,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 1813,
+									"end": 1831,
+									"object": {
+										"type": "CallExpression",
+										"start": 1813,
+										"end": 1821,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 1813,
+											"end": 1819,
+											"object": {
+												"type": "Identifier",
+												"start": 1813,
+												"end": 1814,
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 1818,
+												"end": 1819,
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1825,
+										"end": 1831,
+										"name": "fnName"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 1832,
+										"end": 1918,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 1833,
+												"end": 1834,
+												"name": "p"
+											}
+										],
+										"body": {
+											"type": "CallExpression",
+											"start": 1847,
+											"end": 1918,
+											"callee": {
+												"type": "Identifier",
+												"start": 1847,
+												"end": 1853,
+												"name": "gggggg"
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 1854,
+													"end": 1858,
+													"name": "aaaa"
+												},
+												{
+													"type": "Identifier",
+													"start": 1860,
+													"end": 1917,
+													"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+												}
+											],
+											"optional": false,
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 1839,
+													"end": 1846
+												}
+											]
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At 100 a call body fits flat on the expanded chain's last line, so the chain breaks and the",
+							"start": 1681,
+							"end": 1775
+						},
+						{
+							"type": "Line",
+							"value": " comment stays inline",
+							"start": 1777,
+							"end": 1800
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 2029,
+					"end": 2148,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 2035,
+							"end": 2147,
+							"id": {
+								"type": "Identifier",
+								"start": 2035,
+								"end": 2037,
+								"name": "v7"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 2040,
+								"end": 2147,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 2040,
+									"end": 2052,
+									"object": {
+										"type": "CallExpression",
+										"start": 2040,
+										"end": 2045,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 2040,
+											"end": 2043,
+											"object": {
+												"type": "Identifier",
+												"start": 2040,
+												"end": 2041,
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 2042,
+												"end": 2043,
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 2046,
+										"end": 2052,
+										"name": "fnName"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 2053,
+										"end": 2144,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 2054,
+												"end": 2055,
+												"name": "p"
+											}
+										],
+										"body": {
+											"type": "CallExpression",
+											"start": 2072,
+											"end": 2144,
+											"callee": {
+												"type": "Identifier",
+												"start": 2072,
+												"end": 2078,
+												"name": "gggggg"
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 2079,
+													"end": 2083,
+													"name": "aaaa"
+												},
+												{
+													"type": "Identifier",
+													"start": 2085,
+													"end": 2143,
+													"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+												}
+											],
+											"optional": false,
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 2062,
+													"end": 2069
+												}
+											]
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At 101 the call body fits on no line: the chain stays flat and the comment prints on its",
+							"start": 1923,
+							"end": 2014
+						},
+						{
+							"type": "Line",
+							"value": " own line",
+							"start": 2016,
+							"end": 2027
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 2196,
+					"end": 2328,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 2202,
+							"end": 2327,
+							"id": {
+								"type": "Identifier",
+								"start": 2202,
+								"end": 2204,
+								"name": "v9"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 2207,
+								"end": 2327,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 2207,
+									"end": 2219,
+									"object": {
+										"type": "CallExpression",
+										"start": 2207,
+										"end": 2212,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 2207,
+											"end": 2210,
+											"object": {
+												"type": "Identifier",
+												"start": 2207,
+												"end": 2208,
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 2209,
+												"end": 2210,
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 2213,
+										"end": 2219,
+										"name": "fnName"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 2223,
+										"end": 2324,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 2224,
+												"end": 2225,
+												"name": "p"
+											}
+										],
+										"body": {
+											"type": "SequenceExpression",
+											"start": 2245,
+											"end": 2323,
+											"expressions": [
+												{
+													"type": "Identifier",
+													"start": 2245,
+													"end": 2259,
+													"name": "aaaaaaaaaaaaaa"
+												},
+												{
+													"type": "Identifier",
+													"start": 2261,
+													"end": 2323,
+													"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+												}
+											],
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 2233,
+													"end": 2240
+												}
+											]
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A sequence body breaks the arguments out",
+							"start": 2151,
+							"end": 2194
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 2374,
+					"end": 2496,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 2380,
+							"end": 2495,
+							"id": {
+								"type": "Identifier",
+								"start": 2380,
+								"end": 2383,
+								"name": "v10"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 2386,
+								"end": 2495,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 2386,
+									"end": 2398,
+									"object": {
+										"type": "CallExpression",
+										"start": 2386,
+										"end": 2391,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 2386,
+											"end": 2389,
+											"object": {
+												"type": "Identifier",
+												"start": 2386,
+												"end": 2387,
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 2388,
+												"end": 2389,
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 2392,
+										"end": 2398,
+										"name": "fnName"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 2399,
+										"end": 2492,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 2400,
+												"end": 2401,
+												"name": "p"
+											}
+										],
+										"body": {
+											"type": "CallExpression",
+											"start": 2419,
+											"end": 2492,
+											"callee": {
+												"type": "Identifier",
+												"start": 2419,
+												"end": 2425,
+												"name": "gggggg"
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 2426,
+													"end": 2456,
+													"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+												},
+												{
+													"type": "Identifier",
+													"start": 2458,
+													"end": 2491,
+													"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+												}
+											],
+											"optional": false,
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 2408,
+													"end": 2415
+												}
+											]
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A blank line after the comment is kept",
+							"start": 2331,
+							"end": 2372
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2661,
+					"end": 2784,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2661,
+						"end": 2783,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 2661,
+							"end": 2673,
+							"object": {
+								"type": "CallExpression",
+								"start": 2661,
+								"end": 2666,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 2661,
+									"end": 2664,
+									"object": {
+										"type": "Identifier",
+										"start": 2661,
+										"end": 2662,
+										"name": "a"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 2663,
+										"end": 2664,
+										"name": "b"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 2667,
+								"end": 2673,
+								"name": "fnName"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 2674,
+								"end": 2780,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 2675,
+										"end": 2676,
+										"name": "p"
+									}
+								],
+								"body": {
+									"type": "ConditionalExpression",
+									"start": 2693,
+									"end": 2780,
+									"test": {
+										"type": "Identifier",
+										"start": 2693,
+										"end": 2703,
+										"name": "aaaaaaaaaa"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 2706,
+										"end": 2732,
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbb"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 2735,
+										"end": 2780,
+										"name": "ccccccccccccccccccccccccccccccccccccccccccccc"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 2683,
+											"end": 2690
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control: a short-head statement merges its head, so the chain never reaches the two-state",
+							"start": 2499,
+							"end": 2591
+						},
+						{
+							"type": "Line",
+							"value": " group and the comment prints on its own line in both formatters",
+							"start": 2593,
+							"end": 2659
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 2860,
+					"end": 3011,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 2866,
+							"end": 3010,
+							"id": {
+								"type": "Identifier",
+								"start": 2866,
+								"end": 2868,
+								"name": "v5"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 2871,
+								"end": 3010,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 2871,
+									"end": 2889,
+									"object": {
+										"type": "CallExpression",
+										"start": 2871,
+										"end": 2879,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 2871,
+											"end": 2877,
+											"object": {
+												"type": "Identifier",
+												"start": 2871,
+												"end": 2872,
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 2876,
+												"end": 2877,
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 2883,
+										"end": 2889,
+										"name": "fnName"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 2890,
+										"end": 3006,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 2891,
+												"end": 2892,
+												"name": "p"
+											}
+										],
+										"body": {
+											"type": "ConditionalExpression",
+											"start": 2919,
+											"end": 3006,
+											"test": {
+												"type": "Identifier",
+												"start": 2919,
+												"end": 2929,
+												"name": "aaaaaaaaaa"
+											},
+											"consequent": {
+												"type": "Identifier",
+												"start": 2932,
+												"end": 2958,
+												"name": "bbbbbbbbbbbbbbbbbbbbbbbbbb"
+											},
+											"alternate": {
+												"type": "Identifier",
+												"start": 2961,
+												"end": 3006,
+												"name": "ccccccccccccccccccccccccccccccccccccccccccccc"
+											},
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 2900,
+													"end": 2907
+												},
+												{
+													"type": "Block",
+													"value": " d ",
+													"start": 2908,
+													"end": 2915
+												}
+											]
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control: a two-comment run keeps the chain broken in both formatters",
+							"start": 2787,
+							"end": 2858
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 3104,
+					"end": 3232,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 3110,
+							"end": 3231,
+							"id": {
+								"type": "Identifier",
+								"start": 3110,
+								"end": 3113,
+								"name": "v11"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 3116,
+								"end": 3231,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 3116,
+									"end": 3134,
+									"object": {
+										"type": "CallExpression",
+										"start": 3116,
+										"end": 3124,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 3116,
+											"end": 3122,
+											"object": {
+												"type": "Identifier",
+												"start": 3116,
+												"end": 3117,
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 3121,
+												"end": 3122,
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 3128,
+										"end": 3134,
+										"name": "fnName"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 3139,
+										"end": 3219,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 3140,
+												"end": 3141,
+												"name": "p"
+											}
+										],
+										"body": {
+											"type": "CallExpression",
+											"start": 3154,
+											"end": 3219,
+											"callee": {
+												"type": "Identifier",
+												"start": 3154,
+												"end": 3160,
+												"name": "gggggg"
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 3161,
+													"end": 3191,
+													"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+												},
+												{
+													"type": "Identifier",
+													"start": 3193,
+													"end": 3218,
+													"name": "bbbbbbbbbbbbbbbbbbbbbbbbb",
+													"trailingComments": [
+														{
+															"type": "Block",
+															"value": " t ",
+															"start": 3220,
+															"end": 3227
+														}
+													]
+												}
+											],
+											"optional": false,
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 3146,
+													"end": 3153
+												}
+											]
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control: a second comment trailing the body keeps the chain broken in both formatters",
+							"start": 3014,
+							"end": 3102
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 3339,
+					"end": 3467,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 3345,
+							"end": 3466,
+							"id": {
+								"type": "Identifier",
+								"start": 3345,
+								"end": 3348,
+								"name": "v12"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 3351,
+								"end": 3466,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 3351,
+									"end": 3369,
+									"object": {
+										"type": "CallExpression",
+										"start": 3351,
+										"end": 3359,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 3351,
+											"end": 3357,
+											"object": {
+												"type": "Identifier",
+												"start": 3351,
+												"end": 3352,
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 3356,
+												"end": 3357,
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 3363,
+										"end": 3369,
+										"name": "fnName"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 3382,
+										"end": 3462,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 3383,
+												"end": 3384,
+												"name": "p"
+											}
+										],
+										"body": {
+											"type": "CallExpression",
+											"start": 3397,
+											"end": 3462,
+											"callee": {
+												"type": "Identifier",
+												"start": 3397,
+												"end": 3403,
+												"name": "gggggg"
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 3404,
+													"end": 3434,
+													"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+												},
+												{
+													"type": "Identifier",
+													"start": 3436,
+													"end": 3461,
+													"name": "bbbbbbbbbbbbbbbbbbbbbbbbb"
+												}
+											],
+											"optional": false,
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 3389,
+													"end": 3396
+												}
+											]
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " l ",
+												"start": 3374,
+												"end": 3381
+											}
+										]
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control: a second comment ahead of the first argument keeps the chain broken in both",
+							"start": 3235,
+							"end": 3322
+						},
+						{
+							"type": "Line",
+							"value": " formatters",
+							"start": 3324,
+							"end": 3337
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 3575,
+					"end": 3725,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 3581,
+							"end": 3724,
+							"id": {
+								"type": "Identifier",
+								"start": 3581,
+								"end": 3583,
+								"name": "v8"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 3586,
+								"end": 3724,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 3586,
+									"end": 3611,
+									"object": {
+										"type": "CallExpression",
+										"start": 3586,
+										"end": 3601,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 3586,
+											"end": 3592,
+											"object": {
+												"type": "Identifier",
+												"start": 3586,
+												"end": 3587,
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 3591,
+												"end": 3592,
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "ArrowFunctionExpression",
+												"start": 3593,
+												"end": 3600,
+												"id": null,
+												"expression": true,
+												"generator": false,
+												"async": false,
+												"params": [],
+												"body": {
+													"type": "Literal",
+													"start": 3599,
+													"end": 3600,
+													"value": 1,
+													"raw": "1"
+												}
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 3605,
+										"end": 3611,
+										"name": "fnName"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 3612,
+										"end": 3720,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 3613,
+												"end": 3614,
+												"name": "p"
+											}
+										],
+										"body": {
+											"type": "ConditionalExpression",
+											"start": 3633,
+											"end": 3720,
+											"test": {
+												"type": "Identifier",
+												"start": 3633,
+												"end": 3643,
+												"name": "aaaaaaaaaa"
+											},
+											"consequent": {
+												"type": "Identifier",
+												"start": 3646,
+												"end": 3672,
+												"name": "bbbbbbbbbbbbbbbbbbbbbbbbbb"
+											},
+											"alternate": {
+												"type": "Identifier",
+												"start": 3675,
+												"end": 3720,
+												"name": "ccccccccccccccccccccccccccccccccccccccccccccc"
+											},
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 3622,
+													"end": 3629
+												}
+											]
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control: an earlier call takes a function argument, so the chain stays broken in both",
+							"start": 3470,
+							"end": 3558
+						},
+						{
+							"type": "Line",
+							"value": " formatters",
+							"start": 3560,
+							"end": 3573
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
