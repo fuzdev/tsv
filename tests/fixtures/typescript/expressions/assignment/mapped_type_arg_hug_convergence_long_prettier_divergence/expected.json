@@ -1,0 +1,1476 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 2395,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Declarator: the call fits on no line after `=`, and its argument list cannot hold the",
+			"start": 20,
+			"end": 108
+		},
+		{
+			"type": "Line",
+			"value": " mapped type flat, so the mapped type breaks and the call hugs the `=`",
+			"start": 110,
+			"end": 182
+		},
+		{
+			"type": "Line",
+			"value": " Exported declarator",
+			"start": 304,
+			"end": 326
+		},
+		{
+			"type": "Line",
+			"value": " Assignment",
+			"start": 453,
+			"end": 466
+		},
+		{
+			"type": "Line",
+			"value": " Class field",
+			"start": 584,
+			"end": 598
+		},
+		{
+			"type": "Line",
+			"value": " Under an `await`",
+			"start": 729,
+			"end": 748
+		},
+		{
+			"type": "Line",
+			"value": " No arguments",
+			"start": 870,
+			"end": 885
+		},
+		{
+			"type": "Line",
+			"value": " At 100 the argument list holds the mapped type flat after the `=` break, so the `=` breaks",
+			"start": 1006,
+			"end": 1099
+		},
+		{
+			"type": "Line",
+			"value": " and the argument breaks out",
+			"start": 1101,
+			"end": 1131
+		},
+		{
+			"type": "Line",
+			"value": " At 101 the mapped type breaks, so the call hugs the `=`",
+			"start": 1255,
+			"end": 1313
+		},
+		{
+			"type": "Line",
+			"value": " At 100 the hugged call's first line fits",
+			"start": 1433,
+			"end": 1476
+		},
+		{
+			"type": "Line",
+			"value": " At 101 it does not: the `=` breaks and the mapped type breaks after it",
+			"start": 1611,
+			"end": 1684
+		},
+		{
+			"type": "Line",
+			"value": " Control: a `new` callee hugs the `=` in both formatters",
+			"start": 1824,
+			"end": 1882
+		},
+		{
+			"type": "Line",
+			"value": " Control: an object type argument is a break point in both formatters",
+			"start": 2006,
+			"end": 2077
+		},
+		{
+			"type": "Line",
+			"value": " Control: a property value has no `=` to break after",
+			"start": 2198,
+			"end": 2252
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 2394,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 2385,
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 184,
+					"end": 301,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 190,
+							"end": 300,
+							"id": {
+								"type": "Identifier",
+								"start": 190,
+								"end": 192,
+								"name": "v1"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 195,
+								"end": 300,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 195,
+									"end": 267,
+									"object": {
+										"type": "Identifier",
+										"start": 195,
+										"end": 196,
+										"name": "w"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 197,
+										"end": 267,
+										"name": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 298,
+										"end": 299,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 267,
+									"end": 297,
+									"params": [
+										{
+											"type": "TSMappedType",
+											"start": 268,
+											"end": 296,
+											"readonly": true,
+											"typeParameter": {
+												"type": "TSTypeParameter",
+												"start": 282,
+												"end": 288,
+												"name": "K",
+												"constraint": {
+													"type": "TSTypeReference",
+													"start": 287,
+													"end": 288,
+													"typeName": {
+														"type": "Identifier",
+														"start": 287,
+														"end": 288,
+														"name": "X"
+													}
+												}
+											},
+											"nameType": null,
+											"typeAnnotation": {
+												"type": "TSLiteralType",
+												"start": 291,
+												"end": 292,
+												"literal": {
+													"type": "Literal",
+													"start": 291,
+													"end": 292,
+													"value": 1,
+													"raw": "1"
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Declarator: the call fits on no line after `=`, and its argument list cannot hold the",
+							"start": 20,
+							"end": 108
+						},
+						{
+							"type": "Line",
+							"value": " mapped type flat, so the mapped type breaks and the call hugs the `=`",
+							"start": 110,
+							"end": 182
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 328,
+					"end": 450,
+					"exportKind": "value",
+					"declaration": {
+						"type": "VariableDeclaration",
+						"start": 335,
+						"end": 450,
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 341,
+								"end": 449,
+								"id": {
+									"type": "Identifier",
+									"start": 341,
+									"end": 343,
+									"name": "v2"
+								},
+								"init": {
+									"type": "CallExpression",
+									"start": 346,
+									"end": 449,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 346,
+										"end": 416,
+										"object": {
+											"type": "Identifier",
+											"start": 346,
+											"end": 347,
+											"name": "w"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 348,
+											"end": 416,
+											"name": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 447,
+											"end": 448,
+											"name": "x"
+										}
+									],
+									"typeArguments": {
+										"type": "TSTypeParameterInstantiation",
+										"start": 416,
+										"end": 446,
+										"params": [
+											{
+												"type": "TSMappedType",
+												"start": 417,
+												"end": 445,
+												"readonly": true,
+												"typeParameter": {
+													"type": "TSTypeParameter",
+													"start": 431,
+													"end": 437,
+													"name": "K",
+													"constraint": {
+														"type": "TSTypeReference",
+														"start": 436,
+														"end": 437,
+														"typeName": {
+															"type": "Identifier",
+															"start": 436,
+															"end": 437,
+															"name": "X"
+														}
+													}
+												},
+												"nameType": null,
+												"typeAnnotation": {
+													"type": "TSLiteralType",
+													"start": 440,
+													"end": 441,
+													"literal": {
+														"type": "Literal",
+														"start": 440,
+														"end": 441,
+														"value": 1,
+														"raw": "1"
+													}
+												}
+											}
+										]
+									}
+								}
+							}
+						],
+						"kind": "const"
+					},
+					"specifiers": [],
+					"source": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Exported declarator",
+							"start": 304,
+							"end": 326
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 468,
+					"end": 581,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 468,
+						"end": 580,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 468,
+							"end": 470,
+							"name": "v3"
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 473,
+							"end": 580,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 473,
+								"end": 547,
+								"object": {
+									"type": "Identifier",
+									"start": 473,
+									"end": 474,
+									"name": "w"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 475,
+									"end": 547,
+									"name": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "Identifier",
+									"start": 578,
+									"end": 579,
+									"name": "x"
+								}
+							],
+							"typeArguments": {
+								"type": "TSTypeParameterInstantiation",
+								"start": 547,
+								"end": 577,
+								"params": [
+									{
+										"type": "TSMappedType",
+										"start": 548,
+										"end": 576,
+										"readonly": true,
+										"typeParameter": {
+											"type": "TSTypeParameter",
+											"start": 562,
+											"end": 568,
+											"name": "K",
+											"constraint": {
+												"type": "TSTypeReference",
+												"start": 567,
+												"end": 568,
+												"typeName": {
+													"type": "Identifier",
+													"start": 567,
+													"end": 568,
+													"name": "X"
+												}
+											}
+										},
+										"nameType": null,
+										"typeAnnotation": {
+											"type": "TSLiteralType",
+											"start": 571,
+											"end": 572,
+											"literal": {
+												"type": "Literal",
+												"start": 571,
+												"end": 572,
+												"value": 1,
+												"raw": "1"
+											}
+										}
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Assignment",
+							"start": 453,
+							"end": 466
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 600,
+					"end": 726,
+					"id": {
+						"type": "Identifier",
+						"start": 606,
+						"end": 607,
+						"name": "C"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 608,
+						"end": 726,
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 612,
+								"end": 723,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 612,
+									"end": 614,
+									"name": "v4"
+								},
+								"value": {
+									"type": "CallExpression",
+									"start": 617,
+									"end": 722,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 617,
+										"end": 687,
+										"object": {
+											"type": "Identifier",
+											"start": 617,
+											"end": 618,
+											"name": "w"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 619,
+											"end": 687,
+											"name": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 720,
+											"end": 721,
+											"name": "x"
+										}
+									],
+									"typeArguments": {
+										"type": "TSTypeParameterInstantiation",
+										"start": 687,
+										"end": 719,
+										"params": [
+											{
+												"type": "TSMappedType",
+												"start": 688,
+												"end": 718,
+												"readonly": true,
+												"typeParameter": {
+													"type": "TSTypeParameter",
+													"start": 703,
+													"end": 709,
+													"name": "K",
+													"constraint": {
+														"type": "TSTypeReference",
+														"start": 708,
+														"end": 709,
+														"typeName": {
+															"type": "Identifier",
+															"start": 708,
+															"end": 709,
+															"name": "X"
+														}
+													}
+												},
+												"nameType": null,
+												"typeAnnotation": {
+													"type": "TSLiteralType",
+													"start": 712,
+													"end": 713,
+													"literal": {
+														"type": "Literal",
+														"start": 712,
+														"end": 713,
+														"value": 1,
+														"raw": "1"
+													}
+												}
+											}
+										]
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Class field",
+							"start": 584,
+							"end": 598
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 750,
+					"end": 867,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 756,
+							"end": 866,
+							"id": {
+								"type": "Identifier",
+								"start": 756,
+								"end": 758,
+								"name": "v5"
+							},
+							"init": {
+								"type": "AwaitExpression",
+								"start": 761,
+								"end": 866,
+								"argument": {
+									"type": "CallExpression",
+									"start": 767,
+									"end": 866,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 767,
+										"end": 833,
+										"object": {
+											"type": "Identifier",
+											"start": 767,
+											"end": 768,
+											"name": "w"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 769,
+											"end": 833,
+											"name": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 864,
+											"end": 865,
+											"name": "x"
+										}
+									],
+									"typeArguments": {
+										"type": "TSTypeParameterInstantiation",
+										"start": 833,
+										"end": 863,
+										"params": [
+											{
+												"type": "TSMappedType",
+												"start": 834,
+												"end": 862,
+												"readonly": true,
+												"typeParameter": {
+													"type": "TSTypeParameter",
+													"start": 848,
+													"end": 854,
+													"name": "K",
+													"constraint": {
+														"type": "TSTypeReference",
+														"start": 853,
+														"end": 854,
+														"typeName": {
+															"type": "Identifier",
+															"start": 853,
+															"end": 854,
+															"name": "X"
+														}
+													}
+												},
+												"nameType": null,
+												"typeAnnotation": {
+													"type": "TSLiteralType",
+													"start": 857,
+													"end": 858,
+													"literal": {
+														"type": "Literal",
+														"start": 857,
+														"end": 858,
+														"value": 1,
+														"raw": "1"
+													}
+												}
+											}
+										]
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Under an `await`",
+							"start": 729,
+							"end": 748
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 887,
+					"end": 1003,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 893,
+							"end": 1002,
+							"id": {
+								"type": "Identifier",
+								"start": 893,
+								"end": 895,
+								"name": "v6"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 898,
+								"end": 1002,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 898,
+									"end": 970,
+									"object": {
+										"type": "Identifier",
+										"start": 898,
+										"end": 899,
+										"name": "w"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 900,
+										"end": 970,
+										"name": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 970,
+									"end": 1000,
+									"params": [
+										{
+											"type": "TSMappedType",
+											"start": 971,
+											"end": 999,
+											"readonly": true,
+											"typeParameter": {
+												"type": "TSTypeParameter",
+												"start": 985,
+												"end": 991,
+												"name": "K",
+												"constraint": {
+													"type": "TSTypeReference",
+													"start": 990,
+													"end": 991,
+													"typeName": {
+														"type": "Identifier",
+														"start": 990,
+														"end": 991,
+														"name": "X"
+													}
+												}
+											},
+											"nameType": null,
+											"typeAnnotation": {
+												"type": "TSLiteralType",
+												"start": 994,
+												"end": 995,
+												"literal": {
+													"type": "Literal",
+													"start": 994,
+													"end": 995,
+													"value": 1,
+													"raw": "1"
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " No arguments",
+							"start": 870,
+							"end": 885
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1133,
+					"end": 1252,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1139,
+							"end": 1251,
+							"id": {
+								"type": "Identifier",
+								"start": 1139,
+								"end": 1141,
+								"name": "v7"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1146,
+								"end": 1251,
+								"callee": {
+									"type": "Identifier",
+									"start": 1146,
+									"end": 1215,
+									"name": "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 1246,
+										"end": 1247,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 1215,
+									"end": 1241,
+									"params": [
+										{
+											"type": "TSMappedType",
+											"start": 1216,
+											"end": 1240,
+											"readonly": true,
+											"typeParameter": {
+												"type": "TSTypeParameter",
+												"start": 1228,
+												"end": 1234,
+												"name": "K",
+												"constraint": {
+													"type": "TSTypeReference",
+													"start": 1233,
+													"end": 1234,
+													"typeName": {
+														"type": "Identifier",
+														"start": 1233,
+														"end": 1234,
+														"name": "X"
+													}
+												}
+											},
+											"nameType": null,
+											"typeAnnotation": {
+												"type": "TSLiteralType",
+												"start": 1237,
+												"end": 1238,
+												"literal": {
+													"type": "Literal",
+													"start": 1237,
+													"end": 1238,
+													"value": 1,
+													"raw": "1"
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At 100 the argument list holds the mapped type flat after the `=` break, so the `=` breaks",
+							"start": 1006,
+							"end": 1099
+						},
+						{
+							"type": "Line",
+							"value": " and the argument breaks out",
+							"start": 1101,
+							"end": 1131
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1315,
+					"end": 1430,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1321,
+							"end": 1429,
+							"id": {
+								"type": "Identifier",
+								"start": 1321,
+								"end": 1323,
+								"name": "v8"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1326,
+								"end": 1429,
+								"callee": {
+									"type": "Identifier",
+									"start": 1326,
+									"end": 1396,
+									"name": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 1427,
+										"end": 1428,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 1396,
+									"end": 1426,
+									"params": [
+										{
+											"type": "TSMappedType",
+											"start": 1397,
+											"end": 1425,
+											"readonly": true,
+											"typeParameter": {
+												"type": "TSTypeParameter",
+												"start": 1411,
+												"end": 1417,
+												"name": "K",
+												"constraint": {
+													"type": "TSTypeReference",
+													"start": 1416,
+													"end": 1417,
+													"typeName": {
+														"type": "Identifier",
+														"start": 1416,
+														"end": 1417,
+														"name": "X"
+													}
+												}
+											},
+											"nameType": null,
+											"typeAnnotation": {
+												"type": "TSLiteralType",
+												"start": 1420,
+												"end": 1421,
+												"literal": {
+													"type": "Literal",
+													"start": 1420,
+													"end": 1421,
+													"value": 1,
+													"raw": "1"
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At 101 the mapped type breaks, so the call hugs the `=`",
+							"start": 1255,
+							"end": 1313
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1478,
+					"end": 1608,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1484,
+							"end": 1607,
+							"id": {
+								"type": "Identifier",
+								"start": 1484,
+								"end": 1486,
+								"name": "v9"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1489,
+								"end": 1607,
+								"callee": {
+									"type": "Identifier",
+									"start": 1489,
+									"end": 1574,
+									"name": "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 1605,
+										"end": 1606,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 1574,
+									"end": 1604,
+									"params": [
+										{
+											"type": "TSMappedType",
+											"start": 1575,
+											"end": 1603,
+											"readonly": true,
+											"typeParameter": {
+												"type": "TSTypeParameter",
+												"start": 1589,
+												"end": 1595,
+												"name": "K",
+												"constraint": {
+													"type": "TSTypeReference",
+													"start": 1594,
+													"end": 1595,
+													"typeName": {
+														"type": "Identifier",
+														"start": 1594,
+														"end": 1595,
+														"name": "X"
+													}
+												}
+											},
+											"nameType": null,
+											"typeAnnotation": {
+												"type": "TSLiteralType",
+												"start": 1598,
+												"end": 1599,
+												"literal": {
+													"type": "Literal",
+													"start": 1598,
+													"end": 1599,
+													"value": 1,
+													"raw": "1"
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At 100 the hugged call's first line fits",
+							"start": 1433,
+							"end": 1476
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1686,
+					"end": 1821,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1692,
+							"end": 1820,
+							"id": {
+								"type": "Identifier",
+								"start": 1692,
+								"end": 1695,
+								"name": "v10"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1700,
+								"end": 1820,
+								"callee": {
+									"type": "Identifier",
+									"start": 1700,
+									"end": 1785,
+									"name": "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 1818,
+										"end": 1819,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 1785,
+									"end": 1817,
+									"params": [
+										{
+											"type": "TSMappedType",
+											"start": 1786,
+											"end": 1816,
+											"readonly": true,
+											"typeParameter": {
+												"type": "TSTypeParameter",
+												"start": 1801,
+												"end": 1807,
+												"name": "K",
+												"constraint": {
+													"type": "TSTypeReference",
+													"start": 1806,
+													"end": 1807,
+													"typeName": {
+														"type": "Identifier",
+														"start": 1806,
+														"end": 1807,
+														"name": "X"
+													}
+												}
+											},
+											"nameType": null,
+											"typeAnnotation": {
+												"type": "TSLiteralType",
+												"start": 1810,
+												"end": 1811,
+												"literal": {
+													"type": "Literal",
+													"start": 1810,
+													"end": 1811,
+													"value": 1,
+													"raw": "1"
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At 101 it does not: the `=` breaks and the mapped type breaks after it",
+							"start": 1611,
+							"end": 1684
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1884,
+					"end": 2003,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1890,
+							"end": 2002,
+							"id": {
+								"type": "Identifier",
+								"start": 1890,
+								"end": 1893,
+								"name": "v11"
+							},
+							"init": {
+								"type": "NewExpression",
+								"start": 1896,
+								"end": 2002,
+								"callee": {
+									"type": "Identifier",
+									"start": 1900,
+									"end": 1969,
+									"name": "Wffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 1969,
+									"end": 1999,
+									"params": [
+										{
+											"type": "TSMappedType",
+											"start": 1970,
+											"end": 1998,
+											"readonly": true,
+											"typeParameter": {
+												"type": "TSTypeParameter",
+												"start": 1984,
+												"end": 1990,
+												"name": "K",
+												"constraint": {
+													"type": "TSTypeReference",
+													"start": 1989,
+													"end": 1990,
+													"typeName": {
+														"type": "Identifier",
+														"start": 1989,
+														"end": 1990,
+														"name": "X"
+													}
+												}
+											},
+											"nameType": null,
+											"typeAnnotation": {
+												"type": "TSLiteralType",
+												"start": 1993,
+												"end": 1994,
+												"literal": {
+													"type": "Literal",
+													"start": 1993,
+													"end": 1994,
+													"value": 1,
+													"raw": "1"
+												}
+											}
+										}
+									]
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 2000,
+										"end": 2001,
+										"name": "x"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control: a `new` callee hugs the `=` in both formatters",
+							"start": 1824,
+							"end": 1882
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 2079,
+					"end": 2195,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 2085,
+							"end": 2194,
+							"id": {
+								"type": "Identifier",
+								"start": 2085,
+								"end": 2088,
+								"name": "v12"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 2091,
+								"end": 2194,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 2091,
+									"end": 2163,
+									"object": {
+										"type": "Identifier",
+										"start": 2091,
+										"end": 2092,
+										"name": "w"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 2093,
+										"end": 2163,
+										"name": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 2192,
+										"end": 2193,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 2163,
+									"end": 2191,
+									"params": [
+										{
+											"type": "TSTypeLiteral",
+											"start": 2164,
+											"end": 2190,
+											"members": [
+												{
+													"type": "TSPropertySignature",
+													"start": 2168,
+													"end": 2176,
+													"computed": false,
+													"key": {
+														"type": "Identifier",
+														"start": 2168,
+														"end": 2172,
+														"name": "aaaa"
+													},
+													"typeAnnotation": {
+														"type": "TSTypeAnnotation",
+														"start": 2172,
+														"end": 2175,
+														"typeAnnotation": {
+															"type": "TSLiteralType",
+															"start": 2174,
+															"end": 2175,
+															"literal": {
+																"type": "Literal",
+																"start": 2174,
+																"end": 2175,
+																"value": 1,
+																"raw": "1"
+															}
+														}
+													}
+												},
+												{
+													"type": "TSPropertySignature",
+													"start": 2179,
+													"end": 2187,
+													"computed": false,
+													"key": {
+														"type": "Identifier",
+														"start": 2179,
+														"end": 2183,
+														"name": "bbbb"
+													},
+													"typeAnnotation": {
+														"type": "TSTypeAnnotation",
+														"start": 2183,
+														"end": 2186,
+														"typeAnnotation": {
+															"type": "TSLiteralType",
+															"start": 2185,
+															"end": 2186,
+															"literal": {
+																"type": "Literal",
+																"start": 2185,
+																"end": 2186,
+																"value": 2,
+																"raw": "2"
+															}
+														}
+													}
+												}
+											]
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control: an object type argument is a break point in both formatters",
+							"start": 2006,
+							"end": 2077
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 2254,
+					"end": 2384,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 2260,
+							"end": 2383,
+							"id": {
+								"type": "Identifier",
+								"start": 2260,
+								"end": 2261,
+								"name": "o"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 2264,
+								"end": 2383,
+								"properties": [
+									{
+										"type": "Property",
+										"start": 2268,
+										"end": 2380,
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 2268,
+											"end": 2271,
+											"name": "v13"
+										},
+										"value": {
+											"type": "CallExpression",
+											"start": 2273,
+											"end": 2380,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 2273,
+												"end": 2345,
+												"object": {
+													"type": "Identifier",
+													"start": 2273,
+													"end": 2274,
+													"name": "w"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 2275,
+													"end": 2345,
+													"name": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 2378,
+													"end": 2379,
+													"name": "x"
+												}
+											],
+											"typeArguments": {
+												"type": "TSTypeParameterInstantiation",
+												"start": 2345,
+												"end": 2377,
+												"params": [
+													{
+														"type": "TSMappedType",
+														"start": 2346,
+														"end": 2376,
+														"readonly": true,
+														"typeParameter": {
+															"type": "TSTypeParameter",
+															"start": 2361,
+															"end": 2367,
+															"name": "K",
+															"constraint": {
+																"type": "TSTypeReference",
+																"start": 2366,
+																"end": 2367,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 2366,
+																	"end": 2367,
+																	"name": "X"
+																}
+															}
+														},
+														"nameType": null,
+														"typeAnnotation": {
+															"type": "TSLiteralType",
+															"start": 2370,
+															"end": 2371,
+															"literal": {
+																"type": "Literal",
+																"start": 2370,
+																"end": 2371,
+																"value": 1,
+																"raw": "1"
+															}
+														}
+													}
+												]
+											}
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control: a property value has no `=` to break after",
+							"start": 2198,
+							"end": 2252
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

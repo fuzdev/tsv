@@ -14,7 +14,6 @@
 // - prettier/src/language-js/print/assignment.js
 
 use crate::ast::internal::{self, AssignmentOperator, Expression, ExpressionKind};
-use crate::printer::Printer;
 use crate::printer::calls::chain_has_calls;
 use crate::printer::chain::chain_paren_leading_gap;
 use crate::printer::class_expr_has_decorators;
@@ -24,9 +23,12 @@ use crate::printer::expressions::functions::HeadForcedChainLead;
 use crate::printer::expressions::literals::format_string_literal_from_ast;
 use crate::printer::is_string_literal;
 use crate::printer::types::helpers::unwrap_parenthesized;
+use crate::printer::{AssumedBreak, Printer};
 use tsv_lang::PRINT_WIDTH;
 use tsv_lang::Span;
-use tsv_lang::doc::after_operator::{fluid_after_operator, hang_after_operator};
+use tsv_lang::doc::after_operator::{
+    after_operator_assumed_fluid, fluid_after_operator, hang_after_operator,
+};
 use tsv_lang::doc::arena::{DocArena, DocId};
 
 /// Prettier's heuristic for "short" property keys.
@@ -489,6 +491,106 @@ fn is_call_with_complex_type_arguments(
             && printer
                 .d()
                 .will_break(printer.build_type_parameter_instantiation_doc(type_args)))
+}
+
+/// The width-broken mapped type argument's hug — a convergence state for an assignment
+/// value that is a short call whose sole type argument is a mapped type the author wrote
+/// without a break after its `{` ([`Printer::mapped_type_arg_hug`]).
+///
+/// Prettier's `isCallExpressionWithComplexTypeArguments` lists object, union and
+/// intersection types but reaches a mapped type only through `willBreak(typeArguments)`,
+/// so its first pass reads such a call as poorly breakable and breaks after the `=`, where
+/// the mapped type breaks for width when the continuation line up to the call's `(` cannot
+/// hold it. Its second pass reads that break as authored, classifies the type arguments
+/// complex, and keeps the call on the `=` line — the hug — with the fluid layout. The
+/// state prints that settled form in one pass ([`after_operator_assumed_fluid`]),
+/// gated on the continuation line.
+pub(in crate::printer) struct MappedTypeArgHug {
+    /// The mapped type's span start — the [`AssumedBreak::MappedType`] position.
+    mapped: u32,
+    /// What of the call the continuation line holds when its arguments break out — the
+    /// callee, its type arguments and the `(` — or `None` for a call with no arguments,
+    /// which stays whole on that line.
+    line: Option<DocId>,
+}
+
+impl Printer<'_> {
+    /// [`MappedTypeArgHug`] for an assignment `value` that breaks after its operator
+    /// as poorly breakable, or `None`.
+    ///
+    /// The value is the call, under at most one `await` and any `!` — the wrappers the
+    /// classifier reads through — with no comment anywhere in it and no call anywhere in its
+    /// callee. Every call-rooted callee is excluded, but only a member-chain one
+    /// (`w.a().f…`) is the chain's own window, answered by the member chain's two-state
+    /// group; the others (`w().f…`, `this.w().f…`) are a known residual, which prettier
+    /// settles on the hug as well. The type argument is the mapped type itself: one in a
+    /// redundant paren shell prints its `<…>` another way.
+    pub(in crate::printer) fn mapped_type_arg_hug(
+        &self,
+        value: &Expression<'_>,
+    ) -> Option<MappedTypeArgHug> {
+        let mut core = value;
+        let mut awaited = false;
+        let call = loop {
+            match &core.kind {
+                ExpressionKind::CallExpression(call) => break call,
+                ExpressionKind::TSNonNullExpression(non_null) => core = non_null.expression,
+                ExpressionKind::AwaitExpression(await_expr) if !awaited => {
+                    awaited = true;
+                    core = await_expr.argument;
+                }
+                _ => return None,
+            }
+        };
+        if call.optional || chain_has_calls(call.callee) {
+            return None;
+        }
+        let type_args = call.type_arguments.as_ref()?;
+        let [internal::TSType::Mapped(mapped)] = type_args.params else {
+            return None;
+        };
+        // An authored break after the mapped type's `{` needs no guard of its own: it puts a
+        // newline in the `<…>` and makes its doc break, so the type arguments read complex
+        // and the call is not poorly breakable.
+        if self.has_comments_on_page_between(value.span.start, value.span.end)
+            || !is_poorly_breakable_chain(core, self)
+        {
+            return None;
+        }
+        let d = self.d();
+        // The continuation line opens with what the wrappers print ahead of the call; a `!`
+        // prints after it, past the `(` the line stops at.
+        let line = (!call.arguments.is_empty()).then(|| {
+            d.concat(&[
+                d.text(if awaited { "await " } else { "" }),
+                self.build_expression_doc(call.callee),
+                self.build_type_parameter_instantiation_doc(type_args),
+                d.text("("),
+            ])
+        });
+        Some(MappedTypeArgHug {
+            mapped: mapped.span.start,
+            line,
+        })
+    }
+
+    /// The break-after-operator tail for `value_doc` with the [`MappedTypeArgHug`] state
+    /// gated in — `build_assumed` builds the value again, read with the mapped type broken
+    /// after its `{`.
+    pub(in crate::printer) fn build_mapped_type_arg_hug_tail(
+        &self,
+        hug: &MappedTypeArgHug,
+        value_doc: DocId,
+        build_assumed: impl FnOnce() -> DocId,
+    ) -> DocId {
+        let d = self.d();
+        let probe = match hug.line {
+            Some(line) => d.line_probe(0, line),
+            None => value_doc,
+        };
+        let assumed = self.with_assumed_break(AssumedBreak::MappedType(hug.mapped), build_assumed);
+        after_operator_assumed_fluid(d, value_doc, probe, assumed)
+    }
 }
 
 /// A chain is poorly breakable if it doesn't have good internal break points:
@@ -1308,11 +1410,29 @@ impl<'a> Printer<'a> {
                 // Break after operator with nested groups - matches prettier exactly
                 // Structure: group([group(left), op, group(indent([line, right]))])
                 // Each inner group can break independently based on remaining width
-                d.group(d.concat(&[
-                    d.group(left_doc),
-                    operator,
-                    hang_after_operator(d, right_doc_with_comments),
-                ]))
+                //
+                // A short call whose sole type argument is a flat mapped type takes the
+                // mapped type's width break as authored where prettier's second pass does
+                // ([`MappedTypeArgHug`]). Comment-free by its own gate, so the value it
+                // rebuilds is the plain one.
+                let value_span = right_expr.span();
+                let comment_free = gap_comments.is_none()
+                    && rhs_info.gap.is_none_or(|gap| {
+                        !self.has_comments_on_page_between(gap.start, value_span.start)
+                    })
+                    && rhs_info.boundary.is_none_or(|boundary| {
+                        !self.has_comments_on_page_between(value_span.end, boundary)
+                    });
+                let tail = comment_free
+                    .then(|| self.mapped_type_arg_hug(right_expr))
+                    .flatten()
+                    .map(|hug| {
+                        self.build_mapped_type_arg_hug_tail(&hug, right_doc_with_comments, || {
+                            build_right(None)
+                        })
+                    });
+                let tail = tail.unwrap_or_else(|| hang_after_operator(d, right_doc_with_comments));
+                d.group(d.concat(&[d.group(left_doc), operator, tail]))
             }
 
             AssignmentLayout::NeverBreakAfterOperator => {

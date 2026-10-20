@@ -129,3 +129,34 @@ pub fn after_operator_head_gated(d: &DocArena, value: DocId, value_broken: DocId
         hung,
     ])
 }
+
+/// Break-after-operator for a value that is poorly breakable only while one of its
+/// breaks reads as unauthored — with that break's settled layout gated in between.
+///
+/// Three states: the value flat on the operator's line (state 0, the hang's flat
+/// reading, so an enclosing look-ahead and [`DocArena::will_break`] read exactly what
+/// [`hang_after_operator`] gives them); [`fluid_after_operator`] over `value_assumed`,
+/// the value built with that break assumed authored, admitted only while `probe`
+/// cannot fit on the continuation line the hang would put it on; then the hang again,
+/// rendered when neither fits.
+///
+/// Prettier reaches the middle state on its SECOND pass: its first breaks after the
+/// operator, the value breaks for width on the continuation line, and the second pass
+/// reads that break as authored, which makes the value breakable and keeps it on the
+/// operator's line. `probe` stands for the continuation line — what of the value the
+/// first pass puts there (a [`DocArena::line_probe`] where that line ends before the
+/// value does) — so the state is taken only where that first pass breaks inside the
+/// value.
+pub fn after_operator_assumed_fluid(
+    d: &DocArena,
+    value: DocId,
+    probe: DocId,
+    value_assumed: DocId,
+) -> DocId {
+    let hung = hang_after_operator(d, value);
+    d.conditional_group(&[
+        hung,
+        d.gated_state(probe, fluid_after_operator(d, value_assumed)),
+        hung,
+    ])
+}

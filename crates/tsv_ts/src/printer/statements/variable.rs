@@ -645,7 +645,20 @@ impl<'a> Printer<'a> {
             parts.push(lhs_doc_with_comments(id_doc));
             parts.push(d.text(" ="));
             let init_doc = make_init_doc(value());
-            parts.push(hang_after_operator(d, init_doc));
+            // A short call whose sole type argument is a flat mapped type takes the mapped
+            // type's width break as authored where prettier's second pass does
+            // (`MappedTypeArgHug`, shared with `build_assignment_layout`). Its gate refuses
+            // any comment in the value, and the gap's are refused here, so the rebuilt value
+            // carries nothing `make_init_doc` would add.
+            let hug = (!has_comments_after_eq && gap_comments.is_none())
+                .then(|| self.mapped_type_arg_hug(init))
+                .flatten();
+            parts.push(match hug {
+                Some(hug) => {
+                    self.build_mapped_type_arg_hug_tail(&hug, init_doc, || make_init_doc(value()))
+                }
+                None => hang_after_operator(d, init_doc),
+            });
         } else if is_layout_eligible && !is_simple_value(init) {
             // Fluid layout (default for layout-eligible values)
             //
