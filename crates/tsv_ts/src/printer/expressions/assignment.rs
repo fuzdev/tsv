@@ -1495,11 +1495,21 @@ impl<'a> Printer<'a> {
         }
         match &expr.kind {
             ExpressionKind::CallExpression(call) => {
-                // A line comment between the callee (or its type arguments) and the
-                // arguments forces the break too: the `//` must end its line before the
-                // `(`, so the argument list drops to an indented continuation
-                // (`build_empty_args_parens_doc`). That break is the comment's, not a chain break
-                // point the static analysis missed.
+                // A line comment between the callee (or its type arguments) and the `(`
+                // forces the break too: the `//` must end its line before the `(`, so the
+                // argument list drops to an indented continuation
+                // (`build_empty_args_parens_doc`). That break is the comment's, not a chain
+                // break point the static analysis missed.
+                //
+                // The window ends at the `(`. A `//` past it — leading the first argument
+                // (`f(⏎// c⏎x)`) or dangling in empty parens (`f(⏎// c⏎)`) — breaks the
+                // argument list around itself while the `(` stays on the callee's line, so
+                // it is no chain break point, and the `=` lays out as prettier's does: by
+                // width for a led first argument, after the operator for empty parens.
+                //
+                // The window up to the first argument is asked first, as the cheap gate;
+                // the `(` is located only when a line comment lies in it. A call always has
+                // its `(` there.
                 let args_gap_start = call
                     .type_arguments
                     .as_ref()
@@ -1508,8 +1518,18 @@ impl<'a> Printer<'a> {
                     .arguments
                     .first()
                     .map_or(expr.span.end, |arg| arg.span().start);
-                self.has_line_comments_between(args_gap_start, args_gap_end)
-                    || self.has_line_comments_in_chain(call.callee)
+                let callee_gap_breaks = self
+                    .has_line_comments_between(args_gap_start, args_gap_end)
+                    && tsv_lang::source_scan::find_char_skipping_comments(
+                        self.source.as_bytes(),
+                        args_gap_start as usize,
+                        args_gap_end as usize,
+                        b'(',
+                    )
+                    .is_some_and(|paren| {
+                        self.has_line_comments_between(args_gap_start, paren as u32)
+                    });
+                callee_gap_breaks || self.has_line_comments_in_chain(call.callee)
             }
             ExpressionKind::MemberExpression(member) => {
                 // Check for line comments between object and property. For a computed

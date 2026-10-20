@@ -1,0 +1,1035 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1970,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A call value whose first argument is led by a `//` is no break point of its own: when the",
+			"start": 20,
+			"end": 112
+		},
+		{
+			"type": "Line",
+			"value": " line up to `(` is over width, the `=` breaks",
+			"start": 114,
+			"end": 161
+		},
+		{
+			"type": "Line",
+			"value": " Declarator, `(` line at 100",
+			"start": 164,
+			"end": 194
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 297,
+			"end": 301
+		},
+		{
+			"type": "Line",
+			"value": " Declarator, `(` line at 101",
+			"start": 315,
+			"end": 345
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 452,
+			"end": 456
+		},
+		{
+			"type": "Line",
+			"value": " Exported declarator, `(` line at 100",
+			"start": 472,
+			"end": 511
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 614,
+			"end": 618
+		},
+		{
+			"type": "Line",
+			"value": " Exported declarator, `(` line at 101",
+			"start": 632,
+			"end": 671
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 778,
+			"end": 782
+		},
+		{
+			"type": "Line",
+			"value": " Member callee, `(` line at 100",
+			"start": 798,
+			"end": 831
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 934,
+			"end": 938
+		},
+		{
+			"type": "Line",
+			"value": " Member callee, `(` line at 101",
+			"start": 952,
+			"end": 985
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 1092,
+			"end": 1096
+		},
+		{
+			"type": "Line",
+			"value": " Optional call, `(` line at 100",
+			"start": 1112,
+			"end": 1145
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 1248,
+			"end": 1252
+		},
+		{
+			"type": "Line",
+			"value": " Optional call, `(` line at 101",
+			"start": 1266,
+			"end": 1299
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 1406,
+			"end": 1410
+		},
+		{
+			"type": "Line",
+			"value": " Assignment, `(` line at 101",
+			"start": 1426,
+			"end": 1456
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 1563,
+			"end": 1567
+		},
+		{
+			"type": "Line",
+			"value": " A `//` in the member gap: the chain breaks there, the `=` hugs",
+			"start": 1583,
+			"end": 1648
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 1744,
+			"end": 1748
+		},
+		{
+			"type": "Line",
+			"value": " A trailing `//` after the last argument, `(` line at 100: the `=` hugs",
+			"start": 1762,
+			"end": 1835
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 1951,
+			"end": 1955
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1969,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1960,
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 196,
+					"end": 312,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 202,
+							"end": 311,
+							"id": {
+								"type": "Identifier",
+								"start": 202,
+								"end": 272,
+								"name": "v1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 275,
+								"end": 311,
+								"callee": {
+									"type": "Identifier",
+									"start": 275,
+									"end": 283,
+									"name": "useState"
+								},
+								"arguments": [
+									{
+										"type": "Literal",
+										"start": 304,
+										"end": 308,
+										"value": null,
+										"raw": "null",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 297,
+												"end": 301
+											}
+										]
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 283,
+									"end": 293,
+									"params": [
+										{
+											"type": "TSUnionType",
+											"start": 284,
+											"end": 292,
+											"types": [
+												{
+													"type": "TSTypeReference",
+													"start": 284,
+													"end": 285,
+													"typeName": {
+														"type": "Identifier",
+														"start": 284,
+														"end": 285,
+														"name": "T"
+													}
+												},
+												{
+													"type": "TSNullKeyword",
+													"start": 288,
+													"end": 292
+												}
+											]
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A call value whose first argument is led by a `//` is no break point of its own: when the",
+							"start": 20,
+							"end": 112
+						},
+						{
+							"type": "Line",
+							"value": " line up to `(` is over width, the `=` breaks",
+							"start": 114,
+							"end": 161
+						},
+						{
+							"type": "Line",
+							"value": " Declarator, `(` line at 100",
+							"start": 164,
+							"end": 194
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 347,
+					"end": 469,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 353,
+							"end": 468,
+							"id": {
+								"type": "Identifier",
+								"start": 353,
+								"end": 424,
+								"name": "v2aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 429,
+								"end": 468,
+								"callee": {
+									"type": "Identifier",
+									"start": 429,
+									"end": 437,
+									"name": "useState"
+								},
+								"arguments": [
+									{
+										"type": "Literal",
+										"start": 460,
+										"end": 464,
+										"value": null,
+										"raw": "null",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 452,
+												"end": 456
+											}
+										]
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 437,
+									"end": 447,
+									"params": [
+										{
+											"type": "TSUnionType",
+											"start": 438,
+											"end": 446,
+											"types": [
+												{
+													"type": "TSTypeReference",
+													"start": 438,
+													"end": 439,
+													"typeName": {
+														"type": "Identifier",
+														"start": 438,
+														"end": 439,
+														"name": "T"
+													}
+												},
+												{
+													"type": "TSNullKeyword",
+													"start": 442,
+													"end": 446
+												}
+											]
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Declarator, `(` line at 101",
+							"start": 315,
+							"end": 345
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 513,
+					"end": 629,
+					"exportKind": "value",
+					"declaration": {
+						"type": "VariableDeclaration",
+						"start": 520,
+						"end": 629,
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 526,
+								"end": 628,
+								"id": {
+									"type": "Identifier",
+									"start": 526,
+									"end": 589,
+									"name": "v3aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								},
+								"init": {
+									"type": "CallExpression",
+									"start": 592,
+									"end": 628,
+									"callee": {
+										"type": "Identifier",
+										"start": 592,
+										"end": 600,
+										"name": "useState"
+									},
+									"arguments": [
+										{
+											"type": "Literal",
+											"start": 621,
+											"end": 625,
+											"value": null,
+											"raw": "null",
+											"leadingComments": [
+												{
+													"type": "Line",
+													"value": " c",
+													"start": 614,
+													"end": 618
+												}
+											]
+										}
+									],
+									"typeArguments": {
+										"type": "TSTypeParameterInstantiation",
+										"start": 600,
+										"end": 610,
+										"params": [
+											{
+												"type": "TSUnionType",
+												"start": 601,
+												"end": 609,
+												"types": [
+													{
+														"type": "TSTypeReference",
+														"start": 601,
+														"end": 602,
+														"typeName": {
+															"type": "Identifier",
+															"start": 601,
+															"end": 602,
+															"name": "T"
+														}
+													},
+													{
+														"type": "TSNullKeyword",
+														"start": 605,
+														"end": 609
+													}
+												]
+											}
+										]
+									}
+								}
+							}
+						],
+						"kind": "const"
+					},
+					"specifiers": [],
+					"source": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Exported declarator, `(` line at 100",
+							"start": 472,
+							"end": 511
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 673,
+					"end": 795,
+					"exportKind": "value",
+					"declaration": {
+						"type": "VariableDeclaration",
+						"start": 680,
+						"end": 795,
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 686,
+								"end": 794,
+								"id": {
+									"type": "Identifier",
+									"start": 686,
+									"end": 750,
+									"name": "v4aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								},
+								"init": {
+									"type": "CallExpression",
+									"start": 755,
+									"end": 794,
+									"callee": {
+										"type": "Identifier",
+										"start": 755,
+										"end": 763,
+										"name": "useState"
+									},
+									"arguments": [
+										{
+											"type": "Literal",
+											"start": 786,
+											"end": 790,
+											"value": null,
+											"raw": "null",
+											"leadingComments": [
+												{
+													"type": "Line",
+													"value": " c",
+													"start": 778,
+													"end": 782
+												}
+											]
+										}
+									],
+									"typeArguments": {
+										"type": "TSTypeParameterInstantiation",
+										"start": 763,
+										"end": 773,
+										"params": [
+											{
+												"type": "TSUnionType",
+												"start": 764,
+												"end": 772,
+												"types": [
+													{
+														"type": "TSTypeReference",
+														"start": 764,
+														"end": 765,
+														"typeName": {
+															"type": "Identifier",
+															"start": 764,
+															"end": 765,
+															"name": "T"
+														}
+													},
+													{
+														"type": "TSNullKeyword",
+														"start": 768,
+														"end": 772
+													}
+												]
+											}
+										]
+									}
+								}
+							}
+						],
+						"kind": "const"
+					},
+					"specifiers": [],
+					"source": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Exported declarator, `(` line at 101",
+							"start": 632,
+							"end": 671
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 833,
+					"end": 949,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 839,
+							"end": 948,
+							"id": {
+								"type": "Identifier",
+								"start": 839,
+								"end": 922,
+								"name": "v5aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 925,
+								"end": 948,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 925,
+									"end": 930,
+									"object": {
+										"type": "Identifier",
+										"start": 925,
+										"end": 928,
+										"name": "obj"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 929,
+										"end": 930,
+										"name": "f"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "Literal",
+										"start": 941,
+										"end": 945,
+										"value": null,
+										"raw": "null",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 934,
+												"end": 938
+											}
+										]
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Member callee, `(` line at 100",
+							"start": 798,
+							"end": 831
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 987,
+					"end": 1109,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 993,
+							"end": 1108,
+							"id": {
+								"type": "Identifier",
+								"start": 993,
+								"end": 1077,
+								"name": "v6aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1082,
+								"end": 1108,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 1082,
+									"end": 1087,
+									"object": {
+										"type": "Identifier",
+										"start": 1082,
+										"end": 1085,
+										"name": "obj"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1086,
+										"end": 1087,
+										"name": "f"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "Literal",
+										"start": 1100,
+										"end": 1104,
+										"value": null,
+										"raw": "null",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 1092,
+												"end": 1096
+											}
+										]
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Member callee, `(` line at 101",
+							"start": 952,
+							"end": 985
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1147,
+					"end": 1263,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1153,
+							"end": 1262,
+							"id": {
+								"type": "Identifier",
+								"start": 1153,
+								"end": 1238,
+								"name": "v7aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							},
+							"init": {
+								"type": "ChainExpression",
+								"start": 1241,
+								"end": 1262,
+								"expression": {
+									"type": "CallExpression",
+									"start": 1241,
+									"end": 1262,
+									"callee": {
+										"type": "Identifier",
+										"start": 1241,
+										"end": 1242,
+										"name": "f"
+									},
+									"arguments": [
+										{
+											"type": "Literal",
+											"start": 1255,
+											"end": 1259,
+											"value": null,
+											"raw": "null",
+											"leadingComments": [
+												{
+													"type": "Line",
+													"value": " c",
+													"start": 1248,
+													"end": 1252
+												}
+											]
+										}
+									],
+									"optional": true
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Optional call, `(` line at 100",
+							"start": 1112,
+							"end": 1145
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1301,
+					"end": 1423,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1307,
+							"end": 1422,
+							"id": {
+								"type": "Identifier",
+								"start": 1307,
+								"end": 1393,
+								"name": "v8aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							},
+							"init": {
+								"type": "ChainExpression",
+								"start": 1398,
+								"end": 1422,
+								"expression": {
+									"type": "CallExpression",
+									"start": 1398,
+									"end": 1422,
+									"callee": {
+										"type": "Identifier",
+										"start": 1398,
+										"end": 1399,
+										"name": "f"
+									},
+									"arguments": [
+										{
+											"type": "Literal",
+											"start": 1414,
+											"end": 1418,
+											"value": null,
+											"raw": "null",
+											"leadingComments": [
+												{
+													"type": "Line",
+													"value": " c",
+													"start": 1406,
+													"end": 1410
+												}
+											]
+										}
+									],
+									"optional": true
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Optional call, `(` line at 101",
+							"start": 1266,
+							"end": 1299
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1458,
+					"end": 1580,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1458,
+						"end": 1579,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1458,
+							"end": 1535,
+							"name": "v9aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 1540,
+							"end": 1579,
+							"callee": {
+								"type": "Identifier",
+								"start": 1540,
+								"end": 1548,
+								"name": "useState"
+							},
+							"arguments": [
+								{
+									"type": "Literal",
+									"start": 1571,
+									"end": 1575,
+									"value": null,
+									"raw": "null",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 1563,
+											"end": 1567
+										}
+									]
+								}
+							],
+							"typeArguments": {
+								"type": "TSTypeParameterInstantiation",
+								"start": 1548,
+								"end": 1558,
+								"params": [
+									{
+										"type": "TSUnionType",
+										"start": 1549,
+										"end": 1557,
+										"types": [
+											{
+												"type": "TSTypeReference",
+												"start": 1549,
+												"end": 1550,
+												"typeName": {
+													"type": "Identifier",
+													"start": 1549,
+													"end": 1550,
+													"name": "T"
+												}
+											},
+											{
+												"type": "TSNullKeyword",
+												"start": 1553,
+												"end": 1557
+											}
+										]
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Assignment, `(` line at 101",
+							"start": 1426,
+							"end": 1456
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1650,
+					"end": 1759,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1656,
+							"end": 1758,
+							"id": {
+								"type": "Identifier",
+								"start": 1656,
+								"end": 1728,
+								"name": "x1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1731,
+								"end": 1758,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 1731,
+									"end": 1756,
+									"object": {
+										"type": "MemberExpression",
+										"start": 1731,
+										"end": 1743,
+										"object": {
+											"type": "Identifier",
+											"start": 1731,
+											"end": 1735,
+											"name": "aaaa"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 1736,
+											"end": 1743,
+											"name": "bbbbbbb"
+										},
+										"computed": false,
+										"optional": false,
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 1744,
+												"end": 1748
+											}
+										]
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1752,
+										"end": 1756,
+										"name": "cccc"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `//` in the member gap: the chain breaks there, the `=` hugs",
+							"start": 1583,
+							"end": 1648
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1837,
+					"end": 1959,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1843,
+							"end": 1958,
+							"id": {
+								"type": "Identifier",
+								"start": 1843,
+								"end": 1930,
+								"name": "x2aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1933,
+								"end": 1958,
+								"callee": {
+									"type": "Identifier",
+									"start": 1933,
+									"end": 1934,
+									"name": "f"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 1938,
+										"end": 1942,
+										"name": "aaaa"
+									},
+									{
+										"type": "Identifier",
+										"start": 1946,
+										"end": 1950,
+										"name": "bbbb",
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 1951,
+												"end": 1955
+											}
+										]
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A trailing `//` after the last argument, `(` line at 100: the `=` hugs",
+							"start": 1762,
+							"end": 1835
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
