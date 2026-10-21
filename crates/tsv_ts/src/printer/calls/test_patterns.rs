@@ -63,10 +63,9 @@ fn get_identifier_name<'a>(expr: &internal::Expression<'a>) -> Option<(IdentName
 /// Emitting `source_span` name + `.` doc nodes is byte-identical to the old
 /// resolve-and-`join(".")` `String`: identifiers never contain `.`, and
 /// the concatenated text nodes carry no break point, so the flat callee still
-/// never breaks at `.skip` — at zero heap allocation. `is_test_call` matches the
-/// pattern list against the same chain parts directly (also no allocation) via
-/// the shared [`get_member_chain_parts`], so the two stay in lockstep on which
-/// callees qualify.
+/// never breaks at `.skip` — at zero heap allocation. `is_test_call` accepts the same
+/// callee shapes ([`callee_is_test_pattern`]: an identifier root, identifier properties,
+/// no computed or optional link), so the two stay in lockstep on which callees qualify.
 ///
 /// Each `.` goes through the shared dotted-pair printer, which emits the gaps
 /// around it — the positions an author can comment in (`describe /* c */.only`,
@@ -137,7 +136,24 @@ fn get_member_chain_parts<'a>(
 }
 
 /// Whether the test-call FLAT layout applies to `call` — [`is_test_call`] plus the one
-/// thing that layout cannot do: print a comment sitting in an argument gap.
+/// thing that layout cannot do: print a comment sitting in an argument gap
+/// ([`test_call_flat_gaps_clear`]).
+///
+/// Both routing sites decide the flat layout this way (`calls/mod.rs`'s chain-bypass, and
+/// `build_call_doc_with_wrapping`, which asks ONCE at its head and reads the answer twice —
+/// once to build the break-free callee, once to pick the layout), so they cannot disagree
+/// about which calls take the flat form. The head spells it out as its two halves because it
+/// needs the [`is_test_call`] half on its own as well.
+pub(super) fn test_call_flat_layout_applies(
+    call: &internal::CallExpression<'_>,
+    span: Span,
+    printer: &Printer<'_>,
+) -> bool {
+    is_test_call(call, printer) && test_call_flat_gaps_clear(call, span, printer)
+}
+
+/// Whether no argument gap of a test call holds a comment the flat layout would drop — the
+/// half of [`test_call_flat_layout_applies`] past [`is_test_call`].
 ///
 /// The flat layout joins the argument docs with `", "` and appends a trailing-comment
 /// suffix after the last argument; it never opens the `(`→first-argument gap or any
@@ -150,21 +166,13 @@ fn get_member_chain_parts<'a>(
 /// precedes and rides inside that argument's own doc, so the flat layout does print it
 /// — and keeping the flat layout there matches prettier. The question here is exactly
 /// "would a comment be dropped?", which is the to-emit axis's question. A comment
-/// trailing the whole call is likewise fine — the layout emits that itself.
-///
-/// Both routing sites ask this rather than [`is_test_call`] (`calls/mod.rs`'s chain-bypass,
-/// and `build_call_doc_with_wrapping`, which asks ONCE at its head and reads the answer twice
-/// — once to build the break-free callee, once to pick the layout), so they cannot disagree
-/// about which calls take the flat form. See conformance_prettier_ts_comments.md §Comment
-/// relocation.
-pub(super) fn test_call_flat_layout_applies(
+/// trailing the whole call is likewise fine — the layout emits that itself. See
+/// conformance_prettier_ts_comments.md §Comment relocation.
+pub(super) fn test_call_flat_gaps_clear(
     call: &internal::CallExpression<'_>,
     span: Span,
     printer: &Printer<'_>,
 ) -> bool {
-    if !is_test_call(call, printer) {
-        return false;
-    }
     let paren_open = call_paren_open(printer, call, span);
     // Zero-comment fast gate: ONE binary search over `[paren_open, last argument's start)`,
     // which strictly contains every gap the check below looks at — the `(`→first-argument
@@ -262,24 +270,159 @@ pub(super) fn is_test_call(call: &internal::CallExpression<'_>, printer: &Printe
         return false;
     }
 
-    // Check if the callee matches a known test pattern. Compare the resolved
-    // member-chain parts against the pattern list directly — span-identity slices,
-    // a stack-only `SmallVec` — instead of building and immediately discarding a
-    // dotted callee `String` on every test-shaped call (hot waste).
-    // The flat-layout path (`build_test_callee_flat_doc`) builds no owned text either —
-    // it emits the same parts as `source_span` + dotted-pair docs.
-    let Some(parts) = get_member_chain_parts(call.callee) else {
-        return false;
-    };
-    // Parts come out leaf→root; reverse to root→leaf to match the dotted
-    // patterns (`test.describe.only`). Identifiers never contain `.`, so a
-    // per-segment compare against `pattern.split('.')` is exact.
-    let names: SmallVec<[&str; 8]> = parts
-        .iter()
-        .rev()
-        .map(|&(name, name_start, _)| name.resolve(name_start, printer.source))
-        .collect();
-    TEST_CALL_PATTERNS
-        .iter()
-        .any(|pattern| pattern.split('.').eq(names.iter().copied()))
+    callee_is_test_pattern(call.callee, printer.source)
+}
+
+/// Whether `callee` is a simple identifier or a non-computed, non-optional member chain of
+/// identifiers whose resolved names spell one of [`TEST_CALL_PATTERNS`].
+///
+/// Walks the chain leaf→root into a fixed array — no pattern is deeper than
+/// [`TEST_PATTERN_MAX_DEPTH`], so a deeper chain is refused the moment it outgrows it — and
+/// resolves each name through [`IdentName::resolve`], the channel every other name read uses
+/// (an escaped `te\u0073t` is `test`). The same callees qualify as for the flat callee doc
+/// ([`build_test_callee_flat_doc`], over [`get_member_chain_parts`]): an identifier root and
+/// identifier properties only.
+fn callee_is_test_pattern(callee: &internal::Expression<'_>, source: &str) -> bool {
+    let mut names = [""; TEST_PATTERN_MAX_DEPTH];
+    let mut depth = 0;
+    let mut expr = callee;
+    loop {
+        let (id, object) = match &expr.kind {
+            internal::ExpressionKind::Identifier(id) => (id, None),
+            internal::ExpressionKind::MemberExpression(member) => {
+                if member.computed || member.optional {
+                    return false;
+                }
+                let internal::ExpressionKind::Identifier(property) = &member.property.kind else {
+                    return false;
+                };
+                (property, Some(member.object))
+            }
+            _ => return false,
+        };
+        let Some(slot) = names.get_mut(depth) else {
+            return false;
+        };
+        *slot = id.ident_name().resolve(id.span.start, source);
+        depth += 1;
+        match object {
+            Some(object) => expr = object,
+            None => break,
+        }
+    }
+    let names = &mut names[..depth];
+    names.reverse();
+    is_test_pattern(names)
+}
+
+/// The most segments any [`TEST_CALL_PATTERNS`] entry has (`test.describe.parallel.only`).
+const TEST_PATTERN_MAX_DEPTH: usize = max_pattern_segments(TEST_CALL_PATTERNS);
+
+/// The most `.`-separated segments any of `patterns` has.
+const fn max_pattern_segments(patterns: &[&str]) -> usize {
+    let mut max = 0;
+    let mut i = 0;
+    while i < patterns.len() {
+        let bytes = patterns[i].as_bytes();
+        let mut segments = 1;
+        let mut j = 0;
+        while j < bytes.len() {
+            if bytes[j] == b'.' {
+                segments += 1;
+            }
+            j += 1;
+        }
+        if segments > max {
+            max = segments;
+        }
+        i += 1;
+    }
+    max
+}
+
+/// Whether the root→leaf names `names` spell one of [`TEST_CALL_PATTERNS`] — the list written
+/// as a match, root name first, so a callee is told apart without comparing it against each
+/// entry in turn. Pinned to the list by this module's tests.
+fn is_test_pattern(names: &[&str]) -> bool {
+    matches!(
+        names,
+        ["it"
+            | "describe"
+            | "test"
+            | "skip"
+            | "xit"
+            | "xdescribe"
+            | "xtest"
+            | "fit"
+            | "fdescribe"
+            | "ftest"]
+            | ["it" | "describe", "only" | "skip"]
+            | ["test", "only" | "skip" | "fixme" | "step" | "describe"]
+            | [
+                "test",
+                "describe",
+                "only" | "skip" | "fixme" | "parallel" | "serial"
+            ]
+            | ["test", "describe", "parallel" | "serial", "only"]
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TEST_CALL_PATTERNS, TEST_PATTERN_MAX_DEPTH, is_test_pattern};
+
+    /// Every name sequence up to one segment past the deepest pattern, over the patterns'
+    /// own segments plus near misses, agrees with a plain membership test of the list.
+    #[test]
+    fn is_test_pattern_matches_the_pattern_list() {
+        let mut alphabet: Vec<&str> = TEST_CALL_PATTERNS
+            .iter()
+            .flat_map(|pattern| pattern.split('.'))
+            .collect();
+        alphabet.extend(["Test", "a"]);
+        alphabet.sort_unstable();
+        alphabet.dedup();
+        let in_list = |names: &[&str]| {
+            TEST_CALL_PATTERNS
+                .iter()
+                .any(|pattern| pattern.split('.').eq(names.iter().copied()))
+        };
+        let mut matched = 0;
+        let mut frontier: Vec<Vec<&str>> = vec![Vec::new()];
+        for _ in 0..TEST_PATTERN_MAX_DEPTH {
+            let mut next = Vec::new();
+            for names in &frontier {
+                for &segment in &alphabet {
+                    let mut longer = names.clone();
+                    longer.push(segment);
+                    let expected = in_list(&longer);
+                    assert_eq!(is_test_pattern(&longer), expected, "{}", longer.join("."));
+                    matched += usize::from(expected);
+                    next.push(longer);
+                }
+            }
+            frontier = next;
+        }
+        assert_eq!(matched, TEST_CALL_PATTERNS.len());
+        // One segment past any pattern is never a test callee.
+        for pattern in TEST_CALL_PATTERNS {
+            for &segment in &alphabet {
+                let mut longer: Vec<&str> = pattern.split('.').collect();
+                longer.push(segment);
+                assert_eq!(
+                    is_test_pattern(&longer),
+                    in_list(&longer),
+                    "{}",
+                    longer.join(".")
+                );
+            }
+        }
+        assert_eq!(
+            TEST_CALL_PATTERNS
+                .iter()
+                .map(|pattern| pattern.split('.').count())
+                .max(),
+            Some(TEST_PATTERN_MAX_DEPTH)
+        );
+    }
 }

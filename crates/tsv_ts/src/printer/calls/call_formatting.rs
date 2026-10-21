@@ -28,9 +28,7 @@ use super::arg_wrapping::{
 };
 use super::expand_last::{ArgOwner, try_expand_last_arg};
 use super::module_paths::{get_module_path_chain_break, is_module_path_no_break};
-use super::test_patterns::{
-    build_test_callee_flat_doc, is_test_call, test_call_flat_layout_applies,
-};
+use super::test_patterns::{build_test_callee_flat_doc, is_test_call, test_call_flat_gaps_clear};
 use crate::ast::internal;
 use crate::printer::comments::ShareSite;
 use crate::printer::expressions::functions::{
@@ -91,8 +89,9 @@ struct CallHead {
     doc: DocId,
     /// The one [`super::CalleeGap`] derivation both halves read.
     gap: CalleeGap,
-    /// The test-call flat layout applies — asked ONCE (see below) and re-read by the layout.
-    test_call_flat: bool,
+    /// The test-call decision — asked ONCE (see below) and re-read by the layout and by the
+    /// argument side's blank-line question.
+    test_call: TestCall,
     /// The argument list opens with `?.(` because the `?.` fused into it.
     fuse_optional: bool,
     /// This call is the callee of a call taking fewer arguments, so its default tail prints
@@ -115,8 +114,16 @@ fn build_call_head(
     // emitter for, in which case the call expands like any other. Asked ONCE, here, and
     // re-read by the layout branch below: the flat CALLEE and the flat LAYOUT are two
     // halves of one decision, and a second `test_call_flat_layout_applies` call is a
-    // second question that can answer differently.
-    let test_call_flat = test_call_flat_layout_applies(call, span, printer);
+    // second question that can answer differently. Spelled as its two halves because the
+    // argument side reads the `is_test_call` half alone too.
+    let test_call = if !is_test_call(call, printer) {
+        TestCall::No
+    } else if test_call_flat_gaps_clear(call, span, printer) {
+        TestCall::Flat
+    } else {
+        TestCall::Declined
+    };
+    let test_call_flat = test_call == TestCall::Flat;
 
     // Two callee positions print a required pair that keeps BOTH its gaps inside it: an
     // IIFE (`paren_pair_keeps_leading_run` — prettier's `printCommentsForFunction` prints
@@ -252,10 +259,22 @@ fn build_call_head(
     CallHead {
         doc: callee,
         gap,
-        test_call_flat,
+        test_call,
         fuse_optional,
         ungroup_args,
     }
+}
+
+/// What a call's head decided about the test-call layout ([`CallHead::test_call`]).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TestCall {
+    /// The call is not a test call ([`is_test_call`]).
+    No,
+    /// A test call taking the flat layout.
+    Flat,
+    /// A test call whose argument gaps hold a comment the flat layout would drop
+    /// ([`test_call_flat_gaps_clear`]), so its arguments lay out like any other call's.
+    Declined,
 }
 
 /// The argument-list half of [`build_call_doc_with_wrapping`], `callee` being the head it
@@ -277,7 +296,7 @@ fn build_call_args_doc(
     let d = printer.d();
     let &CallHead {
         gap,
-        test_call_flat,
+        test_call,
         fuse_optional,
         ungroup_args,
         ..
@@ -336,7 +355,7 @@ fn build_call_args_doc(
 
     // The test-call flat layout, whose break-free callee `callee` already carries (built
     // at the top, so the type arguments and the removed-paren comments wrap it there).
-    if test_call_flat {
+    if test_call == TestCall::Flat {
         // Check for trailing comments on last arg. The empty-args case returned
         // above, so `arguments` is non-empty here and `.last()` is always `Some`.
         #[expect(clippy::unreachable)] // empty args already returned above ⇒ last() is Some
@@ -449,7 +468,7 @@ fn build_call_args_doc(
     // drops the blank again. Keying it on the callee gives both passes the same answer —
     // prettier's — and `blanks:audit` caught exactly this as three NON-IDEMPOTENT shapes.
     let any_arg_empty_line =
-        !is_test_call(call, printer) && any_arg_empty_line(call.arguments, printer);
+        test_call == TestCall::No && any_arg_empty_line(call.arguments, printer);
 
     // A trailing BLOCK comment on the last argument — the block twin of the predicate above,
     // disqualifying the hug arms the same way. Computed here rather than at the first hug
