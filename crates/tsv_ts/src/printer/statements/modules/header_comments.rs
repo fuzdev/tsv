@@ -266,9 +266,16 @@ impl<'a> Printer<'a> {
         content_end: Option<u32>,
     ) -> DocId {
         let d = self.d();
+        // The keyword follows the header's last binding, specifier `}` or `*` / `as ns`
+        // (`content_end`, where the binding→`from` gap below opens), so the backward
+        // search starts there rather than crossing the bindings: the window is a suffix of
+        // the header, a token end opens it (no comment or string is open there), and the
+        // last whole-word `from` in it is the last one in the header. A window that holds
+        // none — no binding, or a `content_end` past the keyword — searches the header.
         #[expect(clippy::expect_used)] // "from" must exist in a valid import/export declaration
-        let from_end = self
-            .find_keyword_end("from", decl_start, source.span.start)
+        let from_end = content_end
+            .and_then(|start| self.find_keyword_end("from", start, source.span.start))
+            .or_else(|| self.find_keyword_end("from", decl_start, source.span.start))
             .expect("'from' keyword must exist in import/export declaration");
         let from_start = from_end - "from".len() as u32;
 
