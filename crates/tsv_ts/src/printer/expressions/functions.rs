@@ -461,6 +461,10 @@ fn arrow_signature_will_break(
     {
         return true;
     }
+    let window_start = arrow.params_start.unwrap_or(span.start);
+    if params_cannot_force_break(printer, arrow.params, window_start, arrow.arrow_token) {
+        return false;
+    }
     let unforced = if arrow.body.is_expression() {
         None
     } else {
@@ -473,6 +477,69 @@ fn arrow_signature_will_break(
     };
     printer.ask_signature_params(unforced, || {
         d.will_break(printer.build_arrow_params_doc_ungrouped(arrow, span))
+    })
+}
+
+/// Whether a parameter list's doc provably carries **no forced break**, answered from the
+/// AST and two window reads instead of building the list — the fast path of the signature
+/// questions ([`arrow_signature_will_break`], [`function_signature_refuses_hug`]), which only
+/// ever ask a parameter list's `will_break`.
+///
+/// `true` when every parameter is an atomic identifier ([`param_is_atomic_identifier`]) and
+/// `start..end` — the signature from its `(` (or a bare parameter) to the `=>` or the body,
+/// so it covers every gap the list's emitters read — holds no line break and no comment on
+/// page. A parameter list's doc gets a forced break from exactly these sources:
+///
+/// - a **comment**: a line comment, an own-line block, a format-ignore directive's frozen
+///   slice — none on page in the window;
+/// - a **source line break**: an author blank line between parameters, a line-continuation
+///   or other newline-bearing literal text — none in the window. Asked of the comment
+///   line-break table, which stays real in the canonical reprint, so the answer never rests
+///   on a newline the layout table erased;
+/// - a **parameter property**'s modifiers, or a **sub-doc that breaks on its own**: an
+///   expanded object or object type, a matrix array, a member chain, a default value, a
+///   decorator's arguments, a type's own arguments — none of which an atomic identifier has.
+///
+/// Print width never forces a break, so a list too long for its line is still `false` here,
+/// as `will_break` answers it.
+fn params_cannot_force_break(
+    printer: &Printer<'_>,
+    params: &[internal::Expression<'_>],
+    start: u32,
+    end: u32,
+) -> bool {
+    params.iter().all(param_is_atomic_identifier)
+        && !printer.comment_has_newline_between(start, end)
+        && !printer.has_comments_on_page_between(start, end)
+}
+
+/// A parameter whose doc is a run of plain text — an undecorated identifier, optional or not,
+/// with no annotation or one that is a keyword type, a string / number / bigint literal type,
+/// the `this` type, or a type reference (qualified names included) with no type arguments. A
+/// template literal type is out: its substitutions are arbitrary types.
+fn param_is_atomic_identifier(param: &internal::Expression<'_>) -> bool {
+    let internal::ExpressionKind::Identifier(id) = &param.kind else {
+        return false;
+    };
+    if !id.decorators().unwrap_or_default().is_empty() {
+        return false;
+    }
+    id.type_annotation().is_none_or(|annotation| {
+        matches!(
+            annotation.type_annotation,
+            internal::TSType::Keyword(_)
+                | internal::TSType::ThisType(_)
+                | internal::TSType::Literal(
+                    internal::TSLiteralType::String(_)
+                        | internal::TSLiteralType::Number(_)
+                        | internal::TSLiteralType::BigInt(_)
+                        | internal::TSLiteralType::UnaryExpression(_)
+                )
+                | internal::TSType::TypeReference(internal::TSTypeReference {
+                    type_arguments: None,
+                    ..
+                })
+        )
     })
 }
 
@@ -667,6 +734,14 @@ fn function_signature_refuses_hug(
     if func.params.is_empty()
         || !(arg_count > 1 || func.params.iter().all(is_untyped_identifier_param))
     {
+        return false;
+    }
+    if params_cannot_force_break(
+        printer,
+        func.params,
+        func.params_start,
+        func.body.span.start,
+    ) {
         return false;
     }
     let close = printer
