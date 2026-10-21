@@ -473,23 +473,26 @@ pub(super) fn call_paren_open(
     callee_gap(printer, call, span).paren_open(call)
 }
 
-/// Check if a chain expression contains any call expressions
-pub(in crate::printer) fn chain_has_calls(expr: &internal::Expression<'_>) -> bool {
-    match &expr.kind {
-        internal::ExpressionKind::CallExpression(_) => true,
-        internal::ExpressionKind::MemberExpression(member) => chain_has_calls(member.object),
-        internal::ExpressionKind::TSNonNullExpression(non_null) => {
-            chain_has_calls(non_null.expression)
-        }
-        // Look through await/yield to find nested calls: (await fn()).method()
-        internal::ExpressionKind::AwaitExpression(await_expr) => {
-            chain_has_calls(await_expr.argument)
-        }
-        internal::ExpressionKind::YieldExpression(yield_expr) => yield_expr
-            .argument
-            .as_ref()
-            .is_some_and(|arg| chain_has_calls(arg)),
-        _ => false,
+/// Whether a chain expression holds a call: its spine — member objects, `!` operands, and
+/// `await` / `yield` arguments (`(await fn()).method()`) — reaches a call expression.
+///
+/// A loop down the spine, forced inline: every call build asks it, and LLVM keeps an
+/// out-of-line copy otherwise, a call per ask for what is usually one or two kind tests.
+#[expect(clippy::inline_always)]
+#[inline(always)]
+pub(in crate::printer) fn chain_has_calls(mut expr: &internal::Expression<'_>) -> bool {
+    loop {
+        expr = match &expr.kind {
+            internal::ExpressionKind::CallExpression(_) => return true,
+            internal::ExpressionKind::MemberExpression(member) => member.object,
+            internal::ExpressionKind::TSNonNullExpression(non_null) => non_null.expression,
+            internal::ExpressionKind::AwaitExpression(await_expr) => await_expr.argument,
+            internal::ExpressionKind::YieldExpression(yield_expr) => match yield_expr.argument {
+                Some(argument) => argument,
+                None => return false,
+            },
+            _ => return false,
+        };
     }
 }
 
