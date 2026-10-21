@@ -1,0 +1,125 @@
+{
+	"type": "Program",
+	"start": 0,
+	"end": 146,
+	"body": [
+		{
+			"type": "ExpressionStatement",
+			"start": 88,
+			"end": 145,
+			"expression": {
+				"type": "CallExpression",
+				"start": 88,
+				"end": 144,
+				"callee": {
+					"type": "Identifier",
+					"start": 88,
+					"end": 90,
+					"name": "fn"
+				},
+				"arguments": [
+					{
+						"type": "ArrowFunctionExpression",
+						"start": 93,
+						"end": 142,
+						"id": null,
+						"expression": false,
+						"generator": false,
+						"async": false,
+						"params": [
+							{
+								"type": "Identifier",
+								"start": 122,
+								"end": 123,
+								"name": "a"
+							}
+						],
+						"body": {
+							"type": "BlockStatement",
+							"start": 130,
+							"end": 142,
+							"body": [
+								{
+									"type": "ExpressionStatement",
+									"start": 134,
+									"end": 139,
+									"expression": {
+										"type": "CallExpression",
+										"start": 134,
+										"end": 138,
+										"callee": {
+											"type": "Identifier",
+											"start": 134,
+											"end": 135,
+											"name": "g"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 136,
+												"end": 137,
+												"name": "a"
+											}
+										],
+										"optional": false
+									}
+								}
+							]
+						},
+						"typeParameters": {
+							"type": "TSTypeParameterDeclaration",
+							"start": 93,
+							"end": 118,
+							"params": [
+								{
+									"type": "TSTypeParameter",
+									"start": 97,
+									"end": 115,
+									"name": "T",
+									"default": {
+										"type": "TSTypeLiteral",
+										"start": 101,
+										"end": 115,
+										"members": [
+											{
+												"type": "TSPropertySignature",
+												"start": 106,
+												"end": 111,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 106,
+													"end": 107,
+													"name": "a"
+												},
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 107,
+													"end": 110,
+													"typeAnnotation": {
+														"type": "TSLiteralType",
+														"start": 109,
+														"end": 110,
+														"literal": {
+															"type": "Literal",
+															"start": 109,
+															"end": 110,
+															"value": 1,
+															"raw": "1"
+														}
+													}
+												}
+											}
+										]
+									}
+								}
+							]
+						}
+					}
+				],
+				"optional": false
+			}
+		}
+	],
+	"sourceType": "module"
+}

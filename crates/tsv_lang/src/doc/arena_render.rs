@@ -1285,9 +1285,9 @@ fn render_doc_core<P: RenderPolicy>(
                             // Try each earlier state flat, in order; the final
                             // state is the Break fallback (`states` is non-empty
                             // — the `!expanded_states.is_empty()` guard above).
-                            // The fallback is a pure read of `nodes` and `states`,
-                            // which the loop leaves alone, so it is resolved only
-                            // when no state fits.
+                            // The fallback is a pure read of `nodes`, `contents` and
+                            // `states`, which the loop leaves alone, so it is resolved
+                            // only when no state fits.
                             let states = expanded_states.resolve(children_vec);
                             let last = states.len() - 1;
                             let mut chosen = None;
