@@ -503,7 +503,7 @@ fn arrow_signature_will_break(
 /// questions ([`arrow_signature_will_break`], [`function_signature_refuses_hug`]), which only
 /// ever ask a parameter list's `will_break`.
 ///
-/// `true` when every parameter is an atomic identifier ([`param_is_atomic_identifier`]) and
+/// `true` when every parameter is flat ([`param_is_flat`]) and
 /// `start..end` — the signature from its `(` (or a bare parameter) to the `=>` or the body,
 /// so it covers every gap the list's emitters read — holds no line break and no comment on
 /// page. A parameter list's doc gets a forced break from exactly these sources:
@@ -515,8 +515,9 @@ fn arrow_signature_will_break(
 ///   line-break table, which stays real in the canonical reprint, so the answer never rests
 ///   on a newline the layout table erased;
 /// - a **parameter property**'s modifiers, or a **sub-doc that breaks on its own**: an
-///   expanded object or object type, a matrix array, a member chain, a default value, a
-///   decorator's arguments, a type's own arguments — none of which an atomic identifier has.
+///   expanded object or object type, a matrix array, a nested pattern, a member chain, a
+///   default value that is more than one token, a decorator's arguments — none of which a
+///   flat parameter has.
 ///
 /// Print width never forces a break, so a list too long for its line is still `false` here,
 /// as `will_break` answers it.
@@ -526,39 +527,125 @@ fn params_cannot_force_break(
     start: u32,
     end: u32,
 ) -> bool {
-    params.iter().all(param_is_atomic_identifier)
+    params.iter().all(param_is_flat)
         && !printer.comment_has_newline_between(start, end)
         && !printer.has_comments_on_page_between(start, end)
 }
 
-/// A parameter whose doc is a run of plain text — an undecorated identifier, optional or not,
-/// with no annotation or one that is a keyword type, a string / number / bigint literal type,
-/// the `this` type, or a type reference (qualified names included) with no type arguments. A
-/// template literal type is out: its substitutions are arbitrary types.
-fn param_is_atomic_identifier(param: &internal::Expression<'_>) -> bool {
-    let internal::ExpressionKind::Identifier(id) = &param.kind else {
-        return false;
-    };
-    if !id.decorators().unwrap_or_default().is_empty() {
-        return false;
-    }
-    id.type_annotation().is_none_or(|annotation| {
-        matches!(
-            annotation.type_annotation,
-            internal::TSType::Keyword(_)
-                | internal::TSType::ThisType(_)
-                | internal::TSType::Literal(
-                    internal::TSLiteralType::String(_)
-                        | internal::TSLiteralType::Number(_)
-                        | internal::TSLiteralType::BigInt(_)
-                        | internal::TSLiteralType::UnaryExpression(_)
-                )
-                | internal::TSType::TypeReference(internal::TSTypeReference {
-                    type_arguments: None,
-                    ..
+/// A parameter whose doc holds no break of its own making — only text, the separators
+/// between its pieces, and the soft lines of a type list — so that, with no comment and no
+/// line break in its source, nothing in it is forced to break. Undecorated, and one of:
+///
+/// - an identifier, optional or not, with a flat annotation ([`annotation_is_flat`]) or none;
+/// - a flat object pattern `{ a, b: c, ...d }` or array pattern `[a, , ...b]` — bare
+///   identifier leaves only, no computed key, no nested pattern, no default — with a flat
+///   annotation or none;
+/// - a rest element `...a` over a bare identifier, with a flat annotation or none;
+/// - a default `a = x` whose binding is such an identifier and whose value is a single
+///   literal or identifier token.
+fn param_is_flat(param: &internal::Expression<'_>) -> bool {
+    match &param.kind {
+        internal::ExpressionKind::Identifier(id) => {
+            id.decorators().unwrap_or_default().is_empty()
+                && annotation_is_flat(id.type_annotation())
+        }
+        internal::ExpressionKind::ObjectPattern(pattern) => {
+            pattern.decorators.unwrap_or_default().is_empty()
+                && annotation_is_flat(pattern.type_annotation.as_ref())
+                && pattern.properties.iter().all(|property| match property {
+                    internal::ObjectPatternProperty::Property(property) => {
+                        !property.computed
+                            && !property.method
+                            && is_bare_identifier(property.key)
+                            && is_bare_identifier(property.value)
+                    }
+                    internal::ObjectPatternProperty::RestElement(rest) => {
+                        rest.type_annotation.is_none() && is_bare_identifier(rest.argument)
+                    }
                 })
-        )
+        }
+        internal::ExpressionKind::ArrayPattern(pattern) => {
+            pattern.decorators.unwrap_or_default().is_empty()
+                && annotation_is_flat(pattern.type_annotation.as_ref())
+                && pattern.elements.iter().all(|element| {
+                    element.as_ref().is_none_or(|element| match &element.kind {
+                        internal::ExpressionKind::RestElement(rest) => {
+                            rest.type_annotation.is_none() && is_bare_identifier(rest.argument)
+                        }
+                        _ => is_bare_identifier(element),
+                    })
+                })
+        }
+        internal::ExpressionKind::RestElement(rest) => {
+            is_bare_identifier(rest.argument) && annotation_is_flat(rest.type_annotation.as_ref())
+        }
+        internal::ExpressionKind::AssignmentPattern(default) => {
+            default.decorators.unwrap_or_default().is_empty()
+                && matches!(
+                    &default.left.kind,
+                    internal::ExpressionKind::Identifier(id)
+                        if id.decorators().unwrap_or_default().is_empty()
+                            && annotation_is_flat(id.type_annotation())
+                )
+                && matches!(
+                    default.right.kind,
+                    internal::ExpressionKind::Literal(_) | internal::ExpressionKind::Identifier(_)
+                )
+        }
+        _ => false,
+    }
+}
+
+/// An identifier with no annotation and no decorator — a pattern's leaf.
+fn is_bare_identifier(expr: &internal::Expression<'_>) -> bool {
+    matches!(
+        &expr.kind,
+        internal::ExpressionKind::Identifier(id)
+            if id.type_annotation().is_none() && id.decorators().unwrap_or_default().is_empty()
+    )
+}
+
+/// An absent annotation, or one whose type is flat ([`type_is_flat`]), a top-level union or
+/// intersection of flat members included.
+fn annotation_is_flat(annotation: Option<&internal::TSTypeAnnotation<'_>>) -> bool {
+    annotation.is_none_or(|annotation| match annotation.type_annotation {
+        internal::TSType::Union(internal::TSUnionType { types, .. })
+        | internal::TSType::Intersection(internal::TSIntersectionType { types, .. }) => {
+            types.iter().all(|member| type_is_flat(member))
+        }
+        other => type_is_flat(other),
     })
+}
+
+/// A type printed as text and type lists only: a keyword type, the `this` type, a string /
+/// number / bigint literal type, a type reference (qualified names included) whose type
+/// arguments are flat, a flat element's array type, `keyof` / `unique` / `readonly` over a
+/// flat type, a flat indexed access, or a `typeof` query without type arguments. Unions are
+/// admitted only at the annotation's top level ([`annotation_is_flat`]), so no type argument
+/// list here holds one. Template literal types (substitutions are arbitrary types), object
+/// types, function types, tuples and the rest are out.
+fn type_is_flat(ty: &internal::TSType<'_>) -> bool {
+    match ty {
+        internal::TSType::Keyword(_)
+        | internal::TSType::ThisType(_)
+        | internal::TSType::Literal(
+            internal::TSLiteralType::String(_)
+            | internal::TSLiteralType::Number(_)
+            | internal::TSLiteralType::BigInt(_)
+            | internal::TSLiteralType::UnaryExpression(_),
+        ) => true,
+        internal::TSType::TypeReference(reference) => reference
+            .type_arguments
+            .as_ref()
+            .is_none_or(|args| args.params.iter().all(|arg| type_is_flat(arg))),
+        internal::TSType::Array(array) => type_is_flat(array.element_type),
+        internal::TSType::TypeOperator(operator) => type_is_flat(operator.type_annotation),
+        internal::TSType::IndexedAccess(access) => {
+            type_is_flat(access.object_type) && type_is_flat(access.index_type)
+        }
+        internal::TSType::TypeQuery(query) => query.type_arguments.is_none(),
+        _ => false,
+    }
 }
 
 /// The position of the object-type literal annotating a **hugged** sole parameter at its top
