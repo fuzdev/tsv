@@ -130,7 +130,8 @@ impl<'a> Printer<'a> {
         expression: &Expression<'_>,
         text: LeftmostText,
     ) -> Option<Span> {
-        let leftmost = leftmost_no_lookahead_reached(expression, text).0;
+        let reached = leftmost_no_lookahead_reached(expression, text);
+        let leftmost = reached.0;
         if matches!(
             leftmost.kind,
             ExpressionKind::ObjectExpression(_)
@@ -139,7 +140,13 @@ impl<'a> Printer<'a> {
         ) {
             return Some(leftmost.span());
         }
-        self.let_bracket_head_target(expression)
+        // The `let [` question reads the printed walk; when that is the walk just taken,
+        // its answer is reused rather than walked a second time.
+        let let_target = match text {
+            LeftmostText::Printed => self.let_bracket_target_of(reached),
+            LeftmostText::Frozen => self.let_bracket_head_target(expression),
+        };
+        let_target
             .or_else(|| self.cast_head_keyword_target(expression, is_statement_ambiguous_keyword))
     }
 
@@ -181,8 +188,17 @@ impl<'a> Printer<'a> {
         &self,
         expression: &Expression<'_>,
     ) -> Option<Span> {
-        let (leftmost, is_computed_member_object) =
-            leftmost_no_lookahead_reached(expression, LeftmostText::Printed);
+        self.let_bracket_target_of(leftmost_no_lookahead_reached(
+            expression,
+            LeftmostText::Printed,
+        ))
+    }
+
+    /// [`Self::let_bracket_head_target`] over a printed leftmost walk already taken.
+    fn let_bracket_target_of(
+        &self,
+        (leftmost, is_computed_member_object): (&Expression<'_>, bool),
+    ) -> Option<Span> {
         let ExpressionKind::Identifier(id) = &leftmost.kind else {
             return None;
         };
