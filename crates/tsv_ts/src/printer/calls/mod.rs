@@ -662,6 +662,12 @@ impl<'a> Printer<'a> {
     /// The one definition, asked where a call is printed ([`Self::build_call_doc`]) and
     /// where a member or a `!` is printed over such a call
     /// ([`Self::build_template_bypass_operand_doc`]).
+    ///
+    /// Forced inline: it is asked of every call and member spine, and almost every one fails
+    /// the shape test, so the call site keeps only that test and the rest stays out of line
+    /// ([`Self::call_takes_template_bypass_beyond_shape`]).
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
     pub(in crate::printer) fn call_takes_template_bypass(
         &self,
         call: &internal::CallExpression<'_>,
@@ -669,11 +675,21 @@ impl<'a> Printer<'a> {
     ) -> bool {
         // The shape test comes first: it reads the argument list alone, where the rest
         // needs the callee gap resolved to know where the `(` follows.
-        is_sole_multiline_template_arg(call.arguments) && {
-            let paren_open = call_paren_open(self, call, span);
-            multiline_template_hug_applies(self, call.arguments, paren_open)
-                && !self.has_line_comments_between(span.start, paren_open)
-        }
+        is_sole_multiline_template_arg(call.arguments)
+            && self.call_takes_template_bypass_beyond_shape(call, span)
+    }
+
+    /// [`Self::call_takes_template_bypass`] past its shape test: the argument half's gap
+    /// reads, and no line comment between the call's start and its `(`.
+    #[inline(never)]
+    fn call_takes_template_bypass_beyond_shape(
+        &self,
+        call: &internal::CallExpression<'_>,
+        span: Span,
+    ) -> bool {
+        let paren_open = call_paren_open(self, call, span);
+        multiline_template_hug_applies(self, call.arguments, paren_open)
+            && !self.has_line_comments_between(span.start, paren_open)
     }
 
     /// Whether the first call down `expr`'s object spine — through member objects and
