@@ -20,6 +20,7 @@ use smallvec::SmallVec;
 
 use crate::Span;
 use crate::config::TAB_WIDTH;
+use crate::hash::FxHashMap;
 use crate::printing::{
     next_lf, next_width_relevant, next_width_relevant_in, visual_width, visual_width_mixed,
 };
@@ -4058,7 +4059,7 @@ impl DocArena {
     /// admitted because nothing in it would break): the copy would keep a choice the
     /// swapped piece made wrong. The caller keeps its one form.
     pub fn replace_subdoc(&self, root: DocId, target: DocId, replacement: DocId) -> Option<DocId> {
-        let mut memo = std::collections::HashMap::new();
+        let mut memo = FxHashMap::default();
         match self.replace_subdoc_walk(root, target, replacement, &mut memo) {
             Ok(copy) => Some(copy.unwrap_or(root)),
             Err(()) => None,
@@ -4068,21 +4069,33 @@ impl DocArena {
     /// [`Self::replace_subdoc`]'s walk: `Ok(Some(copy))` when `id`'s subtree holds
     /// `target`, `Ok(None)` when it does not (the caller shares `id`), `Err(())` when a
     /// path to it crosses a keyed group. Memoized, since a doc is a DAG.
+    ///
+    /// A node **older** than `target` is answered without a look: the arena is append-only
+    /// and a node can only name ids that already exist when it is allocated ([`Self::alloc`]
+    /// is the one writer, a [`DocId`] is minted only by it or for the prelude, and
+    /// [`Self::reset`] runs between documents), so every child is older than its parent and
+    /// no subtree rooted below `target` can contain it. That subtree's answer is `Ok(None)`
+    /// — the walk errs only on a path that holds `target` — and pruning it also skips its
+    /// memo entries, which nothing else reads.
     fn replace_subdoc_walk(
         &self,
         id: DocId,
         target: DocId,
         replacement: DocId,
-        memo: &mut std::collections::HashMap<DocId, Option<DocId>>,
+        memo: &mut FxHashMap<DocId, Option<DocId>>,
     ) -> Result<Option<DocId>, ()> {
         if id == target {
             return Ok(Some(replacement));
+        }
+        if id.0 < target.0 {
+            return Ok(None);
         }
         if let Some(&known) = memo.get(&id) {
             return Ok(known);
         }
         let node = self.nodes.borrow()[id.index()].clone();
         let mut walk = |child: DocId| -> Result<(DocId, bool), ()> {
+            debug_assert!(child.0 < id.0, "a doc node names only older nodes");
             Ok(
                 match self.replace_subdoc_walk(child, target, replacement, memo)? {
                     Some(copy) => (copy, true),
