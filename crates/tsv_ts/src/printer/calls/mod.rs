@@ -1060,6 +1060,15 @@ impl<'a> Printer<'a> {
         chain_args::build_call_args_doc_for_chain(self, call, span, facts)
     }
 
+    /// The doc a chain call prints ahead of its `(` ([`chain_args::chain_call_head_doc`]).
+    pub(in crate::printer) fn chain_call_head_doc(
+        &self,
+        call: &internal::CallExpression<'_>,
+        span: Span,
+    ) -> Option<DocId> {
+        chain_args::chain_call_head_doc(self, call, callee_gap(self, call, span))
+    }
+
     /// Build a Doc for call arguments with forced expansion (hardlines instead of softlines)
     ///
     /// Used for the "args expanded, chain inline" state in conditionalGroup.

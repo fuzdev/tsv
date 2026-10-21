@@ -9,7 +9,9 @@ tsv keeps the empty type argument's bracket spacing — `fn<{ /* empty */ }>()` 
 where prettier 3.9.5 tightens the comment-only body to `fn<{/* empty */}>()`
 (`const a`). A line-comment body breaks multiline and hugs in both (`const b`,
 `fn<{ \n // empty \n }>()`) — no divergence there. The comment stays where the
-author wrote it in both formatters; only the bracket padding differs.
+author wrote it in both formatters; only the bracket padding differs. The same
+holds on the last call of a member chain (`const c`), whose memberless type
+argument has nothing to break: the chain stays flat in both.
 
 This is the same bracket-spacing rule as
 [literal_body_empty](../../../types/comments/literal_body_empty_prettier_divergence/)

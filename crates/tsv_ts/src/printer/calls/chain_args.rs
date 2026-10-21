@@ -63,6 +63,42 @@ fn get_call_type_arguments<'a>(
     })
 }
 
+/// The doc a chain call prints ahead of its `(`: an optional call's `?.` half, the
+/// callee→type-arguments comments and the type arguments themselves — `None` when the call
+/// has neither. One builder for the call's own layouts and for a probe measuring the line up
+/// to that `(` (the member chain's type-argument hug state, through
+/// [`Printer::chain_call_head_doc`]).
+// with two callers LLVM outlines it, a call on every chain call for a head that is rarely there
+#[expect(clippy::inline_always)]
+#[inline(always)]
+pub(super) fn chain_call_head_doc(
+    printer: &Printer<'_>,
+    call: &internal::CallExpression<'_>,
+    gap: super::CalleeGap,
+) -> Option<DocId> {
+    let type_args = get_call_type_arguments(call);
+    let type_args_doc = type_args.map(|ta| printer.build_type_parameter_instantiation_doc(ta));
+    let optional_doc = super::optional_callee_gap_doc(printer, gap);
+    if optional_doc.is_none() && type_args.is_none() {
+        return None;
+    }
+    let mut parts = DocBuf::new();
+    parts.extend(optional_doc);
+    // Emit comments between callee and type args: `obj.fn/* c */ <string>()`
+    // Uses build_name_to_type_params_comments for safe line comment handling
+    if let Some(ta) = type_args
+        && let Some(doc) = printer.build_name_to_type_params_comments_opt(
+            gap.start,
+            ta.span.start,
+            CommentSpacing::Trailing,
+        )
+    {
+        parts.push(doc);
+    }
+    parts.extend(type_args_doc);
+    Some(printer.d().concat(&parts))
+}
+
 /// The `(`→first-argument gap for the chain's **body-line** paths, as a doc: the blocks the
 /// author left on the `(`'s line and the rest of the gap, as ONE leading run
 /// ([`PartitionedComments::emit_unpulled_gap`] — the same answer
@@ -272,10 +308,6 @@ fn build_call_args_doc_for_chain_impl(
         own_call_layout,
         ungroup_args,
     } = facts;
-    // Build type arguments if present: `<T, U>`
-    let type_args = get_call_type_arguments(call);
-    let type_args_doc = type_args.map(|ta| printer.build_type_parameter_instantiation_doc(ta));
-
     // Prettier's `anyArgEmptyLine` — the shared predicate, so a member chain's arguments
     // answer the blank question exactly as a plain call's do.
     let any_arg_empty_line = any_arg_empty_line(call.arguments, printer);
@@ -287,7 +319,6 @@ fn build_call_args_doc_for_chain_impl(
     // hand-rolled copy had no `?.` step at all, which is how the callee-side comment reached
     // the argument-leading scan and printed inside the parens.
     let gap = super::callee_gap(printer, call, span);
-    let callee_gap_start = gap.start;
     let paren_open = gap.paren_open(call);
 
     // Check for any comments in arguments (leading, inter-argument, or trailing)
@@ -366,32 +397,10 @@ fn build_call_args_doc_for_chain_impl(
         printer.d().text("(")
     };
 
-    // The HEAD every layout below opens with — an optional call's `?.` half, the
-    // callee→type-arguments comments and the type arguments themselves. Absent on nearly
+    // The HEAD every layout below opens with ([`chain_call_head_doc`]). Absent on nearly
     // every chain call, so it travels as an `Option<DocId>` the layouts prepend
     // ([`with_chain_head`]) rather than a buffer each of them assembles into.
-    let optional_doc = super::optional_callee_gap_doc(printer, gap);
-    let head = if optional_doc.is_none() && type_args.is_none() {
-        None
-    } else {
-        let mut parts = DocBuf::new();
-        parts.extend(optional_doc);
-        // Emit comments between callee and type args: `obj.fn/* c */ <string>()`
-        // Uses build_name_to_type_params_comments for safe line comment handling
-        if let Some(ta) = type_args {
-            let gap_start = callee_gap_start;
-            let gap_end = ta.span.start;
-            if let Some(doc) = printer.build_name_to_type_params_comments_opt(
-                gap_start,
-                gap_end,
-                CommentSpacing::Trailing,
-            ) {
-                parts.push(doc);
-            }
-        }
-        parts.extend(type_args_doc);
-        Some(printer.d().concat(&parts))
-    };
+    let head = chain_call_head_doc(printer, call, gap);
     // The pre-paren run, when the callee→`(` gap splits at the `(` — built here, where the
     // printer is in scope, and closed around whichever layout the arms below pick
     // ([`with_chain_head`]).

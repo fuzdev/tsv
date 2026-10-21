@@ -978,12 +978,17 @@ fn build_long_chain_doc<'a>(
     // parameter's object type, written flat, breaks for width ([`build_assumed_param_hug_state`]);
     // and an expression-bodied arrow whose `=>` holds a glued comment the line ends after,
     // which prettier's second pass reads as own-line ([`build_arrow_comment_line_state`]).
+    //
+    // The last builder keys on the last call's TYPE argument rather than its value arguments:
+    // a hugged object or mapped type written flat, whose hug is the settled form from
+    // prettier's second pass when the type breaks for width ([`build_type_arg_hug_state`]).
     let middle_state = build_breaking_object_chain_doc(first_groups, rest_groups, printer)
         .or_else(|| {
             build_flat_object_hug_state(first_groups, rest_groups, *on_line.last()?, printer)
         })
         .or_else(|| build_assumed_param_hug_state(first_groups, rest_groups, printer))
-        .or_else(|| build_arrow_comment_line_state(first_groups, rest_groups, &on_line, printer));
+        .or_else(|| build_arrow_comment_line_state(first_groups, rest_groups, &on_line, printer))
+        .or_else(|| build_type_arg_hug_state(first_groups, rest_groups, &on_line, printer));
 
     match middle_state {
         Some(state) => d.conditional_group(&[on_line_doc, state, expanded]),
@@ -1324,6 +1329,97 @@ fn build_arrow_comment_line_state<'a>(
         last_flat
     } else {
         d.line_probe(1, printer.build_arg_expression_doc(arg))
+    };
+    Some(d.gated_state(probe, d.concat(&parts)))
+}
+
+/// Build the gated hug state for a last group whose call's sole type argument is an object
+/// type or a mapped type that hugs its `<…>`, written flat — the member-chain type-argument
+/// hug convergence window (`docs/conformance_prettier_ts.md` §Member-chain type-argument hug
+/// convergence).
+///
+/// Prettier's pass 1 reads the flat type literal whole in the chain's one-line measurement,
+/// overflows, and expands the chain, the literal breaking for width on the expanded chain's
+/// line too. Pass 2 re-reads that literal as authored-expanded (its newline after `{`),
+/// truncates the one-line measurement there, and collapses the chain back to flat with the
+/// literal hugging its `<…>`. This state IS that settled form: the flat chain with the last
+/// group printed under the type's break assumed ([`AssumedBreak`] — the type literal, the
+/// mapped type, or the type-literal member of a hugged `{…} | null` union, as
+/// [`Printer::sole_type_arg_hug_break`] reads the instantiation printer's own hug), admitted
+/// while the expanded chain's line cannot hold the type flat. That line ends at the call's
+/// `(` — the arguments break out below it, so prettier's measurement stops at the argument
+/// list's soft line — or, for a call with no arguments and no comment between the parentheses,
+/// runs on through the `()` and whatever follows it on that line (the last group flat, the rest
+/// charged).
+///
+/// A forced break elsewhere in the last group — a block-bodied callback, an authored-expanded
+/// array — does not close the window: prettier's one-line measurement truncates at that
+/// break, which comes after the flat type literal, so it reads the literal whole and expands
+/// the chain all the same. A type literal already authored expanded needs no state (the
+/// `on_line` state's measurement truncates at its `{`, the pass-2 path), and the gate keeps
+/// this one out of it: the probe's line ends at that `{` and fits.
+///
+/// Outside it: an earlier call taking a function argument has prettier's pass 2 force-expand
+/// the chain (`lastGroupWillBreakAndOtherCallsHaveFunctionArguments`), which leaves pass 1 its
+/// fixed point. An object-rooted sole value argument is the object states' shape, and they
+/// answer it first (the `or_else` order in [`build_long_chain_doc`]); one they decline — a
+/// comment-bearing object argument — reaches this state like any other argument. Only the
+/// first call of the last group carrying type arguments is read: a later one
+/// (`f<{…}>(x)!<B>(y)`) prints after the `(` the probe measures to.
+fn build_type_arg_hug_state<'a>(
+    first_groups: &[ChainGroup<'a>],
+    rest_groups: &[ChainGroup<'a>],
+    on_line: &[DocId],
+    printer: &Printer<'_>,
+) -> Option<DocId> {
+    // The canonical reprint erases the authored break the assumed break stands in for, so the
+    // last group would print flat under it — the state has nothing to settle there.
+    if printer.canonical {
+        return None;
+    }
+    let d = printer.arena();
+    let (&last_flat, prefix_flat) = on_line.split_last()?;
+    let (last, _) = rest_groups.split_last()?;
+    let (index, call, span, type_args) =
+        last.nodes
+            .iter()
+            .enumerate()
+            .find_map(|(i, node)| match node {
+                ChainNode::Call { call, span, .. } => {
+                    Some((i, *call, *span, call.type_arguments.as_ref()?))
+                }
+                _ => None,
+            })?;
+    let assumed = printer.sole_type_arg_hug_break(type_args)?;
+    if other_calls_have_function_arguments(first_groups, rest_groups) {
+        return None;
+    }
+    let last_assumed = printer.with_assumed_break(assumed, || print_group(last, printer));
+    debug_assert!(
+        d.will_break(last_assumed),
+        "build_type_arg_hug_state: the assumed break must break the last group"
+    );
+    let mut parts: DocBuf = prefix_flat.iter().copied().collect();
+    parts.push(last_assumed);
+    // An empty list holding a comment breaks like an argument list (`(⏎/* c */⏎)`), so only a
+    // bare `()` carries the line on past it.
+    let bare_empty_list = call.arguments.is_empty()
+        && !printer
+            .find_char_outside_comments(type_args.span.end, span.end, b'(')
+            .is_some_and(|paren| printer.has_comments_on_page_between(paren, span.end));
+    let probe = if bare_empty_list {
+        last_flat
+    } else {
+        // The expanded chain's line up to the `(`: the group's nodes ahead of the call, flat,
+        // then the head the call prints ahead of its `(` — the `?.` half, the callee→`<`
+        // comments and the type arguments — and the `(`.
+        let mut line: DocBuf = last.nodes[..index]
+            .iter()
+            .map(|node| print_node_inner(node, printer, false, false))
+            .collect();
+        line.extend(printer.chain_call_head_doc(call, span));
+        line.push(d.text("("));
+        d.line_probe(0, d.concat(&line))
     };
     Some(d.gated_state(probe, d.concat(&parts)))
 }

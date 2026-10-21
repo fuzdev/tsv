@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 169,
+	"end": 304,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -33,17 +33,29 @@
 			"value": " empty",
 			"start": 143,
 			"end": 151
+		},
+		{
+			"type": "Line",
+			"value": " Empty object with block comment, on the last call of a member chain",
+			"start": 161,
+			"end": 231
+		},
+		{
+			"type": "Block",
+			"value": " empty ",
+			"start": 269,
+			"end": 280
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 168,
+		"end": 303,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 159,
+			"end": 294,
 			"body": [
 				{
 					"type": "VariableDeclaration",
@@ -153,13 +165,118 @@
 							"start": 91,
 							"end": 124
 						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 233,
+					"end": 293,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 239,
+							"end": 292,
+							"id": {
+								"type": "Identifier",
+								"start": 239,
+								"end": 240,
+								"name": "c"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 243,
+								"end": 292,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 243,
+									"end": 266,
+									"object": {
+										"type": "CallExpression",
+										"start": 243,
+										"end": 259,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 243,
+											"end": 251,
+											"object": {
+												"type": "Identifier",
+												"start": 243,
+												"end": 245,
+												"name": "db"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 246,
+												"end": 251,
+												"name": "where"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 252,
+												"end": 258,
+												"name": "filter"
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 260,
+										"end": 266,
+										"name": "select"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 284,
+										"end": 291,
+										"name": "columns",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " empty ",
+												"start": 269,
+												"end": 280
+											}
+										]
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 266,
+									"end": 283,
+									"params": [
+										{
+											"type": "TSTypeLiteral",
+											"start": 267,
+											"end": 282,
+											"members": []
+										}
+									]
+								}
+							}
+						}
 					],
-					"trailingComments": [
+					"kind": "const",
+					"leadingComments": [
 						{
 							"type": "Line",
 							"value": " empty",
 							"start": 143,
 							"end": 151
+						},
+						{
+							"type": "Line",
+							"value": " Empty object with block comment, on the last call of a member chain",
+							"start": 161,
+							"end": 231
 						}
 					]
 				}

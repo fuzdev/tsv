@@ -722,6 +722,30 @@ fn gen_ts_nested_flat_param_literal_first(depth: usize) -> String {
     format!("{body}\n")
 }
 
+/// A member chain whose last call hugs an object type argument, nested in that call's own
+/// argument (`obj0.a().f<{ k0: 1 }>(obj1.a().f<{ k1: 1 }>(…))`) — the chain's type-argument
+/// hug state, which rebuilds the last group under the assumed break. The nested chain's
+/// conditional states are copied into every outer level's rebuild, a quadratic term this
+/// construct already pays without the state; the state multiplies that term by a constant
+/// and must not raise its exponent.
+fn gen_ts_nested_type_arg_hug_chain(depth: usize) -> String {
+    let mut expr = String::from("done()");
+    for i in 0..depth {
+        expr = format!("obj{i}.a().f<{{ k{i}: 1 }}>({expr})");
+    }
+    format!("{expr};\n")
+}
+
+/// The same chain nested in an EARLIER call's argument (`obj0.a(obj1.a(…).f<…>(x1)).f<…>(x0)`)
+/// — the state's prefix docs come from the one-line state's flat groups and must stay shared.
+fn gen_ts_nested_type_arg_hug_chain_prefix(depth: usize) -> String {
+    let mut expr = String::from("done()");
+    for i in 0..depth {
+        expr = format!("obj{i}.a({expr}).f<{{ k{i}: 1 }}>(x{i})");
+    }
+    format!("{expr};\n")
+}
+
 /// Every construct the audit measures, with the depths it grows each one to.
 const CONSTRUCTS: &[Construct] = &[
     Construct {
@@ -1040,6 +1064,18 @@ const CONSTRUCTS: &[Construct] = &[
         name: "ts_nested_flat_param_literal_chain_return",
         parser: ParserType::TypeScript,
         generate: gen_ts_nested_flat_param_literal_chain_return,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_type_arg_hug_chain",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_type_arg_hug_chain,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_type_arg_hug_chain_prefix",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_type_arg_hug_chain_prefix,
         depths: &[4, 8, 12],
     },
 ];

@@ -11,6 +11,7 @@ use super::{
 use crate::ast::internal::{
     self, TSType, TSTypeParameter, TSTypeParameterDeclaration, TSTypeParameterModifier,
 };
+use crate::printer::AssumedBreak;
 use crate::printer::ignore::RoutedScope;
 use crate::printer::layout::bracketed_list_body;
 use smallvec::smallvec;
@@ -736,33 +737,42 @@ impl<'a> Printer<'a> {
         // deliberate divergence; see docs/conformance_prettier_ts_comments.md.) A run that
         // breaks after its last block declines both hugs for the group below
         // (`single_type_arg_run_breaks_after`), as the type-position builder does.
-        if inst.params.len() == 1
-            && !self.single_type_arg_run_breaks_after(inst, has_comments)
-            && let Some(type_doc) = self.try_build_hugging_curly_type_doc(inst.params[0])
-        {
+        //
+        // A single *hugged-union* type argument — `{…} | null` / `null | {…}`
+        // (`type_arg_union_prints_hugged`) — inlines atomically: no group, no softlines;
+        // its object member carries its own group and breaks block-style inside the hugged
+        // `<…>` rather than breaking the `<…>` onto its own lines. Both arms are decided by
+        // [`Self::sole_type_arg_hug`], which a member chain's convergence state asks too.
+        match self.sole_type_arg_hug(inst, has_comments) {
             // The `<`→arg / arg→`>` gaps may hold inline block comments (a glued
             // format-ignore directive included) — the shared single-arg emission
             // preserves them (and applies the freeze) instead of dropping them.
-            return self.build_single_type_arg_inline_with(inst, has_comments, type_doc);
+            Some(SoleTypeArgHug::TypeLiteral(literal)) => {
+                let type_doc = self.build_type_literal_doc(literal);
+                return self.build_single_type_arg_inline_with(inst, has_comments, type_doc);
+            }
+            Some(SoleTypeArgHug::Mapped(mapped)) => {
+                let type_doc = self.build_mapped_type_doc(mapped);
+                return self.build_single_type_arg_inline_with(inst, has_comments, type_doc);
+            }
+            Some(SoleTypeArgHug::Union(_)) => {
+                return self.build_single_type_arg_inline(inst, has_comments);
+            }
+            None => {}
         }
 
-        // A single *simple* or *hugged-union* type argument inlines atomically: no
-        // group, no softlines. Simple = keyword, literal, `this`, or a bare type
-        // reference (`is_simple_type_arg`); hugged union = `{…} | null` / `null | {…}`
-        // (`type_arg_union_prints_hugged`), whose object member carries its own group and
-        // breaks block-style inside the hugged `<…>` rather than breaking the `<…>` onto
-        // its own lines. Matches Prettier's `shouldInline`/`shouldHugType` and tsv's own
-        // type-position builder (`build_type_arguments_doc`), via the shared
-        // predicates. Without it the fall-through group below gives the argument a
-        // softline break point, so an overflowing call head (`callee<Ref>(`) breaks the
-        // `<Ref>` instead of the arguments (and, as an assignment RHS, keeps the RHS on
-        // the `=` line rather than breaking after `=`). Comment-bearing single arguments
-        // are already routed to the multiline path above, so only inline block comments
-        // remain — the shared `build_single_type_arg_inline` preserves them. (The single
-        // brace-delimited object/mapped type is handled by the curly-hug case above.)
+        // A single *simple* type argument inlines atomically too: keyword, literal, `this`,
+        // or a bare type reference (`is_simple_type_arg`). Matches Prettier's
+        // `shouldInline`/`shouldHugType` and tsv's own type-position builder
+        // (`build_type_arguments_doc`), via the shared predicates. Without it the
+        // fall-through group below gives the argument a softline break point, so an
+        // overflowing call head (`callee<Ref>(`) breaks the `<Ref>` instead of the
+        // arguments (and, as an assignment RHS, keeps the RHS on the `=` line rather than
+        // breaking after `=`). Comment-bearing single arguments are already routed to the
+        // multiline path above, so only inline block comments remain — the shared
+        // `build_single_type_arg_inline` preserves them.
         if inst.params.len() == 1
-            && (is_simple_type_arg(inst.params[0])
-                || self.type_arg_union_prints_hugged(inst.span.start + 1, inst.params[0]))
+            && is_simple_type_arg(inst.params[0])
             && !self.single_type_arg_run_breaks_after(inst, has_comments)
         {
             return self.build_single_type_arg_inline(inst, has_comments);
@@ -1097,31 +1107,85 @@ impl<'a> Printer<'a> {
         )
     }
 
-    /// Try to build a hugging doc for curly-brace types (object literals, mapped types).
-    ///
-    /// Returns `Some(doc)` if the type is a curly-brace type that should hug `<{`,
-    /// `None` otherwise. Used for single type arguments where Prettier keeps
-    /// the opening angle bracket hugged with the opening curly brace.
-    ///
-    /// The object/mapped type carries its own width-aware group, so an inline
-    /// `<{ ... }>` that overflows breaks block-style (members on their own lines)
-    /// rather than spilling an inner union/intersection — matching the type-reference
-    /// type-argument path (`build_type_arguments_doc`).
-    fn try_build_hugging_curly_type_doc(&self, ty: &TSType<'_>) -> Option<DocId> {
+    /// How an instantiation's sole type argument hugs its `<…>`, or `None` when the list
+    /// takes another layout — [`Self::build_type_parameter_instantiation_doc`]'s two hug
+    /// arms, decided here once so the builder and the member chain's convergence state
+    /// ([`Self::sole_type_arg_hug_break`]) cannot disagree. `has_comments` is the caller's
+    /// whole-`<…>` window answer; the comment-forced multiline arm is the caller's, asked
+    /// first.
+    fn sole_type_arg_hug<'t>(
+        &self,
+        inst: &internal::TSTypeParameterInstantiation<'t>,
+        has_comments: bool,
+    ) -> Option<SoleTypeArgHug<'t>> {
+        let [ty] = inst.params else {
+            return None;
+        };
+        if self.single_type_arg_run_breaks_after(inst, has_comments) {
+            return None;
+        }
         match ty {
-            // Object type literal: { a: number; b: string } or { /* comment */ }
-            // Hug if it has members OR comments inside. Standard (not hugging) mode
-            // so the object breaks block-style on width, the same as elsewhere.
-            TSType::TypeLiteral(type_lit)
-                if !type_lit.members.is_empty()
-                    || self
-                        .has_comments_to_emit_between(type_lit.span.start, type_lit.span.end) =>
+            // An object type literal hugs with members or comments inside — an empty,
+            // comment-free `{}` does not. It carries its own width-aware group, so an inline
+            // `<{ … }>` that overflows breaks block-style (members on their own lines) rather
+            // than spilling an inner union/intersection — matching the type-reference
+            // type-argument path (`build_type_arguments_doc`).
+            TSType::TypeLiteral(literal)
+                if !literal.members.is_empty()
+                    || self.has_comments_to_emit_between(literal.span.start, literal.span.end) =>
             {
-                Some(self.build_type_literal_doc(type_lit))
+                Some(SoleTypeArgHug::TypeLiteral(literal))
             }
-            // Mapped type: { [K in keyof T]: V }
-            TSType::Mapped(mapped) => Some(self.build_mapped_type_doc(mapped)),
+            TSType::Mapped(mapped) => Some(SoleTypeArgHug::Mapped(mapped)),
+            _ if self.type_arg_union_prints_hugged(inst.span.start + 1, ty) => {
+                Some(SoleTypeArgHug::Union(ty))
+            }
             _ => None,
         }
     }
+
+    /// The break that prints an instantiation's hugged sole type argument expanded — its
+    /// `{` read as authored-broken ([`AssumedBreak`]) — or `None` when the list does not
+    /// hug a brace type at its `<` ([`Self::sole_type_arg_hug`]).
+    ///
+    /// The type literal or mapped type itself, or the type-literal member of a hugged
+    /// union written bare (`{…} | null`): a union's mapped member is not one prettier hugs
+    /// (`isObjectLikeType`), and a redundant paren shell around the union prints its `<…>`
+    /// by other rules. A literal with no members (`{} | null`, `{ /* c */ }`) has nothing to
+    /// break.
+    pub(in crate::printer) fn sole_type_arg_hug_break(
+        &self,
+        inst: &internal::TSTypeParameterInstantiation<'_>,
+    ) -> Option<AssumedBreak> {
+        let has_comments = self.has_comments_on_page_between(inst.span.start, inst.span.end);
+        if self.type_arguments_force_expansion(inst, has_comments) {
+            return None;
+        }
+        match self.sole_type_arg_hug(inst, has_comments)? {
+            SoleTypeArgHug::TypeLiteral(literal) if !literal.members.is_empty() => {
+                Some(AssumedBreak::TypeLiteral(literal.span.start))
+            }
+            SoleTypeArgHug::TypeLiteral(_) => None,
+            SoleTypeArgHug::Mapped(mapped) => Some(AssumedBreak::MappedType(mapped.span.start)),
+            SoleTypeArgHug::Union(TSType::Union(union)) => {
+                union.types.iter().find_map(|member| match member {
+                    TSType::TypeLiteral(literal) if !literal.members.is_empty() => {
+                        Some(AssumedBreak::TypeLiteral(literal.span.start))
+                    }
+                    _ => None,
+                })
+            }
+            SoleTypeArgHug::Union(_) => None,
+        }
+    }
+}
+
+/// How a sole type argument hugs its `<…>` ([`Printer::sole_type_arg_hug`]).
+enum SoleTypeArgHug<'t> {
+    /// An object type literal, hugging `<{` with its own width-aware group.
+    TypeLiteral(&'t internal::TSTypeLiteral<'t>),
+    /// A mapped type, hugging `<{` the same way.
+    Mapped(&'t internal::TSMappedType<'t>),
+    /// A hugged union (`{…} | null`), inlined atomically.
+    Union(&'t TSType<'t>),
 }

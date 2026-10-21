@@ -79,7 +79,7 @@ impl<'a> Printer<'a> {
     /// Assumes `args.params.len() == 1` **and** that the caller has gated on the argument
     /// actually hugging — [`Self::type_arg_hugs`] for both builders here, and its split
     /// spelling in `type_params.rs` (whose object case routes through
-    /// `try_build_hugging_curly_type_doc`, a documented divergence). Own-line and line
+    /// `sole_type_arg_hug`, a documented divergence). Own-line and line
     /// comments are routed to the multiline path before this runs, so only inline block
     /// comments remain to preserve here. Shared by the type-position builder and the
     /// call/`new`/instantiation builder.
@@ -96,7 +96,7 @@ impl<'a> Printer<'a> {
 
     /// [`Self::build_single_type_arg_inline`] with a caller-built argument doc — the
     /// shared emission for the instantiation curly-hug arm, whose argument doc comes
-    /// from `try_build_hugging_curly_type_doc` rather than `build_type_doc`.
+    /// from the type literal or mapped type builder rather than `build_type_doc`.
     /// Applies the Rule A freeze itself (swapping `type_doc` for the frozen verbatim
     /// slice), so every single-argument hug path honors it.
     pub(in crate::printer) fn build_single_type_arg_inline_with(

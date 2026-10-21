@@ -171,3 +171,25 @@ fn blank_between_call_args_dropped() {
         "no blank line survives: {with_blank:?}"
     );
 }
+
+#[test]
+fn chain_type_argument_hug_is_canonical_free() {
+    // A member chain's last call with a hugging type argument, too wide for the expanded
+    // chain's line: the format path's type-argument hug state reads an assumed break the
+    // canonical reprint erases, so it must stay out of the canonical path. Both authorings
+    // reach one canonical form, and that form is a fixed point.
+    let name = "f".repeat(80);
+    let flat = format!("const v = w.a().{name}<{{ aaaa: 1; bbbb: 2 }}>(x);\n");
+    let expanded = format!("const v = w.a().{name}<{{\n\taaaa: 1;\n\tbbbb: 2;\n}}>(x);\n");
+    let once = canonicalize_js(&flat).unwrap();
+    assert_eq!(
+        once,
+        canonicalize_js(&expanded).unwrap(),
+        "authorings must converge"
+    );
+    assert_eq!(
+        once,
+        canonicalize_js(&once).unwrap(),
+        "canonical form must be stable"
+    );
+}
