@@ -847,6 +847,25 @@ impl<'a> Printer<'a> {
         Some(after_operator_head_gated(self.d(), value_doc, value_broken))
     }
 
+    /// [`Self::after_operator_nullable_union_doc`] for an expression `value`, its list found
+    /// by [`Self::value_type_arguments`] — the form the assignment and declarator seams ask
+    /// of every value they lay out fluid.
+    ///
+    /// With no nullable-union `<…>` built yet in the document, the answer is `None` without
+    /// the walk down the value: `value_doc` is already built, so any such list inside it was
+    /// recorded, and [`Self::value_with_nullable_union_broken`] finds nothing to swap in an
+    /// empty record.
+    pub(in crate::printer) fn after_operator_value_nullable_union_doc(
+        &self,
+        value_doc: DocId,
+        value: &internal::Expression<'_>,
+    ) -> Option<DocId> {
+        if self.nullable_union_type_args.borrow().is_empty() {
+            return None;
+        }
+        self.after_operator_nullable_union_doc(value_doc, Self::value_type_arguments(value))
+    }
+
     /// The type arguments of a value whose `<…>` an assignment's `=` meets as the value's
     /// break point: a call's or a `new` expression's, seen through the wrappers that print
     /// ahead of nothing but the value's head — `await`, `as` / `satisfies`, a non-null `!`,

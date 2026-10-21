@@ -1483,12 +1483,9 @@ impl<'a> Printer<'a> {
                 // breaks after the operator while the line up to the value's first break
                 // (a call's `(`) then fits, and otherwise keeps the operator's line and
                 // breaks inside its `<…>` — after the operator too where even the line up
-                // to the `<` overflows ([`Printer::after_operator_nullable_union_doc`]).
+                // to the `<` overflows ([`Printer::after_operator_value_nullable_union_doc`]).
                 let tail = self
-                    .after_operator_nullable_union_doc(
-                        right_doc_with_comments,
-                        Self::value_type_arguments(right_expr),
-                    )
+                    .after_operator_value_nullable_union_doc(right_doc_with_comments, right_expr)
                     .unwrap_or_else(|| fluid_after_operator(d, right_doc_with_comments));
                 d.group(d.concat(&[d.group(left_doc), operator, tail]))
             }

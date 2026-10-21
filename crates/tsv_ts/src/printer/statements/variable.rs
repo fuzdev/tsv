@@ -34,7 +34,7 @@ impl Printer<'_> {
     /// argument is a nullable reference union breaks after `=` while the line up to the
     /// value's first break (a call's `(`) then fits, and otherwise keeps the `=` line and
     /// breaks inside its `<…>` — after the `=` too where even the line up to the `<`
-    /// overflows ([`Printer::after_operator_nullable_union_doc`]).
+    /// overflows ([`Printer::after_operator_value_nullable_union_doc`]).
     fn build_value_fluid_assignment_doc(
         &self,
         id_doc: DocId,
@@ -42,7 +42,7 @@ impl Printer<'_> {
         init: &Expression<'_>,
     ) -> DocId {
         let d = self.d();
-        match self.after_operator_nullable_union_doc(init_doc, Self::value_type_arguments(init)) {
+        match self.after_operator_value_nullable_union_doc(init_doc, init) {
             Some(tail) => d.group(d.concat(&[id_doc, d.text(" ="), tail])),
             None => build_fluid_assignment_doc(d, id_doc, init_doc),
         }
