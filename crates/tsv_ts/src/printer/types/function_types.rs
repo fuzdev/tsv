@@ -933,7 +933,8 @@ impl<'a> Printer<'a> {
         }
 
         // Check for line comments or own-line block comments that force multiline
-        let close_paren_pos = paren_pos.and_then(|p| self.matching_close_paren(p));
+        let close_paren_pos =
+            paren_pos.and_then(|p| self.matching_close_paren_of_params(p, params));
 
         // The sole-parameter hug, shared with the value-param path
         // ([`Printer::hugs_sole_parameter`]); this is the signature-context caller
@@ -1228,7 +1229,8 @@ impl<'a> Printer<'a> {
             );
         } else {
             // Check for line comments or own-line block comments between/after params (force multiline)
-            let close_paren_pos = paren_pos.and_then(|p| self.matching_close_paren(p));
+            let close_paren_pos =
+                paren_pos.and_then(|p| self.matching_close_paren_of_params(p, params));
             // Use last param end as fallback if close paren not found (no trailing check)
             let end_boundary =
                 close_paren_pos.unwrap_or_else(|| params.last().map_or(0, |p| p.span().end));

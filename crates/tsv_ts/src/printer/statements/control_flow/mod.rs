@@ -546,7 +546,7 @@ impl<'a> Printer<'a> {
         grouping: HeadChainGrouping,
     ) -> (DocBuf, u32) {
         let open_paren = self.find_open_paren_after(stmt_start);
-        let close_paren = open_paren.and_then(|o| self.matching_close_paren(o));
+        let close_paren = open_paren.and_then(|o| self.close_paren_around(o, o + 1, test.span()));
         // Preserve comments between the keyword and `(` in place:
         //   if/* c */(a){} → if /* c */ (a) {}
         let keyword_end = stmt_start + keyword.len() as u32;

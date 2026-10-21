@@ -1,0 +1,336 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 176,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 50,
+			"end": 57
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 104,
+			"end": 111
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 145,
+			"end": 152
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 175,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 166,
+			"body": [
+				{
+					"type": "ForOfStatement",
+					"start": 20,
+					"end": 71,
+					"await": false,
+					"left": {
+						"type": "VariableDeclaration",
+						"start": 25,
+						"end": 32,
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 31,
+								"end": 32,
+								"id": {
+									"type": "Identifier",
+									"start": 31,
+									"end": 32,
+									"name": "m"
+								},
+								"init": null
+							}
+						],
+						"kind": "const"
+					},
+					"right": {
+						"type": "CallExpression",
+						"start": 36,
+						"end": 49,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 36,
+							"end": 46,
+							"object": {
+								"type": "Literal",
+								"start": 36,
+								"end": 41,
+								"value": {},
+								"raw": "/\\)/g",
+								"regex": {
+									"pattern": "\\)",
+									"flags": "g"
+								}
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 42,
+								"end": 46,
+								"name": "exec"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 47,
+								"end": 48,
+								"name": "s",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 50,
+										"end": 57
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 59,
+						"end": 71,
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 63,
+								"end": 68,
+								"expression": {
+									"type": "CallExpression",
+									"start": 63,
+									"end": 67,
+									"callee": {
+										"type": "Identifier",
+										"start": 63,
+										"end": 64,
+										"name": "f"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 65,
+											"end": 66,
+											"name": "m"
+										}
+									],
+									"optional": false
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "ForOfStatement",
+					"start": 73,
+					"end": 125,
+					"await": false,
+					"left": {
+						"type": "VariableDeclaration",
+						"start": 78,
+						"end": 85,
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 84,
+								"end": 85,
+								"id": {
+									"type": "Identifier",
+									"start": 84,
+									"end": 85,
+									"name": "m"
+								},
+								"init": null
+							}
+						],
+						"kind": "const"
+					},
+					"right": {
+						"type": "CallExpression",
+						"start": 89,
+						"end": 103,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 89,
+							"end": 100,
+							"object": {
+								"type": "Literal",
+								"start": 89,
+								"end": 95,
+								"value": {},
+								"raw": "/[)]/g",
+								"regex": {
+									"pattern": "[)]",
+									"flags": "g"
+								}
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 96,
+								"end": 100,
+								"name": "exec"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 101,
+								"end": 102,
+								"name": "s",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 104,
+										"end": 111
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 113,
+						"end": 125,
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 117,
+								"end": 122,
+								"expression": {
+									"type": "CallExpression",
+									"start": 117,
+									"end": 121,
+									"callee": {
+										"type": "Identifier",
+										"start": 117,
+										"end": 118,
+										"name": "f"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 119,
+											"end": 120,
+											"name": "m"
+										}
+									],
+									"optional": false
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "ForOfStatement",
+					"start": 127,
+					"end": 165,
+					"await": false,
+					"left": {
+						"type": "VariableDeclaration",
+						"start": 132,
+						"end": 139,
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 138,
+								"end": 139,
+								"id": {
+									"type": "Identifier",
+									"start": 138,
+									"end": 139,
+									"name": "x"
+								},
+								"init": null
+							}
+						],
+						"kind": "const"
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 143,
+						"end": 144,
+						"name": "a",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 145,
+								"end": 152
+							}
+						]
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 154,
+						"end": 165,
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 158,
+								"end": 162,
+								"expression": {
+									"type": "CallExpression",
+									"start": 158,
+									"end": 161,
+									"callee": {
+										"type": "Identifier",
+										"start": 158,
+										"end": 159,
+										"name": "x"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

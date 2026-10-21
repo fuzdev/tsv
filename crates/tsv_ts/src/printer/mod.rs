@@ -2800,6 +2800,137 @@ impl<'a> Printer<'a> {
             .map(|after| after - 1)
     }
 
+    /// Just past the `)` closing a parenthesized list or operand, read FORWARD from
+    /// `from`, the end of the last item the parens hold — the `)`
+    /// [`Self::find_closing_paren`] looks for from the `(`, read short. Between `from` and
+    /// that `)` only trivia (a space, tab, `\n` or `\r`, and comments) may sit, plus one `,` when
+    /// `trailing_comma` (a list's trailing comma) and the `extra` redundant `)` that close
+    /// the pairs wrapping the item. Any other byte, or reaching `end`, answers `None`, and
+    /// the caller runs the full scan.
+    ///
+    /// Sound because an item's span covers the item whole — a parameter's runs through
+    /// its annotation, `?`, default and rest, and an expression's through every operand
+    /// and argument list it holds, a parenthesized one included — while a redundant pair
+    /// around an item opens before its span and closes after it. So every pair the full
+    /// scan meets before `from` is balanced by `from`, and past it the `extra + 1`-th
+    /// `)` is the list's own. A span that ended early could only turn this into `None`
+    /// (the bytes it left out are not trivia), never into another `)`, unless the bytes it
+    /// left out were themselves only `)` the item owns — the case the span rule excludes.
+    pub(in crate::printer) fn close_paren_after_last(
+        &self,
+        from: u32,
+        end: u32,
+        extra: u32,
+        trailing_comma: bool,
+    ) -> Option<u32> {
+        let bytes = self.source.as_bytes();
+        let end = (end as usize).min(bytes.len());
+        let mut i = from as usize;
+        let mut need = extra + 1;
+        let mut comma = trailing_comma;
+        while i < end {
+            match bytes[i] {
+                b' ' | b'\t' | b'\n' | b'\r' => i += 1,
+                // A `/` that opens no comment is not trivia here: a regex or a
+                // division would be part of an item, so the short reading declines.
+                b'/' => i = skip_trivia(bytes, i, end, TriviaProfile::COMMENTS)?,
+                b',' if comma && need == 1 => {
+                    comma = false;
+                    i += 1;
+                }
+                b')' => {
+                    i += 1;
+                    need -= 1;
+                    if need == 0 {
+                        return Some(i as u32);
+                    }
+                }
+                _ => return None,
+            }
+        }
+        None
+    }
+
+    /// How many redundant `(` open in `[from, to)`, the run between a list's `(` (or an
+    /// operand's keyword) and the first byte of the one item it holds — `None` when
+    /// anything but those and trivia sits there. The left half of
+    /// [`Self::close_paren_around`], which needs the count to know how many `)` to pass.
+    fn redundant_open_parens(&self, from: u32, to: u32) -> Option<u32> {
+        let bytes = self.source.as_bytes();
+        let to = (to as usize).min(bytes.len());
+        let mut i = from as usize;
+        let mut extra = 0;
+        while i < to {
+            match bytes[i] {
+                b' ' | b'\t' | b'\n' | b'\r' => i += 1,
+                b'/' => i = skip_trivia(bytes, i, to, TriviaProfile::COMMENTS)?,
+                b'(' => {
+                    extra += 1;
+                    i += 1;
+                }
+                _ => return None,
+            }
+        }
+        (i == to).then_some(extra)
+    }
+
+    /// The index OF the `)` closing the `(` at `open` whose last item is the operand
+    /// spanning `operand` — the `)` [`Self::matching_close_paren`] looks for, read short
+    /// where it can be: when only trivia and redundant `(` lie between `lead` and the
+    /// operand, the close is the `)` [`Self::close_paren_after_last`] finds past those
+    /// pairs' own. `lead` is where that run starts: just past the `(` for an `if` /
+    /// `while` condition, just past the keyword for a for-in / for-of right side (the
+    /// bytes before it — the `(`, the binding, the keyword — are balanced on their own).
+    pub(in crate::printer) fn close_paren_around(
+        &self,
+        open: u32,
+        lead: u32,
+        operand: Span,
+    ) -> Option<u32> {
+        self.redundant_open_parens(lead, operand.start)
+            .and_then(|extra| {
+                self.close_paren_after_last(operand.end, self.source.len() as u32, extra, false)
+            })
+            .map(|after| after - 1)
+            .or_else(|| self.matching_close_paren(open))
+    }
+
+    /// Just past the `)` closing the parameter list whose `(` is at `open`, bounded by
+    /// `end` — [`Self::find_closing_paren`]'s answer, read short from the last
+    /// parameter's end when there is one, else from just past the `(`
+    /// ([`Self::close_paren_after_last`]). The full scan answers whatever that cannot,
+    /// and every position where `open` is not a `(`.
+    pub(in crate::printer) fn close_paren_after_params(
+        &self,
+        open: u32,
+        last_param_end: Option<u32>,
+        end: u32,
+    ) -> Option<u32> {
+        if self.source.as_bytes().get(open as usize) == Some(&b'(') {
+            let (from, trailing_comma) = last_param_end.map_or((open + 1, false), |e| (e, true));
+            if let Some(after) = self.close_paren_after_last(from, end, 0, trailing_comma) {
+                return Some(after);
+            }
+        }
+        self.find_closing_paren(open, end)
+    }
+
+    /// The index OF the `)` closing the non-empty parameter list `params` whose `(` is at
+    /// `open` — [`Self::matching_close_paren`]'s answer, through
+    /// [`Self::close_paren_after_params`]'s short reading.
+    pub(in crate::printer) fn matching_close_paren_of_params(
+        &self,
+        open: u32,
+        params: &[internal::Expression<'_>],
+    ) -> Option<u32> {
+        self.close_paren_after_params(
+            open,
+            params.last().map(|p| p.span().end),
+            self.source.len() as u32,
+        )
+        .map(|after| after - 1)
+    }
+
     /// Find the end position of a keyword in source text.
     ///
     /// Searches backward from `end` for `keyword` as a whole word (not part of

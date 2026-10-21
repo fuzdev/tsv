@@ -98,12 +98,13 @@ impl<'a> Printer<'a> {
     /// `build_function_expression_signature_doc` (function expressions, object methods)
     /// — the two builders differ only in the type-parameter prefix the caller prepends.
     ///
-    /// One depth-tracked close-`)` scan feeds every derived boundary: the params doc
-    /// (trailing comments bounded at `)` — a comment past it belongs to the `)`→return
-    /// gap or the signature→body gap), the combined `)`→`:` return-type doc (the comment
-    /// prefix folded into `: T` so the single-param hug sees a will-break comment there),
-    /// the hug itself (`group_params_if_should`), and the signature end (the return
-    /// type's end, else just past `)`). Returns `(params_doc, return_type_doc, sig_end)`.
+    /// One close-`)` lookup ([`Self::close_paren_after_params`]) feeds every derived
+    /// boundary: the params doc (trailing comments bounded at `)` — a comment past it
+    /// belongs to the `)`→return gap or the signature→body gap), the combined `)`→`:`
+    /// return-type doc (the comment prefix folded into `: T` so the single-param hug sees
+    /// a will-break comment there), the hug itself (`group_params_if_should`), and the
+    /// signature end (the return type's end, else just past `)`). Returns
+    /// `(params_doc, return_type_doc, sig_end)`.
     pub(in crate::printer) fn build_signature_params_return(
         &self,
         params: &[internal::Expression<'_>],
@@ -112,7 +113,11 @@ impl<'a> Printer<'a> {
         params_start: u32,
         body_start: u32,
     ) -> (DocId, Option<DocId>, u32) {
-        let close_paren_after = self.find_closing_paren(params_start, body_start);
+        let close_paren_after = self.close_paren_after_params(
+            params_start,
+            params.last().map(|p| p.span().end),
+            body_start,
+        );
 
         let trailing_comments_end =
             Some(close_paren_after.map_or(body_start, |after_paren| after_paren - 1));

@@ -1539,7 +1539,7 @@ impl<'a> Printer<'a> {
         search_limit: u32,
     ) -> DocId {
         if let Some(open) = params_start
-            && let Some(close_after) = self.find_closing_paren(open, search_limit)
+            && let Some(close_after) = self.close_paren_after_params(open, None, search_limit)
         {
             return self.build_empty_parens_inline_with_comments_doc(
                 open,

@@ -1388,18 +1388,24 @@ impl<'a> Printer<'a> {
         // printer uses (`tsv_lang::source_scan::find_keyword`) rather than a raw
         // substring walk of this file's own — same whole-word rule, and it skips strings
         // and templates as well as comments.
-        let keyword_pos = self
-            .find_keyword_in_range(left_end, right_start, keyword)
-            .unwrap_or(left_end);
+        let keyword_found = self.find_keyword_in_range(left_end, right_start, keyword);
+        let keyword_pos = keyword_found.unwrap_or(left_end);
+        let keyword_end = keyword_pos + keyword.len() as u32;
         let open_paren = self.find_open_paren_after(stmt_start);
+        // The right side is the header's last item, so its `)` is read short from there
+        // once the keyword is located; without the keyword, the full scan.
+        let close_paren = open_paren.and_then(|o| match keyword_found {
+            Some(_) => self.close_paren_around(o, keyword_end, right.span()),
+            None => self.matching_close_paren(o),
+        });
         ForInOfSpans {
             open_paren,
-            close_paren: open_paren.and_then(|o| self.matching_close_paren(o)),
+            close_paren,
             left_start: self.get_for_in_of_left_start(left),
             binding_start: self.get_for_in_of_binding_start(left),
             left_end,
             keyword_pos,
-            keyword_end: keyword_pos + keyword.len() as u32,
+            keyword_end,
             right_start,
             right_end: right.span().end,
         }

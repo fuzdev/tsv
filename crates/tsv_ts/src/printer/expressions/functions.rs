@@ -3012,7 +3012,11 @@ impl<'a> Printer<'a> {
     fn arrow_params_end(&self, arrow: &internal::ArrowFunctionExpression<'_>) -> Option<u32> {
         match arrow.params_start {
             // Find closing `)` to get accurate boundary
-            Some(params_start) => self.find_closing_paren(params_start, arrow.body.span().start),
+            Some(params_start) => self.close_paren_after_params(
+                params_start,
+                arrow.params.last().map(|p| p.span().end),
+                arrow.body.span().start,
+            ),
             // No parens (single param arrow like `x => x`) - use param end
             None => arrow.params.last().map(|p| p.span().end),
         }
