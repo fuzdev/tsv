@@ -13,7 +13,7 @@ use tsv_lang::doc::arena::DocId;
 
 /// Test function patterns that Prettier keeps on a single line
 /// Includes: Jest, Mocha, Jasmine, Playwright, Vitest patterns
-pub(super) const TEST_CALL_PATTERNS: &[&str] = &[
+const TEST_CALL_PATTERNS: &[&str] = &[
     // Core test functions
     "it",
     "it.only",

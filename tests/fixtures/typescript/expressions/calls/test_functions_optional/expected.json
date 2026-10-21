@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 372,
+	"end": 574,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -27,17 +27,23 @@
 			"value": " Short optional call still fits on one line.",
 			"start": 289,
 			"end": 335
+		},
+		{
+			"type": "Line",
+			"value": " An optional member link anywhere in the callee is not a test callee either.",
+			"start": 364,
+			"end": 442
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 371,
+		"end": 573,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 362,
+			"end": 564,
 			"body": [
 				{
 					"type": "ExpressionStatement",
@@ -152,6 +158,87 @@
 							"value": " Short optional call still fits on one line.",
 							"start": 289,
 							"end": 335
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 444,
+					"end": 563,
+					"expression": {
+						"type": "ChainExpression",
+						"start": 444,
+						"end": 562,
+						"expression": {
+							"type": "CallExpression",
+							"start": 444,
+							"end": 562,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 444,
+								"end": 463,
+								"object": {
+									"type": "MemberExpression",
+									"start": 444,
+									"end": 457,
+									"object": {
+										"type": "Identifier",
+										"start": 444,
+										"end": 448,
+										"name": "test"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 449,
+										"end": 457,
+										"name": "describe"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 459,
+									"end": 463,
+									"name": "only"
+								},
+								"computed": false,
+								"optional": true
+							},
+							"arguments": [
+								{
+									"type": "Literal",
+									"start": 467,
+									"end": 547,
+									"value": "does something really long and complicated so I have to write a long test name",
+									"raw": "'does something really long and complicated so I have to write a long test name'"
+								},
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 551,
+									"end": 559,
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 557,
+										"end": 559,
+										"body": []
+									}
+								}
+							],
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An optional member link anywhere in the callee is not a test callee either.",
+							"start": 364,
+							"end": 442
 						}
 					]
 				}

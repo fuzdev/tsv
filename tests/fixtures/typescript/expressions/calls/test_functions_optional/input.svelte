@@ -8,4 +8,10 @@
 
 	// Short optional call still fits on one line.
 	it?.('short', () => {});
+
+	// An optional member link anywhere in the callee is not a test callee either.
+	test.describe?.only(
+		'does something really long and complicated so I have to write a long test name',
+		() => {}
+	);
 </script>

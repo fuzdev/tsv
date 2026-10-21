@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 746,
+	"end": 906,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -96,26 +96,38 @@
 		},
 		{
 			"type": "Line",
-			"value": " a block comment does not end its line, so it stays inline",
+			"value": " a callback argument keeps it too, and the call breaks rather than hug a signature it opens",
 			"start": 626,
-			"end": 686
+			"end": 719
+		},
+		{
+			"type": "Line",
+			"value": " c10",
+			"start": 745,
+			"end": 751
+		},
+		{
+			"type": "Line",
+			"value": " a block comment does not end its line, so it stays inline",
+			"start": 786,
+			"end": 846
 		},
 		{
 			"type": "Block",
 			"value": " c9 ",
-			"start": 704,
-			"end": 712
+			"start": 864,
+			"end": 872
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 745,
+		"end": 905,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 736,
+			"end": 896,
 			"body": [
 				{
 					"type": "VariableDeclaration",
@@ -721,13 +733,143 @@
 					]
 				},
 				{
+					"type": "ExpressionStatement",
+					"start": 721,
+					"end": 783,
+					"expression": {
+						"type": "CallExpression",
+						"start": 721,
+						"end": 782,
+						"callee": {
+							"type": "Identifier",
+							"start": 721,
+							"end": 722,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 726,
+								"end": 727,
+								"name": "x"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 731,
+								"end": 779,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 756,
+										"end": 760,
+										"name": "p",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 757,
+											"end": 760,
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 759,
+												"end": 760,
+												"typeName": {
+													"type": "Identifier",
+													"start": 759,
+													"end": 760,
+													"name": "T"
+												}
+											}
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c10",
+												"start": 745,
+												"end": 751
+											}
+										]
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 765,
+									"end": 779,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 770,
+											"end": 775,
+											"expression": {
+												"type": "CallExpression",
+												"start": 770,
+												"end": 774,
+												"callee": {
+													"type": "Identifier",
+													"start": 770,
+													"end": 771,
+													"name": "g"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 772,
+														"end": 773,
+														"name": "p"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								},
+								"typeParameters": {
+									"type": "TSTypeParameterDeclaration",
+									"start": 731,
+									"end": 744,
+									"params": [
+										{
+											"type": "TSTypeParameter",
+											"start": 732,
+											"end": 743,
+											"name": "T",
+											"constraint": {
+												"type": "TSTypeReference",
+												"start": 742,
+												"end": 743,
+												"typeName": {
+													"type": "Identifier",
+													"start": 742,
+													"end": 743,
+													"name": "A"
+												}
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a callback argument keeps it too, and the call breaks rather than hug a signature it opens",
+							"start": 626,
+							"end": 719
+						}
+					]
+				},
+				{
 					"type": "FunctionDeclaration",
-					"start": 688,
-					"end": 735,
+					"start": 848,
+					"end": 895,
 					"id": {
 						"type": "Identifier",
-						"start": 697,
-						"end": 700,
+						"start": 857,
+						"end": 860,
 						"name": "fn2"
 					},
 					"expression": false,
@@ -735,13 +877,13 @@
 					"async": false,
 					"typeParameters": {
 						"type": "TSTypeParameterDeclaration",
-						"start": 700,
-						"end": 703,
+						"start": 860,
+						"end": 863,
 						"params": [
 							{
 								"type": "TSTypeParameter",
-								"start": 701,
-								"end": 702,
+								"start": 861,
+								"end": 862,
 								"name": "T"
 							}
 						],
@@ -749,29 +891,29 @@
 							{
 								"type": "Block",
 								"value": " c9 ",
-								"start": 704,
-								"end": 712
+								"start": 864,
+								"end": 872
 							}
 						]
 					},
 					"params": [
 						{
 							"type": "Identifier",
-							"start": 713,
-							"end": 717,
+							"start": 873,
+							"end": 877,
 							"name": "p",
 							"typeAnnotation": {
 								"type": "TSTypeAnnotation",
-								"start": 714,
-								"end": 717,
+								"start": 874,
+								"end": 877,
 								"typeAnnotation": {
 									"type": "TSTypeReference",
-									"start": 716,
-									"end": 717,
+									"start": 876,
+									"end": 877,
 									"typeName": {
 										"type": "Identifier",
-										"start": 716,
-										"end": 717,
+										"start": 876,
+										"end": 877,
 										"name": "T"
 									}
 								}
@@ -780,17 +922,17 @@
 					],
 					"body": {
 						"type": "BlockStatement",
-						"start": 719,
-						"end": 735,
+						"start": 879,
+						"end": 895,
 						"body": [
 							{
 								"type": "ReturnStatement",
-								"start": 723,
-								"end": 732,
+								"start": 883,
+								"end": 892,
 								"argument": {
 									"type": "Identifier",
-									"start": 730,
-									"end": 731,
+									"start": 890,
+									"end": 891,
 									"name": "p"
 								}
 							}
@@ -800,8 +942,8 @@
 						{
 							"type": "Line",
 							"value": " a block comment does not end its line, so it stays inline",
-							"start": 626,
-							"end": 686
+							"start": 786,
+							"end": 846
 						}
 					]
 				}

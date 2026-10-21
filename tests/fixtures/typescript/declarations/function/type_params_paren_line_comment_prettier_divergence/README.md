@@ -25,6 +25,11 @@ method it lands **after the body's `{`** — and prettier is not idempotent ther
 a second pass moving it again onto its own line inside the body (pinned by
 `audit_signature.txt`). tsv gives all four spellings one answer.
 
+An arrow passed as a call's last argument (c10) keeps the comment in the same
+place, and the call breaks its arguments rather than hug the callback: the line
+comment ends the signature's first line, so there is no flat signature to hug.
+Prettier breaks the call too, with the comment moved inside the parens as above.
+
 The same gap's **block** comment is already preserved in place by tsv in every
 spelling, so this makes the line comment agree with its own sibling rather than
 introducing a new rule.

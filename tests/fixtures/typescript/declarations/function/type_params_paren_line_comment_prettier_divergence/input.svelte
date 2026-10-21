@@ -33,6 +33,15 @@
 		/* c8 */
 		(p: T) => p;
 
+	// a callback argument keeps it too, and the call breaks rather than hug a signature it opens
+	f(
+		x,
+		<T extends A> // c10
+			(p: T) => {
+			g(p);
+		}
+	);
+
 	// a block comment does not end its line, so it stays inline
 	function fn2<T> /* c9 */(p: T) {
 		return p;
