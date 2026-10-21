@@ -525,9 +525,16 @@ impl Printer<'_> {
     /// group; the others (`w().f…`, `this.w().f…`) are a known residual, which prettier
     /// settles on the hug as well. The type argument is the mapped type itself: one in a
     /// redundant paren shell prints its `<…>` another way.
+    ///
+    /// `gap_comment_free` is the caller's half of the comment gate — the gaps around the
+    /// value its own seam prints. Every test here is a pure read, so their order is free,
+    /// and they run cheapest-and-rarest first: the value's shape and its sole mapped type
+    /// argument, which almost no value has, ahead of the caller's comment reads, the
+    /// callee walk, and the value's own comment read.
     pub(in crate::printer) fn mapped_type_arg_hug(
         &self,
         value: &Expression<'_>,
+        gap_comment_free: impl FnOnce() -> bool,
     ) -> Option<MappedTypeArgHug> {
         let mut core = value;
         let mut awaited = false;
@@ -542,13 +549,13 @@ impl Printer<'_> {
                 _ => return None,
             }
         };
-        if call.optional || chain_has_calls(call.callee) {
-            return None;
-        }
         let type_args = call.type_arguments.as_ref()?;
         let [internal::TSType::Mapped(mapped)] = type_args.params else {
             return None;
         };
+        if !gap_comment_free() || call.optional || chain_has_calls(call.callee) {
+            return None;
+        }
         // An authored break after the mapped type's `{` needs no guard of its own: it puts a
         // newline in the `<…>` and makes its doc break, so the type arguments read complex
         // and the call is not poorly breakable.
@@ -1416,16 +1423,17 @@ impl<'a> Printer<'a> {
                 // ([`MappedTypeArgHug`]). Comment-free by its own gate, so the value it
                 // rebuilds is the plain one.
                 let value_span = right_expr.span();
-                let comment_free = gap_comments.is_none()
-                    && rhs_info.gap.is_none_or(|gap| {
-                        !self.has_comments_on_page_between(gap.start, value_span.start)
-                    })
-                    && rhs_info.boundary.is_none_or(|boundary| {
-                        !self.has_comments_on_page_between(value_span.end, boundary)
-                    });
-                let tail = comment_free
-                    .then(|| self.mapped_type_arg_hug(right_expr))
-                    .flatten()
+                let comment_free = || {
+                    gap_comments.is_none()
+                        && rhs_info.gap.is_none_or(|gap| {
+                            !self.has_comments_on_page_between(gap.start, value_span.start)
+                        })
+                        && rhs_info.boundary.is_none_or(|boundary| {
+                            !self.has_comments_on_page_between(value_span.end, boundary)
+                        })
+                };
+                let tail = self
+                    .mapped_type_arg_hug(right_expr, comment_free)
                     .map(|hug| {
                         self.build_mapped_type_arg_hug_tail(&hug, right_doc_with_comments, || {
                             build_right(None)

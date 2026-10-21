@@ -650,9 +650,8 @@ impl<'a> Printer<'a> {
             // (`MappedTypeArgHug`, shared with `build_assignment_layout`). Its gate refuses
             // any comment in the value, and the gap's are refused here, so the rebuilt value
             // carries nothing `make_init_doc` would add.
-            let hug = (!has_comments_after_eq && gap_comments.is_none())
-                .then(|| self.mapped_type_arg_hug(init))
-                .flatten();
+            let hug =
+                self.mapped_type_arg_hug(init, || !has_comments_after_eq && gap_comments.is_none());
             parts.push(match hug {
                 Some(hug) => {
                     self.build_mapped_type_arg_hug_tail(&hug, init_doc, || make_init_doc(value()))
