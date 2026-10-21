@@ -361,16 +361,29 @@ pub(in crate::printer) fn arrow_signature_has_breaking_comments(
     // `fn(x, <⏎// c⏎T>(a: T) => {…})` onto the callee's line in every spelling.
     // An unparenthesized `x => …` has no `(` either, so the region then opens at the arrow
     // node itself — which still catches `x /* a⏎b */ => y`.
+    let signature_start = arrow.type_parameters.as_ref().map_or_else(
+        || arrow.params_start.unwrap_or(span.start),
+        |type_params| type_params.span.start,
+    );
+    // Zero-comment gate: both disjuncts below read comments inside `[signature_start, body)`,
+    // so with no comment on page there neither can fire, and the `)` scans that locate their
+    // regions are skipped. The signature region `[start, arrow_token)` opens at or after
+    // `signature_start` — at it with parameters, and past the `(` (itself at or after the type
+    // parameters) without, since only a parenthesized list can be empty — and ends at the `=>`,
+    // before the body; the trailing-parameter region `[last parameter's end, params end)` sits
+    // inside the list, its end found by a scan bounded by the body's start. A comment yielded
+    // by either walk lies inside the window, and the window's walk meets it or an earlier one;
+    // the trailing walk is to-emit, a subset of on-page, which counts an owned comment too.
+    if !printer.has_comments_on_page_between(signature_start, arrow.body.span().start) {
+        return false;
+    }
     let start = if arrow.params.is_empty() {
         arrow
             .params_start
             .and_then(|open| printer.find_closing_paren(open, arrow.arrow_token))
             .unwrap_or(arrow.arrow_token)
     } else {
-        arrow.type_parameters.as_ref().map_or_else(
-            || arrow.params_start.unwrap_or(span.start),
-            |type_params| type_params.span.start,
-        )
+        signature_start
     };
     printer.range_has_layout_stable_break_forcing_comment(start, arrow.arrow_token)
         || printer.arrow_trailing_param_comment_forces_break(arrow)
@@ -403,6 +416,14 @@ pub(in crate::printer) fn function_signature_has_breaking_comments(
     printer: &Printer<'_>,
     func: &internal::FunctionExpression<'_>,
 ) -> bool {
+    // Zero-comment gate, as for the arrow: both regions below lie inside
+    // `[params_start, body)` — the parameter-list region ends at or before the body (at the
+    // return type or the body itself), and the trailing-parameter region runs from the last
+    // parameter's end to a `)` found by a scan bounded by the body's start — so with no
+    // comment on page there neither fires, and the `)` scan is skipped.
+    if !printer.has_comments_on_page_between(func.params_start, func.body.span.start) {
+        return false;
+    }
     let end = if func.params.is_empty() {
         func.params_start
     } else {
