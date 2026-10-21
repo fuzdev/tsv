@@ -1479,6 +1479,12 @@ fn is_same_line_scan_capped(
     if !table.lf_only {
         return is_same_line_table(breaks, prev_end, curr_start);
     }
+    // The commonest "no": a range opening on its line's own `\n` — an item or comment
+    // ending its line. The table is the set of `\n` positions here, so that byte is the
+    // break the scan below would find first, and asking it is cheaper than the scan's setup.
+    if bytes.get(prev_end as usize) == Some(&b'\n') {
+        return false;
+    }
     match lf_count_in(bytes, prev_end as usize, curr_start as usize, cap, 1) {
         Some(found) => found == 0,
         None => is_same_line_table(breaks, prev_end, curr_start),
