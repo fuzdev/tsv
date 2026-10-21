@@ -468,12 +468,9 @@ fn arrow_signature_will_break(
     let unforced = if arrow.body.is_expression() {
         None
     } else {
-        sole_param_object_type_start(
-            printer,
-            arrow.params,
-            arrow.params_start,
-            printer.arrow_params_end(arrow),
-        )
+        sole_param_object_type_start(printer, arrow.params, arrow.params_start, || {
+            printer.arrow_params_end(arrow)
+        })
     };
     printer.ask_signature_params(unforced, || {
         d.will_break(printer.build_arrow_params_doc_ungrouped(arrow, span))
@@ -561,31 +558,38 @@ fn sole_param_object_type_start(
     printer: &Printer<'_>,
     params: &[internal::Expression<'_>],
     open: Option<u32>,
-    close: Option<u32>,
+    close: impl FnOnce() -> Option<u32>,
 ) -> Option<u32> {
     sole_param_object_type(printer, params, open, close).map(|literal| literal.span.start)
 }
 
 /// The literal [`sole_param_object_type_start`] names, as the node.
+///
+/// The annotation's shape is read first and the hug's gap and directive reads only for a
+/// list it admits, so `close` — the list's `)`, a source scan for most callers — is located
+/// only then. Both halves are pure reads, so the order is free.
 fn sole_param_object_type<'a>(
     printer: &Printer<'_>,
     params: &'a [internal::Expression<'a>],
     open: Option<u32>,
-    close: Option<u32>,
+    close: impl FnOnce() -> Option<u32>,
 ) -> Option<&'a internal::TSTypeLiteral<'a>> {
-    if !printer.hugs_sole_parameter(params, open, close, true) {
+    let [param] = params else {
         return None;
-    }
-    let annotation = match &params[0].kind {
+    };
+    let annotation = match &param.kind {
         internal::ExpressionKind::Identifier(id) => id.type_annotation(),
         internal::ExpressionKind::ObjectPattern(pattern) => pattern.type_annotation.as_ref(),
         internal::ExpressionKind::ArrayPattern(pattern) => pattern.type_annotation.as_ref(),
         _ => None,
     }?;
-    match unwrap_parenthesized(annotation.type_annotation) {
-        internal::TSType::TypeLiteral(literal) => Some(literal),
-        _ => None,
-    }
+    let internal::TSType::TypeLiteral(literal) = unwrap_parenthesized(annotation.type_annotation)
+    else {
+        return None;
+    };
+    printer
+        .hugs_sole_parameter(params, open, close(), true)
+        .then_some(literal)
 }
 
 /// A block-bodied callback argument whose hugged sole parameter's object type
@@ -657,20 +661,19 @@ pub(in crate::printer) fn flat_sole_param_literal<'a>(
             let internal::ArrowFunctionBody::BlockStatement(body) = &arrow.body else {
                 return None;
             };
-            let literal = sole_param_object_type(
-                printer,
-                arrow.params,
-                arrow.params_start,
-                printer.arrow_params_end(arrow),
-            )?;
+            let literal =
+                sole_param_object_type(printer, arrow.params, arrow.params_start, || {
+                    printer.arrow_params_end(arrow)
+                })?;
             (literal, body, true, None)
         }
         internal::ExpressionKind::FunctionExpression(func) => {
-            let close = printer
-                .find_closing_paren(func.params_start, func.body.span.start)
-                .map(|after_paren| after_paren - 1);
             let literal =
-                sole_param_object_type(printer, func.params, Some(func.params_start), close)?;
+                sole_param_object_type(printer, func.params, Some(func.params_start), || {
+                    printer
+                        .find_closing_paren(func.params_start, func.body.span.start)
+                        .map(|after_paren| after_paren - 1)
+                })?;
             (literal, &func.body, false, function_return_type_break(func))
         }
         _ => return None,
@@ -748,7 +751,7 @@ fn function_signature_refuses_hug(
         .find_closing_paren(func.params_start, func.body.span.start)
         .map(|after_paren| after_paren - 1);
     let unforced =
-        sole_param_object_type_start(printer, func.params, Some(func.params_start), close);
+        sole_param_object_type_start(printer, func.params, Some(func.params_start), || close);
     printer.ask_signature_params(unforced, || {
         printer
             .d()
