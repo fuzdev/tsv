@@ -1285,10 +1285,12 @@ fn render_doc_core<P: RenderPolicy>(
                             // Try each earlier state flat, in order; the final
                             // state is the Break fallback (`states` is non-empty
                             // — the `!expanded_states.is_empty()` guard above).
+                            // The fallback is a pure read of `nodes` and `states`,
+                            // which the loop leaves alone, so it is resolved only
+                            // when no state fits.
                             let states = expanded_states.resolve(children_vec);
                             let last = states.len() - 1;
-                            let mut chosen =
-                                (Mode::Break, fallback_group_state(nodes, contents, states));
+                            let mut chosen = None;
                             for &state in &states[..last] {
                                 // A gated state whose probe fits is inadmissible —
                                 // see `admissible_group_state`.
@@ -1311,11 +1313,13 @@ fn render_doc_core<P: RenderPolicy>(
                                 );
                                 if state_fits {
                                     *should_remeasure = false;
-                                    chosen = (Mode::Flat, state);
+                                    chosen = Some((Mode::Flat, state));
                                     break;
                                 }
                             }
-                            chosen
+                            chosen.unwrap_or_else(|| {
+                                (Mode::Break, fallback_group_state(nodes, contents, states))
+                            })
                         }
                     }
                 } else if should_break || arena.will_break(contents) {
