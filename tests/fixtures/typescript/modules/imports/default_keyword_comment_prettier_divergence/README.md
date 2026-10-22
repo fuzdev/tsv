@@ -17,6 +17,8 @@ import // c5
 Quux from './e';
 import type // c6
 Corge from './f';
+import type // c7
+type from './g';
 ```
 
 **tsv**: preserves each comment where the user placed it; a line comment forces the
@@ -33,13 +35,16 @@ import // c5
 	Quux from './e';
 import type // c6
 	Corge from './f';
+import type // c7
+	type from './g';
 ```
 
-The block `import`→`type` gap (c2) diverges on position. The three line comments
-(c4, c5, c6) diverge on indentation — tsv indents the continuation one level where
-Prettier keeps it flat (an indent-only divergence). The block `import`→binding (c1)
-and `type`→binding (c3) positions are dual-stable (both formatters keep them). Per
-Comment Position Philosophy. Sibling of the empty/named
-`type_keyword_comment_prettier_divergence` fixtures.
+The block `import`→`type` gap (c2) diverges on position. The line comments (c4, c5,
+c6, c7) diverge on indentation — tsv indents the continuation one level where Prettier
+keeps it flat (an indent-only divergence). c7's binding is itself named `type`; the
+header's `type` is found by its own token, so the comment ahead of the binding
+is kept. The block `import`→binding (c1) and `type`→binding (c3) positions are
+dual-stable (both formatters keep them). Per Comment Position Philosophy. Sibling of
+the empty/named `type_keyword_comment_prettier_divergence` fixtures.
 
 See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

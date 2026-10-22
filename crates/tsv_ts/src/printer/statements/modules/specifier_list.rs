@@ -185,10 +185,19 @@ impl<'a> Printer<'a> {
     /// comment in the `import`/`export`→`type` gap doesn't throw off the offset),
     /// else after the 6-char `import`/`export`. `search_end` bounds the `type`
     /// scan. Shared by [`Self::import_header_end`] and [`Self::export_header_end`].
+    ///
+    /// The scan runs FORWARD from past `import`/`export`: the `type` modifier is the
+    /// first token there, while the binding after it may itself be spelled `type`
+    /// (`import type /* c */ type from 'x'`), so the last `type` in the window is not
+    /// necessarily the keyword. Landing on the binding would put the header end past the
+    /// keyword→binding gap and drop a comment in it. This is the probe the header's own
+    /// keyword emitter uses, so the offset and the printed keyword agree.
     fn module_header_end(&self, is_type: bool, span_start: u32, search_end: u32) -> u32 {
         if is_type {
-            self.find_keyword_end("type", span_start, search_end)
-                .unwrap_or(span_start + MODULE_TYPE_KW_LEN)
+            self.find_keyword_in_range(span_start + MODULE_KW_LEN, search_end, "type")
+                .map_or(span_start + MODULE_TYPE_KW_LEN, |start| {
+                    start + "type".len() as u32
+                })
         } else {
             span_start + MODULE_KW_LEN
         }

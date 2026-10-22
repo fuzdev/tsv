@@ -22,4 +22,8 @@
 	// line comment between type keyword and namespace star
 	import type // c7
 		* as ns7 from './g';
+
+	// line comment between type keyword and a namespace binding named `type`
+	import type // c8
+		* as type from './h';
 </script>

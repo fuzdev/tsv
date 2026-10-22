@@ -1,0 +1,173 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 300,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " block comment between the type keyword and a default binding named `type`",
+			"start": 20,
+			"end": 96
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 110,
+			"end": 118
+		},
+		{
+			"type": "Line",
+			"value": " block comment between the type keyword and a namespace binding named `type`",
+			"start": 163,
+			"end": 241
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 256,
+			"end": 264
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 299,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 290,
+			"body": [
+				{
+					"type": "ImportDeclaration",
+					"start": 98,
+					"end": 135,
+					"importKind": "type",
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 119,
+							"end": 123,
+							"local": {
+								"type": "Identifier",
+								"start": 119,
+								"end": 123,
+								"name": "type"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c1 ",
+									"start": 110,
+									"end": 118
+								}
+							]
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 129,
+						"end": 134,
+						"value": "./a",
+						"raw": "'./a'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment between the type keyword and a default binding named `type`",
+							"start": 20,
+							"end": 96
+						}
+					]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 138,
+					"end": 289,
+					"id": {
+						"type": "Literal",
+						"start": 153,
+						"end": 158,
+						"value": "./m",
+						"raw": "'./m'"
+					},
+					"body": {
+						"type": "TSModuleBlock",
+						"start": 159,
+						"end": 289,
+						"body": [
+							{
+								"type": "ImportDeclaration",
+								"start": 244,
+								"end": 286,
+								"importKind": "type",
+								"specifiers": [
+									{
+										"type": "ImportNamespaceSpecifier",
+										"start": 265,
+										"end": 274,
+										"local": {
+											"type": "Identifier",
+											"start": 270,
+											"end": 274,
+											"name": "type"
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c2 ",
+												"start": 256,
+												"end": 264
+											}
+										]
+									}
+								],
+								"source": {
+									"type": "Literal",
+									"start": 280,
+									"end": 285,
+									"value": "./b",
+									"raw": "'./b'"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " block comment between the type keyword and a namespace binding named `type`",
+										"start": 163,
+										"end": 241
+									}
+								]
+							}
+						]
+					},
+					"declare": true
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

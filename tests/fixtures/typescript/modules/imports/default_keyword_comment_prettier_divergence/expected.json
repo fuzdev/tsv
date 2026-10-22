@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 555,
+	"end": 667,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -81,17 +81,29 @@
 			"value": " c6",
 			"start": 519,
 			"end": 524
+		},
+		{
+			"type": "Line",
+			"value": " line comment between type keyword and a default binding named `type`",
+			"start": 547,
+			"end": 618
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 632,
+			"end": 637
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 554,
+		"end": 666,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 545,
+			"end": 657,
 			"body": [
 				{
 					"type": "ImportDeclaration",
@@ -342,6 +354,48 @@
 							"value": " line comment between type keyword and default binding",
 							"start": 449,
 							"end": 505
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 620,
+					"end": 656,
+					"importKind": "type",
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 640,
+							"end": 644,
+							"local": {
+								"type": "Identifier",
+								"start": 640,
+								"end": 644,
+								"name": "type"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c7",
+									"start": 632,
+									"end": 637
+								}
+							]
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 650,
+						"end": 655,
+						"value": "./g",
+						"raw": "'./g'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment between type keyword and a default binding named `type`",
+							"start": 547,
+							"end": 618
 						}
 					]
 				}

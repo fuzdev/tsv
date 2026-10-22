@@ -19,4 +19,8 @@
 	// line comment between type keyword and default binding
 	import type // c6
 		Corge from './f';
+
+	// line comment between type keyword and a default binding named `type`
+	import type // c7
+		type from './g';
 </script>

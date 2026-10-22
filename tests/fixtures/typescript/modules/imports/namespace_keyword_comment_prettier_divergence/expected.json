@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 659,
+	"end": 778,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -93,17 +93,29 @@
 			"value": " c7",
 			"start": 620,
 			"end": 625
+		},
+		{
+			"type": "Line",
+			"value": " line comment between type keyword and a namespace binding named `type`",
+			"start": 651,
+			"end": 724
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 738,
+			"end": 743
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 658,
+		"end": 777,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 649,
+			"end": 768,
 			"body": [
 				{
 					"type": "ImportDeclaration",
@@ -396,6 +408,48 @@
 							"value": " line comment between type keyword and namespace star",
 							"start": 551,
 							"end": 606
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 726,
+					"end": 767,
+					"importKind": "type",
+					"specifiers": [
+						{
+							"type": "ImportNamespaceSpecifier",
+							"start": 746,
+							"end": 755,
+							"local": {
+								"type": "Identifier",
+								"start": 751,
+								"end": 755,
+								"name": "type"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c8",
+									"start": 738,
+									"end": 743
+								}
+							]
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 761,
+						"end": 766,
+						"value": "./h",
+						"raw": "'./h'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment between type keyword and a namespace binding named `type`",
+							"start": 651,
+							"end": 724
 						}
 					]
 				}

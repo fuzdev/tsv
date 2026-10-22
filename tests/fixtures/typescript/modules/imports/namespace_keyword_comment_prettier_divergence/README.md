@@ -19,6 +19,8 @@ import // c6
 * as ns6 from './f';
 import type // c7
 * as ns7 from './g';
+import type // c8
+* as type from './h';
 ```
 
 **tsv**: preserves each comment where the user placed it; a line comment forces the
@@ -36,12 +38,16 @@ import // c6
 	* as ns6 from './f';
 import type // c7
 	* as ns7 from './g';
+import type // c8
+	* as type from './h';
 ```
 
 The block `import`→`type` (c2) and `*`→`as` (c5) gaps diverge on position — prettier
-relocates the former to after `type`, the latter to after `as`. The line comments
-(c4, c6, c7) diverge on indentation — tsv indents the continuation one level where
-Prettier keeps it flat. The block `import`→`*` (c1) and `type`→`*` (c3) positions are
-dual-stable (both formatters keep them). Per Comment Position Philosophy.
+relocates the former to after `type`, the latter to after `as`. The line comments (c4,
+c6, c7, c8) diverge on indentation — tsv indents the continuation one level where
+Prettier keeps it flat. c8's binding is itself named `type`; the header's `type` is
+found by its own token, so the comment ahead of the binding is kept. The block
+`import`→`*` (c1) and `type`→`*` (c3) positions are dual-stable (both formatters keep
+them). Per Comment Position Philosophy.
 
 See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.
