@@ -317,8 +317,10 @@ export const SVELTE_STYLES_BLOCKS_PIN = 615;
  * tier, or a broken filter; `refusals` moves with the snapshot, or with a verdict change on
  * both sides at once (a ts-blank-space bump), the one move the per-file agreement cannot
  * see. Measured over ../corpora `collections/`, ts-blank-space 0.9.0.
+ *
+ * files 4852 → 4844: fuz_mastodon leaves the corpus, taking its 8 strippable files.
  */
-export const STRIP_CORPUS_PINS = { files: 4852, refusals: 175 };
+export const STRIP_CORPUS_PINS = { files: 4844, refusals: 175 };
 
 /**
  * bench:harvest:wpt — exact `<style>` blocks from the default `../wpt/css`. Measured
