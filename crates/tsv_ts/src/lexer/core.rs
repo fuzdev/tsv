@@ -1718,7 +1718,7 @@ impl<'a> Lexer<'a> {
             // `#!`: a hashbang comment at the start of the file, read until end of line
             // ([`Lexer::hashbang_at`]); anywhere else the `#` of a private name.
             b'#' => {
-                debug_assert!(self.byte_ahead(1) == Some(b'!'));
+                debug_assert_eq!(self.byte_ahead(1), Some(b'!'));
                 if self.hashbang_at(start) {
                     self.read_hashbang_into(start, dst)
                 } else {

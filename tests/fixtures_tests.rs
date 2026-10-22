@@ -33,9 +33,7 @@ async fn test_all_fixtures() {
             The Deno sidecar is required for fixture validation.\n\
             All {} fixture tests would fail without it.",
             e.hint(),
-            fixtures::walk_fixtures(fixtures_dir)
-                .map(|f| f.len())
-                .unwrap_or(0)
+            fixtures::walk_fixtures(fixtures_dir).map_or(0, |f| f.len())
         );
     }
 

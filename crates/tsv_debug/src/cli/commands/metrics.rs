@@ -208,9 +208,7 @@ fn classify_phase(crate_name: &str, file_path: &Path, src_dir: &Path) -> String 
 
 /// Count lines in a file
 fn count_lines(path: &Path) -> usize {
-    std::fs::read_to_string(path)
-        .map(|s| s.lines().count())
-        .unwrap_or(0)
+    std::fs::read_to_string(path).map_or(0, |s| s.lines().count())
 }
 
 /// Find the crates/ directory by walking up from the current directory

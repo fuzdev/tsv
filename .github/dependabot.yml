@@ -1,7 +1,6 @@
 # Keeps the SHA-pinned actions in .github/workflows/ current: Dependabot opens
 # PRs that bump each pin *and* rewrite its `# vX.Y.Z` comment, so pinning stays
-# maintainable instead of silently rotting. (dtolnay/rust-toolchain is pinned to
-# a branch SHA with no semver tags, so it can't be auto-bumped — update manually.)
+# maintainable instead of silently rotting.
 
 version: 2
 updates:

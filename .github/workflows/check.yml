@@ -64,15 +64,18 @@ jobs:
         with:
           persist-credentials: false
 
-      # Pinned, not `stable`: the workspace runs clippy::nursery at warn and the
-      # `lint` task denies warnings, so a floating toolchain would fail CI
-      # whenever a new Rust release adds a nursery lint. Edition 2024 needs
-      # >= 1.85. Bump deliberately.
+      # The toolchain is pinned in rust-toolchain.toml, not `stable`: the
+      # workspace runs clippy::nursery at warn and the `lint` task denies
+      # warnings, so a floating toolchain would fail CI whenever a new Rust
+      # release adds a nursery lint. Bump the file deliberately. The runner's
+      # preinstalled rustup installs that toolchain with its components and the
+      # wasm target; any rustup 1.28+ reads the file with no arguments, so skip
+      # self-updating it.
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master (no semver tags; bump manually)
-        with:
-          toolchain: 1.94.1
-          components: clippy, rustfmt
+        run: |
+          rustup toolchain install --no-self-update
+          rustup show active-toolchain
+          cargo --version
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
 
@@ -136,11 +139,12 @@ jobs:
         with:
           persist-credentials: false
 
+      # Installs the toolchain pinned in rust-toolchain.toml (see `check`), the
+      # wasm target with it.
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master (no semver tags; bump manually)
-        with:
-          toolchain: 1.94.1
-          targets: wasm32-unknown-unknown
+        run: |
+          rustup toolchain install --no-self-update
+          rustup show active-toolchain
 
       # Caches the wasm32 dependency builds across runs (keyed on Cargo.lock).
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
@@ -251,11 +255,13 @@ jobs:
         with:
           persist-credentials: false
 
-      # Same pin as `check`; no clippy/rustfmt components — lints gate on ubuntu.
+      # Installs the toolchain pinned in rust-toolchain.toml (see `check`); its
+      # clippy/rustfmt components ride along, but lints gate on ubuntu.
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master (no semver tags; bump manually)
-        with:
-          toolchain: 1.94.1
+        shell: bash
+        run: |
+          rustup toolchain install --no-self-update
+          rustup show active-toolchain
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
 

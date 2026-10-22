@@ -247,7 +247,7 @@ fn contains_rewrite_target(
         ExpressionKind::UnaryExpression(u) => contains(u.argument),
         ExpressionKind::SequenceExpression(s) => s.expressions.iter().copied().any(&contains),
         ExpressionKind::SpreadElement(s) => contains(s.argument),
-        ExpressionKind::ArrayExpression(a) => a.elements.iter().any(|e| e.is_some_and(&contains)),
+        ExpressionKind::ArrayExpression(a) => a.elements.iter().any(|e| e.is_some_and(contains)),
         ExpressionKind::TemplateLiteral(t) => t.expressions.iter().copied().any(&contains),
         _ => false,
     }

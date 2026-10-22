@@ -927,7 +927,7 @@ fn audit_file(path: &Path, tally: &mut Tally) {
         // indent, which `source[line_start..start]` already carries), then the perturbed node.
         let indent_end = source[cand.line_start..cand.start]
             .find(|c: char| !c.is_whitespace())
-            .map_or(cand.start - cand.line_start, |off| off);
+            .unwrap_or(cand.start - cand.line_start);
         let indent = &source[cand.line_start..cand.line_start + indent_end];
         mutant.clear();
         mutant.push_str(&source[..cand.line_start]);

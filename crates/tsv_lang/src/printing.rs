@@ -1261,10 +1261,8 @@ fn classify_at(bytes: &[u8], at: usize, found: &mut Terminators) -> bool {
                 found.first_cr = Some(at);
             }
         }
-        LINE_SEPARATOR_LEAD => {
-            if line_terminator_len(bytes, at).is_some() {
-                found.holds_separator = true;
-            }
+        LINE_SEPARATOR_LEAD if line_terminator_len(bytes, at).is_some() => {
+            found.holds_separator = true;
         }
         _ => {}
     }

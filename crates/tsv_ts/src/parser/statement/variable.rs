@@ -80,7 +80,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// ([`VariableDeclarationKind::words`]); the caller has already recognized them.
     fn eat_declaration_keyword(&mut self, kind: VariableDeclarationKind) -> Result<(), ParseError> {
         for word in kind.words() {
-            debug_assert!(self.current_value() == *word);
+            debug_assert_eq!(self.current_value(), *word);
             self.advance()?;
         }
         Ok(())

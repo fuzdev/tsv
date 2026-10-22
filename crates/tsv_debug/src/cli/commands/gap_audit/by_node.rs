@@ -138,7 +138,7 @@ pub(super) fn compute_by_node(total: &Tally) -> ByNodeRollup {
 
 /// `n/d` as a whole-percent, `0` when `d == 0` — the human view's share formatter.
 fn pct_of(n: usize, d: usize) -> usize {
-    if d > 0 { n * 100 / d } else { 0 }
+    (n * 100).checked_div(d).unwrap_or(0)
 }
 
 /// `n/d` as a fraction rounded to four decimals, `0.0` when `d == 0` — the JSON view's share.
@@ -267,7 +267,7 @@ pub(super) fn report_by_node(rollup: &ByNodeRollup, json: bool) {
 /// they're not unified — a fourth caller would be the moment to parameterize rather than add a
 /// fourth.
 fn tenths_pct(n: usize, d: usize) -> String {
-    let permille = if d > 0 { n * 1000 / d } else { 0 };
+    let permille = (n * 1000).checked_div(d).unwrap_or(0);
     format!("{}.{}", permille / 10, permille % 10)
 }
 

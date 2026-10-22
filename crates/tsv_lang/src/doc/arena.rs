@@ -5090,7 +5090,7 @@ mod pooled_text_width_tests {
         ] {
             let ascii = "a".repeat(len);
             assert_agrees(&ascii);
-            assert!(pooled_text_width(&ascii) & TEXT_WIDTH_NEWLINE_FLAG == 0);
+            assert_eq!(pooled_text_width(&ascii) & TEXT_WIDTH_NEWLINE_FLAG, 0);
             // Tabs multiply the width, so a far shorter run also clamps.
             let tabs = "\t".repeat(len);
             assert_agrees(&tabs);
@@ -5328,7 +5328,7 @@ mod source_span_width_tests {
         for special in SPECIALS {
             for tail in 0..9usize {
                 for len in 0..=12usize {
-                    let host = format!("{}{}{}", "x".repeat(len), special, "y".repeat(tail),);
+                    let host = format!("{}{}{}", "x".repeat(len), special, "y".repeat(tail));
                     let host_len = host.len();
                     // Every span that reaches into the last word, including the empty
                     // one at the very end.

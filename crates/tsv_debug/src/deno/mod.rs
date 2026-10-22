@@ -76,9 +76,7 @@ pub fn set_pool_size(n: usize) {
 /// `buffer_unordered` / `buffered` stream. Centralizes the size-pool-then-fan-out
 /// ordering that every bulk command needs.
 pub fn init_bulk_pool() -> usize {
-    let concurrency = std::thread::available_parallelism()
-        .map(std::num::NonZero::get)
-        .unwrap_or(4);
+    let concurrency = std::thread::available_parallelism().map_or(4, std::num::NonZero::get);
     set_pool_size(bulk_pool_size(concurrency));
     concurrency
 }

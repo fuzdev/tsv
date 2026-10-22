@@ -378,6 +378,10 @@ fn any_byte_has(bytes: &[u8], bit: u8) -> bool {
             .iter()
             .fold(0u8, |seen, &b| seen | BOUNDARY_BITS[b as usize])
     };
+    #[expect(
+        clippy::chunks_exact_to_as_chunks,
+        reason = "the unrolled 8-byte chunk loop (see the doc comment) is measured codegen; moving to `as_chunks` is a perf change to take with a measurement"
+    )]
     let mut chunks = bytes.chunks_exact(8);
     for chunk in &mut chunks {
         if fold(chunk) & bit != 0 {

@@ -1017,13 +1017,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // `if (block.catch)` and raises `block_duplicate_clause`. Without the guard the
         // assignment OVERWRITES, and the discarded fragment's markup is gone from the
         // AST: a formatter reprinting it would silently delete a branch of the document.
-        loop {
-            let Some(clause) = [AwaitClause::Then, AwaitClause::Catch]
-                .into_iter()
-                .find(|c| self.check_await_continuation(c.keyword()))
-            else {
-                break;
-            };
+        while let Some(clause) = [AwaitClause::Then, AwaitClause::Catch]
+            .into_iter()
+            .find(|c| self.check_await_continuation(c.keyword()))
+        {
             let slot = match clause {
                 AwaitClause::Then => &mut then_slot,
                 AwaitClause::Catch => &mut catch_slot,

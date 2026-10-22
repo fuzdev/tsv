@@ -1139,7 +1139,7 @@ impl<'a> Printer<'a> {
                 internal::ArrowFunctionBody::BlockStatement(_) => false,
             },
             // `yield AssignmentExpression[?In]`, `yield*` alike; a bare `yield` has none.
-            E::YieldExpression(yield_expr) => yield_expr.argument.is_some_and(&mut reaches),
+            E::YieldExpression(yield_expr) => yield_expr.argument.is_some_and(reaches),
             // `'a' in b as T` parses as a cast OVER the binary, so the `in` is the cast's
             // operand rather than the root.
             E::TSAsExpression(cast) => reaches(cast.expression),

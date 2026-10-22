@@ -23,7 +23,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let (start, _) = self.current_pos();
 
         // Consume 'type' contextual keyword
-        debug_assert!(self.current_value() == "type");
+        debug_assert_eq!(self.current_value(), "type");
         self.advance()?;
 
         self.parse_type_alias_declaration_body(start, false)
@@ -35,7 +35,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         start: usize,
     ) -> Result<Statement<'arena>, ParseError> {
         // Consume 'type' contextual keyword
-        debug_assert!(self.current_value() == "type");
+        debug_assert_eq!(self.current_value(), "type");
         self.advance()?;
 
         self.parse_type_alias_declaration_body(start, true)
@@ -123,7 +123,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         declare: bool,
     ) -> Result<TSInterfaceDeclaration<'arena>, ParseError> {
         // Consume 'interface' contextual keyword
-        debug_assert!(self.current_value() == "interface");
+        debug_assert_eq!(self.current_value(), "interface");
         self.advance()?;
 
         // Parse interface name — a `BindingIdentifier`, so contextual type keywords
@@ -250,7 +250,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let start = self.current_pos().0;
 
         // Consume 'declare' contextual keyword
-        debug_assert!(self.current_value() == "declare");
+        debug_assert_eq!(self.current_value(), "declare");
         self.advance()?;
 
         // Everything under `declare` parses in ambient context (acorn/babel
@@ -874,7 +874,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         declare: bool,
     ) -> Result<Statement<'arena>, ParseError> {
         // Consume 'global' keyword
-        debug_assert!(self.current_value() == "global");
+        debug_assert_eq!(self.current_value(), "global");
         let (global_start, global_end) = self.current_pos();
         let name = self.current_ident_name();
         self.advance()?;

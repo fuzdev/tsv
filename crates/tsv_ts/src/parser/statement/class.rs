@@ -102,7 +102,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_abstract_class(&mut self) -> Result<Statement<'arena>, ParseError> {
         // Capture position of 'abstract' before consuming it
         let abstract_start = self.current_pos().0;
-        debug_assert!(self.current_value() == "abstract");
+        debug_assert_eq!(self.current_value(), "abstract");
         self.advance()?;
 
         if self.had_line_terminator {
@@ -415,7 +415,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let start = self.current_pos().0;
 
         // Consume '@'
-        debug_assert!(*self.current_kind() == TokenKind::At);
+        debug_assert_eq!(*self.current_kind(), TokenKind::At);
         self.advance()?;
 
         // Parse the decorator expression under the restricted ES decorators

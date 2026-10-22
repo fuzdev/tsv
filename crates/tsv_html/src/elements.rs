@@ -395,7 +395,7 @@ mod tests {
                 [
                     (*name).to_string(),
                     name.to_uppercase(), // a component-cased tag
-                    format!("{}{}", &name[..1].to_uppercase(), &name[1..]),
+                    format!("{}{}", name[..1].to_uppercase(), &name[1..]),
                     format!("{name}x"),                 // one byte longer
                     name[..name.len() - 1].to_string(), // one byte shorter
                     format!("x{name}"),                 // different first byte
@@ -586,7 +586,7 @@ mod tests {
                 [
                     (*name).to_string(),
                     name.to_uppercase(),
-                    format!("{}{}", &name[..1].to_uppercase(), &name[1..]),
+                    format!("{}{}", name[..1].to_uppercase(), &name[1..]),
                     format!("{name}x"),
                     name[..name.len() - 1].to_string(),
                     format!("x{name}"),

@@ -186,13 +186,11 @@ pub(crate) fn refuse_invalid_script_attributes(
                         return Err(unsupported(Refusal::ScriptInvalidContext));
                     }
                 }
-                "module" => {
-                    // The oracle's `attribute.value !== true` — a boolean carries no
-                    // value (`None`); any value (`Some(_)`, incl. an empty string)
-                    // refuses.
-                    if attr.value.is_some() {
-                        return Err(unsupported(Refusal::ScriptInvalidAttributeValue));
-                    }
+                // The oracle's `attribute.value !== true` — a boolean carries no
+                // value (`None`); any value (`Some(_)`, incl. an empty string)
+                // refuses.
+                "module" if attr.value.is_some() => {
+                    return Err(unsupported(Refusal::ScriptInvalidAttributeValue));
                 }
                 _ => {}
             }

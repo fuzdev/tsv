@@ -413,10 +413,7 @@ impl<'a> FlowBuilder<'a> {
     fn set_continue_target(&mut self, loop_node: NodeId, target: FlowNodeId) -> FlowNodeId {
         let mut node = loop_node;
         let mut i = self.active_label_list.len();
-        loop {
-            let Some(parent) = self.bound.parents[node.index()] else {
-                break;
-            };
+        while let Some(parent) = self.bound.parents[node.index()] {
             if self.bound.kinds[parent.index()] != NodeKind::LabeledStatement || i == 0 {
                 break;
             }
