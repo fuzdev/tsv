@@ -1483,6 +1483,14 @@ fn is_same_line_scan_capped(
     if bytes.get(prev_end as usize) == Some(&b'\n') {
         return false;
     }
+    // The next commonest: one byte (a `;`, `,` or closer) and then the line's `\n`. That
+    // `\n` is in the range exactly when the range reaches past the byte ahead of it, so it
+    // is a break the scan below would find, and the answer is the scan's. A range ending
+    // ON it (`curr_start == prev_end + 1`) holds only the first byte, ruled out above:
+    // same line.
+    if curr_start > prev_end + 1 && bytes.get(prev_end as usize + 1) == Some(&b'\n') {
+        return false;
+    }
     match lf_count_in(bytes, prev_end as usize, curr_start as usize, cap, 1) {
         Some(found) => found == 0,
         None => is_same_line_table(breaks, prev_end, curr_start),
