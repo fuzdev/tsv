@@ -305,8 +305,10 @@ export const TS_REPO_PINS = {
  * `.svelte` blocks with the snapshot's tree id unmoved (layercake, layerchart,
  * svelte-maplibre, svelte-ux and flowbite-svelte's `src/lib`; language-tools carries
  * none), the `lang="postcss"` blocks skipped.
+ *
+ * 619 → 615: fuz_mastodon leaves the bench, taking its 4 blocks.
  */
-export const SVELTE_STYLES_BLOCKS_PIN = 619;
+export const SVELTE_STYLES_BLOCKS_PIN = 615;
 
 /**
  * strip:corpus — exact counts over the strippable TypeScript of the `gates` view's snapshot
