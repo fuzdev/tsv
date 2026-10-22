@@ -13,6 +13,8 @@ Each `## Unreleased` section must be non-empty and carry a
 ## Unreleased
 <!-- bump: patch -->
 
+## 0.7.1
+
 - fix: formatting nested callbacks that follow another argument (`a(l, (x) => b(l, (y) => …))`)
   no longer takes time exponential in the nesting depth when the innermost body has a comment
 - fix: formatter output matches Prettier in more call, member chain, arrow and type layouts
