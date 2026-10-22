@@ -2,7 +2,7 @@
 # Exact per-source counts over the `gates` view; see docs/gate_counts.md.
 #
 # <row> <language> match=<n> known=<n> partial=<n> unknown=<n> errors=<n> expected_errors=<n>
-benches/js/.cache/svelte_styles css match=23 known=2 partial=0 unknown=0 errors=0 expected_errors=0
+benches/js/.cache/svelte_styles css match=22 known=2 partial=0 unknown=0 errors=0 expected_errors=0
 continue typescript match=940 known=11 partial=0 unknown=0 errors=0 expected_errors=0
 cosmicplayground svelte match=83 known=48 partial=0 unknown=0 errors=0 expected_errors=0
 cosmicplayground typescript match=82 known=2 partial=0 unknown=0 errors=0 expected_errors=0
