@@ -606,11 +606,18 @@ pub(in crate::printer) fn arrow_body_hugs_call_parens(body: &internal::Expressio
         || arg_predicates::is_ternary_arrow_body(body)
 }
 
-/// Check if callee is a member expression (used for chain detection)
+/// Whether a call's callee is memberish — a member expression or a `!` — so the call is a link
+/// of a member chain.
 ///
-/// Prettier's `isMemberish`, and the gate on BOTH of its chain decisions: the
-/// `printMemberChain` redirect here, and — in the linearizer's
-/// `mark_own_call_layout` — which of the chain's own calls that redirect swallowed.
+/// The gate on BOTH of the chain decisions: the `printMemberChain` redirect here, and — in the
+/// linearizer's `mark_own_call_layout` — which of the chain's own calls that redirect swallowed.
+///
+/// Prettier's `isMemberish` admits a member (or bind) expression; this one also takes a
+/// `TSNonNullExpression` on purpose, so a call on `fnnn!` stays a link of its chain, laid out as
+/// the same call without the `!` — prettier ends the chain at it
+/// (`docs/conformance_prettier_ts.md` §Non-null callee in a member chain). A `!` over a call
+/// (`fnnn(x)!(…)`) is a curried call instead, which [`Printer::build_call_doc`] routes ahead of
+/// the chain as it routes the same call without the `!` ([`callee_is_curried_member_chain_call`]).
 pub(in crate::printer) fn is_memberish(expr: &internal::Expression<'_>) -> bool {
     matches!(
         expr.kind,
@@ -636,6 +643,25 @@ fn curried_run_roots_in_member_chain(callee: &internal::CallExpression<'_>) -> b
         call = inner;
     }
     is_memberish(call.callee)
+}
+
+/// Whether a call on `callee` is a curried call on a member chain: `callee`, through any `!`
+/// over it, is a call whose run roots in a member chain ([`curried_run_roots_in_member_chain`]),
+/// as in `a.b().c(x)(y)` and `a.b().c(x)!(y)`.
+///
+/// Prettier's `isMemberish` takes no `TSNonNullExpression`, so a call on `c(x)!` reaches
+/// `printCallExpression`'s `group([callee, args])` exactly as a call on `c(x)` does: the member
+/// chain ends at the innermost call either way. tsv lays the two out alike — a `!` asserts a
+/// type and nothing else — which here is prettier's layout too.
+fn callee_is_curried_member_chain_call(callee: &internal::Expression<'_>) -> bool {
+    let mut callee = callee;
+    while let internal::ExpressionKind::TSNonNullExpression(non_null) = &callee.kind {
+        callee = non_null.expression;
+    }
+    matches!(
+        &callee.kind,
+        internal::ExpressionKind::CallExpression(inner) if curried_run_roots_in_member_chain(inner)
+    )
 }
 
 /// Whether `call`'s callee is a call taking more arguments than `call` does, and `call` takes
@@ -698,7 +724,7 @@ impl<'a> Printer<'a> {
     /// Whether the first call down `expr`'s object spine — through member objects and
     /// `!` operands — is one prettier prints whole rather than as a link of a member chain:
     /// a call taking the template bypass ([`Self::call_takes_template_bypass`]), or a curried
-    /// call whose run roots in a member chain ([`curried_run_roots_in_member_chain`]).
+    /// call on a member chain ([`callee_is_curried_member_chain_call`]).
     ///
     /// Prettier prints a member through `printMemberExpression` (`[print(object),
     /// lookup]`) and a `!` as `[print(expression), "!"]`; only a CALL reaches
@@ -725,12 +751,8 @@ impl<'a> Printer<'a> {
                 internal::ExpressionKind::MemberExpression(member) => member.object,
                 internal::ExpressionKind::TSNonNullExpression(non_null) => non_null.expression,
                 internal::ExpressionKind::CallExpression(call) => {
-                    if let internal::ExpressionKind::CallExpression(inner) = &call.callee.kind
-                        && curried_run_roots_in_member_chain(inner)
-                    {
-                        return true;
-                    }
-                    return self.call_takes_template_bypass(call, expr.span);
+                    return callee_is_curried_member_chain_call(call.callee)
+                        || self.call_takes_template_bypass(call, expr.span);
                 }
                 _ => return false,
             };
@@ -807,10 +829,9 @@ impl<'a> Printer<'a> {
         ))
     }
 
-    /// A curried call whose run roots in a member chain
-    /// ([`curried_run_roots_in_member_chain`]), as `printCallExpression` prints a call on a
-    /// call: `group([callee, args])`, the callee whole. The callee's chain is printed for this
-    /// call rather than as a statement's, so it takes no short-head merge (prettier's
+    /// A curried call on a member chain ([`callee_is_curried_member_chain_call`]), as
+    /// `printCallExpression` prints a call on a call: `group([callee, args])`, the callee
+    /// whole. The callee's chain is printed for this call rather than as a statement's, so it takes no short-head merge (prettier's
     /// `shouldMerge` reads `isExpressionStatement` off the chain's parent, which is this call);
     /// a callee taking more arguments than this call leaves its own list without a group
     /// ([`Printer::long_curried_target`], armed by the callee build).
@@ -843,6 +864,11 @@ impl<'a> Printer<'a> {
     /// Simple calls like `obj.method()` use the simple call path unless they have
     /// comments between member segments.
     pub(super) fn build_call_doc(&self, call: &internal::CallExpression<'_>, span: Span) -> DocId {
+        // A curried call on a member chain (`a.b().c(x)(y)`, `a.b().c(x)!(y)`) is not a link of
+        // that chain.
+        if callee_is_curried_member_chain_call(call.callee) {
+            return self.build_curried_member_chain_call_doc(call, span);
+        }
         // Curried call with callback pattern: fn()('arg', () => { ... })
         // When the callee is a simple call expression and the last argument is a
         // block function, use conditional_group to try inline first, then expand-all.
@@ -850,10 +876,6 @@ impl<'a> Printer<'a> {
         // Skip when the inner call has array/object args — those may force multiline,
         // and the chain formatter handles that correctly via group(oneLine).
         if let internal::ExpressionKind::CallExpression(inner) = &call.callee.kind {
-            // A curried call on a member chain (`a.b().c(x)(y)`) is not a link of that chain.
-            if curried_run_roots_in_member_chain(inner) {
-                return self.build_curried_member_chain_call_doc(call, span);
-            }
             let inner_has_multiline_arg = inner.arguments.iter().any(|arg| {
                 matches!(
                     arg.kind,
