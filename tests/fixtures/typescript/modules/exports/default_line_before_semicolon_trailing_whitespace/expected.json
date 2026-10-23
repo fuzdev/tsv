@@ -1,0 +1,20 @@
+{
+	"type": "Program",
+	"start": 0,
+	"end": 213,
+	"body": [
+		{
+			"type": "ExportDefaultDeclaration",
+			"start": 189,
+			"end": 206,
+			"exportKind": "value",
+			"declaration": {
+				"type": "Identifier",
+				"start": 204,
+				"end": 205,
+				"name": "a"
+			}
+		}
+	],
+	"sourceType": "module"
+}

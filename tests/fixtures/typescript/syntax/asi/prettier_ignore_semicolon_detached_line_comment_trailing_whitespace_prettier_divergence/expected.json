@@ -1,0 +1,326 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 377,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A frozen statement whose `//` ends in whitespace still keeps its terminator below the",
+			"start": 20,
+			"end": 108
+		},
+		{
+			"type": "Line",
+			"value": " comment, as authored — appending the `;` to the comment's line would swallow it",
+			"start": 110,
+			"end": 192
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 194,
+			"end": 212
+		},
+		{
+			"type": "Line",
+			"value": " c1 ",
+			"start": 224,
+			"end": 230
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 249,
+			"end": 267
+		},
+		{
+			"type": "Line",
+			"value": " c2\t",
+			"start": 279,
+			"end": 285
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 322,
+			"end": 340
+		},
+		{
+			"type": "Line",
+			"value": " c3 ",
+			"start": 353,
+			"end": 359
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 376,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 367,
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 214,
+					"end": 233,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 218,
+							"end": 223,
+							"id": {
+								"type": "Identifier",
+								"start": 218,
+								"end": 219,
+								"name": "a"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 222,
+								"end": 223,
+								"name": "b"
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c1 ",
+									"start": 224,
+									"end": 230
+								}
+							]
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A frozen statement whose `//` ends in whitespace still keeps its terminator below the",
+							"start": 20,
+							"end": 108
+						},
+						{
+							"type": "Line",
+							"value": " comment, as authored — appending the `;` to the comment's line would swallow it",
+							"start": 110,
+							"end": 192
+						},
+						{
+							"type": "Line",
+							"value": " prettier-ignore",
+							"start": 194,
+							"end": 212
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 235,
+					"end": 247,
+					"expression": {
+						"type": "CallExpression",
+						"start": 235,
+						"end": 246,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 235,
+							"end": 242,
+							"object": {
+								"type": "ArrayExpression",
+								"start": 235,
+								"end": 238,
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 236,
+										"end": 237,
+										"name": "a"
+									}
+								]
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 239,
+								"end": 242,
+								"name": "map"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 243,
+								"end": 245,
+								"name": "fn"
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 269,
+					"end": 288,
+					"expression": {
+						"type": "CallExpression",
+						"start": 269,
+						"end": 278,
+						"callee": {
+							"type": "Identifier",
+							"start": 269,
+							"end": 271,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 274,
+								"end": 275,
+								"name": "b",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c2\t",
+										"start": 279,
+										"end": 285
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " prettier-ignore",
+							"start": 249,
+							"end": 267
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 290,
+					"end": 302,
+					"expression": {
+						"type": "CallExpression",
+						"start": 290,
+						"end": 301,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 290,
+							"end": 297,
+							"object": {
+								"type": "ArrayExpression",
+								"start": 290,
+								"end": 293,
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 291,
+										"end": 292,
+										"name": "b"
+									}
+								]
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 294,
+								"end": 297,
+								"name": "map"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 298,
+								"end": 300,
+								"name": "fn"
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 304,
+					"end": 366,
+					"id": {
+						"type": "Identifier",
+						"start": 313,
+						"end": 315,
+						"name": "f1"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 318,
+						"end": 366,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 343,
+								"end": 363,
+								"argument": {
+									"type": "Identifier",
+									"start": 351,
+									"end": 352,
+									"name": "a",
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c3 ",
+											"start": 353,
+											"end": 359
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 322,
+										"end": 340
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

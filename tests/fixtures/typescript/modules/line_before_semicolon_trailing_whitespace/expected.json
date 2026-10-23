@@ -1,0 +1,305 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 358,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A line comment written before a module declaration's `;` trails after it — also when",
+			"start": 20,
+			"end": 107
+		},
+		{
+			"type": "Line",
+			"value": " the author left whitespace after the comment's text (the `;` on the next line)",
+			"start": 109,
+			"end": 190
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 213,
+			"end": 218
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 234,
+			"end": 239
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 266,
+			"end": 271
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 294,
+			"end": 299
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 315,
+			"end": 320
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 342,
+			"end": 347
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 357,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 348,
+			"body": [
+				{
+					"type": "ImportDeclaration",
+					"start": 192,
+					"end": 212,
+					"importKind": "value",
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 199,
+							"end": 200,
+							"local": {
+								"type": "Identifier",
+								"start": 199,
+								"end": 200,
+								"name": "a"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 206,
+						"end": 211,
+						"value": "./a",
+						"raw": "'./a'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A line comment written before a module declaration's `;` trails after it — also when",
+							"start": 20,
+							"end": 107
+						},
+						{
+							"type": "Line",
+							"value": " the author left whitespace after the comment's text (the `;` on the next line)",
+							"start": 109,
+							"end": 190
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c1",
+							"start": 213,
+							"end": 218
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 220,
+					"end": 233,
+					"importKind": "value",
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 227,
+						"end": 232,
+						"value": "./d",
+						"raw": "'./d'"
+					},
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c2",
+							"start": 234,
+							"end": 239
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 241,
+					"end": 265,
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 250,
+							"end": 251,
+							"local": {
+								"type": "Identifier",
+								"start": 250,
+								"end": 251,
+								"name": "b"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 250,
+								"end": 251,
+								"name": "b"
+							},
+							"exportKind": "value"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 259,
+						"end": 264,
+						"value": "./b",
+						"raw": "'./b'"
+					},
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c3",
+							"start": 266,
+							"end": 271
+						}
+					]
+				},
+				{
+					"type": "ExportAllDeclaration",
+					"start": 273,
+					"end": 293,
+					"exportKind": "value",
+					"exported": null,
+					"source": {
+						"type": "Literal",
+						"start": 287,
+						"end": 292,
+						"value": "./c",
+						"raw": "'./c'"
+					},
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c4",
+							"start": 294,
+							"end": 299
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 301,
+					"end": 314,
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 310,
+							"end": 311,
+							"local": {
+								"type": "Identifier",
+								"start": 310,
+								"end": 311,
+								"name": "a"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 310,
+								"end": 311,
+								"name": "a"
+							},
+							"exportKind": "value"
+						}
+					],
+					"source": null,
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c5",
+							"start": 315,
+							"end": 320
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 322,
+					"end": 341,
+					"exportKind": "value",
+					"declaration": {
+						"type": "VariableDeclaration",
+						"start": 329,
+						"end": 341,
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 335,
+								"end": 340,
+								"id": {
+									"type": "Identifier",
+									"start": 335,
+									"end": 336,
+									"name": "e"
+								},
+								"init": {
+									"type": "Literal",
+									"start": 339,
+									"end": 340,
+									"value": 1,
+									"raw": "1"
+								}
+							}
+						],
+						"kind": "const"
+					},
+					"specifiers": [],
+					"source": null,
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c6",
+							"start": 342,
+							"end": 347
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

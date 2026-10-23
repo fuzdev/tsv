@@ -1877,6 +1877,22 @@ impl<'a> Printer<'a> {
         )
     }
 
+    /// **in source**: the comment whose span ends inside `[lo, hi]`, where `lo..hi` holds
+    /// only bytes a backward trim stepped over (whitespace, or a walk's own transparent
+    /// punctuation) — the comment such a walk reaches next.
+    ///
+    /// Asking for a comment ending exactly at the trimmed `lo` misses one: a line comment's
+    /// span runs to its line terminator, so whitespace the author left after its text is the
+    /// comment's own, and the trim walks into it (`b // c ⏎;` trims to `c`). A block comment
+    /// closes on `/`, which no such trim steps over, so it can only end at `lo` itself; only a
+    /// line comment's tail can straddle it. Comments never overlap, so at most one qualifies:
+    /// the last one ending at or before `hi`.
+    pub(crate) fn comment_ending_within(&self, lo: u32, hi: u32) -> Option<&'a internal::Comment> {
+        let idx = self.comments.partition_point(|c| c.span.end <= hi);
+        let comment = self.comments.get(idx.checked_sub(1)?)?;
+        (comment.span.end >= lo).then_some(comment)
+    }
+
     /// **in source**: every comment physically at or after `pos`, to the document's end —
     /// the printer's form of `tsv_lang::comments_in_source_after`. An unbounded walk has
     /// no range for the window to answer, but its search still refreshes the window

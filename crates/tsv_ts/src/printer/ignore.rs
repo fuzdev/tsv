@@ -209,6 +209,7 @@ impl<'a> Printer<'a> {
         let bytes = self.source.as_bytes();
         let mut pos = anchor as usize;
         loop {
+            let untrimmed = pos as u32;
             while pos > 0
                 && matches!(
                     bytes[pos - 1],
@@ -218,23 +219,16 @@ impl<'a> Printer<'a> {
                 pos -= 1;
             }
             // The run continues only across an immediately-preceding comment span;
-            // anything else (an operator, a bracket, source text) bounds it.
-            let c = self.comment_ending_at(pos as u32)?;
+            // anything else (an operator, a bracket, source text) bounds it. A line
+            // comment's span takes in everything to its line terminator, so the trim can
+            // end inside one whose text ends in a byte it steps over (whitespace, `|`, `&`,
+            // `(`) — [`Self::comment_ending_within`].
+            let c = self.comment_ending_within(pos as u32, untrimmed)?;
             if is_format_ignore_directive(c.content(self.source)) {
                 return Some(c);
             }
             pos = c.span.start as usize;
         }
-    }
-
-    /// The comment whose span ends exactly at `pos`, if any. Comments are sorted by
-    /// start and never overlap, so `end` is monotonic and a binary search locates it.
-    /// **In-source axis** (an ownership-blind search over the raw table), like every
-    /// directive-recognition seam in this module — see `member_gap_frozen`'s note for
-    /// why the axes coincide for directives.
-    fn comment_ending_at(&self, pos: u32) -> Option<&'a Comment> {
-        let idx = self.comments.partition_point(|c| c.span.end < pos);
-        self.comments.get(idx).filter(|c| c.span.end == pos)
     }
 
     /// Rule A leading-run freeze plan for a union or intersection whose `span.start` is

@@ -1326,7 +1326,10 @@ body), and one belonging to a kind prettier's table does not list (`type A  =  B
   A `//` additionally owns the rest of its line, so a terminator written below one stays there:
   pulling the `;` up would not move it but SWALLOW it, welding `const a = x // c⏎;` +
   `(y) => 1;` into output that no longer parses at all —
-  [detached terminator comment](../tests/fixtures/typescript/syntax/asi/prettier_ignore_semicolon_detached_comment_prettier_divergence/)
+  [detached terminator comment](../tests/fixtures/typescript/syntax/asi/prettier_ignore_semicolon_detached_comment_prettier_divergence/).
+  A line comment's span runs to the end of its line, so whitespace the author left after its text
+  is part of the comment and the slice ends after it; the terminator still stays below
+  ([detached terminator, line comment ending in whitespace](../tests/fixtures/typescript/syntax/asi/prettier_ignore_semicolon_detached_line_comment_trailing_whitespace_prettier_divergence/)).
 
 **On declaration heads and parenthesized statements.** The last two statement-level heads are
 the ones where prettier **relocates the directive out of the gap** and freezes anyway — the

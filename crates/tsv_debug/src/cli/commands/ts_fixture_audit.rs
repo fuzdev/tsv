@@ -65,6 +65,10 @@ const INTENTIONAL_TS: &[(&str, &str)] = &[
         "format-convertible, but the Svelte parser duplicates a function-type `(`-leading comment in Root.comments (lists the same span twice), so the embedded expected.json can't match without replicating that Svelte bug — kept .ts for clean acorn parity",
     ),
     (
+        "typescript/modules/exports/default_line_before_semicolon_trailing_whitespace",
+        "format-convertible, but a component cannot default-export, so Svelte's compile refuses it and the render check's fallback arm compares Root.comments values, which a trailing-whitespace variant changes by construction",
+    ),
+    (
         "typescript/syntax/unicode_offsets",
         "pins byte→UTF-16 offset translation on the standalone tsv_ts JSON path (convert_ast_json_bytes's multibyte branch) — embedding in .svelte would route through tsv_svelte's convert instead",
     ),

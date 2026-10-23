@@ -125,7 +125,8 @@ impl<'a> Printer<'a> {
     /// It is the statement's full end for every kind that owns no terminator
     /// ([`StatementTerminator::Never`]) and for every ASI spelling; otherwise it is the end of
     /// the content the trailing `;` terminates, so the whitespace the author left between
-    /// the two is outside it.
+    /// the two is outside it. Whitespace after a line comment's text is the comment's own, so
+    /// the content then ends with the comment.
     ///
     /// **Two readers, one table.** [`Self::frozen_statement_slice`] asks it for the extent a
     /// freeze copies verbatim — a terminator belongs to the printer, not to the slice. The
@@ -151,8 +152,17 @@ impl<'a> Printer<'a> {
             // ASI supplied the terminator: there is no authored `;` for content to end before.
             return span.end;
         };
+        let untrimmed = span.start + content.len() as u32;
         let content = content.trim_end_matches(|c| is_es_whitespace(c) || is_es_line_terminator(c));
-        span.start + content.len() as u32
+        let trimmed = span.start + content.len() as u32;
+        if trimmed == untrimmed {
+            return trimmed;
+        }
+        // Whitespace after a line comment's text is the comment's own (its span runs to the
+        // line terminator), so the trim can end inside it; the content ends with the comment
+        // ([`Self::comment_ending_within`]).
+        self.comment_ending_within(trimmed, untrimmed)
+            .map_or(trimmed, |c| c.span.end)
     }
 
     /// Whether a statement's terminator gap belongs to the enclosing statement LIST rather
@@ -336,14 +346,16 @@ impl<'a> Printer<'a> {
     fn trivia_run_start_walk(&self, floor: u32, end: u32) -> u32 {
         let mut pos = end;
         loop {
+            let untrimmed = pos;
             let before = Span::new(floor, pos).extract(self.source);
             let trimmed =
                 before.trim_end_matches(|c| is_es_whitespace(c) || is_es_line_terminator(c));
             pos = floor + trimmed.len() as u32;
+            // A line comment whose text ends in whitespace straddles the trimmed `pos`
+            // ([`Self::comment_ending_within`]), so the lookup reaches to `untrimmed`.
             match self
-                .comments_in_source_between(floor, pos)
-                .last()
-                .filter(|c| c.span.end == pos)
+                .comment_ending_within(pos, untrimmed)
+                .filter(|c| c.span.start >= floor)
             {
                 Some(comment) => pos = comment.span.start,
                 None => return pos,
