@@ -1,9 +1,9 @@
 // Expression parsing using Pratt parser for operator precedence
 
 use crate::ast::internal::{
-    AssignmentExpression, AwaitExpression, BinaryExpression, BinaryOperator, BlockStatement,
-    CallExpression, ConditionalExpression, Expression, ExpressionKind, IdentName, Identifier,
-    ImportExpression, ImportPhase, JsdocCast, Literal, LiteralValue, MemberExpression,
+    AssignmentExpression, AssignmentOperator, AwaitExpression, BinaryExpression, BinaryOperator,
+    BlockStatement, CallExpression, ConditionalExpression, Expression, ExpressionKind, IdentName,
+    Identifier, ImportExpression, ImportPhase, JsdocCast, Literal, LiteralValue, MemberExpression,
     MetaProperty, NewExpression, ParenthesizedExpression, RegexLiteral, SequenceExpression,
     SpreadElement, Statement, Super, TSAsExpression, TSInstantiationExpression,
     TSNonNullExpression, TSSatisfiesExpression, TSTypeAssertion, TSTypeParameterInstantiation,
@@ -796,8 +796,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // WHOLE target it may not be an `AssignmentPattern` (`(a = b) = 1`).
             // `to_assignable` consumes by value; clone the arena ref (shallow — children
             // are refs) on this cold assignment-target path.
-            let left_pattern =
-                self.to_whole_assignable(left.clone(), AssignableContext::Assignment)?;
+            let context = if operator == AssignmentOperator::Assign {
+                AssignableContext::Assignment
+            } else {
+                AssignableContext::CompoundAssignment
+            };
+            let left_pattern = self.to_whole_assignable(left.clone(), context)?;
 
             let span = Span::new(expr_start as u32, end);
             debug_assert_encloses(span.start, span.end, left, right);

@@ -894,10 +894,12 @@ Early errors that still parse (not yet enforced):
   tsc's parser reads it; parenthesized it defers like the rest
   ([conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md#typescript-corrections)).
   The no-declaration for-in/of head is NOT an assignment context and rejects the same
-  targets, and two spellings with no faithful reprint reject in every position: a compound
-  operator as a default (`[a += b] = xs` — the pattern node has no slot for the operator)
-  and a parenthesized assignment as the whole target (`(a = b) = 1`, `for ((a = b) of xs)`
-  — an `AssignmentPattern` where the grammar has none). See
+  targets, and the spellings with no faithful reprint reject in every position: a compound
+  operator as a default (`[a += b] = xs` — the pattern node has no slot for the operator),
+  a parenthesized assignment as the whole target (`(a = b) = 1`, `for ((a = b) of xs)`
+  — an `AssignmentPattern` where the grammar has none), and a method, accessor or
+  generator property in an `=` target (`({ get f() {} } = x)`, `[{ f() {} }] = x` — no
+  pattern property carries one, and converting the value reprints a data property). See
   [conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md#typescript-corrections),
   the non-simple-target entry
 - Reserved words as identifiers — the strict-mode-reserved list of ecma262 §sec-identifiers-static-semantics-early-errors (`var public = 1`, `var let = 1`, `function f(yield) {}`)

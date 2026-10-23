@@ -4,7 +4,7 @@
 
 use crate::ast::internal::{
     ArrayPattern, AssignmentOperator, AssignmentPattern, Expression, ExpressionKind, ObjectPattern,
-    ObjectPatternProperty, ObjectProperty, Property, RestElement, SpreadElement,
+    ObjectPatternProperty, ObjectProperty, Property, PropertyKind, RestElement, SpreadElement,
 };
 use tsv_lang::{ParseError, Span};
 
@@ -25,6 +25,17 @@ use super::Parser;
 pub(in crate::parser) enum AssignableContext {
     /// `… = rhs` — a type-assertion wrapping a *simple* target is itself a valid target.
     Assignment,
+    /// A compound operator's left (`… += rhs`, `… ||= rhs`) — read as `Assignment` reads a
+    /// target, with one exception: a method, accessor or generator property is converted
+    /// as it is, never rejected.
+    ///
+    /// ecma262 §13.15.1 applies the `AssignmentPattern` reparse to the left of `=` alone,
+    /// so a compound left is no pattern at all: acorn keeps the literal there, and tsc's
+    /// parser accepts the literal over any property (its checker reports the operand,
+    /// TS2364). Rejecting a method under a compound operator would therefore be an
+    /// over-rejection against both. The conversion itself is the deviation.
+    // TODO: keep a compound left a literal rather than converting it, and drop this variant
+    CompoundAssignment,
     /// A no-declaration for-in/of head (`for ((x) of …)`) — an
     /// `AssignmentTargetType`/`LeftHandSideExpression` position. Reads a target the
     /// way `Assignment` does — a type assertion over a simple target is itself a
@@ -318,7 +329,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             | ExpressionKind::JsdocCast(_)
                 if matches!(
                     context,
-                    AssignableContext::Assignment | AssignableContext::ForHead
+                    AssignableContext::Assignment
+                        | AssignableContext::CompoundAssignment
+                        | AssignableContext::ForHead
                 ) && matches!(
                     expr.skip_type_assertions().kind,
                     ExpressionKind::Identifier(_) | ExpressionKind::MemberExpression(_)
@@ -334,12 +347,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // grammar parses it and the assignability refinement is layered on top.
             // Per the permissive stance (`crates/tsv_ts/CLAUDE.md` §Sources of truth)
             // the parser defers it: the target is kept as-is so the formatter keeps
-            // formatting well-formed input (prettier formats all of these). Only
-            // `Assignment` defers — `Binding` (params/destructuring bindings) and
-            // `ForHead` (a no-declaration for-in/of head) still reject below, which
-            // is why `for (foo() in b)` stays a parse error (prettier rejects it too).
+            // formatting well-formed input (prettier formats all of these). Only an
+            // assignment defers, plain or compound — `Binding` (params/destructuring
+            // bindings) and `ForHead` (a no-declaration for-in/of head) still reject
+            // below, which is why `for (foo() in b)` stays a parse error (prettier
+            // rejects it too).
             // TODO: the invalid-target early-error belongs in the diagnostics layer.
-            _ if matches!(context, AssignableContext::Assignment) => Ok(expr),
+            _ if matches!(
+                context,
+                AssignableContext::Assignment | AssignableContext::CompoundAssignment
+            ) =>
+            {
+                Ok(expr)
+            }
 
             // Invalid assignment target (binding / for-head position)
             _ => Err(self.error_msg_at("Invalid assignment target", expr.span().start_usize())),
@@ -490,6 +510,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<ObjectPatternProperty<'arena>, ParseError> {
         match prop {
             ObjectProperty::Property(p) => {
+                // A method, accessor or generator property has no pattern form: the wire
+                // has no `ObjectPattern` property carrying one, and converting the value
+                // reprints a different program (`({ get f() {} } = x)` as
+                // `({ f: function () {} } = x)`). The representability floor says reject,
+                // as acorn does and as tsc's grammar check does (TS1136), with the message
+                // and position a binding or for-head target already gives the method's
+                // function value through the non-simple arm.
+                if (p.method || p.kind != PropertyKind::Init)
+                    && !matches!(context, AssignableContext::CompoundAssignment)
+                {
+                    return Err(self
+                        .error_msg_at("Invalid assignment target", p.value.span().start_usize()));
+                }
                 // Convert the value to a pattern
                 let value = self.to_assignable(p.value.clone(), context)?;
 

@@ -1,0 +1,3 @@
+<script>
+	({ f() {} } = x);
+</script>

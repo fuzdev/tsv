@@ -1,0 +1,446 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 318,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a property NAMED like a method keyword is an ordinary assignment property",
+			"start": 10,
+			"end": 86
+		},
+		{
+			"type": "Line",
+			"value": " a function value is a default or the source, never the target",
+			"start": 168,
+			"end": 232
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 317,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 308,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 88,
+					"end": 125,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 89,
+						"end": 123,
+						"operator": "=",
+						"left": {
+							"type": "ObjectPattern",
+							"start": 89,
+							"end": 119,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 91,
+									"end": 94,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 91,
+										"end": 94,
+										"name": "get"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 91,
+										"end": 94,
+										"name": "get"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 96,
+									"end": 99,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 96,
+										"end": 99,
+										"name": "set"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 96,
+										"end": 99,
+										"name": "set"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 101,
+									"end": 106,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 101,
+										"end": 106,
+										"name": "async"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 101,
+										"end": 106,
+										"name": "async"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 108,
+									"end": 117,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 108,
+										"end": 114,
+										"name": "static"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 116,
+										"end": 117,
+										"name": "s"
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 122,
+							"end": 123,
+							"name": "x"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a property NAMED like a method keyword is an ordinary assignment property",
+							"start": 10,
+							"end": 86
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 127,
+					"end": 165,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 128,
+						"end": 163,
+						"operator": "=",
+						"left": {
+							"type": "ObjectPattern",
+							"start": 128,
+							"end": 159,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 130,
+									"end": 137,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 130,
+										"end": 133,
+										"name": "get"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 135,
+										"end": 137,
+										"name": "a1"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 139,
+									"end": 146,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 139,
+										"end": 142,
+										"name": "set"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 144,
+										"end": 146,
+										"name": "a2"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 148,
+									"end": 157,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 148,
+										"end": 153,
+										"name": "async"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 155,
+										"end": 157,
+										"name": "a3"
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 162,
+							"end": 163,
+							"name": "x"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 234,
+					"end": 263,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 235,
+						"end": 261,
+						"operator": "=",
+						"left": {
+							"type": "ObjectPattern",
+							"start": 235,
+							"end": 257,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 237,
+									"end": 255,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 237,
+										"end": 238,
+										"name": "f"
+									},
+									"value": {
+										"type": "AssignmentPattern",
+										"start": 237,
+										"end": 255,
+										"left": {
+											"type": "Identifier",
+											"start": 237,
+											"end": 238,
+											"name": "f"
+										},
+										"right": {
+											"type": "FunctionExpression",
+											"start": 241,
+											"end": 255,
+											"id": null,
+											"expression": false,
+											"generator": false,
+											"async": false,
+											"params": [],
+											"body": {
+												"type": "BlockStatement",
+												"start": 253,
+												"end": 255,
+												"body": []
+											}
+										}
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 260,
+							"end": 261,
+							"name": "x"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a function value is a default or the source, never the target",
+							"start": 168,
+							"end": 232
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 265,
+					"end": 284,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 265,
+						"end": 283,
+						"operator": "=",
+						"left": {
+							"type": "ArrayPattern",
+							"start": 265,
+							"end": 279,
+							"elements": [
+								{
+									"type": "AssignmentPattern",
+									"start": 266,
+									"end": 278,
+									"left": {
+										"type": "Identifier",
+										"start": 266,
+										"end": 267,
+										"name": "g"
+									},
+									"right": {
+										"type": "ArrowFunctionExpression",
+										"start": 270,
+										"end": 278,
+										"id": null,
+										"expression": false,
+										"generator": false,
+										"async": false,
+										"params": [],
+										"body": {
+											"type": "BlockStatement",
+											"start": 276,
+											"end": 278,
+											"body": []
+										}
+									}
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 282,
+							"end": 283,
+							"name": "x"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 286,
+					"end": 307,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 287,
+						"end": 305,
+						"operator": "=",
+						"left": {
+							"type": "ObjectPattern",
+							"start": 287,
+							"end": 292,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 289,
+									"end": 290,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 289,
+										"end": 290,
+										"name": "h"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 289,
+										"end": 290,
+										"name": "h"
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "ObjectExpression",
+							"start": 295,
+							"end": 305,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 297,
+									"end": 303,
+									"method": true,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 297,
+										"end": 298,
+										"name": "h"
+									},
+									"value": {
+										"type": "FunctionExpression",
+										"start": 298,
+										"end": 303,
+										"id": null,
+										"expression": false,
+										"generator": false,
+										"async": false,
+										"params": [],
+										"body": {
+											"type": "BlockStatement",
+											"start": 301,
+											"end": 303,
+											"body": []
+										}
+									},
+									"kind": "init"
+								}
+							]
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
