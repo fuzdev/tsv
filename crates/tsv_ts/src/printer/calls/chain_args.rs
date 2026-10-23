@@ -23,7 +23,7 @@ use super::arg_predicates::{
     lone_arg_params_render_flat, mark_boolean_coercion_argument,
 };
 use super::arg_wrapping::{
-    ArgOpener, AssumedParamHug, ChainArgKind, arrow_body_expands_internally,
+    ArgOpener, AssumedHugKind, AssumedParamHug, ChainArgKind, arrow_body_expands_internally,
     arrow_body_tail_has_comments, arrow_hug_refused_by_comments, build_args_split_last,
     build_arrow_gap_break_multi_arg_doc, build_arrow_gap_break_single_arg_doc, build_arrow_sig_doc,
     build_break_body_ladder, build_expand_first_arg_doc, build_expand_last_obj_array_doc,
@@ -1165,22 +1165,28 @@ fn build_chain_args_single(
                     };
                     // The chain's own convergence state asks for this state alone
                     // (`chain::builder`'s assumed-hug middle state).
-                    if hug.take_forced(printer) {
-                        let assumed_arg = with_trailing(hug.contents(printer, build_arg));
+                    if let Some(contents) =
+                        hug.take_forced(printer, AssumedHugKind::ParamLiteral, build_arg)
+                    {
+                        let assumed_arg = with_trailing(contents);
                         return with_chain_head(
                             d,
                             head,
                             d.concat(&[prefix, assumed_arg, d.text(")")]),
                         );
                     }
-                    let assumed = hug.build(printer, false, build_arg);
-                    let state_assumed =
-                        d.concat(&[prefix, with_trailing(assumed.doc), d.text(")")]);
-                    d.conditional_group(&[
-                        state_hug,
-                        assumed.state(d, arg_with_comments, state_assumed),
-                        state_expand,
-                    ])
+                    match hug.build(printer, false, build_arg).literal {
+                        Some(assumed) => {
+                            let state_assumed =
+                                d.concat(&[prefix, with_trailing(assumed.doc), d.text(")")]);
+                            d.conditional_group(&[
+                                state_hug,
+                                assumed.state(d, arg_with_comments, state_assumed),
+                                state_expand,
+                            ])
+                        }
+                        None => d.conditional_group(&[state_hug, state_expand]),
+                    }
                 }
                 None => d.conditional_group(&[state_hug, state_expand]),
             }
@@ -1364,18 +1370,19 @@ fn build_chain_args_multi(
         }
 
         let last_index = call.arguments.len() - 1;
-        // The chain's own convergence state asks for the hug state alone
-        // (`chain::builder`'s assumed-hug middle state).
+        // The chain's own convergence states ask for one hug state alone
+        // (`chain::builder`'s assumed-hug and return-type hug states).
         let build_last =
             || build_joined_argument_doc(printer, paren_open, call.arguments, last_index);
-        if let Some(hug) = &assumed
-            && hug.take_forced(printer)
-        {
-            let contents = hug.contents(printer, build_last);
+        if let Some(contents) = assumed.as_ref().and_then(|hug| {
+            hug.take_forced(printer, AssumedHugKind::ParamLiteral, build_last)
+                .or_else(|| hug.take_forced(printer, AssumedHugKind::ReturnType, build_last))
+        }) {
             return with_chain_head(d, head, opener.inline(d, &head_parts, contents));
         }
         // A plain call's last of several arguments: its hug flattens a `function`'s parameters.
-        let assumed = assumed.map(|hug| hug.build(printer, true, build_last));
+        let assumed =
+            assumed.map_or_else(Default::default, |hug| hug.build(printer, true, build_last));
         return with_chain_head(
             d,
             head,

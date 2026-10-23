@@ -36,8 +36,10 @@ use super::printing::{
 };
 use super::types::{ChainGroup, ChainNode, ChainNodeVec};
 use crate::ast::internal::{ArrowFunctionBody, CallExpression, Expression, ExpressionKind};
-use crate::printer::calls::{AssumedParamHug, arrow_body_hugs_call_parens, is_memberish};
-use crate::printer::expressions::functions::flat_sole_param_literal;
+use crate::printer::calls::{
+    AssumedHugKind, AssumedParamHug, arrow_body_hugs_call_parens, is_memberish,
+};
+use crate::printer::expressions::functions::{flat_sole_param_literal, function_return_hug_break};
 use crate::printer::{AssumedBreak, Printer};
 
 use smallvec::SmallVec;
@@ -982,6 +984,11 @@ fn build_long_chain_doc<'a>(
     // The last builder keys on the last call's TYPE argument rather than its value arguments:
     // a hugged object or mapped type written flat, whose hug is the settled form from
     // prettier's second pass when the type breaks for width ([`build_type_arg_hug_state`]).
+    //
+    // Ahead of the middle state, and alongside it rather than one of its alternatives: a
+    // `function` last argument whose hug is measured only to its return type's `{`
+    // ([`build_return_hug_state`]).
+    let return_hug_state = build_return_hug_state(first_groups, rest_groups, printer);
     let middle_state = build_breaking_object_chain_doc(first_groups, rest_groups, printer)
         .or_else(|| {
             build_flat_object_hug_state(first_groups, rest_groups, *on_line.last()?, printer)
@@ -990,10 +997,61 @@ fn build_long_chain_doc<'a>(
         .or_else(|| build_arrow_comment_line_state(first_groups, rest_groups, &on_line, printer))
         .or_else(|| build_type_arg_hug_state(first_groups, rest_groups, &on_line, printer));
 
-    match middle_state {
-        Some(state) => d.conditional_group(&[on_line_doc, state, expanded]),
-        None => d.conditional_group(&[on_line_doc, expanded]),
+    let mut states: SmallVec<[DocId; 4]> = smallvec![on_line_doc];
+    states.extend(return_hug_state);
+    states.extend(middle_state);
+    states.push(expanded);
+    d.conditional_group(&states)
+}
+
+/// Build the state for a last call whose last of several arguments is a `function` callback
+/// with one parameter, its hug measured only up to its return type's first `{` — the chain
+/// spelling of the call printers' return-type hug (`calls::AssumedParamHug`,
+/// [`function_return_hug_break`]).
+///
+/// Prettier's member chain measures its `oneLine` through the last call's conditional group,
+/// which is never break-propagated, so it reads that group's hug state: the hug, measured to
+/// the callback's first line break, the return type's `{` where the hug flattens the
+/// parameters. This state is the chain prefix flat and the last call printing that hug
+/// outright, measured like any state.
+///
+/// ⚠️ The last group is NOT wrapped in `group_break`, as the assumed-hug state's is
+/// ([`build_assumed_param_hug_state`]): measured in break mode, the parameter list's own
+/// soft line would end the measurement ahead of the `{`, and the state would be admitted
+/// past the band where prettier breaks the chain.
+///
+/// The argument printer decides whether the state exists, as for the assumed-hug state:
+/// this builder rebuilds the last group with the request set and keeps the state only when
+/// the printer consumed it.
+fn build_return_hug_state<'a>(
+    first_groups: &[ChainGroup<'a>],
+    rest_groups: &[ChainGroup<'a>],
+    printer: &Printer<'_>,
+) -> Option<DocId> {
+    let d = printer.arena();
+    let call = rest_groups
+        .last()?
+        .nodes
+        .iter()
+        .rev()
+        .find_map(ChainNode::as_call_expression)?;
+    let [_, .., last] = call.arguments else {
+        return None;
+    };
+    function_return_hug_break(printer, last)?;
+    let (last_group, prefix) = rest_groups.split_last()?;
+    let outer = printer
+        .force_assumed_param_hug
+        .replace(Some((last.span.start, AssumedHugKind::ReturnType)));
+    let last_doc = print_group(last_group, printer);
+    let taken = printer.force_assumed_param_hug.replace(outer).is_none();
+    if !taken {
+        return None;
     }
+    let mut parts = build_groups_flat_docs(first_groups, printer);
+    parts.extend(prefix.iter().map(|g| print_group(g, printer)));
+    parts.push(last_doc);
+    Some(d.concat(&parts))
 }
 
 /// Build doc for chains ending with member access (e.g., `.length`).
@@ -1222,7 +1280,7 @@ fn build_assumed_param_hug_state<'a>(
     let (last, prefix) = rest_groups.split_last()?;
     let outer = printer
         .force_assumed_param_hug
-        .replace(Some(arg.span.start));
+        .replace(Some((arg.span.start, AssumedHugKind::ParamLiteral)));
     let last_doc = print_group(last, printer);
     let taken = printer.force_assumed_param_hug.replace(outer).is_none();
     if !taken {

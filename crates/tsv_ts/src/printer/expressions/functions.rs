@@ -806,6 +806,112 @@ pub(in crate::printer) fn flat_sole_param_literal<'a>(
     })
 }
 
+/// The break a hug that flattens a `function` callback's parameters is measured up to: the
+/// first `{` of its return type, when that type will not break on its own.
+///
+/// Prettier hugs a last argument that will break (a block body) in
+/// `conditionalGroup([[…, group(last, { shouldBreak: true })], allArgsBrokenOut()])`, and its
+/// `fits` measures every group nested in a broken one in break mode, so the hug is measured
+/// only up to the callback's first line break. Where the hug flattens the parameters
+/// (`shouldExpandParameters`: a plain call's last of several arguments, the parameters
+/// `removeLines`'d), that break is the return type's first `{`. tsv's inline state measures
+/// the hug flat up to the body's `{`; measured that way, a hug that fits only up to the
+/// return type's `{` would break every argument out, and prettier's form would read back as
+/// the hug with that type authored expanded — a second fixed point. The hug ladders admit
+/// the hug with the `{` assumed broken ([`AssumedBreak`]), measured like any state.
+///
+/// The `{` is the return type's own (an object or mapped type), the one in its sole type
+/// argument (`Promise<{`, [`Printer::sole_type_arg_hug_break`]), or the first object member
+/// of a hugged union (`{ … } | null`). Distinct from [`FlatSoleParamLiteral::return_break`],
+/// which models prettier's parameter GROUPING (`shouldGroupFunctionParameters`) and so
+/// takes the object and mapped return types alone: a `Promise<{ … }>` return does not group.
+///
+/// `None` unless the callback has at most one parameter, of any type, and type parameters
+/// that allow grouping (`type_params_allow_grouping`): otherwise tsv's hug does not hold
+/// the parameters flat in this measurement, so the state would admit a hug that breaks
+/// them, which prettier never prints. `None` too for a bare object return type the author
+/// expanded (a perf early-out: the assumed break would be the authored one), an empty
+/// object type (no break inside it), and a comment anywhere from the argument to the body —
+/// the refusal [`flat_sole_param_literal`] makes, so no comment rides on the assumed break.
+pub(in crate::printer) fn function_return_hug_break(
+    printer: &Printer<'_>,
+    arg: &internal::Expression<'_>,
+) -> Option<AssumedBreak> {
+    if printer.canonical {
+        return None;
+    }
+    let internal::ExpressionKind::FunctionExpression(func) = &arg.kind else {
+        return None;
+    };
+    if func.params.len() > 1
+        || !crate::printer::types::function_types::type_params_allow_grouping(
+            func.type_parameters.as_ref(),
+        )
+    {
+        return None;
+    }
+    let return_type = func.return_type.as_ref()?.type_annotation;
+    let brk = return_type_hug_brace(printer, return_type)?;
+    if crate::printer::is_brace_block_multiline(printer.source, return_type.span())
+        || printer.has_comments_on_page_between(arg.span.start, func.body.span.start)
+    {
+        return None;
+    }
+    Some(brk)
+}
+
+/// The `{` [`function_return_hug_break`] assumes broken in `ty`, read through every paren
+/// shell the printer strips — at the top, around a sole type argument, and around a hugged
+/// union's members — so the predicate reads the printed form, and a shell the author wrote
+/// cannot refuse a hug its stripped twin takes.
+fn return_type_hug_brace(printer: &Printer<'_>, ty: &internal::TSType<'_>) -> Option<AssumedBreak> {
+    let member_brace = |union: &internal::TSUnionType<'_>| {
+        union
+            .types
+            .iter()
+            .find_map(|member| match unwrap_parenthesized(member) {
+                internal::TSType::TypeLiteral(literal) if !literal.members.is_empty() => {
+                    Some(AssumedBreak::TypeLiteral(literal.span.start))
+                }
+                _ => None,
+            })
+    };
+    match unwrap_parenthesized(ty) {
+        internal::TSType::TypeLiteral(literal) if !literal.members.is_empty() => {
+            Some(AssumedBreak::TypeLiteral(literal.span.start))
+        }
+        internal::TSType::Mapped(mapped) => Some(AssumedBreak::MappedType(mapped.span.start)),
+        internal::TSType::TypeReference(reference) => {
+            let args = reference.type_arguments.as_ref()?;
+            if let [arg] = args.params {
+                let peeled = unwrap_parenthesized(arg);
+                let is_shell =
+                    |ty: &internal::TSType<'_>| matches!(ty, internal::TSType::Parenthesized(_));
+                let shell = is_shell(arg)
+                    || matches!(peeled, internal::TSType::Union(union)
+                        if union.types.iter().any(|member| is_shell(member)));
+                if shell {
+                    return match peeled {
+                        internal::TSType::TypeLiteral(literal) if !literal.members.is_empty() => {
+                            Some(AssumedBreak::TypeLiteral(literal.span.start))
+                        }
+                        internal::TSType::Mapped(mapped) => {
+                            Some(AssumedBreak::MappedType(mapped.span.start))
+                        }
+                        internal::TSType::Union(union) if printer.union_prints_hugged(union) => {
+                            member_brace(union)
+                        }
+                        _ => None,
+                    };
+                }
+            }
+            printer.sole_type_arg_hug_break(args)
+        }
+        internal::TSType::Union(union) if printer.union_prints_hugged(union) => member_brace(union),
+        _ => None,
+    }
+}
+
 /// Whether `arrow`'s signature refuses a hug that renders its head on the callee's line —
 /// prettier's `ArgExpansionBailout`, whatever forces the break: a comment
 /// ([`arrow_signature_has_breaking_comments`]) or a break the signature's own docs carry

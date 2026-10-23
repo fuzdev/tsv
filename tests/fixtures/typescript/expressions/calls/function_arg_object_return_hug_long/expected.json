@@ -1,0 +1,3809 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 3291,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 3127,
+				"end": 3129,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 3129,
+				"end": 3159,
+				"data": " a template expression "
+			},
+			{
+				"type": "Text",
+				"start": 3159,
+				"end": 3160,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 3160,
+				"end": 3290,
+				"name": "p",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 3163,
+							"end": 3165,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 3165,
+							"end": 3285,
+							"expression": {
+								"type": "CallExpression",
+								"start": 3166,
+								"end": 3284,
+								"callee": {
+									"type": "Identifier",
+									"start": 3166,
+									"end": 3168,
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 3169,
+										"end": 3173,
+										"name": "lead"
+									},
+									{
+										"type": "FunctionExpression",
+										"start": 3175,
+										"end": 3283,
+										"id": null,
+										"expression": false,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 3185,
+												"end": 3255,
+												"name": "a",
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 3186,
+													"end": 3255,
+													"typeAnnotation": {
+														"type": "TSTypeLiteral",
+														"start": 3188,
+														"end": 3255,
+														"members": [
+															{
+																"type": "TSPropertySignature",
+																"start": 3190,
+																"end": 3195,
+																"computed": false,
+																"key": {
+																	"type": "Identifier",
+																	"start": 3190,
+																	"end": 3191,
+																	"name": "b"
+																},
+																"typeAnnotation": {
+																	"type": "TSTypeAnnotation",
+																	"start": 3191,
+																	"end": 3194,
+																	"typeAnnotation": {
+																		"type": "TSTypeReference",
+																		"start": 3193,
+																		"end": 3194,
+																		"typeName": {
+																			"type": "Identifier",
+																			"start": 3193,
+																			"end": 3194,
+																			"name": "C"
+																		}
+																	}
+																}
+															},
+															{
+																"type": "TSPropertySignature",
+																"start": 3196,
+																"end": 3253,
+																"computed": false,
+																"key": {
+																	"type": "Identifier",
+																	"start": 3196,
+																	"end": 3197,
+																	"name": "d"
+																},
+																"typeAnnotation": {
+																	"type": "TSTypeAnnotation",
+																	"start": 3197,
+																	"end": 3253,
+																	"typeAnnotation": {
+																		"type": "TSTypeReference",
+																		"start": 3199,
+																		"end": 3253,
+																		"typeName": {
+																			"type": "Identifier",
+																			"start": 3199,
+																			"end": 3253,
+																			"name": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
+																		}
+																	}
+																}
+															}
+														]
+													}
+												}
+											}
+										],
+										"returnType": {
+											"type": "TSTypeAnnotation",
+											"start": 3256,
+											"end": 3270,
+											"typeAnnotation": {
+												"type": "TSTypeLiteral",
+												"start": 3258,
+												"end": 3270,
+												"members": [
+													{
+														"type": "TSPropertySignature",
+														"start": 3262,
+														"end": 3267,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 3262,
+															"end": 3263,
+															"name": "x"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 3263,
+															"end": 3266,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 3265,
+																"end": 3266,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 3265,
+																	"end": 3266,
+																	"name": "X"
+																}
+															}
+														}
+													}
+												]
+											}
+										},
+										"body": {
+											"type": "BlockStatement",
+											"start": 3271,
+											"end": 3283,
+											"body": [
+												{
+													"type": "ExpressionStatement",
+													"start": 3275,
+													"end": 3280,
+													"expression": {
+														"type": "CallExpression",
+														"start": 3275,
+														"end": 3279,
+														"callee": {
+															"type": "Identifier",
+															"start": 3275,
+															"end": 3276,
+															"name": "g"
+														},
+														"arguments": [
+															{
+																"type": "Identifier",
+																"start": 3277,
+																"end": 3278,
+																"name": "a"
+															}
+														],
+														"optional": false
+													}
+												}
+											]
+										}
+									}
+								],
+								"optional": false
+							}
+						},
+						{
+							"type": "Text",
+							"start": 3285,
+							"end": 3286,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " At 100 the call fits on one line up to the body's `{`, so it stays flat",
+			"start": 20,
+			"end": 94
+		},
+		{
+			"type": "Line",
+			"value": " At 101 it does not: the callback keeps the hug and its object return type breaks, since",
+			"start": 210,
+			"end": 300
+		},
+		{
+			"type": "Line",
+			"value": " the hug is measured only to that type's `{`",
+			"start": 302,
+			"end": 348
+		},
+		{
+			"type": "Line",
+			"value": " At 100 the hugged line up to the return type's `{` fits, so the callback keeps the hug",
+			"start": 469,
+			"end": 558
+		},
+		{
+			"type": "Line",
+			"value": " At 101 it does not, so the arguments break out",
+			"start": 687,
+			"end": 736
+		},
+		{
+			"type": "Line",
+			"value": " a member callee",
+			"start": 877,
+			"end": 895
+		},
+		{
+			"type": "Line",
+			"value": " a curried callee and a non-null one",
+			"start": 1020,
+			"end": 1058
+		},
+		{
+			"type": "Line",
+			"value": " a mapped return type",
+			"start": 1305,
+			"end": 1328
+		},
+		{
+			"type": "Line",
+			"value": " a parameter that is not an object type",
+			"start": 1453,
+			"end": 1494
+		},
+		{
+			"type": "Line",
+			"value": " two preceding arguments, a named callback, a type parameter",
+			"start": 1619,
+			"end": 1681
+		},
+		{
+			"type": "Line",
+			"value": " a two-call member chain stays flat for the hug",
+			"start": 2050,
+			"end": 2099
+		},
+		{
+			"type": "Line",
+			"value": " the same chain as a call argument",
+			"start": 2224,
+			"end": 2260
+		},
+		{
+			"type": "Line",
+			"value": " an empty body",
+			"start": 2395,
+			"end": 2411
+		},
+		{
+			"type": "Line",
+			"value": " control: an empty object return type has nothing to break, so the arguments break out",
+			"start": 2523,
+			"end": 2611
+		},
+		{
+			"type": "Line",
+			"value": " control: a lone callback hugs in both formatters",
+			"start": 2741,
+			"end": 2792
+		},
+		{
+			"type": "Line",
+			"value": " control: an arrow callback breaks the arguments out in both formatters",
+			"start": 2917,
+			"end": 2990
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 3127,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 3118,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 96,
+					"end": 207,
+					"expression": {
+						"type": "CallExpression",
+						"start": 96,
+						"end": 206,
+						"callee": {
+							"type": "Identifier",
+							"start": 96,
+							"end": 98,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 99,
+								"end": 103,
+								"name": "lead"
+							},
+							{
+								"type": "FunctionExpression",
+								"start": 105,
+								"end": 205,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 115,
+										"end": 181,
+										"name": "a",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 116,
+											"end": 181,
+											"typeAnnotation": {
+												"type": "TSTypeLiteral",
+												"start": 118,
+												"end": 181,
+												"members": [
+													{
+														"type": "TSPropertySignature",
+														"start": 120,
+														"end": 125,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 120,
+															"end": 121,
+															"name": "b"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 121,
+															"end": 124,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 123,
+																"end": 124,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 123,
+																	"end": 124,
+																	"name": "C"
+																}
+															}
+														}
+													},
+													{
+														"type": "TSPropertySignature",
+														"start": 126,
+														"end": 179,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 126,
+															"end": 127,
+															"name": "d"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 127,
+															"end": 179,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 129,
+																"end": 179,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 129,
+																	"end": 179,
+																	"name": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
+																}
+															}
+														}
+													}
+												]
+											}
+										}
+									}
+								],
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 182,
+									"end": 192,
+									"typeAnnotation": {
+										"type": "TSTypeLiteral",
+										"start": 184,
+										"end": 192,
+										"members": [
+											{
+												"type": "TSPropertySignature",
+												"start": 186,
+												"end": 190,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 186,
+													"end": 187,
+													"name": "x"
+												},
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 187,
+													"end": 190,
+													"typeAnnotation": {
+														"type": "TSTypeReference",
+														"start": 189,
+														"end": 190,
+														"typeName": {
+															"type": "Identifier",
+															"start": 189,
+															"end": 190,
+															"name": "X"
+														}
+													}
+												}
+											}
+										]
+									}
+								},
+								"body": {
+									"type": "BlockStatement",
+									"start": 193,
+									"end": 205,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 197,
+											"end": 202,
+											"expression": {
+												"type": "CallExpression",
+												"start": 197,
+												"end": 201,
+												"callee": {
+													"type": "Identifier",
+													"start": 197,
+													"end": 198,
+													"name": "g"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 199,
+														"end": 200,
+														"name": "a"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At 100 the call fits on one line up to the body's `{`, so it stays flat",
+							"start": 20,
+							"end": 94
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 350,
+					"end": 466,
+					"expression": {
+						"type": "CallExpression",
+						"start": 350,
+						"end": 465,
+						"callee": {
+							"type": "Identifier",
+							"start": 350,
+							"end": 352,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 353,
+								"end": 357,
+								"name": "lead"
+							},
+							{
+								"type": "FunctionExpression",
+								"start": 359,
+								"end": 464,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 369,
+										"end": 436,
+										"name": "a",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 370,
+											"end": 436,
+											"typeAnnotation": {
+												"type": "TSTypeLiteral",
+												"start": 372,
+												"end": 436,
+												"members": [
+													{
+														"type": "TSPropertySignature",
+														"start": 374,
+														"end": 379,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 374,
+															"end": 375,
+															"name": "b"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 375,
+															"end": 378,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 377,
+																"end": 378,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 377,
+																	"end": 378,
+																	"name": "C"
+																}
+															}
+														}
+													},
+													{
+														"type": "TSPropertySignature",
+														"start": 380,
+														"end": 434,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 380,
+															"end": 381,
+															"name": "d"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 381,
+															"end": 434,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 383,
+																"end": 434,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 383,
+																	"end": 434,
+																	"name": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
+																}
+															}
+														}
+													}
+												]
+											}
+										}
+									}
+								],
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 437,
+									"end": 451,
+									"typeAnnotation": {
+										"type": "TSTypeLiteral",
+										"start": 439,
+										"end": 451,
+										"members": [
+											{
+												"type": "TSPropertySignature",
+												"start": 443,
+												"end": 448,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 443,
+													"end": 444,
+													"name": "x"
+												},
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 444,
+													"end": 447,
+													"typeAnnotation": {
+														"type": "TSTypeReference",
+														"start": 446,
+														"end": 447,
+														"typeName": {
+															"type": "Identifier",
+															"start": 446,
+															"end": 447,
+															"name": "X"
+														}
+													}
+												}
+											}
+										]
+									}
+								},
+								"body": {
+									"type": "BlockStatement",
+									"start": 452,
+									"end": 464,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 456,
+											"end": 461,
+											"expression": {
+												"type": "CallExpression",
+												"start": 456,
+												"end": 460,
+												"callee": {
+													"type": "Identifier",
+													"start": 456,
+													"end": 457,
+													"name": "g"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 458,
+														"end": 459,
+														"name": "a"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At 101 it does not: the callback keeps the hug and its object return type breaks, since",
+							"start": 210,
+							"end": 300
+						},
+						{
+							"type": "Line",
+							"value": " the hug is measured only to that type's `{`",
+							"start": 302,
+							"end": 348
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 560,
+					"end": 684,
+					"expression": {
+						"type": "CallExpression",
+						"start": 560,
+						"end": 683,
+						"callee": {
+							"type": "Identifier",
+							"start": 560,
+							"end": 562,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 563,
+								"end": 567,
+								"name": "lead"
+							},
+							{
+								"type": "FunctionExpression",
+								"start": 569,
+								"end": 682,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 579,
+										"end": 654,
+										"name": "a",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 580,
+											"end": 654,
+											"typeAnnotation": {
+												"type": "TSTypeLiteral",
+												"start": 582,
+												"end": 654,
+												"members": [
+													{
+														"type": "TSPropertySignature",
+														"start": 584,
+														"end": 589,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 584,
+															"end": 585,
+															"name": "b"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 585,
+															"end": 588,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 587,
+																"end": 588,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 587,
+																	"end": 588,
+																	"name": "C"
+																}
+															}
+														}
+													},
+													{
+														"type": "TSPropertySignature",
+														"start": 590,
+														"end": 652,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 590,
+															"end": 591,
+															"name": "d"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 591,
+															"end": 652,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 593,
+																"end": 652,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 593,
+																	"end": 652,
+																	"name": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
+																}
+															}
+														}
+													}
+												]
+											}
+										}
+									}
+								],
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 655,
+									"end": 669,
+									"typeAnnotation": {
+										"type": "TSTypeLiteral",
+										"start": 657,
+										"end": 669,
+										"members": [
+											{
+												"type": "TSPropertySignature",
+												"start": 661,
+												"end": 666,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 661,
+													"end": 662,
+													"name": "x"
+												},
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 662,
+													"end": 665,
+													"typeAnnotation": {
+														"type": "TSTypeReference",
+														"start": 664,
+														"end": 665,
+														"typeName": {
+															"type": "Identifier",
+															"start": 664,
+															"end": 665,
+															"name": "X"
+														}
+													}
+												}
+											}
+										]
+									}
+								},
+								"body": {
+									"type": "BlockStatement",
+									"start": 670,
+									"end": 682,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 674,
+											"end": 679,
+											"expression": {
+												"type": "CallExpression",
+												"start": 674,
+												"end": 678,
+												"callee": {
+													"type": "Identifier",
+													"start": 674,
+													"end": 675,
+													"name": "g"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 676,
+														"end": 677,
+														"name": "a"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At 100 the hugged line up to the return type's `{` fits, so the callback keeps the hug",
+							"start": 469,
+							"end": 558
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 738,
+					"end": 874,
+					"expression": {
+						"type": "CallExpression",
+						"start": 738,
+						"end": 873,
+						"callee": {
+							"type": "Identifier",
+							"start": 738,
+							"end": 740,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 744,
+								"end": 748,
+								"name": "lead"
+							},
+							{
+								"type": "FunctionExpression",
+								"start": 752,
+								"end": 870,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 762,
+										"end": 838,
+										"name": "a",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 763,
+											"end": 838,
+											"typeAnnotation": {
+												"type": "TSTypeLiteral",
+												"start": 765,
+												"end": 838,
+												"members": [
+													{
+														"type": "TSPropertySignature",
+														"start": 767,
+														"end": 772,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 767,
+															"end": 768,
+															"name": "b"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 768,
+															"end": 771,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 770,
+																"end": 771,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 770,
+																	"end": 771,
+																	"name": "C"
+																}
+															}
+														}
+													},
+													{
+														"type": "TSPropertySignature",
+														"start": 773,
+														"end": 836,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 773,
+															"end": 774,
+															"name": "d"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 774,
+															"end": 836,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 776,
+																"end": 836,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 776,
+																	"end": 836,
+																	"name": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
+																}
+															}
+														}
+													}
+												]
+											}
+										}
+									}
+								],
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 839,
+									"end": 855,
+									"typeAnnotation": {
+										"type": "TSTypeLiteral",
+										"start": 841,
+										"end": 855,
+										"members": [
+											{
+												"type": "TSPropertySignature",
+												"start": 846,
+												"end": 851,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 846,
+													"end": 847,
+													"name": "x"
+												},
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 847,
+													"end": 850,
+													"typeAnnotation": {
+														"type": "TSTypeReference",
+														"start": 849,
+														"end": 850,
+														"typeName": {
+															"type": "Identifier",
+															"start": 849,
+															"end": 850,
+															"name": "X"
+														}
+													}
+												}
+											}
+										]
+									}
+								},
+								"body": {
+									"type": "BlockStatement",
+									"start": 856,
+									"end": 870,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 861,
+											"end": 866,
+											"expression": {
+												"type": "CallExpression",
+												"start": 861,
+												"end": 865,
+												"callee": {
+													"type": "Identifier",
+													"start": 861,
+													"end": 862,
+													"name": "g"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 863,
+														"end": 864,
+														"name": "a"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At 101 it does not, so the arguments break out",
+							"start": 687,
+							"end": 736
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 897,
+					"end": 1017,
+					"expression": {
+						"type": "CallExpression",
+						"start": 897,
+						"end": 1016,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 897,
+							"end": 901,
+							"object": {
+								"type": "Identifier",
+								"start": 897,
+								"end": 898,
+								"name": "o"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 899,
+								"end": 901,
+								"name": "fn"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 902,
+								"end": 906,
+								"name": "lead"
+							},
+							{
+								"type": "FunctionExpression",
+								"start": 908,
+								"end": 1015,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 918,
+										"end": 987,
+										"name": "a",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 919,
+											"end": 987,
+											"typeAnnotation": {
+												"type": "TSTypeLiteral",
+												"start": 921,
+												"end": 987,
+												"members": [
+													{
+														"type": "TSPropertySignature",
+														"start": 923,
+														"end": 928,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 923,
+															"end": 924,
+															"name": "b"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 924,
+															"end": 927,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 926,
+																"end": 927,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 926,
+																	"end": 927,
+																	"name": "C"
+																}
+															}
+														}
+													},
+													{
+														"type": "TSPropertySignature",
+														"start": 929,
+														"end": 985,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 929,
+															"end": 930,
+															"name": "d"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 930,
+															"end": 985,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 932,
+																"end": 985,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 932,
+																	"end": 985,
+																	"name": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
+																}
+															}
+														}
+													}
+												]
+											}
+										}
+									}
+								],
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 988,
+									"end": 1002,
+									"typeAnnotation": {
+										"type": "TSTypeLiteral",
+										"start": 990,
+										"end": 1002,
+										"members": [
+											{
+												"type": "TSPropertySignature",
+												"start": 994,
+												"end": 999,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 994,
+													"end": 995,
+													"name": "x"
+												},
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 995,
+													"end": 998,
+													"typeAnnotation": {
+														"type": "TSTypeReference",
+														"start": 997,
+														"end": 998,
+														"typeName": {
+															"type": "Identifier",
+															"start": 997,
+															"end": 998,
+															"name": "X"
+														}
+													}
+												}
+											}
+										]
+									}
+								},
+								"body": {
+									"type": "BlockStatement",
+									"start": 1003,
+									"end": 1015,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 1007,
+											"end": 1012,
+											"expression": {
+												"type": "CallExpression",
+												"start": 1007,
+												"end": 1011,
+												"callee": {
+													"type": "Identifier",
+													"start": 1007,
+													"end": 1008,
+													"name": "g"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 1009,
+														"end": 1010,
+														"name": "a"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a member callee",
+							"start": 877,
+							"end": 895
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1060,
+					"end": 1180,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1060,
+						"end": 1179,
+						"callee": {
+							"type": "CallExpression",
+							"start": 1060,
+							"end": 1065,
+							"callee": {
+								"type": "Identifier",
+								"start": 1060,
+								"end": 1062,
+								"name": "fn"
+							},
+							"arguments": [
+								{
+									"type": "Identifier",
+									"start": 1063,
+									"end": 1064,
+									"name": "a"
+								}
+							],
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 1066,
+								"end": 1070,
+								"name": "lead"
+							},
+							{
+								"type": "FunctionExpression",
+								"start": 1072,
+								"end": 1178,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 1082,
+										"end": 1150,
+										"name": "a",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 1083,
+											"end": 1150,
+											"typeAnnotation": {
+												"type": "TSTypeLiteral",
+												"start": 1085,
+												"end": 1150,
+												"members": [
+													{
+														"type": "TSPropertySignature",
+														"start": 1087,
+														"end": 1092,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 1087,
+															"end": 1088,
+															"name": "b"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 1088,
+															"end": 1091,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 1090,
+																"end": 1091,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 1090,
+																	"end": 1091,
+																	"name": "C"
+																}
+															}
+														}
+													},
+													{
+														"type": "TSPropertySignature",
+														"start": 1093,
+														"end": 1148,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 1093,
+															"end": 1094,
+															"name": "d"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 1094,
+															"end": 1148,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 1096,
+																"end": 1148,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 1096,
+																	"end": 1148,
+																	"name": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
+																}
+															}
+														}
+													}
+												]
+											}
+										}
+									}
+								],
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 1151,
+									"end": 1165,
+									"typeAnnotation": {
+										"type": "TSTypeLiteral",
+										"start": 1153,
+										"end": 1165,
+										"members": [
+											{
+												"type": "TSPropertySignature",
+												"start": 1157,
+												"end": 1162,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 1157,
+													"end": 1158,
+													"name": "x"
+												},
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 1158,
+													"end": 1161,
+													"typeAnnotation": {
+														"type": "TSTypeReference",
+														"start": 1160,
+														"end": 1161,
+														"typeName": {
+															"type": "Identifier",
+															"start": 1160,
+															"end": 1161,
+															"name": "X"
+														}
+													}
+												}
+											}
+										]
+									}
+								},
+								"body": {
+									"type": "BlockStatement",
+									"start": 1166,
+									"end": 1178,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 1170,
+											"end": 1175,
+											"expression": {
+												"type": "CallExpression",
+												"start": 1170,
+												"end": 1174,
+												"callee": {
+													"type": "Identifier",
+													"start": 1170,
+													"end": 1171,
+													"name": "g"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 1172,
+														"end": 1173,
+														"name": "a"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a curried callee and a non-null one",
+							"start": 1020,
+							"end": 1058
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1182,
+					"end": 1302,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1182,
+						"end": 1301,
+						"callee": {
+							"type": "TSNonNullExpression",
+							"start": 1182,
+							"end": 1185,
+							"expression": {
+								"type": "Identifier",
+								"start": 1182,
+								"end": 1184,
+								"name": "fn"
+							}
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 1186,
+								"end": 1190,
+								"name": "lead"
+							},
+							{
+								"type": "FunctionExpression",
+								"start": 1192,
+								"end": 1300,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 1202,
+										"end": 1272,
+										"name": "a",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 1203,
+											"end": 1272,
+											"typeAnnotation": {
+												"type": "TSTypeLiteral",
+												"start": 1205,
+												"end": 1272,
+												"members": [
+													{
+														"type": "TSPropertySignature",
+														"start": 1207,
+														"end": 1212,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 1207,
+															"end": 1208,
+															"name": "b"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 1208,
+															"end": 1211,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 1210,
+																"end": 1211,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 1210,
+																	"end": 1211,
+																	"name": "C"
+																}
+															}
+														}
+													},
+													{
+														"type": "TSPropertySignature",
+														"start": 1213,
+														"end": 1270,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 1213,
+															"end": 1214,
+															"name": "d"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 1214,
+															"end": 1270,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 1216,
+																"end": 1270,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 1216,
+																	"end": 1270,
+																	"name": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
+																}
+															}
+														}
+													}
+												]
+											}
+										}
+									}
+								],
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 1273,
+									"end": 1287,
+									"typeAnnotation": {
+										"type": "TSTypeLiteral",
+										"start": 1275,
+										"end": 1287,
+										"members": [
+											{
+												"type": "TSPropertySignature",
+												"start": 1279,
+												"end": 1284,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 1279,
+													"end": 1280,
+													"name": "x"
+												},
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 1280,
+													"end": 1283,
+													"typeAnnotation": {
+														"type": "TSTypeReference",
+														"start": 1282,
+														"end": 1283,
+														"typeName": {
+															"type": "Identifier",
+															"start": 1282,
+															"end": 1283,
+															"name": "X"
+														}
+													}
+												}
+											}
+										]
+									}
+								},
+								"body": {
+									"type": "BlockStatement",
+									"start": 1288,
+									"end": 1300,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 1292,
+											"end": 1297,
+											"expression": {
+												"type": "CallExpression",
+												"start": 1292,
+												"end": 1296,
+												"callee": {
+													"type": "Identifier",
+													"start": 1292,
+													"end": 1293,
+													"name": "g"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 1294,
+														"end": 1295,
+														"name": "a"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1330,
+					"end": 1450,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1330,
+						"end": 1449,
+						"callee": {
+							"type": "Identifier",
+							"start": 1330,
+							"end": 1332,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 1333,
+								"end": 1337,
+								"name": "lead"
+							},
+							{
+								"type": "FunctionExpression",
+								"start": 1339,
+								"end": 1448,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 1349,
+										"end": 1413,
+										"name": "a",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 1350,
+											"end": 1413,
+											"typeAnnotation": {
+												"type": "TSTypeLiteral",
+												"start": 1352,
+												"end": 1413,
+												"members": [
+													{
+														"type": "TSPropertySignature",
+														"start": 1354,
+														"end": 1359,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 1354,
+															"end": 1355,
+															"name": "b"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 1355,
+															"end": 1358,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 1357,
+																"end": 1358,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 1357,
+																	"end": 1358,
+																	"name": "C"
+																}
+															}
+														}
+													},
+													{
+														"type": "TSPropertySignature",
+														"start": 1360,
+														"end": 1411,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 1360,
+															"end": 1361,
+															"name": "d"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 1361,
+															"end": 1411,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 1363,
+																"end": 1411,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 1363,
+																	"end": 1411,
+																	"name": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
+																}
+															}
+														}
+													}
+												]
+											}
+										}
+									}
+								],
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 1414,
+									"end": 1435,
+									"typeAnnotation": {
+										"type": "TSMappedType",
+										"start": 1416,
+										"end": 1435,
+										"typeParameter": {
+											"type": "TSTypeParameter",
+											"start": 1421,
+											"end": 1427,
+											"name": "K",
+											"constraint": {
+												"type": "TSTypeReference",
+												"start": 1426,
+												"end": 1427,
+												"typeName": {
+													"type": "Identifier",
+													"start": 1426,
+													"end": 1427,
+													"name": "X"
+												}
+											}
+										},
+										"nameType": null,
+										"typeAnnotation": {
+											"type": "TSLiteralType",
+											"start": 1430,
+											"end": 1431,
+											"literal": {
+												"type": "Literal",
+												"start": 1430,
+												"end": 1431,
+												"value": 1,
+												"raw": "1"
+											}
+										}
+									}
+								},
+								"body": {
+									"type": "BlockStatement",
+									"start": 1436,
+									"end": 1448,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 1440,
+											"end": 1445,
+											"expression": {
+												"type": "CallExpression",
+												"start": 1440,
+												"end": 1444,
+												"callee": {
+													"type": "Identifier",
+													"start": 1440,
+													"end": 1441,
+													"name": "g"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 1442,
+														"end": 1443,
+														"name": "a"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a mapped return type",
+							"start": 1305,
+							"end": 1328
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1496,
+					"end": 1616,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1496,
+						"end": 1615,
+						"callee": {
+							"type": "Identifier",
+							"start": 1496,
+							"end": 1498,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 1499,
+								"end": 1503,
+								"name": "lead"
+							},
+							{
+								"type": "FunctionExpression",
+								"start": 1505,
+								"end": 1614,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 1515,
+										"end": 1586,
+										"name": "a",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 1516,
+											"end": 1586,
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 1518,
+												"end": 1586,
+												"typeName": {
+													"type": "Identifier",
+													"start": 1518,
+													"end": 1586,
+													"name": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
+												}
+											}
+										}
+									}
+								],
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 1587,
+									"end": 1601,
+									"typeAnnotation": {
+										"type": "TSTypeLiteral",
+										"start": 1589,
+										"end": 1601,
+										"members": [
+											{
+												"type": "TSPropertySignature",
+												"start": 1593,
+												"end": 1598,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 1593,
+													"end": 1594,
+													"name": "x"
+												},
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 1594,
+													"end": 1597,
+													"typeAnnotation": {
+														"type": "TSTypeReference",
+														"start": 1596,
+														"end": 1597,
+														"typeName": {
+															"type": "Identifier",
+															"start": 1596,
+															"end": 1597,
+															"name": "X"
+														}
+													}
+												}
+											}
+										]
+									}
+								},
+								"body": {
+									"type": "BlockStatement",
+									"start": 1602,
+									"end": 1614,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 1606,
+											"end": 1611,
+											"expression": {
+												"type": "CallExpression",
+												"start": 1606,
+												"end": 1610,
+												"callee": {
+													"type": "Identifier",
+													"start": 1606,
+													"end": 1607,
+													"name": "g"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 1608,
+														"end": 1609,
+														"name": "a"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a parameter that is not an object type",
+							"start": 1453,
+							"end": 1494
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1683,
+					"end": 1803,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1683,
+						"end": 1802,
+						"callee": {
+							"type": "Identifier",
+							"start": 1683,
+							"end": 1685,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 1686,
+								"end": 1690,
+								"name": "lead"
+							},
+							{
+								"type": "Identifier",
+								"start": 1692,
+								"end": 1697,
+								"name": "lead2"
+							},
+							{
+								"type": "FunctionExpression",
+								"start": 1699,
+								"end": 1801,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 1709,
+										"end": 1773,
+										"name": "a",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 1710,
+											"end": 1773,
+											"typeAnnotation": {
+												"type": "TSTypeLiteral",
+												"start": 1712,
+												"end": 1773,
+												"members": [
+													{
+														"type": "TSPropertySignature",
+														"start": 1714,
+														"end": 1719,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 1714,
+															"end": 1715,
+															"name": "b"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 1715,
+															"end": 1718,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 1717,
+																"end": 1718,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 1717,
+																	"end": 1718,
+																	"name": "C"
+																}
+															}
+														}
+													},
+													{
+														"type": "TSPropertySignature",
+														"start": 1720,
+														"end": 1771,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 1720,
+															"end": 1721,
+															"name": "d"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 1721,
+															"end": 1771,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 1723,
+																"end": 1771,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 1723,
+																	"end": 1771,
+																	"name": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
+																}
+															}
+														}
+													}
+												]
+											}
+										}
+									}
+								],
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 1774,
+									"end": 1788,
+									"typeAnnotation": {
+										"type": "TSTypeLiteral",
+										"start": 1776,
+										"end": 1788,
+										"members": [
+											{
+												"type": "TSPropertySignature",
+												"start": 1780,
+												"end": 1785,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 1780,
+													"end": 1781,
+													"name": "x"
+												},
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 1781,
+													"end": 1784,
+													"typeAnnotation": {
+														"type": "TSTypeReference",
+														"start": 1783,
+														"end": 1784,
+														"typeName": {
+															"type": "Identifier",
+															"start": 1783,
+															"end": 1784,
+															"name": "X"
+														}
+													}
+												}
+											}
+										]
+									}
+								},
+								"body": {
+									"type": "BlockStatement",
+									"start": 1789,
+									"end": 1801,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 1793,
+											"end": 1798,
+											"expression": {
+												"type": "CallExpression",
+												"start": 1793,
+												"end": 1797,
+												"callee": {
+													"type": "Identifier",
+													"start": 1793,
+													"end": 1794,
+													"name": "g"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 1795,
+														"end": 1796,
+														"name": "a"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " two preceding arguments, a named callback, a type parameter",
+							"start": 1619,
+							"end": 1681
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1805,
+					"end": 1925,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1805,
+						"end": 1924,
+						"callee": {
+							"type": "Identifier",
+							"start": 1805,
+							"end": 1807,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 1808,
+								"end": 1812,
+								"name": "lead"
+							},
+							{
+								"type": "FunctionExpression",
+								"start": 1814,
+								"end": 1923,
+								"id": {
+									"type": "Identifier",
+									"start": 1823,
+									"end": 1828,
+									"name": "named"
+								},
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 1829,
+										"end": 1895,
+										"name": "a",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 1830,
+											"end": 1895,
+											"typeAnnotation": {
+												"type": "TSTypeLiteral",
+												"start": 1832,
+												"end": 1895,
+												"members": [
+													{
+														"type": "TSPropertySignature",
+														"start": 1834,
+														"end": 1839,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 1834,
+															"end": 1835,
+															"name": "b"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 1835,
+															"end": 1838,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 1837,
+																"end": 1838,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 1837,
+																	"end": 1838,
+																	"name": "C"
+																}
+															}
+														}
+													},
+													{
+														"type": "TSPropertySignature",
+														"start": 1840,
+														"end": 1893,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 1840,
+															"end": 1841,
+															"name": "d"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 1841,
+															"end": 1893,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 1843,
+																"end": 1893,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 1843,
+																	"end": 1893,
+																	"name": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
+																}
+															}
+														}
+													}
+												]
+											}
+										}
+									}
+								],
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 1896,
+									"end": 1910,
+									"typeAnnotation": {
+										"type": "TSTypeLiteral",
+										"start": 1898,
+										"end": 1910,
+										"members": [
+											{
+												"type": "TSPropertySignature",
+												"start": 1902,
+												"end": 1907,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 1902,
+													"end": 1903,
+													"name": "x"
+												},
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 1903,
+													"end": 1906,
+													"typeAnnotation": {
+														"type": "TSTypeReference",
+														"start": 1905,
+														"end": 1906,
+														"typeName": {
+															"type": "Identifier",
+															"start": 1905,
+															"end": 1906,
+															"name": "X"
+														}
+													}
+												}
+											}
+										]
+									}
+								},
+								"body": {
+									"type": "BlockStatement",
+									"start": 1911,
+									"end": 1923,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 1915,
+											"end": 1920,
+											"expression": {
+												"type": "CallExpression",
+												"start": 1915,
+												"end": 1919,
+												"callee": {
+													"type": "Identifier",
+													"start": 1915,
+													"end": 1916,
+													"name": "g"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 1917,
+														"end": 1918,
+														"name": "a"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1927,
+					"end": 2047,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1927,
+						"end": 2046,
+						"callee": {
+							"type": "Identifier",
+							"start": 1927,
+							"end": 1929,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 1930,
+								"end": 1934,
+								"name": "lead"
+							},
+							{
+								"type": "FunctionExpression",
+								"start": 1936,
+								"end": 2045,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"typeParameters": {
+									"type": "TSTypeParameterDeclaration",
+									"start": 1945,
+									"end": 1948,
+									"params": [
+										{
+											"type": "TSTypeParameter",
+											"start": 1946,
+											"end": 1947,
+											"name": "T"
+										}
+									]
+								},
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 1949,
+										"end": 2017,
+										"name": "a",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 1950,
+											"end": 2017,
+											"typeAnnotation": {
+												"type": "TSTypeLiteral",
+												"start": 1952,
+												"end": 2017,
+												"members": [
+													{
+														"type": "TSPropertySignature",
+														"start": 1954,
+														"end": 1959,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 1954,
+															"end": 1955,
+															"name": "b"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 1955,
+															"end": 1958,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 1957,
+																"end": 1958,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 1957,
+																	"end": 1958,
+																	"name": "C"
+																}
+															}
+														}
+													},
+													{
+														"type": "TSPropertySignature",
+														"start": 1960,
+														"end": 2015,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 1960,
+															"end": 1961,
+															"name": "d"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 1961,
+															"end": 2015,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 1963,
+																"end": 2015,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 1963,
+																	"end": 2015,
+																	"name": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
+																}
+															}
+														}
+													}
+												]
+											}
+										}
+									}
+								],
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 2018,
+									"end": 2032,
+									"typeAnnotation": {
+										"type": "TSTypeLiteral",
+										"start": 2020,
+										"end": 2032,
+										"members": [
+											{
+												"type": "TSPropertySignature",
+												"start": 2024,
+												"end": 2029,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 2024,
+													"end": 2025,
+													"name": "x"
+												},
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 2025,
+													"end": 2028,
+													"typeAnnotation": {
+														"type": "TSTypeReference",
+														"start": 2027,
+														"end": 2028,
+														"typeName": {
+															"type": "Identifier",
+															"start": 2027,
+															"end": 2028,
+															"name": "X"
+														}
+													}
+												}
+											}
+										]
+									}
+								},
+								"body": {
+									"type": "BlockStatement",
+									"start": 2033,
+									"end": 2045,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 2037,
+											"end": 2042,
+											"expression": {
+												"type": "CallExpression",
+												"start": 2037,
+												"end": 2041,
+												"callee": {
+													"type": "Identifier",
+													"start": 2037,
+													"end": 2038,
+													"name": "g"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 2039,
+														"end": 2040,
+														"name": "a"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 2101,
+					"end": 2221,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 2107,
+							"end": 2220,
+							"id": {
+								"type": "Identifier",
+								"start": 2107,
+								"end": 2108,
+								"name": "v"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 2111,
+								"end": 2220,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 2111,
+									"end": 2119,
+									"object": {
+										"type": "CallExpression",
+										"start": 2111,
+										"end": 2116,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 2111,
+											"end": 2114,
+											"object": {
+												"type": "Identifier",
+												"start": 2111,
+												"end": 2112,
+												"name": "o"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 2113,
+												"end": 2114,
+												"name": "a"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 2117,
+										"end": 2119,
+										"name": "fn"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 2120,
+										"end": 2124,
+										"name": "lead"
+									},
+									{
+										"type": "FunctionExpression",
+										"start": 2126,
+										"end": 2219,
+										"id": null,
+										"expression": false,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 2136,
+												"end": 2191,
+												"name": "a",
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 2137,
+													"end": 2191,
+													"typeAnnotation": {
+														"type": "TSTypeLiteral",
+														"start": 2139,
+														"end": 2191,
+														"members": [
+															{
+																"type": "TSPropertySignature",
+																"start": 2141,
+																"end": 2146,
+																"computed": false,
+																"key": {
+																	"type": "Identifier",
+																	"start": 2141,
+																	"end": 2142,
+																	"name": "b"
+																},
+																"typeAnnotation": {
+																	"type": "TSTypeAnnotation",
+																	"start": 2142,
+																	"end": 2145,
+																	"typeAnnotation": {
+																		"type": "TSTypeReference",
+																		"start": 2144,
+																		"end": 2145,
+																		"typeName": {
+																			"type": "Identifier",
+																			"start": 2144,
+																			"end": 2145,
+																			"name": "C"
+																		}
+																	}
+																}
+															},
+															{
+																"type": "TSPropertySignature",
+																"start": 2147,
+																"end": 2189,
+																"computed": false,
+																"key": {
+																	"type": "Identifier",
+																	"start": 2147,
+																	"end": 2148,
+																	"name": "d"
+																},
+																"typeAnnotation": {
+																	"type": "TSTypeAnnotation",
+																	"start": 2148,
+																	"end": 2189,
+																	"typeAnnotation": {
+																		"type": "TSTypeReference",
+																		"start": 2150,
+																		"end": 2189,
+																		"typeName": {
+																			"type": "Identifier",
+																			"start": 2150,
+																			"end": 2189,
+																			"name": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
+																		}
+																	}
+																}
+															}
+														]
+													}
+												}
+											}
+										],
+										"returnType": {
+											"type": "TSTypeAnnotation",
+											"start": 2192,
+											"end": 2206,
+											"typeAnnotation": {
+												"type": "TSTypeLiteral",
+												"start": 2194,
+												"end": 2206,
+												"members": [
+													{
+														"type": "TSPropertySignature",
+														"start": 2198,
+														"end": 2203,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 2198,
+															"end": 2199,
+															"name": "x"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 2199,
+															"end": 2202,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 2201,
+																"end": 2202,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 2201,
+																	"end": 2202,
+																	"name": "X"
+																}
+															}
+														}
+													}
+												]
+											}
+										},
+										"body": {
+											"type": "BlockStatement",
+											"start": 2207,
+											"end": 2219,
+											"body": [
+												{
+													"type": "ExpressionStatement",
+													"start": 2211,
+													"end": 2216,
+													"expression": {
+														"type": "CallExpression",
+														"start": 2211,
+														"end": 2215,
+														"callee": {
+															"type": "Identifier",
+															"start": 2211,
+															"end": 2212,
+															"name": "g"
+														},
+														"arguments": [
+															{
+																"type": "Identifier",
+																"start": 2213,
+																"end": 2214,
+																"name": "a"
+															}
+														],
+														"optional": false
+													}
+												}
+											]
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a two-call member chain stays flat for the hug",
+							"start": 2050,
+							"end": 2099
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2262,
+					"end": 2392,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2262,
+						"end": 2391,
+						"callee": {
+							"type": "Identifier",
+							"start": 2262,
+							"end": 2267,
+							"name": "outer"
+						},
+						"arguments": [
+							{
+								"type": "CallExpression",
+								"start": 2271,
+								"end": 2388,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 2271,
+									"end": 2279,
+									"object": {
+										"type": "CallExpression",
+										"start": 2271,
+										"end": 2276,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 2271,
+											"end": 2274,
+											"object": {
+												"type": "Identifier",
+												"start": 2271,
+												"end": 2272,
+												"name": "o"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 2273,
+												"end": 2274,
+												"name": "a"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 2277,
+										"end": 2279,
+										"name": "fn"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 2280,
+										"end": 2284,
+										"name": "lead"
+									},
+									{
+										"type": "FunctionExpression",
+										"start": 2286,
+										"end": 2387,
+										"id": null,
+										"expression": false,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 2296,
+												"end": 2355,
+												"name": "a",
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 2297,
+													"end": 2355,
+													"typeAnnotation": {
+														"type": "TSTypeLiteral",
+														"start": 2299,
+														"end": 2355,
+														"members": [
+															{
+																"type": "TSPropertySignature",
+																"start": 2301,
+																"end": 2306,
+																"computed": false,
+																"key": {
+																	"type": "Identifier",
+																	"start": 2301,
+																	"end": 2302,
+																	"name": "b"
+																},
+																"typeAnnotation": {
+																	"type": "TSTypeAnnotation",
+																	"start": 2302,
+																	"end": 2305,
+																	"typeAnnotation": {
+																		"type": "TSTypeReference",
+																		"start": 2304,
+																		"end": 2305,
+																		"typeName": {
+																			"type": "Identifier",
+																			"start": 2304,
+																			"end": 2305,
+																			"name": "C"
+																		}
+																	}
+																}
+															},
+															{
+																"type": "TSPropertySignature",
+																"start": 2307,
+																"end": 2353,
+																"computed": false,
+																"key": {
+																	"type": "Identifier",
+																	"start": 2307,
+																	"end": 2308,
+																	"name": "d"
+																},
+																"typeAnnotation": {
+																	"type": "TSTypeAnnotation",
+																	"start": 2308,
+																	"end": 2353,
+																	"typeAnnotation": {
+																		"type": "TSTypeReference",
+																		"start": 2310,
+																		"end": 2353,
+																		"typeName": {
+																			"type": "Identifier",
+																			"start": 2310,
+																			"end": 2353,
+																			"name": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
+																		}
+																	}
+																}
+															}
+														]
+													}
+												}
+											}
+										],
+										"returnType": {
+											"type": "TSTypeAnnotation",
+											"start": 2356,
+											"end": 2372,
+											"typeAnnotation": {
+												"type": "TSTypeLiteral",
+												"start": 2358,
+												"end": 2372,
+												"members": [
+													{
+														"type": "TSPropertySignature",
+														"start": 2363,
+														"end": 2368,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 2363,
+															"end": 2364,
+															"name": "x"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 2364,
+															"end": 2367,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 2366,
+																"end": 2367,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 2366,
+																	"end": 2367,
+																	"name": "X"
+																}
+															}
+														}
+													}
+												]
+											}
+										},
+										"body": {
+											"type": "BlockStatement",
+											"start": 2373,
+											"end": 2387,
+											"body": [
+												{
+													"type": "ExpressionStatement",
+													"start": 2378,
+													"end": 2383,
+													"expression": {
+														"type": "CallExpression",
+														"start": 2378,
+														"end": 2382,
+														"callee": {
+															"type": "Identifier",
+															"start": 2378,
+															"end": 2379,
+															"name": "g"
+														},
+														"arguments": [
+															{
+																"type": "Identifier",
+																"start": 2380,
+																"end": 2381,
+																"name": "a"
+															}
+														],
+														"optional": false
+													}
+												}
+											]
+										}
+									}
+								],
+								"optional": false
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same chain as a call argument",
+							"start": 2224,
+							"end": 2260
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2413,
+					"end": 2520,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2413,
+						"end": 2519,
+						"callee": {
+							"type": "Identifier",
+							"start": 2413,
+							"end": 2415,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 2416,
+								"end": 2420,
+								"name": "lead"
+							},
+							{
+								"type": "FunctionExpression",
+								"start": 2422,
+								"end": 2518,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 2432,
+										"end": 2500,
+										"name": "a",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 2433,
+											"end": 2500,
+											"typeAnnotation": {
+												"type": "TSTypeLiteral",
+												"start": 2435,
+												"end": 2500,
+												"members": [
+													{
+														"type": "TSPropertySignature",
+														"start": 2437,
+														"end": 2442,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 2437,
+															"end": 2438,
+															"name": "b"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 2438,
+															"end": 2441,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 2440,
+																"end": 2441,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 2440,
+																	"end": 2441,
+																	"name": "C"
+																}
+															}
+														}
+													},
+													{
+														"type": "TSPropertySignature",
+														"start": 2443,
+														"end": 2498,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 2443,
+															"end": 2444,
+															"name": "d"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 2444,
+															"end": 2498,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 2446,
+																"end": 2498,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 2446,
+																	"end": 2498,
+																	"name": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
+																}
+															}
+														}
+													}
+												]
+											}
+										}
+									}
+								],
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 2501,
+									"end": 2515,
+									"typeAnnotation": {
+										"type": "TSTypeLiteral",
+										"start": 2503,
+										"end": 2515,
+										"members": [
+											{
+												"type": "TSPropertySignature",
+												"start": 2507,
+												"end": 2512,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 2507,
+													"end": 2508,
+													"name": "x"
+												},
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 2508,
+													"end": 2511,
+													"typeAnnotation": {
+														"type": "TSTypeReference",
+														"start": 2510,
+														"end": 2511,
+														"typeName": {
+															"type": "Identifier",
+															"start": 2510,
+															"end": 2511,
+															"name": "X"
+														}
+													}
+												}
+											}
+										]
+									}
+								},
+								"body": {
+									"type": "BlockStatement",
+									"start": 2516,
+									"end": 2518,
+									"body": []
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an empty body",
+							"start": 2395,
+							"end": 2411
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2613,
+					"end": 2738,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2613,
+						"end": 2737,
+						"callee": {
+							"type": "Identifier",
+							"start": 2613,
+							"end": 2615,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 2619,
+								"end": 2623,
+								"name": "lead"
+							},
+							{
+								"type": "FunctionExpression",
+								"start": 2627,
+								"end": 2734,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 2637,
+										"end": 2714,
+										"name": "a",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 2638,
+											"end": 2714,
+											"typeAnnotation": {
+												"type": "TSTypeLiteral",
+												"start": 2640,
+												"end": 2714,
+												"members": [
+													{
+														"type": "TSPropertySignature",
+														"start": 2642,
+														"end": 2647,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 2642,
+															"end": 2643,
+															"name": "b"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 2643,
+															"end": 2646,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 2645,
+																"end": 2646,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 2645,
+																	"end": 2646,
+																	"name": "C"
+																}
+															}
+														}
+													},
+													{
+														"type": "TSPropertySignature",
+														"start": 2648,
+														"end": 2712,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 2648,
+															"end": 2649,
+															"name": "d"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 2649,
+															"end": 2712,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 2651,
+																"end": 2712,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 2651,
+																	"end": 2712,
+																	"name": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
+																}
+															}
+														}
+													}
+												]
+											}
+										}
+									}
+								],
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 2715,
+									"end": 2719,
+									"typeAnnotation": {
+										"type": "TSTypeLiteral",
+										"start": 2717,
+										"end": 2719,
+										"members": []
+									}
+								},
+								"body": {
+									"type": "BlockStatement",
+									"start": 2720,
+									"end": 2734,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 2725,
+											"end": 2730,
+											"expression": {
+												"type": "CallExpression",
+												"start": 2725,
+												"end": 2729,
+												"callee": {
+													"type": "Identifier",
+													"start": 2725,
+													"end": 2726,
+													"name": "g"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 2727,
+														"end": 2728,
+														"name": "a"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " control: an empty object return type has nothing to break, so the arguments break out",
+							"start": 2523,
+							"end": 2611
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2794,
+					"end": 2914,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2794,
+						"end": 2913,
+						"callee": {
+							"type": "Identifier",
+							"start": 2794,
+							"end": 2796,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "FunctionExpression",
+								"start": 2797,
+								"end": 2912,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 2807,
+										"end": 2884,
+										"name": "a",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 2808,
+											"end": 2884,
+											"typeAnnotation": {
+												"type": "TSTypeLiteral",
+												"start": 2810,
+												"end": 2884,
+												"members": [
+													{
+														"type": "TSPropertySignature",
+														"start": 2812,
+														"end": 2817,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 2812,
+															"end": 2813,
+															"name": "b"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 2813,
+															"end": 2816,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 2815,
+																"end": 2816,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 2815,
+																	"end": 2816,
+																	"name": "C"
+																}
+															}
+														}
+													},
+													{
+														"type": "TSPropertySignature",
+														"start": 2818,
+														"end": 2882,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 2818,
+															"end": 2819,
+															"name": "d"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 2819,
+															"end": 2882,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 2821,
+																"end": 2882,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 2821,
+																	"end": 2882,
+																	"name": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
+																}
+															}
+														}
+													}
+												]
+											}
+										}
+									}
+								],
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 2885,
+									"end": 2899,
+									"typeAnnotation": {
+										"type": "TSTypeLiteral",
+										"start": 2887,
+										"end": 2899,
+										"members": [
+											{
+												"type": "TSPropertySignature",
+												"start": 2891,
+												"end": 2896,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 2891,
+													"end": 2892,
+													"name": "x"
+												},
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 2892,
+													"end": 2895,
+													"typeAnnotation": {
+														"type": "TSTypeReference",
+														"start": 2894,
+														"end": 2895,
+														"typeName": {
+															"type": "Identifier",
+															"start": 2894,
+															"end": 2895,
+															"name": "X"
+														}
+													}
+												}
+											}
+										]
+									}
+								},
+								"body": {
+									"type": "BlockStatement",
+									"start": 2900,
+									"end": 2912,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 2904,
+											"end": 2909,
+											"expression": {
+												"type": "CallExpression",
+												"start": 2904,
+												"end": 2908,
+												"callee": {
+													"type": "Identifier",
+													"start": 2904,
+													"end": 2905,
+													"name": "g"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 2906,
+														"end": 2907,
+														"name": "a"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " control: a lone callback hugs in both formatters",
+							"start": 2741,
+							"end": 2792
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2992,
+					"end": 3117,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2992,
+						"end": 3116,
+						"callee": {
+							"type": "Identifier",
+							"start": 2992,
+							"end": 2994,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 2998,
+								"end": 3002,
+								"name": "lead"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 3006,
+								"end": 3113,
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 3085,
+									"end": 3095,
+									"typeAnnotation": {
+										"type": "TSTypeLiteral",
+										"start": 3087,
+										"end": 3095,
+										"members": [
+											{
+												"type": "TSPropertySignature",
+												"start": 3089,
+												"end": 3093,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 3089,
+													"end": 3090,
+													"name": "x"
+												},
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 3090,
+													"end": 3093,
+													"typeAnnotation": {
+														"type": "TSTypeReference",
+														"start": 3092,
+														"end": 3093,
+														"typeName": {
+															"type": "Identifier",
+															"start": 3092,
+															"end": 3093,
+															"name": "X"
+														}
+													}
+												}
+											}
+										]
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 3007,
+										"end": 3084,
+										"name": "a",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 3008,
+											"end": 3084,
+											"typeAnnotation": {
+												"type": "TSTypeLiteral",
+												"start": 3010,
+												"end": 3084,
+												"members": [
+													{
+														"type": "TSPropertySignature",
+														"start": 3012,
+														"end": 3017,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 3012,
+															"end": 3013,
+															"name": "b"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 3013,
+															"end": 3016,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 3015,
+																"end": 3016,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 3015,
+																	"end": 3016,
+																	"name": "C"
+																}
+															}
+														}
+													},
+													{
+														"type": "TSPropertySignature",
+														"start": 3018,
+														"end": 3082,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 3018,
+															"end": 3019,
+															"name": "d"
+														},
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 3019,
+															"end": 3082,
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 3021,
+																"end": 3082,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 3021,
+																	"end": 3082,
+																	"name": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
+																}
+															}
+														}
+													}
+												]
+											}
+										}
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 3099,
+									"end": 3113,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 3104,
+											"end": 3109,
+											"expression": {
+												"type": "CallExpression",
+												"start": 3104,
+												"end": 3108,
+												"callee": {
+													"type": "Identifier",
+													"start": 3104,
+													"end": 3105,
+													"name": "g"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 3106,
+														"end": 3107,
+														"name": "a"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " control: an arrow callback breaks the arguments out in both formatters",
+							"start": 2917,
+							"end": 2990
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

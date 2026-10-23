@@ -409,11 +409,11 @@ pub struct Printer<'a> {
     /// whose span holds the assumed position, which is what keeps the chain share sound under
     /// it ([`Self::chain_share_key`]).
     pub(crate) assumed_break: Cell<Option<AssumedBreak>>,
-    /// The callback argument (by span start) whose member-chain call must print its
-    /// `calls::AssumedParamHug` hug state outright — set by the chain printer while it
-    /// builds the chain's own convergence state, and CONSUMED (cleared) by the argument
-    /// printer that takes it, which is how the chain learns the state exists.
-    pub(crate) force_assumed_param_hug: Cell<Option<u32>>,
+    /// The callback argument (by span start) whose member-chain call must print one of its
+    /// `calls::AssumedParamHug` hug states outright, and which one — set by the chain printer
+    /// while it builds the chain's own convergence states, and CONSUMED (cleared) by the
+    /// argument printer that takes it, which is how the chain learns the state exists.
+    pub(in crate::printer) force_assumed_param_hug: Cell<Option<(u32, calls::AssumedHugKind)>>,
     /// How many trailing runs [`Self::append_trailing_paren_comments`] has DEFERRED out of a
     /// grouping pair the printer strips (`x + (y * z // c⏎)`): a `line_suffix` that no
     /// break inside the operand ends, so it rides to wherever the enclosing line ends.

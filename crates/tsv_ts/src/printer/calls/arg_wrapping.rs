@@ -21,7 +21,7 @@ use super::arg_predicates::{
 use crate::ast::internal;
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, arrow_signature_refuses_hug, arrow_token_end,
-    flat_sole_param_literal, prepend_leading,
+    flat_sole_param_literal, function_return_hug_break, prepend_leading,
 };
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
@@ -1433,11 +1433,12 @@ pub(super) fn build_single_arrow_hug_doc(
         build_arrow_hug_arg_docs(printer, arg, arrow, &build)
     })
     .with_leading(d, leading);
-    let assumed = assumed.map(|hug| {
+    let assumed = assumed.and_then(|hug| {
         hug.build(printer, false, || {
             build_arrow_hug_printed_doc(printer, arg, arrow, &build)
         })
-        .map(|doc| prepend_leading(d, leading, doc))
+        .literal
+        .map(|assumed| assumed.map(|doc| prepend_leading(d, leading, doc)))
     });
     build_single_arrow_arg_states(d, opener, docs, expands_internally, assumed)
 }
@@ -1466,14 +1467,50 @@ pub(super) fn build_single_arrow_hug_doc(
 /// ([`FlatSoleParamLiteral::return_break`](crate::printer::expressions::functions::FlatSoleParamLiteral::return_break)).
 /// Everywhere else the hug breaks the literal itself, and the body's break ends the line.
 ///
+/// The same family holds a second state, for a `function` callback with ONE parameter of any
+/// type whose hug flattens its parameters: the hug with its return type's first `{` assumed
+/// broken ([`function_return_hug_break`]). Prettier measures that hug only up to the `{`, so
+/// it hugs where the inline state, measured to the body's `{`, does not fit. That state needs
+/// no gate — it is the ordinary hug fit, which stops at the assumed break — and sits ahead
+/// of the literal's state. With a flat sole-parameter literal too, its printing IS that
+/// state's probe (the same build under the same break), so the one printing serves both
+/// ([`ShareTag::AssumedHugProbe`]).
+///
 /// The callback's body is built ONCE and shared by every printing of it (the body inject),
 /// so each further printing the state needs costs a signature and not the subtree — nested
 /// callbacks of this shape stay linear.
 pub(in crate::printer) struct AssumedParamHug<'a> {
     arg: &'a internal::Expression<'a>,
-    literal: u32,
+    /// The flat sole-parameter literal's position, when the callback has one
+    /// ([`flat_sole_param_literal`]).
+    literal: Option<u32>,
+    /// The literal state's return-type probe break
+    /// ([`FlatSoleParamLiteral::return_break`](crate::printer::expressions::functions::FlatSoleParamLiteral::return_break)).
     return_break: Option<AssumedBreak>,
+    /// The return-type hug's break ([`function_return_hug_break`]).
+    return_hug: Option<AssumedBreak>,
     body: (u32, DocId),
+}
+
+/// Which of [`AssumedParamHug`]'s states a member chain asks a call to print outright
+/// (`Printer::force_assumed_param_hug`).
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(in crate::printer) enum AssumedHugKind {
+    /// The hug with the sole parameter's literal assumed expanded.
+    ParamLiteral,
+    /// The hug with the return type's first `{` assumed broken.
+    ReturnType,
+}
+
+/// [`AssumedParamHug::build`]'s states for one site: the literal's gated state and the
+/// return-type hug, each `None` where the callback or the site has none.
+#[derive(Clone, Copy, Default)]
+pub(super) struct AssumedHugStates {
+    /// The literal's state ([`AssumedHugDoc`]).
+    pub(super) literal: Option<AssumedHugDoc>,
+    /// The callback printed with its return type's first `{` assumed broken — the
+    /// return-type hug's contents.
+    pub(super) return_hug: Option<DocId>,
 }
 
 /// [`AssumedParamHug::build`]'s printings: the state's contents, and the line its gate
@@ -1521,20 +1558,30 @@ impl<'a> AssumedParamHug<'a> {
         printer: &Printer<'_>,
         arg: &'a internal::Expression<'a>,
     ) -> Option<Self> {
-        let flat = flat_sole_param_literal(printer, arg)?;
+        let flat = flat_sole_param_literal(printer, arg);
+        let return_hug = function_return_hug_break(printer, arg);
+        let body = match (&flat, &arg.kind) {
+            (Some(flat), _) => flat.body,
+            (None, internal::ExpressionKind::FunctionExpression(func)) if return_hug.is_some() => {
+                &func.body
+            }
+            _ => return None,
+        };
+        let is_arrow = flat.as_ref().is_some_and(|flat| flat.is_arrow);
         let key = printer.chain_share_key(arg, ShareTag::AssumedHugBody);
-        let body = printer.chain_shared_doc(key, || {
-            if flat.is_arrow {
-                printer.arrow_block_body_doc(flat.body)
+        let body_doc = printer.chain_shared_doc(key, || {
+            if is_arrow {
+                printer.arrow_block_body_doc(body)
             } else {
-                printer.build_block_statement_doc(flat.body)
+                printer.build_block_statement_doc(body)
             }
         });
         Some(Self {
             arg,
-            literal: flat.literal,
-            return_break: flat.return_break,
-            body: (flat.body.span.start, body),
+            literal: flat.as_ref().map(|flat| flat.literal),
+            return_break: flat.and_then(|flat| flat.return_break),
+            return_hug,
+            body: (body.span.start, body_doc),
         })
     }
 
@@ -1567,18 +1614,36 @@ impl<'a> AssumedParamHug<'a> {
     /// `flattens_params` says the site's hug flattens the callback's parameters (prettier's
     /// `shouldExpandParameters`): a `function` whose return type then ends the broken-out
     /// line is printed a third time for the gate ([`AssumedHugDoc::probe`]), with the same
-    /// `build` and sharing.
+    /// `build` and sharing — and only there does the return-type hug exist. Where both do,
+    /// their breaks are the one return type's `{` (both read the object or mapped return
+    /// type; only the hug also reads a `Promise<{` or a hugged union, which never groups the
+    /// parameters), so one printing is both.
     pub(super) fn build(
         &self,
         printer: &Printer<'_>,
         flattens_params: bool,
         build: impl Fn() -> DocId,
-    ) -> AssumedHugDoc {
-        AssumedHugDoc {
-            doc: self.contents(printer, &build),
-            probe: self
-                .return_probe(flattens_params)
-                .map(|assumed| self.print(printer, ShareTag::AssumedHugProbe, assumed, &build)),
+    ) -> AssumedHugStates {
+        let probe_break = self.return_probe(flattens_params);
+        let hug_break = self.return_hug.filter(|_| flattens_params);
+        debug_assert!(
+            probe_break.is_none() || hug_break.is_none() || probe_break == hug_break,
+            "the literal's probe and the return-type hug read one return type's `{{`"
+        );
+        let return_printed = probe_break
+            .or(hug_break)
+            .map(|assumed| self.print(printer, ShareTag::AssumedHugProbe, assumed, &build));
+        AssumedHugStates {
+            literal: self.literal.map(|literal| AssumedHugDoc {
+                doc: self.print(
+                    printer,
+                    ShareTag::AssumedHugArg,
+                    AssumedBreak::TypeLiteral(literal),
+                    &build,
+                ),
+                probe: probe_break.and(return_printed),
+            }),
+            return_hug: hug_break.and(return_printed),
         }
     }
 
@@ -1609,17 +1674,6 @@ impl<'a> AssumedParamHug<'a> {
         self.return_break.filter(|_| flattens_params)
     }
 
-    /// [`Self::build`]'s contents alone — what a site that returns the state's contents
-    /// outright ([`Self::take_forced`]) renders, with no gate to measure.
-    pub(super) fn contents(&self, printer: &Printer<'_>, build: impl Fn() -> DocId) -> DocId {
-        self.print(
-            printer,
-            ShareTag::AssumedHugArg,
-            AssumedBreak::TypeLiteral(self.literal),
-            build,
-        )
-    }
-
     /// One printing of the callback by `build`, with `assumed` read as authored and the body
     /// shared — shared itself across a member chain's candidates under `tag`.
     fn print(
@@ -1637,15 +1691,32 @@ impl<'a> AssumedParamHug<'a> {
         })
     }
 
-    /// Whether a member chain asked for this callback's hug state outright
-    /// (`Printer::force_assumed_param_hug`) — consuming the request, which is how the chain
-    /// learns the state exists. The site then returns the state's contents alone.
-    pub(super) fn take_forced(&self, printer: &Printer<'_>) -> bool {
-        let forced = printer.force_assumed_param_hug.get() == Some(self.arg.span.start);
-        if forced {
-            printer.force_assumed_param_hug.set(None);
+    /// The contents of the state of `kind` a member chain asked this callback for outright
+    /// (`Printer::force_assumed_param_hug`), printed by `build` with no gate to measure —
+    /// consuming the request, which is how the chain learns the state exists. The site then
+    /// returns those contents alone. `None` when no such request names this callback, or
+    /// the callback has no state of that kind (the request stands, and the chain drops it).
+    ///
+    /// The return-type hug is asked for only at a site whose hug flattens the parameters
+    /// (the chain asks for it on the last of several arguments).
+    pub(super) fn take_forced(
+        &self,
+        printer: &Printer<'_>,
+        kind: AssumedHugKind,
+        build: impl Fn() -> DocId,
+    ) -> Option<DocId> {
+        if printer.force_assumed_param_hug.get() != Some((self.arg.span.start, kind)) {
+            return None;
         }
-        forced
+        let (tag, assumed) = match kind {
+            AssumedHugKind::ParamLiteral => (
+                ShareTag::AssumedHugArg,
+                AssumedBreak::TypeLiteral(self.literal?),
+            ),
+            AssumedHugKind::ReturnType => (ShareTag::AssumedHugProbe, self.return_hug?),
+        };
+        printer.force_assumed_param_hug.set(None);
+        Some(self.print(printer, tag, assumed, build))
     }
 }
 
@@ -1951,29 +2022,33 @@ impl ArgOpener {
     }
 
     /// [`Self::inline_or_expand_all`] for a block-bodied callback last argument, with the
-    /// [`AssumedParamHug`] state between its two when `assumed` (the callback printed with its
-    /// literal assumed expanded) is `Some` — gated on `last_arg_doc`, the argument as the
-    /// broken-out state prints it.
+    /// [`AssumedParamHug`] states between its two, each where `assumed` has it: the
+    /// return-type hug, an ungated inline state over the callback printed with its return
+    /// type's first `{` assumed broken, so it is measured to that `{`; then the literal's
+    /// state, over the callback printed with its literal assumed expanded, gated on
+    /// `last_arg_doc`, the argument as the broken-out state prints it.
+    ///
+    /// The return-type hug comes first: where the broken-out line cannot hold the literal
+    /// flat either, both are admitted, and prettier keeps the literal flat and breaks the
+    /// return type (`calls/function_arg_hugged_return_type_long`).
     #[inline]
     pub(super) fn inline_assumed_or_expand_all(
         self,
         d: &DocArena,
         head_parts: &[DocId],
         last_arg_doc: DocId,
-        assumed: Option<AssumedHugDoc>,
+        assumed: AssumedHugStates,
         all_args_broken: DocId,
     ) -> DocId {
-        let Some(assumed) = assumed else {
-            return self.inline_or_expand_all(d, head_parts, last_arg_doc, all_args_broken);
-        };
-        self.ladder(
-            d,
-            &[
-                self.inline(d, head_parts, last_arg_doc),
-                assumed.state(d, last_arg_doc, self.inline(d, head_parts, assumed.doc)),
-                self.expand_all_state(d, all_args_broken),
-            ],
-        )
+        let mut states: SmallVec<[DocId; 4]> = smallvec![self.inline(d, head_parts, last_arg_doc)];
+        if let Some(return_hug) = assumed.return_hug {
+            states.push(self.inline(d, head_parts, return_hug));
+        }
+        if let Some(literal) = assumed.literal {
+            states.push(literal.state(d, last_arg_doc, self.inline(d, head_parts, literal.doc)));
+        }
+        states.push(self.expand_all_state(d, all_args_broken));
+        self.ladder(d, &states)
     }
 
     /// The three-state ladder for a **different-type** expand-last argument:
@@ -2247,16 +2322,16 @@ pub(super) fn build_expand_first_arg_doc(
     let all_args_broken = AssumedParamHug::sharing(assumed.as_ref(), printer, || {
         build_call_args_expanded(printer, opener.args_only(), arguments, paren_open, call_end)
     });
-    if let Some(hug) = &assumed
-        && hug.take_forced(printer)
+    if let Some(first) = assumed
+        .as_ref()
+        .and_then(|hug| hug.take_forced(printer, AssumedHugKind::ParamLiteral, build_first))
     {
-        let first = hug.contents(printer, build_first);
         return opener.after_callee(
             d,
             opener.expand_first_state(d, d.group_break(first), d.concat(&tail_parts)),
         );
     }
-    let assumed = assumed.map(|hug| hug.build(printer, false, build_first));
+    let assumed = assumed.and_then(|hug| hug.build(printer, false, build_first).literal);
     opener.inline_hug_first_or_expand_all(
         d,
         first_arg_doc,

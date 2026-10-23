@@ -221,8 +221,9 @@ pub(super) fn try_expand_last_arg(
         };
         (call_body, obj_body)
     };
-    // A block-bodied callback whose sole parameter's object type is written flat shares its
-    // body the same way, for the convergence state it may take ([`AssumedParamHug`]). Disjoint
+    // A block-bodied callback whose sole parameter's object type is written flat, or a
+    // `function` one whose hug is measured to its return type's `{`, shares its body the same
+    // way, for the states it may take ([`AssumedParamHug`]). Disjoint
     // from both prebuilds above (an expression body) and from the gap-break state (a comment
     // in the signature, which the state's own gate refuses).
     let assumed = if arrow_gap_break.is_none() && body_reuse.is_none() && obj_reuse.is_none() {
@@ -330,7 +331,7 @@ pub(super) fn try_expand_last_arg(
         {
             return Some(opener.expand_all(d, all_args_broken));
         }
-        let assumed = assumed.map(|hug| {
+        let assumed = assumed.map_or_else(Default::default, |hug| {
             // Prettier's `shouldExpandParameters`: a plain call's last of several arguments.
             let flattens_params = owner == ArgOwner::Call && arguments.len() > 1;
             hug.build(printer, flattens_params, || {

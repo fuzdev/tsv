@@ -39,7 +39,7 @@ mod test_patterns;
 pub(crate) use arg_comments::{
     PartitionedComments, has_stripped_paren_gap, skip_stripped_open_paren,
 };
-pub(in crate::printer) use arg_wrapping::AssumedParamHug;
+pub(in crate::printer) use arg_wrapping::{AssumedHugKind, AssumedParamHug};
 pub(in crate::printer) use import_expr::{ImportOptionsArg, build_import_args_comment_layout};
 
 use super::chain::{self, ChainCall, call_callee_paren_leading_start};
@@ -934,7 +934,7 @@ impl<'a> Printer<'a> {
                         build_args_split_last(call.arguments, self, paren_open, call_has_comments)
                     });
                 let last_index = call.arguments.len() - 1;
-                let assumed = assumed.map(|hug| {
+                let assumed = assumed.map_or_else(Default::default, |hug| {
                     // Prettier's `shouldExpandParameters`: a plain call's last of several
                     // arguments flattens a `function`'s parameters in the hug.
                     hug.build(self, call.arguments.len() > 1, || {
