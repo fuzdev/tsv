@@ -664,7 +664,7 @@ impl<'a> Printer<'a> {
     ///
     /// The one definition, asked where a call is printed ([`Self::build_call_doc`]) and
     /// where a member or a `!` is printed over such a call
-    /// ([`Self::build_template_bypass_operand_doc`]).
+    /// ([`Self::build_whole_call_operand_doc`]).
     ///
     /// Forced inline: it is asked of every call and member spine, and almost every one fails
     /// the shape test, so the call site keeps only that test and the rest stays out of line
@@ -696,25 +696,40 @@ impl<'a> Printer<'a> {
     }
 
     /// Whether the first call down `expr`'s object spine — through member objects and
-    /// `!` operands — takes the template bypass ([`Self::call_takes_template_bypass`]).
+    /// `!` operands — is one prettier prints whole rather than as a link of a member chain:
+    /// a call taking the template bypass ([`Self::call_takes_template_bypass`]), or a curried
+    /// call whose run roots in a member chain ([`curried_run_roots_in_member_chain`]).
     ///
     /// Prettier prints a member through `printMemberExpression` (`[print(object),
     /// lookup]`) and a `!` as `[print(expression), "!"]`; only a CALL reaches
     /// `printMemberChain`, which flattens its callee spine without printing the links. So
-    /// a stack of bypassed calls (`` v.m(r).o(`⏎a⏎`).o(`⏎b⏎`) ``) prints each link
-    /// through its own call printer — each glued to the template that closes the link
-    /// below — and a member or `!` ending such a stack (`` …o(`⏎b⏎`).p ``) prints over it
-    /// the same way. tsv's member and `!` printers linearize instead, so they ask this
-    /// first. A call whose callee spine merely CONTAINS a bypassed call still linearizes
-    /// it — `printMemberChain` absorbs the templates once a non-bypassed call opens the
-    /// chain (`` …o(`⏎b⏎`).p(x) ``).
-    fn spine_takes_template_bypass(&self, expr: &internal::Expression<'_>) -> bool {
+    /// a member or `!` over a call that never reaches it prints over that call whole:
+    ///
+    /// - A stack of bypassed calls (`` v.m(r).o(`⏎a⏎`).o(`⏎b⏎`) ``) prints each link
+    ///   through its own call printer — each glued to the template that closes the link
+    ///   below — and a member or `!` ending such a stack (`` …o(`⏎b⏎`).p ``) prints over it
+    ///   the same way.
+    /// - A call on a call is `printCallExpression`'s `group([callee, args])`, so a member
+    ///   over a curried call on a member chain (`obj.a().b().fnnn(x)(z).p`) prints over that
+    ///   call, whose member chain ends at the innermost call — as the curried call prints
+    ///   with nothing over it ([`Self::build_curried_member_chain_call_doc`]).
+    ///
+    /// tsv's member and `!` printers linearize instead, so they ask this first. A call whose
+    /// callee spine merely CONTAINS such a call still linearizes it — `printMemberChain`
+    /// absorbs the templates, and the curried calls, once a call of its own opens the chain
+    /// (`` …o(`⏎b⏎`).p(x) ``, `…fnnn(x)(z).p()`).
+    fn spine_first_call_prints_whole(&self, expr: &internal::Expression<'_>) -> bool {
         let mut expr = expr;
         loop {
             expr = match &expr.kind {
                 internal::ExpressionKind::MemberExpression(member) => member.object,
                 internal::ExpressionKind::TSNonNullExpression(non_null) => non_null.expression,
                 internal::ExpressionKind::CallExpression(call) => {
+                    if let internal::ExpressionKind::CallExpression(inner) = &call.callee.kind
+                        && curried_run_roots_in_member_chain(inner)
+                    {
+                        return true;
+                    }
                     return self.call_takes_template_bypass(call, expr.span);
                 }
                 _ => return false,
@@ -724,7 +739,7 @@ impl<'a> Printer<'a> {
 
     /// The doc of `operand` printed whole, when the member or `!` spanning `span` over it
     /// prints as prettier's member and non-null printers do — the operand's spine reaches a
-    /// call the template bypass takes ([`Self::spine_takes_template_bypass`]) — and `None`
+    /// call prettier prints whole ([`Self::spine_first_call_prints_whole`]) — and `None`
     /// when the caller linearizes as usual. `parent_optional` is the member's own `?.`
     /// (`false` for a `!`).
     ///
@@ -744,19 +759,19 @@ impl<'a> Printer<'a> {
     /// around the bare operand with no emitter for the gap it strips. A `//` the operand
     /// defers would be owed prettier's `lineSuffixBoundary` between the two halves, which
     /// this route does not print. The linearized chain places all of them.
-    pub(in crate::printer) fn build_template_bypass_operand_doc(
+    pub(in crate::printer) fn build_whole_call_operand_doc(
         &self,
         operand: &internal::Expression<'_>,
         span: Span,
         parent_optional: bool,
     ) -> Option<DocId> {
-        if !self.spine_takes_template_bypass(operand)
+        if !self.spine_first_call_prints_whole(operand)
             || self.has_comments_on_page_between(span.start, span.end)
         {
             return None;
         }
-        // No expression-statement mark to clear: the spine ends at a call that takes the
-        // bypass, whose own route clears it ([`Self::build_call_doc`]).
+        // No expression-statement mark to clear: the spine ends at a call printed whole,
+        // whose own route clears it ([`Self::build_call_doc`]).
         Some(
             if chain::child_stops_optional_chain(span.start, parent_optional, operand)
                 || self.region_keeps_shell(operand)
@@ -773,21 +788,20 @@ impl<'a> Printer<'a> {
         )
     }
 
-    /// A member whose object is a call the template bypass takes, printed as prettier's
+    /// A member whose object reaches a call prettier prints whole, printed as prettier's
     /// `printMemberExpression` prints it — the object whole, then this lookup — rather than
-    /// linearizing the object's links into a chain ([`Self::spine_takes_template_bypass`]);
+    /// linearizing the object's links into a chain ([`Self::spine_first_call_prints_whole`]);
     /// `None` for every other member.
     ///
     /// Out of line: [`Self::build_member_doc`] is inlined into the expression dispatch, the
     /// expression recursion itself, and this rare shape must add nothing to its frames.
     #[inline(never)]
-    fn build_template_bypass_member_doc(
+    fn build_whole_call_member_doc(
         &self,
         member: &internal::MemberExpression<'_>,
         span: Span,
     ) -> Option<DocId> {
-        let object_doc =
-            self.build_template_bypass_operand_doc(member.object, span, member.optional)?;
+        let object_doc = self.build_whole_call_operand_doc(member.object, span, member.optional)?;
         Some(chain::build_lookup_after_operand_doc(
             member, span, object_doc, self,
         ))
@@ -1030,7 +1044,7 @@ impl<'a> Printer<'a> {
             internal::ExpressionKind::CallExpression(_)
                 | internal::ExpressionKind::MemberExpression(_)
                 | internal::ExpressionKind::TSNonNullExpression(_)
-        ) && let Some(doc) = self.build_template_bypass_member_doc(member, span)
+        ) && let Some(doc) = self.build_whole_call_member_doc(member, span)
         {
             return doc;
         }
