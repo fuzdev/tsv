@@ -59,3 +59,102 @@ fn compound_operator_over_a_method_target_parses() {
         assert!(tsv_ts::parse(source, &arena).is_ok(), "{source:?}");
     }
 }
+
+/// A compound operator's left keeps its methods and accessors, and the comments inside them:
+/// a comment between a method's key and its parameter list formats where it was written.
+#[test]
+fn compound_operator_over_a_commented_method_formats_as_written() {
+    for source in [
+        "({ f /* c */() {} } += x);\n",
+        "({ get f /* c */() {} } -= x);\n",
+        "[{ f /* c */() {} }] += x;\n",
+        "f(({ async f /* c */() {} } *= y));\n",
+    ] {
+        assert_eq!(
+            tsv_ts::format_str(source).expect(source),
+            source,
+            "{source:?} formats as written"
+        );
+    }
+}
+
+/// A compound operator's literal left prints its `=` value as the default prettier reads
+/// there, with no pair, on every key→value arm — here the one a line comment between the key
+/// and its `:` takes, where tsv keeps the comment and prettier moves it above the property.
+#[test]
+fn compound_target_default_value_prints_bare_past_a_key_comment() {
+    let source = "({ a // c\n: b = 1 } += x);";
+    let printed = "({\n\ta // c\n\t\t: b = 1\n} += x);\n";
+    let out = tsv_ts::format_str(source).expect(source);
+    assert_eq!(out, printed, "printed from {source:?}");
+    assert_eq!(
+        tsv_ts::format_str(&out).expect(printed),
+        out,
+        "a fixed point"
+    );
+}
+
+/// A comment in the pair the parser erased from a compound target's default VALUE prints where
+/// the `=` pattern prints it, own-line spellings included — the trailing seam, the next
+/// element's leading run and the end-of-array run all anchor where that default's doc stops.
+#[test]
+fn compound_target_default_value_shell_comment_prints_as_the_pattern() {
+    for (compound, pattern) in [
+        ("[a = (b\n/* c */), d] += x;", "[a = (b\n/* c */), d] = x;"),
+        ("[a = (b\n/* c */\n)] += x;", "[a = (b\n/* c */\n)] = x;"),
+        (
+            "[a = (b\n/* c1 */\n) /* c2 */] += x;",
+            "[a = (b\n/* c1 */\n) /* c2 */] = x;",
+        ),
+        (
+            "({ k: a = (b\n/* c */\n), d } += x);",
+            "({ k: a = (b\n/* c */\n), d } = x);",
+        ),
+        (
+            "[[a = (b = c // c\n)]] += x;",
+            "[[a = (b = c // c\n)]] = x;",
+        ),
+    ] {
+        let out = tsv_ts::format_str(compound).expect(compound);
+        let expected = tsv_ts::format_str(pattern)
+            .expect(pattern)
+            .replace("] = x", "] += x")
+            .replace("} = x", "} += x");
+        assert_eq!(out, expected, "{compound:?} prints as {pattern:?}");
+        assert_eq!(
+            tsv_ts::format_str(&out).expect(&out),
+            out,
+            "{compound:?}: a fixed point"
+        );
+    }
+}
+
+/// A `//` in a compound target's last default-value shell, and another past the `)`, stay two
+/// comments on two lines.
+#[test]
+fn compound_target_default_value_shell_line_comments_stay_apart() {
+    let source = "[a = (b // c1\n) // c2\n] += x;";
+    let printed = "[\n\ta = b // c1\n\t// c2\n] += x;\n";
+    let out = tsv_ts::format_str(source).expect(source);
+    assert_eq!(out, printed, "printed from {source:?}");
+    assert_eq!(
+        tsv_ts::format_str(&out).expect(printed),
+        out,
+        "a fixed point"
+    );
+}
+
+/// A value freeze the key→`:` own-line arm does not honor (it builds the value unfrozen) leaves
+/// the default's shell comment to the role's anchor, which must still print it once.
+#[test]
+fn compound_target_unhonored_value_freeze_keeps_the_shell_comment() {
+    let source = "({\n\tk // x\n\t:\n\t\t// prettier-ignore\n\t\ta   =   (b /* c */)\n} += x);\n";
+    let printed = "({\n\tk // x\n\t\t: // prettier-ignore\n\t\ta = b /* c */\n} += x);\n";
+    let out = tsv_ts::format_str(source).expect(source);
+    assert_eq!(out, printed, "printed from {source:?}");
+    assert_eq!(
+        tsv_ts::format_str(&out).expect(printed),
+        out,
+        "a fixed point"
+    );
+}

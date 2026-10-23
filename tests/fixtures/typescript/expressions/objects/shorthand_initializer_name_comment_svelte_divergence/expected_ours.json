@@ -94,10 +94,9 @@
 									]
 								},
 								"value": {
-									"type": "AssignmentExpression",
+									"type": "AssignmentPattern",
 									"start": 206,
 									"end": 221,
-									"operator": "=",
 									"left": {
 										"type": "Identifier",
 										"start": 206,
@@ -204,10 +203,9 @@
 									]
 								},
 								"value": {
-									"type": "AssignmentExpression",
+									"type": "AssignmentPattern",
 									"start": 331,
 									"end": 346,
-									"operator": "=",
 									"left": {
 										"type": "Identifier",
 										"start": 331,
@@ -258,10 +256,9 @@
 									"name": "a3"
 								},
 								"value": {
-									"type": "AssignmentExpression",
+									"type": "AssignmentPattern",
 									"start": 444,
 									"end": 450,
-									"operator": "=",
 									"left": {
 										"type": "Identifier",
 										"start": 444,

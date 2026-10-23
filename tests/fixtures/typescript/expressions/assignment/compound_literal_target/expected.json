@@ -1,0 +1,3213 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 2338,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 2306,
+				"end": 2308,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 2308,
+				"end": 2337,
+				"expression": {
+					"type": "CallExpression",
+					"start": 2309,
+					"end": 2336,
+					"callee": {
+						"type": "Identifier",
+						"start": 2309,
+						"end": 2310,
+						"name": "f"
+					},
+					"arguments": [
+						{
+							"type": "AssignmentExpression",
+							"start": 2312,
+							"end": 2322,
+							"operator": "+=",
+							"left": {
+								"type": "ObjectExpression",
+								"start": 2312,
+								"end": 2317,
+								"properties": [
+									{
+										"type": "Property",
+										"start": 2314,
+										"end": 2315,
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 2314,
+											"end": 2315,
+											"name": "a"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 2314,
+											"end": 2315,
+											"name": "a"
+										},
+										"kind": "init"
+									}
+								]
+							},
+							"right": {
+								"type": "Identifier",
+								"start": 2321,
+								"end": 2322,
+								"name": "x"
+							}
+						},
+						{
+							"type": "AssignmentExpression",
+							"start": 2326,
+							"end": 2334,
+							"operator": "+=",
+							"left": {
+								"type": "ArrayExpression",
+								"start": 2326,
+								"end": 2329,
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 2327,
+										"end": 2328,
+										"name": "a"
+									}
+								]
+							},
+							"right": {
+								"type": "Identifier",
+								"start": 2333,
+								"end": 2334,
+								"name": "y"
+							}
+						}
+					],
+					"optional": false
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a compound operator's left is no pattern: an object or array literal there stays a",
+			"start": 20,
+			"end": 105
+		},
+		{
+			"type": "Line",
+			"value": " literal (an invalid target, deferred), methods and accessors included",
+			"start": 107,
+			"end": 179
+		},
+		{
+			"type": "Line",
+			"value": " a spread or a rest element that a pattern would have to end on",
+			"start": 329,
+			"end": 394
+		},
+		{
+			"type": "Line",
+			"value": " a default, and an assignment the literal holds",
+			"start": 458,
+			"end": 507
+		},
+		{
+			"type": "Line",
+			"value": " a default's own value keeps the pair a default takes",
+			"start": 604,
+			"end": 659
+		},
+		{
+			"type": "Line",
+			"value": " a comment in the pair the parser erased from a default's value",
+			"start": 1112,
+			"end": 1177
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 1195,
+			"end": 1202
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 1229,
+			"end": 1236
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 1265,
+			"end": 1272
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 1296,
+			"end": 1303
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 1341,
+			"end": 1345
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 1377,
+			"end": 1381
+		},
+		{
+			"type": "Line",
+			"value": " nested",
+			"start": 1393,
+			"end": 1402
+		},
+		{
+			"type": "Line",
+			"value": " comments, a freeze and the destructuring break in the target's own layout",
+			"start": 1650,
+			"end": 1726
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 1733,
+			"end": 1740
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 1765,
+			"end": 1772
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 1841,
+			"end": 1859
+		},
+		{
+			"type": "Line",
+			"value": " a freeze over a default whose value shell holds a comment",
+			"start": 2017,
+			"end": 2077
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 2090,
+			"end": 2108
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 2123,
+			"end": 2130
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 2170,
+			"end": 2188
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 2206,
+			"end": 2213
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 2245,
+			"end": 2263
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 2278,
+			"end": 2285
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 2306,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 2297,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 181,
+					"end": 194,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 182,
+						"end": 192,
+						"operator": "+=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 182,
+							"end": 187,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 184,
+									"end": 185,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 184,
+										"end": 185,
+										"name": "a"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 184,
+										"end": 185,
+										"name": "a"
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 191,
+							"end": 192,
+							"name": "x"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a compound operator's left is no pattern: an object or array literal there stays a",
+							"start": 20,
+							"end": 105
+						},
+						{
+							"type": "Line",
+							"value": " literal (an invalid target, deferred), methods and accessors included",
+							"start": 107,
+							"end": 179
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 196,
+					"end": 214,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 197,
+						"end": 212,
+						"operator": "+=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 197,
+							"end": 207,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 199,
+									"end": 205,
+									"method": true,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 199,
+										"end": 200,
+										"name": "f"
+									},
+									"value": {
+										"type": "FunctionExpression",
+										"start": 200,
+										"end": 205,
+										"id": null,
+										"expression": false,
+										"generator": false,
+										"async": false,
+										"params": [],
+										"body": {
+											"type": "BlockStatement",
+											"start": 203,
+											"end": 205,
+											"body": []
+										}
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 211,
+							"end": 212,
+							"name": "x"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 216,
+					"end": 238,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 217,
+						"end": 236,
+						"operator": "-=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 217,
+							"end": 231,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 219,
+									"end": 229,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 223,
+										"end": 224,
+										"name": "f"
+									},
+									"kind": "get",
+									"value": {
+										"type": "FunctionExpression",
+										"start": 224,
+										"end": 229,
+										"id": null,
+										"expression": false,
+										"generator": false,
+										"async": false,
+										"params": [],
+										"body": {
+											"type": "BlockStatement",
+											"start": 227,
+											"end": 229,
+											"body": []
+										}
+									}
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 235,
+							"end": 236,
+							"name": "y"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 240,
+					"end": 264,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 241,
+						"end": 262,
+						"operator": "&&=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 241,
+							"end": 256,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 243,
+									"end": 254,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 247,
+										"end": 248,
+										"name": "f"
+									},
+									"kind": "set",
+									"value": {
+										"type": "FunctionExpression",
+										"start": 248,
+										"end": 254,
+										"id": null,
+										"expression": false,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 249,
+												"end": 250,
+												"name": "v"
+											}
+										],
+										"body": {
+											"type": "BlockStatement",
+											"start": 252,
+											"end": 254,
+											"body": []
+										}
+									}
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 261,
+							"end": 262,
+							"name": "z"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 266,
+					"end": 285,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 267,
+						"end": 283,
+						"operator": "+=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 267,
+							"end": 278,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 269,
+									"end": 276,
+									"method": true,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 270,
+										"end": 271,
+										"name": "g"
+									},
+									"value": {
+										"type": "FunctionExpression",
+										"start": 271,
+										"end": 276,
+										"id": null,
+										"expression": false,
+										"generator": true,
+										"async": false,
+										"params": [],
+										"body": {
+											"type": "BlockStatement",
+											"start": 274,
+											"end": 276,
+											"body": []
+										}
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 282,
+							"end": 283,
+							"name": "x"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 287,
+					"end": 327,
+					"expression": {
+						"type": "CallExpression",
+						"start": 287,
+						"end": 326,
+						"callee": {
+							"type": "Identifier",
+							"start": 287,
+							"end": 289,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "AssignmentExpression",
+								"start": 291,
+								"end": 312,
+								"operator": "*=",
+								"left": {
+									"type": "ObjectExpression",
+									"start": 291,
+									"end": 307,
+									"properties": [
+										{
+											"type": "Property",
+											"start": 293,
+											"end": 305,
+											"method": true,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 299,
+												"end": 300,
+												"name": "f"
+											},
+											"value": {
+												"type": "FunctionExpression",
+												"start": 300,
+												"end": 305,
+												"id": null,
+												"expression": false,
+												"generator": false,
+												"async": true,
+												"params": [],
+												"body": {
+													"type": "BlockStatement",
+													"start": 303,
+													"end": 305,
+													"body": []
+												}
+											},
+											"kind": "init"
+										}
+									]
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 311,
+									"end": 312,
+									"name": "y"
+								}
+							},
+							{
+								"type": "AssignmentExpression",
+								"start": 316,
+								"end": 324,
+								"operator": "+=",
+								"left": {
+									"type": "ArrayExpression",
+									"start": 316,
+									"end": 319,
+									"elements": [
+										{
+											"type": "Identifier",
+											"start": 317,
+											"end": 318,
+											"name": "a"
+										}
+									]
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 323,
+									"end": 324,
+									"name": "y"
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 396,
+					"end": 415,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 397,
+						"end": 413,
+						"operator": "+=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 397,
+							"end": 408,
+							"properties": [
+								{
+									"type": "SpreadElement",
+									"start": 399,
+									"end": 403,
+									"argument": {
+										"type": "Identifier",
+										"start": 402,
+										"end": 403,
+										"name": "a"
+									}
+								},
+								{
+									"type": "Property",
+									"start": 405,
+									"end": 406,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 405,
+										"end": 406,
+										"name": "b"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 405,
+										"end": 406,
+										"name": "b"
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 412,
+							"end": 413,
+							"name": "x"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a spread or a rest element that a pattern would have to end on",
+							"start": 329,
+							"end": 394
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 417,
+					"end": 437,
+					"expression": {
+						"type": "CallExpression",
+						"start": 417,
+						"end": 436,
+						"callee": {
+							"type": "Identifier",
+							"start": 417,
+							"end": 418,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "AssignmentExpression",
+								"start": 420,
+								"end": 434,
+								"operator": "+=",
+								"left": {
+									"type": "ArrayExpression",
+									"start": 420,
+									"end": 429,
+									"elements": [
+										{
+											"type": "SpreadElement",
+											"start": 421,
+											"end": 425,
+											"argument": {
+												"type": "Identifier",
+												"start": 424,
+												"end": 425,
+												"name": "a"
+											}
+										},
+										{
+											"type": "Identifier",
+											"start": 427,
+											"end": 428,
+											"name": "b"
+										}
+									]
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 433,
+									"end": 434,
+									"name": "x"
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 439,
+					"end": 456,
+					"expression": {
+						"type": "CallExpression",
+						"start": 439,
+						"end": 455,
+						"callee": {
+							"type": "Identifier",
+							"start": 439,
+							"end": 440,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "AssignmentExpression",
+								"start": 442,
+								"end": 453,
+								"operator": "+=",
+								"left": {
+									"type": "ArrayExpression",
+									"start": 442,
+									"end": 448,
+									"elements": [
+										{
+											"type": "SpreadElement",
+											"start": 443,
+											"end": 447,
+											"argument": {
+												"type": "Identifier",
+												"start": 446,
+												"end": 447,
+												"name": "a"
+											}
+										}
+									]
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 452,
+									"end": 453,
+									"name": "x"
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 509,
+					"end": 526,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 510,
+						"end": 524,
+						"operator": "+=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 510,
+							"end": 519,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 512,
+									"end": 517,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 512,
+										"end": 513,
+										"name": "a"
+									},
+									"value": {
+										"type": "AssignmentPattern",
+										"start": 512,
+										"end": 517,
+										"left": {
+											"type": "Identifier",
+											"start": 512,
+											"end": 513,
+											"name": "a"
+										},
+										"right": {
+											"type": "Literal",
+											"start": 516,
+											"end": 517,
+											"value": 1,
+											"raw": "1"
+										}
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 523,
+							"end": 524,
+							"name": "x"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a default, and an assignment the literal holds",
+							"start": 458,
+							"end": 507
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 528,
+					"end": 559,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 529,
+						"end": 557,
+						"operator": "+=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 529,
+							"end": 552,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 531,
+									"end": 536,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 531,
+										"end": 532,
+										"name": "a"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 534,
+										"end": 536,
+										"name": "aa"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 538,
+									"end": 547,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 538,
+										"end": 539,
+										"name": "b"
+									},
+									"value": {
+										"type": "AssignmentExpression",
+										"start": 541,
+										"end": 547,
+										"operator": "=",
+										"left": {
+											"type": "Identifier",
+											"start": 541,
+											"end": 543,
+											"name": "bb"
+										},
+										"right": {
+											"type": "Literal",
+											"start": 546,
+											"end": 547,
+											"value": 1,
+											"raw": "1"
+										}
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 549,
+									"end": 550,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 549,
+										"end": 550,
+										"name": "c"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 549,
+										"end": 550,
+										"name": "c"
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 556,
+							"end": 557,
+							"name": "x"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 561,
+					"end": 579,
+					"expression": {
+						"type": "CallExpression",
+						"start": 561,
+						"end": 578,
+						"callee": {
+							"type": "Identifier",
+							"start": 561,
+							"end": 562,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "AssignmentExpression",
+								"start": 564,
+								"end": 576,
+								"operator": "+=",
+								"left": {
+									"type": "ArrayExpression",
+									"start": 564,
+									"end": 571,
+									"elements": [
+										{
+											"type": "AssignmentExpression",
+											"start": 565,
+											"end": 570,
+											"operator": "=",
+											"left": {
+												"type": "Identifier",
+												"start": 565,
+												"end": 566,
+												"name": "a"
+											},
+											"right": {
+												"type": "Literal",
+												"start": 569,
+												"end": 570,
+												"value": 1,
+												"raw": "1"
+											}
+										}
+									]
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 575,
+									"end": 576,
+									"name": "x"
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 581,
+					"end": 602,
+					"expression": {
+						"type": "CallExpression",
+						"start": 581,
+						"end": 601,
+						"callee": {
+							"type": "Identifier",
+							"start": 581,
+							"end": 582,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "AssignmentExpression",
+								"start": 584,
+								"end": 599,
+								"operator": "+=",
+								"left": {
+									"type": "ArrayExpression",
+									"start": 584,
+									"end": 594,
+									"elements": [
+										{
+											"type": "AssignmentExpression",
+											"start": 586,
+											"end": 592,
+											"operator": "+=",
+											"left": {
+												"type": "Identifier",
+												"start": 586,
+												"end": 587,
+												"name": "a"
+											},
+											"right": {
+												"type": "Identifier",
+												"start": 591,
+												"end": 592,
+												"name": "b"
+											}
+										}
+									]
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 598,
+									"end": 599,
+									"name": "x"
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 661,
+					"end": 685,
+					"expression": {
+						"type": "CallExpression",
+						"start": 661,
+						"end": 684,
+						"callee": {
+							"type": "Identifier",
+							"start": 661,
+							"end": 662,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "AssignmentExpression",
+								"start": 664,
+								"end": 682,
+								"operator": "+=",
+								"left": {
+									"type": "ArrayExpression",
+									"start": 664,
+									"end": 677,
+									"elements": [
+										{
+											"type": "AssignmentExpression",
+											"start": 665,
+											"end": 676,
+											"operator": "=",
+											"left": {
+												"type": "Identifier",
+												"start": 665,
+												"end": 666,
+												"name": "a"
+											},
+											"right": {
+												"type": "AssignmentExpression",
+												"start": 670,
+												"end": 675,
+												"operator": "=",
+												"left": {
+													"type": "Identifier",
+													"start": 670,
+													"end": 671,
+													"name": "b"
+												},
+												"right": {
+													"type": "Identifier",
+													"start": 674,
+													"end": 675,
+													"name": "c"
+												}
+											}
+										}
+									]
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 681,
+									"end": 682,
+									"name": "x"
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a default's own value keeps the pair a default takes",
+							"start": 604,
+							"end": 659
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 687,
+					"end": 711,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 688,
+						"end": 709,
+						"operator": "+=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 688,
+							"end": 704,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 690,
+									"end": 702,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 690,
+										"end": 691,
+										"name": "a"
+									},
+									"value": {
+										"type": "AssignmentPattern",
+										"start": 690,
+										"end": 702,
+										"left": {
+											"type": "Identifier",
+											"start": 690,
+											"end": 691,
+											"name": "a"
+										},
+										"right": {
+											"type": "AssignmentExpression",
+											"start": 695,
+											"end": 701,
+											"operator": "+=",
+											"left": {
+												"type": "Identifier",
+												"start": 695,
+												"end": 696,
+												"name": "b"
+											},
+											"right": {
+												"type": "Identifier",
+												"start": 700,
+												"end": 701,
+												"name": "c"
+											}
+										}
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 708,
+							"end": 709,
+							"name": "x"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 713,
+					"end": 739,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 714,
+						"end": 737,
+						"operator": "+=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 714,
+							"end": 732,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 716,
+									"end": 730,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 716,
+										"end": 717,
+										"name": "a"
+									},
+									"value": {
+										"type": "AssignmentExpression",
+										"start": 719,
+										"end": 730,
+										"operator": "=",
+										"left": {
+											"type": "Identifier",
+											"start": 719,
+											"end": 720,
+											"name": "b"
+										},
+										"right": {
+											"type": "AssignmentExpression",
+											"start": 724,
+											"end": 729,
+											"operator": "=",
+											"left": {
+												"type": "Identifier",
+												"start": 724,
+												"end": 725,
+												"name": "c"
+											},
+											"right": {
+												"type": "Identifier",
+												"start": 728,
+												"end": 729,
+												"name": "d"
+											}
+										}
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 736,
+							"end": 737,
+							"name": "x"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 741,
+					"end": 773,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 742,
+						"end": 771,
+						"operator": "+=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 742,
+							"end": 766,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 744,
+									"end": 764,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 744,
+										"end": 745,
+										"name": "a"
+									},
+									"value": {
+										"type": "AssignmentExpression",
+										"start": 747,
+										"end": 764,
+										"operator": "=",
+										"left": {
+											"type": "ObjectPattern",
+											"start": 747,
+											"end": 759,
+											"properties": [
+												{
+													"type": "Property",
+													"start": 749,
+													"end": 757,
+													"method": false,
+													"shorthand": false,
+													"computed": false,
+													"key": {
+														"type": "Identifier",
+														"start": 749,
+														"end": 750,
+														"name": "b"
+													},
+													"value": {
+														"type": "ObjectPattern",
+														"start": 752,
+														"end": 757,
+														"properties": [
+															{
+																"type": "Property",
+																"start": 754,
+																"end": 755,
+																"method": false,
+																"shorthand": true,
+																"computed": false,
+																"key": {
+																	"type": "Identifier",
+																	"start": 754,
+																	"end": 755,
+																	"name": "c"
+																},
+																"value": {
+																	"type": "Identifier",
+																	"start": 754,
+																	"end": 755,
+																	"name": "c"
+																},
+																"kind": "init"
+															}
+														]
+													},
+													"kind": "init"
+												}
+											]
+										},
+										"right": {
+											"type": "ObjectExpression",
+											"start": 762,
+											"end": 764,
+											"properties": []
+										}
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 770,
+							"end": 771,
+							"name": "x"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 775,
+					"end": 873,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 776,
+						"end": 871,
+						"operator": "+=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 776,
+							"end": 866,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 778,
+									"end": 864,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 778,
+										"end": 779,
+										"name": "a"
+									},
+									"value": {
+										"type": "AssignmentPattern",
+										"start": 778,
+										"end": 864,
+										"left": {
+											"type": "Identifier",
+											"start": 778,
+											"end": 779,
+											"name": "a"
+										},
+										"right": {
+											"type": "BinaryExpression",
+											"start": 782,
+											"end": 864,
+											"left": {
+												"type": "BinaryExpression",
+												"start": 782,
+												"end": 846,
+												"left": {
+													"type": "BinaryExpression",
+													"start": 782,
+													"end": 822,
+													"left": {
+														"type": "Identifier",
+														"start": 782,
+														"end": 801,
+														"name": "alphaValueNumberOne"
+													},
+													"operator": "+",
+													"right": {
+														"type": "Identifier",
+														"start": 804,
+														"end": 822,
+														"name": "betaValueNumberTwo"
+													}
+												},
+												"operator": "+",
+												"right": {
+													"type": "Identifier",
+													"start": 825,
+													"end": 846,
+													"name": "gammaValueNumberThree"
+												}
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 849,
+												"end": 864,
+												"name": "deltaValueNumbe"
+											}
+										}
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 870,
+							"end": 871,
+							"name": "x"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 875,
+					"end": 976,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 876,
+						"end": 974,
+						"operator": "+=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 876,
+							"end": 967,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 878,
+									"end": 965,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 878,
+										"end": 879,
+										"name": "a"
+									},
+									"value": {
+										"type": "AssignmentPattern",
+										"start": 878,
+										"end": 965,
+										"left": {
+											"type": "Identifier",
+											"start": 878,
+											"end": 879,
+											"name": "a"
+										},
+										"right": {
+											"type": "BinaryExpression",
+											"start": 882,
+											"end": 965,
+											"left": {
+												"type": "BinaryExpression",
+												"start": 882,
+												"end": 946,
+												"left": {
+													"type": "BinaryExpression",
+													"start": 882,
+													"end": 922,
+													"left": {
+														"type": "Identifier",
+														"start": 882,
+														"end": 901,
+														"name": "alphaValueNumberOne"
+													},
+													"operator": "+",
+													"right": {
+														"type": "Identifier",
+														"start": 904,
+														"end": 922,
+														"name": "betaValueNumberTwo"
+													}
+												},
+												"operator": "+",
+												"right": {
+													"type": "Identifier",
+													"start": 925,
+													"end": 946,
+													"name": "gammaValueNumberThree"
+												}
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 949,
+												"end": 965,
+												"name": "deltaValueNumber"
+											}
+										}
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 973,
+							"end": 974,
+							"name": "x"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 978,
+					"end": 1110,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 979,
+						"end": 1108,
+						"operator": "+=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 979,
+							"end": 1103,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 983,
+									"end": 1100,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 983,
+										"end": 984,
+										"name": "a"
+									},
+									"value": {
+										"type": "AssignmentPattern",
+										"start": 983,
+										"end": 1100,
+										"left": {
+											"type": "Identifier",
+											"start": 983,
+											"end": 984,
+											"name": "a"
+										},
+										"right": {
+											"type": "BinaryExpression",
+											"start": 987,
+											"end": 1100,
+											"left": {
+												"type": "BinaryExpression",
+												"start": 987,
+												"end": 1060,
+												"left": {
+													"type": "Identifier",
+													"start": 987,
+													"end": 1020,
+													"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+												},
+												"operator": "+",
+												"right": {
+													"type": "Identifier",
+													"start": 1026,
+													"end": 1060,
+													"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+												}
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 1066,
+												"end": 1100,
+												"name": "cccccccccccccccccccccccccccccccccc"
+											}
+										}
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 1107,
+							"end": 1108,
+							"name": "x"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1179,
+					"end": 1211,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1179,
+						"end": 1210,
+						"callee": {
+							"type": "Identifier",
+							"start": 1179,
+							"end": 1180,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "AssignmentExpression",
+								"start": 1182,
+								"end": 1208,
+								"operator": "+=",
+								"left": {
+									"type": "ArrayExpression",
+									"start": 1182,
+									"end": 1203,
+									"elements": [
+										{
+											"type": "AssignmentExpression",
+											"start": 1183,
+											"end": 1194,
+											"operator": "=",
+											"left": {
+												"type": "Identifier",
+												"start": 1183,
+												"end": 1184,
+												"name": "a"
+											},
+											"right": {
+												"type": "AssignmentExpression",
+												"start": 1188,
+												"end": 1193,
+												"operator": "=",
+												"left": {
+													"type": "Identifier",
+													"start": 1188,
+													"end": 1189,
+													"name": "b"
+												},
+												"right": {
+													"type": "Identifier",
+													"start": 1192,
+													"end": 1193,
+													"name": "c"
+												},
+												"trailingComments": [
+													{
+														"type": "Block",
+														"value": " c ",
+														"start": 1195,
+														"end": 1202
+													}
+												]
+											}
+										}
+									]
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 1207,
+									"end": 1208,
+									"name": "x"
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a comment in the pair the parser erased from a default's value",
+							"start": 1112,
+							"end": 1177
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1213,
+					"end": 1245,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1214,
+						"end": 1243,
+						"operator": "+=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 1214,
+							"end": 1238,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 1216,
+									"end": 1228,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1216,
+										"end": 1217,
+										"name": "a"
+									},
+									"value": {
+										"type": "AssignmentPattern",
+										"start": 1216,
+										"end": 1228,
+										"left": {
+											"type": "Identifier",
+											"start": 1216,
+											"end": 1217,
+											"name": "a"
+										},
+										"right": {
+											"type": "AssignmentExpression",
+											"start": 1221,
+											"end": 1227,
+											"operator": "+=",
+											"left": {
+												"type": "Identifier",
+												"start": 1221,
+												"end": 1222,
+												"name": "b"
+											},
+											"right": {
+												"type": "Identifier",
+												"start": 1226,
+												"end": 1227,
+												"name": "c"
+											},
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 1229,
+													"end": 1236
+												}
+											]
+										}
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 1242,
+							"end": 1243,
+							"name": "x"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1247,
+					"end": 1284,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1248,
+						"end": 1282,
+						"operator": "+=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 1248,
+							"end": 1277,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 1250,
+									"end": 1264,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1250,
+										"end": 1251,
+										"name": "a"
+									},
+									"value": {
+										"type": "AssignmentExpression",
+										"start": 1253,
+										"end": 1264,
+										"operator": "=",
+										"left": {
+											"type": "Identifier",
+											"start": 1253,
+											"end": 1254,
+											"name": "b"
+										},
+										"right": {
+											"type": "AssignmentExpression",
+											"start": 1258,
+											"end": 1263,
+											"operator": "=",
+											"left": {
+												"type": "Identifier",
+												"start": 1258,
+												"end": 1259,
+												"name": "c"
+											},
+											"right": {
+												"type": "Identifier",
+												"start": 1262,
+												"end": 1263,
+												"name": "d"
+											},
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 1265,
+													"end": 1272
+												}
+											]
+										}
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 1274,
+									"end": 1275,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1274,
+										"end": 1275,
+										"name": "e"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 1274,
+										"end": 1275,
+										"name": "e"
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 1281,
+							"end": 1282,
+							"name": "x"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1286,
+					"end": 1315,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1286,
+						"end": 1314,
+						"callee": {
+							"type": "Identifier",
+							"start": 1286,
+							"end": 1287,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "AssignmentExpression",
+								"start": 1289,
+								"end": 1312,
+								"operator": "+=",
+								"left": {
+									"type": "ArrayExpression",
+									"start": 1289,
+									"end": 1307,
+									"elements": [
+										{
+											"type": "AssignmentExpression",
+											"start": 1290,
+											"end": 1295,
+											"operator": "=",
+											"left": {
+												"type": "Identifier",
+												"start": 1290,
+												"end": 1291,
+												"name": "a"
+											},
+											"right": {
+												"type": "Identifier",
+												"start": 1294,
+												"end": 1295,
+												"name": "b"
+											},
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 1296,
+													"end": 1303
+												}
+											]
+										},
+										{
+											"type": "Identifier",
+											"start": 1305,
+											"end": 1306,
+											"name": "d"
+										}
+									]
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 1311,
+									"end": 1312,
+									"name": "x"
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1317,
+					"end": 1364,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1317,
+						"end": 1363,
+						"callee": {
+							"type": "Identifier",
+							"start": 1317,
+							"end": 1318,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "AssignmentExpression",
+								"start": 1323,
+								"end": 1359,
+								"operator": "+=",
+								"left": {
+									"type": "ArrayExpression",
+									"start": 1323,
+									"end": 1354,
+									"elements": [
+										{
+											"type": "AssignmentExpression",
+											"start": 1328,
+											"end": 1339,
+											"operator": "=",
+											"left": {
+												"type": "Identifier",
+												"start": 1328,
+												"end": 1329,
+												"name": "a"
+											},
+											"right": {
+												"type": "AssignmentExpression",
+												"start": 1333,
+												"end": 1338,
+												"operator": "=",
+												"left": {
+													"type": "Identifier",
+													"start": 1333,
+													"end": 1334,
+													"name": "b"
+												},
+												"right": {
+													"type": "Identifier",
+													"start": 1337,
+													"end": 1338,
+													"name": "c"
+												},
+												"trailingComments": [
+													{
+														"type": "Line",
+														"value": " c",
+														"start": 1341,
+														"end": 1345
+													}
+												]
+											}
+										},
+										{
+											"type": "Identifier",
+											"start": 1349,
+											"end": 1350,
+											"name": "d"
+										}
+									]
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 1358,
+									"end": 1359,
+									"name": "x"
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1366,
+					"end": 1391,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1367,
+						"end": 1389,
+						"operator": "+=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 1367,
+							"end": 1384,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 1371,
+									"end": 1376,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1371,
+										"end": 1372,
+										"name": "a"
+									},
+									"value": {
+										"type": "AssignmentPattern",
+										"start": 1371,
+										"end": 1376,
+										"left": {
+											"type": "Identifier",
+											"start": 1371,
+											"end": 1372,
+											"name": "a"
+										},
+										"right": {
+											"type": "Identifier",
+											"start": 1375,
+											"end": 1376,
+											"name": "b"
+										}
+									},
+									"kind": "init",
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 1377,
+											"end": 1381
+										}
+									]
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 1388,
+							"end": 1389,
+							"name": "x"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1404,
+					"end": 1426,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1405,
+						"end": 1424,
+						"operator": "||=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 1405,
+							"end": 1418,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 1409,
+									"end": 1415,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1409,
+										"end": 1410,
+										"name": "a"
+									},
+									"value": {
+										"type": "ArrayExpression",
+										"start": 1412,
+										"end": 1415,
+										"elements": [
+											{
+												"type": "Identifier",
+												"start": 1413,
+												"end": 1414,
+												"name": "b"
+											}
+										]
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 1423,
+							"end": 1424,
+							"name": "x"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " nested",
+							"start": 1393,
+							"end": 1402
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1428,
+					"end": 1455,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1429,
+						"end": 1453,
+						"operator": "+=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 1429,
+							"end": 1448,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 1433,
+									"end": 1445,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1433,
+										"end": 1434,
+										"name": "a"
+									},
+									"value": {
+										"type": "ObjectExpression",
+										"start": 1436,
+										"end": 1445,
+										"properties": [
+											{
+												"type": "Property",
+												"start": 1438,
+												"end": 1443,
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 1438,
+													"end": 1439,
+													"name": "b"
+												},
+												"value": {
+													"type": "AssignmentPattern",
+													"start": 1438,
+													"end": 1443,
+													"left": {
+														"type": "Identifier",
+														"start": 1438,
+														"end": 1439,
+														"name": "b"
+													},
+													"right": {
+														"type": "Literal",
+														"start": 1442,
+														"end": 1443,
+														"value": 1,
+														"raw": "1"
+													}
+												},
+												"kind": "init"
+											}
+										]
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 1452,
+							"end": 1453,
+							"name": "x"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1457,
+					"end": 1486,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1458,
+						"end": 1484,
+						"operator": "||=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 1458,
+							"end": 1478,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 1462,
+									"end": 1475,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1462,
+										"end": 1463,
+										"name": "a"
+									},
+									"value": {
+										"type": "ArrayExpression",
+										"start": 1465,
+										"end": 1475,
+										"elements": [
+											{
+												"type": "AssignmentExpression",
+												"start": 1467,
+												"end": 1473,
+												"operator": "-=",
+												"left": {
+													"type": "Identifier",
+													"start": 1467,
+													"end": 1468,
+													"name": "b"
+												},
+												"right": {
+													"type": "Identifier",
+													"start": 1472,
+													"end": 1473,
+													"name": "c"
+												}
+											}
+										]
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 1483,
+							"end": 1484,
+							"name": "x"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1488,
+					"end": 1511,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1488,
+						"end": 1510,
+						"callee": {
+							"type": "Identifier",
+							"start": 1488,
+							"end": 1489,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "AssignmentExpression",
+								"start": 1491,
+								"end": 1508,
+								"operator": "+=",
+								"left": {
+									"type": "ArrayExpression",
+									"start": 1491,
+									"end": 1503,
+									"elements": [
+										{
+											"type": "ArrayExpression",
+											"start": 1492,
+											"end": 1495,
+											"elements": [
+												{
+													"type": "Identifier",
+													"start": 1493,
+													"end": 1494,
+													"name": "a"
+												}
+											]
+										},
+										{
+											"type": "ObjectExpression",
+											"start": 1497,
+											"end": 1502,
+											"properties": [
+												{
+													"type": "Property",
+													"start": 1499,
+													"end": 1500,
+													"method": false,
+													"shorthand": true,
+													"computed": false,
+													"key": {
+														"type": "Identifier",
+														"start": 1499,
+														"end": 1500,
+														"name": "b"
+													},
+													"value": {
+														"type": "Identifier",
+														"start": 1499,
+														"end": 1500,
+														"name": "b"
+													},
+													"kind": "init"
+												}
+											]
+										}
+									]
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 1507,
+									"end": 1508,
+									"name": "x"
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1513,
+					"end": 1648,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1514,
+						"end": 1646,
+						"operator": "+=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 1514,
+							"end": 1567,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 1518,
+									"end": 1531,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1518,
+										"end": 1527,
+										"name": "alphaName"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 1529,
+										"end": 1531,
+										"name": "aa"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 1535,
+									"end": 1547,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1535,
+										"end": 1543,
+										"name": "betaName"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 1545,
+										"end": 1547,
+										"name": "bb"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 1551,
+									"end": 1564,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1551,
+										"end": 1560,
+										"name": "gammaName"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 1562,
+										"end": 1564,
+										"name": "cc"
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 1571,
+							"end": 1646,
+							"callee": {
+								"type": "Identifier",
+								"start": 1571,
+								"end": 1587,
+								"name": "someFunctionCall"
+							},
+							"arguments": [
+								{
+									"type": "Identifier",
+									"start": 1588,
+									"end": 1605,
+									"name": "argumentNumberOne"
+								},
+								{
+									"type": "Identifier",
+									"start": 1607,
+									"end": 1624,
+									"name": "argumentNumberTwo"
+								},
+								{
+									"type": "Identifier",
+									"start": 1626,
+									"end": 1645,
+									"name": "argumentNumberThree"
+								}
+							],
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1728,
+					"end": 1756,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1729,
+						"end": 1754,
+						"operator": "+=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 1729,
+							"end": 1749,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 1731,
+									"end": 1747,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1731,
+										"end": 1732,
+										"name": "a",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 1733,
+												"end": 1740
+											}
+										]
+									},
+									"value": {
+										"type": "AssignmentExpression",
+										"start": 1742,
+										"end": 1747,
+										"operator": "=",
+										"left": {
+											"type": "Identifier",
+											"start": 1742,
+											"end": 1743,
+											"name": "b"
+										},
+										"right": {
+											"type": "Literal",
+											"start": 1746,
+											"end": 1747,
+											"value": 1,
+											"raw": "1"
+										}
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 1753,
+							"end": 1754,
+							"name": "x"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " comments, a freeze and the destructuring break in the target's own layout",
+							"start": 1650,
+							"end": 1726
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1758,
+					"end": 1799,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1759,
+						"end": 1797,
+						"operator": "+=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 1759,
+							"end": 1792,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 1763,
+									"end": 1789,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1763,
+										"end": 1764,
+										"name": "k",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 1765,
+												"end": 1772
+											}
+										]
+									},
+									"value": {
+										"type": "ObjectExpression",
+										"start": 1774,
+										"end": 1789,
+										"properties": [
+											{
+												"type": "Property",
+												"start": 1779,
+												"end": 1785,
+												"method": false,
+												"shorthand": false,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 1779,
+													"end": 1780,
+													"name": "b"
+												},
+												"value": {
+													"type": "ArrayExpression",
+													"start": 1782,
+													"end": 1785,
+													"elements": [
+														{
+															"type": "Identifier",
+															"start": 1783,
+															"end": 1784,
+															"name": "c"
+														}
+													]
+												},
+												"kind": "init"
+											}
+										]
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 1796,
+							"end": 1797,
+							"name": "x"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1801,
+					"end": 1828,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1801,
+						"end": 1827,
+						"callee": {
+							"type": "Identifier",
+							"start": 1801,
+							"end": 1802,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "AssignmentExpression",
+								"start": 1804,
+								"end": 1825,
+								"operator": "+=",
+								"left": {
+									"type": "ArrayExpression",
+									"start": 1804,
+									"end": 1820,
+									"elements": [
+										{
+											"type": "ArrayExpression",
+											"start": 1805,
+											"end": 1811,
+											"elements": [
+												{
+													"type": "Identifier",
+													"start": 1806,
+													"end": 1807,
+													"name": "a"
+												},
+												{
+													"type": "Identifier",
+													"start": 1809,
+													"end": 1810,
+													"name": "b"
+												}
+											]
+										},
+										{
+											"type": "ArrayExpression",
+											"start": 1813,
+											"end": 1819,
+											"elements": [
+												{
+													"type": "Identifier",
+													"start": 1814,
+													"end": 1815,
+													"name": "c"
+												},
+												{
+													"type": "Identifier",
+													"start": 1817,
+													"end": 1818,
+													"name": "d"
+												}
+											]
+										}
+									]
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 1824,
+									"end": 1825,
+									"name": "x"
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1830,
+					"end": 1886,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1830,
+						"end": 1885,
+						"callee": {
+							"type": "Identifier",
+							"start": 1830,
+							"end": 1831,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "AssignmentExpression",
+								"start": 1836,
+								"end": 1881,
+								"operator": "+=",
+								"left": {
+									"type": "ArrayExpression",
+									"start": 1836,
+									"end": 1876,
+									"elements": [
+										{
+											"type": "AssignmentExpression",
+											"start": 1863,
+											"end": 1872,
+											"operator": "=",
+											"left": {
+												"type": "Identifier",
+												"start": 1863,
+												"end": 1864,
+												"name": "a"
+											},
+											"right": {
+												"type": "Literal",
+												"start": 1871,
+												"end": 1872,
+												"value": 1,
+												"raw": "1"
+											},
+											"leadingComments": [
+												{
+													"type": "Line",
+													"value": " prettier-ignore",
+													"start": 1841,
+													"end": 1859
+												}
+											]
+										}
+									]
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 1880,
+									"end": 1881,
+									"name": "x"
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1888,
+					"end": 2015,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1889,
+						"end": 2013,
+						"operator": "+=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 1889,
+							"end": 1934,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 1893,
+									"end": 1902,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1893,
+										"end": 1902,
+										"name": "alphaName"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 1893,
+										"end": 1902,
+										"name": "alphaName"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 1906,
+									"end": 1914,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1906,
+										"end": 1914,
+										"name": "betaName"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 1906,
+										"end": 1914,
+										"name": "betaName"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 1918,
+									"end": 1931,
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1918,
+										"end": 1927,
+										"name": "gammaName"
+									},
+									"value": {
+										"type": "AssignmentPattern",
+										"start": 1918,
+										"end": 1931,
+										"left": {
+											"type": "Identifier",
+											"start": 1918,
+											"end": 1927,
+											"name": "gammaName"
+										},
+										"right": {
+											"type": "Literal",
+											"start": 1930,
+											"end": 1931,
+											"value": 1,
+											"raw": "1"
+										}
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 1938,
+							"end": 2013,
+							"callee": {
+								"type": "Identifier",
+								"start": 1938,
+								"end": 1954,
+								"name": "someFunctionCall"
+							},
+							"arguments": [
+								{
+									"type": "Identifier",
+									"start": 1955,
+									"end": 1972,
+									"name": "argumentNumberOne"
+								},
+								{
+									"type": "Identifier",
+									"start": 1974,
+									"end": 1991,
+									"name": "argumentNumberTwo"
+								},
+								{
+									"type": "Identifier",
+									"start": 1993,
+									"end": 2012,
+									"name": "argumentNumberThree"
+								}
+							],
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2079,
+					"end": 2151,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2079,
+						"end": 2150,
+						"callee": {
+							"type": "Identifier",
+							"start": 2079,
+							"end": 2080,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "AssignmentExpression",
+								"start": 2085,
+								"end": 2146,
+								"operator": "+=",
+								"left": {
+									"type": "ArrayExpression",
+									"start": 2085,
+									"end": 2141,
+									"elements": [
+										{
+											"type": "AssignmentExpression",
+											"start": 2112,
+											"end": 2131,
+											"operator": "=",
+											"left": {
+												"type": "Identifier",
+												"start": 2112,
+												"end": 2113,
+												"name": "a"
+											},
+											"right": {
+												"type": "Identifier",
+												"start": 2121,
+												"end": 2122,
+												"name": "b",
+												"trailingComments": [
+													{
+														"type": "Block",
+														"value": " c ",
+														"start": 2123,
+														"end": 2130
+													}
+												]
+											},
+											"leadingComments": [
+												{
+													"type": "Line",
+													"value": " prettier-ignore",
+													"start": 2090,
+													"end": 2108
+												}
+											]
+										},
+										{
+											"type": "Identifier",
+											"start": 2136,
+											"end": 2137,
+											"name": "d"
+										}
+									]
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 2145,
+									"end": 2146,
+									"name": "x"
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a freeze over a default whose value shell holds a comment",
+							"start": 2017,
+							"end": 2077
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2153,
+					"end": 2232,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2153,
+						"end": 2231,
+						"callee": {
+							"type": "Identifier",
+							"start": 2153,
+							"end": 2154,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "AssignmentExpression",
+								"start": 2159,
+								"end": 2227,
+								"operator": "+=",
+								"left": {
+									"type": "ArrayExpression",
+									"start": 2159,
+									"end": 2222,
+									"elements": [
+										{
+											"type": "Identifier",
+											"start": 2164,
+											"end": 2165,
+											"name": "d"
+										},
+										{
+											"type": "AssignmentExpression",
+											"start": 2192,
+											"end": 2218,
+											"operator": "=",
+											"left": {
+												"type": "Identifier",
+												"start": 2192,
+												"end": 2193,
+												"name": "a"
+											},
+											"right": {
+												"type": "Identifier",
+												"start": 2201,
+												"end": 2202,
+												"name": "b"
+											},
+											"leadingComments": [
+												{
+													"type": "Line",
+													"value": " prettier-ignore",
+													"start": 2170,
+													"end": 2188
+												}
+											],
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 2206,
+													"end": 2213
+												}
+											]
+										}
+									]
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 2226,
+									"end": 2227,
+									"name": "x"
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2234,
+					"end": 2296,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 2235,
+						"end": 2294,
+						"operator": "+=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 2235,
+							"end": 2289,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 2239,
+									"end": 2286,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 2239,
+										"end": 2240,
+										"name": "k"
+									},
+									"value": {
+										"type": "AssignmentExpression",
+										"start": 2267,
+										"end": 2286,
+										"operator": "=",
+										"left": {
+											"type": "Identifier",
+											"start": 2267,
+											"end": 2268,
+											"name": "a"
+										},
+										"right": {
+											"type": "Identifier",
+											"start": 2276,
+											"end": 2277,
+											"name": "b",
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 2278,
+													"end": 2285
+												}
+											]
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " prettier-ignore",
+												"start": 2245,
+												"end": 2263
+											}
+										]
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 2293,
+							"end": 2294,
+							"name": "x"
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

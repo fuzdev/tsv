@@ -2085,6 +2085,21 @@ impl<'a> Printer<'a> {
         target: &internal::Expression<'_>,
         context: ParenContext,
     ) -> DocId {
+        self.build_shell_operand_doc_with(node_start, target, context, || {
+            self.build_expression_doc(target)
+        })
+    }
+
+    /// [`Self::build_shell_operand_doc`] over the operand's doc from `build` — for an
+    /// operand its position prints in a role of its own (a compound assignment's literal
+    /// left, [`Printer::build_compound_target_doc`]), with the shell's gaps unchanged.
+    pub(in crate::printer) fn build_shell_operand_doc_with(
+        &self,
+        node_start: u32,
+        target: &internal::Expression<'_>,
+        context: ParenContext,
+        build: impl Fn() -> DocId,
+    ) -> DocId {
         let d = self.d();
         let target_start = target.span().start;
         let needs_parens = self.needs_parens(target, context);
@@ -2093,7 +2108,7 @@ impl<'a> Printer<'a> {
         // prints identically inside the flat pair from the target's own doc, and
         // never asks the pair to expand.
         if !self.has_comments_to_emit_between(node_start, target_start) {
-            let inner = self.build_expression_doc(target);
+            let inner = build();
             return if needs_parens { d.parens(inner) } else { inner };
         }
         let open = find_char_skipping_comments(
@@ -2115,7 +2130,7 @@ impl<'a> Printer<'a> {
                 leading_start,
                 target_start,
                 None,
-                self.build_expression_doc(target),
+                build(),
                 ")",
             )
         {
@@ -2126,7 +2141,7 @@ impl<'a> Printer<'a> {
         // stripped run leads the statement (and there a line comment's hardline
         // separator is what keeps the statement after it on its own line).
         let lead = self.build_rhs_comments_opt(leading_start, target_start);
-        let inner = self.build_expression_doc(target);
+        let inner = build();
         let core = match lead {
             Some(lead) => d.concat(&[lead, inner]),
             None => inner,

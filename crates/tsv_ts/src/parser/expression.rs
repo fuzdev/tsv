@@ -796,12 +796,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // WHOLE target it may not be an `AssignmentPattern` (`(a = b) = 1`).
             // `to_assignable` consumes by value; clone the arena ref (shallow — children
             // are refs) on this cold assignment-target path.
-            let context = if operator == AssignmentOperator::Assign {
-                AssignableContext::Assignment
+            //
+            // Only `=` reparses an object or array literal as a destructuring pattern
+            // (ecma262 §13.15.1): a compound operator's literal left (`({ a } += x)`)
+            // stays the literal, as acorn keeps it — an invalid target, the deferred
+            // early error. Every other compound left converts as an `=` left does, so a
+            // parenthesized assignment there (`(a = b) += 1`) still has no wire shape.
+            let left_pattern = if operator != AssignmentOperator::Assign
+                && matches!(
+                    left.kind,
+                    ExpressionKind::ObjectExpression(_) | ExpressionKind::ArrayExpression(_)
+                ) {
+                left.clone()
             } else {
-                AssignableContext::CompoundAssignment
+                self.to_whole_assignable(left.clone(), AssignableContext::Assignment)?
             };
-            let left_pattern = self.to_whole_assignable(left.clone(), context)?;
 
             let span = Span::new(expr_start as u32, end);
             debug_assert_encloses(span.start, span.end, left, right);

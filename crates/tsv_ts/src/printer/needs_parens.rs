@@ -895,10 +895,15 @@ fn needs_parens_expression_statement(expr: &Expression<'_>) -> bool {
         // to avoid being reparsed as a declaration (which also changes meaning —
         // an anonymous declaration is a syntax error).
         ExpressionKind::FunctionExpression(_) | ExpressionKind::ClassExpression(_) => true,
-        // Object pattern assignment: `({a, b} = obj);` needs parens
-        ExpressionKind::AssignmentExpression(assign) => {
-            matches!(assign.left.kind, ExpressionKind::ObjectPattern(_))
-        }
+        // Object pattern assignment: `({a, b} = obj);` needs parens — and so does a
+        // compound operator's object LITERAL left (`({ a } += x);`), which the parser keeps
+        // a literal and the printer lays out as the pattern prettier reads there. The pair
+        // goes around the whole assignment, as for the pattern: `({ a }) += x` does not
+        // parse under acorn ("Assigning to rvalue").
+        ExpressionKind::AssignmentExpression(assign) => matches!(
+            assign.left.kind,
+            ExpressionKind::ObjectPattern(_) | ExpressionKind::ObjectExpression(_)
+        ),
         // Sequence: check the first expression
         ExpressionKind::SequenceExpression(seq) => seq
             .expressions

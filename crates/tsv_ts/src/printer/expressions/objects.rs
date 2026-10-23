@@ -21,6 +21,95 @@ use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::visual_width;
 use tsv_lang::source_scan::find_char_skipping_comments;
 
+/// What an object or array LITERAL is printed as.
+///
+/// A literal is an expression everywhere but one position: a compound assignment's left
+/// (`({ a } += x)`), which ecma262 never reparses as a pattern (§13.15.1), so the literal
+/// stays — acorn keeps it, and so does tsv. Prettier's TypeScript parser converts it to a
+/// pattern anyway and prints it as one, and tsv prints that layout around the literal it
+/// keeps ([`Printer::build_compound_target_doc`]): no authored first-line expansion, a
+/// break on a directly nested literal, an `=` value or element printed as the default
+/// prettier reads there. Passed down the literal's own builders as a parameter, never held
+/// as printer state, so a doc built for one role is never read back under the other.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(in crate::printer) enum LiteralRole {
+    /// An ordinary object or array literal.
+    Expression,
+    /// A literal on a compound assignment's left, or nested in one through property values
+    /// and elements.
+    CompoundTarget,
+}
+
+impl LiteralRole {
+    /// Where a literal's element or property value STOPS PRINTING in this role — the anchor
+    /// every list seam of the literal takes for the trailing run
+    /// (`docs/comments.md` §The element-comma seam), and the end of the span its expansion
+    /// gates read as the item's own.
+    ///
+    /// The span end, except for an `=` value in a compound target: that value prints as the
+    /// default prettier reads there ([`Printer::build_compound_target_doc`]), whose doc stops
+    /// at its own value, as [`Expression::printed_end`] says of an `AssignmentPattern`. The
+    /// assignment's span runs on over the paren shell the parser erased from that value
+    /// (`[a = (b /* c */)] += x`), which holds nothing but `)`, whitespace and comments, and
+    /// which the ordinary role's assignment prints itself — so anchoring there in this role
+    /// leaves the shell's comments to nobody, and anchoring inside in the other prints them
+    /// twice. A frozen element or value is read through its slice instead
+    /// ([`Printer::element_claim_anchor`]): the slice prints the shell itself.
+    pub(in crate::printer) fn printed_end(self, expr: &Expression<'_>) -> u32 {
+        match (self, &expr.kind) {
+            (Self::CompoundTarget, ExpressionKind::AssignmentExpression(assign))
+                if assign.operator == internal::AssignmentOperator::Assign =>
+            {
+                assign.right.printed_end()
+            }
+            _ => expr.span().end,
+        }
+    }
+
+    /// [`Self::printed_end`] for an object property: [`internal::ObjectProperty::value_end`],
+    /// with the value read in this role.
+    pub(in crate::printer) fn property_printed_end(
+        self,
+        prop: &internal::ObjectProperty<'_>,
+    ) -> u32 {
+        match prop {
+            internal::ObjectProperty::Property(p) => self.printed_end(p.value),
+            internal::ObjectProperty::SpreadElement(_) => prop.value_end(),
+        }
+    }
+}
+
+/// Whether a value inside a [`LiteralRole::CompoundTarget`] literal takes the target's own
+/// print: a nested object or array literal (which prettier reads as a nested pattern), or
+/// an `=` assignment (which it reads as a default, printed as that default). Any other value — a
+/// compound assignment the literal holds included (`[(a += b)]`) — prints as it would in
+/// any literal.
+pub(in crate::printer) fn is_compound_target_value(expr: &Expression<'_>) -> bool {
+    match &expr.kind {
+        ExpressionKind::ObjectExpression(_) | ExpressionKind::ArrayExpression(_) => true,
+        ExpressionKind::AssignmentExpression(assign) => {
+            assign.operator == internal::AssignmentOperator::Assign
+        }
+        _ => false,
+    }
+}
+
+/// Whether a [`LiteralRole::CompoundTarget`] object breaks for a nested pattern —
+/// prettier's `shouldBreak` for an `ObjectPattern` (`print/object.js`): some property's
+/// value is directly an object or array pattern. A default (`a: [b] = c`) is not one.
+fn compound_target_object_breaks(obj: &internal::ObjectExpression<'_>) -> bool {
+    obj.properties.iter().any(|prop| {
+        matches!(
+            prop,
+            internal::ObjectProperty::Property(p)
+                if matches!(
+                    p.value.kind,
+                    ExpressionKind::ObjectExpression(_) | ExpressionKind::ArrayExpression(_)
+                )
+        )
+    })
+}
+
 impl<'a> Printer<'a> {
     /// Build a Doc for an object expression
     ///
@@ -29,6 +118,16 @@ impl<'a> Printer<'a> {
         &self,
         obj: &internal::ObjectExpression<'_>,
         obj_span: Span,
+    ) -> DocId {
+        self.build_object_doc_as(obj, obj_span, LiteralRole::Expression)
+    }
+
+    /// [`Self::build_object_doc`] in a [`LiteralRole`].
+    pub(in crate::printer) fn build_object_doc_as(
+        &self,
+        obj: &internal::ObjectExpression<'_>,
+        obj_span: Span,
+        role: LiteralRole,
     ) -> DocId {
         let d = self.d();
         // Check for comments inside the object.
@@ -56,12 +155,28 @@ impl<'a> Printer<'a> {
                 .iter()
                 .map(internal::ObjectProperty::span)
                 .collect();
-            self.has_standalone_block_comment(
-                obj_span.start,
-                obj_span.end,
-                &property_spans,
-                StandaloneGlue::Source,
-            )
+            match role {
+                LiteralRole::Expression => self.has_standalone_block_comment(
+                    obj_span.start,
+                    obj_span.end,
+                    &property_spans,
+                    StandaloneGlue::Source,
+                ),
+                // The target's key→`:` gap prints its block glued (`k /* c */:`), so a block
+                // the author gave a line of its own there is no line of its own in the output.
+                // With no authored first-line break to hold an expansion, breaking for it
+                // collapses on the next pass; the `=` pattern prints it collapsed in one.
+                LiteralRole::CompoundTarget => self
+                    .comments_on_page_between(obj_span.start, obj_span.end)
+                    .any(|c| {
+                        c.is_block
+                            && !self.comment_in_property_key_colon_gap(obj, c.span)
+                            && self.block_comment_owns_its_line(
+                                c,
+                                property_spans.iter().any(|s| s.start >= c.span.end),
+                            )
+                    }),
+            }
         };
 
         if obj.properties.is_empty() {
@@ -77,8 +192,16 @@ impl<'a> Printer<'a> {
         // authored newline would also be its own second fixed point, since the expanded
         // form reprints one newline and never the author's blank
         // (`patterns.rs::collection_formatting_hints`). Don't mirror this line over there.
+        //
+        // A compound target takes the pattern's own break instead, which the same group
+        // carries ([`compound_target_object_breaks`]).
         let first_prop_start = obj.properties[0].span().start;
-        let has_source_newline = self.has_newline_between(obj_span.start + 1, first_prop_start);
+        let has_source_newline = match role {
+            LiteralRole::Expression => {
+                self.has_newline_between(obj_span.start + 1, first_prop_start)
+            }
+            LiteralRole::CompoundTarget => compound_target_object_breaks(obj),
+        };
 
         // Decide the formatting strategy
         // must_break: conditions that require hardlines (comments)
@@ -189,7 +312,7 @@ impl<'a> Printer<'a> {
                     .then(|| prop.span());
                 parts.push(match frozen_span {
                     Some(slice) => self.raw_source_doc(slice),
-                    None => self.build_object_property_doc(prop, has_comments),
+                    None => self.build_object_property_doc(prop, has_comments, role),
                 });
 
                 // Trailing comments around the separator comma — block comments
@@ -204,7 +327,8 @@ impl<'a> Printer<'a> {
                 // on the page prints it twice, then three times, then four: the emitted
                 // form still carries the directive, so it re-freezes and the run grows
                 // on every pass.
-                let prop_end = Self::element_claim_anchor(frozen_span, prop.value_end());
+                let prop_end =
+                    Self::element_claim_anchor(frozen_span, self.property_printed_end(prop, role));
                 let upper_bound = obj
                     .properties
                     .get(i + 1)
@@ -299,7 +423,7 @@ impl<'a> Printer<'a> {
                 }
 
                 // Build property doc
-                let prop_doc = self.build_object_property_doc(prop, has_comments);
+                let prop_doc = self.build_object_property_doc(prop, has_comments, role);
                 parts.push(prop_doc);
 
                 // Add comma and line break
@@ -370,7 +494,7 @@ impl<'a> Printer<'a> {
         let mut parts: DocBuf = DocBuf::new();
         for (i, prop) in obj.properties.iter().enumerate() {
             // Comment-free past the gate, so the per-property comment queries are dead.
-            let prop_doc = self.build_object_property_doc(prop, false);
+            let prop_doc = self.build_object_property_doc(prop, false, LiteralRole::Expression);
             parts.push(prop_doc);
 
             if i < obj.properties.len() - 1 {
@@ -397,9 +521,10 @@ impl<'a> Printer<'a> {
         &self,
         prop: &internal::ObjectProperty<'_>,
         has_comments: bool,
+        role: LiteralRole,
     ) -> DocId {
         match prop {
-            internal::ObjectProperty::Property(p) => self.build_property_doc(p, has_comments),
+            internal::ObjectProperty::Property(p) => self.build_property_doc(p, has_comments, role),
             internal::ObjectProperty::SpreadElement(s) => self.build_spread_doc(s),
         }
     }
@@ -427,13 +552,97 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// [`Self::build_object_property_value_doc`], for a value a compound target prints its
+    /// own way ([`is_compound_target_value`]) when `target` says so.
+    fn build_property_value_doc_as(
+        &self,
+        value: &Expression<'_>,
+        frozen: Option<Span>,
+        target: bool,
+    ) -> DocId {
+        if target && frozen.is_none() {
+            self.mark_assignment_value(value);
+            return self.build_compound_target_doc(value);
+        }
+        self.build_object_property_value_doc(value, frozen)
+    }
+
+    /// [`LiteralRole::property_printed_end`] read through a `:`→value head freeze: a frozen
+    /// value's verbatim slice prints its whole span, the value shell included, so the trailing
+    /// run starts past it ([`Self::property_value_frozen_span`]).
+    fn property_printed_end(&self, prop: &internal::ObjectProperty<'_>, role: LiteralRole) -> u32 {
+        let printed_end = role.property_printed_end(prop);
+        match prop {
+            internal::ObjectProperty::Property(p)
+                if !p.shorthand
+                    && printed_end != prop.value_end()
+                    && self
+                        .property_value_frozen_span(p, self.property_key_region_end(p))
+                        .is_some() =>
+            {
+                prop.value_end()
+            }
+            _ => printed_end,
+        }
+    }
+
+    /// Whether `span` lies in some regular property's key→`:` gap.
+    fn comment_in_property_key_colon_gap(
+        &self,
+        obj: &internal::ObjectExpression<'_>,
+        span: Span,
+    ) -> bool {
+        obj.properties.iter().any(|prop| match prop {
+            internal::ObjectProperty::Property(p) if !p.shorthand && !p.method => {
+                let key_region_end = self.property_key_region_end(p);
+                key_region_end <= span.start && span.end <= self.find_colon_after(key_region_end)
+            }
+            _ => false,
+        })
+    }
+
+    /// Where a regular property's KEY region ends: past the `]` of a computed key, else at
+    /// the key's own end — the `key_region_end` [`Self::build_property_doc`] scans from.
+    fn property_key_region_end(&self, prop: &internal::Property<'_>) -> u32 {
+        if prop.computed {
+            self.find_closing_bracket_after(prop.key.span().end) + 1
+        } else {
+            prop.key.span().end
+        }
+    }
+
+    /// The verbatim slice a regular property's value prints as: the `:`→value head freeze
+    /// ([`Printer::value_head_frozen_span`]) on every arm of [`Self::build_property_doc`] but
+    /// the key→`:` own-line one, which builds the value unfrozen. One answer for the builder
+    /// and the trailing seam, so the seam never anchors past a shell the value's doc left
+    /// unprinted.
+    fn property_value_frozen_span(
+        &self,
+        prop: &internal::Property<'_>,
+        key_region_end: u32,
+    ) -> Option<Span> {
+        if !self.has_format_ignore {
+            return None;
+        }
+        let colon_pos = self.find_colon_after(key_region_end);
+        if self.comments_force_own_line_between(key_region_end, colon_pos) {
+            return None;
+        }
+        self.value_head_frozen_span(colon_pos + 1, prop.value.span())
+    }
+
     /// Build a Doc for a single property
     ///
     /// `has_comments` is the object-wide comment-presence flag: when it is false,
     /// no comment lies anywhere in the object span, so none can lie in this
     /// property's key→value gap either — the colon scan and the per-gap comment
     /// lookups are skipped (canonical reference: `build_params_doc_with_comments`).
-    fn build_property_doc(&self, prop: &internal::Property<'_>, has_comments: bool) -> DocId {
+    fn build_property_doc(
+        &self,
+        prop: &internal::Property<'_>,
+        has_comments: bool,
+        role: LiteralRole,
+    ) -> DocId {
         let d = self.d();
         // For computed keys, use expression doc (preserves string quotes)
         // For regular keys, use property key doc (converts strings to bare identifiers when valid)
@@ -549,6 +758,9 @@ impl<'a> Printer<'a> {
             // anchor was corrected. The value's doc prints the key and that gap alike, and
             // is not parenthesized here: the shorthand form is the syntax.
             match &prop.value.kind {
+                ExpressionKind::AssignmentExpression(_) if role == LiteralRole::CompoundTarget => {
+                    self.build_compound_target_doc(prop.value)
+                }
                 ExpressionKind::AssignmentExpression(_) | ExpressionKind::AssignmentPattern(_) => {
                     self.build_expression_doc(prop.value)
                 }
@@ -557,11 +769,22 @@ impl<'a> Printer<'a> {
         } else {
             // Regular property.
             //
+            // A compound target's nested literal or `=` value prints as prettier prints the
+            // pattern it reads there — no pair around the default, the nested literal under
+            // the target's own rules — on a plain `key: value` line: a pattern value has no
+            // layout of its own to choose.
+            let target =
+                role == LiteralRole::CompoundTarget && is_compound_target_value(prop.value);
+
             // Zero-comment fast gate: when the object has no comments at all, none
             // can lie between this key and its value, so skip the colon scan and the
             // per-gap comment lookups and emit the plain `key: value` layout directly
             // (canonical reference: build_params_doc_with_comments).
             if !has_comments {
+                if target {
+                    let value_doc = self.build_property_value_doc_as(prop.value, None, true);
+                    return d.concat(&[key_doc, d.text(": "), value_doc]);
+                }
                 let needs_parens =
                     self.needs_parens(prop.value, super::ParenContext::ObjectPropertyValue);
                 return if needs_parens {
@@ -597,9 +820,9 @@ impl<'a> Printer<'a> {
             // layout below; a glued block stays inline via the ordinary path.
             if self.comments_force_own_line_between(key_region_end, colon_pos) {
                 let value_doc = {
-                    let v = self.build_object_property_value_doc(prop.value, None);
-                    let v = if self
-                        .needs_parens(prop.value, super::ParenContext::ObjectPropertyValue)
+                    let v = self.build_property_value_doc_as(prop.value, None, target);
+                    let v = if !target
+                        && self.needs_parens(prop.value, super::ParenContext::ObjectPropertyValue)
                     {
                         d.parens(v)
                     } else {
@@ -625,7 +848,7 @@ impl<'a> Printer<'a> {
 
             // Check if value needs parens (e.g., assignment expressions)
             let needs_parens =
-                self.needs_parens(prop.value, super::ParenContext::ObjectPropertyValue);
+                !target && self.needs_parens(prop.value, super::ParenContext::ObjectPropertyValue);
 
             // A post-colon comment forces break-after-operator when it's a line
             // comment (extends to end of line), an *indentable* block (its reprint is
@@ -657,13 +880,16 @@ impl<'a> Printer<'a> {
                 || self.comment_hangs_value_after_operator(colon_pos + 1, value_start);
 
             // The `:`→value head: an own-line directive there freezes the whole value.
-            let value_frozen = self.value_head_frozen_span(colon_pos + 1, prop.value.span());
+            let value_frozen = self.property_value_frozen_span(prop, key_region_end);
 
             if pre_colon_comments.is_empty()
                 && post_colon_comments.is_empty()
                 && !has_own_line_comment_post_colon
             {
-                if needs_parens {
+                if target {
+                    let value_doc = self.build_property_value_doc_as(prop.value, None, true);
+                    d.concat(&[key_doc, d.text(": "), value_doc])
+                } else if needs_parens {
                     // Build manually with parens
                     let value_doc = d.concat(&[
                         d.text("("),
@@ -749,7 +975,11 @@ impl<'a> Printer<'a> {
                         let value_doc =
                             self.build_hung_value_doc(prop.value, colon_pos + 1, || {
                                 self.build_gap_value_doc(None, prop.value, || {
-                                    self.build_object_property_value_doc(prop.value, value_frozen)
+                                    self.build_property_value_doc_as(
+                                        prop.value,
+                                        value_frozen,
+                                        target,
+                                    )
                                 })
                             });
                         let value_doc = if needs_parens {
@@ -776,7 +1006,7 @@ impl<'a> Printer<'a> {
                     }
                     value_parts.push(self.build_hung_value_doc(prop.value, colon_pos + 1, || {
                         self.build_gap_value_doc(hoisted_run, prop.value, || {
-                            self.build_object_property_value_doc(prop.value, value_frozen)
+                            self.build_property_value_doc_as(prop.value, value_frozen, target)
                         })
                     }));
                     if needs_parens {
@@ -817,15 +1047,20 @@ impl<'a> Printer<'a> {
                         Some(d.concat(&comment_parts))
                     };
 
-                    if needs_parens {
-                        // Rare: assignment expression in object value needs parens
+                    if needs_parens || target {
+                        // Rare: an assignment value in its parens, or a compound target's
+                        // own value, neither of which takes the assignment layout
                         let mut parts: DocBuf = smallvec![lhs_doc, d.text(": ")];
                         if let Some(rc) = rhs_comments {
                             parts.push(rc);
                         }
-                        parts.push(d.text("("));
-                        parts.push(self.build_object_property_value_doc(prop.value, None));
-                        parts.push(d.text(")"));
+                        if needs_parens {
+                            parts.push(d.text("("));
+                        }
+                        parts.push(self.build_property_value_doc_as(prop.value, None, target));
+                        if needs_parens {
+                            parts.push(d.text(")"));
+                        }
                         d.concat(&parts)
                     } else {
                         let is_short_key = self.is_short_property_key(prop.key, prop.computed);

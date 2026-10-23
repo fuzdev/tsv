@@ -8,6 +8,7 @@
 // - Rest elements: `...rest`
 
 use super::assignment::{AssignmentLeft, RhsCommentInfo};
+use super::objects::LiteralRole;
 use crate::ast::internal::{
     self, ArrowFunctionBody, AssignmentOperator, Expression, ExpressionKind, ObjectPatternProperty,
 };
@@ -160,12 +161,16 @@ impl<'a> Printer<'a> {
         // before the target is built and the chain root reads it — see
         // [`Printer::mark_assignment_target_member_lookups`].
         self.mark_assignment_target_member_lookups(assign.left);
-        let left_doc = self.build_shell_operand_doc(
+        // An object or array literal left (a compound operator's, which the parser never
+        // reparses as a pattern) prints in the target's role
+        // ([`Printer::build_compound_target_doc`]); every other left is its own doc.
+        let left_doc = self.build_shell_operand_doc_with(
             assign_span.start,
             assign.left,
             ParenContext::AssignmentTarget {
                 operator: assign.operator,
             },
+            || self.build_compound_target_doc(assign.left),
         );
 
         // The VALUE is an assignment operand too, and prettier's call-object clause is
@@ -456,6 +461,38 @@ impl<'a> Printer<'a> {
                 d.indent_line(right_doc),
             ]))
         }
+    }
+
+    /// A compound assignment's object or array LITERAL left — and, recursively, a nested
+    /// literal or an `=` value inside one — printed as prettier prints the pattern its
+    /// parser makes of it ([`LiteralRole::CompoundTarget`]). Any other expression is its
+    /// ordinary doc.
+    ///
+    /// ecma262 reparses only an `=` left as a pattern (§13.15.1), so the parser keeps a
+    /// compound left the literal it was written as, methods and accessors included; only
+    /// the layout follows the pattern. The one entry the role has: the compound
+    /// assignment's left, and the literal's own builders as they recurse.
+    pub(in crate::printer) fn build_compound_target_doc(&self, expr: &Expression<'_>) -> DocId {
+        let doc = match &expr.kind {
+            ExpressionKind::ObjectExpression(obj) => {
+                self.build_object_doc_as(obj, expr.span, LiteralRole::CompoundTarget)
+            }
+            ExpressionKind::ArrayExpression(arr) => {
+                self.build_array_doc_as(arr, expr.span, LiteralRole::CompoundTarget)
+            }
+            ExpressionKind::AssignmentExpression(assign)
+                if assign.operator == AssignmentOperator::Assign =>
+            {
+                let pattern = internal::AssignmentPattern {
+                    left: assign.left,
+                    right: assign.right,
+                    decorators: None,
+                };
+                self.build_assignment_pattern_doc(&pattern, expr.span)
+            }
+            _ => return self.build_expression_doc(expr),
+        };
+        self.prepend_owned_leading_comment(expr, doc)
     }
 
     /// Where a destructuring pattern's `{…}` / `[…]` body ENDS — the offset just past the

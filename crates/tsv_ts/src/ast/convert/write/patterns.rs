@@ -173,6 +173,12 @@ pub(super) fn write_property(w: &mut JsonWriter, prop: &internal::Property<'_>, 
 
 /// A method/get/set value goes through acorn's `parseMethod`, whose
 /// `typeParameters` are grafted post-hoc (serialize after `body`).
+///
+/// A shorthand default an object LITERAL holds (`({ a = 1 } += x)`, the
+/// `CoverInitializedName` on a compound operator's left, which stays a literal) is an
+/// `AssignmentPattern` on the wire: acorn reads every `{ a = 1 }` through
+/// `parseMaybeDefault`, whatever the literal becomes. The internal literal keeps the
+/// `=` assignment it was parsed as; a pattern property already holds the pattern.
 fn write_property_value(w: &mut JsonWriter, prop: &internal::Property<'_>, ctx: &Ctx<'_>) {
     let method_value = prop.method || !matches!(prop.kind, internal::PropertyKind::Init);
     match (&prop.value, method_value) {
@@ -184,6 +190,21 @@ fn write_property_value(w: &mut JsonWriter, prop: &internal::Property<'_>, ctx: 
             true,
         ) => {
             write_function_expression(w, f, ctx, true);
+        }
+        (
+            internal::Expression {
+                kind: internal::ExpressionKind::AssignmentExpression(assign),
+                span,
+            },
+            false,
+        ) if prop.shorthand => {
+            debug_assert_eq!(assign.operator, internal::AssignmentOperator::Assign);
+            node_header(w, "AssignmentPattern", *span, ctx);
+            w.raw(",\"left\":");
+            write_expression(w, assign.left, ctx);
+            w.raw(",\"right\":");
+            write_expression(w, assign.right, ctx);
+            close_node(w, "AssignmentPattern", *span, ctx);
         }
         _ => write_expression(w, prop.value, ctx),
     }

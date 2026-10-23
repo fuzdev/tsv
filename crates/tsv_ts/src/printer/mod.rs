@@ -1708,7 +1708,24 @@ impl<'a> Printer<'a> {
     /// answer it the same way — `AssignmentLeft::ComplexPattern` / the declarator's
     /// break-lhs arm — so keep them in step: a rule added to one is a rule missing from
     /// the other.
+    ///
+    /// A compound operator's object LITERAL left answers it too, as the pattern prettier's
+    /// parser reads there ([`Printer::build_compound_target_doc`]): a renamed property, or a
+    /// shorthand with a default, which the literal holds as an `=` assignment.
     pub(crate) fn is_complex_destructuring_target(&self, expr: &internal::Expression<'_>) -> bool {
+        if let internal::ExpressionKind::ObjectExpression(obj) = &expr.kind {
+            return obj.properties.len() > 2
+                && obj.properties.iter().any(|prop| match prop {
+                    internal::ObjectProperty::Property(p) => {
+                        !p.shorthand
+                            || matches!(
+                                p.value.kind,
+                                internal::ExpressionKind::AssignmentExpression(_)
+                            )
+                    }
+                    internal::ObjectProperty::SpreadElement(_) => false,
+                });
+        }
         let internal::ExpressionKind::ObjectPattern(obj) = &expr.kind else {
             return false;
         };

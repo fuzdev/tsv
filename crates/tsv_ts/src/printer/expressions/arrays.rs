@@ -5,6 +5,7 @@
 // - Fill mode for number-only arrays
 // - Comment preservation
 
+use super::objects::{LiteralRole, is_compound_target_value};
 use crate::ast::internal::{self, Expression, ExpressionKind, LiteralValue};
 use crate::printer::comments::{
     ShareSite, block_is_before_comma, next_real_element_start, run_defers_line,
@@ -476,10 +477,12 @@ impl<'a> Printer<'a> {
         span: Span,
         i: usize,
         elem_start: u32,
+        role: LiteralRole,
     ) -> u32 {
         match self.prev_real_slot(arr, i) {
             Some((idx, prev)) => {
-                self.element_gap_split(arr, span, idx, prev.span().end, elem_start)
+                let prev_end = self.element_printed_end(arr, span, idx, prev, role);
+                self.element_gap_split(arr, span, idx, prev_end, elem_start)
             }
             None => span.start + 1,
         }
@@ -563,9 +566,29 @@ impl<'a> Printer<'a> {
     /// twice.
     ///
     /// `None` when the array holds no real element: there is nothing to scan past.
-    fn end_scan_start(&self, arr: &internal::ArrayExpression<'_>) -> Option<u32> {
-        let (_, elem) = self.prev_real_slot(arr, arr.elements.len())?;
-        Some(elem.span().end)
+    fn end_scan_start(
+        &self,
+        arr: &internal::ArrayExpression<'_>,
+        span: Span,
+        role: LiteralRole,
+    ) -> Option<u32> {
+        let (idx, elem) = self.prev_real_slot(arr, arr.elements.len())?;
+        Some(self.element_printed_end(arr, span, idx, elem, role))
+    }
+
+    /// [`LiteralRole::printed_end`] for slot `idx`, read through a format-ignore freeze: a
+    /// frozen element's verbatim slice prints its whole span, the value shell included
+    /// ([`Printer::element_claim_anchor`]).
+    fn element_printed_end(
+        &self,
+        arr: &internal::ArrayExpression<'_>,
+        span: Span,
+        idx: usize,
+        elem: &Expression<'_>,
+        role: LiteralRole,
+    ) -> u32 {
+        let frozen = self.element_frozen_span(span.start + 1, arr.elements, idx);
+        Self::element_claim_anchor(frozen, role.printed_end(elem))
     }
 
     /// Whether any slot is a spread whose stripped parens hold an own-line share — an
@@ -594,12 +617,16 @@ impl<'a> Printer<'a> {
         &self,
         arr: &internal::ArrayExpression<'_>,
         arr_span: Span,
+        role: LiteralRole,
     ) -> bool {
         let last_slot_real = arr.elements.last().is_some_and(Option::is_some);
-        let Some(search_start) = last_slot_real.then(|| self.end_scan_start(arr)).flatten() else {
+        let Some(search_start) = last_slot_real
+            .then(|| self.end_scan_start(arr, arr_span, role))
+            .flatten()
+        else {
             return false;
         };
-        let last_real_split = self.last_element_trailing_split(arr, arr_span);
+        let last_real_split = self.last_element_trailing_split(arr, arr_span, role);
         self.comments_to_emit_between(search_start, arr_span.end - 1)
             .any(|c| c.is_block && self.end_scan_emits_comment(c, search_start, last_real_split))
     }
@@ -617,9 +644,10 @@ impl<'a> Printer<'a> {
         &self,
         arr: &internal::ArrayExpression<'_>,
         span: Span,
+        role: LiteralRole,
     ) -> Option<(u32, u32)> {
         let (idx, elem) = self.prev_real_slot(arr, arr.elements.len())?;
-        let elem_end = elem.span().end;
+        let elem_end = self.element_printed_end(arr, span, idx, elem, role);
         // No real element follows, so the gap runs to the closing `]`.
         let gap_end = span.end - 1;
         Some((
@@ -636,6 +664,19 @@ impl<'a> Printer<'a> {
         &self,
         arr: &internal::ArrayExpression<'_>,
         arr_span: Span,
+    ) -> DocId {
+        self.build_array_doc_as(arr, arr_span, LiteralRole::Expression)
+    }
+
+    /// [`Self::build_array_doc`] in a [`LiteralRole`]. A compound target's array prints as
+    /// prettier prints an array PATTERN: an element it reads as a nested pattern or a
+    /// default takes the target's own print, and the nested-literal break
+    /// ([`Self::should_break_nested_array`], an `ArrayExpression` rule) does not apply.
+    pub(in crate::printer) fn build_array_doc_as(
+        &self,
+        arr: &internal::ArrayExpression<'_>,
+        arr_span: Span,
+        role: LiteralRole,
     ) -> DocId {
         self.mark_relational_sibling_authored_pairs(arr.elements.iter().copied());
         if arr.elements.is_empty() {
@@ -658,11 +699,11 @@ impl<'a> Printer<'a> {
         let has_expanding_comments = has_comments
             && (self.has_line_comments_between(arr_span.start, arr_span.end)
                 || self.has_multiline_block_comments_on_page_between(arr_span.start, arr_span.end)
-                || self.has_own_line_block_comments_in_array(arr, arr_span)
+                || self.has_own_line_block_comments_in_array(arr, arr_span, role)
                 || self.spread_has_share(arr, arr_span));
 
         if has_expanding_comments {
-            return self.build_array_doc_with_expanding_comments(arr, arr_span);
+            return self.build_array_doc_with_expanding_comments(arr, arr_span, role);
         }
 
         // A concisely printed array (numbers only) packs as a fill; everything else goes
@@ -677,8 +718,20 @@ impl<'a> Printer<'a> {
             self.build_array_fill_doc(arr, arr_span, has_comments)
         } else {
             // Use group with one-per-line for other content
-            self.build_array_group_doc(arr, arr_span, has_comments)
+            self.build_array_group_doc(arr, arr_span, has_comments, role)
         }
+    }
+
+    /// An element's doc in a [`LiteralRole`]: the target's own print for a value a compound
+    /// target reads as a nested pattern or a default ([`is_compound_target_value`]), the
+    /// argument-position doc every array element takes otherwise.
+    fn build_array_element_doc_as(&self, expr: &Expression<'_>, role: LiteralRole) -> DocId {
+        if role == LiteralRole::CompoundTarget && is_compound_target_value(expr) {
+            return self.build_list_element_doc(expr.span().start, || {
+                self.build_compound_target_doc(expr)
+            });
+        }
+        self.build_arg_expression_doc(expr)
     }
 
     /// Check if array contains own-line single-line block comments that force expansion.
@@ -697,9 +750,14 @@ impl<'a> Printer<'a> {
         &self,
         arr: &internal::ArrayExpression<'_>,
         span: Span,
+        role: LiteralRole,
     ) -> bool {
         let non_null: SmallVec<[_; 8]> = arr.elements.iter().flatten().collect();
-        self.has_own_line_block_comments_in_bracket_list(span, &non_null, |e| e.span())
+        // The element's PRINTED span ([`LiteralRole::printed_end`]): a comment in a compound
+        // target's erased value shell is not inside the element, its doc not printing it.
+        self.has_own_line_block_comments_in_bracket_list(span, &non_null, |e| {
+            Span::new(e.span().start, role.printed_end(e))
+        })
     }
 
     /// Prettier's `isConciselyPrintedArray` (`print/array.js`) — the ONE reading of "this
@@ -776,7 +834,14 @@ impl<'a> Printer<'a> {
             slot.clear();
             // Elements and their glued comments (a hole pushes nothing — though
             // `is_concisely_printed_array` already excludes elisions from this path).
-            self.push_array_element_with_inline_comments(arr, span, i, has_comments, &mut slot);
+            self.push_array_element_with_inline_comments(
+                arr,
+                span,
+                i,
+                has_comments,
+                LiteralRole::Expression,
+                &mut slot,
+            );
 
             if i < last {
                 slot.push(d.text(","));
@@ -826,6 +891,7 @@ impl<'a> Printer<'a> {
         span: Span,
         i: usize,
         has_comments: bool,
+        role: LiteralRole,
         parts: &mut DocBuf,
     ) {
         let Some(expr) = arr.elements[i].as_ref() else {
@@ -834,17 +900,19 @@ impl<'a> Printer<'a> {
 
         if has_comments {
             let elem_start = expr.span().start;
-            let search_start = self.leading_comment_search_start_for(arr, span, i, elem_start);
+            let search_start =
+                self.leading_comment_search_start_for(arr, span, i, elem_start, role);
             self.add_inline_leading_block_comments(search_start, elem_start, parts);
         }
 
-        parts.push(self.build_arg_expression_doc(expr));
+        parts.push(self.build_array_element_doc_as(expr, role));
 
         if has_comments {
             // Trailing block comments — the ones `block_comment_trails_prev_element`
             // binds to this element (before its comma; on the last slot the whole
             // same-line run, its comma never being emitted).
-            self.add_trailing_array_comments(arr, span, expr.span().end, i, parts);
+            let elem_end = self.element_printed_end(arr, span, i, expr, role);
+            self.add_trailing_array_comments(arr, span, elem_end, i, parts);
         }
     }
 
@@ -859,6 +927,7 @@ impl<'a> Printer<'a> {
         arr: &internal::ArrayExpression<'_>,
         arr_span: Span,
         has_comments: bool,
+        role: LiteralRole,
     ) -> DocId {
         let d = self.d();
         let mut parts = d.pooled_docbuf();
@@ -867,7 +936,7 @@ impl<'a> Printer<'a> {
         let has_trailing_elision = arr.elements.last().is_some_and(Option::is_none);
 
         // Check Prettier's shouldBreak heuristic for nested arrays/objects
-        let should_break = self.should_break_nested_array(arr);
+        let should_break = role == LiteralRole::Expression && self.should_break_nested_array(arr);
 
         for i in 0..arr.elements.len() {
             // Elements and their glued comments (a hole pushes nothing).
@@ -876,6 +945,7 @@ impl<'a> Printer<'a> {
                 arr_span,
                 i,
                 has_comments,
+                role,
                 &mut parts,
             );
 
@@ -910,7 +980,7 @@ impl<'a> Printer<'a> {
                 // past the element's end either way, so a LAST spread's stripped-paren
                 // interior stays the spread doc's share and is never re-emitted here.
                 let scan_start = self
-                    .last_element_trailing_split(arr, arr_span)
+                    .last_element_trailing_split(arr, arr_span, role)
                     .map_or(arr_span.start + 1, |(_, split)| split);
                 self.push_trailing_elision_blocks(
                     &mut parts,
@@ -924,7 +994,7 @@ impl<'a> Printer<'a> {
         // routes the array to the expanding printer, and so does a spread's own-line share
         // (`spread_has_share`), which that printer orders against the run past the `)`.
         debug_assert!(
-            !(has_comments && self.grouped_end_scan_finds_comment(arr, arr_span)),
+            !(has_comments && self.grouped_end_scan_finds_comment(arr, arr_span, role)),
             "an array with a comment past its last element must route to the expanding printer"
         );
 
@@ -954,6 +1024,7 @@ impl<'a> Printer<'a> {
         &self,
         arr: &internal::ArrayExpression<'_>,
         span: Span,
+        role: LiteralRole,
     ) -> DocId {
         let d = self.d();
         let mut parts = d.pooled_docbuf();
@@ -996,7 +1067,10 @@ impl<'a> Printer<'a> {
             // O(remaining elements) — compute once and reuse below.
             let next_boundary = array_gap_end(arr, span, i);
             let (elem_start, elem_end) = match elem {
-                Some(e) => (e.span().start, e.span().end),
+                Some(e) => (
+                    e.span().start,
+                    self.element_printed_end(arr, span, i, e, role),
+                ),
                 None => (next_boundary, next_boundary),
             };
 
@@ -1075,8 +1149,15 @@ impl<'a> Printer<'a> {
             // of an own-line comment routes the whole array here.
             if let Some(e) = elem {
                 let element_doc = match self.element_frozen_span(span.start + 1, arr.elements, i) {
+                    // A compound target's default prints bare frozen too: the pair the
+                    // argument position gives an assignment is not the target's.
+                    Some(frozen)
+                        if role == LiteralRole::CompoundTarget && is_compound_target_value(e) =>
+                    {
+                        self.build_frozen_expression_doc(e, frozen)
+                    }
                     Some(frozen) => self.build_frozen_arg_doc(e, frozen),
-                    None => self.build_arg_expression_doc(e),
+                    None => self.build_array_element_doc_as(e, role),
                 };
                 self.push_run_leading_next_item(&mut parts, &pending_leads_next, elem_start);
                 pending_leads_next.clear();
@@ -1248,9 +1329,9 @@ impl<'a> Printer<'a> {
         // The scan never reaches inside a LAST spread's stripped parens: the loop above
         // emitted that share, ordered against the run past the `)` (`end_scan_start`).
         let final_scan_start = trailing_hole_comments_end
-            .or_else(|| self.end_scan_start(arr))
+            .or_else(|| self.end_scan_start(arr, span, role))
             .unwrap_or(span.start + 1);
-        let last_real_split = self.last_element_trailing_split(arr, span);
+        let last_real_split = self.last_element_trailing_split(arr, span, role);
         let mut prev_end = final_scan_start;
         // The comment this scan emitted last — `None` after one it skipped, which another
         // emitter put on a line of its own, so nothing here has it to glue to.

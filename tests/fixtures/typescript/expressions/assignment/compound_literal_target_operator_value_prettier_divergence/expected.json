@@ -1,0 +1,305 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 231,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " an assignment a compound left holds, as a property value or an element, keeps its own",
+			"start": 20,
+			"end": 108
+		},
+		{
+			"type": "Line",
+			"value": " operator",
+			"start": 110,
+			"end": 121
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 230,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 221,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 123,
+					"end": 146,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 124,
+						"end": 144,
+						"operator": "+=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 124,
+							"end": 139,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 126,
+									"end": 137,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 126,
+										"end": 127,
+										"name": "a"
+									},
+									"value": {
+										"type": "AssignmentExpression",
+										"start": 130,
+										"end": 136,
+										"operator": "+=",
+										"left": {
+											"type": "Identifier",
+											"start": 130,
+											"end": 131,
+											"name": "b"
+										},
+										"right": {
+											"type": "Identifier",
+											"start": 135,
+											"end": 136,
+											"name": "c"
+										}
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 143,
+							"end": 144,
+							"name": "x"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an assignment a compound left holds, as a property value or an element, keeps its own",
+							"start": 20,
+							"end": 108
+						},
+						{
+							"type": "Line",
+							"value": " operator",
+							"start": 110,
+							"end": 121
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 148,
+					"end": 169,
+					"expression": {
+						"type": "CallExpression",
+						"start": 148,
+						"end": 168,
+						"callee": {
+							"type": "Identifier",
+							"start": 148,
+							"end": 149,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "AssignmentExpression",
+								"start": 151,
+								"end": 166,
+								"operator": "+=",
+								"left": {
+									"type": "ArrayExpression",
+									"start": 151,
+									"end": 161,
+									"elements": [
+										{
+											"type": "AssignmentExpression",
+											"start": 153,
+											"end": 159,
+											"operator": "+=",
+											"left": {
+												"type": "Identifier",
+												"start": 153,
+												"end": 154,
+												"name": "a"
+											},
+											"right": {
+												"type": "Identifier",
+												"start": 158,
+												"end": 159,
+												"name": "b"
+											}
+										}
+									]
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 165,
+									"end": 166,
+									"name": "x"
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 171,
+					"end": 189,
+					"expression": {
+						"type": "CallExpression",
+						"start": 171,
+						"end": 188,
+						"callee": {
+							"type": "Identifier",
+							"start": 171,
+							"end": 172,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "AssignmentExpression",
+								"start": 174,
+								"end": 186,
+								"operator": "+=",
+								"left": {
+									"type": "ArrayExpression",
+									"start": 174,
+									"end": 181,
+									"elements": [
+										{
+											"type": "AssignmentExpression",
+											"start": 175,
+											"end": 180,
+											"operator": "=",
+											"left": {
+												"type": "Identifier",
+												"start": 175,
+												"end": 176,
+												"name": "a"
+											},
+											"right": {
+												"type": "Literal",
+												"start": 179,
+												"end": 180,
+												"value": 1,
+												"raw": "1"
+											}
+										}
+									]
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 185,
+									"end": 186,
+									"name": "x"
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 191,
+					"end": 220,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 192,
+						"end": 218,
+						"operator": "-=",
+						"left": {
+							"type": "ObjectExpression",
+							"start": 192,
+							"end": 213,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 196,
+									"end": 210,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 196,
+										"end": 197,
+										"name": "a"
+									},
+									"value": {
+										"type": "ArrayExpression",
+										"start": 199,
+										"end": 210,
+										"elements": [
+											{
+												"type": "AssignmentExpression",
+												"start": 201,
+												"end": 208,
+												"operator": "||=",
+												"left": {
+													"type": "Identifier",
+													"start": 201,
+													"end": 202,
+													"name": "b"
+												},
+												"right": {
+													"type": "Identifier",
+													"start": 207,
+													"end": 208,
+													"name": "c"
+												}
+											}
+										]
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 217,
+							"end": 218,
+							"name": "x"
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

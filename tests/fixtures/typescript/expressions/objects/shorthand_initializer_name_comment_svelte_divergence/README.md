@@ -34,7 +34,8 @@ validity the oracle is tsc, whose parser accepts and whose checker reports TS131
 ## Expected behavior
 
 - **tsv parser**: parses, as a `Property` with `shorthand: true` whose `value` is
-  an `AssignmentExpression` spanning the whole `a1 = 1` (see `expected_ours.json`)
+  an `AssignmentPattern` spanning the whole `a1 = 1` — the shape acorn gives every
+  shorthand initializer it reads (see `expected_ours.json`)
 - **Svelte/acorn**: fails to parse (see `expected_svelte.json` with `{"error": "failed to parse"}`)
 - **prettier**: formats to exactly this input — so the fixture also pins formatting
   agreement, which is the claim a Rust test cannot make against a live oracle
@@ -42,5 +43,7 @@ validity the oracle is tsc, whose parser accepts and whose checker reports TS131
 The **destructuring** spelling of the same binding (`const { a /* c */ = 1 } = x`)
 is an ordinary pattern both parsers accept, and is covered by
 [stripped_paren_interior_comment](../../destructuring/stripped_paren_interior_comment/);
-this fixture is the only reachable spelling of the *literal* one, since every
-valid `{ a = 1 }` is refined to a pattern before it is printed.
+every valid `{ a = 1 }` is refined to a pattern before it is printed, so the
+*literal* one is reachable only where the early error is deferred: here, and on a
+compound operator's left
+([compound_literal_target](../../assignment/compound_literal_target/)).
