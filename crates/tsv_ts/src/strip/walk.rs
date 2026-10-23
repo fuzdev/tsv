@@ -215,7 +215,15 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// declaration's around it, which is what blanks or refuses when it is TypeScript.
     fn statement(&mut self, statement: &Statement<'_>, outer: Span, position: Position) {
         if self.statement_kind(statement, outer, position) {
-            self.open = self.statement_tail(statement);
+            // a statement whose last byte is a `;` is closed, whatever its kind:
+            // `statement_tail`'s every arm closes, reaches `unterminated_tail` at that same
+            // last byte (which closes on it), or recurses into the declaration or body
+            // statement the statement ends with — which ends at that byte too
+            self.open = if self.src.ends_with_semicolon(statement.span.end) {
+                Tail::Closed
+            } else {
+                self.statement_tail(statement)
+            };
             self.mark(outer.end);
         }
     }
