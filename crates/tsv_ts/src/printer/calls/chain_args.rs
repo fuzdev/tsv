@@ -9,7 +9,7 @@
 // is still this file's alone is the selection ORDER and the arms the other trees have no twin
 // for (the force-expanded hugs, the classify-and-wrap fallback).
 
-use super::super::chain::ChainCall;
+use super::super::chain::{ChainCall, transparent_instantiation_callee};
 use super::super::comments::CommentSpacing;
 use super::super::{Printer, is_curried_arrow_chain, is_multiline_template_expression};
 use super::arg_comments::{
@@ -44,25 +44,6 @@ use tsv_lang::doc::arena::DocArena;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::has_newline_before_position;
 
-/// Get type arguments for a call expression, checking both the call itself
-/// and a TSInstantiationExpression callee.
-///
-/// Our parser produces `CallExpression { callee: TSInstantiationExpression { expr, <T> } }`
-/// for `expr<T>(args)`, while the canonical parser puts `<T>` directly on
-/// `CallExpression.typeArguments`. In chain context, the TSInstantiationExpression
-/// is linearized away, so the Call node must recover type arguments from the callee.
-fn get_call_type_arguments<'a>(
-    call: &'a internal::CallExpression<'a>,
-) -> Option<&'a internal::TSTypeParameterInstantiation<'a>> {
-    call.type_arguments.as_ref().or({
-        if let ExpressionKind::TSInstantiationExpression(inst) = &call.callee.kind {
-            Some(&inst.type_arguments)
-        } else {
-            None
-        }
-    })
-}
-
 /// The doc a chain call prints ahead of its `(`: an optional call's `?.` half, the
 /// callee→type-arguments comments and the type arguments themselves — `None` when the call
 /// has neither. One builder for the call's own layouts and for a probe measuring the line up
@@ -76,27 +57,42 @@ pub(super) fn chain_call_head_doc(
     call: &internal::CallExpression<'_>,
     gap: super::CalleeGap,
 ) -> Option<DocId> {
-    let type_args = get_call_type_arguments(call);
-    let type_args_doc = type_args.map(|ta| printer.build_type_parameter_instantiation_doc(ta));
+    let d = printer.d();
     let optional_doc = super::optional_callee_gap_doc(printer, gap);
+    // A transparent instantiation callee's list (`T<U>?.(a)`) belongs to the INSTANTIATION:
+    // it prints ahead of the `?.` (behind it, `T?.<U>(a)` moves the list onto the call, a
+    // different program), and its comment window is the expression→`<` gap the linearized
+    // base leaves unclaimed — the callee gap opens past the `>`, so a window opened there
+    // would invert and drop every comment in it.
+    if let Some(inst) = transparent_instantiation_callee(call) {
+        let ta = &inst.type_arguments;
+        let mut parts = DocBuf::new();
+        parts.extend(printer.build_name_to_type_params_comments_opt(
+            inst.expression.span().end,
+            ta.span.start,
+            CommentSpacing::Trailing,
+        ));
+        parts.push(printer.build_type_parameter_instantiation_doc(ta));
+        parts.extend(optional_doc);
+        return Some(d.concat(&parts));
+    }
+    let type_args = call.type_arguments.as_ref();
     if optional_doc.is_none() && type_args.is_none() {
         return None;
     }
     let mut parts = DocBuf::new();
     parts.extend(optional_doc);
-    // Emit comments between callee and type args: `obj.fn/* c */ <string>()`
-    // Uses build_name_to_type_params_comments for safe line comment handling
-    if let Some(ta) = type_args
-        && let Some(doc) = printer.build_name_to_type_params_comments_opt(
+    if let Some(ta) = type_args {
+        // Emit comments between callee and type args: `obj.fn/* c */ <string>()`
+        // Uses build_name_to_type_params_comments for safe line comment handling
+        parts.extend(printer.build_name_to_type_params_comments_opt(
             gap.start,
             ta.span.start,
             CommentSpacing::Trailing,
-        )
-    {
-        parts.push(doc);
+        ));
+        parts.push(printer.build_type_parameter_instantiation_doc(ta));
     }
-    parts.extend(type_args_doc);
-    Some(printer.d().concat(&parts))
+    Some(d.concat(&parts))
 }
 
 /// The `(`→first-argument gap for the chain's **body-line** paths, as a doc: the blocks the

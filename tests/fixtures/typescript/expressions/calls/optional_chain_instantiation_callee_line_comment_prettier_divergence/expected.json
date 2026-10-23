@@ -1,0 +1,244 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 235,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a line comment between the type arguments and the `?.` drops the argument list to a",
+			"start": 20,
+			"end": 106
+		},
+		{
+			"type": "Line",
+			"value": " continuation line, and the type arguments stay ahead of the `?.`",
+			"start": 108,
+			"end": 175
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 182,
+			"end": 187
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 208,
+			"end": 213
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 234,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 225,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 177,
+					"end": 198,
+					"expression": {
+						"type": "ChainExpression",
+						"start": 177,
+						"end": 197,
+						"expression": {
+							"type": "MemberExpression",
+							"start": 177,
+							"end": 197,
+							"object": {
+								"type": "CallExpression",
+								"start": 177,
+								"end": 195,
+								"callee": {
+									"type": "TSInstantiationExpression",
+									"start": 177,
+									"end": 181,
+									"expression": {
+										"type": "Identifier",
+										"start": 177,
+										"end": 178,
+										"name": "T"
+									},
+									"typeArguments": {
+										"type": "TSTypeParameterInstantiation",
+										"start": 178,
+										"end": 181,
+										"params": [
+											{
+												"type": "TSTypeReference",
+												"start": 179,
+												"end": 180,
+												"typeName": {
+													"type": "Identifier",
+													"start": 179,
+													"end": 180,
+													"name": "U"
+												}
+											}
+										]
+									},
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c1",
+											"start": 182,
+											"end": 187
+										}
+									]
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 193,
+										"end": 194,
+										"name": "a"
+									}
+								],
+								"optional": true
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 196,
+								"end": 197,
+								"name": "b"
+							},
+							"computed": false,
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a line comment between the type arguments and the `?.` drops the argument list to a",
+							"start": 20,
+							"end": 106
+						},
+						{
+							"type": "Line",
+							"value": " continuation line, and the type arguments stay ahead of the `?.`",
+							"start": 108,
+							"end": 175
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 201,
+					"end": 224,
+					"expression": {
+						"type": "ChainExpression",
+						"start": 201,
+						"end": 223,
+						"expression": {
+							"type": "MemberExpression",
+							"start": 201,
+							"end": 223,
+							"object": {
+								"type": "CallExpression",
+								"start": 201,
+								"end": 221,
+								"callee": {
+									"type": "TSInstantiationExpression",
+									"start": 201,
+									"end": 207,
+									"expression": {
+										"type": "MemberExpression",
+										"start": 201,
+										"end": 204,
+										"object": {
+											"type": "Identifier",
+											"start": 201,
+											"end": 202,
+											"name": "a"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 203,
+											"end": 204,
+											"name": "T"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"typeArguments": {
+										"type": "TSTypeParameterInstantiation",
+										"start": 204,
+										"end": 207,
+										"params": [
+											{
+												"type": "TSTypeReference",
+												"start": 205,
+												"end": 206,
+												"typeName": {
+													"type": "Identifier",
+													"start": 205,
+													"end": 206,
+													"name": "U"
+												}
+											}
+										]
+									},
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c2",
+											"start": 208,
+											"end": 213
+										}
+									]
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 219,
+										"end": 220,
+										"name": "b"
+									}
+								],
+								"optional": true
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 222,
+								"end": 223,
+								"name": "c"
+							},
+							"computed": false,
+							"optional": false
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

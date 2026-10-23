@@ -55,6 +55,7 @@ pub use analysis::{
 };
 pub(crate) use analysis::{
     call_callee_paren_leading_start, child_stops_optional_chain, tag_paren_leading_start,
+    transparent_instantiation_callee,
 };
 pub use builder::call_prints_as_member_chain;
 pub use inline_lookups::build_lookup_after_operand_doc;

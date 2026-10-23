@@ -608,6 +608,31 @@ fn linearize_member_object<'a>(
     }
 }
 
+/// The instantiation a chain call's callee is, when the chain reads it as TRANSPARENT: the
+/// call's node prints the instantiation's type arguments and the walk continues into
+/// `inst.expression`, so the instantiation itself emits nothing.
+///
+/// `expr<T>(args)` parses to a call whose callee is the instantiation, while the canonical
+/// tree puts `<T>` on the call. This is the one position where an instantiation is
+/// transparent — reached as a member object or a `!` operand it is a parenthesized base.
+/// A call with a list of its OWN (`f<T><U>(x).y`) has two, and the Call node prints only
+/// its own, so there the instantiation stays the base and prints the first.
+///
+/// ⚠️ One predicate for every reader — the linearizer, the call's head doc (which prints
+/// the list, and ahead of an optional call's `?.` when it comes from here) and
+/// [`get_chain_base_start`]. A reader that answered on its own would print the list in the
+/// wrong place or lose the comments between the expression and the `<`.
+pub(crate) fn transparent_instantiation_callee<'a>(
+    call: &'a internal::CallExpression<'a>,
+) -> Option<&'a internal::TSInstantiationExpression<'a>> {
+    match &call.callee.kind {
+        ExpressionKind::TSInstantiationExpression(inst) if call.type_arguments.is_none() => {
+            Some(inst)
+        }
+        _ => None,
+    }
+}
+
 /// Linearize a CallExpression's callee.
 ///
 /// A parenthesized optional chain callee (`(a?.b)()`) terminates the chain and
@@ -632,19 +657,10 @@ fn linearize_call_callee<'a>(
         nodes.push(ChainNode::base(call.callee, true));
         return;
     }
-    // A `TSInstantiationExpression` callee (`expr<T>(args)`) is transparent: the Call
-    // node recovers the type args via `get_call_type_arguments` in `chain_args.rs`, so
-    // the instantiation itself emits nothing. This is the one position where it is —
-    // reached as a member object or a `!` operand it is a parenthesized base. A call with
-    // a list of its OWN (`f<T><U>(x).y`) has two, and the Call node prints only its own,
-    // so there the instantiation stays the base and prints the first.
-    let callee = match call.callee {
-        Expression {
-            kind: ExpressionKind::TSInstantiationExpression(inst),
-            ..
-        } if call.type_arguments.is_none() => inst.expression,
-        callee => callee,
-    };
+    // A transparent instantiation callee ([`transparent_instantiation_callee`]) emits
+    // nothing itself: the Call node prints its type arguments, so the walk goes on into the
+    // instantiated expression.
+    let callee = transparent_instantiation_callee(call).map_or(call.callee, |inst| inst.expression);
     linearize_recursive(callee, input, nodes, paren_gaps);
     // An IIFE callee reached through the chain (`( // c⏎() => {})().p`) owns its own
     // leading gap, exactly as the bare-callee path does: the pair is required and
@@ -1177,7 +1193,9 @@ fn chain_head_comment_window(
 fn get_chain_base_start(expr: &Expression<'_>) -> u32 {
     match &expr.kind {
         ExpressionKind::MemberExpression(member) => get_chain_base_start(member.object),
-        ExpressionKind::CallExpression(call) => get_chain_base_start(call.callee),
+        ExpressionKind::CallExpression(call) => get_chain_base_start(
+            transparent_instantiation_callee(call).map_or(call.callee, |inst| inst.expression),
+        ),
         ExpressionKind::TSNonNullExpression(non_null) => get_chain_base_start(non_null.expression),
         // Note: TaggedTemplateExpression is NOT traversed here because its own
         // build_tagged_template_doc handles comments from removed parentheses

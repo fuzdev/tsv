@@ -27,6 +27,19 @@ async fn check_space_after_block_idempotency_bug() {
     .await;
 }
 
+async fn check_optional_call_instantiation_callee_paren_comment_idempotency_bug() {
+    // A comment in a redundant pair around an optional call's instantiation callee: prettier
+    // strips the pair and keeps the comment's spacing on its first pass, then re-spaces it on
+    // its second. The type arguments stay ahead of the `?.` in every pass, with arguments or
+    // without; the fixed point is a form of `optional_chain_instantiation_callee_comment`.
+    assert_prettier_idempotency_bug(
+        "<script lang=\"ts\">\n\t(T /* c1 */)<U>?.().a;\n\t(T /* c2 */)<U>?.(b).a;\n</script>\n",
+        "<script lang=\"ts\">\n\tT /* c1 */<U>?.().a;\n\tT /* c2 */<U>?.(b).a;\n</script>\n",
+        "<script lang=\"ts\">\n\tT/* c1 */ <U>?.().a;\n\tT/* c2 */ <U>?.(b).a;\n</script>\n",
+    )
+    .await;
+}
+
 /// Asserts that prettier has an idempotency bug and our printer doesn't.
 ///
 /// # Arguments
@@ -198,6 +211,7 @@ fn comment_drop_exact_output_and_idempotent() {
 #[tokio::test]
 async fn sidecar_prettier_checks() {
     check_space_after_block_idempotency_bug().await;
+    check_optional_call_instantiation_callee_paren_comment_idempotency_bug().await;
 
     let cases = COMMENT_DROP_CASES
         .iter()
