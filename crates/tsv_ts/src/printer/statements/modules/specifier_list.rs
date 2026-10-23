@@ -96,7 +96,10 @@ impl<'a> Printer<'a> {
         {
             return false;
         }
-        let text = span.extract(self.source);
+        // Only the bytes ahead of the module source can hold the braces and the `from`
+        // keyword: the source string itself (`import '{} from x'`) and an attribute clause
+        // after it are text the scan must never read as syntax.
+        let text = Span::new(span.start, decl.source.span.start).extract(self.source);
         // Find the `from` keyword, skipping comments and not matching inside an
         // identifier — so empty-brace detection isn't fooled by a `from` in a
         // comment (`import // {} from\n'a'`) or a specifier name (`fromage`).

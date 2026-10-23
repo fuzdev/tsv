@@ -1,0 +1,232 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 462,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A side-effect import stays bare when its source string holds braces and `from`;",
+			"start": 20,
+			"end": 102
+		},
+		{
+			"type": "Line",
+			"value": " the string is the source, never header syntax",
+			"start": 104,
+			"end": 152
+		},
+		{
+			"type": "Line",
+			"value": " the named and re-export siblings, whose braces are real",
+			"start": 307,
+			"end": 365
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 461,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 452,
+			"body": [
+				{
+					"type": "ImportDeclaration",
+					"start": 154,
+					"end": 173,
+					"importKind": "value",
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 161,
+						"end": 172,
+						"value": "{} from a",
+						"raw": "'{} from a'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A side-effect import stays bare when its source string holds braces and `from`;",
+							"start": 20,
+							"end": 102
+						},
+						{
+							"type": "Line",
+							"value": " the string is the source, never header syntax",
+							"start": 104,
+							"end": 152
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 175,
+					"end": 195,
+					"importKind": "value",
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 182,
+						"end": 194,
+						"value": "{ } from b",
+						"raw": "'{ } from b'"
+					}
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 197,
+					"end": 221,
+					"importKind": "value",
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 204,
+						"end": 220,
+						"value": "{/* */} from c",
+						"raw": "'{/* */} from c'"
+					}
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 223,
+					"end": 244,
+					"importKind": "value",
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 230,
+						"end": 243,
+						"value": "{} from 'd'",
+						"raw": "\"{} from 'd'\""
+					}
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 246,
+					"end": 262,
+					"importKind": "value",
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 253,
+						"end": 261,
+						"value": "{}from",
+						"raw": "'{}from'"
+					}
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 264,
+					"end": 305,
+					"importKind": "value",
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 271,
+						"end": 282,
+						"value": "{} from e",
+						"raw": "'{} from e'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 290,
+							"end": 302,
+							"key": {
+								"type": "Identifier",
+								"start": 290,
+								"end": 294,
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 296,
+								"end": 302,
+								"value": "json",
+								"raw": "'json'"
+							}
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 367,
+					"end": 394,
+					"importKind": "value",
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 382,
+						"end": 393,
+						"value": "{} from f",
+						"raw": "'{} from f'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the named and re-export siblings, whose braces are real",
+							"start": 307,
+							"end": 365
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 396,
+					"end": 423,
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [],
+					"source": {
+						"type": "Literal",
+						"start": 411,
+						"end": 422,
+						"value": "{} from g",
+						"raw": "'{} from g'"
+					}
+				},
+				{
+					"type": "ExportAllDeclaration",
+					"start": 425,
+					"end": 451,
+					"exportKind": "value",
+					"exported": null,
+					"source": {
+						"type": "Literal",
+						"start": 439,
+						"end": 450,
+						"value": "{} from h",
+						"raw": "'{} from h'"
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
