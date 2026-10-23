@@ -1978,7 +1978,8 @@ impl<'a> Printer<'a> {
     /// argument list renders at the hang's indent.
     ///
     /// A same-line block's break is forced here too — the seam is reached only when the gap
-    /// hangs — so an author blank after it survives, as after a `//`.
+    /// hangs — so an author blank after it survives, as after a `//`, when the block is the
+    /// last comment on the keyword's line.
     ///
     /// ⚠️ The caller pushes its keyword **bare** — this seam owns every separator after
     /// it, so a keyword text carrying its own trailing space renders two.
@@ -1991,37 +1992,42 @@ impl<'a> Printer<'a> {
     ) {
         let d = self.d();
         let mut value_block: DocBuf = smallvec![d.hardline()];
-        let mut on_head_line = true;
         let comments: CommentVec<'_> = self
             .comments_to_emit_between(keyword_end, value_start)
             .collect();
+        // Whether the current comment still shares the KEYWORD's output line. The first must
+        // sit on it in source; every later one must be GLUED to the comment before it
+        // ([`Self::comment_hugs_next`]), which is the run's own-line-ness read off the
+        // comment's neighbour as everywhere else (docs/comments.md §Own-line-ness is a
+        // SOURCE question). A distance reading against `keyword_end` answers no for a
+        // comment the author glued to a MULTI-LINE block's `*/` (`as /* a⏎b */ /* c */⏎T`)
+        // and gives it a line of its own — a relocation, not a layout. A `//` hugs
+        // nothing, so it still ends the head line for everything after it.
+        let mut same_line = comments
+            .first()
+            .is_some_and(|first| self.is_same_line(keyword_end, first.span.start));
         for (i, comment) in comments.iter().enumerate() {
-            // Whether this comment still shares the KEYWORD's output line. The first must
-            // sit on it in source; every later one must be GLUED to the comment before it
-            // ([`Self::comment_hugs_next`]), which is the run's own-line-ness read off the
-            // comment's neighbour as everywhere else (docs/comments.md §Own-line-ness is a
-            // SOURCE question). A distance reading against `keyword_end` answers no for a
-            // comment the author glued to a MULTI-LINE block's `*/` (`as /* a⏎b */ /* c */⏎T`)
-            // and gives it a line of its own — a relocation, not a layout. A `//` hugs
-            // nothing, so it still ends the head line for everything after it.
-            let same_line = if i == 0 {
-                self.is_same_line(keyword_end, comment.span.start)
-            } else {
-                on_head_line && self.comment_hugs_next(comments[i - 1])
-            };
-            on_head_line = same_line;
+            // The NEXT comment's verdict, read once: the block arm below asks it too, so the
+            // two cannot disagree about which comment ends the head line.
+            let next_same_line =
+                same_line && i + 1 < comments.len() && self.comment_hugs_next(comment);
             if same_line {
                 if comment.is_block {
                     parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));
                     // The gap hangs, so the break after this block is forced — by a comment
                     // below it, by the block spanning lines, or by the value — and an author
-                    // blank after it survives, as after the `//` below.
+                    // blank after it survives, as after the `//` below. Unless the next
+                    // comment joins the head line too (a `//` a stripped grouping paren lets
+                    // up, `export default /* c */ (⏎⏎// d⏎c)`): then no line is left between
+                    // the two for the blank, and it erases, as prettier erases it — the
+                    // break, and any blank after it, belong to the last comment on the line.
                     let next = self.blank_scan_end_after(
                         comment,
                         comments.get(i + 1).map_or(value_start, |c| c.span.start),
                     );
-                    if self.has_blank_line_between_strict(comment.span.end, next) {
+                    if !next_same_line && self.has_blank_line_between_strict(comment.span.end, next)
+                    {
                         debug_assert_eq!(value_block.len(), 1, "value_block is still its seed");
                         value_block.insert(0, d.literalline());
                     }
@@ -2037,9 +2043,9 @@ impl<'a> Printer<'a> {
                         comments.get(i + 1).map_or(value_start, |c| c.span.start),
                     );
                     // Prepending is well-defined: a same-line *block* before this comment
-                    // inserts a blank only when one follows it — which puts this comment on
-                    // a later line, off the head line — so `value_block` still holds nothing
-                    // but its seed hardline, and the blank belongs before that.
+                    // inserts a blank only when the head line ends with it — which puts this
+                    // comment on a later line, off the head line — so `value_block` still
+                    // holds nothing but its seed hardline, and the blank belongs before that.
                     debug_assert_eq!(value_block.len(), 1, "value_block is still its seed");
                     if self.has_blank_line_between_strict(comment.span.end, next) {
                         value_block.insert(0, d.literalline());
@@ -2053,6 +2059,7 @@ impl<'a> Printer<'a> {
                     comments.get(i + 1).map_or(value_start, |c| c.span.start),
                 );
             }
+            same_line = next_same_line;
         }
         value_block.push(value_doc);
         parts.push(d.indent(d.concat(&value_block)));

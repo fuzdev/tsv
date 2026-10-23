@@ -46,8 +46,8 @@ fn method_target_rejects_at_its_value() {
 }
 
 /// A compound operator's left is no pattern (ecma262 §13.15.1 reparses only the left of
-/// `=`), so a method property under one is not rejected: tsc's parser accepts it, and so does
-/// acorn inside a paren or an argument list.
+/// `=`), so a method property under one is not rejected: tsc's parser accepts every case here,
+/// acorn only the parenthesized ones.
 #[test]
 fn compound_operator_over_a_method_target_parses() {
     for source in [

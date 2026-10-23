@@ -1,0 +1,536 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 612,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " the `//` behind the stripped `(` joins the block comment on the keyword's line, so an",
+			"start": 20,
+			"end": 108
+		},
+		{
+			"type": "Line",
+			"value": " author blank between the two has no line left to sit on and is erased",
+			"start": 110,
+			"end": 182
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 214,
+			"end": 222
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 223,
+			"end": 228
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 242,
+			"end": 250
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 251,
+			"end": 256
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 274,
+			"end": 282
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 283,
+			"end": 288
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 293,
+			"end": 298
+		},
+		{
+			"type": "Block",
+			"value": " c8 ",
+			"start": 330,
+			"end": 338
+		},
+		{
+			"type": "Line",
+			"value": " c9",
+			"start": 339,
+			"end": 344
+		},
+		{
+			"type": "Block",
+			"value": " c10 ",
+			"start": 381,
+			"end": 390
+		},
+		{
+			"type": "Line",
+			"value": " c11",
+			"start": 391,
+			"end": 397
+		},
+		{
+			"type": "Block",
+			"value": " c12 ",
+			"start": 422,
+			"end": 431
+		},
+		{
+			"type": "Line",
+			"value": " c13",
+			"start": 432,
+			"end": 438
+		},
+		{
+			"type": "Block",
+			"value": " c14 ",
+			"start": 467,
+			"end": 476
+		},
+		{
+			"type": "Line",
+			"value": " c15",
+			"start": 477,
+			"end": 483
+		},
+		{
+			"type": "Line",
+			"value": " control: a glued run below the `//` keeps a line of its own",
+			"start": 491,
+			"end": 553
+		},
+		{
+			"type": "Line",
+			"value": " c16",
+			"start": 570,
+			"end": 576
+		},
+		{
+			"type": "Block",
+			"value": " c17 ",
+			"start": 579,
+			"end": 588
+		},
+		{
+			"type": "Block",
+			"value": " c18 ",
+			"start": 589,
+			"end": 598
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 611,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 602,
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 184,
+					"end": 307,
+					"id": {
+						"type": "Identifier",
+						"start": 199,
+						"end": 201,
+						"name": "fn"
+					},
+					"expression": false,
+					"generator": false,
+					"async": true,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 204,
+						"end": 307,
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 208,
+								"end": 234,
+								"expression": {
+									"type": "AwaitExpression",
+									"start": 208,
+									"end": 233,
+									"argument": {
+										"type": "Identifier",
+										"start": 232,
+										"end": 233,
+										"name": "a",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 214,
+												"end": 222
+											},
+											{
+												"type": "Line",
+												"value": " c2",
+												"start": 223,
+												"end": 228
+											}
+										]
+									}
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 238,
+								"end": 264,
+								"expression": {
+									"type": "NewExpression",
+									"start": 238,
+									"end": 263,
+									"callee": {
+										"type": "Identifier",
+										"start": 260,
+										"end": 261,
+										"name": "A",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c3 ",
+												"start": 242,
+												"end": 250
+											},
+											{
+												"type": "Line",
+												"value": " c4",
+												"start": 251,
+												"end": 256
+											}
+										]
+									},
+									"arguments": []
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 268,
+								"end": 304,
+								"expression": {
+									"type": "AwaitExpression",
+									"start": 268,
+									"end": 303,
+									"argument": {
+										"type": "Identifier",
+										"start": 302,
+										"end": 303,
+										"name": "b",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c5 ",
+												"start": 274,
+												"end": 282
+											},
+											{
+												"type": "Line",
+												"value": " c6",
+												"start": 283,
+												"end": 288
+											},
+											{
+												"type": "Line",
+												"value": " c7",
+												"start": 293,
+												"end": 298
+											}
+										]
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the `//` behind the stripped `(` joins the block comment on the keyword's line, so an",
+							"start": 20,
+							"end": 108
+						},
+						{
+							"type": "Line",
+							"value": " author blank between the two has no line left to sit on and is erased",
+							"start": 110,
+							"end": 182
+						}
+					]
+				},
+				{
+					"type": "SwitchStatement",
+					"start": 310,
+					"end": 363,
+					"discriminant": {
+						"type": "Identifier",
+						"start": 318,
+						"end": 319,
+						"name": "x"
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 325,
+							"end": 360,
+							"consequent": [
+								{
+									"type": "BreakStatement",
+									"start": 354,
+									"end": 360,
+									"label": null,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c8 ",
+											"start": 330,
+											"end": 338
+										},
+										{
+											"type": "Line",
+											"value": " c9",
+											"start": 339,
+											"end": 344
+										}
+									]
+								}
+							],
+							"test": {
+								"type": "Identifier",
+								"start": 348,
+								"end": 349,
+								"name": "y"
+							}
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 366,
+					"end": 402,
+					"id": {
+						"type": "Identifier",
+						"start": 371,
+						"end": 372,
+						"name": "K"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeOperator",
+						"start": 375,
+						"end": 401,
+						"operator": "keyof",
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 400,
+							"end": 401,
+							"typeName": {
+								"type": "Identifier",
+								"start": 400,
+								"end": 401,
+								"name": "T"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c10 ",
+									"start": 381,
+									"end": 390
+								},
+								{
+									"type": "Line",
+									"value": " c11",
+									"start": 391,
+									"end": 397
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 404,
+					"end": 450,
+					"id": {
+						"type": "Identifier",
+						"start": 409,
+						"end": 410,
+						"name": "R"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeOperator",
+						"start": 413,
+						"end": 449,
+						"operator": "readonly",
+						"typeAnnotation": {
+							"type": "TSArrayType",
+							"start": 441,
+							"end": 449,
+							"elementType": {
+								"type": "TSStringKeyword",
+								"start": 441,
+								"end": 447
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c12 ",
+									"start": 422,
+									"end": 431
+								},
+								{
+									"type": "Line",
+									"value": " c13",
+									"start": 432,
+									"end": 438
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 452,
+					"end": 488,
+					"id": {
+						"type": "Identifier",
+						"start": 457,
+						"end": 458,
+						"name": "F"
+					},
+					"typeAnnotation": {
+						"type": "TSFunctionType",
+						"start": 461,
+						"end": 487,
+						"parameters": [],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 464,
+							"end": 487,
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 486,
+								"end": 487,
+								"typeName": {
+									"type": "Identifier",
+									"start": 486,
+									"end": 487,
+									"name": "T"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c14 ",
+										"start": 467,
+										"end": 476
+									},
+									{
+										"type": "Line",
+										"value": " c15",
+										"start": 477,
+										"end": 483
+									}
+								]
+							}
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 555,
+					"end": 601,
+					"id": {
+						"type": "Identifier",
+						"start": 560,
+						"end": 561,
+						"name": "G"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeOperator",
+						"start": 564,
+						"end": 600,
+						"operator": "keyof",
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 599,
+							"end": 600,
+							"typeName": {
+								"type": "Identifier",
+								"start": 599,
+								"end": 600,
+								"name": "T"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c16",
+									"start": 570,
+									"end": 576
+								},
+								{
+									"type": "Block",
+									"value": " c17 ",
+									"start": 579,
+									"end": 588
+								},
+								{
+									"type": "Block",
+									"value": " c18 ",
+									"start": 589,
+									"end": 598
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " control: a glued run below the `//` keeps a line of its own",
+							"start": 491,
+							"end": 553
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
