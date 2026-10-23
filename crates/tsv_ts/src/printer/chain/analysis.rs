@@ -633,11 +633,40 @@ pub(crate) fn transparent_instantiation_callee<'a>(
     }
 }
 
+/// The sealed optional chain a transparent instantiation callee instantiates
+/// (`(a?.b)<T>?.(c).d`), with the `(` of its pair — the instantiation's own start.
+///
+/// The call is optional, so [`child_stops_optional_chain`] never fires on the callee
+/// itself, and the callee is the instantiation rather than the chain: the pair that
+/// seals the chain belongs to the instantiation's OPERAND. Its `(` is the
+/// instantiation's start, never the call's — a redundant pair around the whole
+/// instantiation (`((a?.b)<T>)?.(c).d`) opens the call's span earlier, and a comment
+/// between the two `(` belongs to the head, not inside the operand's pair.
+///
+/// ⚠️ One predicate for the linearizer (which keeps the chain a sealed base, its leading
+/// run inside the pair) and the call's head (whose expression→`<` window opens past the
+/// pair's `)`). The call-level readers — [`call_callee_paren_leading_start`] and
+/// [`chain_paren_leading_gap`] — deliberately do NOT read it: theirs is the CALLEE's
+/// pair, the one between the call and the instantiation, which here is no pair the
+/// printer keeps. Answering for the operand's pair there would tell the hoisting walk the
+/// call's own shell survives, so a comment the author wrote ahead of the instantiation
+/// (`x = ( // c⏎(a?.b)<T>)?.(d).e`) would be neither hoisted nor hung, and would move on the next
+/// pass; and the callee gap reads that pair's trailing gap past the callee's end, which
+/// is the `>`.
+pub(crate) fn transparent_callee_sealed_chain<'a>(
+    call: &'a internal::CallExpression<'a>,
+) -> Option<(&'a Expression<'a>, u32)> {
+    let inst = transparent_instantiation_callee(call)?;
+    let open = call.callee.span().start;
+    child_stops_optional_chain(open, false, inst.expression).then_some((inst.expression, open))
+}
+
 /// Linearize a CallExpression's callee.
 ///
 /// A parenthesized optional chain callee (`(a?.b)()`) terminates the chain and
-/// must stay a parenthesized base node — see `child_stops_optional_chain`. All
-/// other callees recurse normally.
+/// must stay a parenthesized base node — see `child_stops_optional_chain` — and so
+/// does one instantiated by a transparent instantiation callee
+/// ([`transparent_callee_sealed_chain`]). All other callees recurse normally.
 fn linearize_call_callee<'a>(
     call: &'a internal::CallExpression<'_>,
     span: Span,
@@ -647,6 +676,10 @@ fn linearize_call_callee<'a>(
 ) {
     if child_stops_optional_chain(span.start, call.optional, call.callee) {
         push_sealed_chain_base(call.callee, span.start, nodes);
+        return;
+    }
+    if let Some((chain, open)) = transparent_callee_sealed_chain(call) {
+        push_sealed_chain_base(chain, open, nodes);
         return;
     }
     // A kept shell around a longer callee (`typeof (c.d)()`), as at a member object.

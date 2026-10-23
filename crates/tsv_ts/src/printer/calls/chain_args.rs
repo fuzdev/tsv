@@ -9,7 +9,9 @@
 // is still this file's alone is the selection ORDER and the arms the other trees have no twin
 // for (the force-expanded hugs, the classify-and-wrap fallback).
 
-use super::super::chain::{ChainCall, transparent_instantiation_callee};
+use super::super::chain::{
+    ChainCall, transparent_callee_sealed_chain, transparent_instantiation_callee,
+};
 use super::super::comments::CommentSpacing;
 use super::super::{Printer, is_curried_arrow_chain, is_multiline_template_expression};
 use super::arg_comments::{
@@ -68,7 +70,7 @@ pub(super) fn chain_call_head_doc(
         let ta = &inst.type_arguments;
         let mut parts = DocBuf::new();
         parts.extend(printer.build_name_to_type_params_comments_opt(
-            inst.expression.span().end,
+            instantiation_window_start(printer, call, inst),
             ta.span.start,
             CommentSpacing::Trailing,
         ));
@@ -93,6 +95,23 @@ pub(super) fn chain_call_head_doc(
         parts.push(printer.build_type_parameter_instantiation_doc(ta));
     }
     Some(d.concat(&parts))
+}
+
+/// Where a transparent instantiation callee's expression→`<` window opens: past the `)`
+/// of a sealed optional chain's pair (`(a?.b /* t */)<T>?.(c).d`), whose base emits the
+/// operand→`)` gap inside that pair ([`transparent_callee_sealed_chain`]), else at the
+/// expression's end. Opened at the expression's end, the window would print the comment twice,
+/// inside the pair and again ahead of the `<`.
+fn instantiation_window_start(
+    printer: &Printer<'_>,
+    call: &internal::CallExpression<'_>,
+    inst: &internal::TSInstantiationExpression<'_>,
+) -> u32 {
+    let end = inst.expression.span().end;
+    Printer::gap_start_after_owned_pair(
+        end,
+        printer.owned_pair_trailing_gap(end, transparent_callee_sealed_chain(call).is_some()),
+    )
 }
 
 /// The `(`→first-argument gap for the chain's **body-line** paths, as a doc: the blocks the

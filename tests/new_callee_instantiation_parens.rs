@@ -101,3 +101,66 @@ fn a_sealed_chain_keeps_its_pair_under_an_instantiation() {
         assert_eq!(format(&out), out, "a fixed point: {source:?}");
     }
 }
+
+/// Where the chain goes on past the optional call the pair stays too, and each comment around
+/// it prints once: one the author wrote inside the pair stays inside (the call's head opens
+/// its expression→`<` window past the `)`), one ahead of a redundant pair around the whole
+/// instantiation leads the value, and neither a chain with no pair nor a parenthesized
+/// operand that is no chain takes one.
+#[test]
+fn a_continuing_sealed_chain_prints_its_comments_once() {
+    for (source, printed) in [
+        ("(a?.b /* t */)<T>?.(c).d;", "(a?.b /* t */)<T>?.(c).d;\n"),
+        (
+            "x = (a?.b // t\n)<T>?.(c).d;",
+            "x = (\n\ta?.b // t\n)<T>?.(c).d;\n",
+        ),
+        (
+            "x = ( // o\n\t(a?.b)<T>)?.(c).d;",
+            "x =\n\t// o\n\t(a?.b)<T>?.(c).d;\n",
+        ),
+        ("a?.b<T>?.(c).d;", "a?.b<T>?.(c).d;\n"),
+        ("(a /* t */)<T>?.(c).d;", "a/* t */ <T>?.(c).d;\n"),
+    ] {
+        let out = format(source);
+        assert_eq!(out, printed, "printed from {source:?}");
+        assert_eq!(format(&out), out, "a fixed point: {source:?}");
+    }
+}
+
+/// A comment the author wrote inside a `new` callee's redundant pair, ahead of a sealed chain's
+/// kept pair, is printed inside the callee's pair on the first pass and moves behind the `new`
+/// on the second, where it settles. Both forms keep the comment; pinned so the second pass
+/// stays a fixed point and the movement cannot grow a third form.
+// TODO: settle in one pass. Two emitters own the slot: the chain head's stripped-shell run
+// inside the callee's pair, and the `new` keyword gap once the callee prints opening on a
+// kept `(`.
+#[test]
+fn new_callee_comment_ahead_of_a_kept_pair_settles_on_the_second_pass() {
+    for (source, settled) in [
+        (
+            "new (( /* o */ (a?.b)<T>)?.(c).d)();",
+            "new /* o */ ((a?.b)<T>?.(c).d)();\n",
+        ),
+        (
+            "new (( /* o */ (a?.b)<T>)?.(c)(e))();",
+            "new /* o */ ((a?.b)<T>?.(c)(e))();\n",
+        ),
+        (
+            "new (( /* o */ (a?.b)<T>)?.(c)!.d)();",
+            "new /* o */ ((a?.b)<T>?.(c)!.d)();\n",
+        ),
+        (
+            "new (( // o\n(a?.b)<T>)?.(c).d)();",
+            "new // o\n\t((a?.b)<T>?.(c).d)();\n",
+        ),
+        (
+            "new (( /* o */ (a?.b)!)?.(c).d)();",
+            "new /* o */ ((a?.b)!?.(c).d)();\n",
+        ),
+    ] {
+        let twice = format(&format(source));
+        assert_eq!(twice, settled, "settled from {source:?}");
+        assert_eq!(format(&twice), twice, "a fixed point: {source:?}");
+    }
+}
