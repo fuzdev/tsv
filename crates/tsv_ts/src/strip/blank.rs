@@ -85,13 +85,7 @@ fn blank_into(out: &mut String, text: &str, mark: Mark) {
     } else {
         None
     };
-    for c in chars {
-        if is_line_terminator(c) {
-            out.push(c);
-        } else {
-            push_spaces(out, c.len_utf16());
-        }
-    }
+    blank_text_into(out, chars.as_str());
     if let Some(last) = last {
         if is_line_terminator(last) {
             debug_assert!(false, "a substitution anchored on a line terminator");
@@ -103,15 +97,77 @@ fn blank_into(out: &mut String, text: &str, mark: Mark) {
     }
 }
 
-fn push_spaces(out: &mut String, count: usize) {
-    for _ in 0..count {
-        out.push(' ');
+/// Append `text` blanked with no substitution, reading bytes rather than characters: a
+/// UTF-8 lead byte opens one UTF-16 unit and a four-byte lead (`0xF0` and up) a second, while a
+/// continuation byte opens none, so the units of a valid `&str` are counted exactly; a line
+/// terminator — `\n`, `\r`, or the three bytes of U+2028 / U+2029 — is copied, and the spaces
+/// between two terminators go out as one run.
+fn blank_text_into(out: &mut String, text: &str) {
+    let bytes = text.as_bytes();
+    let mut units = 0;
+    let mut at = 0;
+    loop {
+        // eight bytes at a time while none is `\n`, `\r` or outside ASCII: one space each
+        while let Some(word) = bytes[at..].first_chunk::<8>() {
+            if word_needs_a_closer_look(u64::from_ne_bytes(*word)) {
+                break;
+            }
+            units += 8;
+            at += 8;
+        }
+        let Some(&byte) = bytes.get(at) else {
+            break;
+        };
+        let terminator_len = match byte {
+            b'\n' | b'\r' => 1,
+            // U+2028 / U+2029: `E2 80 A8` / `E2 80 A9`
+            0xE2 if bytes.get(at + 1) == Some(&0x80)
+                && matches!(bytes.get(at + 2), Some(0xA8 | 0xA9)) =>
+            {
+                3
+            }
+            _ => 0,
+        };
+        if terminator_len == 0 {
+            units += usize::from(byte & 0xC0 != 0x80) + usize::from(byte >= 0xF0);
+            at += 1;
+        } else {
+            push_spaces(out, units);
+            units = 0;
+            out.push_str(&text[at..at + terminator_len]);
+            at += terminator_len;
+        }
     }
+    push_spaces(out, units);
+}
+
+/// Whether any byte of `word` is `\n`, `\r` or non-ASCII — a byte [`blank_text_into`] cannot
+/// count as one space without looking at it. Exact in the direction the caller relies on: a
+/// `false` means every byte is ASCII and neither terminator (the zero-byte test on `word` XOR a
+/// terminator is nonzero exactly when some byte equals it). A `true` only sends the word to the
+/// byte-at-a-time step, which decides each byte itself.
+const fn word_needs_a_closer_look(word: u64) -> bool {
+    const ONES: u64 = u64::from_ne_bytes([0x01; 8]);
+    const HIGHS: u64 = u64::from_ne_bytes([0x80; 8]);
+    let lf = word ^ (ONES * b'\n' as u64);
+    let cr = word ^ (ONES * b'\r' as u64);
+    ((lf.wrapping_sub(ONES) & !lf) | (cr.wrapping_sub(ONES) & !cr) | word) & HIGHS != 0
+}
+
+/// The run [`push_spaces`] copies from.
+const SPACES: &str = "                                                                ";
+
+fn push_spaces(out: &mut String, mut count: usize) {
+    while count > SPACES.len() {
+        out.push_str(SPACES);
+        count -= SPACES.len();
+    }
+    out.push_str(&SPACES[..count]);
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Edit, Mark, apply};
+    use super::{Edit, Mark, apply, blank_text_into, is_line_terminator};
 
     fn run(source: &str, edits: &[(u32, u32, Mark)]) -> String {
         let mut edits: Vec<Edit> = edits
@@ -157,5 +213,48 @@ mod tests {
             ),
             "     f"
         );
+    }
+
+    /// The blank by definition, a character at a time: a terminator copied, anything else one
+    /// space per UTF-16 unit.
+    fn blank_by_chars(text: &str) -> String {
+        let mut out = String::new();
+        for c in text.chars() {
+            if is_line_terminator(c) {
+                out.push(c);
+            } else {
+                out.extend(std::iter::repeat_n(' ', c.len_utf16()));
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn blanks_by_bytes_as_by_characters() {
+        // every character class the byte step tells apart — ASCII, two-, three- and four-byte
+        // UTF-8, a three-byte character sharing U+2028's first two bytes, and one sharing its
+        // first and last, each terminator —
+        // at every offset across the eight-byte words, in runs longer than one `SPACES` copy
+        let specials = [
+            "\n", "\r", "\r\n", "\u{2028}", "\u{2029}", "\u{2027}", "\u{202A}", "\u{20a9}", "é",
+            "\u{a0}", "中", "\u{feff}", "😀", "\t", "x",
+        ];
+        for special in specials {
+            for second in specials {
+                for pad in 0..20 {
+                    for tail in [0, 7, 70, 140] {
+                        let text = format!(
+                            "{}{special}{}{second}{}",
+                            "a".repeat(pad),
+                            "b".repeat(pad % 9),
+                            "c".repeat(tail)
+                        );
+                        let mut out = String::new();
+                        blank_text_into(&mut out, &text);
+                        assert_eq!(out, blank_by_chars(&text), "{text:?}");
+                    }
+                }
+            }
+        }
     }
 }
