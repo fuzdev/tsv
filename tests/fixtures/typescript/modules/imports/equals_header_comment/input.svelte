@@ -13,4 +13,7 @@
 
 	// Block comment between `export` and `import`
 	export /* c5 */ import E = require('./e');
+
+	// An `=` inside a comment before the `=`
+	import F /* x = y */ = require('./f');
 </script>

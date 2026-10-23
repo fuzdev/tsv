@@ -1069,7 +1069,7 @@ impl<'a> Printer<'a> {
         let mut cursor = start;
         let mut in_gap = false;
         for word in words {
-            let Some(pos) = self.find_keyword_in_range(cursor, search_end, word) else {
+            let Some(pos) = self.locate_keyword_word(cursor, search_end, word) else {
                 // A non-empty window that does not hold the shape the caller named:
                 // a `search_end` past the words, or a span that isn't the keyword's.
                 // Assert it in debug: this arm's measured end is the very arithmetic
@@ -1110,6 +1110,22 @@ impl<'a> Printer<'a> {
             },
         ]);
         (doc, keyword_end)
+    }
+
+    /// Where one word of a multi-word keyword begins in `[start, end)`, outside comments.
+    ///
+    /// A word is located as a whole-word keyword; a punctuator word (the `=` of `export =`)
+    /// as a byte, because the whole-word test reads an identifier byte against it as part
+    /// of a longer word and finds nothing in `export /* c */=value` or `export=value`. The
+    /// window holds only trivia between the words, so the first `=` outside a comment is
+    /// the punctuator.
+    fn locate_keyword_word(&self, start: u32, end: u32, word: &str) -> Option<u32> {
+        match word.as_bytes() {
+            [punctuator] if !punctuator.is_ascii_alphabetic() => {
+                self.find_char_outside_comments(start, end, *punctuator)
+            }
+            _ => self.find_keyword_in_range(start, end, word),
+        }
     }
 
     /// Build a **declaration header's** keyword run — an optional `declare` modifier

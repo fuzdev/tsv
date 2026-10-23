@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 482,
+	"end": 566,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -69,17 +69,29 @@
 			"value": " c5 ",
 			"start": 436,
 			"end": 444
+		},
+		{
+			"type": "Line",
+			"value": " An `=` inside a comment before the `=`",
+			"start": 474,
+			"end": 515
+		},
+		{
+			"type": "Block",
+			"value": " x = y ",
+			"start": 526,
+			"end": 537
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 481,
+		"end": 565,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 472,
+			"end": 556,
 			"body": [
 				{
 					"type": "TSImportEqualsDeclaration",
@@ -283,6 +295,47 @@
 							"value": " Block comment between `export` and `import`",
 							"start": 381,
 							"end": 427
+						}
+					]
+				},
+				{
+					"type": "TSImportEqualsDeclaration",
+					"start": 517,
+					"end": 555,
+					"importKind": "value",
+					"isExport": false,
+					"id": {
+						"type": "Identifier",
+						"start": 524,
+						"end": 525,
+						"name": "F",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " x = y ",
+								"start": 526,
+								"end": 537
+							}
+						]
+					},
+					"moduleReference": {
+						"type": "TSExternalModuleReference",
+						"start": 540,
+						"end": 554,
+						"expression": {
+							"type": "Literal",
+							"start": 548,
+							"end": 553,
+							"value": "./f",
+							"raw": "'./f'"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An `=` inside a comment before the `=`",
+							"start": 474,
+							"end": 515
 						}
 					]
 				}

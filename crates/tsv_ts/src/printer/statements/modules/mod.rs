@@ -1043,8 +1043,11 @@ impl<'a> Printer<'a> {
         // identifier→`=` and `=`→module-reference gaps. Both are preserved in place
         // (prettier keeps them there too). Nothing else scans them — a module
         // reference is not an expression, so a comment glued to `require` is not
-        // owned by any node and would be dropped if this gap didn't emit it.
-        match self.find_keyword_in_range(decl.id.span.end, module_ref_start, "=") {
+        // owned by any node and would be dropped if this gap didn't emit it. The `=` is
+        // located as a byte outside comments, not as a whole word: an identifier glued to
+        // it (`import a=require(…)`, `import a /* c */=A.B`) would fail a word-boundary
+        // test, and the window holds nothing else but trivia.
+        match self.find_char_outside_comments(decl.id.span.end, module_ref_start, b'=') {
             Some(eq_start) => {
                 // Both gaps FLAT, one `indent` for the whole tail — the multi-word
                 // keyword rule (`build_keyword_words_doc`), which this header is the
