@@ -400,11 +400,11 @@ pub struct Identifier<'arena> {
     /// `type_annotation()` / `decorators()` accessors.
     ///
     /// ⚠️ Every field of `Identifier` beyond the name is `optional` or behind `extra`: the
-    /// two expression-position fast paths (the printer's `build_identifier_expression_doc`,
-    /// the wire's `write_expression_inner`) test just those two (the wire's also its
-    /// `force_optional` context flag), and `build_identifier_doc_inner`'s fast path tests
-    /// `optional` plus each accessor — a new `Identifier` field must join all three, a new
-    /// `IdentifierParamExtra` field the last.
+    /// three expression-position fast paths (the printer's `build_identifier_expression_doc`,
+    /// the wire's `write_expression_inner`, the type strip's `Walk::expr`) test just those two
+    /// (the wire's also its `force_optional` context flag), and `build_identifier_doc_inner`'s
+    /// fast path tests `optional` plus each accessor — a new `Identifier` field must join all
+    /// four, a new `IdentifierParamExtra` field the last.
     pub extra: Option<&'arena IdentifierParamExtra<'arena>>,
     pub span: Span,
 }

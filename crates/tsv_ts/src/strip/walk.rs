@@ -590,7 +590,31 @@ impl<'s, 'b> Walk<'s, 'b> {
     // Expressions
     //
 
+    /// Walk expression `e`. A leaf holding no TypeScript — a literal, `this`, `super`, a private
+    /// name, a meta property, or an identifier with no binding state (no `extra`, not
+    /// `optional`: `Walk::identifier` would blank nothing) — only marks the `;` state, which is
+    /// all the full walk ([`Self::expr_inner`]) does for it; it is answered here, inlined at
+    /// each call site, without entering that walk's frame.
+    #[inline]
     fn expr(&mut self, e: &Expression<'_>) {
+        match &e.kind {
+            ExpressionKind::Literal(_)
+            | ExpressionKind::RegexLiteral(_)
+            | ExpressionKind::ThisExpression(_)
+            | ExpressionKind::Super(_)
+            | ExpressionKind::PrivateIdentifier(_)
+            | ExpressionKind::MetaProperty(_) => self.mark(e.span.end),
+            ExpressionKind::Identifier(id) if id.extra.is_none() && !id.optional => {
+                self.mark(e.span.end);
+            }
+            _ => self.expr_inner(e),
+        }
+    }
+
+    /// The full walk of expression `e`, every kind matched; [`Self::expr`] answers the leaves
+    /// before reaching it.
+    #[inline(never)]
+    fn expr_inner(&mut self, e: &Expression<'_>) {
         match &e.kind {
             ExpressionKind::Literal(_)
             | ExpressionKind::RegexLiteral(_)

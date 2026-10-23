@@ -1,0 +1,3 @@
+# statement_after_block_head
+
+A blanked statement opening a block whose head ends in JS with no `;` — the `if` test `x`, the `while` test `f()`, the `for`-`of` iterable `d` — starts with a `;`, as after any JS node not ending in `;`: the last node ts-blank-space visits before the block's first statement is the head's expression, not a statement. The lines after each blank (`(a)`, `[b]`, `` `e` ``) show what the `;` keeps from continuing the head's expression. A literal or `this` head marks as an identifier does: in the last block the `a;` before it leaves nothing needing a `;` but the head `1` itself.
