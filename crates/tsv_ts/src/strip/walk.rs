@@ -48,8 +48,10 @@ pub(super) struct Walk<'s, 'b> {
     edits: BumpVec<'b, Edit>,
     /// The refusal with the earliest start — the one ts-blank-space reports first.
     refusal: Option<(UnsupportedKind, Span)>,
-    /// ts-blank-space's `semicolonNeeded` (module docs).
-    semicolon_needed: bool,
+    /// The end of the last JS node marked (`Walk::mark`), `None` where nothing is marked yet (the
+    /// start of the program, and of a function body): ts-blank-space's `semicolonNeeded` (module docs), read through
+    /// `Walk::semicolon_needed`.
+    marked_end: Option<u32>,
     /// The end of the innermost statement-list element (statement or class member) — where
     /// a statement-final `as` / `satisfies` would otherwise let the next line continue it.
     statement_end: Option<u32>,
@@ -58,7 +60,7 @@ pub(super) struct Walk<'s, 'b> {
     terminated_at: Option<u32>,
     /// How the last JS left standing in the current statement list or class body ends — a
     /// statement or a field initializer ending in an expression with no `;` after it is open
-    /// to a following line that continues it. Narrower than `semicolon_needed`, which a `}`
+    /// to a following line that continues it. Narrower than `Walk::semicolon_needed`, which a `}`
     /// or a `)` also sets; it decides the `;` that ts-blank-space never writes
     /// (`blank_signature`, and a member key spelled like an operator), so each is written
     /// only where the program would otherwise change.
@@ -93,7 +95,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             src: Source::new(source),
             edits: BumpVec::new_in(arena),
             refusal: None,
-            semicolon_needed: false,
+            marked_end: None,
             statement_end: None,
             terminated_at: None,
             open: Tail::Closed,
@@ -144,7 +146,10 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// Blank a statement or class member whole, with a leading `;` where JS before it could
     /// otherwise run on into what follows (ts-blank-space's `blankStatement`).
     fn blank_statement(&mut self, span: Span, position: Position) {
-        self.blank_whole(span, self.semicolon_needed || position == Position::Nested);
+        self.blank_whole(
+            span,
+            self.semicolon_needed() || position == Position::Nested,
+        );
     }
 
     /// Blank a bodiless signature — an overload, an abstract method or accessor, an index
@@ -166,9 +171,18 @@ impl<'s, 'b> Walk<'s, 'b> {
         }
     }
 
-    /// A JS node ending at `end` was walked: the `;` state follows its last byte.
+    /// A JS node ending at `end` was walked: the `;` state follows its last byte. Only the end
+    /// is stored, and the byte read where the state is asked (`Walk::semicolon_needed`): the
+    /// source never changes, so the byte read then is the byte at marking, and most marks are
+    /// overwritten unread.
     fn mark(&mut self, end: u32) {
-        self.semicolon_needed = !self.src.ends_with_semicolon(end);
+        self.marked_end = Some(end);
+    }
+
+    /// ts-blank-space's `semicolonNeeded`: a JS node was marked, and its last byte is not `;`.
+    fn semicolon_needed(&self) -> bool {
+        self.marked_end
+            .is_some_and(|end| !self.src.ends_with_semicolon(end))
     }
 
     //
@@ -176,9 +190,9 @@ impl<'s, 'b> Walk<'s, 'b> {
     //
 
     fn statement_list(&mut self, list: &[Statement<'_>], function_body: bool) {
-        let outer_semicolon = self.semicolon_needed;
+        let outer_marked = self.marked_end;
         if function_body {
-            self.semicolon_needed = false;
+            self.marked_end = None;
         }
         let outer_end = self.statement_end;
         let outer_open = std::mem::replace(&mut self.open, Tail::Closed);
@@ -189,7 +203,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         self.statement_end = outer_end;
         self.open = outer_open;
         if function_body {
-            self.semicolon_needed = outer_semicolon;
+            self.marked_end = outer_marked;
         }
     }
 
