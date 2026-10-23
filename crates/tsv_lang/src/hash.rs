@@ -51,10 +51,6 @@ impl Hasher for FxHasher {
     /// below.
     #[inline]
     fn write(&mut self, bytes: &[u8]) {
-        #[expect(
-            clippy::chunks_exact_to_as_chunks,
-            reason = "hot hashing loop; moving to `as_chunks` is a codegen change to take with a perf measurement"
-        )]
         let mut chunks = bytes.chunks_exact(8);
         for chunk in &mut chunks {
             let mut word = [0u8; 8];

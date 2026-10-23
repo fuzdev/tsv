@@ -2,7 +2,11 @@
 # Pinned, not `stable`: clippy::nursery at warn + `lint` denies
 # warnings, so a floating toolchain breaks on new nursery lints;
 # also keeps LLVM codegen fixed under the perf anchor series.
+# Held below newer toolchains whose LLVM, under fat LTO, stops
+# inlining constant-length string compares (each becomes a `bcmp`
+# call) and lowers the doc renderer's hot loops worse; re-measure
+# native format instructions before bumping.
 # CI installs from this file. Bump deliberately.
-channel = "1.99.1"
+channel = "1.94.1"
 components = ["clippy", "rustfmt"]
 targets = ["wasm32-unknown-unknown"]
