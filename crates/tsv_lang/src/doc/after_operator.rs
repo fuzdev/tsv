@@ -147,6 +147,15 @@ pub fn after_operator_head_gated(d: &DocArena, value: DocId, value_broken: DocId
 /// first pass puts there (a [`DocArena::line_probe`] where that line ends before the
 /// value does) — so the state is taken only where that first pass breaks inside the
 /// value.
+///
+/// The middle state's contents are a `group_break`, so the gate alone admits the state.
+/// Measured flat, as a conditional group measures a state, the value's own conditional
+/// groups read only their first state — the value whole on the operator's line, up to
+/// the assumed break — so where that line does not fit but a later state of the value's
+/// does (a root call that breaks its own argument list and keeps the hug,
+/// `w(⏎\t1⏎).f…<{`), a flat measurement would fall through to the hang. Measured in break
+/// mode, the contents end at their first line break, and the value's groups choose their
+/// states at render, as prettier's second pass chooses them.
 pub fn after_operator_assumed_fluid(
     d: &DocArena,
     value: DocId,
@@ -156,7 +165,7 @@ pub fn after_operator_assumed_fluid(
     let hung = hang_after_operator(d, value);
     d.conditional_group(&[
         hung,
-        d.gated_state(probe, fluid_after_operator(d, value_assumed)),
+        d.gated_state(probe, d.group_break(fluid_after_operator(d, value_assumed))),
         hung,
     ])
 }

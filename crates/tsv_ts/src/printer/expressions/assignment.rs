@@ -519,12 +519,12 @@ impl Printer<'_> {
     /// as poorly breakable, or `None`.
     ///
     /// The value is the call, under at most one `await` and any `!` — the wrappers the
-    /// classifier reads through — with no comment anywhere in it and no call anywhere in its
-    /// callee. Every call-rooted callee is excluded, but only a member-chain one
-    /// (`w.a().f…`) is the chain's own window, answered by the member chain's two-state
-    /// group; the others (`w().f…`, `this.w().f…`) are a known residual, which prettier
-    /// settles on the hug as well. The type argument is the mapped type itself: one in a
-    /// redundant paren shell prints its `<…>` another way.
+    /// classifier reads through — with no comment anywhere in it. A callee rooted in a call
+    /// (`w().f…`, `w(1).f…`, `this.w().f…`) takes the same window: prettier settles on the
+    /// hug there too. A member-chain callee (`w.a().f…`) is the chain's own window, answered
+    /// by the member chain's two-state group, and never reaches here: the declarator does
+    /// not break after its operator for it. The type argument is the mapped type itself: one
+    /// in a redundant paren shell prints its `<…>` another way.
     ///
     /// `gap_comment_free` is the caller's half of the comment gate — the gaps around the
     /// value its own seam prints. Every test here is a pure read, so their order is free,
@@ -553,7 +553,7 @@ impl Printer<'_> {
         let [internal::TSType::Mapped(mapped)] = type_args.params else {
             return None;
         };
-        if !gap_comment_free() || call.optional || chain_has_calls(call.callee) {
+        if !gap_comment_free() || call.optional {
             return None;
         }
         // An authored break after the mapped type's `{` needs no guard of its own: it puts a
