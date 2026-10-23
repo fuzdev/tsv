@@ -1121,9 +1121,7 @@ fn build_chain_args_single(
     // fits(). conditional_group uses fits() directly, correctly measuring whether
     // the hugged first line (e.g., `fn((params) => {`) fits.
     //
-    // Exception: when the arg has leading comments, force expansion.
-    // Prettier's shouldExpandLastArg returns false for args with leading comments,
-    // and the default path forces expansion via shouldBreak: printedArguments.some(willBreak).
+    // Exception: a commented argument is never hugged — see the arm below.
     if let ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind
         && matches!(arrow.body, internal::ArrowFunctionBody::BlockStatement(_))
     {
@@ -1134,12 +1132,23 @@ fn build_chain_args_single(
             d.text(")"),
         ]);
         let doc = if has_leading_comment_on_page || last_arg_commented {
-            // A comment anywhere on the argument prevents hugging — force expansion, the
-            // same `shouldExpandLastArg` rule the arms above ask, and prettier's layout for
-            // a trailing one too (`(\n  (x) => {…} /* c */\n)`). An owned comment (on page
-            // but not in `has_leading_comments`) rides inside `arg_with_comments` via
-            // `arg_doc`, so it still defeats the hug.
-            state_expand
+            // A comment anywhere on the argument prevents hugging — the same
+            // `shouldExpandLastArg` rule the arms above ask. An owned comment (on page but
+            // not in `has_leading_comments`) rides inside `arg_with_comments` via `arg_doc`,
+            // so it still defeats the hug. What is left is prettier's default arm,
+            // `group(allArgsBrokenOut, {shouldBreak: printedArguments.some(willBreak)})`:
+            // an argument that will break (a non-empty body) forces the list out
+            // (`(\n  /* l */ (x) => {…}\n)`), and one that will not (`/* l */ (q) => {}`)
+            // stays on the call's line while it fits. The forced form is the explicit
+            // hardlines rather than a soft group: a chain measuring this doc flat must stop
+            // at the break, as prettier's `fits` stops at a group already marked broken,
+            // where a soft group would be measured through the body's hardline and expand
+            // the chain.
+            if d.will_break(arg_with_comments) {
+                state_expand
+            } else {
+                opener.wrap_soft(d, arg_with_comments)
+            }
         } else {
             // No leading comments — try hug first, then expand
             let state_hug = d.concat(&[prefix, arg_with_comments, d.text(")")]);
