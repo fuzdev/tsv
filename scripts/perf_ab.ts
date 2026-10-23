@@ -1,24 +1,28 @@
 /**
  * `deno task perf:ab <base-ref> [<cand-ref>]` — a parse / format performance A/B between two
- * trees, per language, that exits non-zero on a regression.
+ * trees, per language, plus the type strip's, that exits non-zero on a regression.
  *
  * ## What it measures
  *
  * Each side is built from a frozen snapshot of its tree (`git archive` of the build inputs —
  * the workspace manifests, the toolchain pin, `.cargo/`, `src/` and `crates/`; never `tests/`
  * or the docs — into `~/.cache/tsv/perf_ab/<inputs-key>/`, its own `CARGO_TARGET_DIR`, `--release
- * --locked`, at `nice` / `ionice` idle priority), and the measuring driver is the same on both
- * sides: the current checkout's `crates/tsv_debug/examples/perf_ab.rs` is copied over each
- * snapshot before it builds, so only the measured libraries differ (that file's module doc says
- * why it is an example). The candidate defaults to the WORKING TREE — `HEAD` plus every
- * uncommitted change, untracked non-ignored files included — snapshotted through a throwaway
+ * --locked`, at `nice` / `ionice` idle priority), and the measuring drivers are the same on both
+ * sides: the current checkout's `crates/tsv_debug/examples/perf_ab.rs` (every language's parse
+ * and format) and `perf_ab_strip.rs` (the type strip) are copied over each snapshot before it
+ * builds, so only the measured libraries differ (the first file's module doc says why they are
+ * examples, the second's why the strip has its own). A tree without the strip's entry point
+ * (`STRIP_ENTRY_POINT`, older than the strip) builds the format driver alone, and a run with
+ * such a side skips the strip rows, saying so on stderr and under the table. The candidate
+ * defaults to the WORKING TREE — `HEAD` plus every uncommitted change, untracked non-ignored
+ * files included — snapshotted through a throwaway
  * copy of the index (`git add -A` + `git write-tree` under `GIT_INDEX_FILE`), so neither the
  * real index nor any ref moves (the snapshot's blobs land in the object store as unreachable
  * loose objects, which `git gc` prunes); naming a second ref measures that ref instead. A
  * snapshot is keyed by its BUILD INPUTS — the sha256 of `git ls-tree -r -z <tree> --
- * <BUILD_INPUTS>`, the same list the archive takes, minus the overlaid driver — so a change to
- * `tests/`, the docs, `scripts/` or the driver file reuses the built snapshot. A built driver
- * is keyed by the driver's content hash and by its build RECIPE (`BUILD_COMMAND`, the
+ * <BUILD_INPUTS>`, the same list the archive takes, minus the overlaid drivers — so a change to
+ * `tests/`, the docs, `scripts/` or a driver file reuses the built snapshot. A built driver
+ * is keyed by the driver's content hash and by its build RECIPE (`build_command`, the
  * `BUILD_FIXED_ENV` variables and the `BUILD_ENV` names, hashed), so a re-run reuses both and a recipe change rebuilds both sides
  * rather than measuring an old-recipe binary against a new one. A run keeps the
  * `KEEP_TREES` most recently used snapshots and evicts the rest. The report prints each side's
@@ -36,7 +40,9 @@
  * per-file medians of `--iterations` iterations, summed per language, are the wall numbers —
  * `tsv_debug profile`'s statistic), parse only, and zero iterations (the process's fixed cost:
  * start-up, the corpus walk, the reads). Parse instructions are parse-only minus
- * zero-iteration, format instructions full minus parse-only, both per iteration. The wall delta
+ * zero-iteration, format instructions full minus parse-only, both per iteration; the strip's
+ * full run parses twice, so its instructions are full minus twice parse-only plus the fixed
+ * cost (`phase_instructions`). The wall delta
  * is paired per round; while a row's verdict is within its standard error of flipping and the
  * cap could settle it, the run adds balanced pairs of rounds up to `MAX_ROUNDS`
  * (`perf_ab_verdict.ts`, which holds the rule).
@@ -96,6 +102,7 @@ import {
 	INSTRUCTIONS_REGRESSION_PCT,
 	lang_presence,
 	type Lang,
+	LANG_PHASES,
 	LANGS,
 	layout_reading,
 	MAX_ROUNDS,
@@ -103,13 +110,14 @@ import {
 	NOISY_SPREAD_PCT,
 	overall_passes,
 	parse_perf_stat_instructions,
-	PHASES,
+	phase_instructions,
 	render_table,
 	row_is_ambiguous,
 	row_is_settleable,
 	type RowSamples,
 	SIGN_OFF_EXCESS_PCT,
 	sign_off_rows,
+	strip_skip_reason,
 	trees_to_evict,
 	unsettled_rows,
 	WALL_REGRESSION_PCT,
@@ -118,7 +126,24 @@ import {
 } from './perf_ab_verdict.ts';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const DRIVER = 'crates/tsv_debug/examples/perf_ab.rs';
+/** The measuring drivers, each an example overlaid on every snapshot before it builds: `format`
+ * measures every language's parse + format, `strip` the type strip (its own example, so a tree
+ * older than the strip still builds the format driver — `perf_ab_strip.rs`'s module doc). */
+const DRIVERS = {
+	format: { path: 'crates/tsv_debug/examples/perf_ab.rs', example: 'perf_ab' },
+	strip: { path: 'crates/tsv_debug/examples/perf_ab_strip.rs', example: 'perf_ab_strip' }
+} as const;
+type DriverKind = keyof typeof DRIVERS;
+const DRIVER_KINDS: ReadonlyArray<DriverKind> = ['format', 'strip'];
+const DRIVER_PATHS = DRIVER_KINDS.map((kind) => DRIVERS[kind].path);
+
+function driver_of(lang: Lang): DriverKind {
+	return lang === 'strip' ? 'strip' : 'format';
+}
+
+/** The text whose presence in a tree's `crates/tsv_ts/src` says the strip driver can build
+ * against it (`strip_skip_reason`). */
+const STRIP_ENTRY_POINT = 'pub fn strip_with_goal';
 
 const DEFAULT_ITERATIONS = 10;
 
@@ -146,25 +171,27 @@ const BUILD_ENV = ['PATH', 'HOME', 'CARGO_HOME', 'RUSTUP_HOME', 'CARGO_BUILD_JOB
  * its own `target/` beside it. Part of the build RECIPE (`build_recipe_text`). */
 const BUILD_FIXED_ENV: Readonly<Record<string, string>> = { CARGO_TARGET_DIR: '../target' };
 
-/** The driver build's command line, run in the snapshot at idle priority. With `BUILD_FIXED_ENV`
+/** A driver build's command line, run in the snapshot at idle priority. With `BUILD_FIXED_ENV`
  * and `BUILD_ENV` it is the build RECIPE, whose hash names the binary (`build_recipe_text`). */
-const BUILD_COMMAND = [
-	'nice',
-	'-n',
-	'19',
-	'ionice',
-	'-c',
-	'3',
-	'cargo',
-	'build',
-	'--release',
-	'--locked',
-	'-p',
-	'tsv_debug',
-	'--example',
-	'perf_ab',
-	'--message-format=json-render-diagnostics'
-];
+function build_command(example: string): Array<string> {
+	return [
+		'nice',
+		'-n',
+		'19',
+		'ionice',
+		'-c',
+		'3',
+		'cargo',
+		'build',
+		'--release',
+		'--locked',
+		'-p',
+		'tsv_debug',
+		'--example',
+		example,
+		'--message-format=json-render-diagnostics'
+	];
+}
 
 /** A 1-minute load average above this before the run warns: something else holds a core. */
 const LOAD_WARN = 1;
@@ -283,6 +310,8 @@ interface Side {
 	key: string;
 	/** The `BUILD_INPUTS` entries the tree has — what its snapshot extracts. */
 	inputs: Array<string>;
+	/** Whether the tree has the strip driver's entry point (`STRIP_ENTRY_POINT`). */
+	has_strip: boolean;
 }
 
 /** The recursive, NUL-separated `git ls-tree -r -z` listing of `paths` in `tree`, run in `cwd`
@@ -301,14 +330,35 @@ export async function list_tree(
 }
 
 /** The cache key and the present build inputs of `tree`, from one recursive `git ls-tree`
- * listing of `BUILD_INPUTS` (the driver left out: the overlay replaces it). */
-async function build_inputs(tree: string): Promise<{ key: string; inputs: Array<string> }> {
+ * listing of `BUILD_INPUTS` (the drivers left out: the overlay replaces them), and whether it
+ * has the strip. */
+async function build_inputs(
+	tree: string
+): Promise<{ key: string; inputs: Array<string>; has_strip: boolean }> {
 	const listing = await list_tree(tree, BUILD_INPUTS);
-	const { names, missing, key_text } = build_inputs_of(listing, REQUIRED_BUILD_INPUTS, DRIVER);
+	const { names, missing, key_text } = build_inputs_of(
+		listing,
+		REQUIRED_BUILD_INPUTS,
+		DRIVER_PATHS
+	);
 	if (missing.length > 0) {
 		throw new HarnessError(`tree ${tree} has no ${missing.join(', ')} — not a tsv workspace`);
 	}
-	return { key: await sha256_hex(new TextEncoder().encode(key_text)), inputs: names };
+	return {
+		key: await sha256_hex(new TextEncoder().encode(key_text)),
+		inputs: names,
+		has_strip: await tree_has_strip(tree)
+	};
+}
+
+/** Whether `tree`'s `crates/tsv_ts/src` has `STRIP_ENTRY_POINT` (`git grep`: exit 1 is "no",
+ * anything but 0 or 1 an error). */
+async function tree_has_strip(tree: string): Promise<boolean> {
+	const args = ['grep', '-q', '-F', STRIP_ENTRY_POINT, tree, '--', 'crates/tsv_ts/src'];
+	const result = await run('git', args);
+	if (result.code === 0) return true;
+	if (result.code === 1) return false;
+	throw new HarnessError(`git ${args.join(' ')} failed:\n${result.stderr.trim()}`);
 }
 
 async function resolve_ref(ref: string): Promise<Side> {
@@ -414,16 +464,22 @@ function build_env(): Record<string, string> {
 	return env;
 }
 
-/** Build (or reuse) the driver for `side`; returns the binary's path. */
-async function ensure_driver(
-	side: Side,
-	cache: string,
-	driver_source: Uint8Array,
-	driver_hash: string,
-	recipe_hash: string
-): Promise<string> {
+/** One driver as the run builds it: its source, the source's hash and its recipe's hash. */
+interface DriverBuild {
+	kind: DriverKind;
+	source: Uint8Array;
+	hash: string;
+	recipe_hash: string;
+}
+
+/** Build (or reuse) `driver` for `side`; returns the binary's path. */
+async function ensure_driver(side: Side, cache: string, driver: DriverBuild): Promise<string> {
+	const { path: driver_path, example } = DRIVERS[driver.kind];
 	const base = resolve(cache, side.key);
-	const binary = resolve(base, `perf_ab-${driver_hash.slice(0, 16)}-${recipe_hash.slice(0, 16)}`);
+	const binary = resolve(
+		base,
+		`${example}-${driver.hash.slice(0, 16)}-${driver.recipe_hash.slice(0, 16)}`
+	);
 	if (existsSync(binary)) {
 		console.error(`perf:ab: ${side.label}: reusing ${binary}`);
 		return binary;
@@ -435,12 +491,12 @@ async function ensure_driver(
 		);
 		await extract_tree(side, src);
 	}
-	const overlay = resolve(src, DRIVER);
+	const overlay = resolve(src, driver_path);
 	await mkdir(dirname(overlay), { recursive: true });
-	await Deno.writeFile(overlay, driver_source);
+	await Deno.writeFile(overlay, driver.source);
 
-	console.error(`perf:ab: ${side.label}: building the driver (release, idle priority)`);
-	const [command, ...args] = BUILD_COMMAND;
+	console.error(`perf:ab: ${side.label}: building the ${example} driver (release, idle priority)`);
+	const [command, ...args] = build_command(example);
 	const child = new Deno.Command(command!, {
 		args,
 		cwd: src,
@@ -468,7 +524,7 @@ async function ensure_driver(
 		};
 		if (
 			reason === 'compiler-artifact' &&
-			target?.name === 'perf_ab' &&
+			target?.name === example &&
 			Array.isArray(target.kind) &&
 			target.kind.includes('example') &&
 			typeof path === 'string'
@@ -479,7 +535,7 @@ async function ensure_driver(
 	const status = await child.status;
 	if (!status.success || executable === null) {
 		throw new HarnessError(
-			`building the driver for ${side.label} failed (${status.success ? 'no executable reported' : `cargo exited ${status.code}`}). ` +
+			`building the ${example} driver for ${side.label} failed (${status.success ? 'no executable reported' : `cargo exited ${status.code}`}). ` +
 				`The driver compiles against each tree's language-crate entry points; a tree older than ` +
 				`those entry points cannot be measured with it.`
 		);
@@ -509,11 +565,13 @@ async function probe_perf(): Promise<string | null> {
 }
 
 interface DriverOutput extends FileSet {
-	lang: Lang;
 	iterations: number;
 	parse_us: number;
-	format_us: number;
-	/** The formatted output's bytes, summed over the files (zero under `--parse-only`). */
+	/** The wall of the work after the parse — the format driver's `format_us`, the strip
+	 * driver's `strip_us`. */
+	work_us: number;
+	/** The formatted (or stripped) output's bytes, summed over the files (zero under
+	 * `--parse-only`). */
 	output_bytes: number;
 	/** Retired user instructions for the whole process, or null without `perf`. */
 	instructions: number | null;
@@ -530,7 +588,10 @@ async function run_driver(
 	use_perf: boolean
 ): Promise<DriverOutput> {
 	const iterations = mode === 'fixed' ? 0 : options.iterations;
-	const driver_args = [options.corpus, '--lang', lang, '--iterations', String(iterations)];
+	const driver_args =
+		lang === 'strip'
+			? [options.corpus, '--iterations', String(iterations)]
+			: [options.corpus, '--lang', lang, '--iterations', String(iterations)];
 	if (mode === 'parse') driver_args.push('--parse-only');
 	const stat_file = resolve(cache, `perf_stat.${Deno.pid}.csv`);
 	const result = use_perf
@@ -558,13 +619,29 @@ async function run_driver(
 		instructions = parse_perf_stat_instructions(stat_text);
 		if (instructions === null) throw new HarnessError(`perf stat counted nothing:\n${stat_text}`);
 	}
-	let output: Omit<DriverOutput, 'instructions'>;
+	let printed: Record<string, unknown>;
 	try {
-		output = JSON.parse(result.stdout);
+		printed = JSON.parse(result.stdout);
 	} catch {
 		throw new HarnessError(`driver ${binary} printed no JSON:\n${result.stdout}`);
 	}
-	return { ...output, instructions };
+	const number_of = (field: string): number => {
+		const value = printed[field];
+		if (typeof value !== 'number') {
+			throw new HarnessError(`driver ${binary} printed no number \`${field}\`:\n${result.stdout}`);
+		}
+		return value;
+	};
+	return {
+		files: number_of('files'),
+		bytes: number_of('bytes'),
+		errors: number_of('errors'),
+		iterations: number_of('iterations'),
+		parse_us: number_of('parse_us'),
+		work_us: number_of(lang === 'strip' ? 'strip_us' : 'format_us'),
+		output_bytes: number_of('output_bytes'),
+		instructions
+	};
 }
 
 function load_1m(): number {
@@ -603,9 +680,19 @@ async function report_load(
 	}
 }
 
+/** One side's built drivers; `strip` is null when the strip rows are skipped. */
+type Binaries = Record<DriverKind, string | null>;
+
+function binary_for(binaries: Binaries, lang: Lang): string {
+	const binary = binaries[driver_of(lang)];
+	if (binary === null) throw new HarnessError(`${lang}: no ${driver_of(lang)} driver was built`);
+	return binary;
+}
+
 interface SideSamples {
 	parse: RowSamples;
-	format: RowSamples;
+	/** The second phase's samples: format, or the strip's walk + blank. */
+	work: RowSamples;
 	/** The first full run's file set; every later full run must match it. */
 	file_set: FileSet | null;
 	/** The first full run's formatted bytes; every later full run must match it. */
@@ -615,7 +702,7 @@ interface SideSamples {
 function empty_samples(): SideSamples {
 	return {
 		parse: { wall_us: [], instructions: [] },
-		format: { wall_us: [], instructions: [] },
+		work: { wall_us: [], instructions: [] },
 		file_set: null,
 		output_bytes: null
 	};
@@ -625,7 +712,7 @@ function empty_samples(): SideSamples {
 async function run_round(
 	round: number,
 	langs: ReadonlyArray<Lang>,
-	binaries: ReadonlyArray<string>,
+	binaries: ReadonlyArray<Binaries>,
 	sides: ReadonlyArray<Side>,
 	samples: ReadonlyArray<Record<Lang, SideSamples>>,
 	cache: string,
@@ -636,7 +723,7 @@ async function run_round(
 	for (const lang of langs) {
 		console.error(`perf:ab: round ${round + 1} ${lang}`);
 		for (const i of order) {
-			const binary = binaries[i]!;
+			const binary = binary_for(binaries[i]!, lang);
 			const full = await run_driver(binary, cache, options, lang, 'full', use_perf);
 			const s = samples[i]![lang];
 			if (s.file_set === null) {
@@ -651,18 +738,23 @@ async function run_round(
 				}
 				if (full.output_bytes !== s.output_bytes) {
 					throw new HarnessError(
-						`${sides[i]!.label} ${lang}: the formatted output changed between runs ` +
-							`(${s.output_bytes} bytes, then ${full.output_bytes}) — a nondeterministic format`
+						`${sides[i]!.label} ${lang}: the output changed between runs ` +
+							`(${s.output_bytes} bytes, then ${full.output_bytes}) — a nondeterministic ${lang === 'strip' ? 'strip' : 'format'}`
 					);
 				}
 			}
 			s.parse.wall_us.push(full.parse_us);
-			s.format.wall_us.push(full.format_us);
+			s.work.wall_us.push(full.work_us);
 			if (use_perf) {
 				const parse = await run_driver(binary, cache, options, lang, 'parse', use_perf);
 				const fixed = await run_driver(binary, cache, options, lang, 'fixed', use_perf);
-				s.parse.instructions.push((parse.instructions! - fixed.instructions!) / options.iterations);
-				s.format.instructions.push((full.instructions! - parse.instructions!) / options.iterations);
+				const [parse_instructions, work_instructions] = phase_instructions(
+					lang,
+					{ full: full.instructions!, parse: parse.instructions!, fixed: fixed.instructions! },
+					options.iterations
+				);
+				s.parse.instructions.push(parse_instructions);
+				s.work.instructions.push(work_instructions);
 			}
 		}
 	}
@@ -675,9 +767,13 @@ function grade(
 	const rows: Array<AbRow> = [];
 	for (const lang of langs) {
 		const [b, c] = [samples[0]![lang], samples[1]![lang]];
-		for (const phase of PHASES) {
+		const [parse_phase, work_phase] = LANG_PHASES[lang];
+		for (const [phase, key] of [
+			[parse_phase, 'parse'],
+			[work_phase, 'work']
+		] as const) {
 			try {
-				rows.push(ab_row(lang, phase, b[phase], c[phase]));
+				rows.push(ab_row(lang, phase, b[key], c[key]));
 			} catch (err) {
 				throw new HarnessError(`${lang} ${phase}: ${err instanceof Error ? err.message : err}`);
 			}
@@ -693,13 +789,22 @@ async function main(): Promise<number> {
 			`corpus not found: ${options.corpus} — check out fuzdev/corpora beside this repo, or pass --corpus`
 		);
 	}
-	const driver_path = resolve(ROOT, DRIVER);
-	if (!existsSync(driver_path)) throw new HarnessError(`driver missing: ${driver_path}`);
-	const driver_source = await Deno.readFile(driver_path);
-	const driver_hash = await sha256_hex(driver_source);
-	const recipe_hash = await sha256_hex(
-		new TextEncoder().encode(build_recipe_text(BUILD_COMMAND, BUILD_FIXED_ENV, BUILD_ENV))
-	);
+	const drivers = {} as Record<DriverKind, DriverBuild>;
+	for (const kind of DRIVER_KINDS) {
+		const driver_path = resolve(ROOT, DRIVERS[kind].path);
+		if (!existsSync(driver_path)) throw new HarnessError(`driver missing: ${driver_path}`);
+		const source = await Deno.readFile(driver_path);
+		drivers[kind] = {
+			kind,
+			source,
+			hash: await sha256_hex(source),
+			recipe_hash: await sha256_hex(
+				new TextEncoder().encode(
+					build_recipe_text(build_command(DRIVERS[kind].example), BUILD_FIXED_ENV, BUILD_ENV)
+				)
+			)
+		};
+	}
 
 	const home = Deno.env.get('HOME');
 	if (!home) throw new HarnessError('HOME is not set');
@@ -728,20 +833,36 @@ async function main(): Promise<number> {
 			`perf:ab: the sides differ only outside the build inputs — one binary, measured against itself (an A/A)`
 		);
 	}
-	const binaries: Array<string> = [];
+	const strip_skip = strip_skip_reason(base.has_strip, cand.has_strip);
+	const strip_skip_line =
+		strip_skip === null
+			? null
+			: `perf:ab: ⚠️ ⚠️  STRIP ROWS SKIPPED — ${strip_skip}; the strip driver cannot build ` +
+				`against such a tree, so this run grades the format rows alone`;
+	if (strip_skip_line !== null) console.error(strip_skip_line);
+	const binaries: Array<Binaries> = [];
 	for (const side of sides) {
-		binaries.push(await ensure_driver(side, cache, driver_source, driver_hash, recipe_hash));
+		binaries.push({
+			format: await ensure_driver(side, cache, drivers.format),
+			strip: strip_skip === null ? await ensure_driver(side, cache, drivers.strip) : null
+		});
 	}
+	const sha256_of = async (binary: string | null): Promise<string | null> =>
+		binary === null ? null : sha256_hex(await Deno.readFile(binary));
 	const binary_sha256 = await Promise.all(
-		binaries.map(async (binary) => sha256_hex(await Deno.readFile(binary)))
+		binaries.map(async (b) => ({
+			format: await sha256_of(b.format),
+			strip: await sha256_of(b.strip)
+		}))
 	);
 
 	// Which languages the corpus holds, per side, from a zero-iteration run (no timing).
 	const langs: Array<Lang> = [];
 	const absent: Array<Lang> = [];
 	for (const lang of LANGS) {
+		if (lang === 'strip' && strip_skip !== null) continue;
 		const [b, c] = await Promise.all(
-			binaries.map((binary) => run_driver(binary, cache, options, lang, 'fixed', false))
+			binaries.map((b) => run_driver(binary_for(b, lang), cache, options, lang, 'fixed', false))
 		);
 		const presence = lang_presence(b!.files, c!.files);
 		if (presence === 'one_sided') {
@@ -753,6 +874,7 @@ async function main(): Promise<number> {
 	}
 	if (langs.length === 0)
 		throw new HarnessError(`no ts, svelte or css files under ${options.corpus}`);
+
 	for (const lang of absent) {
 		console.error(`perf:ab: ${lang}: no files in the corpus — not measured, no rows`);
 	}
@@ -763,7 +885,8 @@ async function main(): Promise<number> {
 	const samples: Array<Record<Lang, SideSamples>> = sides.map(() => ({
 		ts: empty_samples(),
 		svelte: empty_samples(),
-		css: empty_samples()
+		css: empty_samples(),
+		strip: empty_samples()
 	}));
 	let rounds = 0;
 	while (rounds < options.rounds) {
@@ -839,6 +962,7 @@ async function main(): Promise<number> {
 				{
 					base: { ...base, binary_sha256: binary_sha256[0] },
 					cand: { ...cand, binary_sha256: binary_sha256[1] },
+					strip_skipped: strip_skip,
 					corpus: options.corpus,
 					rounds,
 					iterations: options.iterations,
@@ -869,9 +993,11 @@ async function main(): Promise<number> {
 			)
 		);
 	} else {
+		const sha_text = (sha: { format: string | null; strip: string | null }): string =>
+			`binary sha256 ${sha.format}` + (sha.strip === null ? '' : `, strip ${sha.strip}`);
 		console.log(
-			`base: ${base.label}, binary sha256 ${binary_sha256[0]}\n` +
-				`cand: ${cand.label}, binary sha256 ${binary_sha256[1]}`
+			`base: ${base.label}, ${sha_text(binary_sha256[0]!)}\n` +
+				`cand: ${cand.label}, ${sha_text(binary_sha256[1]!)}`
 		);
 		console.log(
 			`corpus: ${options.corpus} (${langs.map((lang) => `${lang} ${samples[0]![lang].file_set!.files}`).join(', ')} files` +
@@ -894,6 +1020,7 @@ async function main(): Promise<number> {
 		);
 		if (layout_line !== null) console.log(layout_line);
 		for (const row of sign_offs) console.log(sign_off_line(row));
+		if (strip_skip_line !== null) console.log(strip_skip_line);
 		console.log(passes ? 'perf:ab: PASS' : 'perf:ab: FAIL — a row regressed');
 	}
 	return passes ? 0 : 1;

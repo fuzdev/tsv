@@ -863,10 +863,10 @@ deno task perf:ab <base> <cand>    # two refs; also --rounds N (even, 6), --iter
 ```
 
 One command for the parse/format regression check, per language (TypeScript, Svelte, CSS) ×
-phase. Each side is built `--release` from a frozen `git archive` snapshot of its tree's build
-inputs (the workspace manifests, the toolchain pin, `.cargo/`, `src/`, `crates/` — not `tests/`)
-in `~/.cache/tsv/perf_ab/`, keyed by those inputs (a hash of their `git ls-tree -r -z` entries,
-the same list the snapshot takes, minus the driver below, which every build overlays). A built
+phase, plus the type strip's (parse, then the strip's walk + blank). Each side is built
+`--release` from a frozen `git archive` snapshot of its tree's build inputs (the workspace
+manifests, the toolchain pin, `.cargo/`, `src/`, `crates/` — not `tests/`) in `~/.cache/tsv/perf_ab/`, keyed by those inputs (a hash of their `git ls-tree -r -z` entries,
+the same list the snapshot takes, minus the drivers below, which every build overlays). A built
 binary is further keyed by the driver's content and by the build recipe (the build's command line,
 the variables it sets itself and the names of the variables it keeps, hashed), so a change to how the driver builds rebuilds
 both sides instead of measuring an old-recipe binary against a new one. A re-run reuses the
@@ -875,17 +875,36 @@ and `perf:ab HEAD` on one measures a binary against itself. A run keeps the few 
 recently used snapshots and evicts the rest. The report prints each side's binary sha256, so a
 reading that moved between runs can be told apart from a build that changed. The builds run in a
 cleared environment, so a `RUSTFLAGS` or `CARGO_PROFILE_*` in the caller's shell cannot reach one
-side's build and not the other's. Both sides run the **same** measuring driver,
-`crates/tsv_debug/examples/perf_ab.rs`, copied from the current checkout over each snapshot:
-only the measured libraries differ. The driver times exactly what `profile` times (fold + parse,
-then format; per-file medians summed per language) over `../corpora/collections`, and is an
-example rather than a `profile` flag so it compiles against an older tree unchanged.
+side's build and not the other's. Both sides run the **same** measuring drivers,
+`crates/tsv_debug/examples/perf_ab.rs` and `perf_ab_strip.rs`, copied from the current checkout
+over each snapshot: only the measured libraries differ. The format driver times exactly what
+`profile` times (fold + parse, then format; per-file medians summed per language) over
+`../corpora/collections`, and is an example rather than a `profile` flag so it compiles against an
+older tree unchanged.
+
+The strip driver times what `profile --strip` times, over the files a module loader strips
+(`.ts` / `.mts` / `.cts`, no declaration file — not the TypeScript row's set, which carries
+`.js` and `.d.ts`): the parse of the author's bytes (no carriage-return fold, so the TypeScript
+format row's parse column is not this one), then `tsv_ts::strip_with_goal`, the goal read from the
+extension as `tsv strip` reads a path; the strip column is the strip's time less the parse's, its
+walk + blank, and a refusal counts as a strip. It is its own example because it calls the strip,
+which an older tree lacks: a side without `tsv_ts::strip_with_goal` builds the format driver
+alone, and the run skips the strip rows — loudly, on stderr and under the table — rather than
+failing every row. Its parse row is a null control for a change confined to the strip, which
+leaves that code identical on both sides.
+
+The strip column's wall is a difference of two parse-sized walls, so it magnifies any relative
+shift between the two parses many times over. A change that moves both the parse and the strip (a
+toolchain bump, a parser change) can fail the strip row on wall while its instructions improve or
+hold flat; re-read such a failure against the strip's parse row before believing it.
 
 Rounds interleave the two sides, an even number of them so each side goes first in half. In each,
 every side runs the pipeline, parse alone, and zero iterations under `perf stat -e
 instructions:u`; the zero-iteration run is the process's fixed cost (start-up, the corpus walk,
 the reads), subtracted so a phase's count is its own work — a sliver of the TypeScript parse
 count, but a large share of CSS's, whose small corpus parses in little more than the fixed cost.
+The strip driver's full run parses twice an iteration (once timed alone, once inside the strip),
+so the strip's count is the full run less twice the parse-only run, plus the fixed cost once.
 The instruction column also carries the arena resets between iterations, which the wall timers
 leave out as `profile` does: a process-level count cannot exclude them, and timing them would part
 the wall column from `profile`'s.

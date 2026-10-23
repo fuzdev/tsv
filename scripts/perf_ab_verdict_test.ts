@@ -14,6 +14,7 @@ import {
 	INSTRUCTIONS_LAYOUT_PCT,
 	INSTRUCTIONS_REGRESSION_PCT,
 	KEEP_TREES,
+	LANG_PHASES,
 	lang_presence,
 	layout_reading,
 	MAX_ROUNDS,
@@ -25,6 +26,7 @@ import {
 	overall_passes,
 	parse_perf_stat_instructions,
 	pct_delta,
+	phase_instructions,
 	render_table,
 	row_is_ambiguous,
 	row_is_settleable,
@@ -32,6 +34,7 @@ import {
 	SIGN_OFF_EXCESS_PCT,
 	sign_off_rows,
 	spread_pct,
+	strip_skip_reason,
 	trees_to_evict,
 	unsettled_rows,
 	WALL_REGRESSION_PCT,
@@ -437,37 +440,54 @@ Deno.test('file_set_mismatch compares counts, bytes and parse errors', () => {
 
 Deno.test('build_inputs_of reads the inputs, the missing ones and the key text', () => {
 	const driver = 'crates/tsv_debug/examples/perf_ab.rs';
+	const strip_driver = 'crates/tsv_debug/examples/perf_ab_strip.rs';
+	const drivers = [driver, strip_driver];
+	const is_driver = (line: string): boolean => drivers.some((d) => line.endsWith(d));
 	const lines = [
 		'100644 blob 1111111111111111111111111111111111111111\t.cargo/config.toml',
 		'100644 blob 2222222222222222222222222222222222222222\tCargo.lock',
 		'100644 blob 3333333333333333333333333333333333333333\tCargo.toml',
 		'100644 blob 4444444444444444444444444444444444444444\tcrates/tsv_ts/src/lib.rs',
 		`100644 blob 5555555555555555555555555555555555555555\t${driver}`,
+		`100644 blob 9999999999999999999999999999999999999999\t${strip_driver}`,
 		'100644 blob 6666666666666666666666666666666666666666\tcrates/tsv_ts/Cargo.toml'
 	];
 	const required = ['Cargo.toml', 'crates', 'src'];
-	const read = build_inputs_of(lines.join('\0'), required, driver);
+	const read = build_inputs_of(lines.join('\0'), required, drivers);
 	deepStrictEqual(read.names, ['.cargo', 'Cargo.lock', 'Cargo.toml', 'crates']);
 	deepStrictEqual(read.missing, ['src']);
-	// the overlaid driver is left out of the key: a tree without it, or with another copy of
-	// it, keys the same
+	// every overlaid driver is left out of the key: a tree without one, or with another copy
+	// of one, keys the same
 	deepStrictEqual(read.key_text.includes(driver), false);
-	const without = lines.filter((line) => !line.endsWith(driver));
-	deepStrictEqual(build_inputs_of(without.join('\0'), required, driver).key_text, read.key_text);
-	const edited = lines.map((line) =>
-		line.endsWith(driver) ? `100644 blob ${'7'.repeat(40)}\t${driver}` : line
+	deepStrictEqual(read.key_text.includes(strip_driver), false);
+	for (const d of drivers) {
+		const without = lines.filter((line) => !line.endsWith(d));
+		deepStrictEqual(build_inputs_of(without.join('\0'), required, drivers).key_text, read.key_text);
+	}
+	const without_both = lines.filter((line) => !is_driver(line));
+	deepStrictEqual(
+		build_inputs_of(without_both.join('\0'), required, drivers).key_text,
+		read.key_text
 	);
-	deepStrictEqual(build_inputs_of(edited.join('\0'), required, driver).key_text, read.key_text);
+	const edited = lines.map((line) =>
+		is_driver(line) ? `100644 blob ${'7'.repeat(40)}\t${line.split('\t')[1]}` : line
+	);
+	deepStrictEqual(build_inputs_of(edited.join('\0'), required, drivers).key_text, read.key_text);
+	// a path that is not overlaid stays in the key, a driver of the old list included
+	deepStrictEqual(
+		build_inputs_of(lines.join('\0'), required, [driver]).key_text.includes(strip_driver),
+		true
+	);
 	// any other input moving moves the key
 	const moved = lines.map((line) => line.replace('4444', '4445'));
 	deepStrictEqual(
-		build_inputs_of(moved.join('\0'), required, driver).key_text === read.key_text,
+		build_inputs_of(moved.join('\0'), required, drivers).key_text === read.key_text,
 		false
 	);
-	deepStrictEqual(build_inputs_of('', required, driver).missing, required);
+	deepStrictEqual(build_inputs_of('', required, drivers).missing, required);
 	// `-z` ends every entry with a NUL, the last one included, and leaves a path raw
 	const raw = `100644 blob ${'8'.repeat(40)}\tcrates/\u00e9/a\nb.rs`;
-	const ended = build_inputs_of(`${lines.join('\0')}\0${raw}\0`, required, driver);
+	const ended = build_inputs_of(`${lines.join('\0')}\0${raw}\0`, required, drivers);
 	deepStrictEqual(ended.names, ['.cargo', 'Cargo.lock', 'Cargo.toml', 'crates']);
 	deepStrictEqual(ended.key_text.endsWith(raw), true);
 });
@@ -520,4 +540,32 @@ Deno.test('trees_to_evict keeps the trees in use plus the most recently used', (
 		trees_to_evict(trees, new Set(['s', 't', 'u', 'v', 'w', 'x', 'y'])).length,
 		trees.length
 	);
+});
+
+Deno.test(
+	'phase_instructions: a format row splits at parse-only, the strip row parses twice',
+	() => {
+		const totals = { full: 1_000, parse: 400, fixed: 100 };
+		// parse = parse-only − fixed; format = full − parse-only
+		deepStrictEqual(phase_instructions('ts', totals, 10), [30, 60]);
+		deepStrictEqual(phase_instructions('css', totals, 1), [300, 600]);
+		// the strip's full run = fixed + it × (parse + parse + walk): walk = full − 2 × parse-only + fixed
+		const [parse, walk] = [30, 7];
+		const it = 5;
+		const strip_totals = {
+			full: 100 + it * (parse + parse + walk),
+			parse: 100 + it * parse,
+			fixed: 100
+		};
+		deepStrictEqual(phase_instructions('strip', strip_totals, it), [parse, walk]);
+		deepStrictEqual(LANG_PHASES.strip, ['parse', 'strip']);
+		deepStrictEqual(LANG_PHASES.ts, ['parse', 'format']);
+	}
+);
+
+Deno.test('strip_skip_reason: measured only when both sides have the strip', () => {
+	deepStrictEqual(strip_skip_reason(true, true), null);
+	deepStrictEqual(strip_skip_reason(false, true)?.includes('the base lacks'), true);
+	deepStrictEqual(strip_skip_reason(true, false)?.includes('the candidate lacks'), true);
+	deepStrictEqual(strip_skip_reason(false, false)?.includes('neither side has'), true);
 });

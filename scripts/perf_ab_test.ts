@@ -47,7 +47,7 @@ async function assert_lists_raw_paths(): Promise<void> {
 		deepStrictEqual(quoted.includes('"crates/\\303\\251/lib.rs"'), true);
 
 		const listing = await list_tree(tree, ['Cargo.toml', 'crates', 'src'], dir);
-		const read = build_inputs_of(listing, ['Cargo.toml', 'crates', 'src'], 'src/driver.rs');
+		const read = build_inputs_of(listing, ['Cargo.toml', 'crates', 'src'], ['src/driver.rs']);
 		deepStrictEqual(read.names, ['Cargo.toml', 'crates', 'src']);
 		deepStrictEqual(read.missing, []);
 		deepStrictEqual(read.key_text.includes('\tcrates/é/lib.rs'), true);

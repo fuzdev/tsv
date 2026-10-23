@@ -71,13 +71,53 @@ export const MAX_ROUNDS = 10;
  * without evicting HEAD's tree. */
 export const KEEP_TREES = 6;
 
-export const LANGS = ['ts', 'svelte', 'css'] as const;
+/** The measured languages: the three formatters, each through the format driver, then the type
+ * strip, TypeScript to JS through its own driver (`perf_ab_strip.rs`). */
+export const LANGS = ['ts', 'svelte', 'css', 'strip'] as const;
 export type Lang = (typeof LANGS)[number];
 
-export const PHASES = ['parse', 'format'] as const;
+export const PHASES = ['parse', 'format', 'strip'] as const;
 export type Phase = (typeof PHASES)[number];
 
-const LANG_LABELS: Record<Lang, string> = { ts: 'TS', svelte: 'Svelte', css: 'CSS' };
+/** Each language's two rows: its parse, then the work after the parse. */
+export const LANG_PHASES: Readonly<Record<Lang, readonly [Phase, Phase]>> = {
+	ts: ['parse', 'format'],
+	svelte: ['parse', 'format'],
+	css: ['parse', 'format'],
+	strip: ['parse', 'strip']
+};
+
+const LANG_LABELS: Record<Lang, string> = {
+	ts: 'TS',
+	svelte: 'Svelte',
+	css: 'CSS',
+	strip: 'Strip'
+};
+
+/** One driver's three `instructions:u` process totals for a language: the full pipeline, parse
+ * only, and zero iterations (the fixed cost). */
+export interface InstructionTotals {
+	full: number;
+	parse: number;
+	fixed: number;
+}
+
+/**
+ * A language's two phases' instructions per iteration, fixed cost removed. The parse is parse-only
+ * less the fixed cost. A format driver's full run parses once and formats, so the format is full
+ * less parse-only; the strip driver's full run parses AND strips, and the strip parses again
+ * inside, so its walk + blank is full less twice the parse-only work (each parse-only total
+ * carries the fixed cost once, so one fixed cost is added back).
+ */
+export function phase_instructions(
+	lang: Lang,
+	totals: InstructionTotals,
+	iterations: number
+): [number, number] {
+	const { full, parse, fixed } = totals;
+	const work = lang === 'strip' ? full - 2 * parse + fixed : full - parse;
+	return [(parse - fixed) / iterations, work / iterations];
+}
 
 /** `pass` = within the wall threshold; `layout` = over it at flat instructions (passes);
  * `warn` = within it but instructions rose, by no more than `INSTRUCTIONS_REGRESSION_PCT`
@@ -328,6 +368,17 @@ export function lang_presence(base_files: number, cand_files: number): LangPrese
 	return base_files === 0 || cand_files === 0 ? 'one_sided' : 'measured';
 }
 
+/** Why the strip rows are left out of a run, or null when both sides have the entry point the
+ * strip driver compiles against (`tsv_ts::strip_with_goal`). A tree without it cannot build that
+ * driver; the format rows still measure it, so the strip rows are skipped — loudly, by the caller
+ * — rather than failing the run, and one side alone is no A/B. */
+export function strip_skip_reason(base_has: boolean, cand_has: boolean): string | null {
+	if (base_has && cand_has) return null;
+	const sides =
+		!base_has && !cand_has ? 'neither side has' : `the ${base_has ? 'candidate' : 'base'} lacks`;
+	return `${sides} the type strip (\`tsv_ts::strip_with_goal\`)`;
+}
+
 /** Why two runs did not measure the same file set (count, bytes, parse failures), or null when
  * they did. A per-file median summed over different files is not an A/B. */
 export function file_set_mismatch(a: FileSet, b: FileSet): string | null {
@@ -341,17 +392,17 @@ export function file_set_mismatch(a: FileSet, b: FileSet): string | null {
  * of `<mode> <type> <oid>\t<path>`, each ended by a NUL, the path raw — `-z` turns off the
  * C-quoting `core.quotePath` applies to a non-ASCII or special byte, which would put a leading
  * `"` on a top-level name): the top-level inputs present, in order; the `required` ones missing;
- * and the key text — the listing without the `overlaid` path, whose content the run replaces
- * before every build (the measuring driver), so neither its presence nor its content in the
+ * and the key text — the listing without the `overlaid` paths, whose content the run replaces
+ * before every build (the measuring drivers), so neither their presence nor their content in the
  * tree changes the binary. The cache is keyed on the key text's sha256: the blob ids cover
  * exactly the files a build reads, so two trees that differ only outside them — `tests/`, the
- * docs, `scripts/`, the driver — share one snapshot and one built driver. The key text keeps
+ * docs, `scripts/`, the drivers — share one snapshot and one built driver. The key text keeps
  * the NUL separators, since a raw path may hold a newline.
  */
 export function build_inputs_of(
 	ls_tree: string,
 	required: ReadonlyArray<string>,
-	overlaid: string
+	overlaid: ReadonlyArray<string>
 ): { names: Array<string>; missing: Array<string>; key_text: string } {
 	const names: Array<string> = [];
 	const kept: Array<string> = [];
@@ -361,7 +412,7 @@ export function build_inputs_of(
 		const path = entry.slice(tab + 1);
 		const top = path.split('/', 1)[0]!;
 		if (!names.includes(top)) names.push(top);
-		if (path !== overlaid) kept.push(entry);
+		if (!overlaid.includes(path)) kept.push(entry);
 	}
 	return {
 		names,
