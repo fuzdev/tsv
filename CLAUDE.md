@@ -271,7 +271,7 @@ deno task wire:audit:terminators     # same harness, injecting a lone CR / U+202
 #                                      differences fall in the `two_line_classes` row) — grades the SPAN arm (+ the loc
 #                                      definition check) on inputs no fixture or real repo carries. Sites are document-wide,
 #                                      so it stays a strided SAMPLE and CANNOT be ratcheted. ⚠️ RED BY DESIGN
-deno task compile:corpus:compare     # compile-parity wide net over ../corpora, the private live roots and Svelte's suites (sidecar, on demand; ./docs/compile_tooling.md)
+deno task compile:corpus:compare     # compile-parity wide net over ../corpora, Svelte's suites and any `compile_corpus_compare.roots.local` roots (sidecar, on demand; ./docs/compile_tooling.md)
 deno task compile:validation         # validation-suite RATCHET over Svelte's compiler-errors + validator suites (sidecar, on demand; :update re-pins, never a MISMATCH; ./docs/compile_validation_ratchet.md)
 deno task compile:fuzz               # differential compile fuzzer over feature cross-products — a discovery tool, RED by design (sidecar, on demand; ./docs/compile_tooling.md)
 ```

@@ -28,10 +28,10 @@ cargo run -p tsv_debug compile_fixtures_validate [pattern...]   # --list, --json
 
 ```bash
 cargo run -p tsv_debug compile_corpus_compare <paths...>
-# Also: --list, --json, --census
+# Also: --list, --json, --census, --roots-file <file>
 ```
 
-The compile-parity wide net: compile every `.svelte` under the given roots with the canonical compiler (oracle) AND tsv, comparing the canonical reprints of both sides. The `compile:corpus:compare` deno task points it at the whole `../corpora` snapshot (every collection), the private live roots it cannot carry, and the Svelte suites. Sidecar-dependent, so kept out of `deno task check`.
+The compile-parity wide net: compile every `.svelte` under the given roots with the canonical compiler (oracle) AND tsv, comparing the canonical reprints of both sides. The `compile:corpus:compare` deno task points it at the whole `../corpora` snapshot (every collection) and the Svelte suites, plus any per-machine roots listed in a gitignored `compile_corpus_compare.roots.local` at the repo root (`--roots-file`: one path per line relative to the repo root, blank lines and `#` comments skipped; a missing file adds none) — the place for live checkouts the snapshot cannot carry. Sidecar-dependent, so kept out of `deno task check`.
 
 **Buckets per file:**
 

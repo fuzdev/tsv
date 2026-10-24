@@ -203,7 +203,8 @@ mod tests {
 
     #[test]
     fn code_difference_is_divergent() {
-        // Same comment, different code (a trailing space in a string — the dealt shape).
+        // Same comment, different code (a trailing space in a string, as a real
+        // corpus file had).
         let ours = "let a = `x `; // c\n";
         let oracle = "let a = `x`; // c\n";
         assert_eq!(compare_canonical(ours, oracle), Parity::Divergent);

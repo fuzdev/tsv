@@ -80,6 +80,14 @@ mod ratchet;
 /// the parity run's `parity / achievable` reporting. Safe by construction — [`Report::build`]
 /// and [`Report::target_set`] are pure functions of the per-call outcomes slice, with no
 /// statics and no cross-invocation state. See the [`ratchet`] module docs.
+///
+/// # `--roots-file` (per-machine roots)
+///
+/// Appends the roots listed in a file — one path per line, blank lines and `#` comments
+/// skipped — after the positional ones. Relative paths resolve against the working
+/// directory, like positionals. A missing file contributes no roots, so a
+/// committed invocation can name a gitignored `*.local` file that only some machines
+/// have. Its roots are ordinary paths: they narrow a `--ratchet` run like positionals.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "compile_corpus_compare")]
 #[expect(clippy::struct_excessive_bools)] // independent CLI flags
@@ -108,9 +116,38 @@ pub struct CompileCorpusCompareCommand {
     #[argh(switch)]
     json: bool,
 
+    /// a file of further roots, one per line relative to the cwd (`#` comments
+    /// allowed), appended after the positional paths; a missing file adds none
+    #[argh(option)]
+    roots_file: Option<String>,
+
     /// directories or files to compare (each a reported group)
     #[argh(positional)]
     paths: Vec<String>,
+}
+
+/// Read a `--roots-file`: its roots, or none when the file does not exist.
+fn read_roots_file(path: &Path) -> Result<Vec<String>, CliError> {
+    match std::fs::read_to_string(path) {
+        Ok(text) => Ok(parse_roots(&text)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            eprintln!("note: no roots file at {}, skipping it", path.display());
+            Ok(Vec::new())
+        }
+        Err(e) => {
+            eprintln!("Error: cannot read roots file {}: {e}", path.display());
+            Err(CliError::Failed)
+        }
+    }
+}
+
+/// Parse a roots file: one root per line, trimmed, skipping blank lines and `#` comments.
+fn parse_roots(text: &str) -> Vec<String> {
+    text.lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .map(str::to_string)
+        .collect()
 }
 
 /// One file's classification.
@@ -181,7 +218,7 @@ struct GroupInfo {
 }
 
 impl CompileCorpusCompareCommand {
-    pub(crate) fn run(self) -> Result<(), CliError> {
+    pub(crate) fn run(mut self) -> Result<(), CliError> {
         // Mode guards first — a misuse must fail before any corpus work.
         if self.update && !self.ratchet {
             eprintln!(
@@ -193,6 +230,11 @@ impl CompileCorpusCompareCommand {
         if self.ratchet && self.census {
             eprintln!("Error: --ratchet and --census are different pipelines; pick one.");
             return Err(CliError::Failed);
+        }
+        // Fold `--roots-file` into the positionals before the narrowing check, so it and
+        // every later read of `self.paths` see one root list.
+        if let Some(file) = &self.roots_file {
+            self.paths.extend(read_roots_file(Path::new(file))?);
         }
         // The ratchet's snapshot is PATH-keyed against a fixed corpus, so an explicit
         // path is a NARROWING: gradable-against-nothing and never pinnable. It stays
@@ -1533,6 +1575,19 @@ impl CensusReport {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parse_roots_skips_blanks_and_comments() {
+        let text = "# per-machine roots\n../a\n\n  ../b  \n  # indented comment\n../c d\n";
+        assert_eq!(parse_roots(text), ["../a", "../b", "../c d"]);
+        assert!(parse_roots("").is_empty());
+    }
+
+    #[test]
+    fn missing_roots_file_adds_no_roots() {
+        let missing = Path::new("target/definitely_missing_roots_file.local");
+        assert!(read_roots_file(missing).unwrap().is_empty());
+    }
 
     #[test]
     fn census_exposure_is_per_file_not_global() {
