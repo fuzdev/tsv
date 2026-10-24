@@ -673,17 +673,28 @@ impl<'a> Printer<'a> {
             || frozen_inner.is_some()
         {
             let mut parts: DocBuf = smallvec![d.hardline()];
-            for comment in self.comments_to_emit_between(open + 1, lead_end) {
+            let mut run = self.comments_to_emit_between(open + 1, lead_end).peekable();
+            while let Some(comment) = run.next() {
                 parts.push(self.build_comment_doc(comment));
-                // A line comment runs to end-of-line, so it must break; a block
-                // comment hugs the next token inline (`/** @type {B} */ (x)`) — unless
-                // it is an honored directive, which must keep its own line for the
-                // freeze to survive the next pass.
-                parts.push(if comment.is_block && !self.is_honored_directive(comment) {
-                    d.text(" ")
+                // What follows this comment: the next one in the run, else the inner — or
+                // a comment the inner owns ahead of its first token (a nested cast's), whose
+                // bytes a blank scan must not cross.
+                let next = self
+                    .blank_scan_end_after(comment, run.peek().map_or(lead_end, |c| c.span.start));
+                // prettier's `printLeadingComment`, as the retained pair of a `return (`
+                // prints its run: a line comment runs to end-of-line, so it must break;
+                // a block comment hugs the next token inline (`/** @type {B} */ (x)`)
+                // unless the author broke after it, which keeps the break — or unless it
+                // is an honored directive, which must keep its own line for the freeze to
+                // survive the next pass. A break keeps the author's blank below it.
+                if comment.is_block
+                    && !self.is_honored_directive(comment)
+                    && self.is_same_line(comment.span.end, next)
+                {
+                    parts.push(d.text(" "));
                 } else {
-                    d.hardline()
-                });
+                    self.push_blank_preserving_hardline(&mut parts, comment.span.end, next);
+                }
             }
             parts.push(inner_doc);
             parts.extend(trailing_parts);
