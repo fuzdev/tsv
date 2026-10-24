@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 612,
+	"end": 660,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -113,39 +113,57 @@
 			"end": 483
 		},
 		{
+			"type": "Block",
+			"value": " c19 ",
+			"start": 505,
+			"end": 514
+		},
+		{
+			"type": "Line",
+			"value": " c20",
+			"start": 515,
+			"end": 521
+		},
+		{
+			"type": "Line",
+			"value": " c21",
+			"start": 525,
+			"end": 531
+		},
+		{
 			"type": "Line",
 			"value": " control: a glued run below the `//` keeps a line of its own",
-			"start": 491,
-			"end": 553
+			"start": 539,
+			"end": 601
 		},
 		{
 			"type": "Line",
 			"value": " c16",
-			"start": 570,
-			"end": 576
+			"start": 618,
+			"end": 624
 		},
 		{
 			"type": "Block",
 			"value": " c17 ",
-			"start": 579,
-			"end": 588
+			"start": 627,
+			"end": 636
 		},
 		{
 			"type": "Block",
 			"value": " c18 ",
-			"start": 589,
-			"end": 598
+			"start": 637,
+			"end": 646
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 611,
+		"end": 659,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 602,
+			"end": 650,
 			"body": [
 				{
 					"type": "FunctionDeclaration",
@@ -458,47 +476,95 @@
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 555,
-					"end": 601,
+					"start": 490,
+					"end": 536,
 					"id": {
 						"type": "Identifier",
-						"start": 560,
-						"end": 561,
+						"start": 495,
+						"end": 496,
+						"name": "N"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeOperator",
+						"start": 499,
+						"end": 535,
+						"operator": "keyof",
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 534,
+							"end": 535,
+							"typeName": {
+								"type": "Identifier",
+								"start": 534,
+								"end": 535,
+								"name": "T"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c19 ",
+									"start": 505,
+									"end": 514
+								},
+								{
+									"type": "Line",
+									"value": " c20",
+									"start": 515,
+									"end": 521
+								},
+								{
+									"type": "Line",
+									"value": " c21",
+									"start": 525,
+									"end": 531
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 603,
+					"end": 649,
+					"id": {
+						"type": "Identifier",
+						"start": 608,
+						"end": 609,
 						"name": "G"
 					},
 					"typeAnnotation": {
 						"type": "TSTypeOperator",
-						"start": 564,
-						"end": 600,
+						"start": 612,
+						"end": 648,
 						"operator": "keyof",
 						"typeAnnotation": {
 							"type": "TSTypeReference",
-							"start": 599,
-							"end": 600,
+							"start": 647,
+							"end": 648,
 							"typeName": {
 								"type": "Identifier",
-								"start": 599,
-								"end": 600,
+								"start": 647,
+								"end": 648,
 								"name": "T"
 							},
 							"leadingComments": [
 								{
 									"type": "Line",
 									"value": " c16",
-									"start": 570,
-									"end": 576
+									"start": 618,
+									"end": 624
 								},
 								{
 									"type": "Block",
 									"value": " c17 ",
-									"start": 579,
-									"end": 588
+									"start": 627,
+									"end": 636
 								},
 								{
 									"type": "Block",
 									"value": " c18 ",
-									"start": 589,
-									"end": 598
+									"start": 637,
+									"end": 646
 								}
 							]
 						}
@@ -507,8 +573,8 @@
 						{
 							"type": "Line",
 							"value": " control: a glued run below the `//` keeps a line of its own",
-							"start": 491,
-							"end": 553
+							"start": 539,
+							"end": 601
 						}
 					]
 				}

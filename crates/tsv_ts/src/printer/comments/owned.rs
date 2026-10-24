@@ -129,12 +129,11 @@ pub(crate) struct ValueGap {
 
 impl<'a> Printer<'a> {
     /// The [`internal::CommentBoundPair`] that leads `value`, or `None` —
-    /// [`leading_comment_bound_pair_walk`]
-    /// behind this document's owned-comment presence flag.
+    /// [`leading_comment_bound_pair_walk`] behind this document's owned-comment presence flag.
     ///
-    /// **The short-circuit belongs here, not at the call sites.** A cast's comment is always
-    /// owned ([`internal::CommentBoundPair`] is minted only for `/** … */ (expr)`), so a document
-    /// carrying no owned comment carries no cast and the left-spine walk cannot find one —
+    /// **The short-circuit belongs here, not at the call sites.** A pair's comment is always
+    /// owned (the parser sets the flag as it mints the [`internal::CommentBoundPair`]), so a
+    /// document carrying no owned comment carries no pair and the left-spine walk cannot find one —
     /// which is ~every document. That is a fact about the DOCUMENT, so every caller owes it,
     /// and stating it once here is what makes it unforgettable: the cannot-hang marks below
     /// run the walk once per Svelte braced head, so a caller reaching past this method pays
@@ -656,7 +655,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn prepend_owned_leading_comment(&self, expr: &Expression<'_>, doc: DocId) -> DocId {
         // Document-level short-circuit: no comment in this document is owned, so nothing
         // here can prepend one. Skips even the byte gate below for the ~all documents with
-        // no owned comment. (Every `CommentBoundPair` comment is owned, so a cast implies the
+        // no owned comment. (Every `CommentBoundPair` comment is owned, so a pair implies the
         // flag.)
         if !self.has_owned_comments {
             return doc;
@@ -825,7 +824,7 @@ impl<'a> Printer<'a> {
     /// does, so the position is the same.
     pub(crate) fn owned_leading_comment_start(&self, expr: &Expression<'_>) -> Option<u32> {
         // Document-level short-circuit: no owned comment anywhere ⇒ no owned start
-        // (and no `CommentBoundPair` exists, since a cast's comment is always owned).
+        // (and no `CommentBoundPair` exists, since a pair's comment is always owned).
         if !self.has_owned_comments {
             return None;
         }
@@ -948,7 +947,14 @@ impl<'a> Printer<'a> {
                 _ => break false,
             }
         };
-        newline_before
-            && !tsv_lang::printing::is_same_line(self.source, comment.span.end, span.start)
+        let own_line = newline_before
+            && !tsv_lang::printing::is_same_line(self.source, comment.span.end, span.start);
+        // A glued-comment pair's block is glued to its `(` by construction, so only a cast's
+        // comment can sit on a line above the pair.
+        debug_assert!(
+            !own_line || cast.kind == internal::CommentBoundPairKind::Cast,
+            "only a JSDoc cast's comment may sit on its own line above the pair"
+        );
+        own_line
     }
 }

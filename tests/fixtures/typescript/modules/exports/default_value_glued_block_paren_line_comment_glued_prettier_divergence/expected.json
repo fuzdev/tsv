@@ -1,0 +1,153 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 249,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a line comment glued to the `(` of a pair a glued block keeps stays on the `(` line: the",
+			"start": 20,
+			"end": 111
+		},
+		{
+			"type": "Line",
+			"value": " opening-delimiter rule",
+			"start": 113,
+			"end": 138
+		},
+		{
+			"type": "Block",
+			"value": " @__PURE__ ",
+			"start": 155,
+			"end": 170
+		},
+		{
+			"type": "Line",
+			"value": " side-effect free",
+			"start": 173,
+			"end": 192
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 214,
+			"end": 222
+		},
+		{
+			"type": "Line",
+			"value": " d2",
+			"start": 225,
+			"end": 230
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 248,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 239,
+			"body": [
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 140,
+					"end": 203,
+					"exportKind": "value",
+					"declaration": {
+						"type": "CallExpression",
+						"start": 195,
+						"end": 199,
+						"callee": {
+							"type": "Identifier",
+							"start": 195,
+							"end": 197,
+							"name": "fn"
+						},
+						"arguments": [],
+						"optional": false,
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " @__PURE__ ",
+								"start": 155,
+								"end": 170
+							},
+							{
+								"type": "Line",
+								"value": " side-effect free",
+								"start": 173,
+								"end": 192
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a line comment glued to the `(` of a pair a glued block keeps stays on the `(` line: the",
+							"start": 20,
+							"end": 111
+						},
+						{
+							"type": "Line",
+							"value": " opening-delimiter rule",
+							"start": 113,
+							"end": 138
+						}
+					]
+				},
+				{
+					"type": "TSExportAssignment",
+					"start": 205,
+					"end": 238,
+					"expression": {
+						"type": "Identifier",
+						"start": 233,
+						"end": 234,
+						"name": "y",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 214,
+								"end": 222
+							},
+							{
+								"type": "Line",
+								"value": " d2",
+								"start": 225,
+								"end": 230
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

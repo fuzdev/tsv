@@ -9,6 +9,7 @@
 		A();
 
 		await /* c5 */ // c6
+
 		// c7
 		b;
 	}
@@ -24,6 +25,9 @@
 	type R = readonly /* c12 */ // c13
 	string[];
 	type F = () => /* c14 */ // c15
+	T;
+	type N = keyof /* c19 */ // c20
+	// c21
 	T;
 
 	// control: a glued run below the `//` keeps a line of its own

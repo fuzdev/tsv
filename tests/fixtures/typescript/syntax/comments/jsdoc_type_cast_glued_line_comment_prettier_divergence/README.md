@@ -21,6 +21,9 @@ points. The sibling sites are
 [keyword_open_paren_line_comment](../keyword_open_paren_line_comment_prettier_divergence/)
 (`return (` / `throw (`) and the unary comment-holder
 ([paren_glued_line_comment](../../../expressions/unary/paren_glued_line_comment_prettier_divergence/)).
+A grouping pair kept by a glued block comment
+([glued_block_paren_line_comment](../glued_block_paren_line_comment_prettier_divergence/))
+is the same node and answers identically.
 
 The `<script>` carries no `lang`, so prettier reads it as JavaScript (babel), which keeps
 the cast's parens — its TypeScript parser drops them, and is no oracle for a cast.

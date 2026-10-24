@@ -1,0 +1,606 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 646,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 139,
+				"data": " a block comment glued to a grouping `(` binds to the parenthesized value, so the pair is\n\tkept when its interior opens with a `//` "
+			},
+			{
+				"type": "Text",
+				"start": 139,
+				"end": 140,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 140,
+				"end": 177,
+				"name": "p",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 143,
+							"end": 145,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 145,
+							"end": 172,
+							"expression": {
+								"type": "Identifier",
+								"start": 167,
+								"end": 168,
+								"name": "a",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " d1",
+										"start": 159,
+										"end": 164
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 172,
+							"end": 173,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 177,
+				"end": 178,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 178,
+				"end": 221,
+				"name": "p",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 182,
+						"end": 215,
+						"name": "title",
+						"value": {
+							"type": "ExpressionTag",
+							"start": 188,
+							"end": 215,
+							"expression": {
+								"type": "Identifier",
+								"start": 210,
+								"end": 211,
+								"name": "a",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " d2",
+										"start": 202,
+										"end": 207
+									}
+								]
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 221,
+				"end": 222,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 222,
+				"end": 263,
+				"test": {
+					"type": "Identifier",
+					"start": 246,
+					"end": 247,
+					"name": "a",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " d3",
+							"start": 239,
+							"end": 244
+						}
+					]
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 251,
+							"end": 258,
+							"raw": "\n\ttext\n",
+							"data": "\n\ttext\n"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 263,
+				"end": 264,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "HtmlTag",
+				"start": 264,
+				"end": 294,
+				"expression": {
+					"type": "Identifier",
+					"start": 290,
+					"end": 291,
+					"name": "a",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " d4",
+							"start": 283,
+							"end": 288
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 294,
+				"end": 295,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 295,
+				"end": 342,
+				"name": "p",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 298,
+							"end": 300,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 300,
+							"end": 337,
+							"expression": {
+								"type": "LogicalExpression",
+								"start": 301,
+								"end": 336,
+								"left": {
+									"type": "Identifier",
+									"start": 301,
+									"end": 302,
+									"name": "b"
+								},
+								"operator": "??",
+								"right": {
+									"type": "Identifier",
+									"start": 331,
+									"end": 332,
+									"name": "a",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " d6",
+											"start": 322,
+											"end": 327
+										}
+									]
+								}
+							}
+						},
+						{
+							"type": "Text",
+							"start": 337,
+							"end": 338,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 342,
+				"end": 343,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Comment",
+				"start": 343,
+				"end": 451,
+				"data": " the same cells with the `//` glued to the `(`, where it keeps its line: the\n\topening-delimiter rule "
+			},
+			{
+				"type": "Text",
+				"start": 451,
+				"end": 452,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 452,
+				"end": 487,
+				"name": "p",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 455,
+							"end": 457,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 457,
+							"end": 482,
+							"expression": {
+								"type": "Identifier",
+								"start": 477,
+								"end": 478,
+								"name": "a",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " h1",
+										"start": 469,
+										"end": 474
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 482,
+							"end": 483,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 487,
+				"end": 488,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 488,
+				"end": 529,
+				"name": "p",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 492,
+						"end": 523,
+						"name": "title",
+						"value": {
+							"type": "ExpressionTag",
+							"start": 498,
+							"end": 523,
+							"expression": {
+								"type": "Identifier",
+								"start": 518,
+								"end": 519,
+								"name": "a",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " h2",
+										"start": 510,
+										"end": 515
+									}
+								]
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 529,
+				"end": 530,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 530,
+				"end": 570,
+				"test": {
+					"type": "Identifier",
+					"start": 553,
+					"end": 554,
+					"name": "a",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " h3",
+							"start": 546,
+							"end": 551
+						}
+					]
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 558,
+							"end": 565,
+							"raw": "\n\ttext\n",
+							"data": "\n\ttext\n"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 570,
+				"end": 571,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "HtmlTag",
+				"start": 571,
+				"end": 600,
+				"expression": {
+					"type": "Identifier",
+					"start": 596,
+					"end": 597,
+					"name": "a",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " h4",
+							"start": 589,
+							"end": 594
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 600,
+				"end": 601,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 601,
+				"end": 645,
+				"name": "p",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 604,
+							"end": 606,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 606,
+							"end": 640,
+							"expression": {
+								"type": "LogicalExpression",
+								"start": 607,
+								"end": 639,
+								"left": {
+									"type": "Identifier",
+									"start": 607,
+									"end": 608,
+									"name": "b"
+								},
+								"operator": "??",
+								"right": {
+									"type": "Identifier",
+									"start": 634,
+									"end": 635,
+									"name": "a",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " h6",
+											"start": 625,
+											"end": 630
+										}
+									]
+								}
+							}
+						},
+						{
+							"type": "Text",
+							"start": 640,
+							"end": 641,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 146,
+			"end": 154
+		},
+		{
+			"type": "Line",
+			"value": " d1",
+			"start": 159,
+			"end": 164
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 189,
+			"end": 197
+		},
+		{
+			"type": "Line",
+			"value": " d2",
+			"start": 202,
+			"end": 207
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 227,
+			"end": 235
+		},
+		{
+			"type": "Line",
+			"value": " d3",
+			"start": 239,
+			"end": 244
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 271,
+			"end": 279
+		},
+		{
+			"type": "Line",
+			"value": " d4",
+			"start": 283,
+			"end": 288
+		},
+		{
+			"type": "Block",
+			"value": " c6 ",
+			"start": 308,
+			"end": 316
+		},
+		{
+			"type": "Line",
+			"value": " d6",
+			"start": 322,
+			"end": 327
+		},
+		{
+			"type": "Block",
+			"value": " g1 ",
+			"start": 458,
+			"end": 466
+		},
+		{
+			"type": "Line",
+			"value": " h1",
+			"start": 469,
+			"end": 474
+		},
+		{
+			"type": "Block",
+			"value": " g2 ",
+			"start": 499,
+			"end": 507
+		},
+		{
+			"type": "Line",
+			"value": " h2",
+			"start": 510,
+			"end": 515
+		},
+		{
+			"type": "Block",
+			"value": " g3 ",
+			"start": 535,
+			"end": 543
+		},
+		{
+			"type": "Line",
+			"value": " h3",
+			"start": 546,
+			"end": 551
+		},
+		{
+			"type": "Block",
+			"value": " g4 ",
+			"start": 578,
+			"end": 586
+		},
+		{
+			"type": "Line",
+			"value": " h4",
+			"start": 589,
+			"end": 594
+		},
+		{
+			"type": "Block",
+			"value": " g6 ",
+			"start": 614,
+			"end": 622
+		},
+		{
+			"type": "Line",
+			"value": " h6",
+			"start": 625,
+			"end": 630
+		}
+	]
+}

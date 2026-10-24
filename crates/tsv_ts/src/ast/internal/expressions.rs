@@ -85,7 +85,8 @@ pub enum ExpressionKind<'arena> {
     // Meta property: import.meta, new.target (two inline Identifiers)
     MetaProperty(&'arena MetaProperty<'arena>),
     // A grouping pair bound to the comment before its `(` — the JSDoc type cast
-    // `/** @type {T} */ (inner)`. Internal-only, never serialized
+    // `/** @type {T} */ (inner)`, or a glued block whose pair opens with a line comment
+    // (`/* c */ (⏎// d⏎inner)`). Internal-only, never serialized
     CommentBoundPair(CommentBoundPair<'arena>),
     // Preserved grouping parens: `(expr)` — only produced under the parser's
     // `preserve_parens` mode (snippet parameters), serialized to match acorn's
@@ -297,13 +298,15 @@ impl<'arena> Expression<'arena> {
 }
 
 /// A grouping pair the comment before its `(` binds: the JSDoc type cast
-/// `/** @type {T} */ (inner)`.
+/// `/** @type {T} */ (inner)`, or a block glued to a pair whose interior opens with a
+/// line comment (`/* c */ (⏎// d⏎inner)`) — see [`CommentBoundPairKind`].
 ///
 /// Internal-only wrapper recording that the author wrote a parenthesized
-/// expression immediately preceded by a `@type`/`@satisfies` block comment — a
-/// TypeScript type **cast** whose parentheses are semantically required (without
-/// them the assertion is dropped). Ordinary grouping parens are discarded at
-/// parse time; cast parens are preserved here so the printer can re-emit them.
+/// expression immediately preceded by a block comment that the pair keeps bound to the
+/// expression. Ordinary grouping parens are discarded at parse time; these are preserved
+/// here so the printer can re-emit them. The kind decides only whether the parser mints
+/// the node: every printer reader lays both kinds out alike, which is the point — a
+/// glued block's pair prints exactly as a cast's.
 ///
 /// The holding `Expression`'s span covers the parentheses (`(`…`)`); `inner` keeps its
 /// own paren-free span. **Never serialized** — the convert layer unwraps to `inner`, so the
@@ -314,12 +317,30 @@ impl<'arena> Expression<'arena> {
 #[derive(Debug, Clone)]
 pub struct CommentBoundPair<'arena> {
     pub inner: &'arena Expression<'arena>,
-    /// The `@type`/`@satisfies` comment glued to `span.start`. The cast owns it
-    /// (`Comment::owned_by_node`), so the generic comment machinery skips it and this
-    /// node is the only thing that prints it — which is what keeps a paren synthesized
-    /// around an enclosing expression from landing between the comment and the `(` and
-    /// silently re-binding the cast.
+    /// The comment glued to `span.start` — the `@type`/`@satisfies` comment of a cast, or
+    /// the glued block. The node owns it (`Comment::owned_by_node`), so the generic
+    /// comment machinery skips it and this node is the only thing that prints it — which
+    /// is what keeps a paren synthesized around an enclosing expression from landing
+    /// between the comment and the `(` and silently re-binding it.
     pub comment: Comment,
+    /// Why the pair is kept.
+    pub kind: CommentBoundPairKind,
+}
+
+/// Why a [`CommentBoundPair`] keeps its grouping pair.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommentBoundPairKind {
+    /// A JSDoc type cast (`/** @type {T} */ (inner)` / `@satisfies`): a TypeScript type
+    /// assertion whose parentheses are semantically required — without them the
+    /// assertion is dropped. Its comment may sit on a line of its own above the `(`.
+    Cast,
+    /// A block comment glued to the `(` (same line, spaces/tabs only) of a pair whose
+    /// interior opens with a line comment (`/* c */ (⏎// d⏎inner)`, also behind further
+    /// `(`s: `/* c */ ((⏎// d⏎x).m)`). A glued block binds the expression it leads, but
+    /// with the pair stripped the `//` prints between the two and the block leads
+    /// nothing — a `/* @__PURE__ */` there no longer marks the call. Kept, the block
+    /// stays glued to the `(` it was written against. Always same-line by construction.
+    GluedComment,
 }
 
 /// Preserved grouping parentheses: `(expr)`.

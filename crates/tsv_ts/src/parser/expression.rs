@@ -2,13 +2,13 @@
 
 use crate::ast::internal::{
     AssignmentExpression, AssignmentOperator, AwaitExpression, BinaryExpression, BinaryOperator,
-    BlockStatement, CallExpression, CommentBoundPair, ConditionalExpression, Expression,
-    ExpressionKind, IdentName, Identifier, ImportExpression, ImportPhase, Literal, LiteralValue,
-    MemberExpression, MetaProperty, NewExpression, ParenthesizedExpression, RegexLiteral,
-    SequenceExpression, SpreadElement, Statement, Super, TSAsExpression, TSInstantiationExpression,
-    TSNonNullExpression, TSSatisfiesExpression, TSTypeAssertion, TSTypeParameterInstantiation,
-    TaggedTemplateExpression, TemplateLiteral, ThisExpression, UnaryExpression, UnaryOperator,
-    UpdateExpression, UpdateOperator, YieldExpression,
+    BlockStatement, CallExpression, CommentBoundPair, CommentBoundPairKind, ConditionalExpression,
+    Expression, ExpressionKind, IdentName, Identifier, ImportExpression, ImportPhase, Literal,
+    LiteralValue, MemberExpression, MetaProperty, NewExpression, ParenthesizedExpression,
+    RegexLiteral, SequenceExpression, SpreadElement, Statement, Super, TSAsExpression,
+    TSInstantiationExpression, TSNonNullExpression, TSSatisfiesExpression, TSTypeAssertion,
+    TSTypeParameterInstantiation, TaggedTemplateExpression, TemplateLiteral, ThisExpression,
+    UnaryExpression, UnaryOperator, UpdateExpression, UpdateOperator, YieldExpression,
 };
 use crate::lexer::{KeywordKind, TokenKind};
 use crate::parser::expression_assignable::AssignableContext;
@@ -22,7 +22,8 @@ use super::expression_lookahead::{
 };
 use super::expression_type_args::TypeArgScan;
 use super::scan::{
-    LeadingZeroLiteral, classify_leading_zero, parse_number_literal, skip_whitespace_and_comments,
+    LeadingZeroLiteral, classify_leading_zero, parse_number_literal, skip_whitespace,
+    skip_whitespace_and_comments,
 };
 use super::{Checkpoint, GroupingParen, Parser};
 
@@ -181,6 +182,9 @@ enum SubscriptMode {
 // `CommentBoundPair` node). It retains a residual ownership role only because a cast's comment may
 // sit a newline *above* its `(` (`CommentGlue::AnyLine`), which the general `SameLine`-glued
 // rule doesn't reach; a same-line cast comment's ownership is already subsumed by that rule.
+// A glued block keeps its pair as well when the pair's interior opens with a line comment
+// (`CommentBoundPairKind::GluedComment`, `glued_comment_pair_index`) — position again, not
+// content.
 //
 // An owned comment must be printed by some node — an owned comment nothing prints is a
 // *dropped* comment. See `printer/comments/owned.rs`.
@@ -2075,6 +2079,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // CallExpression starting at '(', not at 'a'
         let (paren_start, _) = self.current_pos();
         let cast_comment_idx = self.jsdoc_cast_comment_index(paren_start);
+        // The cheap half of the glued-comment pair's test, read while the comment is the
+        // last one drained: a block glued to this `(`. The interior half waits for the
+        // pair's comments ([`Self::glued_comment_pair_index`]).
+        let glued_idx = if cast_comment_idx.is_none() && !self.preserve_parens {
+            self.glued_block_comment_index(paren_start)
+        } else {
+            None
+        };
         self.expect(&TokenKind::ParenOpen)?; // consume '('
 
         self.enter_grouping();
@@ -2123,6 +2135,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         //   `CommentBoundPair` belongs to the paren-free tree, the one that prints. The comment's
         //   ownership is still claimed here, so the two parses agree on it (the binding
         //   audit buckets a cast's re-binding HARD by it).
+        // - **Glued-comment pair** (`/* c */ (⏎// d⏎expr)`) — a block glued to the `(` of a
+        //   pair whose interior opens with a line comment keeps the pair in the same node,
+        //   owning the block, so it prints exactly as a cast does
+        //   ([`Self::glued_comment_pair_index`]). Not under `preserve_parens`: that tree
+        //   keeps every pair already.
         // Every other comment stays located positionally at print time.
         let paren_span = Span::new(paren_start as u32, paren_end as u32);
         let expr = if self.preserve_parens {
@@ -2136,7 +2153,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     expression: parsed,
                 }),
             })
-        } else if let Some(idx) = cast_comment_idx {
+        } else if let Some((idx, kind)) = cast_comment_idx
+            .map(|idx| (idx, CommentBoundPairKind::Cast))
+            .or_else(|| {
+                let idx = self.glued_comment_pair_index(glued_idx?, paren_start)?;
+                Some((idx, CommentBoundPairKind::GluedComment))
+            })
+        {
             self.comments[idx].owned_by_node = true;
             let comment = self.comments[idx];
             self.alloc(Expression {
@@ -2144,6 +2167,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 kind: ExpressionKind::CommentBoundPair(CommentBoundPair {
                     inner: parsed,
                     comment,
+                    kind,
                 }),
             })
         } else {
@@ -2204,6 +2228,44 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let start = self.comments[run_start].content_span.start as usize - self.base_offset;
         let end = c.content_span.end as usize - self.base_offset;
         is_jsdoc_type_cast_comment(&self.source[start..end]).then_some(idx)
+    }
+
+    /// `glued_idx` — the block glued to the `(` at `paren_start`
+    /// ([`Self::glued_block_comment_index`]) — when the pair's interior opens with a line
+    /// comment, which makes the pair a [`CommentBoundPairKind::GluedComment`]; `None`
+    /// otherwise. Called once the pair is parsed, so its comments are all drained.
+    ///
+    /// "Opens with" means between the `(` and the first token of the content that is not
+    /// itself a `(`: a stripped inner pair (`/* c */ ((⏎// d⏎x).m)`) and blocks ahead of the
+    /// line comment (`/* c */ (/* e */ // d⏎x)`) are part of the opening. A line comment
+    /// after that token (`/* c */ (a + // d⏎b)`, `/* c */ (x // d⏎)`) never separates the
+    /// block from the value, so it does not count; nor does an interior holding only
+    /// blocks, which strips with the block still glued through to the value.
+    ///
+    /// The walk is bounded by that opening run: it steps the source and the comments drained
+    /// after `glued_idx` in lockstep, skipping whitespace, `(` and comments, and stops at
+    /// the first other byte — so a pair costs nothing past its leading trivia. The
+    /// whitespace class is the lexer's ([`skip_whitespace`]): a narrower one would read a
+    /// non-ASCII space as content and strip a pair whose printed form, its space now
+    /// ASCII, the next pass keeps.
+    fn glued_comment_pair_index(&self, glued_idx: usize, paren_start: usize) -> Option<usize> {
+        let src = self.source.as_bytes();
+        let mut pos = paren_start - self.base_offset + 1;
+        let mut next = glued_idx + 1;
+        loop {
+            pos = skip_whitespace(src, pos);
+            match self.comments.get(next) {
+                Some(c) if c.span.start as usize == pos + self.base_offset => {
+                    if !c.is_block {
+                        return Some(glued_idx);
+                    }
+                    pos = c.span.end as usize - self.base_offset;
+                    next += 1;
+                }
+                _ if src.get(pos) == Some(&b'(') => pos += 1,
+                _ => return None,
+            }
+        }
     }
 
     /// A collected comment's content (delimiters excluded) as a slice of `self.source`.

@@ -8,15 +8,10 @@
 		new /* c3 */ // c4
 			A();
 
-		await /* c5 */ (
+		await /* c5 */ // c6
 
-			// c6
-			(
-
-				// c7
-				b
-			)
-		);
+			// c7
+			b;
 	}
 
 	switch (x) {
@@ -31,6 +26,15 @@
 		string[];
 	type F = () => /* c14 */ // c15
 		T;
+	type N = keyof /* c19 */ (
+
+		// c20
+		(
+
+			// c21
+			T
+		)
+	);
 
 	// control: a glued run below the `//` keeps a line of its own
 	type G = keyof // c16

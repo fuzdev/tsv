@@ -1,0 +1,153 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 318,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a block comment glued to a grouping `(` binds to the parenthesized value, so the pair is kept",
+			"start": 20,
+			"end": 116
+		},
+		{
+			"type": "Line",
+			"value": " when its interior opens with a `//`: stripped, the `//` would land between the two",
+			"start": 118,
+			"end": 203
+		},
+		{
+			"type": "Block",
+			"value": " @__PURE__ ",
+			"start": 220,
+			"end": 235
+		},
+		{
+			"type": "Line",
+			"value": " side-effect free",
+			"start": 240,
+			"end": 259
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 281,
+			"end": 289
+		},
+		{
+			"type": "Line",
+			"value": " d2",
+			"start": 294,
+			"end": 299
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 317,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 308,
+			"body": [
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 205,
+					"end": 270,
+					"exportKind": "value",
+					"declaration": {
+						"type": "CallExpression",
+						"start": 262,
+						"end": 266,
+						"callee": {
+							"type": "Identifier",
+							"start": 262,
+							"end": 264,
+							"name": "fn"
+						},
+						"arguments": [],
+						"optional": false,
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " @__PURE__ ",
+								"start": 220,
+								"end": 235
+							},
+							{
+								"type": "Line",
+								"value": " side-effect free",
+								"start": 240,
+								"end": 259
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block comment glued to a grouping `(` binds to the parenthesized value, so the pair is kept",
+							"start": 20,
+							"end": 116
+						},
+						{
+							"type": "Line",
+							"value": " when its interior opens with a `//`: stripped, the `//` would land between the two",
+							"start": 118,
+							"end": 203
+						}
+					]
+				},
+				{
+					"type": "TSExportAssignment",
+					"start": 272,
+					"end": 307,
+					"expression": {
+						"type": "Identifier",
+						"start": 302,
+						"end": 303,
+						"name": "y",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 281,
+								"end": 289
+							},
+							{
+								"type": "Line",
+								"value": " d2",
+								"start": 294,
+								"end": 299
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

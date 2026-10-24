@@ -26,6 +26,10 @@
 		string[];
 	type F = () => /* c14 */ // c15
 		T;
+	type N = keyof /* c19 */ // c20
+
+		// c21
+		T;
 
 	// control: a glued run below the `//` keeps a line of its own
 	type G = keyof // c16

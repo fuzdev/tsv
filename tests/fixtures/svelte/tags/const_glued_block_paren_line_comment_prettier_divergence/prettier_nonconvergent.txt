@@ -1,0 +1,7 @@
+Prettier never reaches a fixed point on this input: it strips the pair and relocates the block
+comment ahead of the declarator's `=` (`{@const v /* c1 */ =`), which is not a `{@const}` tag
+Svelte can parse, so prettier cannot re-read its own pass-1 output ("Expected token ="). No
+prettier-anchored claim file (output_prettier.*, audit_signature.txt, variants) is expressible.
+The validator live-verifies this claim (rule F5). tsv keeps the pair, so the block stays glued
+to the `(` it was written against. See README.md and
+docs/conformance_prettier_ts_comments.md §Comment relocation.

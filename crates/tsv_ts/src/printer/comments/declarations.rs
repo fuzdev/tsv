@@ -2019,8 +2019,9 @@ impl<'a> Printer<'a> {
                     // below it, by the block spanning lines, or by the value — and an author
                     // blank after it survives, as after the `//` below. Unless the next
                     // comment joins the head line too (a `//` a stripped grouping paren lets
-                    // up, `export default /* c */ (⏎⏎// d⏎c)`): then no line is left between
-                    // the two for the blank, and it erases, as prettier erases it — the
+                    // up at a type position, `keyof /* c */ (⏎⏎// d⏎T)` — an expression keeps
+                    // that pair, `CommentBoundPairKind::GluedComment`): then no line is left
+                    // between the two for the blank, and it erases, as prettier erases it — the
                     // break, and any blank after it, belong to the last comment on the line.
                     let next = self.blank_scan_end_after(
                         comment,

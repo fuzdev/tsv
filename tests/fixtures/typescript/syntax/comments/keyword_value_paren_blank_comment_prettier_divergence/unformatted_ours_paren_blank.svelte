@@ -2,17 +2,11 @@
 	// the `//` behind the stripped `(` joins the block comment on the keyword's line, so an
 	// author blank between the two has no line left to sit on and is erased
 	async function fn() {
-		await /* c1 */ (
+		await /* c1 */ // c2
+			a;
 
-			// c2
-			a
-		);
-
-		new /* c3 */ (
-
-			// c4
-			A
-		)();
+		new /* c3 */ // c4
+			A();
 
 		await /* c5 */ // c6
 
@@ -21,11 +15,8 @@
 	}
 
 	switch (x) {
-		case /* c8 */ (
-
-			// c9
-			y
-		):
+		case /* c8 */ // c9
+			y:
 			break;
 	}
 
@@ -44,6 +35,10 @@
 		// c15
 		T
 	);
+	type N = keyof /* c19 */ // c20
+
+		// c21
+		T;
 
 	// control: a glued run below the `//` keeps a line of its own
 	type G = keyof // c16
