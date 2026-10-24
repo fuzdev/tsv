@@ -622,6 +622,7 @@ Failure → diagnostic — fix:
 - Parser (AST mismatch) → `diff <(jq . expected.json) <(cargo run -p tsv_cli parse input.svelte --pretty | jq .)` — May be stale: `deno task fixtures:update:parsed <pattern>`. Otherwise fix parser.
 - Formatter (not idempotent) → `cargo run -p tsv_debug compare input.svelte` — May be stale: `deno task fixtures:update:formatted`. Otherwise fix formatter — never adjust fixtures.
 - Validation (structure) → Read the error message — Delete identical files, ensure `expected.json` exists, check naming conventions.
+- Panic (`[Panic] validation panicked: panicked at <file>:<line>:<col>: …`) → the report names the panic's location — Fix the panic. It is caught per fixture: that fixture fails, named, and every other fixture is still graded (both `fixtures:validate` and `fixtures_tests` build under unwinding profiles, so the catch is reachable).
 
 Fixtures exist to catch bugs — they're doing their job when they fail. Never adjust fixtures to work around formatter bugs; fix the code instead.
 

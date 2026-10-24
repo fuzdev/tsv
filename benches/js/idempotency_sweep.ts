@@ -10,7 +10,10 @@
  * pristine pass, which asserts the three invariants on each seed **as authored**,
  * with no mutation. The load-bearing one here is **F1** — `format(format(x)) ==
  * format(x)`, tsv's core "input always formats to itself" invariant — alongside
- * no-panic and structural reparse.
+ * no-panic and structural reparse. The pass also runs the fuzzer's two extra legs on
+ * each seed: the `locations` wire of every input tsv parses (no panic), and the type
+ * strip of every TypeScript-family input (no panic, the position contract, the no-copy
+ * promise, idempotence).
  *
  * Why this isn't in `deno task check`: the corpus is sibling checkouts (the snapshot
  * is not cloned in CI; the working trees are machine-dependent) and the sweep is

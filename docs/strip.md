@@ -124,7 +124,12 @@ tsc also accepts a class declaration as the lone body of an `if`, a loop or a sc
 ts-blank-space is the expected-output oracle for every fixture and Node the second,
 cross-checked (`deno task strip:fixtures:oracle`); the accepted disagreements with each —
 line terminators tested beyond LF, U+2028 / U+2029 kept, Node's own substitution spellings —
-are listed in [tests/fixtures_strip/README.md](../tests/fixtures_strip/README.md). The real-code
+are listed in [tests/fixtures_strip/README.md](../tests/fixtures_strip/README.md). On a `T!`
+inside a would-be type-argument list (`f(a < b, c! > (d))`), tsv reads comparisons, as
+acorn-typescript and Node do, while tsc and ts-blank-space read a generic call (tsc's checker
+then rejects it, TS17019), and the stripped output follows tsv's reading
+([conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md#typescript-corrections),
+"the non-null type"). The real-code
 differential is `deno task strip:corpus` ([audits.md §Strip corpus](./audits.md#strip-corpus-differential-stripcorpus)),
 and the two engines are held to each other by `deno task engines:audit`.
 

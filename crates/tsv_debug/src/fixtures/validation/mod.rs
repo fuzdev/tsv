@@ -167,6 +167,50 @@ impl FixtureValidation {
     }
 }
 
+/// [`validate_fixture`] with its panics caught: a panic anywhere in the fixture's
+/// validation (our parser or formatter on any of its files, a phase's own code) becomes
+/// that fixture's [`ValidationError::ValidationPanicked`] failure, named by its path,
+/// and the caller keeps grading every other fixture. Without it the panic surfaces as
+/// a `tokio` join error with no fixture attached, and the driver aborts the whole run.
+///
+/// Both drivers call this: the `fixtures_validate` command and the `fixtures_tests`
+/// integration test, each holding a [`PanicLocations`] for the run, so the failure
+/// carries the panic's `file:line:col` as well as its message. Each builds under an
+/// unwinding profile (`dev` and `test`), so the catch is reachable; under a
+/// `panic = "abort"` profile it would be inert and a panic would end the process as
+/// before.
+pub async fn validate_fixture_isolated(
+    fixture: &Fixture,
+    prettier_only: bool,
+) -> FixtureValidation {
+    match crate::audit::panic_hook::catch_panic(validate_fixture(fixture, prettier_only)).await {
+        Ok(result) => result,
+        Err(report) => {
+            let mut result = FixtureValidation::new(fixture.relative_path.clone());
+            result.add_error(ValidationError::ValidationPanicked(report));
+            result
+        }
+    }
+}
+
+/// RAII: while alive, a panic inside a fixture's validation is recorded with its location
+/// instead of printed, so [`validate_fixture_isolated`] reports where it happened. Every
+/// other panic — a sidecar actor's, a runtime worker's, the driver's own — still reaches the
+/// displaced hook, since no catch would report it. Hold one for the validation run alone.
+#[must_use = "the capture lasts only while the guard is held"]
+pub struct PanicLocations {
+    _hook: crate::audit::panic_hook::CapturingPanicHook,
+}
+
+impl PanicLocations {
+    /// Install the capturing hook; the displaced one comes back on drop.
+    pub fn install() -> Self {
+        Self {
+            _hook: crate::audit::panic_hook::CapturingPanicHook::install_for_catches(),
+        }
+    }
+}
+
 /// Validate a single fixture, collecting all errors
 ///
 /// When `prettier_only` is true, skips our parser/formatter validation.

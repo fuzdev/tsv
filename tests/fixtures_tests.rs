@@ -48,20 +48,27 @@ async fn test_all_fixtures() {
 
     // Validate fixtures in parallel — tokio::spawn per fixture so the
     // CPU-bound Rust work runs on all runtime workers (buffer_unordered alone
-    // only interleaves at await points on the stream-driving task)
+    // only interleaves at await points on the stream-driving task). A panicking
+    // fixture is caught inside its task and graded as that fixture's failure
+    // (`validate_fixture_isolated`), with its location while `locations` is held, so
+    // the rest are still graded.
+    let locations = validation::PanicLocations::install();
     let results: Vec<_> = stream::iter(fixture_list)
         .map(|fixture| {
-            tokio::spawn(async move { validation::validate_fixture(&fixture, false).await })
+            tokio::spawn(
+                async move { validation::validate_fixture_isolated(&fixture, false).await },
+            )
         })
         .buffer_unordered(concurrency)
         .collect()
         .await;
+    drop(locations);
 
     // Aggregate results (failure diffs are buffered per fixture — print them
     // here so `cargo test` output keeps the diagnostic detail)
     let mut summary = validation::ValidationSummary::new();
     for joined in results {
-        let result = joined.expect("fixture validation task panicked");
+        let result = joined.expect("fixture validation task did not complete");
         if !result.diff_output.is_empty() {
             eprint!("{}", result.diff_output);
         }

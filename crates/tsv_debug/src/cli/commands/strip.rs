@@ -155,7 +155,7 @@ fn answer(source: &str, arena: &mut bumpalo::Bump) -> serde_json::Value {
                 if code == source && matches!(stripped.code, Cow::Owned(_)) {
                     findings.push("nothing is type-only, yet the output is a copy".to_string());
                 }
-                findings.extend(idempotence_failure(code));
+                findings.extend(idempotence_failure(source, code).map(|f| f.to_string()));
                 (code.to_string(), findings)
             })
         }))

@@ -44,8 +44,8 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Binding](#commenttoken-binding-audit-bindingaudit) | `binding:audit` | a glued comment re-bound to a different subtree by a migrating paren | `deno task check`; `audit:corpus` (real code) |
 | [Render equivalence](#render-equivalence-audit-renderaudit) | `render:audit` | `tsv format` changing what a Svelte component renders | `deno task conformance` (release) |
 | [Layout neutrality](#layout-neutrality-audit-neutrality_audit) | — | a layout gate reading comment *ownership* instead of page occupancy | dev tool (pre-ownership-change) |
-| [Fuzz](#seeded-mutational-fuzzer-fuzzaudit) | `fuzz:audit` | panic / non-idempotency / node loss / structural divergence on arbitrary input | `deno task check` |
-| [F1 sweep](#f1-idempotency-sweep-idempotencysweep) | `idempotency:sweep` | pass-2 reflow on real code | conformance cadence |
+| [Fuzz](#seeded-mutational-fuzzer-fuzzaudit) | `fuzz:audit` · `fuzz:audit:debug` | panic / non-idempotency / node loss / structural divergence on arbitrary input; a panic in the `locations` wire; a type-strip panic or contract break; with `:debug`, a fired `debug_assert!` or overflow check | `deno task check`; `idempotency:sweep` / `audit:corpus` (real code) |
+| [F1 sweep](#f1-idempotency-sweep-idempotencysweep) | `idempotency:sweep` | pass-2 reflow on real code; a panic in the `locations` wire, a type-strip panic or contract break | conformance cadence |
 | [Corpus bundle](#the-corpus-bundle-auditcorpus) | `audit:corpus` | the content-loss / robustness bundle over real code | publish Step 3c |
 | [Lexer diff](#differential-lexer-harness-lex_diff) | — | token-stream drift after a lexer change | dev tool |
 | [Variant direction](#variant-whitespace-direction-audit-variantsaudit) | `variants:audit` | a `_compact` variant that ADDS whitespace, or a `_spaces` variant that REMOVES it — the pair's two directions collapsing into one | `deno task check` |
@@ -1911,6 +1911,8 @@ then, over external corpora).
 cargo run -p tsv_debug fuzz                                    # 2000 iters over tests/fixtures
 cargo run -p tsv_debug fuzz --seed 7 --iterations 20000 --evolve --minimize --dump-dir /tmp/fz  # discovery
 cargo run -p tsv_debug fuzz --iterations 0 ../corpora/collections/zzz/src       # pristine pass only = an F1 sweep
+cargo run -p tsv_debug fuzz --embedded css                     # seeds = every <style> body + the .css files
+cargo run -p tsv_debug fuzz --embedded ts tests/fixtures tests/fixtures_strip  # every <script> body + the TS files
 # Also: --max-mutations N, --limit N, --max-findings N (HARD only), --slow-budget-ms N, --strict, --no-render, --json
 ```
 
@@ -1928,17 +1930,60 @@ It asserts three properties nothing else guards on ARBITRARY input:
 3. **structural reparse** — reusing roundtrip_audit's compare: the node-population census,
    HARD, ahead of the soft skeleton compare.
 
-**Findings.** HARD (exit 1): panic / unreparseable / node_loss / leaf_value_corruption /
-non_idempotent / format_error — always real bugs. SOFT (reported, non-fatal):
+Two more legs ride every attempt, over entry points the format leg never reaches:
+
+- **the `locations` wire** — every input the parser accepts is also written through the
+  language's `convert_ast_json_bytes_with_locations` (the `--locations` / `{locations: true}`
+  wire; the span-only wire the audits read never builds its line table). Property: no panic.
+  Its content is `check:loc`'s question, over the fixtures;
+- **the type strip** — every TypeScript-family input goes through `tsv_ts::strip` at the
+  unset-goal fallback the shipped entry points take. Properties: no panic, and on a strip the
+  checks `strip:corpus` makes of its tsv side — the position contract
+  (`strip_fixtures::contract_violations`: UTF-16 length, every kept character in place,
+  terminators kept), the no-copy promise, and idempotence (`idempotence_failure`). A refusal or
+  a parse error is a verdict, not a finding.
+
+Both ride the pristine pass too, so the `fuzz --iterations 0` of `idempotency:sweep` and
+`audit:corpus` grades them over real code. Each leg's graded count is floored after the
+report: zero inputs written through the `locations` wire, or zero stripped when the run had
+TypeScript seeds, fails the run as vacuous. Every TypeScript-family seed is stripped — a `.js`
+file and an `--embedded ts` body (a `<script>` without `lang="ts"` included) alike, since the
+strip API takes any string and type-free JS is its no-copy fast path.
+
+**Seed sets.** `tests/fixtures` holds almost all of its CSS and much of its TypeScript inside
+`.svelte` files, so as found it seeds the CSS printer and the standalone TypeScript paths (the
+strip among them) from a handful of files. `--embedded css|ts` reseeds the run from every
+Svelte seed's `<style>` body (`css`) or instance and module `<script>` bodies (`ts`) — the text
+between the tags, each its own seed and stream (`<path>#style`, `#script`, `#module`) — plus the
+standalone files of that language; a Svelte seed tsv cannot parse gives no body.
+
+**Findings.** HARD (exit 1): panic / locations_panic / strip_panic / strip_contract /
+unreparseable / node_loss / leaf_value_corruption / non_idempotent / format_error — always real
+bugs. A panic is attributed to the leg that was running — a panic of the idempotence check's
+second strip is a strip_panic too — and a strip_contract finding carries the break in its detail
+line. SOFT (reported, non-fatal):
 structural_divergence — the render-model-noisy bucket that needs canonical confirmation
 (roundtrip_audit --canonical-all), like roundtrip_audit --gate. `--strict` fails on soft too.
 
 **Deterministic and CORPUS-ADD-STABLE** per `--seed` + corpus: each seed file draws mutants
 from its own path-keyed PRNG stream, scheduled round-robin, so a fixture add/remove/rename
 changes only that file's mutants (every other stream is byte-identical; a shrunken per-file
-budget trims a stream's tail, never rewrites it). The `fuzz:audit` deno task (fixed --seed 0
---iterations 5000 over tests/fixtures) is gated in `deno task check` — a cheap standing
-tripwire for the three invariants.
+budget trims a stream's tail, never rewrites it). The `fuzz:audit` deno task — three runs at
+fixed --seed 0 --iterations 5000: tests/fixtures as found, then `--embedded css` (the
+`fuzz:audit:css` task), then `--embedded ts` over tests/fixtures + tests/fixtures_strip
+(`fuzz:audit:ts`) — is gated in `deno task check`, a cheap standing tripwire for every
+property above.
+
+**The debug leg (`fuzz:audit:debug`, also in `check`).** The same three runs with the same
+arguments, built under `--profile corpus-debug`: the `corpus` world plus `debug-assertions` and
+`overflow-checks`. Every `--profile corpus` audit compiles both out, yet a crate that depends on
+tsv and builds in `dev` compiles them in, so a `debug_assert!` that fires on legal input — or an
+arithmetic overflow — is a panic in that consumer and invisible to every other gate. The profile
+inherits `panic = "unwind"`, so a fired assert is an ordinary caught `panic` finding, reported
+with its input and the assert's location by the same capturing panic hook. Same arguments as
+the release legs, so a finding here and not there is an assert or an overflow check. It is a
+profile of its own, a second build world, because overriding `corpus` itself would rebuild the
+one world every `check` audit shares.
 
 **Hangs** can't be caught in-process (the exponential-rebuild class), so two tripwires: every
 attempt's input is written to a last-input repro file BEFORE the attempt (path printed at
@@ -1964,7 +2009,7 @@ report/dump.
 
 ## F1 Idempotency Sweep (`idempotency:sweep`)
 
-The fuzzer's pristine pass, pointed at the `robustness` corpus view (the WHOLE `../corpora` snapshot — every collection it vendors, placed or not, since the sweep grades an invariant rather than a pinned count — plus the `svelte_styles` harvest cache and the live diff: the files of this machine's working trees of the `own` repos that differ from, or are absent in, the snapshot — `lib/corpus.ts` `corpus_robustness_seeds` / `live_diff_files`) — `format(format(x)) == format(x)` on every real file. NOT in `deno task check`: the corpus is machine-dependent checkouts and the sweep is minutes, not seconds. It is a different risk surface from the fixtures — a formatter can be idempotent on every curated fixture and still reflow a real component on pass 2. Run at conformance cadence, or after any printer change.
+The fuzzer's pristine pass, pointed at the `robustness` corpus view (the WHOLE `../corpora` snapshot — every collection it vendors, placed or not, since the sweep grades an invariant rather than a pinned count — plus the `svelte_styles` harvest cache and the live diff: the files of this machine's working trees of the `own` repos that differ from, or are absent in, the snapshot — `lib/corpus.ts` `corpus_robustness_seeds` / `live_diff_files`) — `format(format(x)) == format(x)` on every real file, plus the pass's two other legs: the `locations` wire of every file tsv parses (no panic) and the type strip of every TypeScript-family file (no panic, the position contract, the no-copy promise, idempotence — [the fuzzer's extra legs](#seeded-mutational-fuzzer-fuzzaudit)). NOT in `deno task check`: the corpus is machine-dependent checkouts and the sweep is minutes, not seconds. It is a different risk surface from the fixtures — a formatter can be idempotent on every curated fixture and still reflow a real component on pass 2. Run at conformance cadence, or after any printer change.
 
 ```bash
 deno task idempotency:sweep
@@ -2262,8 +2307,11 @@ deno task strip:fixtures:oracle            # the oracle side (Node; needs bench:
 committed `expected.*` or the refusal in `refusal.txt`; its output has the input's UTF-16
 length, keeps every line terminator at its UTF-16 offset, and holds at every other offset the
 input's character, a space, or a `;` / `(` / `)` hazard substitution — so every surviving
-character keeps its line and UTF-16 column; and stripping the output returns it borrowed. The
-expected output itself is held to the same contract and must parse under `tsv_ts::parse` at
+character keeps its line and UTF-16 column; and stripping the output returns it borrowed,
+save one excused change — the re-strip blanking a type-argument list that only the output's
+TypeScript re-read holds (`f(a < b, c        > (d))` re-read as `a<b, c>(d)`;
+`strip_fixtures::idempotence_failure`, shared with `strip:corpus` and the fuzzer's strip leg).
+The expected output itself is held to the same contract and must parse under `tsv_ts::parse` at
 module goal — a TypeScript parse, so it shows the output parses, not that it is JS.
 The JS-validity guard is the oracle side's: `strip:fixtures:oracle` (and `:update`) parse
 every claimed output (derived or reviewed) with oxc-parser in JS mode and fail on any error. File conventions and

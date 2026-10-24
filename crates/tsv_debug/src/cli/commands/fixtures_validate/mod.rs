@@ -42,12 +42,19 @@ impl FixturesValidateCommand {
         // Validate fixtures concurrently on the bulk sidecar pool, in completion
         // order — each fixture's failure diffs are buffered into its result, so
         // phases never print directly and concurrent fixtures can't interleave
-        // output (each fixture's diffs stay contiguous).
+        // output (each fixture's diffs stay contiguous). A fixture whose validation
+        // panics is that fixture's failure, not the run's end
+        // (`validate_fixture_isolated`), reported with its location while `locations`
+        // is held — dropped once the stream is drained, before the reporting below;
+        // `task_result` keeps only a non-panic join error (a cancelled task) fatal.
+        let locations = validation::PanicLocations::install();
         let prettier_only = self.prettier_only;
         let mut results = super::spawn_work_stream(
             fixture_list,
             super::ResultOrder::Completion,
-            move |fixture| async move { validation::validate_fixture(&fixture, prettier_only).await },
+            move |fixture| async move {
+                validation::validate_fixture_isolated(&fixture, prettier_only).await
+            },
         );
 
         let mut summary = validation::ValidationSummary::new();
@@ -58,6 +65,7 @@ impl FixturesValidateCommand {
             }
             summary.add(result);
         }
+        drop(locations);
 
         // Check for cross-fixture duplicates (only when not filtering)
         if self.filters.is_empty() {

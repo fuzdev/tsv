@@ -1,3 +1,4 @@
+use crate::audit::panic_hook::{CapturingPanicHook, catch_panic};
 use crate::cli::CliError;
 use crate::cli::commands::print_json_tabs;
 use crate::compile_fixtures::{
@@ -139,16 +140,21 @@ impl CompileFixturesValidateCommand {
         // Validate fixtures concurrently on the bulk sidecar pool, in input
         // order — each fixture's failure details are buffered into its report,
         // so concurrent fixtures can't interleave output and the printed order
-        // stays deterministic.
+        // stays deterministic. A fixture whose validation panics is that fixture's
+        // failure, not the run's end (`validate_fixture_isolated`), reported with its
+        // location while `locations` is held — dropped once the stream is drained;
+        // `task_result` keeps only a non-panic join error (a cancelled task) fatal.
         let count = fixtures.len();
+        let locations = CapturingPanicHook::install_for_catches();
         let mut stream =
             super::spawn_work_stream(fixtures, super::ResultOrder::Input, |fixture| async move {
-                validate_fixture(&fixture).await
+                validate_fixture_isolated(&fixture).await
             });
         let mut reports = Vec::with_capacity(count);
         while let Some(joined) = stream.next().await {
             reports.push(super::task_result(joined, "compile-validation")?);
         }
+        drop(locations);
 
         let gating_failures = reports.iter().filter(|r| !r.passed()).count();
         let parity = reports
@@ -195,6 +201,23 @@ impl CompileFixturesValidateCommand {
         } else {
             Ok(())
         }
+    }
+}
+
+/// [`validate_fixture`] with its panics caught ([`catch_panic`], the isolation
+/// `fixtures_validate` uses): a panic in tsv's compiler, the canonicalizer or the check
+/// itself fails that fixture alone — every check unproven, the report naming the panic and,
+/// under the capturing hook, its location — and every other fixture is still graded.
+async fn validate_fixture_isolated(fixture: &CompileFixture) -> FixtureReport {
+    match catch_panic(validate_fixture(fixture)).await {
+        Ok(report) => report,
+        Err(panic) => FixtureReport {
+            fixture: fixture.relative_path.clone(),
+            oracle_fresh: false,
+            expected_idempotent: false,
+            ours_status: OursStatus::Error,
+            errors: vec![format!("validation panicked: {panic}")],
+        },
     }
 }
 

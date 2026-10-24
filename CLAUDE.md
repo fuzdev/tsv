@@ -229,7 +229,12 @@ deno task paren:audit                # authoring-independence over redundant PAR
 #                                      floors relational sites, which only tests/fixtures holds — a narrowed run drops it
 deno task fuzz:audit                 # seeded mutational fuzzer: no-panic + idempotency + structural reparse (node loss HARD,
 #                                      skeleton divergence soft); its dictionary carries `// prettier-ignore`, the only standing
-#                                      instrument composing a freeze with a comment or a paren shell
+#                                      instrument composing a freeze with a comment or a paren shell. Every accepted attempt
+#                                      also writes the `locations` wire (no panic) and type-strips TypeScript (no panic + the
+#                                      strip's contract + idempotence); runs tests/fixtures as found, then `:css` / `:ts`
+#                                      (`--embedded`: every `<style>` / `<script>` body as a seed)
+deno task fuzz:audit:debug           # the same three runs under `--profile corpus-debug` (debug-assertions + overflow-checks,
+#                                      what a consumer's dev build compiles in): a fired `debug_assert!` is a caught panic finding
 deno task swallow:audit              # `//` line comment swallowing following output-line content (also over real code via audit:corpus)
 deno task comments:audit             # print-once comment ledger: DROPPED / DOUBLE-PRINTED comments
 deno task gaps:audit                 # gap-injection RATCHET (~37 s): ledger DROPPED/DOUBLE-PRINTED + SWALLOW + a bare reparse

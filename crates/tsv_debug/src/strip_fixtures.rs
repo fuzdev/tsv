@@ -48,6 +48,10 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use tsv_cli::cli::input::ParserType;
+
+use crate::audit::panic_hook::caught_panic_report;
+use crate::audit::properties::tsv_parse_to_value;
 use crate::audit::ratchet::{Ratchet, SnapshotKey};
 
 /// The strip fixture tree root, relative to the repo root.
@@ -478,8 +482,12 @@ pub fn check_fixture(fixture: &StripFixture) -> Vec<Finding> {
                     "nothing is type-only, yet the output is a copy".to_string(),
                 );
             }
-            if let Some(detail) = idempotence_failure(code) {
-                push(StripCheck::Idempotence, detail);
+            match idempotence_failure(&input, code) {
+                Some(failure) if failure.is_panic() => {
+                    push(StripCheck::Panic, failure.to_string());
+                }
+                Some(failure) => push(StripCheck::Idempotence, failure.to_string()),
+                None => {}
             }
         }
         (Claim::Refusal(claimed), Ok(_)) => push(
@@ -611,23 +619,133 @@ fn divergences_failure(content: &str) -> Option<String> {
     seen.is_empty().then(|| "empty".to_string())
 }
 
-/// Why stripping `code` again is not the identity on a borrowed source, if it is not.
-pub fn idempotence_failure(code: &str) -> Option<String> {
+/// Why stripping a strip's output again is not the identity on a borrowed source.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IdempotenceFailure {
+    /// The second strip panicked: [`caught_panic_report`]'s text, with the location under
+    /// a capturing panic hook.
+    Panicked(String),
+    /// The second strip failed (a parse error or a refusal).
+    Fails(String),
+    /// The second strip copied the output unchanged (type syntax survived?).
+    Copies,
+    /// The second strip changed the output, outside what [`only_reread_type_arguments`]
+    /// excuses; the first difference.
+    Changes(String),
+}
+
+impl IdempotenceFailure {
+    /// Whether the second strip panicked — a panic finding, not a contract one.
+    pub const fn is_panic(&self) -> bool {
+        matches!(self, Self::Panicked(_))
+    }
+}
+
+impl std::fmt::Display for IdempotenceFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Panicked(report) => write!(f, "stripping the output panicked: {report}"),
+            Self::Fails(error) => write!(f, "stripping the output fails: {error}"),
+            Self::Copies => f.write_str("stripping the output copies it (type syntax survived?)"),
+            Self::Changes(difference) => write!(f, "stripping the output changes it: {difference}"),
+        }
+    }
+}
+
+/// Why stripping `code` — the strip of `input` — again is not the identity on a borrowed
+/// source, if it is not.
+///
+/// One re-strip difference is excused: the JS/TS ambiguity of `<`. The output is JS, yet
+/// the second strip reads it as TypeScript, where a comparison pair may read as a
+/// type-argument list — `f(a < b, c as any > (d))` strips to `f(a < b, c        > (d))`,
+/// both comparisons as tsv read the input, and re-read as TypeScript that is the generic
+/// call `a<b, c>(d)`, whose list the second strip blanks. The first output is the right one
+/// (ts-blank-space's and Node's bytes), so a re-strip whose every change is the blanking of
+/// such a list is not a failure ([`only_reread_type_arguments`]); any other change is.
+pub fn idempotence_failure(input: &str, code: &str) -> Option<IdempotenceFailure> {
     let arena = bumpalo::Bump::new();
     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| tsv_ts::strip(code, &arena))) {
-        Err(_) => Some("stripping the output panicked".to_string()),
-        Ok(Err(e)) => Some(format!("stripping the output fails: {e}")),
+        Err(payload) => Some(IdempotenceFailure::Panicked(caught_panic_report(
+            payload.as_ref(),
+        ))),
+        Ok(Err(e)) => Some(IdempotenceFailure::Fails(e.to_string())),
         Ok(Ok(again)) => match again.code {
             Cow::Borrowed(_) => None,
-            Cow::Owned(again) if again == code => {
-                Some("stripping the output copies it (type syntax survived?)".to_string())
-            }
-            Cow::Owned(again) => Some(format!(
-                "stripping the output changes it: {}",
-                first_difference(code, &again)
-            )),
+            Cow::Owned(again) if again == code => Some(IdempotenceFailure::Copies),
+            Cow::Owned(again) if only_reread_type_arguments(input, code, &again) => None,
+            Cow::Owned(again) => Some(IdempotenceFailure::Changes(first_difference(code, &again))),
         },
     }
+}
+
+/// Whether `again` — the strip of `code`, itself the strip of `input` — differs from
+/// `code` only by blanking type-argument lists that `code` holds and `input` did not: each
+/// changed UTF-16 unit is a space, and lies inside the `typeArguments` of a call, a `new`,
+/// a tagged template or an instantiation expression in `code`'s parse whose span is no
+/// such list in `input`'s parse. The strip keeps UTF-16 offsets, so the two parses' spans
+/// share coordinates.
+///
+/// A list `input` already held is never excused: a first strip that left it in place
+/// missed it. Nor is any other change — a leftover annotation, a modifier, a `;` / `(` /
+/// `)` substitution — or a change in length.
+fn only_reread_type_arguments(input: &str, code: &str, again: &str) -> bool {
+    let code_units: Vec<u16> = code.encode_utf16().collect();
+    let again_units: Vec<u16> = again.encode_utf16().collect();
+    if code_units.len() != again_units.len() {
+        return false;
+    }
+    let held = type_argument_lists(input);
+    let reread: Vec<(usize, usize)> = type_argument_lists(code)
+        .into_iter()
+        .filter(|list| !held.contains(list))
+        .collect();
+    code_units
+        .iter()
+        .zip(&again_units)
+        .enumerate()
+        .filter(|(_, (ours, theirs))| ours != theirs)
+        .all(|(i, (_, &theirs))| {
+            theirs == u16::from(b' ') && reread.iter().any(|&(start, end)| start <= i && i < end)
+        })
+}
+
+/// The UTF-16 spans of every expression-level type-argument list in `source`'s parse — the
+/// `typeArguments` of a `CallExpression`, `NewExpression`, `TaggedTemplateExpression` or
+/// `TSInstantiationExpression` on the wire, which carries UTF-16 offsets. Read as the strip
+/// reads it (the unset-goal fallback); empty when `source` does not parse.
+fn type_argument_lists(source: &str) -> BTreeSet<(usize, usize)> {
+    let mut lists = BTreeSet::new();
+    let Some(wire) = tsv_parse_to_value(source, ParserType::TypeScript) else {
+        return lists;
+    };
+    let span = |node: &serde_json::Value| {
+        let start = usize::try_from(node.get("start")?.as_u64()?).ok()?;
+        let end = usize::try_from(node.get("end")?.as_u64()?).ok()?;
+        Some((start, end))
+    };
+    let mut stack = vec![&wire];
+    while let Some(value) = stack.pop() {
+        match value {
+            serde_json::Value::Object(node) => {
+                let instantiates = matches!(
+                    node.get("type").and_then(serde_json::Value::as_str),
+                    Some(
+                        "CallExpression"
+                            | "NewExpression"
+                            | "TaggedTemplateExpression"
+                            | "TSInstantiationExpression"
+                    )
+                );
+                if instantiates && let Some(list) = node.get("typeArguments").and_then(span) {
+                    lists.insert(list);
+                }
+                stack.extend(node.values());
+            }
+            serde_json::Value::Array(items) => stack.extend(items),
+            _ => {}
+        }
+    }
+    lists
 }
 
 /// The first line where `actual` departs from `expected`, both escaped.
@@ -772,6 +890,82 @@ mod tests {
         let found = contract_violations("a\r\nb\rc\u{2028}d: T", "a\r\nb\rc\u{2028}dX  ");
         assert_eq!(found.len(), 1);
         assert!(found[0].1.contains("at 4:1 "), "{}", found[0].1);
+    }
+
+    /// The JS/TS ambiguity: the output's comparison pair re-reads as TypeScript's generic
+    /// call `a<b, c>(d)`, whose list the second strip blanks. Excused — the first output is
+    /// the right one.
+    #[test]
+    fn a_reread_type_argument_list_is_not_an_idempotence_failure() {
+        let input = "f(a < b, c as any > (d));\n";
+        let code = "f(a < b, c        > (d));\n";
+        let arena = bumpalo::Bump::new();
+        let again = tsv_ts::strip(code, &arena).expect("the output strips");
+        assert_eq!(
+            again.code, "f(a                 (d));\n",
+            "the re-read the excuse is for"
+        );
+        assert!(only_reread_type_arguments(input, code, &again.code));
+        assert_eq!(idempotence_failure(input, code), None);
+    }
+
+    /// Every other re-strip change still fails: a first strip that left an annotation in
+    /// place (here beside an excused list, which excuses nothing else), and one that left a
+    /// type-argument list the input already held.
+    #[test]
+    fn a_restrip_change_outside_a_reread_list_still_fails() {
+        let input = "let y: T = f(a < b, c as any > (d));\n";
+        let leftover_annotation = "let y: T = f(a < b, c        > (d));\n";
+        assert!(matches!(
+            idempotence_failure(input, leftover_annotation),
+            Some(IdempotenceFailure::Changes(_))
+        ));
+        let input = "f<T>(x);\n";
+        assert!(matches!(
+            idempotence_failure(input, input),
+            Some(IdempotenceFailure::Changes(_))
+        ));
+    }
+
+    /// Inside a re-read list only a blank is excused, and the length must hold.
+    #[test]
+    fn a_reread_list_excuses_blanks_alone() {
+        let input = "f(a < b, c as any > (d));\n";
+        let code = "f(a < b, c        > (d));\n";
+        assert!(only_reread_type_arguments(
+            input,
+            code,
+            "f(a                 (d));\n"
+        ));
+        assert!(!only_reread_type_arguments(
+            input,
+            code,
+            "f(a   ;             (d));\n"
+        ));
+        assert!(!only_reread_type_arguments(input, code, "f(a (d));\n"));
+    }
+
+    /// The excuse ends at the list's `>`: the unit right after it is not excused, nor is a
+    /// shorter re-strip whose every surviving unit would pass.
+    #[test]
+    fn a_reread_list_excuses_nothing_past_its_end_or_a_length_change() {
+        let input = "f(a < b, c as any >(d));\n";
+        let code = "f(a < b, c        >(d));\n";
+        assert!(only_reread_type_arguments(
+            input,
+            code,
+            "f(a                (d));\n"
+        ));
+        assert!(!only_reread_type_arguments(
+            input,
+            code,
+            "f(a                 d));\n"
+        ));
+        assert!(!only_reread_type_arguments(
+            input,
+            code,
+            "f(a                "
+        ));
     }
 
     #[test]

@@ -366,6 +366,14 @@ pub enum ValidationError {
     /// The message comes from `read_file` and already names the path.
     #[error("{0}")]
     FileReadError(String),
+
+    // Isolation
+    /// The fixture's validation panicked. Caught per fixture, so one panicking fixture is
+    /// that fixture's failure, named, while every other fixture is still graded. Carries
+    /// the panic's report: `panicked at <file>:<line>:<col>:` and its message, or the
+    /// message alone when the driver installed no `PanicLocations`.
+    #[error("validation panicked: {0}")]
+    ValidationPanicked(String),
 }
 
 impl ValidationError {
@@ -626,6 +634,9 @@ impl ValidationError {
             Self::UnknownFile(_) => {
                 "Remove or rename the file. Check for typos (e.g., 'unformated' vs 'unformatted')."
             }
+            Self::ValidationPanicked(_) => {
+                "A parser, formatter or validator panic on this fixture's files — fix the panic at the location the report names"
+            }
             Self::FileReadError(_) => {
                 "Check filesystem permissions/encoding — the directory scan listed this file but it could not be read"
             }
@@ -734,6 +745,8 @@ impl ValidationError {
             | Self::InvalidSyntaxParsedByParseCss(_) => "InvalidSyntax",
 
             Self::UnknownFile(_) | Self::FileReadError(_) => "Structure",
+
+            Self::ValidationPanicked(_) => "Panic",
         }
     }
 }

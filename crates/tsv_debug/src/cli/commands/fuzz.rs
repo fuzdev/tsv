@@ -30,6 +30,31 @@
 //!    check — a still-parses value change (a mis-decoded string, a miscanonicalized
 //!    number) the skeleton erases and so cannot see.
 //!
+//! Two more legs ride every attempt, each over the entry points the format leg never
+//! reaches:
+//!
+//! - **The `locations` wire.** Every input the parser accepts is also written through
+//!   the language's `convert_ast_json_bytes_with_locations` (the `{locations: true}` /
+//!   `--locations` wire, whose line table the span-only audit wire never builds); a
+//!   panic there is a finding.
+//! - **The type strip.** Every TypeScript-family input goes through `tsv_ts::strip` at
+//!   the unset-goal fallback the shipped entry points take: no panic, and on a strip,
+//!   the strip's own contract (`strip_fixtures::contract_violations` — UTF-16 length and
+//!   position identity, terminators kept), its no-copy promise, and its idempotence
+//!   (`strip_fixtures::idempotence_failure`; a panic of its second strip is a
+//!   `strip_panic`, like one of the first). A refusal or a parse error is a verdict, not
+//!   a finding.
+//!
+//! Each leg's graded count is floored: a run whose locations leg graded nothing, or
+//! whose strip leg stripped nothing although it had TypeScript seeds, fails rather than
+//! reporting a clean run it never made.
+//!
+//! **`--embedded css|ts`** reseeds the run from the `<style>` / `<script>` bodies of the
+//! Svelte seeds (plus the standalone files of that language), so the CSS parser and
+//! printer and the standalone TypeScript paths — strip included — get a seed set as
+//! wide as the Svelte one; without it, `tests/fixtures` holds only a handful of
+//! standalone `.css` and `.ts` inputs.
+//!
 //! ## Design
 //!
 //! Pure Rust, **zero new deps** (the tight-dep policy): a seeded SplitMix64 PRNG
@@ -69,6 +94,7 @@ use crate::audit::properties::{F1Outcome, f1_check};
 use crate::audit::tally::CappedPaths;
 use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
+use crate::strip_fixtures::{contract_violations, idempotence_failure};
 
 /// Seeded mutational fuzzer: mutate corpus bytes and assert the parser never
 /// panics, `format` is idempotent, and formatted output reparses structurally
@@ -150,9 +176,78 @@ pub struct FuzzCommand {
     #[argh(switch)]
     json: bool,
 
+    /// seed from the `<style>` (`css`) or `<script>` (`ts`) bodies of the Svelte
+    /// seeds, plus the standalone files of that language, in place of the corpus as
+    /// found — the wide CSS and standalone-TypeScript seed sets
+    #[argh(option)]
+    embedded: Option<EmbeddedSeeds>,
+
     /// seed corpus file paths / directories (default: tests/fixtures)
     #[argh(positional)]
     paths: Vec<String>,
+}
+
+/// The language `--embedded` reseeds the run with.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum EmbeddedSeeds {
+    /// `<style>` bodies + standalone `.css` files.
+    Css,
+    /// `<script>` bodies (instance and module) + standalone TypeScript-family files.
+    Ts,
+}
+
+impl std::str::FromStr for EmbeddedSeeds {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "css" => Ok(Self::Css),
+            "ts" => Ok(Self::Ts),
+            other => Err(format!("unknown --embedded language {other:?} (css or ts)")),
+        }
+    }
+}
+
+impl EmbeddedSeeds {
+    fn parser(self) -> ParserType {
+        match self {
+            Self::Css => ParserType::Css,
+            Self::Ts => ParserType::TypeScript,
+        }
+    }
+}
+
+/// The embedded bodies of one Svelte seed in `lang`, as `(display suffix, text)`: the
+/// `<style>` content, or the instance and module `<script>` contents. A seed tsv cannot
+/// parse yields nothing (its regions are not known), as does an empty body.
+fn embedded_bodies(src: &str, lang: EmbeddedSeeds) -> Vec<(&'static str, String)> {
+    let arena = bumpalo::Bump::new();
+    let Ok(root) = tsv_svelte::parse(src, &arena) else {
+        return Vec::new();
+    };
+    let mut bodies = Vec::new();
+    let mut push = |suffix: &'static str, span: tsv_lang::Span| {
+        let text = &src[span.range()];
+        if !text.trim().is_empty() {
+            bodies.push((suffix, text.to_string()));
+        }
+    };
+    match lang {
+        EmbeddedSeeds::Css => {
+            if let Some(style) = root.css {
+                push("#style", style.content_span);
+            }
+        }
+        EmbeddedSeeds::Ts => {
+            if let Some(script) = root.instance {
+                push("#script", script.content.span);
+            }
+            if let Some(script) = root.module {
+                push("#module", script.content.span);
+            }
+        }
+    }
+    bodies
 }
 
 /// A dep-free SplitMix64 PRNG — deterministic, tiny, no external crate.
@@ -347,10 +442,25 @@ fn mutate(rng: &mut Rng, seed: &[u8], max_ops: usize) -> Vec<u8> {
 /// [`F1Outcome`] of the invariant checks (whose `Rejected` / `Ok` aren't findings).
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Outcome {
-    /// The parser or formatter panicked (the DoS-safety violation).
-    Panic,
+    /// A leg panicked (the DoS-safety violation): the parse + format leg, the
+    /// `locations` wire, or the type strip.
+    Panic(Leg),
+    /// The type strip produced output that breaks its own contract, its no-copy
+    /// promise, or its idempotence (the finding's detail names which).
+    StripContract,
     /// The shared F1 checks ([`f1_check`]) ran to a verdict.
     Checked(F1Outcome),
+}
+
+/// Which leg of an attempt was running — what a caught panic is attributed to.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Leg {
+    /// Parse, format, reparse, format again ([`f1_check`]).
+    Format,
+    /// The `locations` wire of the accepted input.
+    Locations,
+    /// `tsv_ts::strip` on a TypeScript-family input.
+    Strip,
 }
 
 impl Outcome {
@@ -360,30 +470,129 @@ impl Outcome {
     /// canonical-confirmation-needing bucket (see [`FuzzCommand::strict`]).
     fn is_hard(self) -> bool {
         match self {
-            Self::Panic => true,
+            Self::Panic(_) | Self::StripContract => true,
             Self::Checked(outcome) => outcome.is_hard(),
         }
     }
 
     fn label(self) -> &'static str {
         match self {
-            Self::Panic => "panic",
+            Self::Panic(Leg::Format) => "panic",
+            Self::Panic(Leg::Locations) => "locations_panic",
+            Self::Panic(Leg::Strip) => "strip_panic",
+            Self::StripContract => "strip_contract",
             Self::Checked(outcome) => outcome.label(),
         }
     }
 }
 
-/// One guarded attempt: write the last-input repro, clear the panic slot, run the shared
-/// [`f1_check`] under `catch_unwind`, map a panic to [`Outcome::Panic`].
-fn attempt(src: &str, parser: ParserType, render: bool, last: &mut LastInput) -> Outcome {
+/// What one guarded attempt produced: its [`Outcome`], the finding's detail (a strip
+/// contract break), and which of the extra legs graded the input — the counts their
+/// vacuity floors read.
+struct Attempt {
+    outcome: Outcome,
+    detail: Option<String>,
+    /// The `locations` wire was written (the input parsed).
+    locations: bool,
+    /// The type strip produced output (not a refusal or a parse error).
+    stripped: bool,
+}
+
+/// One guarded attempt: write the last-input repro, clear the panic slot, run every leg
+/// under one `catch_unwind` — the shared [`f1_check`], then the `locations` wire of an
+/// accepted input, then the type strip of a TypeScript-family input — and map a panic
+/// to [`Outcome::Panic`] of the leg that was running.
+///
+/// A hard format verdict ends the attempt (it is the finding); a soft or clean one
+/// lets the other legs grade the same input, and a strip contract break outranks it.
+fn attempt(src: &str, parser: ParserType, render: bool, last: &mut LastInput) -> Attempt {
     last.write(parser, src);
     let _ = take_last_panic();
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        f1_check(src, parser, render)
-    })) {
-        Ok(outcome) => Outcome::Checked(outcome),
-        Err(_) => Outcome::Panic,
+    let mut leg = Leg::Format;
+    let mut locations = false;
+    let mut stripped = false;
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let f1 = f1_check(src, parser, render);
+        if f1.is_hard() {
+            return (Outcome::Checked(f1), None);
+        }
+        if f1 != F1Outcome::Rejected {
+            leg = Leg::Locations;
+            locations = locations_wire(src, parser);
+        }
+        if parser == ParserType::TypeScript {
+            leg = Leg::Strip;
+            let (did_strip, finding) = strip_check(src);
+            stripped = did_strip;
+            if let Some((outcome, detail)) = finding {
+                return (outcome, Some(detail));
+            }
+        }
+        (Outcome::Checked(f1), None)
+    }));
+    let (outcome, detail) = result.unwrap_or((Outcome::Panic(leg), None));
+    Attempt {
+        outcome,
+        detail,
+        locations,
+        stripped,
     }
+}
+
+/// Write the `locations` wire of `src` — the `{locations: true}` / `--locations`
+/// product, with its line table — parsed the way [`f1_check`] parses it. Returns
+/// whether the input parsed (the leg graded it); the bytes are discarded, since the
+/// leg's property is that writing them does not panic (`deno task check:loc` grades
+/// their content over the fixtures).
+fn locations_wire(src: &str, parser: ParserType) -> bool {
+    let arena = bumpalo::Bump::new();
+    let wire = match parser {
+        ParserType::TypeScript => tsv_ts::parse_with_goal_or_fallback(src, None, &arena)
+            .ok()
+            .map(|ast| tsv_ts::convert_ast_json_bytes_with_locations(&ast, src)),
+        ParserType::Svelte => tsv_svelte::parse(src, &arena)
+            .ok()
+            .map(|ast| tsv_svelte::convert_ast_json_bytes_with_locations(&ast, src)),
+        ParserType::Css => tsv_css::parse(src, &arena)
+            .ok()
+            .map(|ast| tsv_css::convert_ast_json_bytes_with_locations(&ast, src)),
+    };
+    wire.is_some_and(|bytes| !bytes.is_empty())
+}
+
+/// Strip `src` at the unset-goal fallback (`tsv_ts::strip`, what `tsv strip <file.ts>`
+/// and a bare `strip_typescript(source)` run) and check the output the way the strip
+/// corpus differential does (`strip --stdin`'s reply): the position contract, the
+/// no-copy promise, idempotence. Returns whether it stripped, and the finding with its
+/// detail: [`Outcome::StripContract`] carrying the joined breaks, or
+/// [`Outcome::Panic`] of [`Leg::Strip`] when the second strip of the idempotence check
+/// panicked (caught there, its location recorded by the capturing hook).
+fn strip_check(src: &str) -> (bool, Option<(Outcome, String)>) {
+    let arena = bumpalo::Bump::new();
+    let Ok(stripped) = tsv_ts::strip(src, &arena) else {
+        return (false, None);
+    };
+    let code = stripped.code.as_ref();
+    let mut broken: Vec<String> = contract_violations(src, code)
+        .into_iter()
+        .map(|(check, detail)| format!("{}: {detail}", check.as_str()))
+        .collect();
+    if code == src && matches!(stripped.code, std::borrow::Cow::Owned(_)) {
+        broken.push("nothing is type-only, yet the output is a copy".to_string());
+    }
+    let mut outcome = Outcome::StripContract;
+    if let Some(failure) = idempotence_failure(src, code) {
+        if failure.is_panic() {
+            outcome = Outcome::Panic(Leg::Strip);
+            broken.insert(0, failure.to_string());
+        } else {
+            broken.push(failure.to_string());
+        }
+    }
+    (
+        true,
+        (!broken.is_empty()).then(|| (outcome, broken.join("; "))),
+    )
 }
 
 /// Best-effort pre-attempt repro file: written **before** every parse/format
@@ -447,7 +656,8 @@ struct Finding {
     outcome: Outcome,
     seed_path: String,
     input: String,
-    panic: Option<String>,
+    /// The panic's text and location, or a strip contract break's detail.
+    detail: Option<String>,
 }
 
 /// A loaded seed-corpus entry.
@@ -495,6 +705,7 @@ impl Found {
     fn record(
         &mut self,
         outcome: Outcome,
+        detail: Option<String>,
         iteration: Option<usize>,
         seed_path: &str,
         parser: ParserType,
@@ -507,10 +718,13 @@ impl Found {
         };
         *count += 1;
         if store.len() < cap {
-            let panic = if outcome == Outcome::Panic {
-                take_last_panic()
+            // A leg's panic is caught by `attempt` and its record taken here; the second
+            // strip's is caught (and its record taken) inside the strip leg, which hands
+            // it over as the detail
+            let detail = if matches!(outcome, Outcome::Panic(_)) {
+                detail.or_else(take_last_panic)
             } else {
-                None
+                detail
             };
             store.push(Finding {
                 iteration,
@@ -518,7 +732,7 @@ impl Found {
                 outcome,
                 seed_path: seed_path.to_string(),
                 input: src.to_string(),
-                panic,
+                detail,
             });
         }
     }
@@ -554,7 +768,7 @@ fn minimize(
             probes += 1;
             let reproduces = !cand.is_empty()
                 && std::str::from_utf8(&cand)
-                    .is_ok_and(|s| attempt(s, parser, render, last) == target);
+                    .is_ok_and(|s| attempt(s, parser, render, last).outcome == target);
             if reproduces {
                 best = cand;
                 removed_any = true; // retry the same offset at this chunk size
@@ -603,7 +817,35 @@ impl Slow {
     }
 }
 
+/// How many inputs each extra leg graded — what the legs' vacuity floors read.
+#[derive(Default)]
+struct LegCounts {
+    /// Inputs written through the `locations` wire.
+    locations: usize,
+    /// Inputs the type strip stripped (a refusal or a parse error grades no output).
+    stripped: usize,
+}
+
+impl LegCounts {
+    /// Count one attempt's legs, passing the attempt through.
+    fn count(&mut self, attempt: Attempt) -> Attempt {
+        self.locations += usize::from(attempt.locations);
+        self.stripped += usize::from(attempt.stripped);
+        attempt
+    }
+}
+
 impl FuzzCommand {
+    /// One seed entry, with its own path-keyed stream.
+    fn seed_entry(&self, display: String, bytes: Vec<u8>, parser: ParserType) -> Seed {
+        Seed {
+            parser,
+            rng: Rng::new(stream_seed(self.seed, &display)),
+            display,
+            bytes,
+        }
+    }
+
     pub(crate) fn run(self) -> Result<(), CliError> {
         // Intentionally-invalid fixtures are poor seeds (they don't parse), but
         // they're still valid *bytes* to mutate — keep them, so no subject filter;
@@ -611,27 +853,44 @@ impl FuzzCommand {
         let files = resolve_seed_files(&self.paths, self.limit)?;
 
         let mut skipped_unreadable = 0usize;
-        let mut seeds: Vec<Seed> = files
-            .iter()
-            .filter_map(|p| {
-                let display = p.to_string_lossy().into_owned();
-                let Ok(bytes) = std::fs::read(p) else {
-                    skipped_unreadable += 1;
-                    return None;
-                };
-                Some(Seed {
-                    parser: ParserType::from_extension(&display),
-                    rng: Rng::new(stream_seed(self.seed, &display)),
-                    display,
-                    bytes,
-                })
-            })
-            .filter(|s| !s.bytes.is_empty())
-            .collect();
+        let mut seeds: Vec<Seed> = Vec::new();
+        for p in &files {
+            let display = p.to_string_lossy().into_owned();
+            let Ok(bytes) = std::fs::read(p) else {
+                skipped_unreadable += 1;
+                continue;
+            };
+            let parser = ParserType::from_extension(&display);
+            match self.embedded {
+                None => seeds.push(self.seed_entry(display, bytes, parser)),
+                // The standalone files of the language stay seeds as they are
+                Some(lang) if parser == lang.parser() => {
+                    seeds.push(self.seed_entry(display, bytes, parser));
+                }
+                // A Svelte seed gives its bodies in the language, each its own seed
+                // (and stream, keyed by the suffixed display name)
+                Some(lang) if parser == ParserType::Svelte => {
+                    let Ok(src) = std::str::from_utf8(&bytes) else {
+                        continue;
+                    };
+                    for (suffix, body) in embedded_bodies(src, lang) {
+                        seeds.push(self.seed_entry(
+                            format!("{display}{suffix}"),
+                            body.into_bytes(),
+                            lang.parser(),
+                        ));
+                    }
+                }
+                Some(_) => {}
+            }
+        }
+        seeds.retain(|s| !s.bytes.is_empty());
 
         // Resolution already rejects an empty walk; this is the narrower question
-        // below it — every resolved file was unreadable or empty of bytes.
+        // below it — every resolved file was unreadable or empty of bytes (or, under
+        // `--embedded`, held no body in the language).
         check_graded_nonzero(seeds.len(), "readable non-empty seed files")?;
+        let has_ts_seeds = seeds.iter().any(|s| s.parser == ParserType::TypeScript);
 
         if let Some(dir) = &self.dump_dir
             && let Err(e) = std::fs::create_dir_all(dir)
@@ -662,6 +921,7 @@ impl FuzzCommand {
         let mut reflow_paths = CappedPaths::default();
         let mut found = Found::new();
         let mut slow = Slow::new();
+        let mut legs = LegCounts::default();
 
         // Pass 1 — every seed **as authored**. The mutation loop below only ever drives
         // mutants, so a pristine corpus file is never itself checked; yet the corpus is
@@ -677,7 +937,9 @@ impl FuzzCommand {
             tested += 1;
 
             let started = Instant::now();
-            let outcome = attempt(src, seed.parser, render, &mut last_input);
+            let Attempt {
+                outcome, detail, ..
+            } = legs.count(attempt(src, seed.parser, render, &mut last_input));
             slow.track(started.elapsed(), self.slow_budget_ms, || {
                 format!("as authored · {}", seed.display)
             });
@@ -696,7 +958,7 @@ impl FuzzCommand {
                 // not actionable. The seed path IS the reproduction (an unmutated file
                 // on disk), so record that rather than dumping the input.
                 f if !f.is_hard() => reflow_paths.push(seed.display.clone()),
-                finding => found.record(finding, None, &seed.display, seed.parser, src),
+                finding => found.record(finding, detail, None, &seed.display, seed.parser, src),
             }
         }
 
@@ -717,7 +979,9 @@ impl FuzzCommand {
 
             let parser = seeds[idx].parser;
             let started = Instant::now();
-            let outcome = attempt(src, parser, render, &mut last_input);
+            let Attempt {
+                outcome, detail, ..
+            } = legs.count(attempt(src, parser, render, &mut last_input));
             slow.track(started.elapsed(), self.slow_budget_ms, || {
                 format!("iter {iteration} · {}", seeds[idx].display)
             });
@@ -741,7 +1005,14 @@ impl FuzzCommand {
                     }
                 }
                 finding => {
-                    found.record(finding, Some(iteration), &seeds[idx].display, parser, src);
+                    found.record(
+                        finding,
+                        detail,
+                        Some(iteration),
+                        &seeds[idx].display,
+                        parser,
+                        src,
+                    );
                     // Only HARD findings stop the run early — soft ones (render-
                     // model-noisy structural divergences) are counted, not fatal.
                     if self.max_findings > 0 && found.hard >= self.max_findings {
@@ -780,8 +1051,25 @@ impl FuzzCommand {
             reflow_paths,
             slow_count: slow.count,
             slow: slow.store,
+            legs,
         };
-        self.report(&stats, &found.hard_store, &found.soft_store)
+        self.report(&stats, &found.hard_store, &found.soft_store)?;
+
+        // The extra legs' floors, after the report so its counts are on screen: a leg
+        // that graded nothing must not read as a clean run. Locations grades every
+        // accepted input, so zero means nothing parsed; the strip owes output only when
+        // the run had TypeScript seeds to strip.
+        check_graded_nonzero(
+            stats.legs.locations,
+            "inputs written through the locations wire",
+        )?;
+        if has_ts_seeds {
+            check_graded_nonzero(
+                stats.legs.stripped,
+                "TypeScript inputs the type strip stripped",
+            )?;
+        }
+        Ok(())
     }
 
     /// Write each finding's input to `--dump-dir` (if set) for reproduction.
@@ -822,7 +1110,7 @@ impl FuzzCommand {
                         "hard": f.outcome.is_hard(),
                         "parser": f.parser.name(),
                         "seed": f.seed_path,
-                        "panic": f.panic,
+                        "detail": f.detail,
                         "input": f.input,
                     })
                 })
@@ -840,6 +1128,8 @@ impl FuzzCommand {
                 "skipped_non_utf8": stats.skipped_non_utf8,
                 "rejected": stats.rejected,
                 "ok": stats.ok,
+                "locations_graded": stats.legs.locations,
+                "strip_graded": stats.legs.stripped,
                 "evolved": stats.evolved,
                 "hard_findings": stats.hard_count,
                 "soft_findings": stats.soft_count,
@@ -868,6 +1158,14 @@ impl FuzzCommand {
             stats.rejected
         );
         println!("  {:>7}  ok (parsed, idempotent, reparses equal)", stats.ok);
+        println!(
+            "  {:>7}  written through the locations wire (no panic)",
+            stats.legs.locations
+        );
+        println!(
+            "  {:>7}  stripped by the type strip (no panic, contract + idempotence held)",
+            stats.legs.stripped
+        );
         if self.evolve {
             println!(
                 "  {:>7}  accepted mutants evolved into the seed pool",
@@ -879,7 +1177,7 @@ impl FuzzCommand {
             stats.reflow_paths.count()
         );
         println!(
-            "  {:>7}  HARD findings (panic / format_error / unreparseable / node_loss /\n           leaf_value_corruption / non_idempotent)",
+            "  {:>7}  HARD findings (panic / locations_panic / strip_panic / strip_contract /\n           format_error / unreparseable / node_loss / leaf_value_corruption /\n           non_idempotent)",
             stats.hard_count
         );
         println!(
@@ -989,8 +1287,8 @@ fn print_finding(f: &Finding) {
         f.parser.name(),
         f.seed_path
     );
-    if let Some(p) = &f.panic {
-        println!("      {p}");
+    if let Some(detail) = &f.detail {
+        println!("      {detail}");
     }
     println!("      input: {}", preview(&f.input));
 }
@@ -1015,6 +1313,8 @@ struct Stats {
     slow_count: usize,
     /// `(origin, elapsed ms)` behind `slow_count`, capped at [`SLOW_STORE_CAP`].
     slow: Vec<(String, u128)>,
+    /// What the extra legs graded.
+    legs: LegCounts,
 }
 
 /// A single-line, length-capped preview of a (possibly multi-line) mutant.
@@ -1024,4 +1324,37 @@ fn preview(input: &str) -> String {
         .map(|c| if c == '\n' { '⏎' } else { c })
         .collect();
     super::truncate_chars_counted(&one_line, 120)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{EmbeddedSeeds, embedded_bodies};
+
+    /// The bodies are the text between the tags, exactly — the seed a standalone parse
+    /// of the language receives.
+    #[test]
+    fn embedded_bodies_are_the_text_between_the_tags() {
+        let src = "<script module>export const m = 1;</script>\n\
+                   <script lang=\"ts\">\n\tlet a: T = 1;\n</script>\n\
+                   <p>x</p>\n<style>\n\tp { color: red; }\n</style>\n";
+        assert_eq!(
+            embedded_bodies(src, EmbeddedSeeds::Ts),
+            vec![
+                ("#script", "\n\tlet a: T = 1;\n".to_string()),
+                ("#module", "export const m = 1;".to_string()),
+            ]
+        );
+        assert_eq!(
+            embedded_bodies(src, EmbeddedSeeds::Css),
+            vec![("#style", "\n\tp { color: red; }\n".to_string())]
+        );
+    }
+
+    /// An empty body, or a document tsv cannot parse, gives no seed.
+    #[test]
+    fn empty_or_unparseable_documents_give_no_bodies() {
+        assert!(embedded_bodies("<script></script><style> </style>", EmbeddedSeeds::Ts).is_empty());
+        assert!(embedded_bodies("<style> </style>", EmbeddedSeeds::Css).is_empty());
+        assert!(embedded_bodies("{#if", EmbeddedSeeds::Ts).is_empty());
+    }
 }

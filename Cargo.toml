@@ -270,6 +270,19 @@ panic = "unwind"
 lto = false
 codegen-units = 16
 
+# The `corpus` world with the checks a consumer's DEBUG build turns on: every
+# `debug_assert!` and every arithmetic overflow check. Release builds compile both
+# out, so a `debug_assert!` that fires on legal input is invisible to every
+# `--profile corpus` audit — yet it is a panic in any crate that depends on tsv and
+# builds in `dev`. `fuzz:audit:debug` runs the seeded fuzzer here; `panic =
+# "unwind"` (inherited) makes a fired assert a caught, reported finding. A profile
+# of its own rather than an env override of `corpus`, which would rebuild the one
+# world every `check` audit shares.
+[profile.corpus-debug]
+inherits = "corpus"
+debug-assertions = true
+overflow-checks = true
+
 # The N-API artifact's profile: full `release` optimization plus an unwinding
 # panic strategy. `tsv_napi`'s exports carry `#[napi(catch_unwind)]`, converting
 # a Rust panic into a thrown JS error — but only an unwinding profile makes the

@@ -144,6 +144,14 @@ length, keep every line terminator at its UTF-16 offset, and hold at every other
 input's character, a space, or a `;` / `(` / `)` substitution; and stripping the output again
 must return it unchanged and uncopied. A type-free input must come back uncopied.
 
+One re-strip change is excused: the output is JS, and read again as TypeScript a comparison
+pair can be a type-argument list — `f(a < b, c as any > (d))` strips to
+`f(a < b, c        > (d))`, whose `a < b, c > (d)` re-reads as the generic call `a<b, c>(d)`.
+A re-strip whose every change blanks a call's, a `new`'s, a tagged template's or an
+instantiation expression's type-argument list that the input's own parse did not hold is not
+an idempotence failure; any other change is
+([erase/assertion_left_of_comparison_chain](erase/assertion_left_of_comparison_chain/)).
+
 The position check has a known limit: a space or a `;` / `(` / `)` is allowed at any offset,
 not only inside a type-only range or at a hazard site, so deleted JS or a misplaced
 `;` is caught only by the output comparison.
