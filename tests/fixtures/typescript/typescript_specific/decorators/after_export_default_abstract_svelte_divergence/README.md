@@ -9,12 +9,13 @@ the layout of the undecorated `export default abstract class` and the decorated
 `export default @dec class` alike). tsv parses it (`expected_ours.json`; the canonical
 parser errors → `expected_svelte.json`) as the class expression it builds for
 `export default @dec class Foo {}`, with `abstract: true` — and, as tsc's declaration does,
-the value ends at the class's `}` with no `;`: what follows is the next statement, an operator
-(`{} + 1` is the export, then `+1;`) or not (`{} foo();`), each printed on its own line as
-prettier prints it. A follower that begins no statement is a syntax error, as for tsc
-(`{}.x`, `input_invalid_member_follower`). Only the `abstract` form ends there: without it the
-value is acorn's class expression, which an operator continues (`export default @dec class
-Foo {} + 1;` is one value).
+the value ends at the class's `}` with no `;` required: what follows is the next statement, an
+operator (`{} + 1` is the export, then `+1;`) or not (`{} foo();`), each printed on its own line
+as prettier prints it. A `;` right after the `}` is the export's own and ends it there, one
+statement (tsc reads an empty statement after the declaration). A follower that begins no statement is a syntax error, as for tsc
+(`{}.x`, `input_invalid_member_follower`). The decorated class without `abstract` ends there
+too, tsc's reading where acorn's expression would take the operator
+([after_export_default_next_statement](../after_export_default_next_statement_svelte_divergence/)).
 
 The admission is owed to the `export default` position alone, under the same
 `[no LineTerminator here]` gate the decorators-first form applies: `x = @dec abstract

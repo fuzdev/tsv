@@ -256,8 +256,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // mirrors its decorator+abstract+class handling. acorn emits
             // `ExportNamedDeclaration → ClassDeclaration` with the decorators on the
             // class and the class span covering them (`export default @dec class` is a
-            // separate shape — a decorated class *expression* — handled by the fall-
-            // through expression arm of `parse_export_default_declaration`).
+            // separate shape — a decorated class *expression* on the wire — handled by the
+            // fall-through arm of `parse_export_default_declaration`).
             TokenKind::At => {
                 let deco_start = self.current_pos().0;
                 let decorators = self.parse_decorators(DecoratorListKind::Class)?;
@@ -477,33 +477,41 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 (ExportDefaultValue::TSInterfaceDeclaration(iface), end)
             }
             _ => {
-                // Expression — unless it is a decorated class carrying `abstract`
-                // (`export default @dec abstract class {}`), which tsc reads as a class
-                // declaration: the value ends at the class, with no `;`, and what follows it
-                // is the next statement (`export default @dec abstract class C {} + 1;` is
-                // the export, then `+1;`). The decorator list is read as a candidate; a
-                // class without `abstract` is rewound and read as the head of an expression,
-                // acorn's reading (`export default @dec class C {} + 1;` is one value). An
-                // error in the candidate is the expression's too — the two parses read the
-                // same tokens up to the `abstract` only the candidate admits — so it is
-                // returned as is.
+                // Expression — unless it is a decorated class (`export default @dec class
+                // {}`, `abstract` admitted), which tsc reads as a class declaration: the
+                // value ends at the class, and what follows it is the next statement
+                // (`export default @dec class C {} + 1;` is the export, then `+1;`, where
+                // acorn's class expression would take the operator). The wire keeps the
+                // `ClassExpression` acorn builds for the value alone. A `;` right after the
+                // class is the export's, as acorn ends the statement there; tsc reads an
+                // empty statement, which carries nothing. Only a class may follow a
+                // decorator, so the list commits the arm: its errors are the ones the
+                // expression parse would raise at the same tokens.
                 if matches!(self.current_kind(), TokenKind::At) {
                     let value_start = self.current_pos().0;
-                    let checkpoint = self.checkpoint();
                     let decorators = self.parse_decorators(DecoratorListKind::Class)?;
-                    if self.at_abstract_class_modifier() {
-                        let class =
-                            self.finish_decorated_class_expression(value_start, decorators, true)?;
-                        return Ok(Statement {
-                            span: Span::new(start, class.span.end),
-                            kind: StatementKind::ExportDefaultDeclaration(self.arena.alloc(
-                                ExportDefaultDeclaration {
-                                    declaration: ExportDefaultValue::Expression(class.clone()),
-                                },
-                            )),
-                        });
-                    }
-                    self.rewind(checkpoint);
+                    let r#abstract = self.at_abstract_class_modifier();
+                    let class = self.finish_decorated_class_expression(
+                        value_start,
+                        decorators,
+                        r#abstract,
+                    )?;
+                    // The expression parse's head binding, which this arm bypasses: a
+                    // block comment glued to the first `@` is the class's to print.
+                    self.bind_leading_comment(value_start, class);
+                    let end = if self.eat(TokenKind::Semicolon)? {
+                        self.prev_token_end() as u32
+                    } else {
+                        class.span.end
+                    };
+                    return Ok(Statement {
+                        span: Span::new(start, end),
+                        kind: StatementKind::ExportDefaultDeclaration(self.arena.alloc(
+                            ExportDefaultDeclaration {
+                                declaration: ExportDefaultValue::Expression(class.clone()),
+                            },
+                        )),
+                    });
                 }
                 let expr = self.parse_expression()?;
                 let end = self.semicolon_end()?;

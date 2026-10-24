@@ -320,10 +320,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// The expression-position counterpart of `parse_decorated_class` (which
     /// builds a class *declaration*): parse the decorator list, then a class
     /// expression, attaching the decorators to it. `export` and `abstract` never appear
-    /// here: the `export default` value, the one position that admits `abstract`
-    /// (`export default @dec abstract class {}`, a value tsc reads as a class declaration,
-    /// so the statement ends at the class), reads the list itself and finishes it through
-    /// [`Parser::finish_decorated_class_expression`].
+    /// here: the `export default` value, a decorated class tsc reads as a class declaration
+    /// (so the statement ends at the class) and the one position that admits `abstract`
+    /// (`export default @dec abstract class {}`), reads the list itself and finishes it
+    /// through [`Parser::finish_decorated_class_expression`].
     pub(in crate::parser) fn parse_decorated_class_expression(
         &mut self,
     ) -> Result<&'arena Expression<'arena>, ParseError> {

@@ -1,0 +1,201 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 151,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 76,
+				"end": 78,
+				"raw": "\n\n",
+				"data": "\n\n"
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"module": {
+		"type": "Script",
+		"start": 0,
+		"end": 76,
+		"context": "module",
+		"content": {
+			"type": "Program",
+			"start": 25,
+			"end": 67,
+			"body": [
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 27,
+					"end": 61,
+					"exportKind": "value",
+					"declaration": {
+						"type": "ClassExpression",
+						"start": 43,
+						"end": 61,
+						"decorators": [
+							{
+								"type": "Decorator",
+								"start": 43,
+								"end": 47,
+								"expression": {
+									"type": "Identifier",
+									"start": 44,
+									"end": 47,
+									"name": "dec"
+								}
+							}
+						],
+						"id": {
+							"type": "Identifier",
+							"start": 55,
+							"end": 58,
+							"name": "Foo"
+						},
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 59,
+							"end": 61,
+							"body": []
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 63,
+					"end": 66,
+					"expression": {
+						"type": "UnaryExpression",
+						"start": 63,
+						"end": 65,
+						"operator": "+",
+						"prefix": true,
+						"argument": {
+							"type": "Literal",
+							"start": 64,
+							"end": 65,
+							"value": 1,
+							"raw": "1"
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			},
+			{
+				"type": "Attribute",
+				"start": 18,
+				"end": 24,
+				"name": "module",
+				"value": true
+			}
+		]
+	},
+	"instance": {
+		"type": "Script",
+		"start": 78,
+		"end": 150,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 96,
+			"end": 141,
+			"body": [
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 98,
+					"end": 132,
+					"exportKind": "value",
+					"declaration": {
+						"type": "ClassExpression",
+						"start": 114,
+						"end": 132,
+						"decorators": [
+							{
+								"type": "Decorator",
+								"start": 114,
+								"end": 118,
+								"expression": {
+									"type": "Identifier",
+									"start": 115,
+									"end": 118,
+									"name": "dec"
+								}
+							}
+						],
+						"id": {
+							"type": "Identifier",
+							"start": 126,
+							"end": 129,
+							"name": "Bar"
+						},
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 130,
+							"end": 132,
+							"body": []
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 134,
+					"end": 140,
+					"expression": {
+						"type": "CallExpression",
+						"start": 134,
+						"end": 139,
+						"callee": {
+							"type": "Identifier",
+							"start": 134,
+							"end": 137,
+							"name": "foo"
+						},
+						"arguments": [],
+						"optional": false
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 86,
+				"end": 95,
+				"name": "lang",
+				"value": [
+					{
+						"start": 92,
+						"end": 94,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -34,6 +34,10 @@
 //! written down, and prettier's own `js/classes/multiple-static.js` snapshot pins
 //! the `static` reading a third time. Cataloged in `docs/conformance_svelte.md`
 //! §TypeScript Corrections.
+//!
+//! One more `export default` modifier shape rides here for the same reason: the decorated
+//! `export default @d abstract class X {}`, which the same gate admits and acorn rejects,
+//! takes a following `;` as the export's own — a wire no fixture can hold.
 
 use serde_json::Value;
 
@@ -135,6 +139,47 @@ fn export_default_abstract_line_break_is_two_statements() {
     assert_eq!(
         statement_types("export default abstract /* c\n*/ class Base {}\n"),
         vec!["ExportDefaultDeclaration", "ClassDeclaration"]
+    );
+}
+
+/// The `;` after a decorated `abstract` default export is the export's own: one statement
+/// spanning it, as for the class without `abstract` (acorn's reading there), not the class's
+/// statement followed by an `EmptyStatement` (tsc's, which carries nothing). acorn rejects
+/// the `abstract` form outright, so no fixture variant can pin this wire.
+#[test]
+fn a_semicolon_after_a_decorated_abstract_default_export_is_the_exports() {
+    // `(source, class end, export end)`: the class ends at its `}`, the export at the `;`
+    for (source, class_end, export_end) in [
+        ("export default @d abstract class X {};", 37, 38),
+        ("export default @d class X {};", 28, 29),
+    ] {
+        let json = parse_json(source);
+        let body = nodes_at(&json, "/body", "a program body");
+        assert_eq!(
+            body.iter().map(type_of).collect::<Vec<_>>(),
+            vec!["ExportDefaultDeclaration"],
+            "{source}: the `;` must not become an `EmptyStatement`"
+        );
+        assert_eq!(
+            (
+                body[0].get("start").and_then(Value::as_u64),
+                body[0].get("end").and_then(Value::as_u64)
+            ),
+            (Some(0), Some(export_end)),
+            "{source}: the export spans its `;`"
+        );
+        assert_eq!(str_at(&json, "/body/0/declaration/type"), "ClassExpression");
+        assert_eq!(
+            json.pointer("/body/0/declaration/end")
+                .and_then(Value::as_u64),
+            Some(class_end),
+            "{source}: the class ends at its `}}`"
+        );
+    }
+    // Without the `;` the class still ends the export, and what follows is a statement.
+    assert_eq!(
+        statement_types("export default @d abstract class X {} + 1;"),
+        vec!["ExportDefaultDeclaration", "ExpressionStatement"]
     );
 }
 

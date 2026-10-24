@@ -2299,7 +2299,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// a node genuinely starts at the token, never when the head was a grouping `(` the
     /// parser discards (`/* c */ (a + b)` — there the comment leads a paren, no node
     /// begins at it, and it stays an ordinary positional comment).
-    fn bind_leading_comment(&mut self, head_start: usize, expr: &Expression<'arena>) {
+    pub(in crate::parser) fn bind_leading_comment(
+        &mut self,
+        head_start: usize,
+        expr: &Expression<'arena>,
+    ) {
         if expr.span().start as usize != head_start {
             return;
         }
