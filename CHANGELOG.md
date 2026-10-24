@@ -11,7 +11,9 @@ Each `## Unreleased` section must be non-empty and carry a
 `## Unreleased` (reset to `bump: patch`) for the next cycle.
 
 ## Unreleased
-<!-- bump: patch -->
+<!-- bump: minor -->
+
+- **breaking** chore: GitHub Release checksums are `SHA512SUMS` (`sha512sum -c`), not `SHA256SUMS`
 
 ## 0.7.1
 
