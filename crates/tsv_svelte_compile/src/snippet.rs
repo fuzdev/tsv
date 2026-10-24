@@ -681,7 +681,7 @@ impl<'s> Collector<'s> {
                     self.expr(options);
                 }
             }
-            ExpressionKind::JsdocCast(j) => self.expr(j.inner),
+            ExpressionKind::CommentBoundPair(j) => self.expr(j.inner),
             ExpressionKind::ParenthesizedExpression(p) => self.expr(p.unreachable_contents()),
             ExpressionKind::Literal(_)
             | ExpressionKind::PrivateIdentifier(_)

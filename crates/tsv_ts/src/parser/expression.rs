@@ -2,10 +2,10 @@
 
 use crate::ast::internal::{
     AssignmentExpression, AssignmentOperator, AwaitExpression, BinaryExpression, BinaryOperator,
-    BlockStatement, CallExpression, ConditionalExpression, Expression, ExpressionKind, IdentName,
-    Identifier, ImportExpression, ImportPhase, JsdocCast, Literal, LiteralValue, MemberExpression,
-    MetaProperty, NewExpression, ParenthesizedExpression, RegexLiteral, SequenceExpression,
-    SpreadElement, Statement, Super, TSAsExpression, TSInstantiationExpression,
+    BlockStatement, CallExpression, CommentBoundPair, ConditionalExpression, Expression,
+    ExpressionKind, IdentName, Identifier, ImportExpression, ImportPhase, Literal, LiteralValue,
+    MemberExpression, MetaProperty, NewExpression, ParenthesizedExpression, RegexLiteral,
+    SequenceExpression, SpreadElement, Statement, Super, TSAsExpression, TSInstantiationExpression,
     TSNonNullExpression, TSSatisfiesExpression, TSTypeAssertion, TSTypeParameterInstantiation,
     TaggedTemplateExpression, TemplateLiteral, ThisExpression, UnaryExpression, UnaryOperator,
     UpdateExpression, UpdateOperator, YieldExpression,
@@ -178,7 +178,7 @@ enum SubscriptMode {
 // set by `bind_leading_comment`): ownership is keyed on *position* (glued-ness), not content.
 // The one content classifier below, `is_jsdoc_type_cast_comment`, is no longer an ownership
 // membership test — it decides a **cast's paren-retention** (whether `(expr)` becomes a
-// `JsdocCast` node). It retains a residual ownership role only because a cast's comment may
+// `CommentBoundPair` node). It retains a residual ownership role only because a cast's comment may
 // sit a newline *above* its `(` (`CommentGlue::AnyLine`), which the general `SameLine`-glued
 // rule doesn't reach; a same-line cast comment's ownership is already subsumed by that rule.
 //
@@ -2102,7 +2102,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // containing expression reads for a discarded pair:
         // - **JSDoc type cast** (`/** @type {T} */ (expr)`) — the parens are
         //   semantically required (dropping them drops the cast), so a preceding
-        //   `@type`/`@satisfies` block comment wraps the inner in a `JsdocCast`. The cast
+        //   `@type`/`@satisfies` block comment wraps the inner in a `CommentBoundPair`. The cast
         //   also takes **ownership** of that comment: the comment and this `(` are one
         //   unit, so the cast prints it and the flat-`Vec<Comment>` lookups skip it
         //   (`Comment::owned_by_node`) — printed from an enclosing gap instead, a
@@ -2120,7 +2120,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         //   cast's pair is a grouping pair to acorn like any other, so under
         //   `preserveParens` it is a `ParenthesizedExpression` too (the cast comment
         //   attaches to it as a leading comment — Svelte's `{#snippet}` wire), and the
-        //   `JsdocCast` belongs to the paren-free tree, the one that prints. The comment's
+        //   `CommentBoundPair` belongs to the paren-free tree, the one that prints. The comment's
         //   ownership is still claimed here, so the two parses agree on it (the binding
         //   audit buckets a cast's re-binding HARD by it).
         // Every other comment stays located positionally at print time.
@@ -2141,7 +2141,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let comment = self.comments[idx];
             self.alloc(Expression {
                 span: paren_span,
-                kind: ExpressionKind::JsdocCast(JsdocCast {
+                kind: ExpressionKind::CommentBoundPair(CommentBoundPair {
                     inner: parsed,
                     comment,
                 }),
@@ -2162,7 +2162,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// (the `/**` form) and contains `@type`/`@satisfies` (word boundary), with
     /// only whitespace between the comment's `*/` and the `(`.
     ///
-    /// The caller hands the index to the `JsdocCast`, which takes ownership of the
+    /// The caller hands the index to the `CommentBoundPair`, which takes ownership of the
     /// comment — so this must identify it *exactly*, never merely "a cast-shaped
     /// comment somewhere before here" (an owned comment nothing prints is a dropped
     /// comment).
@@ -2228,7 +2228,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// must not fire. There is no content sniff: a bundler annotation
     /// (`/* @__PURE__ */`) and a plain comment bind their token identically; only the
     /// JSDoc cast is special, and only for *paren retention* (`jsdoc_cast_comment_index`
-    /// builds the `JsdocCast`), never for ownership — that flows through here too.
+    /// builds the `CommentBoundPair`), never for ownership — that flows through here too.
     ///
     /// `expr` is the node the head token begins — the leftmost leaf of whatever
     /// expression is being parsed, before any postfix subscript or infix operator wraps

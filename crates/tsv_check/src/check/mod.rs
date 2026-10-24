@@ -364,7 +364,7 @@ impl<'a> CheckWalk<'a> {
             }
             E::TSNonNullExpression(t) => self.visit_expression(t.expression),
             E::ParenthesizedExpression(p) => self.visit_expression(p.expression),
-            E::JsdocCast(c) => self.visit_expression(c.inner),
+            E::CommentBoundPair(c) => self.visit_expression(c.inner),
             E::UnaryExpression(u) => self.visit_expression(u.argument),
             E::UpdateExpression(u) => self.visit_expression(u.argument),
             E::AwaitExpression(a) => self.visit_expression(a.argument),

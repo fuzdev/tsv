@@ -601,7 +601,7 @@ pub(crate) fn evaluate(
         ExpressionKind::TSInstantiationExpression(e) => {
             evaluate(e.expression, scope, source, depth + 1)
         }
-        ExpressionKind::JsdocCast(e) => evaluate(e.inner, scope, source, depth + 1),
+        ExpressionKind::CommentBoundPair(e) => evaluate(e.inner, scope, source, depth + 1),
 
         // Everything else is the oracle's `default: UNKNOWN` — portable.
         _ => Ok(Evaluation::single(Entry::Unknown)),

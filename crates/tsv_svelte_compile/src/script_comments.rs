@@ -159,10 +159,10 @@ pub(crate) fn collect_script_comments(
         refuse_comment_reflushed_into_block(comment, &census, source)?;
         let mut comment = *comment;
         // Release a JSDoc cast's comment back to the positional machinery. `tsv_ts`
-        // binds it to its `JsdocCast` node (`Comment::owned_by_node`) so a synthesized
+        // binds it to its `CommentBoundPair` node (`Comment::owned_by_node`) so a synthesized
         // paren can't land between the comment and the `(` it glues to — the owning
         // node becomes the only thing that prints it, and the range lookups skip it.
-        // Erasure unwraps *every* `JsdocCast` (the compile path matches the oracle,
+        // Erasure unwraps *every* `CommentBoundPair` (the compile path matches the oracle,
         // which has no such node and drops the parens), so in the emitted program that
         // owner does not exist: left owned, the comment is printed by nothing and
         // silently dropped. Un-owned, it prints from its gap exactly as the oracle
@@ -291,7 +291,7 @@ pub(crate) fn collect_module_script_comments(
         refuse_comment_reflushed_into_block(comment, &census, source)?;
         let mut comment = *comment;
         // Release JSDoc-cast ownership so the positional machinery prints it — its
-        // owning `JsdocCast` node is erased in the emitted program (see the same
+        // owning `CommentBoundPair` node is erased in the emitted program (see the same
         // step in `collect_script_comments`).
         comment.owned_by_node = false;
         kept.push(comment);
@@ -723,7 +723,7 @@ fn census_expr(expr: &Expression<'_>, census: &mut BlockCensus) {
                 census_expr(options, census);
             }
         }
-        ExpressionKind::JsdocCast(j) => census_expr(j.inner, census),
+        ExpressionKind::CommentBoundPair(j) => census_expr(j.inner, census),
         ExpressionKind::ParenthesizedExpression(p) => census_expr(p.unreachable_contents(), census),
         // Leaves — no children, no blocks.
         ExpressionKind::Literal(_)

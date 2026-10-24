@@ -120,18 +120,18 @@ impl<'a> Printer<'a> {
     /// A non-cast value clears the target rather than leaving a stale one, which is why
     /// every call is unconditional: the flag names one node, and a gap that no longer has a
     /// cast in it must not keep vouching for the last one that did. That clearing is also
-    /// why the answer is read by `build_jsdoc_cast_lead_doc`, which its caller invokes
+    /// why the answer is read by `build_comment_bound_pair_lead_doc`, which its caller invokes
     /// BEFORE building the inner — a cast's own value gaps mark themselves while that inner
     /// is built, overwriting the mark that was meant for it.
     pub(in crate::printer) fn mark_jsdoc_cast_value_gap(&self, value: &Expression<'_>) {
         self.jsdoc_cast_value_gap_target.set(match &value.kind {
-            ExpressionKind::JsdocCast(_) => Some(value.span),
+            ExpressionKind::CommentBoundPair(_) => Some(value.span),
             _ => None,
         });
     }
 
     /// Whether this cast is the one a value gap recorded — asked where the separator is
-    /// chosen ([`Printer::build_jsdoc_cast_lead_doc`]).
+    /// chosen ([`Printer::build_comment_bound_pair_lead_doc`]).
     ///
     /// Span-keyed, so a cast nested deeper inside the value (a call argument, an operand)
     /// answers `false` and keeps the width-decided soft `line`. That is the intent: the

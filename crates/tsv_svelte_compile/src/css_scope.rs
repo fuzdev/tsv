@@ -1669,12 +1669,12 @@ struct GatherSet {
 }
 
 /// Follow the TypeScript-expression wrappers to their inner expression, mirroring
-/// `erase.rs`'s "five TS wrappers + `JsdocCast` unwrap to inner". The oracle erases
+/// `erase.rs`'s "five TS wrappers + `CommentBoundPair` unwrap to inner". The oracle erases
 /// TypeScript in phase 1 before CSS analysis, so its `get_possible_values` sees the
 /// erased value; tsv's CSS matcher reads the raw AST, so it must unwrap here.
 ///
 /// ⚠️ This list MUST stay exhaustive against `erase.rs`'s wrapper arms (the five
-/// `TS*` + `JsdocCast`) — a forgotten wrapper variant falls to `else → UNKNOWN →
+/// `TS*` + `CommentBoundPair`) — a forgotten wrapper variant falls to `else → UNKNOWN →
 /// assume-match` and re-introduces an over-match MISMATCH for that variant.
 /// (`ParenthesizedExpression` is deliberately absent: every tree the compiler reads is
 /// paren-free — a `{#snippet}` head's `preserveParens` parse is kept for the wire alone,
@@ -1688,7 +1688,7 @@ fn strip_ts_wrappers<'a, 'arena>(mut node: &'a Expression<'arena>) -> &'a Expres
             ExpressionKind::TSNonNullExpression(n) => n.expression,
             ExpressionKind::TSInstantiationExpression(n) => n.expression,
             ExpressionKind::TSTypeAssertion(n) => n.expression,
-            ExpressionKind::JsdocCast(cast) => cast.inner,
+            ExpressionKind::CommentBoundPair(cast) => cast.inner,
             _ => return node,
         };
     }

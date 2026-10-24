@@ -26,7 +26,7 @@
 //! tree-shaking / bundling. So if either side carries one, the comparator requires
 //! byte-exactness (never tolerates), a conservative fall-back to the strict bar.
 //! JSDoc casts are NOT a hazard here: the compiler's erase pass unwraps every
-//! `JsdocCast` to its inner expression, so a cast survives into the emitted program
+//! `CommentBoundPair` to its inner expression, so a cast survives into the emitted program
 //! as a plain comment with no node to bind — cosmetic, like any other comment.
 //!
 //! ## JSDoc-cast parens are comment position
@@ -39,7 +39,7 @@
 //! comment first, and one before an arrow's expression body is flushed into the
 //! parameter list — so `f(a, /** @type {T} */ b)` gets no parens on one line and
 //! `(b)` with `b` on its own. The parens are a function of where the comment sat, so
-//! the code comparison erases every `JsdocCast` on both sides and they compare as
+//! the code comparison erases every `CommentBoundPair` on both sides and they compare as
 //! comment position.
 
 use bumpalo::Bump;
@@ -118,11 +118,11 @@ pub fn compare_canonical(ours: &str, oracle: &str) -> Parity {
     // The CODE must be identical: reprint both with comments cleared and byte-compare.
     // A comment-forced line break vanishes with its comment, so two same-code programs
     // reprint identically here regardless of where their comments sat. A JSDoc cast's
-    // parens go with it (see the module docs): the erase pass unwraps every `JsdocCast`.
+    // parens go with it (see the module docs): the erase pass unwraps every `CommentBoundPair`.
     ours_program.comments = &[];
     oracle_program.comments = &[];
-    ours_program.body = without_jsdoc_casts(&ours_arena, ours, ours_program.body);
-    oracle_program.body = without_jsdoc_casts(&oracle_arena, oracle, oracle_program.body);
+    ours_program.body = without_comment_bound_pairs(&ours_arena, ours, ours_program.body);
+    oracle_program.body = without_comment_bound_pairs(&oracle_arena, oracle, oracle_program.body);
     let ours_code = tsv_ts::format_canonical(&ours_program, ours);
     let oracle_code = tsv_ts::format_canonical(&oracle_program, oracle);
     if ours_code == oracle_code {
@@ -132,11 +132,11 @@ pub fn compare_canonical(ours: &str, oracle: &str) -> Parity {
     }
 }
 
-/// `body` with every `JsdocCast` unwrapped to its inner expression, through the
+/// `body` with every `CommentBoundPair` unwrapped to its inner expression, through the
 /// compiler's erase pass. Canonical JS carries no TypeScript for it to erase, so a
 /// refusal cannot come from a cast; should one come from anything else, the body is
 /// compared as it stands.
-fn without_jsdoc_casts<'arena>(
+fn without_comment_bound_pairs<'arena>(
     arena: &'arena Bump,
     source: &str,
     body: &'arena [tsv_ts::ast::internal::Statement<'arena>],

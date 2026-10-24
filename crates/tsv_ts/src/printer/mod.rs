@@ -501,7 +501,7 @@ pub struct Printer<'a> {
     pub(crate) long_curried_target: Cell<Option<Span>>,
     /// Span of a JSDoc cast sitting directly in a **value gap**, whose comment→`(`
     /// separator therefore reflows to a space instead of taking the soft `line`
-    /// ([`Printer::build_jsdoc_cast_lead_doc`]).
+    /// ([`Printer::build_comment_bound_pair_lead_doc`]).
     ///
     /// The gap the cast's comment sits in is a value gap or it isn't, and only the
     /// enclosing printer knows which — the byte before the comment cannot tell an object
@@ -518,11 +518,11 @@ pub struct Printer<'a> {
     /// braced-head category (`EmbedContext::jsdoc_cast_cannot_hang`): the comment→`(`
     /// separator reflows to a space in **every** authoring, the own-line hardline arm
     /// included, because the host has no operator line to end and the hardline would
-    /// strand the `(` at the head's own column ([`Printer::build_jsdoc_cast_lead_doc`]).
+    /// strand the `(` at the head's own column ([`Printer::build_comment_bound_pair_lead_doc`]).
     ///
     /// Set once per expression entry (`tsv_ts::build_expression_doc` →
     /// [`Printer::mark_jsdoc_cast_cannot_hang_gap`]) on the value's **left-spine** cast —
-    /// the one whose comment leads the value, the same `leading_jsdoc_cast` walk the TS
+    /// the one whose comment leads the value, the same `leading_comment_bound_pair` walk the TS
     /// hang predicates use — and never touched during the walk, unlike
     /// [`Self::jsdoc_cast_value_gap_target`], whose per-gap marks overwrite each other.
     /// Span-keyed like it: a cast nested off the spine keeps its width-decided layout.

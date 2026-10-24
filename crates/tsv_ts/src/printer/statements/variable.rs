@@ -147,7 +147,7 @@ impl<'a> Printer<'a> {
         let mut parts: DocBuf = DocBuf::new();
         // Comments after `=` all stay after `=`, matching prettier — a JSDoc
         // cast (`= /** @type {T} */ (expr)`) keeps its parens via the
-        // `JsdocCast` node, so its comment lives inside the init expression and
+        // `CommentBoundPair` node, so its comment lives inside the init expression and
         // never reaches this gap.
         let rhs_comments_start = equals_pos + 1;
 

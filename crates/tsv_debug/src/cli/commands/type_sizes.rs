@@ -250,7 +250,7 @@ pub(crate) fn board() -> Vec<TypeRow> {
             ts::ExpressionKind<'static>,
             ts::FunctionExpression<'static>,
             ts::ImportExpression<'static>,
-            ts::JsdocCast<'static>,
+            ts::CommentBoundPair<'static>,
             ts::MemberExpression<'static>,
             ts::MetaProperty<'static>,
             ts::NewExpression<'static>,

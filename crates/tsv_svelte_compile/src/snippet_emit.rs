@@ -143,7 +143,7 @@ pub(crate) fn build_snippet_function<'arena>(
 /// the emitter (its shape gate and callee/argument extraction, on the raw node
 /// then again on the erased one) and the `needs_context` render walk.
 ///
-/// A `JsdocCast` around the call (`{@render /** @type {A} */ (fn())}`) is NOT that
+/// A `CommentBoundPair` around the call (`{@render /** @type {A} */ (fn())}`) is NOT that
 /// rule: the oracle sees only parens + a comment there and compiles it. tsv's
 /// parser accepts the shape too, but this helper returns `None` for it, so the
 /// emitter refuses — a safe over-refusal, subsumed by the standing

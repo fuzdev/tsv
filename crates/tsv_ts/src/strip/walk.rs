@@ -786,7 +786,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                     self.expr(options);
                 }
             }
-            ExpressionKind::JsdocCast(cast) => self.expr(cast.inner),
+            ExpressionKind::CommentBoundPair(cast) => self.expr(cast.inner),
             ExpressionKind::ParenthesizedExpression(parens) => {
                 self.expr(parens.unreachable_contents());
             }

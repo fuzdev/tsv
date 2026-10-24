@@ -356,7 +356,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     // the printer emits identifiers by source span, so flattening
                     // through the cast would drop its parens from the output
                     // (breaking idempotency and the cast's binding).
-                    if let ExpressionKind::SequenceExpression(seq) = &expr.unwrap_jsdoc_casts().kind
+                    if let ExpressionKind::SequenceExpression(seq) =
+                        &expr.unwrap_comment_bound_pairs().kind
                     {
                         for element in seq.expressions {
                             self.require_debug_identifier(element)?;
@@ -384,12 +385,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// (regex/member/call/binary/`this`/literal) here to match Svelte — and, for
     /// a regex literal, to avoid re-emitting a `/…*/` source span glued to `}` as
     /// unreparseable output. The check looks through JSDoc casts
-    /// (`unwrap_jsdoc_casts`): Svelte validates after `remove_parens`, to which a
+    /// (`unwrap_comment_bound_pairs`): Svelte validates after `remove_parens`, to which a
     /// cast is nothing but parens + a comment, so `{@debug /** @type {A} */ (a)}`
     /// is an identifier to both parsers.
     fn require_debug_identifier(&self, expr: &Expression<'arena>) -> Result<(), ParseError> {
         if matches!(
-            expr.unwrap_jsdoc_casts().kind,
+            expr.unwrap_comment_bound_pairs().kind,
             ExpressionKind::Identifier(_)
         ) {
             Ok(())
@@ -413,7 +414,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// `CallExpression`. A non-call form (`{@render foo}`, `{@render a?.b}`) is
     /// rejected, mirroring `require_debug_identifier`.
     ///
-    /// The check looks through JSDoc casts (`unwrap_jsdoc_casts`): Svelte
+    /// The check looks through JSDoc casts (`unwrap_comment_bound_pairs`): Svelte
     /// validates after `remove_parens`, to which a cast is nothing but parens +
     /// a comment, so `{@render /** @type {A} */ (fn())}` is a call to both
     /// parsers. The stored expression keeps the wrapper — the printer reproduces
@@ -425,7 +426,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let (expression, span) =
             self.parse_keyword_expression_tag(start, "render", |this, expression| {
                 if matches!(
-                    expression.unwrap_jsdoc_casts().kind,
+                    expression.unwrap_comment_bound_pairs().kind,
                     ExpressionKind::CallExpression(_)
                 ) {
                     Ok(())

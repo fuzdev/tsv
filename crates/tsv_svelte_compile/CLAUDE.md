@@ -220,7 +220,7 @@ project-wide conventions.
   *finished* program and getting no change PROVES no TypeScript survived — the one
   check that catches a missed erase, which the output reparse cannot (a surviving
   annotation still parses). Besides TypeScript it applies two JS
-  normalizations the oracle's printer makes: a `JsdocCast` unwraps, and a same-name
+  normalizations the oracle's printer makes: a `CommentBoundPair` unwraps, and a same-name
   longhand property (`{ a: a }`) collapses to the shorthand esrap prints
   (`Eraser::same_name_shorthand`, recording the dropped `a:` gap as a comment
   window). Refuse-don't-erase for the runtime-bearing constructs
@@ -1502,7 +1502,7 @@ fast `==`):
 3. **Annotation guard** — a bundler annotation (`/* @__PURE__ */`, `@__NO_SIDE_EFFECTS__`,
    webpack/vite magic comments) is NOT position-neutral (moving it changes
    tree-shaking), so its presence falls back to strict byte-equality. JSDoc casts
-   are safe — erasure unwraps every `JsdocCast` to a plain comment.
+   are safe — erasure unwraps every `CommentBoundPair` to a plain comment.
 
 The relaxation is confined to the JS leg: CSS parity stays byte-exact, and the
 fixture validator's oracle-freshness / expected-idempotence checks stay strict (a

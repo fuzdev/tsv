@@ -769,7 +769,7 @@ cargo run --release -p tsv_debug -- ast_census ../corpora/collections/fuz_app/sr
 ⚠️ **Counts come off the wire AST**, which the writer emits by walking the
 internal AST once, one object per node — so a count is the parser's own
 construction count for every node the wire names. The blind spot is an internal
-node the writer does not name: `ParenthesizedExpression` and `JsdocCast` are
+node the writer does not name: `ParenthesizedExpression` and `CommentBoundPair` are
 `Expression` variants it prints *through* (so a census of `Expression` values is
 a lower bound, short by exactly the parenthesized ones), and the slot enums
 (`ForInit`, `ArrowFunctionBody`, `AttributeValue`) are field types rather than

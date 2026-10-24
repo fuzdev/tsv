@@ -315,7 +315,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             | ExpressionKind::TSSatisfiesExpression(_)
             | ExpressionKind::TSNonNullExpression(_)
             | ExpressionKind::TSTypeAssertion(_)
-            | ExpressionKind::JsdocCast(_)
+            | ExpressionKind::CommentBoundPair(_)
                 if matches!(
                     context,
                     AssignableContext::Assignment | AssignableContext::ForHead

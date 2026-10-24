@@ -93,7 +93,7 @@ impl<'a> Printer<'a> {
 
         // The single comment-emission seam in this crate — every leading / trailing / gap
         // / owned comment routes through here, including the JSDoc cast's, which prints
-        // from the copy on its `JsdocCast` node rather than from the shared array (the
+        // from the copy on its `CommentBoundPair` node rather than from the shared array (the
         // ledger keys on the span, so the copy lands on the same entry). The renderer
         // records the emit when it reaches the node.
         #[cfg(feature = "comment_check")]

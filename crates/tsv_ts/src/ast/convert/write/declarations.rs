@@ -112,9 +112,9 @@ fn super_class_wrap_span(
     source: &str,
 ) -> Option<Span> {
     let tp_span = type_params_span?;
-    // The public super-class node starts at the JsdocCast-unwrapped inner
+    // The public super-class node starts at the CommentBoundPair-unwrapped inner
     // expression.
-    let sc_start = super_class.map(|e| e.unwrap_jsdoc_casts().span().start)?;
+    let sc_start = super_class.map(|e| e.unwrap_comment_bound_pairs().span().start)?;
     let stp_end = super_type_parameters_end?;
     if tsv_lang::printing::is_same_line(source, tp_span.end, sc_start) {
         return None;

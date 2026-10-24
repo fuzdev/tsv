@@ -1804,7 +1804,7 @@ files only (.ts/.js/.mts/.cts/…); casts/annotations concentrate in JSDoc-typed
 
 **Signal.** Reparse input + tsv-formatted output with `preserve_parens` (grouping parens become
 ParenthesizedExpression nodes), and per glued comment compare the bound subtree. A cast stays
-invisible even so (its JsdocCast node emits its bare inner), so the audit anchors INSIDE the
+invisible even so (its CommentBoundPair node emits its bare inner), so the audit anchors INSIDE the
 cast's `(`. And since the only structural delta formatting can add under preserve_parens is a
 clarity-paren (roundtrip_audit gates the rest), the skeleton is compared with
 ParenthesizedExpression STRIPPED — the binding-paren signal rides a separate `anchor_is_paren`

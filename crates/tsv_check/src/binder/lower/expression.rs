@@ -8,13 +8,13 @@ use super::super::*;
 use tsv_ts::ast::internal::{
     ArrayExpression, ArrayPattern, ArrowFunctionBody, ArrowFunctionExpression,
     AssignmentExpression, AssignmentPattern, AwaitExpression, BinaryExpression, CallExpression,
-    ClassExpression, ConditionalExpression, Decorator, Expression, ExpressionKind,
-    FunctionExpression, Identifier, ImportExpression, JsdocCast, MemberExpression, MetaProperty,
-    NewExpression, ObjectExpression, ObjectPattern, ObjectPatternProperty, ObjectProperty,
-    ParenthesizedExpression, Property, RestElement, SequenceExpression, SpreadElement,
-    TSAsExpression, TSInstantiationExpression, TSNonNullExpression, TSParameterProperty,
-    TSSatisfiesExpression, TSTypeAssertion, TaggedTemplateExpression, TemplateElement,
-    TemplateLiteral, UnaryExpression, UpdateExpression, YieldExpression,
+    ClassExpression, CommentBoundPair, ConditionalExpression, Decorator, Expression,
+    ExpressionKind, FunctionExpression, Identifier, ImportExpression, MemberExpression,
+    MetaProperty, NewExpression, ObjectExpression, ObjectPattern, ObjectPatternProperty,
+    ObjectProperty, ParenthesizedExpression, Property, RestElement, SequenceExpression,
+    SpreadElement, TSAsExpression, TSInstantiationExpression, TSNonNullExpression,
+    TSParameterProperty, TSSatisfiesExpression, TSTypeAssertion, TaggedTemplateExpression,
+    TemplateElement, TemplateLiteral, UnaryExpression, UpdateExpression, YieldExpression,
 };
 
 impl SoaWalk {
@@ -80,7 +80,7 @@ impl SoaWalk {
             E::TSParameterProperty(pp) => self.visit_ts_parameter_property(pp, expr.span, parent),
             E::ImportExpression(i) => self.visit_import_expression(i, expr.span, parent),
             E::MetaProperty(m) => self.visit_meta_property(m, expr.span, parent),
-            E::JsdocCast(c) => self.visit_jsdoc_cast(c, expr.span, parent),
+            E::CommentBoundPair(c) => self.visit_comment_bound_pair(c, expr.span, parent),
             E::ParenthesizedExpression(p) => {
                 self.visit_parenthesized_expression(p, expr.span, parent);
             }
@@ -444,8 +444,8 @@ impl SoaWalk {
     }
 
     #[inline]
-    fn visit_jsdoc_cast(&mut self, c: &JsdocCast<'_>, span: Span, parent: NodeId) {
-        let id = self.add(NodeKind::JsdocCast, span, Some(parent), addr_of(c));
+    fn visit_comment_bound_pair(&mut self, c: &CommentBoundPair<'_>, span: Span, parent: NodeId) {
+        let id = self.add(NodeKind::CommentBoundPair, span, Some(parent), addr_of(c));
         self.visit_expression(c.inner, id);
         self.close(id);
     }

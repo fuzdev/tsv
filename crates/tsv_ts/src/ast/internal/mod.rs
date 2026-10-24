@@ -86,13 +86,13 @@ pub use statements::{
 pub use expressions::{
     ArrayExpression, ArrowFunctionBody, ArrowFunctionExpression, AssignmentExpression,
     AssignmentOperator, AwaitExpression, BinaryExpression, BinaryOperator, CallExpression,
-    ConditionalExpression, Expression, ExpressionKind, FunctionExpression, ImportExpression,
-    JsdocCast, MemberExpression, MetaProperty, NewExpression, ObjectExpression, ObjectProperty,
-    ParenthesizedExpression, Property, PropertyKind, RegexLiteral, SequenceExpression,
-    SpreadElement, Super, TSAsExpression, TSInstantiationExpression, TSNonNullExpression,
-    TSSatisfiesExpression, TSTypeAssertion, TaggedTemplateExpression, TemplateCooked,
-    TemplateElement, TemplateLiteral, ThisExpression, UnaryExpression, UnaryOperator,
-    UpdateExpression, UpdateOperator, YieldExpression,
+    CommentBoundPair, ConditionalExpression, Expression, ExpressionKind, FunctionExpression,
+    ImportExpression, MemberExpression, MetaProperty, NewExpression, ObjectExpression,
+    ObjectProperty, ParenthesizedExpression, Property, PropertyKind, RegexLiteral,
+    SequenceExpression, SpreadElement, Super, TSAsExpression, TSInstantiationExpression,
+    TSNonNullExpression, TSSatisfiesExpression, TSTypeAssertion, TaggedTemplateExpression,
+    TemplateCooked, TemplateElement, TemplateLiteral, ThisExpression, UnaryExpression,
+    UnaryOperator, UpdateExpression, UpdateOperator, YieldExpression,
 };
 
 // The two node enums are wide enough that holding one BY VALUE across a recursive

@@ -68,11 +68,11 @@ pub(crate) struct Erased<'arena> {
     /// window (see [`Eraser::drop_region`]). In walk order.
     pub(crate) regions: Vec<Span>,
     /// Whether the tree was rebuilt at all. `false` proves the input carried no
-    /// TypeScript-only node **and** no `JsdocCast` — the property the self-check
+    /// TypeScript-only node **and** no `CommentBoundPair` — the property the self-check
     /// asserts of the finished program.
     pub(crate) changed: bool,
     /// Whether TypeScript-only *syntax* was erased. Distinct from
-    /// [`Self::changed`]: unwrapping a `JsdocCast` (`/** @type {T} */ (x)`) is a
+    /// [`Self::changed`]: unwrapping a `CommentBoundPair` (`/** @type {T} */ (x)`) is a
     /// compile-path normalization of **valid JS**, so it must not make a
     /// `lang`-less script look like TypeScript.
     pub(crate) typescript: bool,
@@ -109,7 +109,7 @@ pub(crate) struct ErasedExpr<'arena> {
     /// Whether TypeScript-only *syntax* was erased — the `lang="ts"` gate, which
     /// applies to the template exactly as it does to the script (the oracle's
     /// flag is document-wide). Distinct from `expr.is_some()`: unwrapping a
-    /// `JsdocCast` rebuilds valid JS and must not read as TypeScript.
+    /// `CommentBoundPair` rebuilds valid JS and must not read as TypeScript.
     pub(crate) typescript: bool,
 }
 
@@ -281,7 +281,7 @@ struct Eraser<'arena, 'src> {
     source: &'src str,
     /// Erased regions, already extended to their comment-refusal windows.
     regions: Vec<Span>,
-    /// Set by every TypeScript-only erasure (never by the `JsdocCast` unwrap).
+    /// Set by every TypeScript-only erasure (never by the `CommentBoundPair` unwrap).
     typescript: bool,
     /// Whether the parameter list currently being erased is a **constructor's**.
     /// The oracle rejects a parameter property only there, and only when it
@@ -1516,7 +1516,7 @@ impl<'arena> Eraser<'arena, '_> {
     ///
     /// The five TypeScript wrappers **unwrap to their inner expression**
     /// (`x as T` → `x`, `x!` → `x`, `x satisfies T` → `x`, `<T>x` → `x`,
-    /// `f<T>` → `f`), and so does the internal `JsdocCast` wrapper — the oracle's
+    /// `f<T>` → `f`), and so does the internal `CommentBoundPair` wrapper — the oracle's
     /// AST has no such node (it parses without `preserveParens`), so
     /// `/** @type {T} */ (1)` is simply `1` with a leading comment there; keeping
     /// tsv's wrapper would print the parens the oracle drops *and* block the
@@ -1917,7 +1917,7 @@ impl<'arena> Eraser<'arena, '_> {
             // dropping the wrapper leaves that comment printed by nothing. The
             // compile path releases it back to the positional machinery — see
             // `transform_server::collect_script_comments`.
-            ExpressionKind::JsdocCast(cast) => {
+            ExpressionKind::CommentBoundPair(cast) => {
                 Some(self.expr(cast.inner)?.unwrap_or_else(|| cast.inner.clone()))
             }
             ExpressionKind::ParenthesizedExpression(paren) => {

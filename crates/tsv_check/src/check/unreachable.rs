@@ -689,7 +689,7 @@ impl CandidateWalk<'_> {
             E::TSInstantiationExpression(t) => self.visit_expr(t.expression),
             E::TSNonNullExpression(t) => self.visit_expr(t.expression),
             E::ParenthesizedExpression(p) => self.visit_expr(p.expression),
-            E::JsdocCast(c) => self.visit_expr(c.inner),
+            E::CommentBoundPair(c) => self.visit_expr(c.inner),
             E::UnaryExpression(u) => self.visit_expr(u.argument),
             E::UpdateExpression(u) => self.visit_expr(u.argument),
             E::AwaitExpression(a) => self.visit_expr(a.argument),

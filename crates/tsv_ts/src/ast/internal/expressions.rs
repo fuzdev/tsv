@@ -84,8 +84,9 @@ pub enum ExpressionKind<'arena> {
     ImportExpression(ImportExpression<'arena>),
     // Meta property: import.meta, new.target (two inline Identifiers)
     MetaProperty(&'arena MetaProperty<'arena>),
-    // JSDoc type cast: `/** @type {T} */ (inner)` — internal-only, never serialized
-    JsdocCast(JsdocCast<'arena>),
+    // A grouping pair bound to the comment before its `(` — the JSDoc type cast
+    // `/** @type {T} */ (inner)`. Internal-only, never serialized
+    CommentBoundPair(CommentBoundPair<'arena>),
     // Preserved grouping parens: `(expr)` — only produced under the parser's
     // `preserve_parens` mode (snippet parameters), serialized to match acorn's
     // `preserveParens` output.
@@ -205,7 +206,7 @@ impl<'arena> Expression<'arena> {
     /// assignment-target validation (does the assertion wrap a *simple* target?).
     /// `TSInstantiationExpression` (`f<T>`) is deliberately **not** peeled — it is not
     /// an assertion. Peeling is a QUESTION here, never an emission: the wire keeps the
-    /// assertion node, and only convert's `unwrap_jsdoc_casts` drops anything.
+    /// assertion node, and only convert's `unwrap_comment_bound_pairs` drops anything.
     pub fn skip_type_assertions(&self) -> &Expression<'arena> {
         match &self.kind {
             ExpressionKind::TSAsExpression(e) => e.expression.skip_type_assertions(),
@@ -214,20 +215,20 @@ impl<'arena> Expression<'arena> {
             ExpressionKind::TSTypeAssertion(e) => e.expression.skip_type_assertions(),
             // A JSDoc `/** @type {T} */ (expr)` cast is a type assertion too —
             // peel it to its inner target like the others.
-            ExpressionKind::JsdocCast(e) => e.inner.skip_type_assertions(),
+            ExpressionKind::CommentBoundPair(e) => e.inner.skip_type_assertions(),
             _ => self,
         }
     }
 
-    /// Peel internal-only `JsdocCast` wrappers, returning the expression the
+    /// Peel internal-only `CommentBoundPair` wrappers, returning the expression the
     /// public AST will actually carry — a cast converts to its inner
     /// expression (paren-free, matching acorn/Svelte), so structural checks
     /// against "the converted node" must look through the wrapper. Note the
     /// wrapper's own `span()` covers the parens; the public node's span is the
     /// unwrapped inner's.
-    pub fn unwrap_jsdoc_casts(&self) -> &Expression<'arena> {
+    pub fn unwrap_comment_bound_pairs(&self) -> &Expression<'arena> {
         let mut e = self;
-        while let ExpressionKind::JsdocCast(cast) = &e.kind {
+        while let ExpressionKind::CommentBoundPair(cast) = &e.kind {
             e = cast.inner;
         }
         e
@@ -295,7 +296,8 @@ impl<'arena> Expression<'arena> {
     }
 }
 
-/// JSDoc type cast: `/** @type {T} */ (inner)`.
+/// A grouping pair the comment before its `(` binds: the JSDoc type cast
+/// `/** @type {T} */ (inner)`.
 ///
 /// Internal-only wrapper recording that the author wrote a parenthesized
 /// expression immediately preceded by a `@type`/`@satisfies` block comment — a
@@ -310,7 +312,7 @@ impl<'arena> Expression<'arena> {
 /// is opaque to layout heuristics (expand-last etc.), mirroring how acorn's
 /// `ParenthesizedExpression` hides the inner type in prettier-plugin-svelte.
 #[derive(Debug, Clone)]
-pub struct JsdocCast<'arena> {
+pub struct CommentBoundPair<'arena> {
     pub inner: &'arena Expression<'arena>,
     /// The `@type`/`@satisfies` comment glued to `span.start`. The cast owns it
     /// (`Comment::owned_by_node`), so the generic comment machinery skips it and this
@@ -330,10 +332,10 @@ pub struct JsdocCast<'arena> {
 /// `remove_parens` (`1-parse/state/tag.js`) — and for the binding audit's wire-only
 /// reparse. The public AST then keeps the `ParenthesizedExpression` node, matching
 /// Svelte's output. A JSDoc cast's pair is one of them: under that mode it is this node
-/// (the cast comment leading it on Svelte's wire), never a [`JsdocCast`].
+/// (the cast comment leading it on Svelte's wire), never a [`CommentBoundPair`].
 ///
 /// The holding `Expression`'s span covers the parentheses (`(`…`)`); `expression`
-/// keeps its own paren-free span. Unlike [`JsdocCast`], the parens are **not** semantically
+/// keeps its own paren-free span. Unlike [`CommentBoundPair`], the parens are **not** semantically
 /// required — prettier re-derives them (`(b)`→`b`, but keeps `(2, 3)` because a
 /// sequence needs them) — so the node is a **wire** shape only: no printer or compiler
 /// ever reads a tree that holds one. `tsv_svelte` parses such a head twice and hands every

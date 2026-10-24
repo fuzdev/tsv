@@ -52,7 +52,7 @@ pub(super) enum ChainState {
 /// - `strip_optional` — the unparenthesized-decorator quirk: `optional` is
 ///   omitted along the call/member spine.
 ///
-/// Both flags survive a `JsdocCast` unwrap (they act on the unwrapped inner
+/// Both flags survive a `CommentBoundPair` unwrap (they act on the unwrapped inner
 /// expression) and die at a `ChainExpression` wrap ([`flags_after_wrap`]).
 /// `force_optional` is read by the call/member arms and by the `Identifier` arm — the
 /// bare callee of `a?.<T>(x)` is the node it marks optional — and `strip_optional` by
@@ -141,7 +141,7 @@ pub(super) fn write_expression_inner(
 /// whatever it claimed.
 #[cold]
 #[inline(never)]
-fn write_jsdoc_cast_paren_frame(
+fn write_comment_bound_pair_paren_frame(
     w: &mut JsonWriter,
     span: Span,
     inner: &internal::Expression<'_>,
@@ -191,7 +191,7 @@ fn write_expression_full_dispatch(
         // JSDoc cast is internal-only: emit the inner expression (paren-free
         // public AST). `chain: ChainState::Unresolved` — the cast's parens seal any chain;
         // force/strip pass through (they act on the converted inner).
-        internal::ExpressionKind::JsdocCast(cast) => {
+        internal::ExpressionKind::CommentBoundPair(cast) => {
             let flags = ExprFlags {
                 // The cast's parens seal the chain, so the inner
                 // expression inherits no verdict — `/** @type {T} */
@@ -202,7 +202,7 @@ fn write_expression_full_dispatch(
             if let CommentMode::Attach(attach) = ctx.comments
                 && attach.removes_parens()
             {
-                write_jsdoc_cast_paren_frame(w, expr.span, cast.inner, ctx, flags, attach);
+                write_comment_bound_pair_paren_frame(w, expr.span, cast.inner, ctx, flags, attach);
             } else {
                 write_expression_inner(w, cast.inner, ctx, flags);
             }
@@ -524,9 +524,9 @@ fn write_expression_full_dispatch(
             // acorn quirk: when the parameter is an AssignmentPattern whose left
             // has no type annotation, its span/loc expand to include the
             // accessibility modifier keyword (the whole parameter property).
-            let param = param_prop.parameter.unwrap_jsdoc_casts();
+            let param = param_prop.parameter.unwrap_comment_bound_pairs();
             let override_ap = if let internal::ExpressionKind::AssignmentPattern(ap) = &param.kind {
-                let has_type_ann = match &ap.left.unwrap_jsdoc_casts().kind {
+                let has_type_ann = match &ap.left.unwrap_comment_bound_pairs().kind {
                     internal::ExpressionKind::Identifier(id) => id.type_annotation().is_some(),
                     internal::ExpressionKind::ArrayPattern(arr) => arr.type_annotation.is_some(),
                     internal::ExpressionKind::ObjectPattern(obj) => obj.type_annotation.is_some(),

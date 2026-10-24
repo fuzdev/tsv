@@ -26,7 +26,7 @@ Prettier is idempotent on its own output here, so unlike the JSDoc-cast case the
 no second pass to reveal the shift.
 
 This is the same boundary the [JSDoc cast](../jsdoc_type_cast_enclosing_parens_prettier_divergence/)
-rule protects, minus the AST node: a cast is a `JsdocCast` the parser can hand
+rule protects, minus the AST node: a cast is a `CommentBoundPair` the parser can hand
 ownership of its comment to, while an annotation is an ordinary block comment glued to
 an ordinary call. tsv therefore holds *any* leading comment against the token it
 precedes rather than enumerating bundler vocabularies — an annotation set is

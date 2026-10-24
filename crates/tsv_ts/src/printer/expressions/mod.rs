@@ -169,7 +169,8 @@ impl<'a> Printer<'a> {
     /// Also where the embed's other build-time field lands: a host that cannot hang a
     /// leading cast (`EmbedContext::jsdoc_cast_cannot_hang` — a Svelte braced head) has
     /// the root's left-spine cast marked here, before any doc is built, so its
-    /// comment→`(` break reflows in every authoring (`build_jsdoc_cast_lead_doc`). Both root
+    /// comment→`(` break reflows in every authoring (`build_comment_bound_pair_lead_doc`). Both
+    /// root
     /// entries — this doc builder and `print_expression`'s string path — pass through
     /// here, so the flag cannot behave differently per entry.
     ///
@@ -463,7 +464,9 @@ impl<'a> Printer<'a> {
             ExpressionKind::TSParameterProperty(param_prop) => {
                 self.build_ts_parameter_property_doc(param_prop, expr.span)
             }
-            ExpressionKind::JsdocCast(cast) => self.build_jsdoc_cast_doc(cast, expr.span),
+            ExpressionKind::CommentBoundPair(cast) => {
+                self.build_comment_bound_pair_doc(cast, expr.span)
+            }
             // Unreachable by construction: the one parse that builds this node — a
             // `{#snippet}` head's `preserve_parens` parse — feeds the Svelte wire writer
             // alone, and the printer is handed that head's paren-free parse instead
@@ -501,7 +504,7 @@ impl<'a> Printer<'a> {
     /// Two gap categories override the default with a **rule**, via span-keyed printer
     /// cells the gap sets before the value is built. Both are read HERE rather than by
     /// the caller, and the caller must therefore invoke this before it builds the inner
-    /// (see [`Printer::build_jsdoc_cast_doc`]):
+    /// (see [`Printer::build_comment_bound_pair_doc`]):
     ///
     /// - a **value gap** is not one of the soft `line`'s gaps: there the break is answered
     ///   by rule, not by width ([`Printer::jsdoc_cast_value_gap_target`]), so it reflows to
@@ -526,9 +529,9 @@ impl<'a> Printer<'a> {
     /// all three separators alike. The two REFLOW arms are the exception by construction:
     /// a reflow says the break was layout rather than authoring, so the blank inside it
     /// goes with it. Pinned by `typescript/syntax/comments/jsdoc_type_cast_leading_run_blank`.
-    fn build_jsdoc_cast_lead_doc(
+    fn build_comment_bound_pair_lead_doc(
         &self,
-        cast: &crate::ast::internal::JsdocCast<'_>,
+        cast: &crate::ast::internal::CommentBoundPair<'_>,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -545,12 +548,13 @@ impl<'a> Printer<'a> {
             "a JSDoc cast's comment→`(` gap is whitespace-only by construction"
         );
         // The array's entry, not the node's copy: a nestled predecessor merges INTO the
-        // cast's comment, and printing the copy would drop it ([`Self::jsdoc_cast_comment`]).
+        // cast's comment, and printing the copy would drop it
+        // ([`Self::comment_bound_pair_comment`]).
         // `jsdoc_cast_comment_own_line` below resolves the same entry again rather than
         // taking this one — the resolution stays inside that predicate so its two other
         // callers, which hold only the cast, cannot reach a different answer. Deliberate:
         // one predicate is worth more than one saved lookup on a path this rare.
-        let comment = self.jsdoc_cast_comment(cast, span);
+        let comment = self.comment_bound_pair_comment(cast, span);
         let mut parts: DocBuf = smallvec![self.build_comment_doc(&comment)];
         if self.jsdoc_cast_in_cannot_hang_gap(span) {
             parts.push(d.text(" "));
@@ -577,7 +581,7 @@ impl<'a> Printer<'a> {
     /// cast silently re-binds to the wider expression on reparse. See
     /// `docs/conformance_prettier_ts_comments.md` §JSDoc / paren semantics.
     ///
-    /// A **nested** cast's comment lands the same way — the inner `JsdocCast` prints
+    /// A **nested** cast's comment lands the same way — the inner `CommentBoundPair` prints
     /// its own (`/** @type {A} */ (/** @type {B} */ (expr))`) — so the interior gap
     /// below carries only ordinary comments. The inner is built bare: the cast's own
     /// parens provide grouping, so `needs_parens` must not double-wrap it.
@@ -587,9 +591,9 @@ impl<'a> Printer<'a> {
     /// inner gets a breakable group (`(inner)` flat, `(⏎\tinner⏎)` when wide). A
     /// line comment in the gap forces a hardline layout so it can't swallow the
     /// inner and the closing `)`.
-    fn build_jsdoc_cast_doc(
+    fn build_comment_bound_pair_doc(
         &self,
-        cast: &crate::ast::internal::JsdocCast<'_>,
+        cast: &crate::ast::internal::CommentBoundPair<'_>,
         cast_span: Span,
     ) -> DocId {
         let d = self.d();
@@ -600,7 +604,7 @@ impl<'a> Printer<'a> {
         // own mark overwrites them — so an answer taken after the recursion below is the
         // innermost gap's, not this cast's, and every cast wrapping such a value lost its
         // reflow.
-        let lead = self.build_jsdoc_cast_lead_doc(cast, cast_span);
+        let lead = self.build_comment_bound_pair_lead_doc(cast, cast_span);
         // Rule A inside the cast's own parens: a directive alone on its line in the
         // `(`→inner gap freezes the INNER verbatim, with the cast's comment and parens
         // printing around the frozen slice. Freezing the paren-stripped inner rather than

@@ -27,7 +27,7 @@ so `b` — the value whose type the author was asserting — goes unchecked. tsv
 the cast on the node the author wrote it on, and reaches a fixed point in one pass.
 
 tsv holds the pair together structurally rather than by re-deriving it from text: the
-parser gives the `JsdocCast` node **ownership** of its comment, so the comment is
+parser gives the `CommentBoundPair` node **ownership** of its comment, so the comment is
 printed by the cast, never by an enclosing gap, and a synthesized paren cannot land
 between the two. Prettier re-decides cast-hood from text adjacency on every parse,
 which is exactly why its own output doesn't survive a second pass.

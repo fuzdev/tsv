@@ -53,7 +53,7 @@ pub struct Comment {
     ///
     /// - the general glued comment (plain or annotation) has no node of its own, so the
     ///   innermost node its token begins prints it (via `build_expression_doc`);
-    /// - the JSDoc cast is printed by its `JsdocCast` node, which carries its own copy.
+    /// - the JSDoc cast is printed by its `CommentBoundPair` node, which carries its own copy.
     ///   `is_jsdoc_type_cast_comment` (the only surviving content sniff) decides cast
     ///   *paren-retention*, i.e. whether that node is built — never ownership itself.
     ///

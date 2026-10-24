@@ -1119,7 +1119,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
 
             // ── Leaves, and nodes that cannot appear post-erasure ──────────
             // The TypeScript wrappers (`x as T`, `x!`, `<T>x`, `x satisfies T`,
-            // `f<T>`, a parameter property) and `JsdocCast` are all removed by
+            // `f<T>`, a parameter property) and `CommentBoundPair` are all removed by
             // `erase` before this pass; a survivor is caught by the erase
             // self-check on the finished program, never a silent store miss here.
             // Exhaustive on purpose — a NEW expression variant fails compilation.
@@ -1135,7 +1135,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
             | ExpressionKind::TSInstantiationExpression(_)
             | ExpressionKind::TSNonNullExpression(_)
             | ExpressionKind::TSParameterProperty(_)
-            | ExpressionKind::JsdocCast(_) => None,
+            | ExpressionKind::CommentBoundPair(_) => None,
             ExpressionKind::ParenthesizedExpression(paren) => {
                 self.expr(paren.unreachable_contents())?
             }

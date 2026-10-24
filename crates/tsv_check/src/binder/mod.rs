@@ -163,7 +163,7 @@ pub enum NodeKind {
     TSParameterProperty,
     ImportExpression,
     MetaProperty,
-    JsdocCast,
+    CommentBoundPair,
     ParenthesizedExpression,
     // --- Types ---
     TSKeywordType,
@@ -646,7 +646,7 @@ pub(crate) fn statement_kind(stmt: &Statement<'_>) -> NodeKind {
 /// `debug_assert` at the end of `visit_expression` pins the agreement on every
 /// lowered expression (corpus-exercised — the conformance gate runs debug
 /// builds), and the flow walk's strict resolver hard-fails on any residual
-/// mismatch. A `JsdocCast` resolves to its **inner** expression's key: the flow
+/// mismatch. A `CommentBoundPair` resolves to its **inner** expression's key: the flow
 /// walk treats the cast wrapper as transparent (matching tsgo, where the
 /// reparsed cast is not a flow subject), and the SoA walk lowers both the
 /// wrapper and the inner, so the inner's key is always present.
@@ -660,7 +660,7 @@ pub(crate) fn expression_addr_kind(e: &Expression<'_>) -> (usize, NodeKind) {
     // it survives a copy of the enum, where an inline payload's address does not.
     // The lockstep `debug_assert` in `lower::expression` is what catches drift here.
     match &e.kind {
-        E::JsdocCast(c) => expression_addr_kind(c.inner),
+        E::CommentBoundPair(c) => expression_addr_kind(c.inner),
         E::Literal(x) => (addr_of(x), NodeKind::Literal),
         E::Identifier(x) => (addr_of(x), NodeKind::Identifier),
         E::PrivateIdentifier(x) => (addr_of(x), NodeKind::PrivateIdentifier),

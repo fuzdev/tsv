@@ -59,7 +59,7 @@ impl<'a> AttachInputs<'a> {
 /// emits.** `preserveParens` makes every pair a `ParenthesizedExpression` the walk
 /// enters, and `remove_parens` then discards it together with every comment it claimed.
 /// tsv's parse keeps a span for one kind of pair — a JSDoc cast's
-/// (`internal::JsdocCast`'s span covers its `(`…`)`), which the writer runs as a silent
+/// (`internal::CommentBoundPair`'s span covers its `(`…`)`), which the writer runs as a silent
 /// frame (`IslandComments::removes_parens`) — and discards the rest, so the bare pairs
 /// around the ROOT are recovered here ([`grouping_parens_around`]) and handed over as
 /// `IslandComments::root_parens`. Two things follow from the root being a pair:

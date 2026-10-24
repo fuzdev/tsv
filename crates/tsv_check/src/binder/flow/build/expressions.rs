@@ -413,7 +413,7 @@ impl<'a> FlowBuilder<'a> {
             E::TSNonNullExpression(t) => self.visit_expression(t.expression),
             E::TSParameterProperty(pp) => self.visit_expression(pp.parameter),
             E::ImportExpression(i) => self.visit_import_expression(i),
-            E::JsdocCast(c) => self.visit_expression(c.inner),
+            E::CommentBoundPair(c) => self.visit_expression(c.inner),
             E::ParenthesizedExpression(p) => self.visit_expression(p.expression),
         }
         if let Some((t, f)) = restore {

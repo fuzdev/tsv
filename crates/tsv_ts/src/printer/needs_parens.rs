@@ -1156,7 +1156,7 @@ fn export_default_leftmost<'a>(expr: &'a Expression<'a>, text: LeftmostText) -> 
 /// Two nodes carry a pair no position asks for, and both are tested at every step rather
 /// than at the root alone:
 ///
-/// - a [`JsdocCast`](crate::ast::internal::JsdocCast), whose parens are semantically
+/// - a [`CommentBoundPair`](crate::ast::internal::CommentBoundPair), whose parens are semantically
 ///   required — strip them and the cast stops being one — so its own doc always prints
 ///   them. A `/** @type {T} */` the author glued to the shell of a `<` operand is the same
 ///   document as the shell without it, and the region reads alike either way: the head scan
@@ -1378,7 +1378,7 @@ impl RegionHop {
 fn prints_its_own_paren_pair(expr: &Expression<'_>) -> bool {
     matches!(
         expr.kind,
-        ExpressionKind::JsdocCast(_) | ExpressionKind::SequenceExpression(_)
+        ExpressionKind::CommentBoundPair(_) | ExpressionKind::SequenceExpression(_)
     )
 }
 

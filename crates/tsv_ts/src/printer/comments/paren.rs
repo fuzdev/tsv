@@ -2759,7 +2759,7 @@ impl<'a> Printer<'a> {
     /// **A printer that synthesizes its own `(`…`)` owns this gap** — no enclosing emitter
     /// can see between those parens, so a comment left unclaimed here is DROPPED, not
     /// relocated. Both such printers call this: the stripped-paren restorer below and
-    /// `build_jsdoc_cast_doc`, which lacked the gap entirely
+    /// `build_comment_bound_pair_doc`, which lacked the gap entirely
     /// (`parenthesized/jsdoc_cast_trailing_paren_comment`).
     ///
     /// The separator is newline-aware — a comment the author put on a new line relative to

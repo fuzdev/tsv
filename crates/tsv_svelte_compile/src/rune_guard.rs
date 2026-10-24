@@ -1137,7 +1137,7 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
                 None => Ok(()),
             }
         }
-        ExpressionKind::JsdocCast(j) => walk_expression(j.inner, ctx),
+        ExpressionKind::CommentBoundPair(j) => walk_expression(j.inner, ctx),
         ExpressionKind::ParenthesizedExpression(p) => {
             walk_expression(p.unreachable_contents(), ctx)
         }

@@ -78,7 +78,7 @@ fn is_hopefully_short_arg(expr: &Expression<'_>) -> bool {
         // shortness question is asked of what it wraps. The recursion is one level deep on
         // purpose: `is_simple_call_argument` has no paren case, so a cast nested inside
         // another argument stays opaque, matching prettier.
-        ExpressionKind::JsdocCast(cast) => is_hopefully_short_arg(cast.inner),
+        ExpressionKind::CommentBoundPair(cast) => is_hopefully_short_arg(cast.inner),
 
         // Prettier: `isBinaryCastExpression(node) || node.type === "TypeCastExpression"` —
         // the `as` / `satisfies` pair (the Flow spellings have no tsv equivalent).

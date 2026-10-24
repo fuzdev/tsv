@@ -244,7 +244,7 @@ enum Payload {
     Line,
     /// A JSDoc type cast — the **one** remaining content sniff
     /// (`is_jsdoc_type_cast_comment`), which governs paren retention by building a
-    /// `JsdocCast` node that prints the comment itself.
+    /// `CommentBoundPair` node that prints the comment itself.
     JsdocCast,
     /// A bundler annotation — owned exactly like any other glued block comment (no sniff).
     /// Called out because losing one is silently *semantic*: the marked call stops being

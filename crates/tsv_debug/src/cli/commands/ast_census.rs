@@ -23,7 +23,7 @@
 //!
 //! ⚠️ **An internal node the writer does not name has no row.** Two kinds:
 //!
-//! - **Unwrapped wrappers** — `ParenthesizedExpression` and `JsdocCast` are
+//! - **Unwrapped wrappers** — `ParenthesizedExpression` and `CommentBoundPair` are
 //!   real `Expression` variants the parser builds and the writer prints
 //!   *through*, so a corpus's parens are invisible here. A census of
 //!   `Expression` values is therefore a LOWER BOUND, and the gap is exactly the

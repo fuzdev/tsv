@@ -170,7 +170,7 @@ fn any_expression_child<'e>(
                     .options
                     .is_some_and(|options| visit(options, Element { list_end }))
         }
-        ExpressionKind::JsdocCast(cast) => visit(cast.inner, Other),
+        ExpressionKind::CommentBoundPair(cast) => visit(cast.inner, Other),
         ExpressionKind::ParenthesizedExpression(paren) => visit(paren.expression, Other),
         ExpressionKind::Literal(_)
         | ExpressionKind::Identifier(_)
@@ -239,7 +239,7 @@ fn holds_region_closer(expr: &Expression<'_>) -> bool {
 fn supplies_its_own_pair(expr: &Expression<'_>) -> bool {
     matches!(
         expr.kind,
-        ExpressionKind::SequenceExpression(_) | ExpressionKind::JsdocCast(_)
+        ExpressionKind::SequenceExpression(_) | ExpressionKind::CommentBoundPair(_)
     )
 }
 

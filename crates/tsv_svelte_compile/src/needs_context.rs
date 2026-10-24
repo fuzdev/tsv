@@ -823,7 +823,7 @@ fn declare_ident(id: &tsv_ts::ast::internal::Identifier<'_>, nc: &mut Nc<'_>) {
 /// local, a `$state` binding, a block local, a global) read as a non-identifier
 /// and spuriously fire `needs_context` — wrapping the whole body in
 /// `$$renderer.component(…)` the oracle never emits. A silent MISMATCH, not a
-/// refusal. `JsdocCast` is the sixth transparent wrapper (valid JS, and
+/// refusal. `CommentBoundPair` is the sixth transparent wrapper (valid JS, and
 /// the oracle has no such node at all).
 fn root_of<'e>(expr: &'e Expression<'e>) -> &'e Expression<'e> {
     let mut node = expr;
@@ -835,7 +835,7 @@ fn root_of<'e>(expr: &'e Expression<'e>) -> &'e Expression<'e> {
             ExpressionKind::TSNonNullExpression(t) => node = t.expression,
             ExpressionKind::TSTypeAssertion(t) => node = t.expression,
             ExpressionKind::TSInstantiationExpression(t) => node = t.expression,
-            ExpressionKind::JsdocCast(j) => node = j.inner,
+            ExpressionKind::CommentBoundPair(j) => node = j.inner,
             _ => return node,
         }
     }
@@ -1099,7 +1099,7 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
             walk_expr(i.source, nc);
             walk_opt(i.options, nc);
         }
-        ExpressionKind::JsdocCast(j) => walk_expr(j.inner, nc),
+        ExpressionKind::CommentBoundPair(j) => walk_expr(j.inner, nc),
         ExpressionKind::ParenthesizedExpression(p) => walk_expr(p.unreachable_contents(), nc),
     }
 }

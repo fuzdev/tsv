@@ -90,7 +90,7 @@ pub(super) struct AwaitPieces {
 /// expression's own delimiter break to carry its own group, at which point the arms below
 /// become an `if_break` on it. No fixture pins the hole on purpose — `input.svelte` must be
 /// idempotent, so one could only bake the hugged form in as canonical.
-/// `JsdocCast` is deliberately **absent** for that reason and no other: its parens are
+/// `CommentBoundPair` is deliberately **absent** for that reason and no other: its parens are
 /// unconditional, but the flat-cast-under-a-multi-line-comment shape is the one this
 /// codebase already pins (`svelte/blocks/head_jsdoc_cast_multiline_comment_prettier_divergence`),
 /// so adding it would move a committed shape to fix a rarer one.

@@ -26,7 +26,7 @@
 //! facts make the comparison sound:
 //!
 //! - A **cast**'s pair is a grouping pair to `preserve_parens` like any other (a
-//!   `ParenthesizedExpression`, as under acorn's `preserveParens`; the `JsdocCast`
+//!   `ParenthesizedExpression`, as under acorn's `preserveParens`; the `CommentBoundPair`
 //!   node belongs to the paren-free parse), and its comment binds what the pair
 //!   wraps — so the audit anchors *inside* the cast's `(`, on the first real
 //!   token, and compares the wrapped subtree.

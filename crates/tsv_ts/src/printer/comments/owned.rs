@@ -71,7 +71,7 @@ fn outermost_claim_child<'x>(value: &'x Expression<'x>) -> Option<&'x Expression
     }
 }
 
-/// The [`internal::JsdocCast`] whose comment is the FIRST thing `expr` prints — `expr`
+/// The [`internal::CommentBoundPair`] whose comment is the FIRST thing `expr` prints — `expr`
 /// itself, or the leftmost leaf reached through [`left_spine_child`].
 ///
 /// A cast is the one owned comment that has to be reached as a **node**: the cast's span
@@ -89,16 +89,16 @@ fn outermost_claim_child<'x>(value: &'x Expression<'x>) -> Option<&'x Expression
 /// parenthesized inner) means the parent prints something ahead of it, so nothing below it
 /// leads the value.
 ///
-/// ⚠️ The **unguarded** walk. Every caller goes through [`Printer::leading_jsdoc_cast`],
+/// ⚠️ The **unguarded** walk. Every caller goes through [`Printer::leading_comment_bound_pair`],
 /// which carries the document-level short-circuit; this half exists only so that
 /// short-circuit has exactly one spelling.
-fn leading_jsdoc_cast_walk<'x>(
+fn leading_comment_bound_pair_walk<'x>(
     expr: &'x Expression<'x>,
-) -> Option<(&'x internal::JsdocCast<'x>, Span)> {
+) -> Option<(&'x internal::CommentBoundPair<'x>, Span)> {
     let start = expr.span().start;
     let mut node = expr;
     loop {
-        if let ExpressionKind::JsdocCast(cast) = &node.kind {
+        if let ExpressionKind::CommentBoundPair(cast) = &node.kind {
             return Some((cast, node.span));
         }
         let child = left_spine_child(node)?;
@@ -128,11 +128,12 @@ pub(crate) struct ValueGap {
 }
 
 impl<'a> Printer<'a> {
-    /// The [`internal::JsdocCast`] that leads `value`, or `None` — [`leading_jsdoc_cast_walk`]
+    /// The [`internal::CommentBoundPair`] that leads `value`, or `None` —
+    /// [`leading_comment_bound_pair_walk`]
     /// behind this document's owned-comment presence flag.
     ///
     /// **The short-circuit belongs here, not at the call sites.** A cast's comment is always
-    /// owned ([`internal::JsdocCast`] is minted only for `/** … */ (expr)`), so a document
+    /// owned ([`internal::CommentBoundPair`] is minted only for `/** … */ (expr)`), so a document
     /// carrying no owned comment carries no cast and the left-spine walk cannot find one —
     /// which is ~every document. That is a fact about the DOCUMENT, so every caller owes it,
     /// and stating it once here is what makes it unforgettable: the cannot-hang marks below
@@ -140,14 +141,14 @@ impl<'a> Printer<'a> {
     /// the spine walk on every `{expr}` in the template. A caller that ALSO tests the flag
     /// does so for its own further work (a position lookup, a comment-body read), not for
     /// this walk.
-    fn leading_jsdoc_cast<'x>(
+    fn leading_comment_bound_pair<'x>(
         &self,
         value: &'x Expression<'x>,
-    ) -> Option<(&'x internal::JsdocCast<'x>, Span)> {
+    ) -> Option<(&'x internal::CommentBoundPair<'x>, Span)> {
         if !self.has_owned_comments {
             return None;
         }
-        leading_jsdoc_cast_walk(value)
+        leading_comment_bound_pair_walk(value)
     }
 
     /// Record that `value` sits in a gap that answers a leading cast's break by rule and
@@ -156,7 +157,8 @@ impl<'a> Printer<'a> {
     /// authoring, the own-line hardline arm included
     /// ([`Printer::jsdoc_cast_cannot_hang_target`]).
     ///
-    /// The mark lands on the value's [`Self::leading_jsdoc_cast`] — the left-spine walk the TS
+    /// The mark lands on the value's [`Self::leading_comment_bound_pair`] — the left-spine walk the
+    /// TS
     /// hang predicates use — because a braced head's bug is exactly the hang's absence:
     /// wherever a TS value gap would answer the cast's hardline by ending the operator's
     /// line, a braced head has no operator line, so the reflow must reach every cast the
@@ -170,7 +172,7 @@ impl<'a> Printer<'a> {
     /// their build in [`Printer::with_jsdoc_cast_cannot_hang_gap`] instead.
     pub(in crate::printer) fn mark_jsdoc_cast_cannot_hang_gap(&self, value: &Expression<'_>) {
         self.jsdoc_cast_cannot_hang_target
-            .set(self.leading_jsdoc_cast(value).map(|(_, span)| span));
+            .set(self.leading_comment_bound_pair(value).map(|(_, span)| span));
     }
 
     /// Build `value`'s doc under a cannot-hang mark, restoring the previous mark after —
@@ -188,14 +190,14 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let saved = self.jsdoc_cast_cannot_hang_target.get();
         self.jsdoc_cast_cannot_hang_target
-            .set(self.leading_jsdoc_cast(value).map(|(_, span)| span));
+            .set(self.leading_comment_bound_pair(value).map(|(_, span)| span));
         let doc = build();
         self.jsdoc_cast_cannot_hang_target.set(saved);
         doc
     }
 
     /// Whether this cast is the one a cannot-hang gap recorded — asked where the
-    /// separator is chosen ([`Printer::build_jsdoc_cast_lead_doc`]), ahead of the own-line
+    /// separator is chosen ([`Printer::build_comment_bound_pair_lead_doc`]), ahead of the own-line
     /// arm. The complement of [`Printer::jsdoc_cast_in_value_gap`], which reflows only
     /// the soft-`line` arm (its gaps CAN hang, so their own-line authoring keeps the
     /// hardline and the enclosing gap supplies the hang).
@@ -271,8 +273,8 @@ impl<'a> Printer<'a> {
     /// emitters. `end` is the value's printed start, and the separator stays
     /// `printLeadingComment`'s: a space where the author glued the value to the `*/`.
     ///
-    /// ⚠️ **A JSDoc cast is excluded**: it prints its own copy from the `JsdocCast` node
-    /// (`build_jsdoc_cast_lead_doc`), so hoisting would print the comment twice — and its
+    /// ⚠️ **A JSDoc cast is excluded**: it prints its own copy from the `CommentBoundPair` node
+    /// (`build_comment_bound_pair_lead_doc`), so hoisting would print the comment twice — and its
     /// value needs no hoist anyway, since the cast's retained parens already stand between
     /// the comment and anything breakable.
     ///
@@ -438,14 +440,14 @@ impl<'a> Printer<'a> {
         if !self.comment_run_glued_through(gap_start, value.span().start) {
             return None;
         }
-        // ⚠️ The cast test is the LEFT-SPINE one ([`Self::leading_jsdoc_cast`]), never a
+        // ⚠️ The cast test is the LEFT-SPINE one ([`Self::leading_comment_bound_pair`]), never a
         // match on the value node: a cast at the base of a chain
         // (`= /** @type {A} */ (x).y`) is the node the comment binds to, and a node-keyed
         // test sees only the MemberExpression and hoists a run the cast then prints again —
         // a DOUBLE-PRINT the nestled-cast fixture caught. Same reason
         // `indentable_block_leads_value` is a gap question rather than a node one, and the
         // same walk every other cast reading in this file goes through.
-        if self.leading_jsdoc_cast(value).is_some() {
+        if self.leading_comment_bound_pair(value).is_some() {
             return None;
         }
         // A pair between the run and the value — the seam's, or the sequence's own — holds
@@ -643,7 +645,7 @@ impl<'a> Printer<'a> {
         // The left-spine walk, entered at the child rather than at the node above it: both
         // start at `start`, so the two readings are the same one, and the span-keyed form has
         // no node above to enter at.
-        first_child.is_none_or(|c| self.leading_jsdoc_cast(c).is_none())
+        first_child.is_none_or(|c| self.leading_comment_bound_pair(c).is_none())
     }
 
     /// Prepend the comment `expr` owns, glued to its own first token.
@@ -654,7 +656,8 @@ impl<'a> Printer<'a> {
     pub(crate) fn prepend_owned_leading_comment(&self, expr: &Expression<'_>, doc: DocId) -> DocId {
         // Document-level short-circuit: no comment in this document is owned, so nothing
         // here can prepend one. Skips even the byte gate below for the ~all documents with
-        // no owned comment. (Every `JsdocCast` comment is owned, so a cast implies the flag.)
+        // no owned comment. (Every `CommentBoundPair` comment is owned, so a cast implies the
+        // flag.)
         if !self.has_owned_comments {
             return doc;
         }
@@ -662,7 +665,7 @@ impl<'a> Printer<'a> {
         // Cheap byte gate next: this runs once per expression node (the highest-frequency
         // comment path), and almost every expression is mid-line — preceded by `(`/`,`/space,
         // not a block comment's `*/` — so the gate bails in a few instructions before the
-        // JsdocCast match and the 13-arm left-spine walk.
+        // CommentBoundPair match and the 13-arm left-spine walk.
         //
         // ⚠️ Deliberately **narrower** than the lookup it guards, which asks
         // `CommentGlue::AnyLine` because a JSDoc cast owns its comment from the line above
@@ -680,8 +683,8 @@ impl<'a> Printer<'a> {
             return doc;
         }
         // A JSDoc cast holds its own copy of its comment and prints it against its own
-        // `(` — see `build_jsdoc_cast_lead_doc`. Claiming it here would print it twice.
-        if matches!(expr.kind, ExpressionKind::JsdocCast(_)) {
+        // `(` — see `build_comment_bound_pair_lead_doc`. Claiming it here would print it twice.
+        if matches!(expr.kind, ExpressionKind::CommentBoundPair(_)) {
             return doc;
         }
         // A node whose left-spine child starts here is not the innermost — that child is
@@ -766,7 +769,8 @@ impl<'a> Printer<'a> {
         // The separator is the author's: a general owned comment is glued on the token's
         // own line, so it is always the space — but a JSDoc cast may own its comment from
         // the line ABOVE its `(`, and collapsing that onto one line is a relocation the
-        // unfrozen path does not make (`build_jsdoc_cast_lead_doc` keeps the break on exactly
+        // unfrozen path does not make (`build_comment_bound_pair_lead_doc` keeps the break on
+        // exactly
         // `Self::jsdoc_cast_comment_own_line`'s shape, and so does prettier). Reading it off
         // the source keeps the two producers answering with one rule rather than the
         // claim having to know which bound the comment.
@@ -797,11 +801,11 @@ impl<'a> Printer<'a> {
     /// difference is the general rule's alone: prettier hangs an indentable block at a
     /// declarator and keeps it inline at a binding default and an enum member — where tsv
     /// matches it (`member_init_multiline_block_comment`), because those gaps ask only this.
-    /// Every asker reads the same cast off [`Self::leading_jsdoc_cast`], so none can
+    /// Every asker reads the same cast off [`Self::leading_comment_bound_pair`], so none can
     /// disagree about WHICH cast leads a value, and all take that lookup's document-level
     /// short-circuit.
     pub(crate) fn is_own_line_jsdoc_cast(&self, value: &Expression<'_>) -> bool {
-        self.leading_jsdoc_cast(value)
+        self.leading_comment_bound_pair(value)
             .is_some_and(|(cast, span)| self.jsdoc_cast_comment_own_line(cast, span))
     }
 
@@ -821,20 +825,22 @@ impl<'a> Printer<'a> {
     /// does, so the position is the same.
     pub(crate) fn owned_leading_comment_start(&self, expr: &Expression<'_>) -> Option<u32> {
         // Document-level short-circuit: no owned comment anywhere ⇒ no owned start
-        // (and no `JsdocCast` exists, since a cast's comment is always owned).
+        // (and no `CommentBoundPair` exists, since a cast's comment is always owned).
         if !self.has_owned_comments {
             return None;
         }
-        // A JSDoc cast carries its own copy and always prints it (`build_jsdoc_cast_lead_doc`), so
+        // A JSDoc cast carries its own copy and always prints it
+        // (`build_comment_bound_pair_lead_doc`), so
         // it is the one node that answers from the node rather than the position lookup.
         // It must: the cast's span covers the `(`…`)` only — the comment sits *outside* it —
         // so the lookup below can only ever find the cast's comment when the cast is `expr`'s
         // own left edge, and it is asked at a POSITION, which cannot walk.
-        // Resolved down the left spine ([`Self::leading_jsdoc_cast`]): the comment leads the value
+        // Resolved down the left spine ([`Self::leading_comment_bound_pair`]): the comment leads
+        // the value
         // from its leftmost leaf too, and a bound taken past it drops an authored blank line
         // (`[a,⏎⏎/** @type {A} */⏎(x).b]`) — the loss this function exists to prevent.
-        if let Some((cast, span)) = self.leading_jsdoc_cast(expr) {
-            return Some(self.jsdoc_cast_comment(cast, span).span.start);
+        if let Some((cast, span)) = self.leading_comment_bound_pair(expr) {
+            return Some(self.comment_bound_pair_comment(cast, span).span.start);
         }
         self.owned_leading_comment_at(expr.span().start)
             .map(|c| c.span.start)
@@ -847,14 +853,15 @@ impl<'a> Printer<'a> {
     /// so the lookup takes their union and `owned_by_node` decides (see that function). A
     /// JSDoc cast's comment therefore IS found here even from the line above its `(` — the
     /// three callers that must not print it twice each resolve the cast off the node first
-    /// ([`Self::leading_jsdoc_cast`], which also walks the left spine this position cannot).
+    /// ([`Self::leading_comment_bound_pair`], which also walks the left spine this position
+    /// cannot).
     pub(crate) fn owned_leading_comment_at(&self, start: u32) -> Option<&'a internal::Comment> {
         tsv_lang::owned_leading_comment_at(self.source, self.comments, start)
     }
 
     /// A JSDoc cast's owned comment **as this printer's array holds it**.
     ///
-    /// `JsdocCast` is the one node carrying a `Comment` copy of its own, taken at parse.
+    /// `CommentBoundPair` is the one node carrying a `Comment` copy of its own, taken at parse.
     /// The format path's comment view merges a nestled pair into one entry
     /// (`tsv_lang::merge_nestled_block_comments`), and a cast's comment can be the pair's
     /// TAIL — the merge is keyed on `*/`→`/*` adjacency and the cast on what precedes its
@@ -867,9 +874,9 @@ impl<'a> Printer<'a> {
     /// [`Self::owned_leading_comment_at`] finds it from the same position that bound it.
     /// Unconditional rather than gated on a document flag: a cast is rare, and a gate that
     /// can be forgotten at a fourth read site is worth less than the two compares it saves.
-    pub(crate) fn jsdoc_cast_comment(
+    pub(crate) fn comment_bound_pair_comment(
         &self,
-        cast: &internal::JsdocCast<'_>,
+        cast: &internal::CommentBoundPair<'_>,
         span: Span,
     ) -> internal::Comment {
         self.owned_leading_comment_at(span.start)
@@ -891,7 +898,7 @@ impl<'a> Printer<'a> {
     /// The single source of truth for both consequences of that shape: the hang itself
     /// (`expressions::assignment::choose_layout`, and the declarator's own predicates in
     /// `statements/variable.rs`) and the **hardline** the cast prints between the comment and
-    /// its `(` (`build_jsdoc_cast_lead_doc`). They must agree — a hang without the hardline
+    /// its `(` (`build_comment_bound_pair_lead_doc`). They must agree — a hang without the hardline
     /// leaves the `(` stranded, and a hardline without the hang un-indents it. A gap that
     /// CANNOT hang at all (a Svelte braced head, a computed key —
     /// [`Printer::jsdoc_cast_cannot_hang_target`]) opts out of both halves together: the
@@ -905,7 +912,7 @@ impl<'a> Printer<'a> {
     /// Reading `false` as "space" collapsed a break the author left after the `*/`
     /// (`a();⏎/* c */ /** @type {A} */⏎(b);`) at statement position, where the list keeps
     /// lines and every *other* leading comment — a plain glued run, a bundler annotation —
-    /// kept it. `build_jsdoc_cast_lead_doc` owns that three-way split.
+    /// kept it. `build_comment_bound_pair_lead_doc` owns that three-way split.
     ///
     /// ⚠️ **The soft `line` arm is scoped to gaps that are not VALUE gaps**, because a value
     /// gap answers the break with a rule rather than with width: an unforced break there
@@ -916,16 +923,17 @@ impl<'a> Printer<'a> {
     /// names, reached from the other side. `Printer::jsdoc_cast_value_gap_target` is how the
     /// value gap says so.
     ///
-    /// ⚠️ **It reads the ARRAY's comment, not the node's copy** ([`Self::jsdoc_cast_comment`]):
+    /// ⚠️ **It reads the ARRAY's comment, not the node's copy**
+    /// ([`Self::comment_bound_pair_comment`]):
     /// a nestled predecessor merges into the cast's comment, and the line the run opens is
     /// then the predecessor's. The resolution lives inside this predicate rather than at its
     /// caller so the two cannot part.
     pub(crate) fn jsdoc_cast_comment_own_line(
         &self,
-        cast: &internal::JsdocCast<'_>,
+        cast: &internal::CommentBoundPair<'_>,
         span: Span,
     ) -> bool {
-        let comment = self.jsdoc_cast_comment(cast, span);
+        let comment = self.comment_bound_pair_comment(cast, span);
         let bytes = self.source.as_bytes();
         // Only whitespace between the start of the line and the comment.
         let mut i = comment.span.start as usize;
