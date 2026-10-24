@@ -1654,13 +1654,13 @@ impl<'a> Printer<'a> {
     /// to end of line — and only a comment the author actually glued; a **block** is
     /// untouched, since it already renders inline inside the construct.
     ///
-    /// The retained type paren shells were the first callers and a **statement header's**
-    /// `(` the last — `if` / `while` / do-while / `with` / `switch` / `catch` and all three `for`
-    /// spellings, which followed prettier here long after every other delimiter in the
-    /// printer had stopped. Prettier is no coherent oracle for the position: it un-glues at
-    /// `if`-like heads and the C-style `for`, **glues** at for-in / for-of (emitting the
-    /// rest of the head unindented at column zero), and relocates the comment out of the
-    /// parens entirely at do-while. See
+    /// Its callers include the retained type paren shells, every **statement header's** `(`
+    /// (`if` / `while` / do-while / `with` / `switch` / `catch` and all three `for`
+    /// spellings) and a JSDoc cast's pair (`Self::build_comment_bound_pair_doc`). Prettier
+    /// is no coherent oracle for the position: it un-glues at `if`-like heads and the
+    /// C-style `for`, **glues** at for-in / for-of (emitting the rest of the head unindented
+    /// at column zero), and relocates the comment out of the parens entirely at do-while.
+    /// See
     /// [conformance_prettier_ts_comments.md §Comment relocation](../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).
     ///
     /// The leading `" "` is the PRINTER's and rides in the returned doc, never the

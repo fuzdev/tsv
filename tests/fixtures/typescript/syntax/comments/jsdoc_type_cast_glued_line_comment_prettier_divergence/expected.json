@@ -1,0 +1,574 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 908,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A line comment the author glued to a cast's `(` keeps that line, at `await`",
+			"start": 10,
+			"end": 88
+		},
+		{
+			"type": "Block",
+			"value": "* @type {A} ",
+			"start": 96,
+			"end": 112
+		},
+		{
+			"type": "Line",
+			"value": " d1",
+			"start": 115,
+			"end": 120
+		},
+		{
+			"type": "Line",
+			"value": " and at a declarator.",
+			"start": 132,
+			"end": 155
+		},
+		{
+			"type": "Block",
+			"value": "* @type {A} ",
+			"start": 168,
+			"end": 184
+		},
+		{
+			"type": "Line",
+			"value": " d2",
+			"start": 187,
+			"end": 192
+		},
+		{
+			"type": "Line",
+			"value": " Only the glued comment claims the line - the rest of the run keeps its own.",
+			"start": 204,
+			"end": 282
+		},
+		{
+			"type": "Block",
+			"value": "* @type {A} ",
+			"start": 295,
+			"end": 311
+		},
+		{
+			"type": "Line",
+			"value": " d3",
+			"start": 314,
+			"end": 319
+		},
+		{
+			"type": "Line",
+			"value": " e3",
+			"start": 322,
+			"end": 327
+		},
+		{
+			"type": "Line",
+			"value": " An author blank below the glued comment survives it,",
+			"start": 339,
+			"end": 394
+		},
+		{
+			"type": "Block",
+			"value": "* @type {A} ",
+			"start": 407,
+			"end": 423
+		},
+		{
+			"type": "Line",
+			"value": " d4",
+			"start": 426,
+			"end": 431
+		},
+		{
+			"type": "Line",
+			"value": " stopping at a nested cast's comment, above which none is added.",
+			"start": 444,
+			"end": 510
+		},
+		{
+			"type": "Block",
+			"value": "* @type {A} ",
+			"start": 523,
+			"end": 539
+		},
+		{
+			"type": "Line",
+			"value": " d5",
+			"start": 542,
+			"end": 547
+		},
+		{
+			"type": "Block",
+			"value": "* @type {B} ",
+			"start": 551,
+			"end": 567
+		},
+		{
+			"type": "Block",
+			"value": "* @type {A} ",
+			"start": 590,
+			"end": 606
+		},
+		{
+			"type": "Line",
+			"value": " d6",
+			"start": 609,
+			"end": 614
+		},
+		{
+			"type": "Block",
+			"value": "* @type {B} ",
+			"start": 617,
+			"end": 633
+		},
+		{
+			"type": "Line",
+			"value": " A block glued to the `(` claims nothing, so the whole run stays below it.",
+			"start": 645,
+			"end": 721
+		},
+		{
+			"type": "Block",
+			"value": "* @type {A} ",
+			"start": 734,
+			"end": 750
+		},
+		{
+			"type": "Block",
+			"value": " e7 ",
+			"start": 755,
+			"end": 763
+		},
+		{
+			"type": "Line",
+			"value": " d7",
+			"start": 764,
+			"end": 769
+		},
+		{
+			"type": "Line",
+			"value": " Control - written on its own line the comment keeps its own line.",
+			"start": 781,
+			"end": 849
+		},
+		{
+			"type": "Block",
+			"value": "* @type {A} ",
+			"start": 862,
+			"end": 878
+		},
+		{
+			"type": "Line",
+			"value": " d8",
+			"start": 883,
+			"end": 888
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 907,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 898,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 90,
+					"end": 129,
+					"expression": {
+						"type": "AwaitExpression",
+						"start": 90,
+						"end": 128,
+						"argument": {
+							"type": "Identifier",
+							"start": 123,
+							"end": 125,
+							"name": "x1",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": "* @type {A} ",
+									"start": 96,
+									"end": 112
+								},
+								{
+									"type": "Line",
+									"value": " d1",
+									"start": 115,
+									"end": 120
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A line comment the author glued to a cast's `(` keeps that line, at `await`",
+							"start": 10,
+							"end": 88
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 157,
+					"end": 201,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 163,
+							"end": 200,
+							"id": {
+								"type": "Identifier",
+								"start": 163,
+								"end": 165,
+								"name": "v2"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 195,
+								"end": 197,
+								"name": "x2",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {A} ",
+										"start": 168,
+										"end": 184
+									},
+									{
+										"type": "Line",
+										"value": " d2",
+										"start": 187,
+										"end": 192
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " and at a declarator.",
+							"start": 132,
+							"end": 155
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 284,
+					"end": 336,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 290,
+							"end": 335,
+							"id": {
+								"type": "Identifier",
+								"start": 290,
+								"end": 292,
+								"name": "v3"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 330,
+								"end": 332,
+								"name": "x3",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {A} ",
+										"start": 295,
+										"end": 311
+									},
+									{
+										"type": "Line",
+										"value": " d3",
+										"start": 314,
+										"end": 319
+									},
+									{
+										"type": "Line",
+										"value": " e3",
+										"start": 322,
+										"end": 327
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Only the glued comment claims the line - the rest of the run keeps its own.",
+							"start": 204,
+							"end": 282
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 396,
+					"end": 441,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 402,
+							"end": 440,
+							"id": {
+								"type": "Identifier",
+								"start": 402,
+								"end": 404,
+								"name": "v4"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 435,
+								"end": 437,
+								"name": "x4",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {A} ",
+										"start": 407,
+										"end": 423
+									},
+									{
+										"type": "Line",
+										"value": " d4",
+										"start": 426,
+										"end": 431
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An author blank below the glued comment survives it,",
+							"start": 339,
+							"end": 394
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 512,
+					"end": 576,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 518,
+							"end": 575,
+							"id": {
+								"type": "Identifier",
+								"start": 518,
+								"end": 520,
+								"name": "v5"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 569,
+								"end": 571,
+								"name": "x5",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {A} ",
+										"start": 523,
+										"end": 539
+									},
+									{
+										"type": "Line",
+										"value": " d5",
+										"start": 542,
+										"end": 547
+									},
+									{
+										"type": "Block",
+										"value": "* @type {B} ",
+										"start": 551,
+										"end": 567
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " stopping at a nested cast's comment, above which none is added.",
+							"start": 444,
+							"end": 510
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 579,
+					"end": 642,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 585,
+							"end": 641,
+							"id": {
+								"type": "Identifier",
+								"start": 585,
+								"end": 587,
+								"name": "v6"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 635,
+								"end": 637,
+								"name": "x6",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {A} ",
+										"start": 590,
+										"end": 606
+									},
+									{
+										"type": "Line",
+										"value": " d6",
+										"start": 609,
+										"end": 614
+									},
+									{
+										"type": "Block",
+										"value": "* @type {B} ",
+										"start": 617,
+										"end": 633
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 723,
+					"end": 778,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 729,
+							"end": 777,
+							"id": {
+								"type": "Identifier",
+								"start": 729,
+								"end": 731,
+								"name": "v7"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 772,
+								"end": 774,
+								"name": "x7",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {A} ",
+										"start": 734,
+										"end": 750
+									},
+									{
+										"type": "Block",
+										"value": " e7 ",
+										"start": 755,
+										"end": 763
+									},
+									{
+										"type": "Line",
+										"value": " d7",
+										"start": 764,
+										"end": 769
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block glued to the `(` claims nothing, so the whole run stays below it.",
+							"start": 645,
+							"end": 721
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 851,
+					"end": 897,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 857,
+							"end": 896,
+							"id": {
+								"type": "Identifier",
+								"start": 857,
+								"end": 859,
+								"name": "v8"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 891,
+								"end": 893,
+								"name": "x8",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {A} ",
+										"start": 862,
+										"end": 878
+									},
+									{
+										"type": "Line",
+										"value": " d8",
+										"start": 883,
+										"end": 888
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control - written on its own line the comment keeps its own line.",
+							"start": 781,
+							"end": 849
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

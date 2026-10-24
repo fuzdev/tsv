@@ -672,8 +672,12 @@ impl<'a> Printer<'a> {
             || trailing_needs_break
             || frozen_inner.is_some()
         {
+            // The opening-delimiter rule: a `//` the author glued to the `(` keeps its line
+            // (`/** @type {T} */ ( // d`), the author blank below it riding along, and the run
+            // resumes past it.
+            let (glued, resume) = self.split_open_delimiter_glued_run(open + 1, lead_end);
             let mut parts: DocBuf = smallvec![d.hardline()];
-            let mut run = self.comments_to_emit_between(open + 1, lead_end).peekable();
+            let mut run = self.comments_to_emit_between(resume, lead_end).peekable();
             while let Some(comment) = run.next() {
                 parts.push(self.build_comment_doc(comment));
                 // What follows this comment: the next one in the run, else the inner — or
@@ -698,8 +702,10 @@ impl<'a> Printer<'a> {
             }
             parts.push(inner_doc);
             parts.extend(trailing_parts);
+            let mut paren_parts: DocBuf = smallvec![d.text("(")];
+            paren_parts.extend(glued);
             return with_lead(d.concat(&[
-                d.text("("),
+                d.concat(&paren_parts),
                 d.indent(d.concat(&parts)),
                 d.hardline(),
                 d.text(")"),
