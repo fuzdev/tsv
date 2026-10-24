@@ -437,10 +437,9 @@ export function build_recipe_text(
 	return JSON.stringify({ command, fixed_env: fixed, kept_env });
 }
 
-/** A cache directory name: the sha256 of a tree's build-inputs key text (`build_inputs_of`). A
- * 40-hex name is a snapshot keyed by the whole tree id, from before the key moved to the build
- * inputs: it is never reused, only kept or evicted like any other by when it was last used. */
-export const CACHE_DIR_PATTERN = /^[0-9a-f]{40}([0-9a-f]{24})?$/;
+/** A cache directory name: the sha256 of a tree's build-inputs key text (`build_inputs_of`), as
+ * lowercase hex. */
+export const CACHE_DIR_PATTERN = /^[0-9a-f]{64}$/;
 
 /** One cached snapshot: its directory name (`CACHE_DIR_PATTERN`) and when a run last used it. */
 export interface CachedTree {

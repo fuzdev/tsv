@@ -1,7 +1,7 @@
 /**
  * Collect the GitHub Release assets for one version: the native `tsv` CLI
- * binary of every `@fuzdev/tsv-<triple>` platform package, plus a `SHA256SUMS`
- * file (`sha256sum -c` format). The release workflow's `release` job runs this
+ * binary of every `@fuzdev/tsv-<triple>` platform package, plus a `SHA512SUMS`
+ * file (`sha512sum -c` format). The release workflow's `release` job runs this
  * after the npm publish and uploads the directory.
  *
  * The binaries come FROM THE REGISTRY, not from the workflow's build artifacts:
@@ -34,7 +34,7 @@
  *        deno task release:assets v0.3.0 --out /tmp/tsv_assets
  *
  * Re-runnable locally against any published version, which is also how a
- * release's `SHA256SUMS` can be re-derived from npm and compared.
+ * release's `SHA512SUMS` can be re-derived from npm and compared.
  */
 
 import { parseArgs } from 'node:util';
@@ -158,16 +158,16 @@ const collect = async (): Promise<void> => {
 		Deno.removeSync(pack_dir, { recursive: true });
 	}
 
-	// `sha256sum -c SHA256SUMS` format: hex, two spaces, name.
+	// `sha512sum -c SHA512SUMS` format: hex, two spaces, name
 	const sums: Array<string> = [];
 	for (const asset of asset_names) {
 		const bytes = Deno.readFileSync(`${out_dir}/${asset}`);
-		const digest = await crypto.subtle.digest('SHA-256', bytes);
+		const digest = await crypto.subtle.digest('SHA-512', bytes);
 		const hex = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
 		sums.push(`${hex}  ${asset}`);
 	}
-	Deno.writeTextFileSync(`${out_dir}/SHA256SUMS`, sums.join('\n') + '\n');
-	console.log(`  SHA256SUMS  (${asset_names.length} assets)`);
+	Deno.writeTextFileSync(`${out_dir}/SHA512SUMS`, sums.join('\n') + '\n');
+	console.log(`  SHA512SUMS  (${asset_names.length} assets)`);
 };
 
 try {

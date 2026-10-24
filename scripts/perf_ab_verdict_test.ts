@@ -521,10 +521,11 @@ Deno.test('build_recipe_text moves with the command and the set and kept variabl
 	);
 });
 
-Deno.test('CACHE_DIR_PATTERN takes a build-inputs key and a legacy tree id, nothing else', () => {
+Deno.test('CACHE_DIR_PATTERN takes a build-inputs key, nothing else', () => {
 	deepStrictEqual(CACHE_DIR_PATTERN.test('a'.repeat(64)), true);
-	// a snapshot keyed by the whole tree id: never reused, aged out by eviction like any other
-	deepStrictEqual(CACHE_DIR_PATTERN.test('b'.repeat(40)), true);
+	// a git tree id is not a build-inputs key
+	deepStrictEqual(CACHE_DIR_PATTERN.test('b'.repeat(40)), false);
+	deepStrictEqual(CACHE_DIR_PATTERN.test('A'.repeat(64)), false);
 	deepStrictEqual(CACHE_DIR_PATTERN.test('a'.repeat(63)), false);
 	deepStrictEqual(CACHE_DIR_PATTERN.test(`${'a'.repeat(64)}.partial.12`), false);
 	deepStrictEqual(CACHE_DIR_PATTERN.test('index.12'), false);

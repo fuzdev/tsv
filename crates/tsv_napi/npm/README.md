@@ -24,7 +24,7 @@ The right platform binary installs automatically (per-platform `optionalDependen
 
 On any other platform the import throws with a pointer at `@fuzdev/tsv-wasm`.
 
-The same native `tsv` CLI binary is also attached to each [GitHub Release](https://github.com/fuzdev/tsv/releases) (one per platform above, with a `SHA256SUMS`; every asset carries a build provenance attestation: `gh attestation verify <file> -R fuzdev/tsv`) for use without npm.
+The same native `tsv` CLI binary is also attached to each [GitHub Release](https://github.com/fuzdev/tsv/releases) (one per platform above, with a `SHA512SUMS` for `sha512sum -c`; every asset carries a build provenance attestation: `gh attestation verify <file> -R fuzdev/tsv`) for use without npm.
 
 ## CLI
 

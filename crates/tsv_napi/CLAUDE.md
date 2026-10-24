@@ -308,8 +308,8 @@ release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
   `dry_run=false` dispatch on the tag, never the cron or a dry run). Body: `CHANGELOG.md`'s
   stamped `## <version>` section (`scripts/release_notes.ts`; preview with
   `deno task release:notes v<version>`). Assets: each platform package's native `tsv`
-  binary (`tsv-<triple>`, `tsv-win32-x64.exe`) + a `SHA256SUMS`, pulled back **from the
-  registry** (`scripts/release_assets.ts`; `deno task release:assets v<version> --out <dir>`),
+  binary (`tsv-<triple>`, `tsv-win32-x64.exe`) + a `SHA512SUMS` (`sha512sum -c`), pulled
+  back **from the registry** (`scripts/release_assets.ts`; `deno task release:assets v<version> --out <dir>`),
   so an asset is byte-identical to what npm serves even on a recovery re-run where the
   matrix rebuilds while the publish step skips live versions; its registry reads retry for
   a bounded window, since a just-published version can lag the read path. Every asset, the
@@ -319,7 +319,8 @@ release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
   attaches the assets in the same call, so a Release is never public without them; on a
   re-run an existing Release keeps its notes, the assets re-upload with `--clobber`, and
   the attestation is made again. The job holds the workflow's only `contents: write` and
-  `attestations: write`, and no npm token.
+  `attestations: write`, and no npm token. The checksum file and the attestation are this
+  channel's whole integrity story; it has no signed release log of its own.
 
 ## Marshalling & errors
 

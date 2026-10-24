@@ -132,8 +132,10 @@ As with other wasm packages, browsers must call `await init()`.
 
 The same native `tsv` CLI binaries are attached to each
 [GitHub Release](https://github.com/fuzdev/tsv/releases) (one per platform above,
-with a `SHA256SUMS`) for use without npm; every asset carries a build provenance
-attestation (`gh attestation verify tsv-linux-x64-gnu -R fuzdev/tsv`).
+with a `SHA512SUMS` for `sha512sum -c`) for use without npm; every asset carries
+a build provenance attestation (`gh attestation verify tsv-linux-x64-gnu -R fuzdev/tsv`).
+The checksum file and the attestation are this channel's whole integrity story;
+it has no signed release log of its own.
 
 See the [website docs](https://tsv.fuz.dev/docs)
 and package READMEs for the full API and CLI flags:

@@ -38,7 +38,7 @@
 # After a real publish, the `release` job creates the GitHub Release for the
 # tag: body = CHANGELOG.md's stamped `## <version>` section
 # (scripts/release_notes.ts); assets = each platform package's native `tsv`
-# CLI binary + SHA256SUMS, pulled back from the registry
+# CLI binary + SHA512SUMS, pulled back from the registry
 # (scripts/release_assets.ts) so an asset is byte-identical to what npm
 # serves, each with a Sigstore provenance attestation
 # (actions/attest-build-provenance; `gh attestation verify <file> -R fuzdev/tsv`).
@@ -412,7 +412,7 @@ jobs:
 
   # The GitHub Release for the tag: the CHANGELOG's stamped `## <version>`
   # section as the body (scripts/release_notes.ts) and, as assets, the native
-  # `tsv` CLI binary of every platform package plus a SHA256SUMS — pulled back
+  # `tsv` CLI binary of every platform package plus a SHA512SUMS — pulled back
   # FROM THE REGISTRY (scripts/release_assets.ts), so an asset is byte-identical
   # to what npm serves even on a recovery re-run, where the matrix rebuilds
   # while the publish step skips the versions already live. Runs only after a
@@ -463,10 +463,10 @@ jobs:
         run: |
           deno run --allow-read --allow-write --allow-run=npm,tar \
             scripts/release_assets.ts "$GITHUB_REF_NAME" --out "$RUNNER_TEMP/assets"
-          cat "$RUNNER_TEMP/assets/SHA256SUMS"
+          cat "$RUNNER_TEMP/assets/SHA512SUMS"
 
       # Provenance attestation over EVERY asset — the binaries and the
-      # SHA256SUMS beside them, so a verifier who fetches only the checksum file
+      # SHA512SUMS beside them, so a verifier who fetches only the checksum file
       # has something to verify it against (Sigstore, stored on the repo;
       # `gh attestation verify <file> -R fuzdev/tsv`). Ahead of the Release so a
       # failed attestation fails before anything is public; a re-run attests
