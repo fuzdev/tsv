@@ -868,6 +868,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // (tsc rejects an ambient implementation with TS1183; tsv defers it to
         // diagnostics rather than failing to parse/format).
         if is_static && matches!(self.current_kind(), TokenKind::BraceOpen) {
+            // A static block takes no modifier (ecma262 `ClassStaticBlock` is bare
+            // `static { … }`). tsc reports `public static {}` / `declare static {}`
+            // from its checker (TS1184), but the drop-in wire has no field for the
+            // modifier, so it cannot be reprinted (the representability floor) and tsv
+            // rejects it; acorn rejects it too. A decorator list is a different call:
+            // acorn keeps it on the block and tsc reports TS1206 from its checker, so
+            // tsv keeps it too, deferring the error.
+            if accessibility.is_some() || is_declare {
+                return Err(self.error_msg("Static class blocks cannot have any modifier"));
+            }
             // Parse the block body. A class static initialization block is a
             // `[+Await]` context (`await` is allowed inside it) but `[~Yield]`
             // (`yield` is not the enclosing generator's yield here).
@@ -875,6 +885,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let end = block.span.end;
 
             return Ok(ClassMember::StaticBlock(StaticBlock {
+                decorators: if decorators.is_empty() {
+                    None
+                } else {
+                    Some(decorators)
+                },
                 body: block.body,
                 span: Span::new(start as u32, end),
             }));
@@ -983,7 +998,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     self.error_msg("'override' modifier cannot appear on an index signature")
                 );
             }
-            return self.parse_class_index_signature(start, is_static, readonly);
+            return self.parse_class_index_signature(start, decorators, is_static, readonly);
         }
 
         // Parse member name (key)
@@ -1251,6 +1266,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let is_overload_or_abstract = is_abstract
             || self.check(&TokenKind::Semicolon)
             || (self.can_insert_semicolon() && !self.check(&TokenKind::BraceOpen));
+        // A decorator on a constructor IMPLEMENTATION: acorn rejects at parse
+        // ("Decorators can't be used with a constructor"), reporting at the first
+        // decorator, so tsv does too — the class itself is the decorated element. A
+        // bodiless constructor signature (an overload, an ambient or `abstract` one)
+        // keeps its decorators in acorn's tree, so it parses here as well, its TS1206
+        // deferred like any signature's.
+        if matches!(kind, MethodKind::Constructor)
+            && !is_overload_or_abstract
+            && !decorators.is_empty()
+        {
+            return Err(self.error_msg_at("Decorators can't be used with a constructor", start));
+        }
         let (body_block, end) = if is_overload_or_abstract {
             // Without a return type the signature ends at the params' `)` —
             // the next token's start would overshoot past trailing comments
@@ -1423,6 +1450,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(in crate::parser) fn parse_class_index_signature(
         &mut self,
         start: usize,
+        decorators: &'arena [Decorator<'arena>],
         is_static: bool,
         readonly: bool,
     ) -> Result<ClassMember<'arena>, ParseError> {
@@ -1488,6 +1516,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(ClassMember::IndexSignature(TSIndexSignature {
             parameters: parameters.into_bump_slice(),
             type_annotation: value_type,
+            // A decorated index signature is kept: acorn keeps the list on the
+            // `TSIndexSignature` and tsc reports TS1206 from its checker, which tsv defers.
+            decorators: if decorators.is_empty() {
+                None
+            } else {
+                Some(decorators)
+            },
             is_static,
             readonly,
             span: Span::new(start as u32, end),

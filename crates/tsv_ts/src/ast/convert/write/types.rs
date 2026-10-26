@@ -1,7 +1,7 @@
 // TypeScript type writers.
 
 use super::super::super::internal;
-use super::declarations::write_type_parameter;
+use super::declarations::{write_decorators_field, write_type_parameter};
 use super::expressions::{write_expression, write_expressions};
 use super::patterns::write_template_element;
 use super::{
@@ -493,7 +493,7 @@ fn write_signature_declaration(
 
 /// Emits a `TSIndexSignature` node (identical for a class member and a type
 /// element). Field order: `static` (only when true), `readonly` (only when
-/// true), `parameters`, `typeAnnotation`.
+/// true), `parameters`, `typeAnnotation`, `decorators` (a class member's, only when present).
 pub(super) fn write_index_signature(
     w: &mut JsonWriter,
     sig: &internal::TSIndexSignature<'_>,
@@ -527,6 +527,9 @@ pub(super) fn write_index_signature(
         w.raw(",\"typeAnnotation\":");
         write_type_annotation(w, type_annotation, ctx);
     }
+    // A class index signature's decorators come last, as acorn-typescript attaches
+    // them once it has built the member.
+    write_decorators_field(w, sig.decorators, ctx);
     close_node(w, "TSIndexSignature", sig.span, ctx);
 }
 

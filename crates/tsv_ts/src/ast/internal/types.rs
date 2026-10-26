@@ -7,7 +7,8 @@ use crate::lexer::KeywordKind;
 use tsv_lang::Span;
 
 use super::{
-    Expression, IdentName, Identifier, Literal, MethodKind, TemplateElement, UnaryExpression,
+    Decorator, Expression, IdentName, Identifier, Literal, MethodKind, TemplateElement,
+    UnaryExpression,
 };
 
 /// TypeScript type annotation node (e.g., `: number` in `const a: number = 5`)
@@ -595,6 +596,10 @@ pub struct TSConstructSignatureDeclaration<'arena> {
 pub struct TSIndexSignature<'arena> {
     pub parameters: &'arena [Identifier<'arena>],
     pub type_annotation: Option<TSTypeAnnotation<'arena>>,
+    /// Decorators in front of a class index signature (`@a [k: string]: T;`).
+    /// No decorator grammar reaches one (tsc's checker reports TS1206); acorn keeps
+    /// the list and tsv defers the error. Always `None` in a type literal or interface.
+    pub decorators: Option<&'arena [Decorator<'arena>]>,
     pub is_static: bool,
     pub readonly: bool,
     pub span: Span,

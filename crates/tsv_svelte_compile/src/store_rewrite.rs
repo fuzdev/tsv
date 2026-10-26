@@ -799,7 +799,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
             ClassMember::StaticBlock(block) => self.statements(block.body)?.map(|stmts| {
                 ClassMember::StaticBlock(StaticBlock {
                     body: stmts,
-                    span: block.span,
+                    ..block.clone()
                 })
             }),
             // Type-only — no value children.

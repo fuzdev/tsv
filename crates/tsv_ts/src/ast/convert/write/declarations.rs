@@ -271,6 +271,9 @@ fn write_class_body(w: &mut JsonWriter, body: &internal::ClassBody<'_>, ctx: &Ct
             node_header(w, "StaticBlock", block.span, ctx);
             w.raw(",\"body\":");
             write_array(w, block.body, |w, s| write_statement(w, s, ctx));
+            // acorn-typescript attaches a member's decorators once it has built it,
+            // so a static block's list follows its `body`.
+            write_decorators_field(w, block.decorators, ctx);
             close_node(w, "StaticBlock", block.span, ctx);
         }
         internal::ClassMember::IndexSignature(sig) => {

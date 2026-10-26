@@ -1,0 +1,218 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 219,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a decorator list on a class index signature is kept and printed, inline or own-line as",
+			"start": 20,
+			"end": 109
+		},
+		{
+			"type": "Line",
+			"value": " authored, like any member's",
+			"start": 111,
+			"end": 141
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 218,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 209,
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 143,
+					"end": 208,
+					"id": {
+						"type": "Identifier",
+						"start": 149,
+						"end": 150,
+						"name": "A"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 151,
+						"end": 208,
+						"body": [
+							{
+								"type": "TSIndexSignature",
+								"start": 155,
+								"end": 173,
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 159,
+										"end": 168,
+										"name": "k",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 160,
+											"end": 168,
+											"typeAnnotation": {
+												"type": "TSStringKeyword",
+												"start": 162,
+												"end": 168
+											}
+										}
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 169,
+									"end": 172,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 171,
+										"end": 172,
+										"typeName": {
+											"type": "Identifier",
+											"start": 171,
+											"end": 172,
+											"name": "T"
+										}
+									}
+								},
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 155,
+										"end": 157,
+										"expression": {
+											"type": "Identifier",
+											"start": 156,
+											"end": 157,
+											"name": "a"
+										}
+									}
+								]
+							},
+							{
+								"type": "TSIndexSignature",
+								"start": 177,
+								"end": 205,
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 191,
+										"end": 200,
+										"name": "k",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 192,
+											"end": 200,
+											"typeAnnotation": {
+												"type": "TSNumberKeyword",
+												"start": 194,
+												"end": 200
+											}
+										}
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 201,
+									"end": 204,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 203,
+										"end": 204,
+										"typeName": {
+											"type": "Identifier",
+											"start": 203,
+											"end": 204,
+											"name": "T"
+										}
+									}
+								},
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 177,
+										"end": 179,
+										"expression": {
+											"type": "Identifier",
+											"start": 178,
+											"end": 179,
+											"name": "b"
+										}
+									},
+									{
+										"type": "Decorator",
+										"start": 182,
+										"end": 187,
+										"expression": {
+											"type": "CallExpression",
+											"start": 183,
+											"end": 187,
+											"callee": {
+												"type": "Identifier",
+												"start": 183,
+												"end": 184,
+												"name": "c"
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 185,
+													"end": 186,
+													"name": "d"
+												}
+											]
+										}
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a decorator list on a class index signature is kept and printed, inline or own-line as",
+							"start": 20,
+							"end": 109
+						},
+						{
+							"type": "Line",
+							"value": " authored, like any member's",
+							"start": 111,
+							"end": 141
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

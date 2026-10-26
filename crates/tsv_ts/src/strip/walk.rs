@@ -1104,6 +1104,9 @@ impl<'s, 'b> Walk<'s, 'b> {
             }
             ClassMember::MethodDefinition(method) => self.method_definition(method, open_field),
             ClassMember::StaticBlock(block) => {
+                // a decorated block's decorators stay, as any member's do (their type
+                // arguments blank)
+                self.decorators(block.decorators);
                 self.statement_list(block.body, false);
                 true
             }

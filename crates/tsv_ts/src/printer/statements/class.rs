@@ -363,15 +363,25 @@ impl<'a> Printer<'a> {
     // (or an explicit node-kind tag) if that happens.
     fn build_static_block_doc(&self, block: &internal::StaticBlock<'_>) -> DocId {
         let d = self.d();
+        // Decorators (inline or own-line as authored, like any member's). The block's
+        // own span opens at its first decorator, so the `BlockStatement` wrapper starts
+        // at the `static` after them, exactly where an undecorated block's span starts;
+        // a comment inside a decorator is the decorator's, never the block's.
+        let static_start = self.member_decorator_boundary(block.decorators, block.span.start);
+        let decorators_doc = self.build_class_member_decorators_doc(block.decorators, static_start);
         // Create a BlockStatement wrapper to reuse existing doc building logic
         let block_stmt = internal::BlockStatement {
             body: block.body,
-            span: block.span,
+            span: Span::new(static_start, block.span.end),
         };
-        d.concat(&[
+        let static_doc = d.concat(&[
             d.text("static "),
             self.build_static_block_body_doc(&block_stmt),
-        ])
+        ]);
+        match decorators_doc {
+            Some(dec_doc) => d.concat(&[dec_doc, static_doc]),
+            None => static_doc,
+        }
     }
 
     /// Build a Doc for a non-computed class **field** key.

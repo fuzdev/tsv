@@ -448,10 +448,11 @@ const CHECK_DECORATOR_PAYLOADS: &[(&str, &str)] =
     &[("", ""), ("...", ""), ("", " as T"), ("", "!"), ("", ".b")];
 
 /// The decorators: a class nested in a decorator's argument, `n` deep, in each position a
-/// decorator takes — on a class expression, on a class member, and on a method's
-/// parameter — behind every callee and inside every payload ([`DECORATOR_CALLEES`],
-/// [`DECORATOR_PAYLOADS`]; `full`, else `check`'s sample). Each repetition puts the class,
-/// its member or parameter, the decorator and its call on the path.
+/// decorator takes — on a class expression, on a class member (a field, a static block, an
+/// index signature), and on a method's parameter — behind every callee and inside every
+/// payload ([`DECORATOR_CALLEES`], [`DECORATOR_PAYLOADS`]; `full`, else `check`'s sample).
+/// Each repetition puts the class, its member or parameter, the decorator and its call on
+/// the path.
 fn decorator_sweep(shapes: &mut Vec<Shape>, full: bool) {
     let (callees, payloads) = if full {
         (DECORATOR_CALLEES, DECORATOR_PAYLOADS)
@@ -476,6 +477,16 @@ fn decorator_sweep(shapes: &mut Vec<Shape>, full: bool) {
                     "parameter",
                     format!("class {{ m({decorator}"),
                     format!("{after}) p) {{}} }}"),
+                ),
+                (
+                    "static block",
+                    format!("class {{ {decorator}"),
+                    format!("{after}) static {{}} }}"),
+                ),
+                (
+                    "index signature",
+                    format!("class {{ {decorator}"),
+                    format!("{after}) [k: string]: T }}"),
                 ),
             ] {
                 shapes.push(Shape {
@@ -1759,6 +1770,24 @@ const POSITIONS: &[(Lang, &str, &str, &str, &str, &str, &str)] = &[
         "class extends B { constructor(override p = ",
         "0",
         ") {} }",
+        ";\n",
+    ),
+    (
+        Lang::Ts,
+        "pos_static_block_decorator",
+        "x = ",
+        "class { @a(",
+        "class {}",
+        ") static {} }",
+        ";\n",
+    ),
+    (
+        Lang::Ts,
+        "pos_index_signature_decorator",
+        "x = ",
+        "class { @a(",
+        "class {}",
+        ") [k: string]: T }",
         ";\n",
     ),
     (

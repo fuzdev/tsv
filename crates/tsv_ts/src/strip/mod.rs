@@ -341,6 +341,16 @@ mod tests {
         }
     }
 
+    /// A decorated static block keeps its decorators, as any member's, and their type
+    /// arguments blank; the output is ts-blank-space's, byte for byte.
+    #[test]
+    fn a_static_block_decorator_blanks_its_type_arguments() {
+        assert_eq!(
+            stripped("class A { @a<T>() static {} }\n"),
+            "class A { @a   () static {} }\n"
+        );
+    }
+
     /// A `with` body is a lone statement body like an `if`'s: a statement blanked whole
     /// there becomes `;`, so the statement after it cannot become the body. ts-blank-space
     /// blanks the overload plain, which hands `f()` to the `with`.

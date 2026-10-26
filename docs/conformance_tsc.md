@@ -283,10 +283,15 @@ literals, the legacy string escapes — reject, though the spec words each as a 
 Semantics early error, because tsc reports all of them wherever it reads the file — its
 parser rejects the two literal rules (TS1121 / TS1489, TS1487 / TS1488), and its binder
 reports a strict `with` (TS1101) among the grammar errors it raises even in an unchecked
-JavaScript file; and a decorated arrow parameter rejects in every form, the generic
+JavaScript file; a decorated arrow parameter rejects in every form, the generic
 spellings tsc's parser accepts included (TS1206 is its checker's) — a sanctioned
 over-rejection
-([conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md#typescript-corrections)).
+([conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md#typescript-corrections));
+and a decorated constructor implementation (`@dec constructor() {}`) rejects though
+TS1206 is tsc's checker's, as acorn and prettier's parser reject it, while the members
+acorn keeps decorated (a static block, a class index signature, a bodiless constructor
+signature) defer it
+([checklist_typescript.md §TypeScript Class Features](./checklist_typescript.md#typescript-class-features)).
 
 ## Triage
 

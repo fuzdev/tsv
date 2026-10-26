@@ -1368,15 +1368,23 @@ impl<'arena> Eraser<'arena, '_> {
         Ok(match member {
             // `[key: string]: T` — a pure type construct, but the oracle's strip
             // pass has no case for it and its transform then *crashes*. Refuse
-            // rather than guess at output the oracle cannot produce.
-            ClassMember::IndexSignature(_) => return unsupported(Refusal::TsIndexSignature),
-            ClassMember::StaticBlock(block) => match self.statements(block.body)? {
-                None => MemberOut::Keep,
-                Some(body) => MemberOut::Replace(ClassMember::StaticBlock(StaticBlock {
-                    body,
-                    span: block.span,
-                })),
-            },
+            // rather than guess at output the oracle cannot produce. A decorated one
+            // hits the oracle's decorator error first, so it refuses as a decorator.
+            ClassMember::IndexSignature(sig) => {
+                self.refuse_decorators(sig.decorators)?;
+                return unsupported(Refusal::TsIndexSignature);
+            }
+            ClassMember::StaticBlock(block) => {
+                self.refuse_decorators(block.decorators)?;
+                match self.statements(block.body)? {
+                    None => MemberOut::Keep,
+                    Some(body) => MemberOut::Replace(ClassMember::StaticBlock(StaticBlock {
+                        decorators: block.decorators,
+                        body,
+                        span: block.span,
+                    })),
+                }
+            }
             ClassMember::MethodDefinition(method) => self.method_definition(method)?,
             ClassMember::PropertyDefinition(prop) => self.property_definition(prop)?,
         })

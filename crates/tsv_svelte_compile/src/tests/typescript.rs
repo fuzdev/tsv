@@ -352,6 +352,17 @@ fn compile_refuses_runtime_typescript_features() {
         "<script lang=\"ts\">\n\tfunction dec(v: any, c: any) {\n\t\treturn v;\n\t}\n\tclass C {\n\t\t@dec\n\t\tm() {}\n\t}\n</script>\n<p>text</p>",
         "decorator",
     );
+    // So is one on a member no decorator grammar reaches, which the oracle's walk
+    // still visits: a static block, and a class index signature (whose own refusal
+    // would otherwise answer first).
+    for member in ["@dec\n\t\tstatic {}", "@dec\n\t\t[key: string]: unknown;"] {
+        assert_unsupported(
+            &format!(
+                "<script lang=\"ts\">\n\tclass C {{\n\t\t{member}\n\t}}\n</script>\n<p>text</p>"
+            ),
+            "decorator",
+        );
+    }
     // A bodiless, non-abstract class method (an overload signature).
     assert_unsupported(
         "<script lang=\"ts\">\n\tclass C {\n\t\tm(x: number): void;\n\t\tm(x: any) {}\n\t}\n</script>\n<p>text</p>",

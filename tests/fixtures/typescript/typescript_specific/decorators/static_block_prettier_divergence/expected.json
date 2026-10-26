@@ -1,0 +1,184 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 212,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a decorator list on a static block is kept and printed, inline or own-line as",
+			"start": 20,
+			"end": 100
+		},
+		{
+			"type": "Line",
+			"value": " authored, like any member's",
+			"start": 102,
+			"end": 132
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 211,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 202,
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 134,
+					"end": 201,
+					"id": {
+						"type": "Identifier",
+						"start": 140,
+						"end": 141,
+						"name": "A"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 142,
+						"end": 201,
+						"body": [
+							{
+								"type": "StaticBlock",
+								"start": 146,
+								"end": 161,
+								"body": [],
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 146,
+										"end": 151,
+										"expression": {
+											"type": "CallExpression",
+											"start": 147,
+											"end": 151,
+											"callee": {
+												"type": "Identifier",
+												"start": 147,
+												"end": 148,
+												"name": "a"
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 149,
+													"end": 150,
+													"name": "b"
+												}
+											]
+										}
+									}
+								]
+							},
+							{
+								"type": "StaticBlock",
+								"start": 165,
+								"end": 198,
+								"body": [
+									{
+										"type": "ExpressionStatement",
+										"start": 190,
+										"end": 194,
+										"expression": {
+											"type": "CallExpression",
+											"start": 190,
+											"end": 193,
+											"callee": {
+												"type": "Identifier",
+												"start": 190,
+												"end": 191,
+												"name": "x"
+											},
+											"arguments": [],
+											"optional": false
+										}
+									}
+								],
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 165,
+										"end": 167,
+										"expression": {
+											"type": "Identifier",
+											"start": 166,
+											"end": 167,
+											"name": "c"
+										}
+									},
+									{
+										"type": "Decorator",
+										"start": 170,
+										"end": 175,
+										"expression": {
+											"type": "CallExpression",
+											"start": 171,
+											"end": 175,
+											"callee": {
+												"type": "Identifier",
+												"start": 171,
+												"end": 172,
+												"name": "d"
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 173,
+													"end": 174,
+													"name": "e"
+												}
+											]
+										}
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a decorator list on a static block is kept and printed, inline or own-line as",
+							"start": 20,
+							"end": 100
+						},
+						{
+							"type": "Line",
+							"value": " authored, like any member's",
+							"start": 102,
+							"end": 132
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

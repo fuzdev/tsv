@@ -94,6 +94,10 @@ impl<'arena> ClassMember<'arena> {
 /// Static initialization block in a class: `static { ... }` (ES2022)
 #[derive(Debug, Clone)]
 pub struct StaticBlock<'arena> {
+    /// Decorators in front of the block (`@a static {}`). No decorator grammar
+    /// reaches a static block (tsc's checker reports TS1206); acorn keeps the list
+    /// and tsv defers the error, so the list is kept and printed.
+    pub decorators: Option<&'arena [Decorator<'arena>]>,
     pub body: &'arena [Statement<'arena>],
     pub span: Span,
 }

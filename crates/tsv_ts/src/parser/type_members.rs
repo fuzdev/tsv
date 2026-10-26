@@ -62,6 +62,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(TSTypeElement::IndexSignature(TSIndexSignature {
             parameters: parameters.into_bump_slice(),
             type_annotation,
+            decorators: None,
             is_static: false,
             readonly,
             span: Span::new(sig_start as u32, member_end),

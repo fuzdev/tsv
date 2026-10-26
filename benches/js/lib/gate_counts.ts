@@ -281,12 +281,17 @@ export const TS_FIXTURES_PINS: GatePins = { scanned: 226, both_accept: 202, over
  * accepted as an assignment's left (no `LeftHandSideExpression` derives it; conformance_svelte.md
  * §TypeScript Corrections, the non-simple assignment target entry). A head-vs-new parse A/B
  * over all of tests/cases moved no other file, and every other bucket is unmoved.
+ *
+ * 468 → 467 `over_acceptance_checker`: `decoratorOnClassConstructor1.ts`
+ * (`@dec constructor() {}`, TS1206) left it for reject parity when a decorated
+ * constructor implementation became a parse error, as acorn's; every other bucket
+ * unmoved.
  */
 export const TS_REPO_PINS = {
 	scanned: 13708,
 	accept_parity: 12284,
 	over_acceptance_parser: 16,
-	over_acceptance_checker: 468,
+	over_acceptance_checker: 467,
 	units_scanned: 7874,
 	units_accept_parity: 7858
 };

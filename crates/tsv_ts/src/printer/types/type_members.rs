@@ -550,6 +550,14 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = smallvec![];
 
+        // A class index signature's decorators (inline or own-line as authored, like
+        // any member's). The signature proper starts at the first token after them, so
+        // a `[` inside a decorator's arguments is never taken for the opening bracket.
+        let sig_start = self.member_decorator_boundary(idx.decorators, idx.span.start);
+        if let Some(dec_doc) = self.build_class_member_decorators_doc(idx.decorators, sig_start) {
+            parts.push(dec_doc);
+        }
+
         // Locate the opening `[`, skipping comments so a `[` inside one (e.g.
         // `readonly /* [ */ [k]`) isn't matched. Bounded at the first parameter so
         // a `[` in the key type can't be mistaken for it.
@@ -557,7 +565,7 @@ impl<'a> Printer<'a> {
         let bracket_bound = first_param_start.unwrap_or(idx.span.end);
         let bracket_open_pos = find_char_skipping_comments(
             self.source.as_bytes(),
-            idx.span.start as usize,
+            sig_start as usize,
             bracket_bound as usize,
             b'[',
         )
@@ -567,7 +575,7 @@ impl<'a> Printer<'a> {
             // Modifier keywords (`static`/`readonly`, the former class-only),
             // preserving comments before each and before the `[`
             // (e.g., `static /* c */ readonly /* d */ [k: string]: T`).
-            let mut cursor = idx.span.start;
+            let mut cursor = sig_start;
             if idx.is_static {
                 self.push_member_keyword_doc(&mut parts, "static ", &mut cursor, bracket_bound);
             }
@@ -616,7 +624,7 @@ impl<'a> Printer<'a> {
 
         // The closing `]`, located outside comments so a `]` glyph inside a
         // comment before it (`[key: string /* ] */]`) isn't mistaken for it.
-        let search_start = idx.parameters.last().map_or(idx.span.start, |p| p.span.end);
+        let search_start = idx.parameters.last().map_or(sig_start, |p| p.span.end);
         let bracket_close_pos = self.find_char_outside_comments(search_start, idx.span.end, b']');
 
         // Build `[key: type]` as a group that can break when key type is long

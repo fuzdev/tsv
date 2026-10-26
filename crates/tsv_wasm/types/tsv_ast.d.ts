@@ -867,6 +867,8 @@ export interface StaticBlock {
 	end: number;
 	loc?: SourceLocation;
 	body: Statement[];
+	/** A decorated block's decorators (`@a static {}`), after `body`; omitted when none. */
+	decorators?: Decorator[];
 }
 
 export interface MethodDefinition extends AcornCommentAttachment {
@@ -1623,6 +1625,8 @@ export interface TSIndexSignature extends AcornCommentAttachment {
 	parameters: Identifier[];
 	/** Omitted from JSON for a typeless index signature (`[key: string]`). */
 	typeAnnotation?: TSTypeAnnotation;
+	/** A decorated class index signature's decorators (`@a [k: string]: T;`); omitted when none. */
+	decorators?: Decorator[];
 }
 
 export interface TSUnionType {

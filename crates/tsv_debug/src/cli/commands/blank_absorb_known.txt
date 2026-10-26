@@ -35,7 +35,7 @@
 # fix — or a vanished site; re-pin either way).
 #
 # Format: (NODE_TYPE, LEFT→RIGHT)
-# shapes: 532
+# shapes: 537
 (AnimateDirective, ^→expression)
 (AnimateDirective, expression→$)
 (ArrayExpression, ^→$)
@@ -356,6 +356,9 @@
 (StaticBlock, ^→$)
 (StaticBlock, ^→body)
 (StaticBlock, body→$)
+(StaticBlock, decorators→$)
+(StaticBlock, decorators→body)
+(StaticBlock, decorators→decorators)
 (StyleDirective, ^→value)
 (SvelteComponent, ^→expression)
 (SvelteComponent, attributes→expression)
@@ -448,6 +451,8 @@
 (TSImportType, options→$)
 (TSImportType, options→qualifier)
 (TSIndexSignature, ^→parameters)
+(TSIndexSignature, decorators→decorators)
+(TSIndexSignature, decorators→parameters)
 (TSIndexSignature, parameters→$)
 (TSIndexSignature, parameters→typeAnnotation)
 (TSIndexSignature, typeAnnotation→$)
