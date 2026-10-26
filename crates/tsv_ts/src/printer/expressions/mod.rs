@@ -1090,15 +1090,20 @@ impl<'a> Printer<'a> {
         );
 
         if should_break_after_cast {
+            // The `>`→operand block leads the OPERAND, so when the operand breaks into its
+            // own parens the comment goes inside them, ahead of the operand on its line
+            // (`<T>(⏎\t/* c */ a⏎)`), as prettier prints it. Welded onto the cast instead,
+            // it would sit outside the parens it leads into and the conditional group would
+            // measure `<T>/* c */ (` as the broken form's first line.
             let expr_contents = d.group_break(d.concat(&[
                 d.if_break(d.text("("), d.empty()),
-                d.indent(d.concat(&[d.softline(), expr_doc])),
+                d.indent(d.concat(&[d.softline(), after_close_doc, expr_doc])),
                 d.softline(),
                 d.if_break(d.text(")"), d.empty()),
             ]));
             d.conditional_group(&[
                 d.concat(&[cast_group, expr_doc]),
-                d.concat(&[cast_group, expr_contents]),
+                d.concat(&[cast_doc, expr_contents]),
                 d.concat(&[cast_group, expr_doc]),
             ])
         } else {

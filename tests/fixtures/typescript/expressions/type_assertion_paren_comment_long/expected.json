@@ -1,0 +1,313 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 757,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " exactly 100 wide: the cast and its commented operand stay inline",
+			"start": 20,
+			"end": 87
+		},
+		{
+			"type": "Block",
+			"value": "c",
+			"start": 179,
+			"end": 184
+		},
+		{
+			"type": "Line",
+			"value": " 101 wide: the operand breaks into parens, the comment leading it inside them",
+			"start": 190,
+			"end": 269
+		},
+		{
+			"type": "Block",
+			"value": "c",
+			"start": 366,
+			"end": 371
+		},
+		{
+			"type": "Line",
+			"value": " the `<type>(` line exactly 100 wide still holds the type",
+			"start": 380,
+			"end": 439
+		},
+		{
+			"type": "Block",
+			"value": "c",
+			"start": 542,
+			"end": 547
+		},
+		{
+			"type": "Line",
+			"value": " the `<type>(` line 101 wide: the cast breaks after `<`, the operand inline",
+			"start": 556,
+			"end": 633
+		},
+		{
+			"type": "Block",
+			"value": "c",
+			"start": 738,
+			"end": 743
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 756,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 747,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 89,
+					"end": 187,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 89,
+						"end": 186,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 89,
+							"end": 90,
+							"name": "x"
+						},
+						"right": {
+							"type": "TSTypeAssertion",
+							"start": 93,
+							"end": 186,
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 94,
+								"end": 178,
+								"typeName": {
+									"type": "Identifier",
+									"start": 94,
+									"end": 178,
+									"name": "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT"
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 185,
+								"end": 186,
+								"name": "a",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "c",
+										"start": 179,
+										"end": 184
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " exactly 100 wide: the cast and its commented operand stay inline",
+							"start": 20,
+							"end": 87
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 271,
+					"end": 377,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 271,
+						"end": 376,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 271,
+							"end": 272,
+							"name": "x"
+						},
+						"right": {
+							"type": "TSTypeAssertion",
+							"start": 275,
+							"end": 376,
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 276,
+								"end": 361,
+								"typeName": {
+									"type": "Identifier",
+									"start": 276,
+									"end": 361,
+									"name": "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT"
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 372,
+								"end": 373,
+								"name": "a",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "c",
+										"start": 366,
+										"end": 371
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 wide: the operand breaks into parens, the comment leading it inside them",
+							"start": 190,
+							"end": 269
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 441,
+					"end": 553,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 441,
+						"end": 552,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 441,
+							"end": 442,
+							"name": "x"
+						},
+						"right": {
+							"type": "TSTypeAssertion",
+							"start": 445,
+							"end": 552,
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 446,
+								"end": 537,
+								"typeName": {
+									"type": "Identifier",
+									"start": 446,
+									"end": 537,
+									"name": "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT"
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 548,
+								"end": 549,
+								"name": "a",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "c",
+										"start": 542,
+										"end": 547
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the `<type>(` line exactly 100 wide still holds the type",
+							"start": 380,
+							"end": 439
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 635,
+					"end": 746,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 635,
+						"end": 745,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 635,
+							"end": 636,
+							"name": "x"
+						},
+						"right": {
+							"type": "TSTypeAssertion",
+							"start": 639,
+							"end": 745,
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 643,
+								"end": 735,
+								"typeName": {
+									"type": "Identifier",
+									"start": 643,
+									"end": 735,
+									"name": "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT"
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 744,
+								"end": 745,
+								"name": "a",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "c",
+										"start": 738,
+										"end": 743
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the `<type>(` line 101 wide: the cast breaks after `<`, the operand inline",
+							"start": 556,
+							"end": 633
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -350,9 +350,6 @@ fn prefix_pair_sweep(shapes: &mut Vec<Shape>) {
     for &op in PREFIXES {
         for &(before, after) in PREFIX_PAIR_FORMS {
             for &inner in PREFIX_PAIR_INNER {
-                if k290(op, before, inner) {
-                    continue;
-                }
                 shapes.push(Shape {
                     name: format!("ts_gen_prefix_pair `{op}{before}{inner}…{after}`"),
                     close: after.to_owned(),
@@ -361,14 +358,6 @@ fn prefix_pair_sweep(shapes: &mut Vec<Shape>) {
             }
         }
     }
-}
-
-/// TODO: K290 — an angle-bracket assertion with a comment between it and its operand's
-/// authored pair, the pair holding a unary operator (`<T>/*c*/(- …)`), formats to a
-/// different output on a second pass once the line wraps — a printer bug that predates the
-/// depth limit, so the form stays out of the sweep until it is fixed.
-fn k290(op: &str, before: &str, inner: &str) -> bool {
-    op == "<T>" && before == "/*c*/(" && matches!(inner, "- " | "!")
 }
 
 /// The prefix alphabet ([`PREFIXES`]): every ordered pair of operators nested `n` times,
